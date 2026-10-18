@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Weaver migrated routing policy",
+  "description": "Upstream-compatible policy shape. Weaver validates structure and cross-object rules; policy eligibility is not verified provider execution support.",
+  "type": "object",
+  "required": [
+    "version",
+    "engines",
+    "owners",
+    "workers",
+    "herdr"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "chatgpt_review": {
+      "description": "Review policy preference; missing means enabled. No automatic external review integration is implemented.",
+      "type": "boolean"
+    },
+    "engines": {
+      "description": "Agent CLI engines keyed by engine id.",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/id"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/engine"
+      }
+    },
+    "owners": {
+      "description": "Owner agents keyed by owner id. Each enabled engine has at most one enabled owner.",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/id"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/owner"
+      }
+    },
+    "workers": {
+      "description": "Workers keyed by worker id; every id ends with _worker.",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]{0,32}_worker$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/worker"
+      }
+    },
+    "herdr": {
+      "description": "Legacy compatibility metadata only. Does not enable or configure a Weaver transport.",
+      "type": "object",
+      "required": [
+        "max_wait_minutes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_wait_minutes": {
+          "description": "Retained upstream wait preference, unused by current Weaver runtime.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,39}$"
+    },
+    "workerId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,32}_worker$"
+    },
+    "effort": {
+      "description": "Engine-native effort. Allowed set depends on the engine kind: claude low|medium|high|xhigh|max; codex low|medium|high|xhigh|max; grok none|minimal|low|medium|high|xhigh|max; other kinds (e.g. opencode, whose --variant is provider/model specific) any non-empty string. Checked by the script.",
+      "type": "string",
+      "minLength": 1
+    },
+    "engine": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "kind": {
+          "description": "Upstream provider vocabulary for policy matching, not an installed capability.",
+          "enum": [
+            "pi",
+            "claude",
+            "codex",
+            "gemini",
+            "cursor",
+            "devin",
+            "agy",
+            "cline",
+            "omp",
+            "mastracode",
+            "opencode",
+            "copilot",
+            "kimi",
+            "kiro",
+            "droid",
+            "amp",
+            "grok",
+            "hermes",
+            "kilo",
+            "qodercli",
+            "qwen",
+            "letta",
+            "maki",
+            "muse"
+          ]
+        },
+        "native_subagents": {
+          "description": "Upstream compatibility classification for owner eligibility; not a runtime capability probe.",
+          "type": "boolean"
+        }
+      },
+      "if": {
+        "required": [
+          "native_subagents"
+        ],
+        "properties": {
+          "native_subagents": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "claude",
+              "codex"
+            ]
+          }
+        }
+      }
+    },
+    "owner": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "engine",
+        "model",
+        "effort",
+        "workers",
+        "max_parallel"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "engine": {
+          "$ref": "#/$defs/id"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effort": {
+          "$ref": "#/$defs/effort"
+        },
+        "workers": {
+          "description": "Worker ids in priority order; resolve --class judgment takes the first available non-free one (with --tag: the first available heterogeneous one carrying the domain tag, else the owner's native worker); free class workers are taken by resolve --class mechanical|routine.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/workerId"
+          }
+        },
+        "max_parallel": {
+          "description": "Cap on workers (native and herdr) running concurrently for this owner; the owner enforces it by counting running ledger entries.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "worker": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "engine",
+        "model",
+        "effort"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "engine": {
+          "$ref": "#/$defs/id"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effort": {
+          "$ref": "#/$defs/effort"
+        },
+        "description": {
+          "type": "string"
+        },
+        "tags": {
+          "description": "mechanical and routine are reserved class tags: a worker carrying one is a free worker that resolve --class mechanical|routine picks first (at most one of the two; any engine, native when it matches the owner's). Every other tag is a domain tag describing the model's strengths; resolve --class judgment --tag <t> uses it only to pick a heterogeneous worker (a different engine than the owner), falling back to the owner's native worker.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          }
+        }
+      }
+    }
+  }
+}

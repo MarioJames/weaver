@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import type { Task } from '../src/shared/types';
+import { filterTasks, isActive, reviewLabel, reviewStatus } from '../src/renderer/task-view';
+import { TaskBoard } from '../src/renderer/components/TaskBoard';
+import { TaskDetail } from '../src/renderer/components/TaskDetail';
+import { ArtifactsPanel } from '../src/renderer/components/ArtifactsPanel';
+const task:Task={id:'t',title:'中文任务',instruction:'Do work',owner:{name:'Owner',transport:'herdr-visible',session:'main',pane:'1'},status:'completed',progress:100,createdAt:'2026-10-18T00:00:00Z',updatedAt:'2026-10-18T00:00:00Z',events:[],artifacts:[]};
+test('execution completion is distinct from acceptance',()=>{assert.equal(reviewStatus(task),'pending');assert.equal(reviewLabel(task),'待验收');assert.equal(reviewLabel({...task,reviewState:'accepted'}),'已通过');assert.equal(reviewLabel({...task,status:'running'}),'尚未进入验收');});
+test('filters preserve pending review and support Chinese and owner search',()=>{const items=[task,{...task,id:'accepted',reviewState:'accepted' as const},{...task,id:'running',status:'running' as const}];assert.equal(filterTasks(items,'review','中文').length,1);assert.equal(filterTasks(items,'all','OWNER').length,3);assert.equal(filterTasks(items,'active','').length,1);assert.equal(filterTasks(items,'closed','').length,2);assert.equal(isActive({...task,status:'cancelling'}),true);});
+test('board has distinct loading and empty states',()=>{const props={tasks:[],onSelect:()=>{}};assert.match(renderToStaticMarkup(React.createElement(TaskBoard,{...props,loading:true})),/正在加载/);assert.match(renderToStaticMarkup(React.createElement(TaskBoard,{...props,loading:false})),/还没有任务/);});
+test('task view separates execution and review, escapes instruction',()=>{const html=renderToStaticMarkup(React.createElement(TaskDetail,{task:{...task,instruction:'<script>bad()</script>'},busy:false,onStart:()=>{},onCancel:()=>{},action:async()=>true}));assert.match(html,/执行完成/);assert.match(html,/待验收/);assert.match(html,/待验收/);assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.doesNotMatch(html,/开始 mock 执行/);});
+test('artifact preview renders hostile markup as text only',()=>{const html=renderToStaticMarkup(React.createElement(ArtifactsPanel,{artifacts:[{id:'a',name:'test.html',mediaType:'text/plain',createdAt:task.createdAt,content:'<img src=x onerror=alert(1)>'}]}));assert.match(html,/&lt;img/);assert.doesNotMatch(html,/<img/);});
+test('cancelling task disables repeat cancellation',()=>{const html=renderToStaticMarkup(React.createElement(TaskDetail,{task:{...task,status:'cancelling'},busy:false,onStart:()=>{},onCancel:()=>{},action:async()=>true}));assert.match(html,/<button disabled="">正在停止/);});

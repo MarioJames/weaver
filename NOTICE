@@ -1,0 +1,9 @@
+Weaver desktop scaffold
+
+The agents-cooperation skill and src/main/policy validation, routing, schemas
+and defaults are adapted from MarioJames/skill-foundry,
+https://github.com/MarioJames/skill-foundry, revision 61989b1,
+licensed under Apache License 2.0. Its workflow text and architecture have
+been rewritten for desktop orchestration. Pure helpers are adapted into
+app modules; CLI/session execution is excluded. See skills/agents-cooperation/
+references/provenance.md. The original upstream repository is not modified.

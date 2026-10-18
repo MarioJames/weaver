@@ -1,0 +1,16 @@
+import React, { useEffect, useState } from 'react';
+import type { PolicySnapshot } from '../../shared/policy';
+export interface CreateTaskDraft { title: string; goal: string; workspace: string; ownerProfileId: string; acceptanceCriteria: string[] }
+export function TaskComposer({ disabled, onCreate, onImport }: { disabled: boolean; onCreate: (input: CreateTaskDraft)=>Promise<boolean>; onImport: ()=>void }) {
+ const [title,setTitle]=useState('');const [goal,setGoal]=useState('');const [workspace,setWorkspace]=useState('.');const [profile,setProfile]=useState('');const [acceptance,setAcceptance]=useState('');const [policy,setPolicy]=useState<PolicySnapshot>();const [error,setError]=useState('');const [attempt,setAttempt]=useState(0);
+ useEffect(()=>{let current=true;if(!window.weaver){setError('请连接桌面以读取 Owner profiles');return;}setError('');void window.weaver.getPolicy().then(snapshot=>{if(current){setPolicy(snapshot);setProfile(previous=>previous||Object.keys(snapshot.config.owners).find(id=>snapshot.owners[id]?.status==='available')||'');}}).catch(error=>{if(current)setError(String(error));});return()=>{current=false;};},[attempt]);
+ const criteria=acceptance.split('\n').map(line=>line.trim()).filter(Boolean);const valid=title.trim()&&goal.trim()&&workspace.trim()&&profile&&criteria.length>0&&criteria.length<=30&&criteria.every(line=>line.length<=1000);
+ return <section><div className="section-title"><h2>新建任务</h2><button type="button" className="subtle" disabled={disabled} onClick={onImport}>导入 JSON</button></div>{error&&<div role="alert" className="composer-loading"><p>{error}</p><button onClick={()=>setAttempt(value=>value+1)}>重新读取 Profiles</button></div>}<form onSubmit={async event=>{event.preventDefault();if(disabled||!valid)return;if(await onCreate({title:title.trim(),goal:goal.trim(),workspace:workspace.trim(),ownerProfileId:profile,acceptanceCriteria:criteria})){setTitle('');setGoal('');setAcceptance('');}}}>
+ <fieldset disabled={disabled}><label>任务标题<input required maxLength={160} value={title} placeholder="这次要完成什么？" onChange={event=>setTitle(event.target.value)}/></label>
+ <label>目标与约束<textarea required maxLength={16000} rows={3} value={goal} placeholder="目标、范围与不能做的事…" onChange={event=>setGoal(event.target.value)}/></label>
+ <label>工作目录<input required maxLength={4000} value={workspace} placeholder="项目工作目录" onChange={event=>setWorkspace(event.target.value)}/></label>
+ <label>Owner profile<select required className="composer-select" value={profile} onChange={event=>setProfile(event.target.value)}><option value="">{policy?'选择可用 Profile':'正在读取…'}</option>{policy&&Object.keys(policy.config.owners).map(id=><option key={id} value={id} disabled={policy.owners[id]?.status!=='available'}>{id}{policy.owners[id]?.status!=='available'?' · 不可用':''}</option>)}</select></label>
+ <label>验收标准（一行一项）<textarea required maxLength={30000} rows={3} value={acceptance} placeholder="例如：输出变更摘要\n列出验证结果" onChange={event=>setAcceptance(event.target.value)}/><small>1–30 项，每项最多 1,000 字符</small></label>
+ <p className="muted">创建时自动分配本地 mock Owner 并记录承载句柄，无需填写 pane。默认空闲 60 分钟后在下一次活动时换新上下文，可在详情中调整；这是本地策略，不代表厂商缓存有效期。</p>
+ <button className="primary full" disabled={disabled||!valid}>创建任务与 mock Owner</button></fieldset></form></section>;
+}
