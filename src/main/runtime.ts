@@ -24,6 +24,7 @@ import { QuotaProber } from './quota';
 import { QuotaScheduler } from './quota/scheduler';
 import { RpcError, parseRpcBody } from './rpc';
 import { TaskStore } from './store';
+import { VERSION } from '../shared/version';
 
 export interface RuntimeOptions {
   dataDir: string;
@@ -60,6 +61,11 @@ function publicError(error: unknown): { code: string; message: string } {
   return { code: 'INTERNAL_ERROR', message: 'Request failed' };
 }
 
+/** Which service manager, if any, started this process. Set only by `weaver server install`. */
+export function managedBy(env: Record<string, string | undefined> = process.env): 'systemd' | 'launchd' | null {
+  return env.WEAVER_SERVICE === 'systemd' || env.WEAVER_SERVICE === 'launchd' ? env.WEAVER_SERVICE : null;
+}
+
 function openBrowser(url: string): void {
   const command = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
   const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
@@ -71,6 +77,7 @@ function openBrowser(url: string): void {
 export async function startRuntime(options: RuntimeOptions): Promise<WeaverRuntime> {
   const paths = modulePaths();
   const dataDir = resolve(options.dataDir);
+  const startedAt = new Date().toISOString();
   const repo = options.repoRoot ?? paths.repo;
   const rendererRoot = options.rendererRoot ?? paths.rendererRoot;
   const embedded = embeddedApp();
@@ -201,6 +208,16 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
         maxParallel: configuredParallel(active.policy),
         storePath: active.store.path,
         quota: QUOTA_CAPABILITIES,
+      };
+      case 'serverInfo': return {
+        pid: process.pid,
+        url: runtime.url,
+        port: runtime.port,
+        dataDir,
+        version: VERSION,
+        startedAt,
+        runningWorkers: active.manager.runningCount,
+        managedBy: managedBy(),
       };
       default: throw new RpcError('INVALID_REQUEST', 'Unknown method');
     }

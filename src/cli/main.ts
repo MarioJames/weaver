@@ -10,6 +10,7 @@ import { failure, LocalIPCError, MAX_FRAME_BYTES, readDiscovery, TRANSPORT_TIMEO
 import { startRuntime } from '../main/runtime';
 import { VERSION } from '../shared/version';
 import { installSkill, SKILL_AGENTS, SKILL_NAME, sourceSkill, type SkillAgent } from './skills';
+import { runServer, SERVER_HELP, serverEnv, type Envelope } from './server';
 
 export const DEFAULT_WEB_PORT = 4737;
 export type OutputFormat = 'json' | 'jsonl' | 'text';
@@ -72,10 +73,11 @@ export const CLI_HELP = `Weaver local control plane
   weaver web [--port <0-65535>] [--data-dir <path>] [--no-open] [--dev] [--output json|jsonl|text]
   weaver <command> [--data-dir <path>] [--output json|jsonl|text] [--input <file|->] [--command-id <id>] [--task-id <id>] [--for <seconds>]
   weaver skills install [--agent claude-code,codex] [--dir <skills-root>] [--link] [--force] [--output json|text]
+  weaver server <status|start|stop|install|uninstall> [--port <0-65535>] [--data-dir <path>] [--output json|text] [--force] [--timeout <seconds>]
 
 weaver web runs one foreground control plane: loopback HTTP on 127.0.0.1 and the authenticated Unix CLI socket. Closing a browser does not stop tasks. Ctrl+C stops new work and cancels workers this process started. Task and policy files are kept. Default data directory: $XDG_DATA_HOME/weaver or ~/.local/share/weaver.
 
-If a client command reports APP_NOT_RUNNING, start: weaver web --no-open
+If a client command reports APP_NOT_RUNNING, start: weaver server start
 
 --output json writes one weaver.v1 envelope and is the default. jsonl writes one JSON object per line. text writes a short status line. --json is an alias of --output json. --json together with --output is rejected. Errors use the same format. The command does not write extra stdout.
 
@@ -128,7 +130,7 @@ function positionals(argv: string[]): string[] {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg.startsWith('--')) { words.push(arg); continue; }
-    if (['--input', '--command-id', '--data-dir', '--task-id', '--port', '--output', '--for', '--agent', '--dir'].includes(arg)) i++;
+    if (['--input', '--command-id', '--data-dir', '--task-id', '--port', '--output', '--for', '--agent', '--dir', '--timeout'].includes(arg)) i++;
   }
   return words;
 }
@@ -297,7 +299,7 @@ export async function sendRequest(dataDir: string, request: unknown, timeoutMs =
   let endpoint: Awaited<ReturnType<typeof readDiscovery>>;
   try { endpoint = await readDiscovery(dataDir); }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new LocalIPCError('APP_NOT_RUNNING', 'Weaver is not running; start weaver web --no-open');
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new LocalIPCError('APP_NOT_RUNNING', 'Weaver is not running; run weaver server start');
     if (error instanceof LocalIPCError) throw error;
     throw new LocalIPCError('UNSAFE_ENDPOINT', 'Could not safely read the app endpoint');
   }
@@ -419,6 +421,7 @@ export async function runCLI(argv: string[]): Promise<number> {
       const rest=argv.filter(arg=>arg!=='--help');
       const words=positionals(rest);
       if(words[0]==='skills') { process.stdout.write(SKILLS_HELP+'\n'); return 0; }
+      if(words[0]==='server') { process.stdout.write(SERVER_HELP+'\n'); return 0; }
       if(words[0]==='web') {
         const web=parseWeb(rest);
         if(web.output==='text')process.stdout.write(WEB_HELP+'\n');
@@ -450,6 +453,12 @@ export async function runCLI(argv: string[]): Promise<number> {
       return 0;
     }
     if (words[0] === 'skills') return runSkills(argv, words);
+    if (words[0] === 'server') return runServer(argv, words, serverEnv({
+      request: async (dataDir, payload, timeoutMs) => await sendRequest(dataDir, payload, timeoutMs) as Envelope,
+      output: (format, envelope) => writeEnvelope(format, envelope),
+      defaultPort: DEFAULT_WEB_PORT,
+      defaultDataDir: defaultDataDir(),
+    }));
     const options = parseCLI(argv);
     errorFormat = options.output;
     commandId = options.commandId;

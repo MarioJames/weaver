@@ -11,7 +11,7 @@ CLI 与浏览器都是客户端，共享同一 `CommandHandler` 与同一 `weave
 - CLI：`weaver <command> …` → Unix 域 socket（token 帧、每请求 ≤1 MiB、15 秒等待）。
 - 浏览器：`POST /api/rpc`（仅 loopback `127.0.0.1`）；逻辑命令与方法白名单共享。
 - 全部请求/响应用 `apiVersion:"weaver.v1"`；请求体 ≤128 KiB；未知命令 `COMMAND_UNKNOWN` 拒绝。
-- App 未运行报 `APP_NOT_RUNNING`（提示 `weaver web --no-open`）；启动中 `APP_STARTING`；退出中 `APP_DRAINING`。CLI 退出只结束自己的等待，不取消已提交的任务。
+- App 未运行报 `APP_NOT_RUNNING`（提示 `weaver server start`）；启动中 `APP_STARTING`；退出中 `APP_DRAINING`。CLI 退出只结束自己的等待，不取消已提交的任务。
 
 逻辑命令信封：
 
@@ -108,6 +108,17 @@ weaver quota refresh --help --output json
 
 这些认证文件只读；不提取或使用 refresh token，不刷新登录、不登录/登出、不切换账户、不扫描浏览器/Keychain、不启动 TUI 或模型。请求禁止重定向，不遵循自定义 base URL；一次探测的总截止时间 8 秒，认证文件与响应均实际限制为 256 KiB，只输出受控字段与错误，不回传 token、账户 ID 或原始响应。Claude Code 即便未接入真实 worker，也可以独立探测额度。Grok CLI 订阅 credits 与 xAI API 团队钱包、美元余额、RPM/TPM、token 费用不同，不能拿后者替代此处的订阅额度。
 
+### 3.2 服务命令组 `weaver server`
+
+一台机器上的所有 agent 会话共享同一个 Weaver 服务进程（唯一写者与 worker 监督者）。`weaver server` 管理它的生命周期；参数与返回字段以 `weaver server --help` 与 `weaver --help --output json` 为准。
+
+- `weaver server start [--port 4737] [--data-dir D]`：以后台分离进程启动服务，日志写在 `<data-dir>/server.log`，等到服务能应答才返回。已有运行中的服务时不再起第二个，直接返回那个服务的信息；同一 port + data dir 装了登录自启服务时，由它来启动。客户端报 `APP_NOT_RUNNING` 就执行这条。
+- `weaver server status`：运行时给出 pid、url、port、data dir、版本、running workers 与 `managedBy`；未运行时明确报停止状态。两种情况都附带「是否已安装登录自启服务」。
+- `weaver server stop [--force]`：发 SIGTERM 并等待退出。有 worker 在跑时默认拒绝并返回 `SERVER_BUSY`——停止会取消在途工作——`--force` 才强制。停止由用户发起：owner agent 不把停服务当作任务收尾，也不杀它的进程或 systemd scope。
+- `weaver server install [--port] [--data-dir] [--force]` / `weaver server uninstall`：安装或移除登录自启，Linux 写 systemd user unit `weaver.service`，macOS 写 launchd agent `dev.weaver.server`；只在安装后的独立可执行文件下可用。install 捕获调用时的 `PATH`，让 worker 仍找得到各引擎 CLI；对没有被该服务管理的运行实例只给提示，不动它。
+
+前台模式 `weaver web` 保留给开发与调试（打开浏览器），它与后台服务是同一进程实现的两种运行方式。崩溃服务遗留的 stale endpoint（discovery 文件还在、socket 已不应答）在服务启动时自动清除，所以 `weaver server start` 能自行恢复。
+
 ## 4. 幂等、续传与修订
 
 - 写命令携带稳定 commandId；同键同参返回原收据，同键不同参 `IDEMPOTENCY_CONFLICT`；受影响但收据未持久返回 `COMMAND_INDETERMINATE`。未知/损坏回复先 `operations get --command-id <id>` 查收据再决定，不换新 ID 盲重试。
@@ -188,6 +199,6 @@ weaver reviews submit --task-id <taskId> --input review.json --command-id review
 
 ## 7. 本地传输与错误
 
-- 当前本地控制面只面向 Linux/Unix：`weaver web` 启动顺序是先起 Unix socket 服务再起 HTTP（`src/main/runtime.ts`），而 `startLocalIPC` 在 win32 直接抛 `UNSUPPORTED_PLATFORM`（`src/main/local-ipc.ts`），所以原生 Windows 上整个 web 控制面起不来，HTTP 面不单独可用。真实受管 worker 依赖 Linux systemd user scope。
-- token/frame 控制文件在 `<dataDir>/control-<instanceId>/`（用户目录受限），损坏或 stale 的 discovery 文件安全拒绝（`UNSAFE_ENDPOINT`），不能被另一进程伪造这样一套端点。
+- 当前本地控制面只面向 Linux/Unix：服务进程（前台 `weaver web`，或 `weaver server start` 起的后台实例）启动顺序是先起 Unix socket 服务再起 HTTP（`src/main/runtime.ts`），而 `startLocalIPC` 在 win32 直接抛 `UNSUPPORTED_PLATFORM`（`src/main/local-ipc.ts`），所以原生 Windows 上整个控制面起不来，HTTP 面不单独可用。真实受管 worker 依赖 Linux systemd user scope。
+- token/frame 控制文件在 `<dataDir>/control-<instanceId>/`（用户目录受限），损坏或 stale 的 discovery 文件安全拒绝（`UNSAFE_ENDPOINT`），不能被另一进程伪造这样一套端点。崩溃服务遗留的 stale 端点（discovery 文件在、socket 已不应答）在服务启动时自动清除，见 [3.2 服务命令组](#32-服务命令组-weaver-server)。
 - HTTP 错误码映射 `INVALID_HOST/INVALID_ORIGIN` 等有校验；body 中仅 method+args 的白名单 method 可调用，无反射分发。

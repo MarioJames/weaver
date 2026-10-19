@@ -1,4 +1,4 @@
-import { createServer, type Socket } from 'node:net';
+import { createServer, connect, type Socket } from 'node:net';
 import { constants } from 'node:fs';
 import { chmod, lstat, mkdir, open, rm, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -50,7 +50,64 @@ export async function readDiscovery(userData: string): Promise<{ discovery: Disc
   return { discovery, token };
 }
 
-/** An absent app never starts a worker. A stale discovery file must be removed manually. */
+const STALE_PROBE_MS = 500;
+interface StaleEndpoint { directory: string; socketPath: string; ino: number; dev: number }
+
+/** Only a refused or missing socket file proves nobody is listening; anything else stays as-is. */
+function socketIsDead(path: string): Promise<boolean> {
+  return new Promise(resolvePromise => {
+    const socket = connect(path);
+    let settled = false;
+    const finish = (stale: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.destroy();
+      resolvePromise(stale);
+    };
+    const timer = setTimeout(() => finish(false), STALE_PROBE_MS);
+    socket.once('connect', () => finish(false));
+    socket.once('close', () => finish(false));
+    socket.once('error', error => {
+      const code = (error as NodeJS.ErrnoException).code;
+      finish(code === 'ECONNREFUSED' || code === 'ENOENT');
+    });
+  });
+}
+
+/**
+ * The endpoint a dead process left behind, or undefined unless the discovery file is private,
+ * laid out for its own instance id, points at a socket nobody can reach, and owns nothing else.
+ */
+async function staleEndpoint(base: string, discoveryPath: string): Promise<StaleEndpoint | undefined> {
+  let candidate: StaleEndpoint;
+  try {
+    const published = await lstat(discoveryPath);
+    if (!published.isFile()) return;
+    const value = JSON.parse(await readPrivateFile(discoveryPath)) as Discovery;
+    if (value.version !== 1 || typeof value.instanceId !== 'string' || !/^[a-f0-9]{32}$/.test(value.instanceId) ||
+        typeof value.socketPath !== 'string' || typeof value.tokenPath !== 'string') return;
+    const directory = join(base, `control-${value.instanceId}`);
+    if (value.socketPath !== join(directory, 'ipc.sock') || value.tokenPath !== join(directory, 'token')) return;
+    candidate = { directory, socketPath: value.socketPath, ino: published.ino, dev: published.dev };
+  } catch { return; }
+  try {
+    const info = await lstat(candidate.directory);
+    if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0) return;
+  } catch (error) {
+    // The instance directory is gone, so nothing can be listening on a path inside it.
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return;
+    return candidate;
+  }
+  return (await socketIsDead(candidate.socketPath)) ? candidate : undefined;
+}
+
+/**
+ * An absent app never starts a worker. Another live app keeps its endpoint: startup stops with
+ * ENDPOINT_EXISTS. Only an endpoint whose own socket is refused or missing is provably left over
+ * by a dead process, so that discovery file and instance directory are cleared once and startup
+ * continues.
+ */
 export async function startLocalIPC(userData: string, handle: (request: unknown) => unknown): Promise<{ close(): Promise<void> }> {
   if (process.platform === 'win32') throw new LocalIPCError('UNSUPPORTED_PLATFORM', 'Local CLI transport requires Unix filesystem permissions');
   const base = resolve(userData);
@@ -58,12 +115,19 @@ export async function startLocalIPC(userData: string, handle: (request: unknown)
   const baseInfo = await lstat(base);
   if (!baseInfo.isDirectory() || baseInfo.isSymbolicLink() || baseInfo.uid !== process.getuid?.() || (baseInfo.mode & 0o022))
     throw new LocalIPCError('UNSAFE_ENDPOINT', 'Application data directory is unsafe');
+  const discoveryPath = join(base, 'control.v1.json');
+  const stale = await staleEndpoint(base, discoveryPath);
+  if (stale) {
+    // Re-check the inode: a live instance may have republished the discovery while it was probed.
+    const now = await lstat(discoveryPath).catch(() => undefined);
+    if (now && now.ino === stale.ino && now.dev === stale.dev) await unlink(discoveryPath).catch(() => {});
+    await rm(stale.directory, { recursive: true, force: true });
+  }
   const instanceId = randomBytes(16).toString('hex');
   const directory = join(base, `control-${instanceId}`);
   await mkdir(directory, { mode: 0o700 });
   const socketPath = join(directory, 'ipc.sock');
   const tokenPath = join(directory, 'token');
-  const discoveryPath = join(base, 'control.v1.json');
   const token = randomBytes(32).toString('hex');
   const clients = new Set<Socket>();
   let published: { ino: number; dev: number } | undefined;

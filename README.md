@@ -56,15 +56,39 @@ weaver skills install --link              # source checkout: link to skills/agen
 
 It refuses to replace a skill or link at those paths that it did not install (`--force` to override) and updates its own copy on rerun. The skill reads the saved policy through the CLI: the owner profile for the host engine, worker weights, `herdr.max_wait_minutes` as the wait bound, blocks, and `chatgpt_review`, which turns on ChatGPT Pro review gates through [Convorel](https://github.com/MarioJames/convorel)'s `chatgpt-review` skill. It coexists with a global `agents-cooperation` skill, which stays untouched.
 
-## Run one local control plane
+## Run the Weaver service
+
+The Weaver service is the single process that holds the task and policy stores, supervises workers and answers both the CLI and the browser UI. One machine shares one service across every agent session; start it with:
 
 ```sh
-weaver web --no-open
+weaver server start
 ```
 
-`weaver web` is a foreground process and the only writer and supervisor. It binds `127.0.0.1` only (default port 4737; `--port` selects another, `0` picks a free port), prints the URL after the stores and endpoints are ready, and keeps running after the browser closes. `--dev` serves the UI with Vite on the same loopback origin. `--data-dir` overrides the state directory; the default is `$XDG_DATA_HOME/weaver` or `~/.local/share/weaver`, which is also the discoverable endpoint root (`control.v1.json`). A busy port reports `EADDRINUSE` and names `--port`. Weaver does not read, migrate, or delete `~/.config/weaver-desktop`.
+It launches detached, writes its log to `<data-dir>/server.log`, and returns only once the service answers — when a service is already running it returns that one's info instead of starting a second. `--port` (default 4737) and `--data-dir` (default `$XDG_DATA_HOME/weaver` or `~/.local/share/weaver`) select the instance; when a login service is installed for the same port and data dir, `start` starts that one. A client that reports `APP_NOT_RUNNING` just needs this command.
 
-Stop with Ctrl+C or SIGTERM: the process drains, stops the workers it started, and exits. Task and policy files are kept. Closing the browser tab does not stop tasks, and there is no second background daemon; if a client reports `APP_NOT_RUNNING`, start `weaver web --no-open` first.
+```sh
+weaver server status    # running: pid, url, port, data dir, version, running workers, managedBy
+weaver server stop      # SIGTERM, then wait
+```
+
+`status` prints that block when the service runs and says it is stopped otherwise; either way it also reports whether a login service is installed. `stop` refuses with `SERVER_BUSY` while workers are running, because stopping cancels them; `--force` overrides. Stopping is the user's call — an owner agent never stops the service as task cleanup, since other sessions share it.
+
+To bring the service up at login, from the installed standalone binary:
+
+```sh
+weaver server install      # systemd user unit weaver.service (Linux) / launchd agent dev.weaver.server (macOS)
+weaver server uninstall
+```
+
+`install` takes `--port` and `--data-dir`, captures the current `PATH` so workers keep finding the agent CLIs, and replaces an existing login service only with `--force`. A server that is running but not managed by that unit is left alone with a hint. An endpoint left behind by a crashed server (a discovery file whose socket no longer answers) is removed automatically at startup, so `weaver server start` recovers on its own.
+
+`weaver web` stays the foreground mode, for development and debugging, and opens the browser:
+
+```sh
+weaver web              # same service, in this terminal; --no-open skips the browser
+```
+
+It is the same single writer and supervisor: it binds `127.0.0.1` only (default port 4737; `--port` selects another, `0` picks a free port), prints the URL after the stores and endpoints are ready, and keeps running after the browser closes. `--dev` serves the UI with Vite on the same loopback origin. `--data-dir` overrides the state directory, which is also the discoverable endpoint root (`control.v1.json`). A busy port reports `EADDRINUSE` and names `--port`. Stop it with Ctrl+C or SIGTERM: the process drains, stops the workers it started, and exits. Task and policy files are kept, closing the browser tab does not stop tasks, and there is no second daemon behind any of this. Weaver does not read, migrate, or delete `~/.config/weaver-desktop`.
 
 ## Skill entry and preflight
 
@@ -133,7 +157,7 @@ Policy is one validated document saved atomically with a revision check. It hold
 - Dispatch picks the owner's highest-weight available worker. Weights are integers 0..1000, default 100; they are priority, not probability. Ties follow the owner's `workers` order. Weight `0` excludes the worker, and an explicitly named worker cannot bypass weight 0.
 - A disabled worker, a disabled engine, or an active block on the engine/model skips that worker. Pause an engine from its card on the Engines page; exhausted quota adds and removes its own block.
 - Concurrency is per owner: `max_parallel`. The reported total is the sum of enabled owners, not a separate global limit. Lowering `max_parallel` leaves running tasks alone.
-- Timeout is `herdr.max_wait_minutes` (1-1440); there is no 60-second default.
+- `herdr.max_wait_minutes` (1-1440) is how long an owner keeps polling `weaver tasks wait` for one package before it inspects events and decides to keep waiting, cancel, or take the package back; Weaver never stops a worker on it.
 
 ```sh
 weaver policy validate --input config.json   # config.json is the config document itself

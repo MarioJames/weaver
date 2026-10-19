@@ -8,14 +8,14 @@ Weaver 是本地任务控制面，交付三件套：
 
 1. 公开技能 `skills/agents-weaver`（skill name `agents-weaver`，`weaver skills install` 安装）：宿主里的真实 owner agent 按它读能力、路由与包，再调 CLI 派发、验收与登记。workers 不递归，owner 不在 Weaver 之外另跑调度循环。
 2. Node CLI `weaver`（`src/cli/main.ts`）：一次命令一次连接，经 Unix 域 socket 的帧 token 认证通道写入运行中的控制面；自身不打开任务文件、不持有状态、不启动 worker。
-3. 前台 web 进程 `weaver web`（`src/main/runtime.ts`）：唯一写者与进程监督者，绑定 loopback HTTP（仅 `127.0.0.1`，dev 模式同源 Vite middleware）并同时开启已认证的 Unix CLI socket。二者共享同一个 `CommandHandler`（`src/main/commands.ts`）。
+3. Weaver 服务进程（`src/main/runtime.ts`）：唯一写者与进程监督者，两种运行方式是同一实现的两种启动法——前台 `weaver web`（开发/调试，打开浏览器）与后台 `weaver server start`（分离进程，日志 `<data-dir>/server.log`；`weaver server install` 让它随登录启动）。绑定 loopback HTTP（仅 `127.0.0.1`，dev 模式同源 Vite middleware）并同时开启已认证的 Unix CLI socket。HTTP 面与 CLI 面共享同一个 `CommandHandler`（`src/main/commands.ts`）。
 
 被撤销的旧方案（仅作历史，不是目标）：Electron 桌面、/render/preload 分层、SQLite/outbox、MCP facade、独立 owner 模型进程、多机调度。当前系统没有第二守护进程，没有隐藏的付费 owner 模型。
 
 核心原则：
 
 1. Owner 是真实技能宿主 agent；Weaver 只登记 logical owner（manual 元数据）或显式 `provider:"mock"` 的进程内 mock 测试宿主。登记存在不等于 AI 已启动。
-2. 单写权威是运行中的 `weaver web` 进程；renderer、worker 日志、宿主屏幕文字都不是状态权威。CLI 与浏览器只是客户端。
+2. 单写权威是运行中的 Weaver 服务进程（前台 `weaver web` 或后台 `weaver server start`，同一实现）；renderer、worker 日志、宿主屏幕文字都不是状态权威。CLI 与浏览器只是客户端。
 3. `执行完成 ≠ 结果送达 ≠ owner 已 ack ≠ owner 已验收`。执行终态需要 vendor 真实成功 final + 零退出。
 4. 能力探测只证明安装与版本；enable 与角色配置分离；未知即明确报告，不假称可用。
 5. mock 是显式测试 provider；真实引擎失败/launcher 缺失/引擎不支持都失败，不回退 mock、Claude Code 或其他引擎。
@@ -27,7 +27,7 @@ Weaver 是本地任务控制面，交付三件套：
                             ├─┤ weaver CLI（Unix socket，weaver.v1 帧）
 浏览器 Web UI (React) ────┘ ─ POST /api/rpc（loopback HTTP，同一 handler）
                  │
-        weaver web 进程（唯一写者）
+        Weaver 服务进程（唯一写者）
           ├─ CommandHandler ─ 命令校验/幂等收据/调度 pump
           ├─ TaskManager ─ worker 子进程监督（SIGTERM→1.5s SIGKILL）
           │    ├─ MockWorkerAdapter（显式 mock-jsonl，bundled scripts/mock-worker.mjs）
@@ -40,7 +40,7 @@ Weaver 是本地任务控制面，交付三件套：
           └─ ContinuationService（src/main/continuation.ts，owner 手动上下文）
 ```
 
-进程语义：`weaver web` 前台单实例；端口被占返回 `EADDRINUSE`；`--data-dir` 决定默认 endpoint/state 目录。Ctrl+C/SIGTERM → draining → 中止在途额度探测 → 等待未响应请求完成 → `manager.shutdown()` 逐个取消本进程拥有的 running 任务并等待子进程退出 → 关闭 HTTP/socket → 退出。draining 后完成的额度请求不再保存策略。任务与策略文件保留。关闭浏览器页不停任务。客户端断开不取消已提交的工作。
+进程语义：服务单实例。前台 `weaver web` 跑在当前终端；后台 `weaver server start` 以分离进程启动并等到能应答才返回，已有运行实例时不再起第二个、直接返回它的信息，同一 port + data dir 装了登录自启服务时由该服务启动。端口被占返回 `EADDRINUSE`；`--data-dir` 决定默认 endpoint/state 目录。崩溃服务遗留的 stale endpoint（discovery 文件还在、socket 已不应答）在启动时自动清除。停止两种模式走同一条关停路径——`weaver web` 用 Ctrl+C，后台用 `weaver server stop`（有 running worker 时默认拒绝 `SERVER_BUSY`，因为停止会取消它们，`--force` 才强制）——随后 draining → 中止在途额度探测 → 等待未响应请求完成 → `manager.shutdown()` 逐个取消本进程拥有的 running 任务并等待子进程退出 → 关闭 HTTP/socket → 退出。draining 后完成的额度请求不再保存策略。任务与策略文件保留。关闭浏览器页不停任务。客户端断开不取消已提交的工作。服务是整机共享的：owner agent 不把停服务当作任务收尾，也不杀它的进程或 systemd scope，只有用户停。登录自启由 `weaver server install` / `uninstall` 管理：Linux 写 systemd user unit `weaver.service`，macOS 写 launchd agent `dev.weaver.server`，只从安装后的独立可执行文件可用，install 捕获当前 `PATH` 让 worker 仍找得到引擎 CLI，对未被该服务管理的运行实例只给提示不动它。
 
 ## 3. 单写权威与存储
 
@@ -63,7 +63,7 @@ JSON 双文件即全部持久状态：
 - `worker_weights`：整数 0..1000，缺省 100；0 直接排除该 worker，显式 worker 指定也不能绕过权重 0。
 - 配额 block 按引擎/model 精确匹配，绝对时间戳 `release_at` 只有明确恢复时间才自动到期，其余手动解除。
 - 准入与派发同一 resolve 函数：`policy preview` 只读（`dispatch:"preview"`、`execution:"disabled"`）不执行；`workers.spawn` 实际校验 workspace/provider/容量后按结果 start 或入队。
-- 并发按 owner 的 `max_parallel`；报告总数是 enabled owner 的 `max_parallel` 之和，没有独立全局上限。超时来自 `herdr.max_wait_minutes`（1-1440），没有 60 秒默认值。
+- 并发按 owner 的 `max_parallel`；报告总数是 enabled owner 的 `max_parallel` 之和，没有独立全局上限。`herdr.max_wait_minutes`（1-1440）只是负责人轮询等待一个工作包的最长时间，超过后由负责人查看进展并决定继续等待、取消或收回，Weaver 不会据此停止工作代理。
 
 队列与冻结：
 
@@ -82,7 +82,7 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 - 请求的真实引擎/model/effort、adapter、workspace、scopeUnit 和 observed evidence 都记录在 `run` 与 observability 里；mock 显式记录 `execution:'mock'`。没有静默回退：CC 报 `CAPABILITY_UNAVAILABLE`（deferred），unknown kind 同拒，launcher 未加载同拒。
 - 生命周期收尾只清理本 launch 拥有的进程；Linux/systemd host 上每个真实 launch 使用唯一命名 user scope，取消/超时/完成前先关闭自身 scope。没有共享 leader/daemon。
 
-真实执行的 timeout 只来自配置的 `herdr.max_wait_minutes`；直接单测的 mock adapter 允许更短的测试等待，不改变真实 runtime 的这一语义。
+真实与 native 执行在 Weaver 侧没有任何停止定时器；`herdr.max_wait_minutes` 只是负责人的轮询等待上限，直接单测的 mock adapter 才允许一个更短的测试等待。
 
 ## 6. Owner 手动上下文与结果（ContinuationService）
 
@@ -101,7 +101,7 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 
 - 没有按 owner 的认证/对象级权限；本地凭据是 trusted-user 级（`capabilities.authentication` 声明）。
 - 定时额度刷新只按固定间隔探测并同步自有阻断，不做失败重试；超额失败按 provider 错误如实报告，不自动换引擎或模型。
-- 本地控制面只面向 Linux/Unix：`weaver web` 先启动 Unix CLI socket 再启动 HTTP（`src/main/runtime.ts`），而 `startLocalIPC` 在 win32 直接 `UNSUPPORTED_PLATFORM`（`src/main/local-ipc.ts`），因此 web 控制面在原生 Windows 不能启动。真实受管 worker 还依赖 Linux systemd user scope。不声称原生 Windows 支持，也不再描述未验证的远程访问形态。
+- 本地控制面只面向 Linux/Unix：服务进程（前台 `weaver web`，或 `weaver server start` 起的后台实例）先启动 Unix CLI socket 再启动 HTTP（`src/main/runtime.ts`），而 `startLocalIPC` 在 win32 直接 `UNSUPPORTED_PLATFORM`（`src/main/local-ipc.ts`），因此控制面在原生 Windows 不能启动。真实受管 worker 还依赖 Linux systemd user scope。不声称原生 Windows 支持，也不再描述未验证的远程访问形态。
 - 没有 retention/archival UI、迁移导入工具、SQLite/outbox/事件总线、全局持久事件流。
 - 没有 worker 递归与多 owner 交叉指挥；一个任务一个 owner，owner 间协作回到技能宿主的可见会话。
 - 本机实测宿主/版本证据以 `docs/verification/**` 与 [VERIFICATION.md](../VERIFICATION.md) 为准；本文不声称最终验收。

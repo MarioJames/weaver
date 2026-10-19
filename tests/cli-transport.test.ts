@@ -98,5 +98,5 @@ test('CLI subprocess prints a single JSON response when app is not running', asy
  const result=spawnSync(process.execPath,['--import','tsx','src/cli/main.ts','capabilities','--data-dir','/tmp/weaver-does-not-exist-'+Date.now()],{encoding:'utf8'});
  assert.equal(result.status,1);assert.equal(result.stdout.trim().split('\n').length,1);
  const response=JSON.parse(result.stdout);assert.equal(response.apiVersion,'weaver.v1');assert.equal(response.error.code,'APP_NOT_RUNNING');
- assert.match(response.error.message,/weaver web --no-open/);
+ assert.match(response.error.message,/weaver server start/);
 });

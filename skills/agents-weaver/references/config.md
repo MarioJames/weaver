@@ -1,6 +1,6 @@
 # Reading and changing the Weaver policy
 
-`weaver policy get --output json` returns `{revision, config, blocks}` plus per-role availability. The same document is edited on the web pages (`weaver web`, then 引擎 / 负责人 / 工作代理 / 设置). Read it fresh before each dispatch decision; it can change while you work (a scheduled quota refresh adds or lifts blocks).
+`weaver policy get --output json` returns `{revision, config, blocks}` plus per-role availability. The same document is edited on the web pages (open the service URL from `weaver server status`, then 引擎 / 负责人 / 工作代理 / 设置). Read it fresh before each dispatch decision; it can change while you work (a scheduled quota refresh adds or lifts blocks).
 
 ## Fields that steer an owner
 
@@ -14,7 +14,7 @@
 | `engines.<id>.enabled` | A disabled engine makes its workers unavailable. Enabling goes through `weaver engines set-enabled` (it probes the CLI first), not `policy save`. |
 | `engines.<id>.quota_refresh` | Whether Weaver polls that subscription's quota (codex, claude, grok only). An exhausted window adds a block `by: "weaver-quota:<kind>"` that lifts itself at reset. |
 | `blocks` | Active pauses, manual or quota. A blocked engine or worker is skipped; `policy preview` names the reason and release time. |
-| `herdr.max_wait_minutes` | How long one wait on a worker may last (1–1440). Real workers are stopped after this; use it as your stall threshold. |
+| `herdr.max_wait_minutes` | How long you keep polling `weaver tasks wait` for one package (1–1440); past it, inspect events and decide to keep waiting, cancel, or take the package back. Weaver never stops a worker on it. |
 | `chatgpt_review` | `true`: apply the Convorel review gates in [convorel.md](convorel.md). `false`: skip ChatGPT Pro review; local review and tests still apply. |
 | `quota.auto_refresh`, `quota.interval_minutes` | The scheduled quota refresh (5–1440 minutes). |
 

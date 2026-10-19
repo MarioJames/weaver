@@ -15,7 +15,7 @@ Weaver is the scheduling authority for owner-led work on this machine. Its saved
 ## Preflight (once per session)
 
 1. `weaver --version`. Missing: tell the user to install it (`curl -fsSL https://raw.githubusercontent.com/MarioJames/weaver/main/install.sh | bash`) and continue without delegation.
-2. `weaver capabilities --output json`. `APP_NOT_RUNNING` means no control plane: start `weaver web --no-open` as a persistent background process (a Herdr pane or `systemd-run --user --scope`), never tied to your shell; closing it later stops admitted work. `TRANSPORT_ERROR` inside a Codex `workspace-write` sandbox means the sandbox blocks the local socket: ask the user to set `sandbox_workspace_write.network_access = true` (or run with full access); do not change their config yourself.
+2. `weaver capabilities --output json`. `APP_NOT_RUNNING` means the Weaver service is not running: run `weaver server start` (`--port`, `--data-dir`; it waits until the service answers, and returns the info of the service already running when there is one). Do not launch the service yourself in a pane or scope, and never stop it: the service is shared by every agent session on this machine, and stopping it cancels other sessions' running workers — even when this session started it. Only the user stops it (`weaver server status` shows what runs; `weaver server install` is the option for users who want it at login). `TRANSPORT_ERROR` inside a Codex `workspace-write` sandbox means the sandbox blocks the local socket: ask the user to set `sandbox_workspace_write.network_access = true` (or run with full access); do not change their config yourself.
 3. `weaver policy get --output json` and read, per [config](references/config.md):
    - **Your owner profile**: the enabled owner whose engine is your host (`claude` for Claude Code, `codex` for Codex). Its `workers` and `worker_weights` are your dispatch candidates; `max_parallel` bounds concurrent work.
    - **Weights**: highest weight first, ties by list order, weight `0` never dispatched. A worker on your own engine runs natively.
@@ -26,7 +26,7 @@ Weaver is the scheduling authority for owner-led work on this machine. Its saved
 
 ## Decide what to delegate
 
-Dispatch every task through Weaver except a pure question, including small edits, tests, docs, research and verification; the size of a change is never a reason to skip. Do it yourself only when the user explicitly asks you to, and say so. Split independent problems into separate packages. If the control plane is not running, start it (preflight step 2) rather than skipping Weaver; only if `weaver` is missing or cannot start, say so and do the work yourself.
+Dispatch every task through Weaver except a pure question, including small edits, tests, docs, research and verification; the size of a change is never a reason to skip. Do it yourself only when the user explicitly asks you to, and say so. Split independent problems into separate packages. If the Weaver service is not running, start it with `weaver server start` (preflight step 2) rather than skipping Weaver; only if `weaver` is missing or the service cannot start, say so and do the work yourself.
 
 Split the work into packages and classify each: **mechanical** (fixed rules, explicit files, checkable result), **routine** (bounded implementation of a frozen plan), **judgment** (design, cross-module or risky). Dispatch mechanical and routine packages; for judgment work, settle the design yourself (with the Convorel gate when it applies), then dispatch the implementation as routine packages. Integration, review and final decisions stay with you. Never let two writers share files; independent packages can run in parallel up to `max_parallel`.
 
@@ -50,6 +50,6 @@ Mutations use stable `--command-id`s. After an uncertain response, inspect `oper
 
 ## Report
 
-Tell the user, per package: owner, worker, engine, requested vs observed model, class, status, evidence you verified, review result and remaining risk. Unknown vendor facts stay unknown. Do not disclose Weaver's local socket credential or provider credentials. Stop only resources this task started.
+Tell the user, per package: owner, worker, engine, requested vs observed model, class, status, evidence you verified, review result and remaining risk. Unknown vendor facts stay unknown. Do not disclose Weaver's local socket credential or provider credentials. Clean up only the scratch and resources this task started; the shared Weaver service is never one of them — leave it running and let the user stop it.
 
 See [provenance](references/provenance.md) for origin and current capability boundaries.

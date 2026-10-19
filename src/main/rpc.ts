@@ -17,6 +17,7 @@ Object.assign(ARITY, {
   startTask: 1,
   cancelTask: 1,
   capabilities: 0,
+  serverInfo: 0,
 });
 
 export class RpcError extends Error {
