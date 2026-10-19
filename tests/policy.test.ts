@@ -48,6 +48,8 @@ test('release times accept timezone/relative forms and reject invalid or overflo
  for(const value of ['tomorrow','+0m','2026-10-18T14:00:00','+999999999999999999999999d']) assert.throws(()=>parseReleaseAt(value,now));
 });
 function fixture(fn:(store:PolicyStore,path:string)=>void) {const root=mkdtempSync(join(tmpdir(),'weaver-policy-'));try{const path=join(root,'policy.json');fn(new PolicyStore(path,()=>now),path);}finally{rmSync(root,{recursive:true,force:true});}}
+/** The thrown message, so a caller can assert on its exact prefix. */
+function grab(fn:()=>unknown):string {try{fn();}catch(error){return error instanceof Error?error.message:'thrown';}throw new Error('expected a throw');}
 test('app settings roundtrip without reading upstream/home, stale writes fail',()=>fixture((store,path)=>{
  const s=store.snapshot();s.config.chatgpt_review=false; const next=store.save({revision:s.revision,config:s.config,blocks:[]});assert.equal(next.revision,1);
  assert.deepEqual(new PolicyStore(path,()=>now).snapshot(),next);assert.equal(store.preview({owner:'claude_owner'}).chatgptReview,false);
@@ -75,6 +77,12 @@ test('capacity is hypothetical preview only, never execution permission',()=>fix
 }));
 test('corrupt policy file is rejected and retained',()=>fixture((_store,path)=>{
  writeFileSync(path,'{"version":2}');assert.throws(()=>new PolicyStore(path),/Unsupported/);assert.equal(readFileSync(path,'utf8'),'{"version":2}');
+}));
+test('a saved policy with a gemini engine fails with the ordinary schema error',()=>fixture((_store,path)=>{
+ const config=defaultConfig() as any; config.engines.gemini={enabled:true,kind:'gemini'};
+ assert.deepEqual(validateConfig(config).map(i=>i.path),['$.engines.gemini.kind']);
+ writeFileSync(path,JSON.stringify({version:1,revision:0,config,blocks:[]}));
+ assert.throws(()=>new PolicyStore(path),/\$\.engines\.gemini\.kind: must be one of/);
 }));
 test('disabled pi template validates and stays out of claude routing',()=>{
  const c=defaultConfig(); assert.deepEqual(validateConfig(c),[]);
@@ -114,4 +122,67 @@ test('a saved policy with retired tags and engine pins still loads without them'
  const loaded=new PolicyStore(path,()=>now).snapshot();
  assert.equal('tags' in loaded.config.workers.claude_worker,false); assert.equal('only_engine' in loaded.config.owners.claude_owner,false);
  assert.equal(loaded.revision,1);
+}));
+test('weights balance load: the lowest (running + 1) / weight wins, ties go to the higher weight then list order',()=>{
+ const c=all(); c.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:50,opencode_worker:100,grok_worker:0};
+ const pick=(load:Record<string,number>)=>resolveDispatch(c,[],{owner:'claude_owner',workerLoad:load}).worker;
+ assert.equal(pick({}),'opencode_worker');
+ // 2/100 ties 1/50: the higher weight takes it.
+ assert.equal(pick({opencode_worker:1}),'opencode_worker');
+ assert.equal(pick({opencode_worker:2}),'qoder_worker');
+ assert.equal(pick({opencode_worker:3,qoder_worker:1}),'opencode_worker');
+ assert.equal(pick({opencode_worker:4,qoder_worker:1}),'qoder_worker');
+ // Six dispatches in a row split 2:1 by weight.
+ const load:Record<string,number>={};
+ for(let i=0;i<6;i++){const w=pick(load);load[w]=(load[w]??0)+1;}
+ assert.deepEqual(load,{opencode_worker:4,qoder_worker:2});
+ // Equal weights spread one by one in list order.
+ c.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:100,opencode_worker:100,grok_worker:0};
+ assert.equal(pick({}),'qoder_worker'); assert.equal(pick({qoder_worker:1}),'opencode_worker');
+ // An explicit worker ignores load; weight 0 still never dispatches.
+ assert.equal(resolveDispatch(c,[],{owner:'claude_owner',worker:'opencode_worker',workerLoad:{opencode_worker:9}}).worker,'opencode_worker');
+ assert.equal(pick({qoder_worker:50,opencode_worker:50}),'qoder_worker');
+});
+test('preview reports each candidate load and score',()=>{
+ const c=all(); c.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:50,opencode_worker:100,grok_worker:0};
+ const r=resolveDispatch(c,[],{owner:'claude_owner',workerLoad:{opencode_worker:2}});
+ assert.equal(r.worker,'qoder_worker');
+ assert.deepEqual(r.candidates,[{worker:'qoder_worker',weight:50,running:0},{worker:'opencode_worker',weight:100,running:2}]);
+ assert.deepEqual(r.skipped,[{worker:'claude_worker',reason:'priority weight 0'},{worker:'grok_worker',reason:'priority weight 0'}]);
+});
+test('excluded engines are skipped with their reason and load balancing still works',()=>{
+ const c=all(); const pick=(excludeEngines:string[])=>resolveDispatch(c,[],{owner:'claude_owner',excludeEngines});
+ assert.equal(pick([]).worker,'claude_worker'); assert.equal(pick(['pi']).worker,'claude_worker');
+ const moved=pick(['claude']);
+ assert.equal(moved.worker,'qoder_worker');
+ assert.deepEqual(moved.skipped,[{worker:'claude_worker',reason:'failed earlier in this retry chain'}]);
+ assert.deepEqual(moved.candidates,[{worker:'qoder_worker',weight:100,running:0},{worker:'opencode_worker',weight:100,running:0},{worker:'grok_worker',weight:100,running:0}]);
+ // The excluded engine is out of the balancing, the rest keeps its weighted order.
+ assert.equal(resolveDispatch(c,[],{owner:'claude_owner',excludeEngines:['claude'],workerLoad:{qoder_worker:5}}).worker,'opencode_worker');
+ // Weight 0 is reported before exclusion: it was never a candidate at all.
+ const weighted=all(); weighted.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:100,opencode_worker:100,grok_worker:100};
+ assert.deepEqual(resolveDispatch(weighted,[],{owner:'claude_owner',excludeEngines:['claude']}).skipped,[{worker:'claude_worker',reason:'priority weight 0'}]);
+});
+test('an explicit worker on an excluded engine and an exhausted chain both refuse to dispatch',()=>{
+ const c=all();
+ const named=grab(()=>resolveDispatch(c,[],{owner:'claude_owner',worker:'claude_worker',excludeEngines:['claude']}));
+ assert.ok(named.startsWith('NO_ALTERNATIVE_ENGINE'),named);
+ assert.match(named,/failed earlier in this retry chain/); assert.match(named,/claude_worker/); assert.match(named,/claude/);
+ const closed=grab(()=>resolveDispatch(c,[],{owner:'claude_owner',excludeEngines:['claude','qoder','opencode','grok']}));
+ assert.ok(closed.startsWith('NO_ALTERNATIVE_ENGINE'),closed);
+ assert.match(closed,/failed earlier in this retry chain/);
+ for(const engine of ['claude','qoder','opencode','grok'])assert.ok(closed.includes(engine),engine);
+ // Nothing available is still the ordinary availability error, not an engine exclusion.
+ const none=all(); for(const w of Object.values(none.workers)) w.enabled=false;
+ assert.throws(()=>resolveDispatch(none,[],{owner:'claude_owner',excludeEngines:['claude']}),/no available worker/);
+});
+test('preview takes excluded engines and rejects a malformed list',()=>fixture((store)=>{
+ const s=store.snapshot(); s.config.engines.opencode.enabled=true; s.config.workers.opencode_worker.enabled=true;
+ store.save({revision:s.revision,config:s.config,blocks:[]},{allowEngineEnable:true});
+ assert.equal(store.preview({owner:'claude_owner'}).worker,'claude_worker');
+ assert.equal(store.preview({owner:'claude_owner',excludeEngines:['claude']}).worker,'opencode_worker');
+ assert.ok(grab(()=>store.preview({owner:'claude_owner',excludeEngines:['claude','opencode']})).startsWith('NO_ALTERNATIVE_ENGINE'));
+ for(const bad of ['claude',[1],Array(51).fill('claude'),['']]) assert.throws(()=>store.preview({owner:'claude_owner',excludeEngines:bad}),/excluded engine/);
+ assert.equal(store.preview({owner:'claude_owner',excludeEngines:[]}).worker,'claude_worker');
+ assert.throws(()=>store.preview({owner:'claude_owner',excludeEngines:['claude'],argv:['unsafe']}),/Unknown/);
 }));

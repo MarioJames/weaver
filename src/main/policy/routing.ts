@@ -131,8 +131,10 @@ export interface Dispatch {
  owner: string; worker: string; engine: string; model: string; effort: string;
  execution: 'disabled'; dispatch: 'preview'; warnings: string[];
  selected_by?: 'worker' | 'weight'; skipped?: {worker:string; reason:string}[];
- /** Effective priority of the selected worker. Omitted config means 100. */
+ /** Effective weight of the selected worker. Omitted config means 100. */
  weight?: number;
+ /** Dispatchable workers in the order they would be chosen, with the running count the choice used. */
+ candidates?: {worker:string; weight:number; running:number}[];
 }
 function previewSelection(config: Config, ownerId: string, workerId: string, warnings: string[]): Dispatch {
  const owner = config.owners[ownerId]!;
@@ -147,28 +149,45 @@ function requireOwner(config: Config, blocks: Block[], id: string, what = "owner
   if (a.status !== "available") throw new PolicyError(`${what} ${id} unavailable: ${describeUnavailable(a)}`);
   return owner;
 }
-export interface RouteOptions { owner: string; worker?: string }
-/** An explicit worker, or the owner's highest-weight available worker; equal weights keep the list order. */
+export interface RouteOptions { owner: string; worker?: string; /** Running tasks per worker, across all owners. */ workerLoad?: Record<string, number>; /** Engines whose attempt already failed or was cancelled earlier in this task's retry chain. */ excludeEngines?: string[] }
+/** Why an engine never comes back for this task: the owner's earlier attempt on it did not succeed. */
+export const EXCLUDED_ENGINE_REASON = "failed earlier in this retry chain";
+/**
+ * An explicit worker, or the owner's least-loaded available worker relative to its weight:
+ * the lowest (running + 1) / weight wins, ties go to the higher weight, then to list order.
+ * Idle workers are tried by weight; under load, work spreads in proportion to the weights.
+ * A worker on an excluded engine is never selected, so a retry always changes engine.
+ */
 export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOptions): Dispatch {
   const owner = requireOwner(config, blocks, opts.owner);
+  const excluded = new Set(opts.excludeEngines ?? []);
   if (opts.worker) {
     const worker = Object.hasOwn(config.workers,opts.worker) ? config.workers[opts.worker] : undefined;
     if (!worker) throw new PolicyError(`unknown worker ${opts.worker}`);
+    if (excluded.has(worker.engine)) throw new PolicyError(`NO_ALTERNATIVE_ENGINE: worker ${opts.worker} runs on engine ${worker.engine}, which ${EXCLUDED_ENGINE_REASON} (excluded: ${[...excluded].join(", ")})`, [{ path: `$.owners.${opts.owner}.workers`, message: `${opts.worker}: ${EXCLUDED_ENGINE_REASON}` }]);
     const a = availabilityOf(config, blocks, worker);
     if (a.status !== "available") throw new PolicyError(`worker ${opts.worker} unavailable: ${describeUnavailable(a)}`);
     if (effectiveWeight(owner, opts.worker) === 0) throw new PolicyError(`worker ${opts.worker} unavailable: priority weight 0`);
     const warnings = owner.workers.includes(opts.worker) ? [] : [`worker ${opts.worker} 不在 owner ${opts.owner} 的 workers 列表中`];
     return { ...previewSelection(config, opts.owner, opts.worker, warnings), selected_by: "worker" };
   }
+  const load = (id: string) => opts.workerLoad?.[id] ?? 0;
   const candidates = owner.workers
-    .map((id, index) => ({ id, index, weight: effectiveWeight(owner, id), availability: availabilityOf(config, blocks, config.workers[id]!) }))
-    .sort((a, b) => b.weight - a.weight || a.index - b.index);
-  const reason = (c: (typeof candidates)[number]) => c.weight === 0 ? "priority weight 0" : describeUnavailable(c.availability);
-  const hit = candidates.find(c => c.weight > 0 && c.availability.status === "available");
+    .map((id, index) => ({ id, index, engine: config.workers[id]!.engine, weight: effectiveWeight(owner, id), running: load(id), availability: availabilityOf(config, blocks, config.workers[id]!) }));
+  const reason = (c: (typeof candidates)[number]) => c.weight === 0 ? "priority weight 0" : c.availability.status !== "available" ? describeUnavailable(c.availability) : excluded.has(c.engine) ? EXCLUDED_ENGINE_REASON : "available";
+  const usable = candidates.filter(c => c.weight > 0 && c.availability.status === "available");
+  // (a+1)/wa < (b+1)/wb, compared without division.
+  const eligible = usable.filter(c => !excluded.has(c.engine))
+    .sort((a, b) => (a.running + 1) * b.weight - (b.running + 1) * a.weight || b.weight - a.weight || a.index - b.index);
+  const hit = eligible[0];
   if (!hit) {
+    if (usable.length) {
+      const detail = usable.map(c => `${c.id}: ${EXCLUDED_ENGINE_REASON}`).join("; ");
+      throw new PolicyError(`NO_ALTERNATIVE_ENGINE: every available worker for owner ${opts.owner} is on an excluded engine (excluded: ${[...excluded].join(", ")}): ${detail}`, usable.map(c => ({ path: `$.owners.${opts.owner}.workers`, message: `${c.id}: ${EXCLUDED_ENGINE_REASON}` })));
+    }
     const detail = candidates.map(c => `${c.id}: ${reason(c)}`).join("; ");
     throw new PolicyError(`no available worker for owner ${opts.owner}${detail ? `: ${detail}` : ""}`, candidates.map(c => ({ path: `$.owners.${opts.owner}.workers`, message: `${c.id}: ${reason(c)}` })));
   }
-  const skipped = candidates.slice(0, candidates.indexOf(hit)).map(c => ({ worker: c.id, reason: reason(c) }));
-  return { ...previewSelection(config, opts.owner, hit.id, []), selected_by: "weight", skipped };
+  const skipped = candidates.filter(c => !eligible.includes(c)).map(c => ({ worker: c.id, reason: reason(c) }));
+  return { ...previewSelection(config, opts.owner, hit.id, []), selected_by: "weight", skipped, candidates: eligible.map(c => ({ worker: c.id, weight: c.weight, running: c.running })) };
 }

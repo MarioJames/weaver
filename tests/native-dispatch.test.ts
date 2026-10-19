@@ -8,6 +8,7 @@ import { TaskStore } from '../src/main/store';
 import { TaskManager } from '../src/main/manager';
 import { CommandHandler } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
+import { workerInstruction } from '../src/main/adapters/instruction';
 import type { WorkerAdapter } from '../src/main/adapters/worker';
 
 /** A real (non-mock) adapter that must never be asked to launch a process for native work. */
@@ -98,5 +99,43 @@ test('native work holds an owner slot, can be cancelled, and survives a restart'
     assert.equal(f.store.get(b.id).status, 'running');
     assert.equal(f.store.get(b.id).run?.execution, 'native');
     assert.deepEqual(launches, []);
+  } finally { await f.close(); }
+});
+
+test('a native dispatch hands the owner the same instruction a real worker would get', async () => {
+  const f = setup();
+  try {
+    const t = f.task();
+    const started = f.call('workers.spawn', { taskId: t.id });
+    assert.equal(started.dispatch.execution, 'native');
+    const stored = f.store.get(t.id);
+    const pkg = f.store.getMetadata().packages.find(p => p.id === stored.packageId)!;
+    assert.equal(started.next.action, 'run_subagent');
+    assert.equal(started.next.model, 'sonnet');
+    assert.equal(started.next.effort, 'high');
+    // Byte for byte the frozen worker contract, so a native subagent is no different from a launched one.
+    assert.equal(started.next.prompt, workerInstruction(stored, pkg));
+    assert.match(started.next.prompt, /You are a Weaver worker executing one frozen work package/);
+    assert.equal(started.next.then, `weaver workers complete --task-id ${t.id} --input report.json`);
+    // An owner that lost the spawn response recovers the same handoff from the running task.
+    assert.deepEqual(f.call('tasks.get', { taskId: t.id }).next, started.next);
+    f.call('workers.complete', { taskId: t.id, outcome: 'completed', summary: 'Edited the file' });
+    assert.equal(f.call('tasks.get', { taskId: t.id }).next, undefined);
+  } finally { await f.close(); }
+});
+
+test('native work that has not been admitted into a slot is only waited for', async () => {
+  const f = setup();
+  try {
+    const s = f.policy.snapshot();
+    s.config.owners.claude_owner.max_parallel = 1;
+    f.policy.save({ revision: s.revision, config: s.config, blocks: [] });
+    const a = f.task(); const b = f.task();
+    assert.equal(f.call('workers.spawn', { taskId: a.id }).next.action, 'run_subagent');
+    const queued = f.call('workers.spawn', { taskId: b.id });
+    assert.equal(queued.scheduled, true);
+    assert.equal(queued.dispatch.execution, 'native');
+    assert.deepEqual(queued.next, { action: 'wait', command: `weaver tasks wait --task-id ${b.id}` });
+    assert.equal(f.call('tasks.get', { taskId: b.id }).next, undefined);
   } finally { await f.close(); }
 });

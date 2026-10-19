@@ -237,6 +237,7 @@ test('explicit mock provider still runs the mock worker from the real runtime ad
     const spawned = handler.handle({ apiVersion: 'weaver.v1', commandId: randomUUID(), command: 'workers.spawn', args: { taskId: createdId, provider: 'mock-jsonl' } });
     assert.equal(spawned.ok, true, JSON.stringify(spawned));
     assert.equal((spawned.data as { dispatch: { execution: string } }).dispatch.execution, 'mock');
+    assert.deepEqual((spawned.data as { next?: { action: string; command: string } }).next, { action: 'wait', command: `weaver tasks wait --task-id ${createdId}` });
     assert.equal(launched, 0);
     const deadline = Date.now() + 4000;
     let done = store.get(createdId);
@@ -322,4 +323,97 @@ test('pump never makes an attempted worker runnable again after PID persistence 
   handler.pump();assert.equal(starts,1);assert.equal(store.get(task.id).status,'failed');assert.equal(store.get(task.id).scheduled,false);
   handler.pump();assert.equal(starts,1);assert.equal(store.get(task.id).run?.status,'stopped');
  }finally{handler.draining=true;await manager.shutdown();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('the dispatch response names the owner one next step, never an engine',async()=>{
+ const f=setup(()=>hangProcess());
+ try{
+  const s=f.policy.snapshot();s.config.owners.claude_owner.max_parallel=1;
+  f.policy.save({revision:s.revision,config:s.config,blocks:[]});
+  const running=f.raw('tasks.create',{title:'Real',instruction:'fixture',owner,workspace:f.dir});
+  const spawned=f.raw('workers.spawn',{taskId:running.data.id,owner:'claude_owner',worker:'codex_worker'});
+  assert.equal(spawned.ok,true,JSON.stringify(spawned));
+  assert.equal(spawned.data.dispatch.execution,'real');
+  assert.deepEqual(spawned.data.next,{action:'wait',command:`weaver tasks wait --task-id ${running.data.id}`});
+  // Work that has only been admitted to the queue is waited for too.
+  const waiting=f.raw('tasks.create',{title:'Held',instruction:'fixture',owner,workspace:f.dir});
+  const queued=f.raw('workers.spawn',{taskId:waiting.data.id,owner:'claude_owner',worker:'codex_worker'});
+  assert.equal(queued.ok,true,JSON.stringify(queued));
+  assert.equal(queued.data.scheduled,true);
+  assert.deepEqual(queued.data.next,{action:'wait',command:`weaver tasks wait --task-id ${waiting.data.id}`});
+  assert.equal(f.raw('tasks.get',{taskId:queued.data.id}).data.next,undefined);
+ }finally{await f.close();}
+});
+
+/** One attempt as a finished run leaves it: routed to an engine and terminal. */
+function attempt(f:ReturnType<typeof setup>,engine:'claude'|'codex',status:'failed'|'cancelled'|'completed'='failed',retryOf?:string):string {
+ const created=f.raw('tasks.create',{title:`Attempt on ${engine}`,instruction:'fixture',owner,workspace:f.dir});
+ const task=f.store.get(created.data.id);
+ task.status=status;
+ if(retryOf)task.retryOf=retryOf;
+ task.dispatch={owner:'claude_owner',worker:engine==='claude'?'claude_worker':'codex_alt_worker',engine,model:'frozen-model',effort:'high',execution:'real',maxParallel:4,adapter:engine,workspace:realpathSync(f.dir)};
+ f.store.put(task);
+ return task.id;
+}
+
+/** Claude owns this owner, so only a second engine gives dispatch somewhere to move. */
+function addCodexWorker(f:ReturnType<typeof setup>):void {
+ const s=f.policy.snapshot();
+ s.config.workers.codex_alt_worker={enabled:true,engine:'codex',model:'gpt-6.1-sol',effort:'high',description:'Second codex worker for retry routing.'};
+ s.config.owners.claude_owner.workers=[...s.config.owners.claude_owner.workers,'codex_alt_worker'];
+ f.policy.save({revision:s.revision,config:s.config,blocks:[]});
+}
+
+test('a retry is routed away from the engine that failed it, and the response says so',async()=>{
+ const f=setup(()=>successProcess());
+ try{
+  addCodexWorker(f);
+  const first=attempt(f,'codex');
+  const retry=f.raw('tasks.retry',{taskId:first});
+  assert.equal(retry.ok,true,JSON.stringify(retry));
+  // tasks.retry only links the task; dispatch stays the owner's call.
+  assert.equal(retry.data.status,'queued');
+  assert.equal(retry.data.dispatch,undefined);
+  const spawned=f.raw('workers.spawn',{taskId:retry.data.id,owner:'claude_owner'});
+  assert.equal(spawned.ok,true,JSON.stringify(spawned));
+  assert.equal(spawned.data.dispatch.engine,'claude');
+  assert.deepEqual(spawned.data.excludedEngines,['codex']);
+  const note=f.store.get(retry.data.id).events.find(e=>e.message.startsWith('Policy selected'))!;
+  assert.match(note.message,/failed earlier in this retry chain/);
+  assert.match(note.message,/codex/);
+  // A completed attempt is not a failure, so its engine stays on the table.
+  const succeeded=attempt(f,'codex','completed');
+  const again=f.raw('tasks.retry',{taskId:succeeded});
+  const reusable=f.raw('workers.spawn',{taskId:again.data.id,owner:'claude_owner',worker:'codex_alt_worker'});
+  assert.equal(reusable.ok,true,JSON.stringify(reusable));
+  assert.equal(reusable.data.dispatch.engine,'codex');
+  assert.equal(reusable.data.excludedEngines,undefined);
+ }finally{await f.close();}
+});
+
+test('an explicit worker on an excluded engine is refused, and so is a chain with no engine left',async()=>{
+ const f=setup(()=>successProcess());
+ try{
+  addCodexWorker(f);
+  const cancelled=attempt(f,'codex','cancelled');
+  const retry=f.raw('tasks.retry',{taskId:cancelled});
+  const rejected=f.raw('workers.spawn',{taskId:retry.data.id,owner:'claude_owner',worker:'codex_alt_worker'});
+  assert.equal(rejected.error?.code,'NO_ALTERNATIVE_ENGINE');
+  assert.match(rejected.error?.message??'',/^NO_ALTERNATIVE_ENGINE/);
+  assert.match(rejected.error?.message??'',/codex_alt_worker/);
+  assert.equal(f.store.get(retry.data.id).status,'queued');
+  assert.equal(f.store.get(retry.data.id).dispatch,undefined);
+  assert.equal(f.seen.length,0);
+  // Two levels: the chain closes every engine its parent and grandparent tried.
+  const second=attempt(f,'claude','failed',cancelled);
+  const third=f.raw('tasks.retry',{taskId:second});
+  const blocked=f.raw('workers.spawn',{taskId:third.data.id,owner:'claude_owner'});
+  assert.equal(blocked.error?.code,'NO_ALTERNATIVE_ENGINE');
+  assert.match(blocked.error?.message??'',/^NO_ALTERNATIVE_ENGINE/);
+  for(const engine of ['claude','codex'])assert.ok(blocked.error?.message?.includes(engine),engine);
+  assert.equal(f.store.get(third.data.id).status,'queued');
+  assert.equal(f.store.get(third.data.id).dispatch,undefined);
+  assert.equal(f.seen.length,0);
+  assert.equal(f.mockStarts(),0);
+ }finally{await f.close();}
 });

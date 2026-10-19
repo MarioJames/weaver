@@ -10,7 +10,7 @@ import { HelloJobs, parseHelloInput, sayHi } from './engines/hello';
 import { embeddedApp } from './embedded';
 import { RoutingWorkerAdapter } from './adapters/routing';
 import { MockWorkerAdapter } from './adapters/worker';
-import { CommandHandler, configuredParallel } from './commands';
+import { CommandHandler, configuredParallel, workerLoad } from './commands';
 import { applyEngineEnabled, parseEngineToggle } from './engines/control';
 import { EngineProber } from './engines/probe';
 import { SECURITY_HEADERS, startHttpServer, type HttpRuntime } from './http';
@@ -168,7 +168,11 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
         if (!job) throw new RpcError('NOT_FOUND', 'Probe not found or expired');
         return job;
       }
-      case 'previewRoute': return active.policy.preview(args[0]);
+      case 'previewRoute': {
+        // The route shown is the route a dispatch would take now, so the server supplies the live load.
+        const input = args[0] && typeof args[0] === 'object' && !Array.isArray(args[0]) ? args[0] as Record<string, unknown> : {};
+        return active.policy.preview({ ...input, workerLoad: workerLoad(active.store.list()) });
+      }
       case 'scanEngines': {
         const found = await track(prober.scan());
         probes = found;

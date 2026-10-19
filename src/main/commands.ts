@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { API_VERSION, type CommandResponse, type LogicalOwner, type WorkPackage } from '../shared/commands';
+import { API_VERSION, type CommandResponse, type DispatchNext, type LogicalOwner, type WorkPackage } from '../shared/commands';
 import type { Task } from '../shared/types';
 import { object, parseId, parseTaskInput, parseWorkerRecord, text } from '../shared/validation';
 import { TaskManager } from './manager';
@@ -7,12 +7,20 @@ import { event } from './store';
 import { ContinuationService, ContinuationError, redactContext } from './continuation';
 import { MockOwnerHostAdapter, type OwnerHostEvidence, type OwnerMessage } from './adapters/logical';
 import { PolicyStore } from './policy/store';
+import { EXCLUDED_ENGINE_REASON } from './policy/routing';
+import type { RoutePreview } from '../shared/policy';
 import { QUOTA_CAPABILITIES } from './policy/quota';
 import { absoluteExistingWorkspace, assertFrozenWorkspace, workspaceIdentity, isRealEngineKind, REAL_ENGINE_KINDS } from './workspace';
 import { workerInstruction } from './adapters/instruction';
 export const WRITE_COMMANDS = ['owners.attach','owners.spawn','owners.switch','owners.continuation.configure','tasks.create','tasks.retry','tasks.cancel','packages.create','workers.spawn','workers.complete','results.deliver','results.ack','reviews.submit'] as const;
 export const READ_COMMANDS = ['capabilities.get','sync.snapshot','sync.status','owners.list','owners.get','owners.continuation.get','tasks.get','tasks.list','tasks.events','tasks.results','artifacts.read','packages.get','operations.get','observability.get','observability.export'] as const;
 const writes=new Set<string>(WRITE_COMMANDS);
+/** Running tasks per worker across every owner: the load that weighted dispatch balances. */
+export function workerLoad(tasks: Task[]): Record<string, number> {
+ const load: Record<string, number> = {};
+ for (const task of tasks) if ((task.status === 'running' || task.status === 'cancelling') && task.dispatch?.worker) load[task.dispatch.worker] = (load[task.dispatch.worker] ?? 0) + 1;
+ return load;
+}
 export function configuredParallel(policy: PolicyStore): number {
  return Object.values(policy.snapshot().config.owners).filter(owner => owner.enabled).reduce((sum, owner) => sum + owner.max_parallel, 0);
 }
@@ -125,6 +133,35 @@ export class CommandHandler {
   if(!this.manager.canLaunchReal)fail('CAPABILITY_UNAVAILABLE',`Real launcher for ${kind} is not loaded. No mock provider was substituted.`);
   return {execution:'real',adapter:kind,engineKind:kind,workspace:absoluteExistingWorkspace(task.workspace),maxWaitMinutes:minutes};
  }
+ /** Engines of every earlier attempt in this task's retry chain that ended failed or cancelled: a retry never returns to one. */
+ private chainEngines(task:Task):string[] {
+  const engines:string[]=[];const seen=new Set<string>([task.id]);let id=task.retryOf;
+  while(id&&!seen.has(id)){
+   seen.add(id);
+   let previous:Task;
+   try{previous=this.manager.store.get(id);}catch{break;}
+   const engine=previous.dispatch?.engine;
+   if(engine&&(previous.status==='failed'||previous.status==='cancelled')&&!engines.includes(engine))engines.push(engine);
+   id=previous.retryOf;
+  }
+  return engines;
+ }
+ /** The single step the owner takes next, so an owner never has to understand engines. */
+ private nextFor(task:Task):DispatchNext|undefined {
+  const dispatch=task.dispatch;
+  if(!dispatch)return undefined;
+  if(dispatch.execution!=='native'||task.scheduled)return {action:'wait',command:`weaver tasks wait --task-id ${task.id}`};
+  const pkg=this.manager.store.getMetadata().packages.find(p=>p.id===task.packageId&&p.taskId===task.id);
+  // Dispatch freezes the package before a native run starts; without one there is no instruction to hand over.
+  if(!pkg)return undefined;
+  // Identical to the instruction a real worker is launched with, so heterogeneous workers get the same contract.
+  return {action:'run_subagent',model:dispatch.model,effort:dispatch.effort,prompt:workerInstruction(task,pkg),then:`weaver workers complete --task-id ${task.id} --input report.json`};
+ }
+ /** Dispatch response: the task snapshot, the owner's next step, and the engines this retry chain excluded. */
+ private dispatchResponse(task:Task,excluded:string[]) {
+  const next=this.nextFor(task);
+  return {...this.publicTask(task),...(next?{next}:{}),...(excluded.length?{excludedEngines:excluded}:{})};
+ }
  private execute(command:string,a:Record<string,unknown>):unknown {
   switch(command){
    case 'sync.snapshot':return {revision:this.manager.store.revision,tasks:this.manager.store.list().map(t=>({id:t.id,title:t.title,status:t.status,revision:t.revision??0,ownerId:t.ownerId,updatedAt:t.updatedAt,reviewState:t.reviewState??'pending'})),owners:this.manager.store.getMetadata().owners.map(o=>({id:o.id,name:o.name,profileId:o.profileId,mode:o.mode,state:o.state}))};
@@ -151,7 +188,12 @@ export class CommandHandler {
     const task=this.manager.create(input);if(owner){task.ownerId=owner.id;task.ownerEpoch=0;task.ownerLastActivityAt=new Date().toISOString();task.continuationPolicy={idleRotationMinutes:60};this.put(task);}return this.publicTask(task);
    });
    case 'tasks.retry':{const previous=this.task(a);if(!terminal(previous))fail('INVALID_STATE','Retry requires terminal execution');const task=this.manager.create({title:previous.title,instruction:previous.instruction,owner:previous.owner,workspace:previous.workspace,acceptanceCriteria:previous.acceptanceCriteria,constraints:previous.constraints});task.ownerId=previous.ownerId;task.retryOf=previous.id;this.put(task);return this.publicTask(task);}
-   case 'tasks.get':return this.publicTask(this.task(a));
+   case 'tasks.get':{
+    const task=this.task(a);
+    // A running native task is the owner's own subagent, so its instruction is recoverable here even if the spawn response was lost.
+    const next=task.status==='running'&&task.dispatch?.execution==='native'?this.nextFor(task):undefined;
+    return {...this.publicTask(task),...(next?{next}:{})};
+   }
    case 'tasks.list':{
     const offset=a.offset??0;const limit=a.limit??25;if(!Number.isSafeInteger(offset)||Number(offset)<0||!Number.isSafeInteger(limit)||Number(limit)<1||Number(limit)>100)fail('INVALID_REQUEST','Invalid pagination');
     const all=this.manager.store.list().filter(t=>a.ownerId===undefined||t.ownerId===a.ownerId);const tasks=all.slice(Number(offset),Number(offset)+Number(limit)).map(t=>{const {events,artifacts,...summary}=this.publicTask(t);return {...summary,artifactCount:artifacts.length};});return {tasks,nextOffset:Number(offset)+tasks.length<all.length?Number(offset)+tasks.length:null};
@@ -171,18 +213,28 @@ export class CommandHandler {
     const logical=task.ownerId?this.owner(task.ownerId):undefined;
     const owner=text(a.owner??logical?.profileId??Object.keys(this.policy.snapshot().config.owners)[0],'owner profile',120);
     if(logical&&owner!==logical.profileId)fail('POLICY_DENIED','Task owner profile cannot be changed at dispatch');
+    const excluded=this.chainEngines(task);
     const running=this.manager.store.list().filter(t=>(t.status==='running'||t.status==='cancelling')&&t.dispatch?.owner===owner).length;
-    const route=this.policy.preview({owner,...(a.worker!==undefined?{worker:a.worker}:{}),runningCount:running});
+    let route:RoutePreview;
+    try {
+     route=this.policy.preview({owner,...(a.worker!==undefined?{worker:a.worker}:{}),runningCount:running,workerLoad:workerLoad(this.manager.store.list()),...(excluded.length?{excludeEngines:excluded}:{})});
+    } catch(error) {
+     const message=error instanceof Error?error.message:String(error);
+     if(message.startsWith('NO_ALTERNATIVE_ENGINE'))fail('NO_ALTERNATIVE_ENGINE',message);
+     throw error;
+    }
     const decision=this.decideExecution(route.engine,a.provider,task,this.policy.snapshot().config.owners[route.owner]?.engine);
     const pendingPackage:WorkPackage=task.packageId?this.manager.store.getMetadata().packages.find(p=>p.id===task.packageId&&p.taskId===task.id)!:{id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:[decision.workspace??task.workspace??'Explicit mock fixture'],acceptanceCriteria:task.acceptanceCriteria?.length?task.acceptanceCriteria:[decision.execution==='mock'?'Mock output returned for owner review':'Provider result returned for owner review'],createdAt:new Date().toISOString()};
     if(!pendingPackage)fail('INVALID_REQUEST','Frozen work package is missing');
-    if(decision.execution==='real')workerInstruction({...task,workspace:decision.workspace},pendingPackage);
+    // Real launch and native handoff freeze the same instruction, so it must fit before any state changes.
+    if(decision.execution!=='mock')workerInstruction({...task,workspace:decision.workspace??task.workspace},pendingPackage);
     this.prepareOwnerActivity(command,a);task=this.task(a);
     if(decision.workspace)task.workspace=decision.workspace;
     if(!task.packageId){const meta=this.manager.store.getMetadata();if(meta.packages.length>=1000)fail('RESOURCE_LIMIT','Package limit reached');meta.packages.push(pendingPackage);this.manager.store.transaction(()=>{this.manager.store.setMetadata(meta);task.packageId=pendingPackage.id;this.put(task);});}
     task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,...(decision.execution==='real'?{workspaceIdentity:workspaceIdentity(decision.workspace)}:{})}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
-    event(task,'lifecycle',decision.execution==='real'?`Policy selected ${route.worker}; launching ${decision.engineKind} in ${decision.workspace}`:decision.execution==='native'?`Policy selected ${route.worker} on the owner's engine; the owner runs it with its built-in subagent tool (${route.model}, ${route.effort})`:`Policy selected ${route.worker}; explicit mock-jsonl provider`);
-    if(!route.capacityAvailable){task.scheduled=true;task.queueReason={code:'waiting_for_capacity',message:`Owner ${route.owner} is at its current concurrency limit (${route.maxParallel}).`};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.put(task);return this.publicTask(task);}this.put(task);return this.publicTask(this.manager.start(task.id,route.maxParallel));
+    const selected=decision.execution==='real'?`Policy selected ${route.worker}; launching ${decision.engineKind} in ${decision.workspace}`:decision.execution==='native'?`Policy selected ${route.worker} on the owner's engine; the owner runs it with its built-in subagent tool (${route.model}, ${route.effort})`:`Policy selected ${route.worker}; explicit mock-jsonl provider`;
+    event(task,'lifecycle',`${selected}${excluded.length?`; engines excluded because they ${EXCLUDED_ENGINE_REASON}: ${excluded.join(', ')}`:''}`);
+    if(!route.capacityAvailable){task.scheduled=true;task.queueReason={code:'waiting_for_capacity',message:`Owner ${route.owner} is at its current concurrency limit (${route.maxParallel}).`};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.put(task);return this.dispatchResponse(task,excluded);}this.put(task);return this.dispatchResponse(this.manager.start(task.id,route.maxParallel),excluded);
    }
    case 'workers.complete':{
     const task=this.task(a);this.revise(task,a);
