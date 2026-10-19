@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { failure, LocalIPCError, MAX_FRAME_BYTES, readDiscovery, TRANSPORT_TIMEOUT_MS } from '../main/local-ipc';
 import { startRuntime } from '../main/runtime';
 import { VERSION } from '../shared/version';
+import { installSkill, SKILL_AGENTS, SKILL_NAME, sourceSkill, type SkillAgent } from './skills';
 
 export const DEFAULT_WEB_PORT = 4737;
 export type OutputFormat = 'json' | 'jsonl' | 'text';
@@ -70,6 +71,7 @@ export const CLI_HELP = `Weaver local control plane
 
   weaver web [--port <0-65535>] [--data-dir <path>] [--no-open] [--dev] [--output json|jsonl|text]
   weaver <command> [--data-dir <path>] [--output json|jsonl|text] [--input <file|->] [--command-id <id>] [--task-id <id>] [--for <seconds>]
+  weaver skills install [--agent claude-code,codex] [--dir <skills-root>] [--link] [--force] [--output json|text]
 
 weaver web runs one foreground control plane: loopback HTTP on 127.0.0.1 and the authenticated Unix CLI socket. Closing a browser does not stop tasks. Ctrl+C stops new work and cancels workers this process started. Task and policy files are kept. Default data directory: $XDG_DATA_HOME/weaver or ~/.local/share/weaver.
 
@@ -86,6 +88,17 @@ Mutations need --command-id, except policy save, engines set-enabled, and quota 
 ${catalogHelp}
 
 Engine scan is PATH plus --version. It does not call a model.`;
+
+const SKILLS_HELP = `weaver skills install [--agent claude-code,codex] [--dir <skills-root>] [--link] [--force] [--output json|text]
+
+Installs the ${SKILL_NAME} skill this executable carries. It does not need a running control plane.
+
+  --agent  Agents to link: claude-code (~/.claude/skills), codex (~/.codex/skills), comma-separated. Default both.
+  --dir    Install into <skills-root>/${SKILL_NAME} instead of ~/.agents/skills, with no agent links.
+  --link   Link to this source checkout's skills/${SKILL_NAME} instead of copying, so edits apply at once.
+  --force  Replace a skill or agent link at those paths that weaver did not install.
+
+The copy goes to ~/.agents/skills/${SKILL_NAME} and each agent path links to it. Rerunning updates a copy weaver installed.`;
 
 const WEB_HELP = `weaver web [--port <0-65535>] [--data-dir <path>] [--no-open] [--dev] [--output json|jsonl|text]
 
@@ -115,7 +128,7 @@ function positionals(argv: string[]): string[] {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg.startsWith('--')) { words.push(arg); continue; }
-    if (['--input', '--command-id', '--data-dir', '--task-id', '--port', '--output', '--for'].includes(arg)) i++;
+    if (['--input', '--command-id', '--data-dir', '--task-id', '--port', '--output', '--for', '--agent', '--dir'].includes(arg)) i++;
   }
   return words;
 }
@@ -352,6 +365,41 @@ function readyLine(url: string, port: number, format: OutputFormat): string {
   if (format === 'text') return url + '\n';
   return JSON.stringify({ apiVersion: 'weaver.v1', commandId: null, ok: true, data: { url, port } }) + '\n';
 }
+function runSkills(argv: string[], words: string[]): number {
+  if (words.length !== 2 || words[1] !== 'install') throw new LocalIPCError('INVALID_ARGUMENT', 'Usage: weaver skills install [--agent claude-code,codex] [--dir <skills-root>] [--link] [--force]');
+  let agents: SkillAgent[] = [...SKILL_AGENTS];
+  let dir: string | undefined;
+  let link = false;
+  let force = false;
+  let output: OutputFormat = 'text';
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === 'skills' || arg === 'install') continue;
+    if (arg === '--link') link = true;
+    else if (arg === '--force') force = true;
+    else if (arg === '--json') output = 'json';
+    else if (arg === '--output') { const value = argv[++i]; if (value !== 'json' && value !== 'text') throw new LocalIPCError('INVALID_ARGUMENT', '--output must be json or text'); output = value; }
+    else if (arg === '--agent') {
+      const value = argv[++i] ?? '';
+      const chosen = value.split(',').map(item => item.trim()).filter(Boolean);
+      if (!chosen.length || chosen.some(item => !(SKILL_AGENTS as readonly string[]).includes(item))) throw new LocalIPCError('INVALID_ARGUMENT', '--agent takes claude-code, codex, or claude-code,codex');
+      agents = chosen as SkillAgent[];
+    } else if (arg === '--dir') {
+      const value = argv[++i];
+      if (!value || !isAbsolute(value)) throw new LocalIPCError('INVALID_ARGUMENT', '--dir must be an absolute path');
+      dir = value;
+    } else throw new LocalIPCError('INVALID_ARGUMENT', `Unknown skills argument: ${arg}`);
+  }
+  const source = sourceSkill();
+  if (link && !source.dir) throw new LocalIPCError('INVALID_ARGUMENT', '--link needs a source checkout; this executable carries its own copy');
+  let result;
+  try { result = installSkill({ home: homedir(), files: source.files, agents, dir, force, version: VERSION, linkTo: link ? source.dir : undefined }); }
+  catch (error) { throw new LocalIPCError(String((error as Error).message).split(':')[0] || 'SKILL_INSTALL_FAILED', (error as Error).message); }
+  if (output === 'json') writeEnvelope('json', { apiVersion: 'weaver.v1', ok: true, data: { skill: SKILL_NAME, version: VERSION, ...result } });
+  else process.stdout.write(`${result.action} ${SKILL_NAME} at ${result.canonical}${result.links.length ? `\nlinked ${result.links.join(', ')}` : ''}\n`);
+  return 0;
+}
+
 export async function runCLI(argv: string[]): Promise<number> {
   let commandId: string | undefined;
   let errorFormat: OutputFormat = requestedOutput(argv);
@@ -360,6 +408,7 @@ export async function runCLI(argv: string[]): Promise<number> {
     if (argv.includes('--help')) {
       const rest=argv.filter(arg=>arg!=='--help');
       const words=positionals(rest);
+      if(words[0]==='skills') { process.stdout.write(SKILLS_HELP+'\n'); return 0; }
       if(words[0]==='web') {
         const web=parseWeb(rest);
         if(web.output==='text')process.stdout.write(WEB_HELP+'\n');
@@ -390,6 +439,7 @@ export async function runCLI(argv: string[]): Promise<number> {
       await runtime.done;
       return 0;
     }
+    if (words[0] === 'skills') return runSkills(argv, words);
     const options = parseCLI(argv);
     errorFormat = options.output;
     commandId = options.commandId;

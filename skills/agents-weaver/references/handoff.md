@@ -1,6 +1,6 @@
 # CLI handoff: weaver.v1
 
-The external CLI Owner uses this `weaver` skill and the Weaver CLI. The app's default Owner mode is manual registration. No second scheduler or hidden Owner AI is started. For an exact command catalog, run `weaver --help --output json`; `weaver results ack --help --output json` shows required fields, mutation status and usage. Output is `json` (default), `jsonl`, or `text`; `--json` aliases json and cannot be combined with `--output`.
+The owner uses this `agents-weaver` skill and the `weaver` CLI. The app's default Owner mode is manual registration. No second scheduler or hidden Owner AI is started. For an exact command catalog, run `weaver --help --output json`; `weaver results ack --help --output json` shows required fields, mutation status and usage. Output is `json` (default), `jsonl`, or `text`; `--json` aliases json and cannot be combined with `--output`.
 
 ## Task scratch root
 
@@ -35,11 +35,13 @@ Save a UTF-8 JSON request under the task's scratch directory:
   "title": "Implement the scoped change",
   "goal": "Edit the specified fixture and report verification evidence",
   "workspace": "/absolute/path/to/authorized/project",
-  "ownerProfileId": "AVAILABLE_PROFILE_FROM_POLICY",
+  "ownerProfileId": "codex_owner",
   "constraints": ["Do not delegate, commit or push", "Do not modify unrelated files"],
   "acceptanceCriteria": ["The specified file has the requested content and the existing check passes"]
 }
 ```
+
+`ownerProfileId` is your owner profile from the policy (the enabled owner on your engine, see [config](config.md)).
 
 ```sh
 weaver tasks create --input request.json --command-id create-work-001 --output json
@@ -60,10 +62,12 @@ The revision above is illustrative; always read the actual current value. `packa
 
 ```sh
 weaver workers spawn --input dispatch.json --command-id dispatch-work-001 --output json
-weaver tasks watch --task-id RETURNED_TASK_UUID --for 30 --output jsonl
+weaver tasks wait --task-id RETURNED_TASK_UUID --for 600 --output json
 weaver tasks get --task-id RETURNED_TASK_UUID --output json
 weaver tasks results --task-id RETURNED_TASK_UUID --output json
 ```
+
+One wait call lasts at most 600 seconds and returns the current snapshot on timeout. Repeat until a terminal state or until `herdr.max_wait_minutes` from the policy has passed; then inspect `tasks events` and decide (keep waiting, cancel, or take the package back). Use `tasks watch --for N --output jsonl` when you want the event stream.
 
 A worker on the owner's own engine is dispatched as `execution: "native"`: no process starts, and the owner runs the package with its built-in subagent tool at the frozen model/effort, then reports:
 

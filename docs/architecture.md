@@ -6,7 +6,7 @@
 
 Weaver 是本地任务控制面，交付三件套：
 
-1. 公开技能 `skills/weaver`（skill name `weaver`）：宿主里的真实 owner agent 按它读能力、路由与包，再调 CLI 派发、验收与登记。workers 不递归，owner 不在 Weaver 之外另跑调度循环。
+1. 公开技能 `skills/agents-weaver`（skill name `agents-weaver`，`weaver skills install` 安装）：宿主里的真实 owner agent 按它读能力、路由与包，再调 CLI 派发、验收与登记。workers 不递归，owner 不在 Weaver 之外另跑调度循环。
 2. Node CLI `weaver`（`src/cli/main.ts`）：一次命令一次连接，经 Unix 域 socket 的帧 token 认证通道写入运行中的控制面；自身不打开任务文件、不持有状态、不启动 worker。
 3. 前台 web 进程 `weaver web`（`src/main/runtime.ts`）：唯一写者与进程监督者，绑定 loopback HTTP（仅 `127.0.0.1`，dev 模式同源 Vite middleware）并同时开启已认证的 Unix CLI socket。二者共享同一个 `CommandHandler`（`src/main/commands.ts`）。
 
@@ -23,7 +23,7 @@ Weaver 是本地任务控制面，交付三件套：
 ## 2. 组件与进程生命周期
 
 ```text
-宿主 agent + skills/weaver ─┐
+宿主 agent + agents-weaver ─┐
                             ├─┤ weaver CLI（Unix socket，weaver.v1 帧）
 浏览器 Web UI (React) ────┘ ─ POST /api/rpc（loopback HTTP，同一 handler）
                  │

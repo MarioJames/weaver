@@ -1,11 +1,13 @@
 /**
  * What a standalone executable carries inside itself instead of files next to it:
- * the built renderer, and the argument that makes the executable run the mock worker.
+ * the built renderer, the agents-weaver skill, and the argument that makes the executable run the mock worker.
  * A source checkout or npm install never sets this.
  */
 export interface EmbeddedApp {
   renderer: ReadonlyMap<string, Uint8Array>;
   mockWorkerArg: string;
+  /** The agents-weaver skill, for `weaver skills install`. */
+  skill: ReadonlyMap<string, Uint8Array>;
 }
 
 let embedded: EmbeddedApp | undefined;

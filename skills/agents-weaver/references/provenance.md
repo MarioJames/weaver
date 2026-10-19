@@ -4,7 +4,7 @@ Source: https://github.com/MarioJames/skill-foundry/tree/61989b1/skills/agents-c
 
 Baseline inspected: `61989b1`. Source license: Apache-2.0; a copy is included as LICENSE. The upstream repository remains untouched.
 
-The repository skill is now independently named `weaver`; the upstream `agents-cooperation` name above is provenance, not an instruction to replace or invoke the installed global skill. It is a short, transport-agnostic set of cooperation principles and truthful current interaction guidance. Its model/effort/provider validation, class/tag routing, availability and quota time helpers have been adapted into Weaver app code, along with the upstream schema validator and config schema/defaults. See [the script-by-script inventory](../../../docs/script-migration.md).
+The repository skill is now independently named `agents-weaver` (earlier `weaver`); the upstream `agents-cooperation` name above is provenance, not an instruction to replace or invoke the installed global skill. It is a short, transport-agnostic set of cooperation principles and truthful current interaction guidance. Its model/effort/provider validation, class/tag routing, availability and quota time helpers have been adapted into Weaver app code, along with the upstream schema validator and config schema/defaults. See [the script-by-script inventory](../../../docs/script-migration.md).
 
 The app does not execute upstream scripts. It does not import old hidden-session runs, take over unknown PIDs, read global agent config, inspect provider home files or pass bypass arguments. Config vocabulary does not prove a model call succeeded.
 

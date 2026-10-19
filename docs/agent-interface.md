@@ -37,6 +37,8 @@ CLI 直接用 `--input <file|->` 传 JSON（args 对象或完整信封均可；�
 
 CLI 目录共 38 条命令：读取（15）与写入（13）共 28 条逻辑命令，如下表；另有 `policy`/`engines`/`quota` 八个 method-wrapped RPC 动词与 CLI 本地 `tasks wait/watch` 两条命令。逻辑写入命令必须带 commandId；RPC 动词不接收 command/task ID。
 
+`weaver skills install [--agent claude-code,codex] [--dir <root>] [--link] [--force]` 是不进命令目录、不连控制面的本地命令：把可执行文件携带的 `agents-weaver` 技能装到 `~/.agents/skills/agents-weaver`，并从 `~/.claude/skills`、`~/.codex/skills` 链接过去；只更新自己装的副本，路径上已有别的技能或链接时拒绝覆盖（`--force` 例外）。
+
 | 命令 | CLI 输入要点 |
 |---|---|
 | `capabilities.get` | 无参；返回全部命令名、limits、`realExecution`、`workerProviders`、`authentication:'ephemeral-local-trusted-user-demo'`、`mcp:false` 等 |

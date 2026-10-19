@@ -6,7 +6,7 @@
 
 [品牌素材与使用规范](docs/assets/brand/README.md)
 
-Weaver is a local Node control plane for owner-led agent work. It ships as one public skill (`skills/weaver`, skill name `weaver`), one `weaver` CLI, and one foreground web process. The browser UI and the CLI call the same `CommandHandler`: the web serves loopback HTTP on `127.0.0.1`, the CLI connects through an authenticated Unix-socket transport, and both speak `weaver.v1`. There is no second daemon, no separate owner-model process, no MCP service, no remote API, and no database: state is a versioned JSON store owned by the running process.
+Weaver is a local Node control plane for owner-led agent work. It ships as one public skill (`skills/agents-weaver`, skill name `agents-weaver`), one `weaver` CLI, and one foreground web process. The browser UI and the CLI call the same `CommandHandler`: the web serves loopback HTTP on `127.0.0.1`, the CLI connects through an authenticated Unix-socket transport, and both speak `weaver.v1`. There is no second daemon, no separate owner-model process, no MCP service, no remote API, and no database: state is a versioned JSON store owned by the running process.
 
 The owner is the real agent that hosts the skill. It registers logical ownership in Weaver through the CLI and dispatches workers from there; Weaver never spawns an owner model itself. Saved routes launch real OpenCode, Pi, Grok, and Codex launchers through fixed argument adapters. `mock-jsonl` runs only when explicitly requested. A failed or unloaded real engine fails the dispatch; it never falls back to mock, Claude Code, or another engine. Claude Code real execution is deferred. Engine scan checks `PATH` and `--version` only.
 
@@ -46,7 +46,15 @@ npm run dev          # local dev web at http://127.0.0.1:4738
 
 Without a global install you can run the built CLI directly: `node dist/cli/main.mjs --help`. `package.json` exposes the `weaver` bin, but where `npm link` places it depends on your npm `globalPrefix`: check `npm prefix -g` first and never assume it is `~/.local`; only proceed when it is already a user-owned prefix (the install worker's verified setup used `globalPrefix=/home/mocha/.local`, then `npm link --offline --ignore-scripts` with no args; current npm rejects `npm link --global` with `ELINKGLOBAL`). After linking, verify `realpath ~/.local/bin/weaver` resolves into this repository's `dist/cli/main.mjs` and that `weaver --help` works. Do not overwrite an existing `weaver` bin or skill of the same name; keep both and stop. Installation and invocation acceptance records live in [VERIFICATION.md](VERIFICATION.md).
 
-The public skill lives at `skills/weaver` in this repository. A user-level skill entry links or copies that directory to `~/.agents/skills/weaver`; it coexists with any preinstalled global `agents-cooperation` skill, which stays untouched. Never point the skill at the old Herdr scheduler.
+The public skill lives at `skills/agents-weaver` and every executable carries a copy. Install it for your agents with:
+
+```sh
+weaver skills install                     # ~/.agents/skills/agents-weaver, linked from ~/.claude/skills and ~/.codex/skills
+weaver skills install --agent codex       # link only one agent
+weaver skills install --link              # source checkout: link to skills/agents-weaver so edits apply at once
+```
+
+It refuses to replace a skill or link at those paths that it did not install (`--force` to override) and updates its own copy on rerun. The skill reads the saved policy through the CLI: the owner profile for the host engine, worker weights, `herdr.max_wait_minutes` as the wait bound, blocks, and `chatgpt_review`, which turns on ChatGPT Pro review gates through [Convorel](https://github.com/MarioJames/convorel)'s `chatgpt-review` skill. It coexists with a global `agents-cooperation` skill, which stays untouched.
 
 ## Run one local control plane
 
@@ -65,7 +73,7 @@ The skill instructs the owner to use Weaver CLI for capability inspection, routi
 ```sh
 weaver capabilities           # command catalog, limits, realExecution
 weaver engines scan           # PATH + --version probe of the fixed engine catalog
-weaver policy get             # saved owners, workers, weights, pins, blocks, revision
+weaver policy get             # saved owners, workers, weights, blocks, revision
 weaver quota get              # 只读内存中的 Codex / Claude Code / Grok 额度，不联网
 ```
 
@@ -195,6 +203,6 @@ Repository honesty: real runs record the frozen route, requested engine/model/ef
 - [agent-interface](docs/agent-interface.md): command catalog, envelope, outputs, and a full real lifecycle example
 - [local engine operation guide](docs/local-integration-plan.md): discovery, enablement, roles, models, timeout, cancellation, and failure diagnosis for OpenCode/Pi/Grok/Codex
 - [script-migration](docs/script-migration.md): the real Apache-2.0 upstream provenance and migration mapping
-- Skill: [skills/weaver/SKILL.md](skills/weaver/SKILL.md) with [references](skills/weaver/references/handoff.md)
+- Skill: [skills/agents-weaver/SKILL.md](skills/agents-weaver/SKILL.md) with references for [the CLI handoff](skills/agents-weaver/references/handoff.md), [policy](skills/agents-weaver/references/config.md) and [Convorel review](skills/agents-weaver/references/convorel.md)
 
 Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
