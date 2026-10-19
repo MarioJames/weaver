@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { CLI_CATALOG, CLI_HELP, applyCallerWorkspace, parseCLI, renderEnvelope } from '../src/cli/main';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { startLocalIPC } from '../src/main/local-ipc';
+import { CLI_CATALOG, CLI_HELP, applyCallerWorkspace, makeRequest, parseCLI, renderEnvelope, runCLI } from '../src/cli/main';
 import { READ_COMMANDS, WRITE_COMMANDS } from '../src/main/commands';
 
 const serverCommands = [...READ_COMMANDS, ...WRITE_COMMANDS];
@@ -104,4 +108,111 @@ test('command help and root catalog are machine-readable and expose digest and r
  const root=spawnSync(process.execPath,['--import','tsx','src/cli/main.ts','--help','--output','json'],{encoding:'utf8'});
  assert.equal(root.status,0);const catalog=JSON.parse(root.stdout).data.catalog;
  assert.equal(catalog.length,CLI_CATALOG.length);for(const item of catalog)assert.ok(item.inputFields);
+});
+
+const logical = [['tasks','health'],['engines','health'],['engines','penalty'],['engines','unblock'],['owners','launch']];
+
+test('new logical commands are catalogued, parseable in both forms and in help',()=>{
+ for(const words of logical){
+  const name=words.join('.');
+  assert.ok(CLI_CATALOG.some(item=>item.command===name),name);
+  assert.equal(parseCLI(words).command,name);
+  assert.equal(parseCLI([name]).command,name);
+  assert.match(CLI_HELP,new RegExp(name.replaceAll('.',' ')));
+ }
+ assert.match(CLI_HELP,/\[--engine <id>\] \[--cancel\]/);
+ assert.match(CLI_HELP,/engine <id> is the engine argument of engines penalty and engines unblock/);
+ assert.match(CLI_HELP,/the server decides what a retry or an unblock does/);
+});
+
+test('flags become the frozen logical args and a mutation keeps the shared command ID rule',()=>{
+ assert.equal(makeRequest(parseCLI(['tasks','health','--task-id','task-1'])).command,'tasks.health');
+ assert.deepEqual(makeRequest(parseCLI(['tasks','health','--task-id','task-1'])).args,{taskId:'task-1'});
+ assert.deepEqual(makeRequest(parseCLI(['engines','health'])).args,{});
+ assert.deepEqual(makeRequest(parseCLI(['engines','penalty','--engine','qoder'])).args,{engine:'qoder'});
+ assert.deepEqual(makeRequest(parseCLI(['tasks','retry','--task-id','task-1','--cancel'])).args,{taskId:'task-1',cancel:true});
+ assert.deepEqual(makeRequest(parseCLI(['owners','launch','--task-id','task-1']),{expectedRevision:3}).args,{expectedRevision:3,taskId:'task-1'});
+ const generated=makeRequest(parseCLI(['engines','unblock','--engine','qoder']));
+ assert.match(String(generated.commandId),/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+ assert.equal(makeRequest(parseCLI(['engines','unblock','--engine','qoder','--command-id','c-1'])).commandId,'c-1');
+});
+
+test('--engine and --cancel are refused on any other command, repeated or without a value',()=>{
+ for(const words of [['tasks','health','--task-id','t'],['engines','health'],['tasks','get','--task-id','t'],['tasks','retry','--task-id','t'],['owners','launch','--task-id','t'],['engines','scan'],['engines','set-enabled','--input','{}']]){
+  assert.throws(()=>parseCLI([...words,'--engine','qoder']),/--engine is only valid for engines penalty and engines unblock/);
+ }
+ for(const words of [['tasks','cancel','--task-id','t'],['tasks','health','--task-id','t'],['engines','unblock','--engine','qoder'],['tasks','list']]){
+  assert.throws(()=>parseCLI([...words,'--cancel']),/--cancel is only valid for tasks retry/);
+ }
+ assert.throws(()=>parseCLI(['engines','penalty','--engine','qoder','--engine','codex']),/Duplicate option --engine/);
+ assert.throws(()=>parseCLI(['tasks','retry','--task-id','t','--cancel','--cancel']),/Duplicate option --cancel/);
+ assert.throws(()=>parseCLI(['engines','unblock','--engine']),/Missing value for --engine/);
+ assert.throws(()=>parseCLI(['engines','unblock','--engine','--command-id','c']),/Missing value for --engine/);
+ assert.throws(()=>parseCLI(['--engine','qoder','--input','{"taskId":"t"}']),/--engine is only valid/);
+ // --cancel takes no value, so a trailing word stays a positional and never becomes an argument.
+ assert.throws(()=>parseCLI(['tasks','retry','--task-id','t','--cancel','qoder']),/Unknown command/);
+});
+
+test('a flag never overrides a different value already in the --input body or envelope',()=>{
+ const penalty=parseCLI(['engines','penalty','--engine','qoder']);
+ assert.deepEqual(makeRequest(penalty,{engine:'qoder'}).args,{engine:'qoder'});
+ assert.throws(()=>makeRequest(penalty,{engine:'codex'}),/Input engine does not match CLI engine/);
+ assert.throws(()=>makeRequest(penalty,{apiVersion:'weaver.v1',command:'engines.penalty',args:{engine:'codex'}}),/Input engine does not match CLI engine/);
+ const retry=parseCLI(['tasks','retry','--task-id','task-1','--cancel']);
+ assert.deepEqual(makeRequest(retry,{expectedRevision:2}).args,{expectedRevision:2,taskId:'task-1',cancel:true});
+ assert.throws(()=>makeRequest(retry,{cancel:false}),/Input cancel does not match CLI cancel/);
+ assert.throws(()=>makeRequest(retry,{taskId:'other'}),/Input task ID does not match CLI task ID/);
+ assert.throws(()=>makeRequest(parseCLI(['tasks','health','--task-id','t']),{apiVersion:'weaver.v1',command:'tasks.health',args:[1]}),/Request args must be an object/);
+ assert.throws(()=>makeRequest(parseCLI(['tasks','health','--task-id','t']),{apiVersion:'weaver.v1',command:'tasks.get',args:{}}),/does not match CLI command/);
+});
+
+test('help parses the new flags and reports an invalid pairing in the requested format',()=>{
+ const run=(argv:string[])=>spawnSync(process.execPath,['--import','tsx','src/cli/main.ts',...argv],{encoding:'utf8'});
+ for(const [argv,command,mutation] of [[['engines','penalty','--engine','qoder','--help','--output','json'],'engines.penalty',false],[['engines','unblock','--engine','qoder','--help','--output','json'],'engines.unblock',true]] as const){
+  const result=run([...argv]);
+  assert.equal(result.status,0,result.stderr);
+  const item=JSON.parse(result.stdout).data;
+  assert.equal(item.command,command);assert.equal(item.mutation,mutation);assert.ok(item.inputFields.required.engine);
+ }
+ const launch=run(['owners','launch','--help','--output','json']);
+ assert.equal(launch.status,0,launch.stderr);
+ assert.ok(JSON.parse(launch.stdout).data.inputFields.required.expectedRevision);
+ const text=run(['tasks','retry','--cancel','--help']);
+ assert.equal(text.status,0,text.stderr);
+ assert.match(text.stdout,/^tasks retry --task-id <id> \[--cancel\]/m);
+ assert.match(text.stdout,/Mutation: true/);
+ const bad=run(['tasks','get','--cancel','--help','--output','text']);
+ assert.equal(bad.status,1);assert.match(bad.stdout,/^INVALID_ARGUMENT: --cancel is only valid/);
+ assert.equal(bad.stdout.trim().split('\n').length,1);
+});
+
+test('the new commands reach the socket as logical envelopes, not method wrappers',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'wv-catalog-'));
+ const app=await startLocalIPC(directory,request=>({apiVersion:'weaver.v1',ok:true,data:request}));
+ const original=process.stdout.write;
+ let output='';
+ try{
+  process.stdout.write=((chunk:unknown)=>{output+=String(chunk);return true;}) as typeof process.stdout.write;
+  const cases:[string[],string,Record<string,unknown>][]=[
+   [['tasks','health','--task-id','task-1'],'tasks.health',{taskId:'task-1'}],
+   [['engines','health'],'engines.health',{}],
+   [['engines','penalty','--engine','qoder'],'engines.penalty',{engine:'qoder'}],
+   [['engines','unblock','--engine','qoder'],'engines.unblock',{engine:'qoder'}],
+   [['tasks','retry','--task-id','task-1','--cancel'],'tasks.retry',{taskId:'task-1',cancel:true}],
+   [['owners','launch','--task-id','task-1','--input','{"expectedRevision":3}'],'owners.launch',{expectedRevision:3,taskId:'task-1'}],
+  ];
+  for(const [argv,command,args] of cases){
+   output='';
+   assert.equal(await runCLI([...argv,'--data-dir',directory]),0,command);
+   const sent=JSON.parse(output).data as {apiVersion?:string;command?:string;method?:unknown;args?:unknown;commandId?:unknown};
+   assert.equal(sent.apiVersion,'weaver.v1',command);
+   assert.equal(sent.command,command);
+   assert.equal(sent.method,undefined,`${command} must not become an RPC method wrapper`);
+   assert.deepEqual(sent.args,args);
+   assert.equal(typeof sent.commandId,'string');
+  }
+  output='';
+  assert.equal(await runCLI(['engines','health','--engine','qoder','--data-dir',directory]),1);
+  assert.equal(JSON.parse(output).error.code,'INVALID_ARGUMENT');
+ }finally{process.stdout.write=original;await app.close();await rm(directory,{recursive:true,force:true});}
 });

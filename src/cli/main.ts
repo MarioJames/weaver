@@ -33,11 +33,13 @@ export const CLI_CATALOG: CatalogCommand[] = [
   { command: 'owners.continuation.get', inputFields: {"required": {"taskId": "UUID"}, "optional": {}}, mutation: false, usage: 'owners continuation get --task-id <id>' },
   { command: 'owners.attach', inputFields: {"required": {"name": "string (1–120)", "profileId": "available owner profile ID"}, "optional": {"session": "unverified reference string", "pane": "unverified reference string"}}, mutation: true, usage: 'owners attach --input <json> --command-id <id>    json: name, profileId, optional session, optional pane. Metadata only; verified stays false.' },
   { command: 'owners.spawn', inputFields: {"required": {"name": "string (1–120)", "profileId": "available owner profile ID"}, "optional": {"provider": "mock (explicit fixture only); omitted registers manual external owner", "session": "unverified reference string (manual only)", "pane": "unverified reference string (manual only)"}}, mutation: true, usage: 'owners spawn --input <json> --command-id <id>    json: name, profileId. Logical registration; no owner model and no session.' },
-  { command: 'owners.switch', inputFields: {"required": {"taskId": "UUID", "expectedRevision": "integer"}, "optional": {"expectedEpoch": "integer", "reason": "manual | idle", "profileId": "available owner profile ID"}}, mutation: true, usage: 'owners switch --task-id <id> --input <json> --command-id <id>' },
+  { command: 'owners.switch', inputFields: {"required": {"taskId": "UUID", "expectedRevision": "integer"}, "optional": {"expectedEpoch": "integer", "reason": "manual | idle", "profileId": "available owner profile ID", "launch": "boolean (also start the Herdr owner for the new profile; a failed start is reported in launch, the switch stays)"}}, mutation: true, usage: 'owners switch --task-id <id> --input <json> --command-id <id>' },
+  { command: 'owners.launch', inputFields: {"required": {"taskId": "UUID", "expectedRevision": "integer (pass it in the JSON body)"}, "optional": {}}, mutation: true, usage: 'owners launch --task-id <id> --input <json> --command-id <id>    json: expectedRevision. Starts the owner host from the task context pack and returns the handoff prompt.' },
   { command: 'owners.continuation.configure', inputFields: {"required": {"taskId": "UUID", "expectedRevision": "integer", "idleRotationMinutes": "integer 1–10080 | null"}, "optional": {}}, mutation: true, usage: 'owners continuation configure --task-id <id> --input <json> --command-id <id>' },
   { command: 'tasks.create', inputFields: {"required": {"title": "string (1–160)", "instruction | goal": "string (1–16000)", "ownerId | ownerProfileId | owner": "one existing logical owner UUID, profile ID, or legacy OwnerRef"}, "optional": {"workspace": "nonempty path; omitted uses caller cwd", "ownerName": "string (1–120)", "ownerProvider": "mock only when intentionally using mock Owner", "acceptanceCriteria": "string[] (≤30; each ≤1000)", "constraints": "string[] (≤30; each ≤1000)"}}, mutation: true, usage: 'tasks create --input <json> --command-id <id>' },
-  { command: 'tasks.retry', inputFields: {"required": {"taskId": "UUID"}, "optional": {}}, mutation: true, usage: 'tasks retry --task-id <id> --command-id <id>' },
+  { command: 'tasks.retry', inputFields: {"required": {"taskId": "UUID"}, "optional": {"cancel": "boolean (set by --cancel)", "expectedRevision": "integer"}}, mutation: true, usage: 'tasks retry --task-id <id> [--cancel] --command-id <id>    The server cancels first when cancel is true, copies the frozen package into the linked task, prepends the continuation instructions, dispatches and returns next.' },
   { command: 'tasks.cancel', inputFields: {"required": {"taskId": "UUID"}, "optional": {"expectedRevision": "integer"}}, mutation: true, usage: 'tasks cancel --task-id <id> --command-id <id>' },
+  { command: 'tasks.health', inputFields: {"required": {"taskId": "UUID"}, "optional": {}}, mutation: false, usage: 'tasks health --task-id <id>' },
   { command: 'tasks.get', inputFields: {"required": {"taskId": "UUID"}, "optional": {}}, mutation: false, usage: 'tasks get --task-id <id>' },
   { command: 'tasks.list', inputFields: {"required": {}, "optional": {"offset": "integer ≥0 (default 0)", "limit": "integer 1–100 (default 25)", "ownerId": "UUID"}}, mutation: false, usage: 'tasks list [--input <json>]' },
   { command: 'tasks.events', inputFields: {"required": {"taskId": "UUID"}, "optional": {"after": "event cursor UUID", "limit": "integer 1–100 (default 50)"}}, mutation: false, usage: 'tasks events --task-id <id> [--input <json>]' },
@@ -46,7 +48,7 @@ export const CLI_CATALOG: CatalogCommand[] = [
   { command: 'tasks.watch', inputFields: {"required": {"--task-id": "UUID"}, "optional": {"--for": "seconds 1–600 (default min(600, herdr.max_wait_minutes×60), else 30)"}}, mutation: false, local: 'watch', usage: 'tasks watch --task-id <id> [--for <seconds>]' },
   { command: 'packages.create', inputFields: {"required": {"taskId": "UUID", "scope": "string[1–30] (each ≤1000)", "acceptanceCriteria": "string[1–30] (each ≤1000)"}, "optional": {"expectedRevision": "integer"}}, mutation: true, usage: 'packages create --task-id <id> --input <json> --command-id <id>' },
   { command: 'packages.get', inputFields: {"required": {"packageId": "UUID"}, "optional": {}}, mutation: false, usage: 'packages get --input <json>' },
-  { command: 'workers.spawn', inputFields: {"required": {"taskId": "UUID"}, "optional": {"expectedRevision": "integer", "packageId": "frozen package UUID", "owner": "profile ID (must match task owner)", "worker": "explicit worker ID (omitted picks the owner's highest-weight available worker)", "provider": "mock-jsonl only for explicit fixture execution"}}, mutation: true, usage: 'workers spawn --task-id <id> [--input <json>] --command-id <id>' },
+  { command: 'workers.spawn', inputFields: {"required": {"taskId": "UUID"}, "optional": {"expectedRevision": "integer", "packageId": "frozen package UUID", "owner": "profile ID (must match task owner)", "worker": "explicit worker ID (omitted picks the owner's least-loaded worker relative to its weight: lowest (running+1)/weight wins, ties go to higher weight, then list order)", "provider": "mock-jsonl only for explicit fixture execution"}}, mutation: true, usage: 'workers spawn --task-id <id> [--input <json>] --command-id <id>' },
   { command: 'workers.complete', inputFields: {"required": {"taskId": "UUID", "outcome": "completed | failed", "summary": "result or failure reason (≤8000 chars)"}, "optional": {"expectedRevision": "integer", "artifacts": "≤20 of {name, mediaType: text/plain|text/markdown|application/json, content ≤32000 chars}"}, "notes": "Only for a running task whose dispatch.execution is native: the owner ran that same-engine worker with its built-in subagent tool and reports the outcome here."}, mutation: true, usage: 'workers complete --input <report.json> --command-id <id>' },
   { command: 'results.deliver', inputFields: {"required": {"taskId": "UUID"}, "optional": {}}, mutation: true, usage: 'results deliver --task-id <id> --command-id <id>' },
   { command: 'results.ack', inputFields: {"required": {"taskId": "UUID", "expectedRevision": "integer", "manifestDigest": "current manifest SHA-256"}, "optional": {}}, mutation: true, usage: 'results ack --task-id <id> --input <json> --command-id <id>' },
@@ -60,6 +62,9 @@ export const CLI_CATALOG: CatalogCommand[] = [
   { command: 'policy.save', inputFields: {"required": {"revision": "current policy revision integer", "config": "full policy config", "blocks": "quota block array (≤500)"}, "optional": {}}, mutation: true, rpc: { method: 'savePolicy', arity: 1 }, usage: 'policy save --input <save.json>' },
   { command: 'policy.preview', inputFields: {"required": {"owner": "owner profile ID"}, "optional": {"worker": "explicit worker ID", "runningCount": "integer ≥0"}}, mutation: false, rpc: { method: 'previewRoute', arity: 1 }, usage: 'policy preview --input <preview.json>' },
   { command: 'engines.scan', mutation: false, rpc: { method: 'scanEngines', arity: 0 }, usage: 'engines scan' },
+  { command: 'engines.health', inputFields: {"required": {}, "optional": {}}, mutation: false, usage: 'engines health' },
+  { command: 'engines.penalty', inputFields: {"required": {"engine": "engine ID (set by --engine)"}, "optional": {}}, mutation: false, usage: 'engines penalty --engine <id>' },
+  { command: 'engines.unblock', inputFields: {"required": {"engine": "engine ID (set by --engine)"}, "optional": {}}, mutation: true, usage: 'engines unblock --engine <id> --command-id <id>' },
   { command: 'quota.get', mutation: false, rpc: { method: 'getQuota', arity: 0 }, usage: 'quota get' },
   { command: 'quota.refresh', inputFields: { required: {}, optional: { engine: 'codex | claude | grok (omitted refreshes all three)' }, notes: 'Refreshes native account quota without inference and synchronizes Weaver-owned policy blocks. Manual blocks are retained. Does not accept commandId, taskId, --command-id, or --task-id.' }, mutation: true, rpc: { method: 'refreshQuota', arity: 1 }, usage: 'quota refresh [--input <refresh.json>]' },
   { command: 'engines.set-enabled', inputFields: {"required": {"id": "engine ID", "enabled": "boolean", "revision": "current policy revision integer"}, "optional": {}}, mutation: true, rpc: { method: 'setEngineEnabled', arity: 1 }, usage: 'engines set-enabled --input <toggle.json>' },
@@ -71,7 +76,7 @@ const catalogHelp = CLI_CATALOG.map(item => `  ${item.usage}`).join('\n');
 export const CLI_HELP = `Weaver
 
   weaver web [--port <0-65535>] [--data-dir <path>] [--no-open] [--dev] [--output json|jsonl|text]
-  weaver <command> [--data-dir <path>] [--output json|jsonl|text] [--input <file|->] [--command-id <id>] [--task-id <id>] [--for <seconds>]
+  weaver <command> [--data-dir <path>] [--output json|jsonl|text] [--input <file|->] [--command-id <id>] [--task-id <id>] [--for <seconds>] [--engine <id>] [--cancel]
   weaver skills install [--agent claude-code,codex] [--dir <skills-root>] [--link] [--force] [--output json|text]
   weaver server <status|start|stop|install|uninstall> [--port <0-65535>] [--data-dir <path>] [--output json|text] [--force] [--timeout <seconds>]
   weaver --skill prints the bundled agents-weaver SKILL.md
@@ -85,6 +90,8 @@ If a client command reports APP_NOT_RUNNING, start: weaver server start
 tasks create: an omitted workspace becomes this CLI process's working directory before the request is sent. An explicit path wins. A relative explicit path is resolved against that same caller directory. The server does not fill a workspace from its own directory. Real dispatch still requires the directory to exist.
 
 tasks wait and tasks watch poll tasks get and tasks events. --for is 1 through 600 seconds; omitted, it defaults to min(600, herdr.max_wait_minutes × 60) from the policy, or 30 seconds when the policy cannot be read. They do not start a second scheduler.
+
+--engine <id> is the engine argument of engines penalty and engines unblock. --cancel is a valueless flag that sets cancel on tasks retry. Both are rejected on any other command, repeated, missing their value, or when the --input body already carries a different one. The CLI only maps them into the request args; the server decides what a retry or an unblock does, and the CLI never cancels, copies or dispatches by itself.
 
 Mutations need --command-id, except policy save, engines set-enabled, and quota refresh, which send the JSON body shown in their usage. quota refresh defaults to {} and synchronizes Weaver-owned policy blocks without inference; it does not accept command or task IDs. operations get reads that same --command-id. owners attach stores a name and profile plus optional caller labels. It does not contact a host. owners spawn does not start an owner model. capabilities.realExecution means the worker launcher is loaded, not that a model ran or a login was proven. mock-jsonl is an explicit provider. A real route does not fall back to mock.
 
@@ -125,13 +132,17 @@ export interface CLIOptions {
   dataDir: string;
   output: OutputFormat;
   forSeconds?: number;
+  engine?: string;
+  cancel?: boolean;
 }
+/** The only commands --engine names; anything else is a wrong-command error. */
+const ENGINE_FLAG_COMMANDS = ['engines.penalty', 'engines.unblock'];
 function positionals(argv: string[]): string[] {
   const words: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg.startsWith('--')) { words.push(arg); continue; }
-    if (['--input', '--command-id', '--data-dir', '--task-id', '--port', '--output', '--for', '--agent', '--dir', '--timeout'].includes(arg)) i++;
+    if (['--input', '--command-id', '--data-dir', '--task-id', '--port', '--output', '--for', '--agent', '--dir', '--timeout', '--engine'].includes(arg)) i++;
   }
   return words;
 }
@@ -197,6 +208,7 @@ export function parseCLI(argv: string[]): CLIOptions {
     if (seen.has(arg)) throw new LocalIPCError('INVALID_ARGUMENT', `Duplicate option ${arg}`);
     seen.add(arg);
     if (arg === '--json') { jsonAlias = true; continue; }
+    if (arg === '--cancel') { options.cancel = true; continue; }
     if (arg === '--output') { output = takeOutput(argv, ++i).format; continue; }
     if (arg === '--for') {
       const value = argv[++i];
@@ -204,7 +216,7 @@ export function parseCLI(argv: string[]): CLIOptions {
       options.forSeconds = Number(value);
       continue;
     }
-    const key = ({ '--input': 'input', '--command-id': 'commandId', '--data-dir': 'dataDir', '--task-id': 'taskId' } as const)[arg as '--input'];
+    const key = ({ '--input': 'input', '--command-id': 'commandId', '--data-dir': 'dataDir', '--task-id': 'taskId', '--engine': 'engine' } as const)[arg as '--input'];
     if (!key) throw new LocalIPCError('INVALID_ARGUMENT', `Unknown option ${arg}`);
     const value = argv[++i];
     if (!value || value.startsWith('--')) throw new LocalIPCError('INVALID_ARGUMENT', `Missing value for ${arg}`);
@@ -220,6 +232,8 @@ export function parseCLI(argv: string[]): CLIOptions {
   if (!options.command && !options.input) throw new LocalIPCError('INVALID_ARGUMENT', 'A command or --input envelope is required');
   if (options.input && CLI_CATALOG.find(item => item.command === options.command)?.local) throw new LocalIPCError('INVALID_ARGUMENT', 'tasks wait/watch do not accept --input; use --task-id and --for');
   if (options.forSeconds !== undefined && !CLI_CATALOG.find(item => item.command === options.command)?.local) throw new LocalIPCError('INVALID_ARGUMENT', '--for is only valid for tasks wait and tasks watch');
+  if (options.engine !== undefined && !ENGINE_FLAG_COMMANDS.includes(options.command ?? '')) throw new LocalIPCError('INVALID_ARGUMENT', '--engine is only valid for engines penalty and engines unblock');
+  if (options.cancel && options.command !== 'tasks.retry') throw new LocalIPCError('INVALID_ARGUMENT', '--cancel is only valid for tasks retry');
   options.dataDir = resolve(options.dataDir);
   return options;
 }
@@ -251,6 +265,14 @@ export async function readInput(path: string): Promise<unknown> {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
   catch { throw new LocalIPCError('INVALID_ARGUMENT', 'Input must contain valid JSON'); }
 }
+/** Put one convenience flag into request args, refusing to overwrite a different --input value. */
+function mergeArg(envelope: Record<string, unknown>, key: string, value: unknown, label: string): void {
+  const args = envelope.args ?? {};
+  if (!args || typeof args !== 'object' || Array.isArray(args)) throw new LocalIPCError('INVALID_ARGUMENT', 'Request args must be an object');
+  const record = args as Record<string, unknown>;
+  if (key in record && record[key] !== value) throw new LocalIPCError('INVALID_ARGUMENT', `Input ${label} does not match CLI ${label}`);
+  envelope.args = { ...record, [key]: value };
+}
 export function makeRequest(options: CLIOptions, input: unknown = {}): Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new LocalIPCError('INVALID_ARGUMENT', 'Input must be a JSON object');
   const object = input as Record<string, unknown>;
@@ -259,12 +281,9 @@ export function makeRequest(options: CLIOptions, input: unknown = {}): Record<st
   if (options.command && isEnvelope && envelope.command !== options.command) throw new LocalIPCError('INVALID_ARGUMENT', 'Input command does not match CLI command');
   if (options.commandId && envelope.commandId && envelope.commandId !== options.commandId) throw new LocalIPCError('INVALID_ARGUMENT', 'Input command ID does not match CLI command ID');
   envelope.commandId = options.commandId || envelope.commandId || randomUUID();
-  if (options.taskId) {
-    const args = envelope.args ?? {};
-    if (!args || typeof args !== 'object' || Array.isArray(args)) throw new LocalIPCError('INVALID_ARGUMENT', 'Request args must be an object');
-    if ('taskId' in args && args.taskId !== options.taskId) throw new LocalIPCError('INVALID_ARGUMENT', 'Input task ID does not match CLI task ID');
-    envelope.args = { ...args, taskId: options.taskId };
-  }
+  if (options.taskId) mergeArg(envelope, 'taskId', options.taskId, 'task ID');
+  if (options.engine !== undefined) mergeArg(envelope, 'engine', options.engine, 'engine');
+  if (options.cancel) mergeArg(envelope, 'cancel', true, 'cancel');
   return envelope;
 }
 /** Fill tasks create workspace from the CLI caller cwd before the request is submitted. */
