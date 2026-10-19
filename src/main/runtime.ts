@@ -6,6 +6,7 @@ import { API_VERSION } from '../shared/commands';
 import { EXECUTION_BOUNDARY, ENGINE_CATALOG, readinessFor, type EngineProbeRecord } from '../shared/engines';
 import { parseId, parseTaskInput } from '../shared/validation';
 import { startCliAgent } from './adapters/cli/index';
+import { parseHelloInput, sayHi } from './engines/hello';
 import { RoutingWorkerAdapter } from './adapters/routing';
 import { MockWorkerAdapter } from './adapters/worker';
 import { CommandHandler, configuredParallel } from './commands';
@@ -17,7 +18,9 @@ import { TaskManager } from './manager';
 import { validateConfig } from './policy/routing';
 import { PolicyStore } from './policy/store';
 import { applyQuotaSnapshot, parseQuotaRefresh, QuotaPolicyConflict, QUOTA_CAPABILITIES } from './policy/quota';
+import type { QuotaRefreshInput } from '../shared/quota';
 import { QuotaProber } from './quota';
+import { QuotaScheduler } from './quota/scheduler';
 import { RpcError, parseRpcBody } from './rpc';
 import { TaskStore } from './store';
 
@@ -79,6 +82,8 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   let http: HttpRuntime | undefined;
   let vite: { middlewares: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next: (error?: unknown) => void) => void; close(): Promise<void> } | undefined;
   const inflight = new Set<Promise<unknown>>();
+  const greetings = new AbortController();
+  let greeting = 0;
   const prober = new EngineProber();
   const quotaProber = options.quotaProber ?? new QuotaProber();
   let probes: EngineProbeRecord[] | null = null;
@@ -98,27 +103,34 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     if (!ready || !commands || !manager || !store || !policy) throw new RpcError('APP_STARTING', 'Weaver is still starting');
     return { commands, manager, store, policy };
   };
+  /** Manual and scheduled refresh share one probe-then-merge path. */
+  function refreshQuota(input: QuotaRefreshInput) {
+    const active = requireReady();
+    return track((async () => {
+      const quota = await quotaProber.refresh(input);
+      if (draining) throw new RpcError('APP_DRAINING', 'Weaver is shutting down');
+      let result;
+      try { result = applyQuotaSnapshot(active.policy, quota, input); }
+      catch (error) {
+        if (error instanceof QuotaPolicyConflict) throw new RpcError(error.code, error.message);
+        throw new RpcError('PERSISTENCE_ERROR', 'Quota was checked but automatic policy blocks could not be saved');
+      }
+      if (result.policyChanged) active.commands.pump();
+      return result;
+    })());
+  }
+  const scheduler = new QuotaScheduler({
+    config: () => policy!.snapshot().config,
+    refresh: async engine => { if (ready && !draining) await refreshQuota({ engine }); },
+    log: error => console.error(`Scheduled quota refresh failed: ${error instanceof Error ? error.message : 'unknown error'}`),
+  });
   async function dispatch(method: string, args: unknown[]): Promise<unknown> {
     const active = requireReady();
     switch (method) {
       case 'command': return active.commands.handle(args[0]);
       case 'getPolicy': return active.policy.snapshot();
-      case 'getQuota': return quotaProber.get();
-      case 'refreshQuota': {
-        const input = parseQuotaRefresh(args[0]);
-        return track((async () => {
-          const quota = await quotaProber.refresh(input);
-          if (draining) throw new RpcError('APP_DRAINING', 'Weaver is shutting down');
-          let result;
-          try { result = applyQuotaSnapshot(active.policy, quota, input); }
-          catch (error) {
-            if (error instanceof QuotaPolicyConflict) throw new RpcError(error.code, error.message);
-            throw new RpcError('PERSISTENCE_ERROR', 'Quota was checked but automatic policy blocks could not be saved');
-          }
-          if (result.policyChanged) active.commands.pump();
-          return result;
-        })());
-      }
+      case 'getQuota': return { ...quotaProber.get(), schedule: scheduler.status() };
+      case 'refreshQuota': return refreshQuota(parseQuotaRefresh(args[0]));
       case 'validatePolicy': {
         let encoded = '';
         try { encoded = JSON.stringify(args[0]); } catch { throw new RpcError('INVALID_REQUEST', 'Policy must be JSON'); }
@@ -129,6 +141,14 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
         const snapshot = active.policy.save(args[0]);
         active.commands.pump();
         return snapshot;
+      }
+      case 'sayHi': {
+        const input = parseHelloInput(args[0]);
+        const engine = active.policy.snapshot().config.engines[input.engine];
+        if (!engine) throw new RpcError('INVALID_REQUEST', `Engine ${input.engine} is not configured`);
+        if (greeting >= 3) throw new RpcError('CAPACITY_EXCEEDED', 'Three probes are already running; wait for one to finish');
+        greeting += 1;
+        return track(sayHi({ ...input, kind: engine.kind }, { launch: startCliAgent, root: join(dataDir, 'agent-state'), signal: greetings.signal }).finally(() => { greeting -= 1; }));
       }
       case 'previewRoute': return active.policy.preview(args[0]);
       case 'scanEngines': {
@@ -208,6 +228,8 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
         vite = await createServer({
           configFile: join(repo, 'vite.config.ts'),
           appType: 'spa',
+          // Per data dir, so a test or another instance cannot rebuild the dependency cache under a running dev server.
+          cacheDir: join(dataDir, 'vite'),
           server: { middlewareMode: true, cors: false, port, headers: SECURITY_HEADERS, ws: { server } },
         });
       } : undefined,
@@ -224,6 +246,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     commands = new CommandHandler(manager, policy);
     commands.transportStatus = 'ready';
     ready = true;
+    scheduler.start();
     runtime.port = http.port;
     runtime.url = `http://127.0.0.1:${http.port}`;
     if (options.open) openBrowser(runtime.url);
@@ -244,7 +267,9 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     draining = true;
     ready = false;
     if (commands) commands.draining = true;
+    await scheduler.stop().catch(() => {});
     await quotaProber.close().catch(() => {});
+    greetings.abort();
     await Promise.allSettled([...inflight]);
     try { await manager?.shutdown(); } catch (error) { console.error(error instanceof Error ? error.message : 'shutdown failed'); }
     await vite?.close().catch(() => {});

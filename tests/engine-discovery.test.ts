@@ -15,8 +15,6 @@ test('pi is a fixed catalog engine and only claude and codex advertise native su
   assert.equal(ENGINE_CATALOG.length, 7);
   assert.equal(pi?.kind, 'pi');
   assert.equal(pi?.command, 'pi');
-  assert.equal(pi?.nativeSubagents, false);
-  assert.deepEqual(ENGINE_CATALOG.filter(entry => entry.nativeSubagents).map(entry => entry.id), ['claude', 'codex']);
 });
 
 function bin(name: string, body: string): { root: string; pathEnv: string } {
@@ -94,7 +92,6 @@ test('enabling an installed engine does not create or enable roles and preserves
     assert.deepEqual(enabled.snapshot.config.workers, before.config.workers);
     assert.equal(enabled.snapshot.config.engines.gemini.enabled, true);
     assert.equal(enabled.snapshot.config.engines.gemini.kind, 'gemini');
-    assert.equal(enabled.snapshot.config.engines.gemini.native_subagents, false);
     const disabled = await applyEngineEnabled(store, prober, { id: 'gemini', enabled: false, revision: enabled.snapshot.revision });
     assert.equal(disabled.snapshot.config.engines.gemini.enabled, false);
     assert.deepEqual(disabled.snapshot.config.owners, before.config.owners);

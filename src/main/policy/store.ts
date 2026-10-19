@@ -26,6 +26,14 @@ function blocksOf(value: unknown, config: Config): Block[] {
   return block;
  });
 }
+/** Task classes, worker tags, owner engine pins and the engine native-subagent flag were removed; saved policies keep loading without them. */
+function dropRetiredFields(value: unknown): unknown {
+ const config=object(value);
+ for(const owner of Object.values(object(config.owners))) if(owner&&typeof owner==='object') delete (owner as Record<string,unknown>).only_engine;
+ for(const worker of Object.values(object(config.workers))) if(worker&&typeof worker==='object') delete (worker as Record<string,unknown>).tags;
+ for(const engine of Object.values(object(config.engines))) if(engine&&typeof engine==='object') delete (engine as Record<string,unknown>).native_subagents;
+ return config;
+}
 /** App-owned single-writer settings. Never reads or changes upstream config/SQLite or a host home. */
 export class PolicyStore {
  private config=defaultConfig(); private blocks: Block[]=[]; private revision=0;
@@ -34,7 +42,7 @@ export class PolicyStore {
   if(statSync(path).size>LIMIT) throw new Error('Policy exceeds 256 KiB; file retained');
   const data=object(JSON.parse(readFileSync(path,'utf8'))); exact(data,['version','revision','config','blocks']);
   if(data.version!==1||!Number.isSafeInteger(data.revision)||Number(data.revision)<0) throw new Error('Unsupported policy store');
-  const parsed=this.parse(data.config,data.blocks); this.config=parsed.config; this.blocks=parsed.blocks; this.revision=Number(data.revision);
+  const parsed=this.parse(dropRetiredFields(data.config),data.blocks); this.config=parsed.config; this.blocks=parsed.blocks; this.revision=Number(data.revision);
  }
  private parse(config: unknown, blocks: unknown): {config:Config;blocks:Block[]} {
   bounded({config,blocks}); const issues=validateConfig(config);
@@ -65,9 +73,9 @@ export class PolicyStore {
   this.config=parsed.config; this.blocks=parsed.blocks; this.revision++; return this.snapshot();
  }
  preview(value: unknown): RoutePreview {
-  const input=object(value); exact(input,['owner','worker','class','tag','runningCount']);
+  const input=object(value); exact(input,['owner','worker','runningCount']);
   const opts: RouteOptions={owner:text(input.owner,'owner')};
-  for(const key of ['worker','class','tag'] as const) if(input[key]!==undefined) opts[key]=text(input[key],key);
+  if(input.worker!==undefined) opts.worker=text(input.worker,'worker');
   const count=input.runningCount??0; if(!Number.isSafeInteger(count)||Number(count)<0) throw new Error('Invalid running count');
   const route=resolveDispatch(this.config,activeBlocks({version:1,blocks:this.blocks},this.now()),opts);
   const maxParallel=this.config.owners[opts.owner].max_parallel;

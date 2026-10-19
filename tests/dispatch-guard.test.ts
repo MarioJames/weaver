@@ -61,7 +61,7 @@ test('server create does not invent a workspace and real dispatch never falls ba
     const created = f.raw('tasks.create', { title: 'Bare', instruction: 'no workspace', owner });
     assert.equal(created.ok, true);
     assert.equal(created.data.workspace, undefined);
-    const missing = f.raw('workers.spawn', { taskId: created.data.id, owner: 'codex_owner', worker: 'codex_worker' });
+    const missing = f.raw('workers.spawn', { taskId: created.data.id, owner: 'claude_owner', worker: 'codex_worker' });
     assert.equal(missing.ok, false);
     assert.equal(missing.error?.code, 'CAPABILITY_UNAVAILABLE');
     assert.match(missing.error?.message ?? '', /not loaded|No mock/);
@@ -72,7 +72,7 @@ test('server create does not invent a workspace and real dispatch never falls ba
     assert.equal(stored.run, undefined);
     assert.equal(stored.dispatch, undefined);
     const claude = f.raw('tasks.create', { title: 'Claude', instruction: 'deferred', owner, workspace: '/tmp' });
-    const denied = f.raw('workers.spawn', { taskId: claude.data.id, owner: 'claude_owner', worker: 'claude_worker' });
+    const denied = f.raw('workers.spawn', { taskId: claude.data.id, owner: 'codex_owner', worker: 'claude_worker' });
     assert.equal(denied.ok, false);
     assert.match(denied.error?.message ?? '', /Claude Code real execution is deferred/);
     assert.equal(f.store.get(claude.data.id).status, 'queued');
@@ -85,14 +85,14 @@ test('real dispatch freezes an existing absolute workspace and does not launch w
   const f = setup(() => successProcess());
   try {
     const relative = f.raw('tasks.create', { title: 'Relative', instruction: 'no', owner, workspace: 'relative/project' });
-    const rejected = f.raw('workers.spawn', { taskId: relative.data.id, owner: 'codex_owner', worker: 'codex_worker' });
+    const rejected = f.raw('workers.spawn', { taskId: relative.data.id, owner: 'claude_owner', worker: 'codex_worker' });
     assert.equal(rejected.ok, false);
     assert.match(rejected.error?.message ?? '', /absolute project directory/);
     assert.equal(f.seen.length, 0);
     assert.equal(f.store.get(relative.data.id).status, 'queued');
     assert.equal(f.mockStarts(), 0);
     const absent = f.raw('tasks.create', { title: 'Gone', instruction: 'no', owner, workspace: join(workspace, 'missing') });
-    const notFound = f.raw('workers.spawn', { taskId: absent.data.id, owner: 'codex_owner', worker: 'codex_worker' });
+    const notFound = f.raw('workers.spawn', { taskId: absent.data.id, owner: 'claude_owner', worker: 'codex_worker' });
     assert.equal(notFound.ok, false);
     assert.match(notFound.error?.message ?? '', /does not exist/);
     assert.equal(f.seen.length, 0);
@@ -100,7 +100,7 @@ test('real dispatch freezes an existing absolute workspace and does not launch w
     const created = f.raw('tasks.create', { title: 'Real', instruction: 'edit the fixture', owner, workspace, constraints:['Only edit the fixture'],acceptanceCriteria:['Verify actual fixture contents'] });
     const pkg=f.raw('packages.create',{taskId:created.data.id,scope:['Read fixture.txt','Write fixture.txt only'],acceptanceCriteria:['Verify actual fixture contents']});
     assert.equal(pkg.ok,true);
-    const spawned = f.raw('workers.spawn', { taskId: created.data.id, owner: 'codex_owner', worker: 'codex_worker' });
+    const spawned = f.raw('workers.spawn', { taskId: created.data.id, owner: 'claude_owner', worker: 'codex_worker' });
     assert.equal(spawned.ok, true, JSON.stringify(spawned));
     assert.equal(spawned.data.dispatch.execution, 'real');
     assert.equal(spawned.data.dispatch.workspace, realpathSync(workspace));
@@ -231,7 +231,7 @@ test('oversized complete instructions fail before package admission or launch',a
  const f=setup(()=>successProcess());try{
   const created=f.raw('tasks.create',{title:'Too large',instruction:'x'.repeat(15500),owner,workspace:f.dir,constraints:['Must not disappear']});
   assert.equal(created.ok,true);
-  const dispatched=f.raw('workers.spawn',{taskId:created.data.id,owner:'codex_owner',worker:'codex_worker'});
+  const dispatched=f.raw('workers.spawn',{taskId:created.data.id,owner:'claude_owner',worker:'codex_worker'});
   assert.equal(dispatched.ok,false);assert.match(dispatched.error.message,/exceeds 16000/);
   const task=f.store.get(created.data.id);assert.equal(task.status,'queued');assert.equal(task.packageId,undefined);assert.equal(task.dispatch,undefined);assert.equal(f.seen.length,0);assert.equal(f.store.getMetadata().packages.length,0);
  }finally{await f.close();}
@@ -243,7 +243,7 @@ test('requested and observed provider facts survive completion and reload, bound
   return Object.assign(proc,{scopeUnit:'weaver-cli-codex-owned-fixture',evidence:{engine:'codex' as const,requestedModel:input.model,requestedEffort:input.effort,workspace:input.workspace,terminal:'success' as const,vendorModel:'reported-model',vendorSessionId:'session-'+ 'x'.repeat(1000),usage:{inputTokens:12,outputTokens:3}}});
  });try{
   const created=f.raw('tasks.create',{title:'Evidence',instruction:'inspect fixture',owner,workspace:f.dir});
-  const spawned=f.raw('workers.spawn',{taskId:created.data.id,owner:'codex_owner',worker:'codex_worker'});assert.equal(spawned.ok,true,JSON.stringify(spawned));
+  const spawned=f.raw('workers.spawn',{taskId:created.data.id,owner:'claude_owner',worker:'codex_worker'});assert.equal(spawned.ok,true,JSON.stringify(spawned));
   await new Promise(resolve=>setImmediate(resolve));
   const task=f.store.get(created.data.id);assert.equal(task.status,'completed');assert.equal(task.dispatch?.model,'gpt-6.1-sol');
   assert.equal(task.run?.scopeUnit,'weaver-cli-codex-owned-fixture');assert.equal(task.run?.evidence?.vendorModel,'reported-model');assert.equal(task.run?.evidence?.terminal,'success');assert.equal(task.run?.evidence?.vendorSessionId?.length,512);

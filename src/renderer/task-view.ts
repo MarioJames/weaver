@@ -6,6 +6,15 @@ export function filterTasks(tasks: Task[], filter: TaskFilter, query: string): T
  const needle = query.trim().toLocaleLowerCase();
  return tasks.filter(task => (!needle || `${task.title} ${task.owner.name} ${task.id}`.toLocaleLowerCase().includes(needle)) && (filter === 'all' || (filter === 'active' && isActive(task)) || (filter === 'review' && task.status === 'completed' && reviewStatus(task) === 'pending') || (filter === 'closed' && !isActive(task))));
 }
+export type TaskColumn = 'queued' | 'running' | 'review' | 'closed';
+export const TASK_COLUMNS: readonly { key: TaskColumn; label: string }[] = [{ key: 'queued', label: '待执行' }, { key: 'running', label: '执行中' }, { key: 'review', label: '待验收' }, { key: 'closed', label: '已结束' }];
+/** Kanban column: where the task is in its lifecycle. Completed work waits for review before it is closed. */
+export function taskColumn(task: Task): TaskColumn {
+ if (task.status === 'queued') return 'queued';
+ if (task.status === 'running' || task.status === 'cancelling') return 'running';
+ if (task.status === 'completed' && reviewStatus(task) === 'pending') return 'review';
+ return 'closed';
+}
 export function reviewStatus(task: Task): string { return task.status === 'completed' ? (task.reviewState ?? 'pending') : 'not_ready'; }
 export function reviewLabel(task: Task): string { const status = reviewStatus(task); return ({ pending: '待验收', approved: '已通过', accepted: '已通过', rejected: '需修改', changes_requested: '需修改', not_ready: '尚未进入验收' } as Record<string,string>)[status] ?? status; }
 

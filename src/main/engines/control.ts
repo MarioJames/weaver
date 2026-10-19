@@ -35,7 +35,7 @@ export async function applyEngineEnabled(store: PolicyStore, prober: EngineProbe
     if (probe.status !== 'installed') throw new EngineControlError(probe.detail ?? 'Engine is not installed; it was not enabled');
     config.engines[entry.id] = existing
       ? { ...existing, enabled: true }
-      : { enabled: true, kind: entry.kind, native_subagents: entry.nativeSubagents };
+      : { enabled: true, kind: entry.kind };
   } else {
     const existing = config.engines[entry.id];
     if (!existing) throw new EngineControlError('Engine has no saved record to disable');

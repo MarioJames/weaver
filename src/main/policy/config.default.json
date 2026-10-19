@@ -2,13 +2,14 @@
   "$schema": "./config.schema.json",
   "version": 1,
   "chatgpt_review": true,
+  "quota": { "auto_refresh": true, "interval_minutes": 15 },
   "engines": {
-    "claude": { "enabled": true, "kind": "claude", "native_subagents": true },
-    "codex": { "enabled": true, "kind": "codex", "native_subagents": true },
-    "grok": { "enabled": false, "kind": "grok", "native_subagents": false },
-    "opencode": { "enabled": false, "kind": "opencode", "native_subagents": false },
-    "pi": { "enabled": false, "kind": "pi", "native_subagents": false },
-    "qoder": { "enabled": false, "kind": "qodercli", "native_subagents": false }
+    "claude": { "enabled": true, "kind": "claude", "quota_refresh": true },
+    "codex": { "enabled": true, "kind": "codex", "quota_refresh": true },
+    "grok": { "enabled": false, "kind": "grok", "quota_refresh": true },
+    "opencode": { "enabled": false, "kind": "opencode", "quota_refresh": false },
+    "pi": { "enabled": false, "kind": "pi", "quota_refresh": false },
+    "qoder": { "enabled": false, "kind": "qodercli", "quota_refresh": false }
   },
   "owners": {
     "claude_owner": {
@@ -37,12 +38,12 @@
     }
   },
   "workers": {
-    "claude_worker": { "enabled": true, "engine": "claude", "model": "sonnet", "effort": "high", "tags": ["frontend", "ui", "browser", "docs"], "description": "Default worker for Claude Code (Sonnet); strong at frontend, UI, browser acceptance and docs." },
-    "codex_worker": { "enabled": true, "engine": "codex", "model": "gpt-6.1-sol", "effort": "high", "tags": ["backend", "algorithm", "refactor", "long-test"], "description": "Default worker for Codex (gpt-6.1-sol); strong at backend logic, algorithms, refactors and long-running test loops." },
-    "grok_worker": { "enabled": false, "engine": "grok", "model": "grok-4.7", "effort": "high", "tags": ["research"], "description": "Example worker for Grok (grok-4.7); strong at research." },
-    "qoder_worker": { "enabled": false, "engine": "qoder", "model": "Qwen3.8-Flash", "effort": "xhigh", "tags": ["routine"], "description": "Free routine worker (Qwen3.8-Flash via qodercli); resolve --class mechanical|routine picks it for routine implementation whose plan is frozen and write scope is explicit." },
-    "opencode_worker": { "enabled": false, "engine": "opencode", "model": "opencode/glm-5.3-flash-free", "effort": "max", "tags": ["mechanical"], "description": "Free mechanical worker (glm-5.3-flash-free via opencode); resolve --class mechanical picks it for rule-bound edits, test runs, lint fixes and read-only sweeps. Its TUI uses the variant remembered in ~/.local/state/opencode/model.json, which must match effort." },
-    "pi_worker": { "enabled": false, "engine": "pi", "model": "glm-5.3-flash", "effort": "high", "description": "Disabled Pi template (glm-5.3-flash). Not proof the CLI is installed, authenticated, or callable. Enable the engine and this role separately before dispatch. Real Claude calls stay deferred." }
+    "claude_worker": { "enabled": true, "engine": "claude", "model": "sonnet", "effort": "high", "description": "Default Claude Code worker (Sonnet)." },
+    "codex_worker": { "enabled": true, "engine": "codex", "model": "gpt-6.1-sol", "effort": "high", "description": "Default Codex worker (gpt-6.1-sol)." },
+    "grok_worker": { "enabled": false, "engine": "grok", "model": "grok-4.7", "effort": "high", "description": "Example Grok worker (grok-4.7)." },
+    "qoder_worker": { "enabled": false, "engine": "qoder", "model": "Qwen3.8-Flash", "effort": "xhigh", "description": "Free worker (Qwen3.8-Flash via qodercli)." },
+    "opencode_worker": { "enabled": false, "engine": "opencode", "model": "opencode/glm-5.3-flash-free", "effort": "max", "description": "Free worker (glm-5.3-flash-free via opencode). Its TUI uses the variant remembered in ~/.local/state/opencode/model.json, which must match effort." },
+    "pi_worker": { "enabled": false, "engine": "pi", "model": "glm-5.3-flash", "effort": "high", "description": "Disabled Pi template (glm-5.3-flash). Enable the engine and this worker before dispatch." }
   },
   "herdr": { "max_wait_minutes": 15 }
 }

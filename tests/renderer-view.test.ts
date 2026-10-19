@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../src/shared/types';
-import { filterTasks, isActive, nextTab, reviewLabel, reviewStatus } from '../src/renderer/task-view';
+import { TASK_COLUMNS, filterTasks, isActive, nextTab, reviewLabel, reviewStatus, taskColumn } from '../src/renderer/task-view';
 import { TaskBoard } from '../src/renderer/components/TaskBoard';
 import { TaskDetail } from '../src/renderer/components/TaskDetail';
 import { workspacePathError } from '../src/renderer/components/TaskComposer';
@@ -19,6 +19,18 @@ function markup(node: React.ReactNode) {
 const task:Task={id:'t',title:'中文任务',instruction:'Do work',owner:{name:'Owner',transport:'herdr-visible',session:'main',pane:'1'},status:'completed',progress:100,createdAt:'2026-10-18T00:00:00Z',updatedAt:'2026-10-18T00:00:00Z',events:[],artifacts:[]};
 test('execution completion is distinct from acceptance',()=>{assert.equal(reviewStatus(task),'pending');assert.equal(reviewLabel(task),'待验收');assert.equal(reviewLabel({...task,reviewState:'accepted'}),'已通过');assert.equal(reviewLabel({...task,status:'running'}),'尚未进入验收');});
 test('filters preserve pending review and support Chinese and owner search',()=>{const items=[task,{...task,id:'accepted',reviewState:'accepted' as const},{...task,id:'running',status:'running' as const}];assert.equal(filterTasks(items,'review','中文').length,1);assert.equal(filterTasks(items,'all','OWNER').length,3);assert.equal(filterTasks(items,'active','').length,1);assert.equal(filterTasks(items,'closed','').length,2);assert.equal(isActive({...task,status:'cancelling'}),true);});
+test('every task lands in exactly one kanban column by where it is in its lifecycle',()=>{
+  assert.deepEqual(TASK_COLUMNS.map(column=>column.key),['queued','running','review','closed']);
+  assert.equal(taskColumn({...task,status:'queued'}),'queued');
+  assert.equal(taskColumn({...task,status:'running'}),'running');
+  assert.equal(taskColumn({...task,status:'cancelling'}),'running');
+  assert.equal(taskColumn(task),'review');
+  assert.equal(taskColumn({...task,reviewState:'accepted'}),'closed');
+  assert.equal(taskColumn({...task,reviewState:'rejected'}),'closed');
+  assert.equal(taskColumn({...task,status:'failed'}),'closed');
+  assert.equal(taskColumn({...task,status:'cancelled'}),'closed');
+});
+test('board lays tasks out in columns with counts',()=>{const html=markup(React.createElement(TaskBoard,{tasks:[task,{...task,id:'q',title:'排队任务',status:'queued' as const}],loading:false,onSelect:()=>{}}));assert.match(html,/待执行/);assert.match(html,/待验收/);assert.match(html,/排队任务/);assert.match(html,/中文任务/);});
 test('board has distinct loading and empty states',()=>{const props={tasks:[],onSelect:()=>{}};assert.match(markup(React.createElement(TaskBoard,{...props,loading:true})),/正在加载/);assert.match(markup(React.createElement(TaskBoard,{...props,loading:false})),/还没有任务/);});
 test('task view separates execution and review, escapes instruction',()=>{const html=markup(React.createElement(TaskDetail,{task:{...task,instruction:'<script>bad()</script>'},busy:false,onStart:()=>{},onCancel:()=>{},action:async()=>true}));assert.match(html,/执行完成/);assert.match(html,/待验收/);assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.doesNotMatch(html,/开始 mock 执行/);assert.doesNotMatch(html,/真实 provider 未连接/);assert.doesNotMatch(html,/本地 mock/);assert.match(html,/尚未记录调度结果/);assert.match(html,/id="task-tab-events"/);assert.match(html,/aria-controls="task-panel-events"/);assert.match(html,/aria-labelledby="task-tab-events"/);assert.match(html,/tabindex="0"/);assert.match(html,/tabindex="-1"/);});
 test('task workspace must be an absolute directory',()=>{assert.equal(workspacePathError(''), '填写目标项目的绝对路径。');assert.match(workspacePathError('.'),/绝对路径/);assert.match(workspacePathError('docs'),/绝对路径/);assert.equal(workspacePathError('/home/user/project'),'');});

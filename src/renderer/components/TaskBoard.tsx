@@ -1,25 +1,49 @@
 import { useState } from 'react';
 import { Empty } from '@lobehub/ui';
-import { Input, Segmented, Skeleton, Text } from '@lobehub/ui/base-ui';
+import { Input, Progress, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
 import type { Task } from '../../shared/types';
-import { filterTasks, reviewLabel, statusLabels, type TaskFilter } from '../task-view';
+import { TASK_COLUMNS, filterTasks, reviewLabel, statusLabels, taskColumn } from '../task-view';
 import { styles } from '../style';
+
+/** Closed tasks say how they ended; open ones are already described by their column. */
+function outcome(task: Task): { label: string; color?: string } | undefined {
+  if (task.status === 'failed') return { label: statusLabels.failed, color: 'error' };
+  if (task.status === 'cancelled') return { label: statusLabels.cancelled };
+  if (task.status === 'cancelling') return { label: statusLabels.cancelling, color: 'warning' };
+  if (task.status === 'completed' && task.reviewState) return { label: reviewLabel(task), color: task.reviewState === 'accepted' ? 'success' : 'warning' };
+  if (task.scheduled) return { label: '排队中', color: 'processing' };
+  return undefined;
+}
 
 export function TaskBoard({ tasks, selected, loading, onSelect }: { tasks: Task[]; selected?: string; loading: boolean; onSelect: (id: string) => void }) {
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<TaskFilter>('all');
-  const visible = filterTasks(tasks, filter, query);
-  return <section aria-label="任务列表" className={styles.stack}>
-    <Input aria-label="搜索任务" placeholder="标题、Owner 或任务 ID" value={query} onChange={event => setQuery(event.target.value)} />
-    <Segmented aria-label="任务筛选" block size="small" value={filter} onChange={setFilter} options={[{ value: 'all', label: '全部' }, { value: 'active', label: '进行中' }, { value: 'review', label: '待验收' }, { value: 'closed', label: '已结束' }]} />
-    <div aria-busy={loading} className={styles.stack}>
-      {loading && !tasks.length ? <div role="status" className={styles.stack}><Skeleton animated /><Text type="secondary">正在加载本地任务…</Text></div>
-        : !visible.length ? <Empty description={tasks.length ? '没有符合筛选的任务' : '从上方创建第一个任务。'} title={tasks.length ? '没有匹配结果' : '还没有任务'} />
-          : visible.map(task => <button key={task.id} type="button" aria-current={selected === task.id ? 'true' : undefined} className={styles.item} onClick={() => onSelect(task.id)}>
-            <span className={styles.spread}><Text>{statusLabels[task.status]}</Text><Text type="secondary" className={styles.meta}>{task.progress}%</Text></span>
-            <strong className={styles.wrap}>{task.title}</strong>
-            <Text type="secondary" className={styles.meta}>{task.owner.name} · {task.status === 'completed' ? reviewLabel(task) : new Date(task.createdAt).toLocaleString()}</Text>
-          </button>)}
+  const visible = filterTasks(tasks, 'all', query);
+  if (loading && !tasks.length) return <div role="status" className={styles.stack}><Skeleton animated /><Text type="secondary">正在加载本地任务…</Text></div>;
+  if (!tasks.length) return <Empty title="还没有任务" description="从右上角新建第一个任务。" />;
+  return <section aria-label="任务看板" className={styles.board}>
+    <Input aria-label="搜索任务" placeholder="搜索标题、负责人或任务 ID" value={query} onChange={event => setQuery(event.target.value)} style={{ maxInlineSize: 360 }} />
+    <div className={styles.lanes} aria-busy={loading}>
+      {TASK_COLUMNS.map(column => {
+        const items = visible.filter(task => taskColumn(task) === column.key).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        return <section key={column.key} aria-label={column.label} className={styles.lane}>
+          <header className={styles.laneHead}><Text strong>{column.label}</Text><Text type="secondary" className={styles.numbers}>{items.length}</Text></header>
+          <div className={styles.laneBody}>
+            {!items.length && <Text type="secondary" className={styles.meta} style={{ padding: 8 }}>{query.trim() ? '没有匹配的任务' : '暂无'}</Text>}
+            {items.map(task => {
+              const tag = outcome(task);
+              return <button key={task.id} type="button" className={styles.taskCard} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
+                <span className={styles.spread} style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
+                  <strong className={styles.wrap}>{task.title}</strong>
+                  {tag && <Tag size="small" color={tag.color}>{tag.label}</Tag>}
+                </span>
+                {task.status === 'running' && <Progress aria-label={`${task.title} 执行进度`} percent={task.progress} size="small" />}
+                <Text type="secondary" className={`${styles.meta} ${styles.wrap}`}>{task.owner.name}{task.dispatch ? ` → ${task.dispatch.worker}` : ''}</Text>
+                <Text type="secondary" className={styles.meta}>{new Date(task.updatedAt).toLocaleString()}</Text>
+              </button>;
+            })}
+          </div>
+        </section>;
+      })}
     </div>
   </section>;
 }

@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Block, Config } from '../main/policy/routing';
-import type { Issue, PolicySnapshot, RoutePreview } from '../shared/policy';
+import type { Issue, PolicySnapshot } from '../shared/policy';
+
+export interface PolicyDocument { config: Config; blocks: Block[] }
+export type PolicyUpdate = (current: PolicyDocument) => PolicyDocument;
+
+const isConflict = (text: string) => text.includes('reload') || text.includes('changed') || text.includes('Settings changed');
 
 export function usePolicyDraft() {
   const [snapshot, setSnapshot] = useState<PolicySnapshot>();
@@ -12,10 +17,16 @@ export function usePolicyDraft() {
   const [saveError, setSaveError] = useState('');
   const [issues, setIssues] = useState<Issue[]>([]);
   const [conflict, setConflict] = useState(false);
-  const [message, setMessage] = useState('');
   const dirty = useMemo(() => Boolean(snapshot && config && (JSON.stringify(config) !== JSON.stringify(snapshot.config) || JSON.stringify(blocks) !== JSON.stringify(snapshot.blocks))), [snapshot, config, blocks]);
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
+  const draftRef = useRef<PolicyDocument | undefined>(undefined);
+  draftRef.current = config ? { config, blocks } : undefined;
+  const commits = useRef<Promise<unknown>>(Promise.resolve());
 
   const accept = useCallback((next: PolicySnapshot) => {
     setSnapshot(next);
@@ -26,11 +37,21 @@ export function usePolicyDraft() {
     setSaveError('');
   }, []);
 
+  /** Adopt a newer saved policy. A draft is kept and receives the same update instead of being replaced. */
+  const rebase = useCallback((next: PolicySnapshot, update?: PolicyUpdate) => {
+    const draft = draftRef.current;
+    if (!dirtyRef.current || !draft || !update) { accept(next); return; }
+    const merged = update(structuredClone(draft));
+    setSnapshot(next);
+    setConfig(merged.config);
+    setBlocks(merged.blocks);
+  }, [accept]);
+
   const load = useCallback(async (force = false) => {
     if (!window.weaver) { setLoadError('控制面不可用。请通过 weaver web 打开这个页面。'); setLoading(false); return false; }
     if (dirtyRef.current && !force) return false;
     setLoading(true); setLoadError('');
-    try { accept(await window.weaver.getPolicy()); setMessage(force ? '已重新加载已保存配置。' : ''); return true; }
+    try { accept(await window.weaver.getPolicy()); return true; }
     catch (error) { setLoadError(error instanceof Error ? error.message : String(error)); return false; }
     finally { setLoading(false); }
   }, [accept]);
@@ -41,34 +62,74 @@ export function usePolicyDraft() {
     return true;
   }, [accept]);
 
-  useEffect(() => { void load(false); }, [accept]);
+  useEffect(() => { void load(false); }, [load]);
+
+  // Scheduled quota refresh can change blocks; a clean page follows the saved policy, a draft is never replaced.
+  useEffect(() => {
+    if (!window.weaver) return;
+    const sync = () => {
+      if (dirtyRef.current || busyRef.current) return;
+      void window.weaver.getPolicy().then(next => { if (!dirtyRef.current && !busyRef.current) accept(next); }).catch(() => {});
+    };
+    const timer = setInterval(sync, 30_000);
+    window.addEventListener('focus', sync);
+    return () => { clearInterval(timer); window.removeEventListener('focus', sync); };
+  }, [accept]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const protect = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener('beforeunload', protect);
+    return () => window.removeEventListener('beforeunload', protect);
+  }, [dirty]);
 
   const save = useCallback(async () => {
     if (!window.weaver || !snapshot || !config || busy) return false;
-    setBusy(true); setSaveError(''); setIssues([]); setMessage('');
+    setBusy(true); setSaveError(''); setIssues([]);
     try {
       const found = await window.weaver.validatePolicy(config);
-      if (found.length) { setIssues(found); setSaveError('配置还不能保存。'); return false; }
+      if (found.length) { setIssues(found); setSaveError('配置有错误，还不能保存。'); return false; }
       const enabledWithoutProbe = Object.entries(config.engines).filter(([id, engine]) => engine.enabled && snapshot.config.engines[id]?.enabled !== true).map(([id]) => id);
-      if (enabledWithoutProbe.length) { setSaveError(`不能通过策略保存启用引擎 ${enabledWithoutProbe.join('、')}。请到引擎页探测后再启用。草稿已保留。`); return false; }
+      if (enabledWithoutProbe.length) { setSaveError(`引擎 ${enabledWithoutProbe.join('、')} 需要在引擎页用启用开关打开，保存不会启用引擎。草稿已保留。`); return false; }
       accept(await window.weaver.savePolicy({ revision: snapshot.revision, config, blocks }));
-      setMessage('策略已保存。启用引擎不会创建角色。是否真实执行以任务记录的 execution 和引擎就绪状态为准。');
       return true;
     } catch (error) {
       const text = error instanceof Error ? error.message : String(error);
       setSaveError(text);
-      if (text.includes('reload') || text.includes('changed') || text.includes('Settings changed')) setConflict(true);
+      if (isConflict(text)) setConflict(true);
       return false;
     } finally { setBusy(false); }
   }, [accept, blocks, busy, config, snapshot]);
 
-  const preview = useCallback(async (input: { owner: string; class: string; tag?: string; runningCount: number }) => {
-    if (!window.weaver) throw new Error('控制面不可用');
-    return window.weaver.previewRoute(input);
-  }, []);
+  /**
+   * Save one change immediately on top of the saved policy, independent of the page draft.
+   * A revision bumped meanwhile (for example by a scheduled quota block) is re-read and retried once.
+   * Rejects with the server message; the caller shows it next to the control.
+   */
+  const commit = useCallback((update: PolicyUpdate): Promise<void> => {
+    const run = async () => {
+      if (!window.weaver) throw new Error('控制面不可用');
+      let base = snapshotRef.current;
+      if (!base) throw new Error('配置尚未读取');
+      for (let attempt = 0; ; attempt++) {
+        const next = update(structuredClone({ config: base.config, blocks: base.blocks }));
+        try {
+          const saved = await window.weaver.savePolicy({ revision: base.revision, config: next.config, blocks: next.blocks });
+          rebase(saved, update);
+          return;
+        } catch (error) {
+          const text = error instanceof Error ? error.message : String(error);
+          if (attempt > 0 || !isConflict(text)) throw error;
+          base = await window.weaver.getPolicy();
+        }
+      }
+    };
+    const job = commits.current.then(run, run);
+    commits.current = job.catch(() => {});
+    return job;
+  }, [rebase]);
 
-  return { snapshot, config, setConfig, blocks, setBlocks, loading, busy, loadError, saveError, issues, conflict, message, dirty, load, save, preview, setMessage, applyServerSnapshot };
+  return { snapshot, config, setConfig, blocks, setBlocks, loading, busy, loadError, saveError, issues, conflict, dirty, load, save, commit, rebase, applyServerSnapshot };
 }
 
 export type PolicyDraft = ReturnType<typeof usePolicyDraft>;
-export type { RoutePreview };

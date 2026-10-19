@@ -1,5 +1,5 @@
 import type { EngineQuotaRecord, QuotaEngine, QuotaRefreshInput, QuotaRefreshResult, QuotaSnapshot } from '../../shared/quota';
-import type { Block } from './routing';
+import { quotaRefreshEnabled, type Block, type Config } from './routing';
 import type { PolicyStore } from './store';
 import { object } from '../../shared/validation';
 
@@ -10,6 +10,12 @@ export const QUOTA_CAPABILITIES = {
   get: { command: 'quota.get', rpc: 'getQuota', network: false },
   refresh: { command: 'quota.refresh', rpc: 'refreshQuota', updatesPolicyBlocks: true, inference: false },
 };
+
+/** Distinct quota kinds of enabled engines that opted into scheduled refresh. */
+export function quotaRefreshTargets(config: Config): QuotaEngine[] {
+  const kinds = new Set(Object.values(config.engines).filter(engine => engine.enabled && quotaRefreshEnabled(engine)).map(engine => engine.kind));
+  return ENGINES.filter(engine => kinds.has(engine));
+}
 
 export function parseQuotaRefresh(value: unknown): QuotaRefreshInput {
   const raw = object(value);
@@ -49,7 +55,8 @@ export function applyQuotaSnapshot(store: PolicyStore, quota: QuotaSnapshot, inp
     if (record.status !== 'available' && record.status !== 'exhausted') continue;
     const source = `weaver-quota:${record.engine}`;
     for (const [id, engine] of Object.entries(current.config.engines)) {
-      if (engine.kind !== record.engine) continue;
+      // An engine whose quota is not tracked would never get a fresh observation to release the block.
+      if (engine.kind !== record.engine || !quotaRefreshEnabled(engine)) continue;
       const existing = blocks.find(block => block.engine === id && block.model === undefined);
       if (existing && existing.by !== source) {
         if (record.status === 'exhausted' && existing.release_at && Date.parse(existing.release_at) <= now) throw new QuotaPolicyConflict();

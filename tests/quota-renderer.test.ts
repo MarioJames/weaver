@@ -6,7 +6,7 @@ import type { EngineQuotaRecord, QuotaRefreshResult, QuotaWindow } from '../src/
 import {
   acceptQuotaPolicy, quotaCountText, quotaNextUpdateMs, quotaPercentText, quotaProgressPercent, quotaRecordStale,
   quotaRetryMs, quotaScopeText, quotaStatusText, quotaWindowStale,
-} from '../src/renderer/components/QuotaPanel';
+} from '../src/renderer/quota-view';
 
 const NOW = Date.parse('2026-10-19T02:00:00Z');
 const time = (offset: number) => new Date(NOW + offset).toISOString();
@@ -108,13 +108,13 @@ test('quota refresh preserves dirty or newer policy and exposes reload/conflict 
   const result: QuotaRefreshResult = { records: [], snapshot: snapshot(6), policyChanged: true };
   const accepted: PolicySnapshot[] = [];
   const applyServerSnapshot = (value: PolicySnapshot) => { accepted.push(value); return true; };
-  assert.match(acceptQuotaPolicy({ dirty: true, snapshot: previous, applyServerSnapshot }, result), /草稿已保留.*重新加载.*冲突/);
+  assert.match(acceptQuotaPolicy({ dirty: true, snapshot: previous, applyServerSnapshot }, result), /未保存的修改已保留.*重新加载.*冲突/);
   assert.equal(accepted.length, 0);
   assert.match(acceptQuotaPolicy({ dirty: false, snapshot: snapshot(7), applyServerSnapshot }, result), /已有更新的策略版本/);
   assert.equal(accepted.length, 0);
-  assert.match(acceptQuotaPolicy({ dirty: false, snapshot: previous, applyServerSnapshot: () => false }, result), /草稿已保留.*重新加载.*冲突/);
+  assert.match(acceptQuotaPolicy({ dirty: false, snapshot: previous, applyServerSnapshot: () => false }, result), /未保存的修改已保留.*重新加载.*冲突/);
   assert.equal(accepted.length, 0);
-  assert.match(acceptQuotaPolicy({ dirty: false, snapshot: previous, applyServerSnapshot }, result), /自动来源阻断已同步.*人工\/历史阻断保留/);
+  assert.match(acceptQuotaPolicy({ dirty: false, snapshot: previous, applyServerSnapshot }, result), /已按额度更新自动限制/);
   assert.deepEqual(accepted, [result.snapshot]);
-  assert.match(acceptQuotaPolicy({ dirty: false, snapshot: result.snapshot, applyServerSnapshot }, { ...result, policyChanged: false }), /自动来源阻断无变化/);
+  assert.match(acceptQuotaPolicy({ dirty: false, snapshot: result.snapshot, applyServerSnapshot }, { ...result, policyChanged: false }), /^额度已刷新。$/);
 });

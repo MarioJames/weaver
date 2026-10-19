@@ -59,11 +59,9 @@ weaver tasks create --input task.json --command-id create-0731
 # 2. Freeze the bounded work package (scope + acceptance criteria).
 weaver packages create --task-id <taskId> --input package.json --command-id package-0731
 
-# 3. Dispatch on the current saved route: the judgment class resolves
-#    worker/engine/model/effort by eligibility, weights and tier order.
-#    Without an explicit `only_engine` pin saved in policy this may not land
-#    on Codex (Pi/Grok are eligible too); a Codex pin must be configured
-#    explicitly in policy, not assumed here. An explicit `worker` is accepted.
+# 3. Dispatch on the current saved route: the owner's highest-weight available
+#    worker is chosen (ties keep the owner's list order). An explicit `worker`
+#    is accepted.
 weaver workers spawn --task-id <taskId> --input dispatch.json --command-id dispatch-0731
 
 # 4. Bounded wait (1-600 seconds, default 30). Exiting wait or watch never cancels the task.
@@ -87,26 +85,25 @@ package.json
 }
 
 dispatch.json
-{ "class": "judgment" }
+{}
 ```
 
-`workers spawn` returns the frozen dispatch (owner, worker, engine, model, effort, execution, max_parallel bounds, max wait, workspace) and either starts the worker or queues it when the owner is at its `max_parallel`. Queued work freezes the chosen route: it is never silently reselected or moved to another engine. `--input -` reads JSON from stdin; a full `{apiVersion:"weaver.v1",commandId,command,args}` envelope is accepted the same way.
+`workers spawn` returns the frozen dispatch (owner, worker, engine, model, effort, execution, max_parallel bounds, max wait, workspace) and either starts the worker or queues it when the owner is at its `max_parallel`. When the worker runs on the owner's own engine the dispatch is `execution: "native"`: Weaver launches nothing, the task holds an owner slot, and the owner runs the package with its built-in subagent tool, then reports with `weaver workers complete`. Queued work freezes the chosen route: it is never silently reselected or moved to another engine. `--input -` reads JSON from stdin; a full `{apiVersion:"weaver.v1",commandId,command,args}` envelope is accepted the same way.
 
 If a mutation reply is lost, do not retry with a new ID: `weaver operations get --command-id <id>` reads the durable receipt for the same command ID. Unknown commands are rejected before any dispatch; a command executed but not acknowledged returns `COMMAND_INDETERMINATE` and requires inspecting state, not blind replay.
 
-## Configure: order, weights, pin
+## Configure: weights
 
-Policy is one validated document saved atomically with a revision check. It holds enabled engines, owners (ordered `workers` list, `worker_weights`, optional `only_engine`, `max_parallel`), workers (engine, model, effort, tags), and quota `blocks`.
+Policy is one validated document saved atomically with a revision check. It holds enabled engines, owners (`workers` list, `worker_weights`, `max_parallel`), workers (engine, model, effort, description), and quota `blocks`.
 
-- Weights are integers 0..1000, default 100; they are priority, not probability. Larger first within a tier; ties follow the owner's `workers` order. Weight `0` excludes the worker, and an explicitly named worker cannot bypass weight 0 or the pin.
-- Class/tag eligibility is resolved first (mechanical/routine/judgment tiers, then tags), weights only reorder inside a tier.
-- `only_engine` is a hard pin: every dispatch for that owner (automatic, explicit worker, or queued pump) is constrained to that engine. There is no fallback across engines. A pin whose selection set is empty or unavailable can be saved but every dispatch fails until it is fixed.
+- Dispatch picks the owner's highest-weight available worker. Weights are integers 0..1000, default 100; they are priority, not probability. Ties follow the owner's `workers` order. Weight `0` excludes the worker, and an explicitly named worker cannot bypass weight 0.
+- A disabled worker, a disabled engine, or an active block on the engine/model skips that worker. Pause an engine from its card on the Engines page; exhausted quota adds and removes its own block.
 - Concurrency is per owner: `max_parallel`. The reported total is the sum of enabled owners, not a separate global limit. Lowering `max_parallel` leaves running tasks alone.
 - Timeout is `herdr.max_wait_minutes` (1-1440); there is no 60-second default.
 
 ```sh
 weaver policy validate --input config.json   # config.json is the config document itself
-weaver policy preview  --input preview.json  # preview.json is a {owner, worker/class, runningCount} object
+weaver policy preview  --input preview.json  # preview.json is a {owner, worker?, runningCount} object
 weaver policy save     --input save.json     # save.json is {revision, config, blocks}; validate and save take different shapes
 weaver engines set-enabled --input toggle.json
 ```
@@ -119,7 +116,7 @@ Route preview is non-executing; dispatch separately applies current policy. Edit
 
 ## 原生账户额度
 
-`quota get` 只读内存；`quota refresh` 手动探测 Codex、Claude Code 和 Grok，并同步 Weaver 自建的 `policy.blocks`。初次读取或进程重启后显示未知，额度观测不持久缓存；自动阻断仍保留在策略文件中。额度状态不保证模型能够运行，引擎启用、角色、权重与 pin 仍独立配置。
+`quota get` 只读内存；`quota refresh` 手动探测 Codex、Claude Code 和 Grok，并同步 Weaver 自建的 `policy.blocks`。运行中的 `weaver web` 还会按设置页的间隔（policy `quota`，缺省每 15 分钟）自动刷新开启了「主动刷新额度」（`engines.*.quota_refresh`）的已启用引擎；额度耗尽时自动阻断该引擎，恢复或到重置时间后自动解除。初次读取或进程重启后显示未知，额度观测不持久缓存；自动阻断仍保留在策略文件中。额度状态不保证模型能够运行，引擎启用、角色、权重与 pin 仍独立配置。
 
 ```sh
 weaver quota get --output json
@@ -129,7 +126,7 @@ printf '{"engine":"claude"}\n' | weaver quota refresh --input - --output json
 weaver quota refresh --help --output json
 ```
 
-两条命令都支持 `json`、`jsonl`、`text`；刷新缺省探测全部三家，输入只接受可选的 `engine: codex|claude|grok`，不接受 command/task ID。当前机器目录共 37 条命令（27 个逻辑命令、8 个 RPC 动词、2 个本地等待动词），可用 `weaver --help --output json` 读取完整目录与参数；`capabilities.quota` 提供发现入口。
+两条命令都支持 `json`、`jsonl`、`text`；刷新缺省探测全部三家，输入只接受可选的 `engine: codex|claude|grok`，不接受 command/task ID。当前机器目录共 38 条命令（28 个逻辑命令、8 个 RPC 动词、2 个本地等待动词），可用 `weaver --help --output json` 读取完整目录与参数；`capabilities.quota` 提供发现入口。
 
 成功观测在内存中保鲜 5 分钟，每家网络请求至少间隔 60 秒，并遵守接口的 `Retry-After`。没有后台轮询或强制绕过。只有新鲜、明确的账户耗尽会增加自有阻断，只有新鲜 `available` 会解除自有阻断；未知、失败或过期观测保留旧阻断。人工和其他来源的阻断保持原样；已过期的人工引擎阻断妨碍自动阻断时，刷新返回 `QUOTA_POLICY_CONFLICT`（HTTP 409），整次策略合并不落盘。
 

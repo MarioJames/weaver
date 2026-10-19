@@ -44,7 +44,8 @@ export class TaskStore {
  }
  recover(): void {
   let changed = false;
-  for (const task of this.tasks.values()) if (active(task)) {
+  // A native run lives in the owner, not this process, so the owner can still report it after a restart.
+ for (const task of this.tasks.values()) if (active(task) && task.run?.execution !== 'native') {
    task.status = 'failed'; if (task.run) { task.run.status='stopped'; task.run.endedAt=new Date().toISOString(); delete task.run.pid; }
    event(task,'error','Interrupted by app exit. No worker was resumed; create a new task to retry.'); changed = true;
   }

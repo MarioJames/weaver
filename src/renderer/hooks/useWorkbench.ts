@@ -2,19 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Capabilities, Task } from '../../shared/types';
 import { createTaskSynchronizer } from '../task-sync';
 export function useWorkbench() {
- const [tasks,setTasks]=useState<Task[]>([]);const [caps,setCaps]=useState<Capabilities>();const [error,setError]=useState('');const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [lastSync,setLastSync]=useState<string>();const [syncState,setSyncState]=useState<'connecting'|'live'|'stale'|'disconnected'>('connecting');
+ const [tasks,setTasks]=useState<Task[]>([]);const [caps,setCaps]=useState<Capabilities>();const [error,setError]=useState('');const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);
  const locked=useRef(false);const mounted=useRef(true);const sync=useRef<ReturnType<typeof createTaskSynchronizer<Task[]>> | undefined>(undefined);
  const connect=useCallback(async()=>{
   setLoading(true);setError('');
-  if(!window.weaver){setError('控制面不可用。请通过 weaver web 打开这个页面。');setSyncState('disconnected');setLoading(false);return;}
+  if(!window.weaver){setError('控制面不可用。请通过 weaver web 打开这个页面。');setLoading(false);return;}
   try{const[,capabilities]=await Promise.all([sync.current?.refresh(),window.weaver.capabilities()]);if(mounted.current)setCaps(capabilities);}
-  catch(error){if(mounted.current){setError(String(error));setSyncState('stale');}}
+  catch(error){if(mounted.current)setError(String(error));}
   finally{if(mounted.current)setLoading(false);}
  },[]);
  useEffect(()=>{
   mounted.current=true;
   if(!window.weaver){void connect();return()=>{mounted.current=false;};}
-  const channel=createTaskSynchronizer(()=>window.weaver.listTasks(),value=>{if(mounted.current){setTasks(value);setLastSync(new Date().toISOString());setSyncState('live');}},error=>{if(mounted.current){setError(String(error));setSyncState('stale');}});sync.current=channel;
+  const channel=createTaskSynchronizer(()=>window.weaver.listTasks(),value=>{if(mounted.current)setTasks(value);},error=>{if(mounted.current)setError(String(error));});sync.current=channel;
   // Subscribe before requesting the initial authoritative snapshot to avoid a startup gap.
   const invalidate=()=>{void channel.refresh().catch(()=>{});};
   const unsubscribe=window.weaver.onTasksChanged(invalidate);
@@ -29,5 +29,5 @@ export function useWorkbench() {
   catch(error){if(mounted.current)setError(String(error));try{await sync.current?.refresh();}catch{/* Preserve command error. */}return false;}
   finally{locked.current=false;if(mounted.current)setBusy(false);}
  },[]);
- return{tasks,caps,error,loading,busy,lastSync,syncState,refresh:connect,action,dismissError:()=>setError('')};
+ return{tasks,caps,error,loading,busy,refresh:connect,action,dismissError:()=>setError('')};
 }

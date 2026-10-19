@@ -32,7 +32,6 @@ test('quota merge preserves manual/model blocks and applies aliases without chan
     const current = f.policy.snapshot();
     current.config.engines.codex_alias = { kind: 'codex', enabled: false };
     current.config.engines.codex_foreign = { kind: 'codex', enabled: false };
-    current.config.owners.codex_owner.only_engine = 'codex';
     current.config.owners.codex_owner.worker_weights = { codex_worker: 37 };
     const manual = { engine: 'codex', reason: 'manual', since, by: 'person' };
     const model = { engine: 'codex_alias', model: 'specific', reason: 'model only', since, by: 'external' };
@@ -69,8 +68,8 @@ test('release waits for latest exhausted account window, and any unknown reset r
   const f = await fixture();
   try {
     const pinned = f.policy.snapshot();
-    pinned.config.owners.claude_owner.only_engine = 'codex';
     pinned.config.owners.claude_owner.workers = ['claude_worker', 'codex_worker'];
+    pinned.config.owners.claude_owner.worker_weights = { claude_worker: 0 };
     f.policy.save({ revision: pinned.revision, config: pinned.config, blocks: [] });
     const latest = '2030-01-04T00:00:00.000Z';
     let result = applyQuotaSnapshot(f.policy, { records: [record({ windows: [window(reset), { ...window(latest), id: 'weekly' }, { ...window('2029-12-31T23:00:00Z'), id: 'expired' }, { ...window(null), id: 'model', scope: 'model' }] })] }, {}, now);
@@ -82,8 +81,7 @@ test('release waits for latest exhausted account window, and any unknown reset r
     assert.equal(applyQuotaSnapshot(f.policy, { records: [record({ windows: [] })] }, {}, now).policyChanged, false);
     assert.equal(result.snapshot.owners.codex_owner.status, 'blocked');
     assert.throws(() => f.policy.preview({ owner: 'claude_owner', worker: 'codex_worker' }), /blocked/);
-    assert.throws(() => f.policy.preview({ owner: 'claude_owner', class: 'judgment' }), /no available worker/);
-    assert.equal(f.policy.snapshot().config.owners.claude_owner.only_engine, 'codex');
+    assert.throws(() => f.policy.preview({ owner: 'claude_owner' }), /no available worker/);
   } finally { await f.close(); }
 });
 
@@ -326,7 +324,6 @@ test('refresh blocks the existing queue without cancelling its explicit mock fix
     const policy = new PolicyStore(join(f.dir, 'policy.v1.json'));
     const current = policy.snapshot();
     current.config.owners.codex_owner.max_parallel = 1;
-    current.config.owners.codex_owner.only_engine = 'codex';
     policy.save({ revision: current.revision, config: current.config, blocks: [] });
     const workerScript = join(f.dir, 'mock-hang.mjs');
     await writeFile(workerScript, 'process.stdin.resume(); setInterval(() => {}, 1000);');

@@ -13,11 +13,12 @@ export interface Artifact { id: string; name: string; mediaType: 'text/plain' | 
 export interface TaskEvent { id: string; at: string; kind: 'lifecycle' | 'log' | 'progress' | 'artifact' | 'result' | 'error'; message: string }
 export interface TaskDispatch {
   owner: string; worker: string; engine: string; model: string; effort: string;
-  execution: 'real' | 'mock'; maxParallel: number; maxWaitMinutes?: number;
+  /** native: the owner runs this same-engine worker with its built-in subagent tool; no process is launched. */
+  execution: 'real' | 'mock' | 'native'; maxParallel: number; maxWaitMinutes?: number;
   adapter?: string; workspace?: string; engineKind?: string; workspaceIdentity?: string;
 }
 export interface AgentRun {
-  id: string; adapter: string; execution?: 'real' | 'mock'; status: AgentStatus;
+  id: string; adapter: string; execution?: 'real' | 'mock' | 'native'; status: AgentStatus;
   engine?: string; model?: string; effort?: string; workspace?: string; timeoutMs?: number;
   scopeUnit?: string; evidence?: import('../main/adapters/cli/types').CliAgentEvidence;
   pid?: number; startedAt?: string; endedAt?: string; exitCode?: number | null;
@@ -39,6 +40,7 @@ export interface WeaverAPI {
  getQuota(): Promise<QuotaSnapshot>;
  refreshQuota(input: QuotaRefreshInput): Promise<QuotaRefreshResult>;
  setEngineEnabled(input: EngineToggleInput): Promise<EngineToggleResult>;
+ sayHi(input: import('./engines').HelloInput): Promise<import('./engines').HelloResult>;
  listTasks(): Promise<Task[]>;
  createTask(input: TaskInput): Promise<Task>;
  importTask(): Promise<Task | null>;

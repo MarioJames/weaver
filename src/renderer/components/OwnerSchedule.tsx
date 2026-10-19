@@ -1,33 +1,47 @@
-import { NamedSelect, NamedInputNumber } from './NamedControls';
-import { useState } from 'react';
-import { Button, Text } from '@lobehub/ui/base-ui';
+import { NamedInputNumber } from './NamedControls';
+import { Plus, X } from 'lucide-react';
+import { ActionIcon, Button, DropdownMenu, Tag, Text } from '@lobehub/ui/base-ui';
 import { Form } from '@lobehub/ui/base-ui/form';
-import type { Config, Owner } from '../../main/policy/routing';
-import { appendWorker, moveWorker, withOnlyEngine, withWorkerWeight, withoutListedWorker, workerWeight } from '../policy-edit';
+import { activeBlocks, availabilityOf, type Block, type Config, type Owner } from '../../main/policy/routing';
+import { appendWorker, withWorkerWeight, withoutListedWorker, workerWeight } from '../policy-edit';
 import { styles } from '../style';
 
-export function OwnerScheduleFields({ config, record, update }: { config: Config; record: Owner; update: (next: Owner) => void }) {
-  const [add, setAdd] = useState<string>();
+/** Why dispatch would skip this worker right now, as a short tag. */
+export function workerStatusTag(config: Config, blocks: Block[], workerId: string, weight: number): { label: string; color?: string } | undefined {
+  const worker = config.workers[workerId];
+  if (!worker) return { label: '引用不存在', color: 'error' };
+  if (weight === 0) return { label: '不派发' };
+  const availability = availabilityOf(config, activeBlocks({ version: 1, blocks }, Date.now()), worker);
+  if (availability.status === 'disabled') return { label: '停用' };
+  if (availability.status === 'engine_disabled') return { label: '引擎未启用' };
+  if (availability.status === 'blocked') return { label: '已限制', color: 'warning' };
+  return undefined;
+}
+
+export function OwnerScheduleFields({ config, blocks, record, update }: { config: Config; blocks: Block[]; record: Owner; update: (next: Owner) => void }) {
   const available = Object.keys(config.workers).filter(id => !record.workers.includes(id));
-  const pending = appendWorker(record.workers, available, add);
-  return <>
-    <Form.Field label="固定单一引擎" desc="选定后，自动派发、指定工作代理和排队重试都只能用这台引擎。它不可用时不会改派到别的引擎。">
-      <div className={styles.row}>
-        <NamedSelect aria-label="固定单一引擎" value={record.only_engine} placeholder="不固定" options={Object.keys(config.engines).map(id => ({ value: id, label: `${id}${config.engines[id]?.enabled ? '' : ' · 未启用'}` }))} onChange={value => { if (typeof value === 'string') update(withOnlyEngine(record, value)); }} />
-        <Button disabled={!record.only_engine} onClick={() => update(withOnlyEngine(record, undefined))}>清除固定</Button>
-      </div>
-    </Form.Field>
-    <Form.Field label="工作代理与同类优先权重" required desc="类别和标签仍先决定候选。同一层级内，优先权重更大的先尝试，相同权重才按上面的顺序。0 表示这个负责人不派给该工作代理。这是优先级，不是随机概率。">
-      <div className={styles.stack}>{record.workers.map((id, index) => <div key={`${id}-${index}`} className={styles.row}>
-        <Text className={styles.grow}>{index + 1}. {id}{Object.hasOwn(config.workers, id) ? '' : '（引用不存在）'}</Text>
-        <NamedInputNumber aria-label={`${id} 的优先权重`} min={0} max={1000} step={1} value={workerWeight(record, id)} onChange={value => update(withWorkerWeight(record, id, typeof value === 'number' ? value : 100))} />
-        <Button size="small" aria-label={`上移 ${id}`} disabled={index === 0} onClick={() => update({ ...record, workers: moveWorker(record.workers, index, -1) })}>上移</Button>
-        <Button size="small" aria-label={`下移 ${id}`} disabled={index === record.workers.length - 1} onClick={() => update({ ...record, workers: moveWorker(record.workers, index, 1) })}>下移</Button>
-        <Button size="small" aria-label={`移除引用 ${id}`} onClick={() => update(withoutListedWorker(record, id))}>移除</Button>
-      </div>)}
-        {!record.workers.length && <Text type="danger">还没有工作代理。启用的负责人至少需要一个已启用、且引擎已启用的工作代理。权重为 0 或固定引擎暂时不可用时仍可保存，预览会说明没有候选。</Text>}
-        <div className={styles.row}><NamedSelect aria-label="加入顺序的工作代理" value={pending ? add : undefined} placeholder="选择工作代理" options={available.map(id => ({ value: id, label: id }))} onChange={value => setAdd(typeof value === 'string' ? value : undefined)} /><Button disabled={!pending} onClick={() => { if (!pending) return; update({ ...record, workers: pending }); setAdd(undefined); }}>添加引用</Button></div>
-      </div>
-    </Form.Field>
-  </>;
+  // Shown in dispatch order: weight first, list order for ties.
+  const ordered = record.workers.map((id, index) => ({ id, index, weight: workerWeight(record, id) })).sort((a, b) => b.weight - a.weight || a.index - b.index);
+  // A titled section rather than a Form.Field: the add button sits beside the title, and a label element would forward clicks on the title to it.
+  return <section aria-label="工作代理" className={styles.tight}>
+    <div className={styles.spread} style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
+      <Form.Title title="工作代理" desc="派发时按权重从高到低尝试，跳过停用或受限的工作代理；权重相同按加入先后。权重 0 表示不派给它。" />
+      <DropdownMenu placement="bottomRight" items={available.length ? available.map(id => ({ key: id, label: id, desc: [config.workers[id]?.engine, config.workers[id]?.model].filter(Boolean).join(' · '), onClick: () => { const next = appendWorker(record.workers, available, id); if (next) update({ ...record, workers: next }); } })) : [{ key: 'none', label: '没有可添加的工作代理', disabled: true }]}>
+        <Button size="small" icon={Plus}>添加工作代理</Button>
+      </DropdownMenu>
+    </div>
+    <div className={styles.stack}>
+      <div className={styles.listRows}>{ordered.map(({ id, weight }) => {
+        const status = workerStatusTag(config, blocks, id, weight);
+        return <div key={id} className={styles.listRow}>
+          <span className={styles.row} style={{ minInlineSize: 0 }}><Text className={styles.wrap}>{id}</Text>{status && <Tag size="small" color={status.color}>{status.label}</Tag>}</span>
+          <span className={styles.row} style={{ flexWrap: 'nowrap' }}>
+            <NamedInputNumber aria-label={`${id} 的权重`} size="small" min={0} max={1000} step={10} value={weight} style={{ inlineSize: 96 }} onChange={value => update(withWorkerWeight(record, id, typeof value === 'number' ? value : 100))} />
+            <ActionIcon size="small" icon={X} aria-label={`移除 ${id}`} onClick={() => update(withoutListedWorker(record, id))} />
+          </span>
+        </div>;
+      })}</div>
+      {!record.workers.length && <Text type="danger">还没有工作代理。启用的负责人至少需要一个可用的工作代理。</Text>}
+    </div>
+  </section>;
 }

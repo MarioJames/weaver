@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Task, TaskInput, WorkerRecord } from '../shared/types';
+import type { Artifact, Task, TaskInput, WorkerRecord } from '../shared/types';
 import { parseTaskInput } from '../shared/validation';
 import type { ManagedProcess, WorkerAdapter } from './adapters/worker';
 import { JsonlParser } from './protocol';
@@ -60,6 +60,13 @@ export class TaskManager {
       timeoutMs,
       ...(task.dispatch ? { engine: task.dispatch.engine, model: task.dispatch.model, effort: task.dispatch.effort, workspace: task.dispatch.workspace ?? task.workspace } : {}),
     };
+    if (execution === 'native') {
+      // The owner runs this worker itself and reports back through completeNative; there is no process or timer here.
+      delete task.run.timeoutMs;
+      event(task, 'lifecycle', `Owner runs ${task.dispatch?.worker} with its built-in subagent tool; waiting for its report`);
+      this.persist(task);
+      return this.store.get(id);
+    }
     event(task, 'lifecycle', execution === 'real'
       ? `Launching ${task.dispatch?.engineKind ?? task.dispatch?.engine} in ${task.dispatch?.workspace}`
       : 'Launching explicit mock-jsonl provider');
@@ -106,10 +113,26 @@ export class TaskManager {
     if (task.status === 'queued') { task.status = 'cancelled'; task.scheduled = false; delete task.queueReason; event(task, 'lifecycle', 'Cancelled before dispatch'); this.persist(task); return task; }
     if (task.status === 'cancelling' || task.status === 'cancelled') return task;
     if (task.status !== 'running') throw new Error('Only queued or running tasks can be cancelled');
+    if (task.run?.execution === 'native') {
+      task.status = 'cancelled'; task.run.status = 'stopped'; task.run.endedAt = new Date().toISOString();
+      event(task, 'lifecycle', 'Cancelled; the owner should stop its built-in subagent'); this.persist(task); return task;
+    }
     const run = this.running.get(id); if (!run) throw new Error('No active worker');
     task.status = 'cancelling'; if (task.run) task.run.status = 'stopping';
     event(task, 'lifecycle', 'Cancellation requested; waiting for worker exit'); this.persist(task);
     run.cancelled = true; this.terminate(run); return task;
+  }
+  /** The owner's report for a native run. Artifacts are already validated plain files. */
+  completeNative(id: string, report: { outcome: 'completed' | 'failed'; summary: string; artifacts: Pick<Artifact, 'name' | 'mediaType' | 'content'>[] }): Task {
+    const task = this.store.get(id);
+    if (task.status !== 'running' || task.run?.execution !== 'native') throw new Error('Only a running native task accepts a report');
+    const at = new Date().toISOString();
+    for (const artifact of report.artifacts) { task.artifacts.push({ id: randomUUID(), ...artifact, createdAt: at }); event(task, 'artifact', `Received ${artifact.name}`); }
+    task.run.status = 'stopped'; task.run.endedAt = at;
+    if (report.outcome === 'completed') { task.status = 'completed'; task.progress = 100; task.summary = report.summary; event(task, 'result', report.summary); event(task, 'lifecycle', 'Owner reported the native run complete; output is ready for review'); }
+    else { task.status = 'failed'; event(task, 'error', `Owner reported the native run failed: ${report.summary}`); }
+    this.persist(task);
+    return task;
   }
   async shutdown(): Promise<void> {
     const exits = [...this.running.values()].map(run => new Promise<void>(resolve => run.child.once('close', () => resolve())));

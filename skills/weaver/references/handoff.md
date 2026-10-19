@@ -56,7 +56,7 @@ Use the returned task ID and revision to freeze a package file containing:
 }
 ```
 
-The revision above is illustrative; always read the actual current value. `packages create --input package.json --command-id package-work-001` returns the frozen package. Then create dispatch args with `taskId`, latest `expectedRevision`, `packageId`, and `class` (mechanical/routine/judgment), optional judgment `tag` or explicit `worker`. Inspect `policy preview` for the same routing input first.
+The revision above is illustrative; always read the actual current value. `packages create --input package.json --command-id package-work-001` returns the frozen package. Then create dispatch args with `taskId`, latest `expectedRevision`, `packageId`, and an optional explicit `worker` (omitted picks the owner's highest-weight available worker). Inspect `policy preview` for the same routing input first.
 
 ```sh
 weaver workers spawn --input dispatch.json --command-id dispatch-work-001 --output json
@@ -64,6 +64,14 @@ weaver tasks watch --task-id RETURNED_TASK_UUID --for 30 --output jsonl
 weaver tasks get --task-id RETURNED_TASK_UUID --output json
 weaver tasks results --task-id RETURNED_TASK_UUID --output json
 ```
+
+A worker on the owner's own engine is dispatched as `execution: "native"`: no process starts, and the owner runs the package with its built-in subagent tool at the frozen model/effort, then reports:
+
+```sh
+weaver workers complete --task-id RETURNED_TASK_UUID --input report.json --command-id complete-work-001 --output json
+```
+
+`report.json` holds `{outcome: "completed"|"failed", summary (≤8000 chars), artifacts?: [{name, mediaType, content}] (≤20)}`. Only a running native task accepts one report; cancel ends it without a report.
 
 The server requires an existing absolute workspace for real execution and freezes its realpath and directory identity. `tasks create` supplies the CLI caller cwd only if workspace is omitted; explicit empty/non-string values fail, and explicit relative paths resolve against that caller cwd. The server never assumes its own repository. The trusted launcher receives the full frozen goal/scope/criteria/constraints and Worker role contract. Total instructions over 16000 characters fail before admission rather than silently dropping scope.
 

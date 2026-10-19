@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { API_VERSION, type CommandResponse, type LogicalOwner, type WorkPackage } from '../shared/commands';
 import type { Task } from '../shared/types';
-import { object, parseId, parseTaskInput, text } from '../shared/validation';
+import { object, parseId, parseTaskInput, parseWorkerRecord, text } from '../shared/validation';
 import { TaskManager } from './manager';
 import { event } from './store';
 import { ContinuationService, ContinuationError, redactContext } from './continuation';
@@ -10,7 +10,7 @@ import { PolicyStore } from './policy/store';
 import { QUOTA_CAPABILITIES } from './policy/quota';
 import { absoluteExistingWorkspace, assertFrozenWorkspace, workspaceIdentity, isRealEngineKind } from './workspace';
 import { workerInstruction } from './adapters/instruction';
-export const WRITE_COMMANDS = ['owners.attach','owners.spawn','owners.switch','owners.continuation.configure','tasks.create','tasks.retry','tasks.cancel','packages.create','workers.spawn','results.deliver','results.ack','reviews.submit'] as const;
+export const WRITE_COMMANDS = ['owners.attach','owners.spawn','owners.switch','owners.continuation.configure','tasks.create','tasks.retry','tasks.cancel','packages.create','workers.spawn','workers.complete','results.deliver','results.ack','reviews.submit'] as const;
 export const READ_COMMANDS = ['capabilities.get','sync.snapshot','sync.status','owners.list','owners.get','owners.continuation.get','tasks.get','tasks.list','tasks.events','tasks.results','artifacts.read','packages.get','operations.get','observability.get','observability.export'] as const;
 const writes=new Set<string>(WRITE_COMMANDS);
 export function configuredParallel(policy: PolicyStore): number {
@@ -112,10 +112,12 @@ export class CommandHandler {
  }
  private publicTask(task:Task){const {owner,run,...rest}=task;if(!run)return rest;const visible={...run};delete visible.pid;return {...rest,run:visible};}
  private manifest(task:Task){if(!terminal(task))fail('RESULT_NOT_READY','Execution has not reached a terminal state');const manifest={taskId:task.id,attemptId:task.run?.id??null,packageId:task.packageId??null,execution:task.status,summary:task.summary??null,artifacts:task.artifacts.map(a=>({id:a.id,name:a.name,mediaType:a.mediaType,sha256:createHash('sha256').update(a.content).digest('hex')})),exitCode:task.run?.exitCode??null};return {...manifest,manifestDigest:digest(manifest),delivery:task.acknowledged?'acknowledged':'pending',acceptance:task.reviewState??'pending'};}
- private decideExecution(engine:string,provider:unknown,task:Task):{execution:'real'|'mock';adapter:string;maxWaitMinutes:number;workspace?:string;engineKind?:string} {
+ private decideExecution(engine:string,provider:unknown,task:Task,ownerEngine?:string):{execution:'real'|'mock'|'native';adapter:string;maxWaitMinutes:number;workspace?:string;engineKind?:string} {
   const minutes=this.policy.snapshot().config.herdr.max_wait_minutes;
   if(!Number.isSafeInteger(minutes)||minutes<1||minutes>1440)fail('INVALID_REQUEST','Configured max_wait_minutes is invalid');
   if(provider==='mock-jsonl'||this.manager.adapterId==='mock-jsonl') return {execution:'mock',adapter:'mock-jsonl',maxWaitMinutes:minutes};
+  // A worker on the owner's own engine runs inside the owner with its built-in subagent tool; Weaver launches nothing.
+  if(ownerEngine!==undefined&&engine===ownerEngine) return {execution:'native',adapter:'native',maxWaitMinutes:minutes,...(task.workspace?{workspace:task.workspace}:{})};
   const kind=this.policy.snapshot().config.engines[engine]?.kind??'';
   if(kind==='claude')fail('CAPABILITY_UNAVAILABLE','Claude Code real execution is deferred. No mock provider was substituted.');
   if(!isRealEngineKind(kind))fail('CAPABILITY_UNAVAILABLE',`Engine ${engine} (${kind||'unknown kind'}) cannot be launched. No mock provider was substituted.`);
@@ -169,17 +171,27 @@ export class CommandHandler {
     const owner=text(a.owner??logical?.profileId??Object.keys(this.policy.snapshot().config.owners)[0],'owner profile',120);
     if(logical&&owner!==logical.profileId)fail('POLICY_DENIED','Task owner profile cannot be changed at dispatch');
     const running=this.manager.store.list().filter(t=>(t.status==='running'||t.status==='cancelling')&&t.dispatch?.owner===owner).length;
-    const route=this.policy.preview({owner,...(a.worker!==undefined?{worker:a.worker}:{class:a.class??'routine'}),...(a.tag!==undefined?{tag:a.tag}:{}),runningCount:running});
-    const decision=this.decideExecution(route.engine,a.provider,task);
+    const route=this.policy.preview({owner,...(a.worker!==undefined?{worker:a.worker}:{}),runningCount:running});
+    const decision=this.decideExecution(route.engine,a.provider,task,this.policy.snapshot().config.owners[route.owner]?.engine);
     const pendingPackage:WorkPackage=task.packageId?this.manager.store.getMetadata().packages.find(p=>p.id===task.packageId&&p.taskId===task.id)!:{id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:[decision.workspace??task.workspace??'Explicit mock fixture'],acceptanceCriteria:task.acceptanceCriteria?.length?task.acceptanceCriteria:[decision.execution==='mock'?'Mock output returned for owner review':'Provider result returned for owner review'],createdAt:new Date().toISOString()};
     if(!pendingPackage)fail('INVALID_REQUEST','Frozen work package is missing');
     if(decision.execution==='real')workerInstruction({...task,workspace:decision.workspace},pendingPackage);
     this.prepareOwnerActivity(command,a);task=this.task(a);
     if(decision.workspace)task.workspace=decision.workspace;
     if(!task.packageId){const meta=this.manager.store.getMetadata();if(meta.packages.length>=1000)fail('RESOURCE_LIMIT','Package limit reached');meta.packages.push(pendingPackage);this.manager.store.transaction(()=>{this.manager.store.setMetadata(meta);task.packageId=pendingPackage.id;this.put(task);});}
-    task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,workspaceIdentity:workspaceIdentity(decision.workspace)}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
-    event(task,'lifecycle',decision.execution==='real'?`Policy selected ${route.worker}; launching ${decision.engineKind} in ${decision.workspace}`:`Policy selected ${route.worker}; explicit mock-jsonl provider`);
+    task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,...(decision.execution==='real'?{workspaceIdentity:workspaceIdentity(decision.workspace)}:{})}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
+    event(task,'lifecycle',decision.execution==='real'?`Policy selected ${route.worker}; launching ${decision.engineKind} in ${decision.workspace}`:decision.execution==='native'?`Policy selected ${route.worker} on the owner's engine; the owner runs it with its built-in subagent tool (${route.model}, ${route.effort})`:`Policy selected ${route.worker}; explicit mock-jsonl provider`);
     if(!route.capacityAvailable){task.scheduled=true;task.queueReason={code:'waiting_for_capacity',message:`Owner ${route.owner} is at its current concurrency limit (${route.maxParallel}).`};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.put(task);return this.publicTask(task);}this.put(task);return this.publicTask(this.manager.start(task.id,route.maxParallel));
+   }
+   case 'workers.complete':{
+    const task=this.task(a);this.revise(task,a);
+    if(task.status!=='running'||task.run?.execution!=='native')fail('INVALID_STATE','Only a running native task accepts workers complete');
+    if(a.outcome!=='completed'&&a.outcome!=='failed')fail('INVALID_REQUEST','outcome must be completed or failed');
+    const summary=text(a.summary,'summary',8000);
+    if(a.artifacts!==undefined&&(!Array.isArray(a.artifacts)||a.artifacts.length>20))fail('INVALID_REQUEST','artifacts must be an array of at most 20 files');
+    const artifacts=((a.artifacts as unknown[]|undefined)??[]).map(item=>{const record=parseWorkerRecord({...object(item),type:'artifact'});if(record.type!=='artifact')throw new CommandError('INVALID_REQUEST','Invalid artifact');return {name:record.name,mediaType:record.mediaType,content:record.content};});
+    if(task.artifacts.length+artifacts.length>20)fail('RESOURCE_LIMIT','Task exceeds 20 artifacts');
+    return this.publicTask(this.manager.completeNative(task.id,{outcome:a.outcome as 'completed'|'failed',summary,artifacts}));
    }
    case 'tasks.cancel':{const task=this.task(a);this.revise(task,a);if(terminal(task))return {task:this.publicTask(task),alreadyTerminal:true};return this.publicTask(this.manager.cancel(task.id));}
    case 'tasks.events':{

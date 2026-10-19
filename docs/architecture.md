@@ -49,7 +49,7 @@ JSON 双文件即全部持久状态：
 - `tasks.v1.json`：任务（含 events/artifacts/run/摘要）、owners 元数据、frozen packages、命令收据 revisions；原子快照 revision 单调递增。上限 32 MiB、200 tasks、200 owners、1000 packages、5000 receipts、每任务 500 events、每任务 20 artifacts（内容 ≤32,000 字符）。
 - `policy.v1.json`：验证过的 policy 配置 + quota blocks；上限 256 KiB、500 blocks；revision 乐观锁，保存整文档替换。
 
-额度观测不增加持久文件：`QuotaProber` 只读原生认证并通过三个固定非公开 HTTPS GET 获取数据，观测在内存保鲜 5 分钟、每 provider 请求间隔至少 60 秒；`quota get` 无网络，`quota refresh` 显式触发探测与自有 blocks 合并。`policy.blocks` 仍是唯一持久阻断来源；人工来源不被自动覆盖，遇到妨碍施加自动阻断的过期 foreign 唯一 key 返回原子冲突。请求/认证边界及错误语义见 [额度接口](agent-interface.md#31-原生账户额度)。
+额度观测不增加持久文件：`QuotaProber` 只读原生认证并通过三个固定非公开 HTTPS GET 获取数据，观测在内存保鲜 5 分钟、每 provider 请求间隔至少 60 秒；`quota get` 无网络，`quota refresh` 显式触发探测与自有 blocks 合并。`QuotaScheduler` 每分钟按已保存的 `quota.auto_refresh` / `quota.interval_minutes`（缺省开启、15 分钟，5–1440）检查一次，到期后对已启用且 `quota_refresh` 生效的引擎所属 kind 走同一探测与合并路径；进程启动后首轮至少等一个检查周期。`policy.blocks` 仍是唯一持久阻断来源；人工来源不被自动覆盖，遇到妨碍施加自动阻断的过期 foreign 唯一 key 返回原子冲突。请求/认证边界及错误语义见 [额度接口](agent-interface.md#31-原生账户额度)。
 
 写入模型均在 fsync + rename 原子替换内完成（`src/main/store.ts`），无 directory fsync；中断的写命令先以 durable intent（receipt 写入）暴露为 `COMMAND_INDETERMINATE`，要求用 `operations.get` 查收据并核对现状，不做自动重放。命令收据键为 `local-demo:<commandId>`，同键同参返回原响应、同键不同参拒绝 `IDEMPOTENCY_CONFLICT`。这不是 exactly-once 外部执行保证，也没有事务 outbox。
 
@@ -59,9 +59,8 @@ JSON 双文件即全部持久状态：
 
 路由基于 policy 配置（`engines`/`owners`/`workers`/`herdr` + `blocks`）：
 
-- 类别/标签优先：mechanical → routine → judgment 的 tier 与 tag/native/顺序顺序由 `resolveDispatch` 决定；worker 权重只在同 tier 内重排。
-- `worker_weights`：整数 0..1000，缺省 100；同 tier 大者先、同权重按 owner.workers 声明顺序；0 直接排除该 worker，显式 worker 指定也不能绕过权重 0 或 pin。
-- `only_engine`：strong pin，把该 owner 的全部派发（自动、显式 worker、queued pump）约束到一个已存在引擎；没有跨引擎 fallback。全 0 或集合不可用的 pin 可以保存，但每次派发都会报无可用 worker。
+- `resolveDispatch` 只按权重：owner.workers 中权重最高且可用（worker 启用、引擎启用、无生效 block）的 worker 胜出；同权重按 owner.workers 声明顺序。
+- `worker_weights`：整数 0..1000，缺省 100；0 直接排除该 worker，显式 worker 指定也不能绕过权重 0。
 - 配额 block 按引擎/model 精确匹配，绝对时间戳 `release_at` 只有明确恢复时间才自动到期，其余手动解除。
 - 准入与派发同一 resolve 函数：`policy preview` 只读（`dispatch:"preview"`、`execution:"disabled"`）不执行；`workers.spawn` 实际校验 workspace/provider/容量后按结果 start 或入队。
 - 并发按 owner 的 `max_parallel`；报告总数是 enabled owner 的 `max_parallel` 之和，没有独立全局上限。超时来自 `herdr.max_wait_minutes`（1-1440），没有 60 秒默认值。
@@ -69,6 +68,7 @@ JSON 双文件即全部持久状态：
 队列与冻结：
 
 - `workers.spawn` 通过预检后把当时选出的 owner/worker/engine/kind/model/effort/execution/adapter/workspace 冻结进 `task.dispatch`；排队槽只是等待容量。
+- worker 与 owner 同引擎时 `execution:"native"`、adapter `native`：不启动进程，任务进入 running 并占用 owner 槽位，由 owner 用宿主内置子代理工具执行后调用 `workers.complete` 回报；取消直接转 cancelled，重启恢复时保持 running。
 - pump 复核当前资格/容量/配额/pin/workspace：route 改变（含 kind 不符）、容量不足、workspace 失效或 launch 失败都会给 `task.queueReason`（有界 message，仅变化落盘），代码取 `waiting_for_capacity/policy_blocked/frozen_route_changed/workspace_changed/launch_blocked`。冻结路由不会被默默改派或跨引擎替换。
 - 取消：queued 直接转 cancelled；running 先 `cancelling` 再等待本进程拥有的 worker 子进程退出（SIGTERM → 1.5s SIGKILL）。取消/文件损坏不删除已有 history 与事件。
 
@@ -98,7 +98,7 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 ## 8. 已知限制（不是未来路线）
 
 - 没有按 owner 的认证/对象级权限；本地凭据是 trusted-user 级（`capabilities.authentication` 声明）。
-- 没有自动 quota 探测/重试策略引擎；超额失败按 provider 错误如实报告，不自动换引擎或模型。
+- 定时额度刷新只按固定间隔探测并同步自有阻断，不做失败重试；超额失败按 provider 错误如实报告，不自动换引擎或模型。
 - 本地控制面只面向 Linux/Unix：`weaver web` 先启动 Unix CLI socket 再启动 HTTP（`src/main/runtime.ts`），而 `startLocalIPC` 在 win32 直接 `UNSUPPORTED_PLATFORM`（`src/main/local-ipc.ts`），因此 web 控制面在原生 Windows 不能启动。真实受管 worker 还依赖 Linux systemd user scope。不声称原生 Windows 支持，也不再描述未验证的远程访问形态。
 - 没有 retention/archival UI、迁移导入工具、SQLite/outbox/事件总线、全局持久事件流。
 - 没有 worker 递归与多 owner 交叉指挥；一个任务一个 owner，owner 间协作回到技能宿主的可见会话。

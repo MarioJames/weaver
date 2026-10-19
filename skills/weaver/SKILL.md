@@ -5,7 +5,7 @@ description: "Use Weaver to coordinate owner-led development through its CLI: in
 
 # Weaver
 
-Weaver is the scheduling authority for this task. Use its saved configuration, route preview and execution records. Do not run the global agents-cooperation/Herdr scheduler, native subagents, or another dispatch loop in place of Weaver. The public skill is named `weaver`; it does not replace any global `agents-cooperation` skill.
+Weaver is the scheduling authority for this task. Use its saved configuration, route preview and execution records. Do not run the global agents-cooperation/Herdr scheduler or another dispatch loop in place of Weaver; use your built-in subagent tool only for a dispatch Weaver marks `execution: "native"`. The public skill is named `weaver`; it does not replace any global `agents-cooperation` skill.
 
 ## Role and preflight
 
@@ -16,14 +16,16 @@ A Worker executes one package, modifies only its authorized files, returns actua
 Before dispatch:
 
 1. Read `weaver --help --output json`, `weaver capabilities --output json`, and `weaver policy get --output json`. A missing control plane reports `APP_NOT_RUNNING`; start the existing foreground `weaver web --no-open` when authorized. Closing a browser or client does not stop admitted work.
-2. Select the available Owner profile for your host and read its worker order, priority weights, fixed engine and active quota blocks. Engine scan proves only installation/version. `realExecution` means the Worker launcher exists; authentication and model availability are not established until an actual call. Claude Code real execution is deferred. Never substitute mock or another engine after a real failure.
-3. Classify the package as `mechanical`, `routine`, or `judgment`; inspect `weaver policy preview --help --output json` and preview the saved route. `tag` is for judgment domain selection; an explicit `worker` is for a justified choice or continuation. Weaver enforces weight 0, fixed engine, current policy, quota and capacity. Greater weights are priorities within the current routing tier, not random probabilities.
+2. Select the available Owner profile for your host and read its workers, priority weights and active quota blocks. Engine scan proves only installation/version. `realExecution` means the Worker launcher exists; authentication and model availability are not established until an actual call. Claude Code real execution is deferred. Never substitute mock or another engine after a real failure.
+3. Preview the saved route with `weaver policy preview` (see `--help --output json`). Without an explicit `worker`, Weaver picks the owner's highest-weight available worker; name a `worker` only for a justified choice or continuation. Weaver enforces weight 0, current policy, quota and capacity. Weights are priorities, not random probabilities.
 
 ## Execute and review
 
 Read [the handoff contract](references/handoff.md) before the first create/dispatch. Use `weaver <command> --help --output json` for required input fields; natural and dotted command names are equivalent. Keep JSON argument files under the [task scratch-root contract](references/handoff.md#task-scratch-root) and use stable command IDs.
 
-Create a task with the real absolute project workspace, bind its manual Owner, freeze an explicit read/write scope and acceptance criteria, then call `workers spawn`. Inspect the returned frozen worker/engine/model/effort and requested versus observed run evidence. A queued dispatch keeps its route; `queueReason` explains capacity, policy, changed frozen route or workspace. Do not overlap writers or create duplicate attempts while a dispatch is queued or running. Scope is a trusted-local cooperation boundary; it is not OS isolation.
+Create a task with the real absolute project workspace, bind its manual Owner, freeze an explicit read/write scope and acceptance criteria, then call `workers spawn`. Inspect the returned frozen worker/engine/model/effort and requested versus observed run evidence. A queued dispatch keeps its route; `queueReason` explains capacity, policy, changed frozen route or workspace. Do not overlap writers or create duplicate attempts while a dispatch is queued or running.
+
+When the dispatched worker runs on your own engine, the dispatch returns `execution: "native"` and Weaver launches no process: the task is running and holds an owner slot. Run the frozen package yourself with your host's built-in subagent tool at the frozen model/effort, keep it inside the frozen scope, then report with `weaver workers complete` (`{taskId, expectedRevision?, outcome: "completed"|"failed", summary, artifacts?}`). The task stays running until you report or cancel it; the same pull, review, ack and acceptance steps follow. Scope is a trusted-local cooperation boundary; it is not OS isolation.
 
 Use bounded `tasks wait` or `tasks watch --for 1..600` and inspect task state after timeout. They poll the same control plane and do not replay mutations. An uncertain mutation response requires `operations get --command-id <same-id>` plus task/Owner inspection; never blindly retry with a new ID. An expired event cursor requires a fresh task snapshot.
 

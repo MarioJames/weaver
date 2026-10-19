@@ -2,13 +2,13 @@ import type { Config } from './policy';
 
 /** Fixed allowlist. Discovery never accepts a caller-supplied command. */
 export const ENGINE_CATALOG = [
-  { id: 'claude', kind: 'claude', command: 'claude', nativeSubagents: true },
-  { id: 'codex', kind: 'codex', command: 'codex', nativeSubagents: true },
-  { id: 'grok', kind: 'grok', command: 'grok', nativeSubagents: false },
-  { id: 'opencode', kind: 'opencode', command: 'opencode', nativeSubagents: false },
-  { id: 'pi', kind: 'pi', command: 'pi', nativeSubagents: false },
-  { id: 'qoder', kind: 'qodercli', command: 'qodercli', nativeSubagents: false },
-  { id: 'gemini', kind: 'gemini', command: 'gemini', nativeSubagents: false },
+  { id: 'claude', kind: 'claude', command: 'claude' },
+  { id: 'codex', kind: 'codex', command: 'codex' },
+  { id: 'grok', kind: 'grok', command: 'grok' },
+  { id: 'opencode', kind: 'opencode', command: 'opencode' },
+  { id: 'pi', kind: 'pi', command: 'pi' },
+  { id: 'qoder', kind: 'qodercli', command: 'qodercli' },
+  { id: 'gemini', kind: 'gemini', command: 'gemini' },
 ] as const;
 
 export type CatalogEngine = (typeof ENGINE_CATALOG)[number];
@@ -99,3 +99,7 @@ export function engineReadiness(probe: EngineProbeRecord, config: Config): Engin
 export function readinessFor(probes: EngineProbeRecord[], config: Config): EngineReadiness[] {
   return probes.map(probe => engineReadiness(probe, config));
 }
+
+/** One worker route to greet: an engine id from the saved policy plus the model and effort to call. */
+export interface HelloInput { engine: string; model: string; effort: string }
+export interface HelloResult { ok: boolean; reply?: string; error?: string; durationMs: number; checkedAt: string }

@@ -34,6 +34,7 @@ export interface EngineQuotaRecord {
   retryAt: string | null;
 }
 
-export interface QuotaSnapshot { records: EngineQuotaRecord[] }
+export interface QuotaSchedule { enabled: boolean; intervalMinutes: number; lastRunAt: string | null; nextRunAt: string | null }
+export interface QuotaSnapshot { records: EngineQuotaRecord[]; schedule?: QuotaSchedule }
 export interface QuotaRefreshInput { engine?: QuotaEngine }
 export interface QuotaRefreshResult extends QuotaSnapshot { snapshot: PolicySnapshot; policyChanged: boolean }

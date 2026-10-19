@@ -11,15 +11,15 @@
 ## 2. 启用与角色配置（两步，不互换）
 
 - 第一步 `weaver engines set-enabled --input toggle.json`，body `{"id":"codex","enabled":true,"revision":<current>}`。启用要求已有 installed 探测与当前 revision；停用有启用的 owner/worker 时被拒绝并要求先单独停用角色，引擎记录与角色历史保留，不级联。启用成功后 pump 让排队任务按新准入重估。用 `policy save`/高级 JSON 把停用引擎改成启用是不允许的，同样必须走这里。
-- 第二步是角色配置：worker（`engine/model/effort/tags`）与 owner（`engine/model/effort/workers 顺序/worker_weights/only_engine/max_parallel`）都是 policy 字段。每个引擎 kind 有固定 effort 词表（`EFFORTS`：claude/codex low…max、grok none…max、pi off…max、qodercli auto…ultracode；opencode 不限定词表）。启用引擎不会自动建任何角色；权重 0 排除、`only_engine` 是硬 pin（保存合法但派发时无可用 worker 会失败）。保存走 `policy validate` → `policy save`（revision 乐观锁），预览用 `policy preview`。
+- 第二步是角色配置：worker（`engine/model/effort/description`）与 owner（`engine/model/effort/workers/worker_weights/max_parallel`）都是 policy 字段。每个引擎 kind 有固定 effort 词表（`EFFORTS`：claude/codex low…max、grok none…max、pi off…max、qodercli auto…ultracode；opencode 不限定词表）。启用引擎不会自动建任何角色；派发取权重最高的可用 worker，权重 0 排除。保存走 `policy validate` → `policy save`（revision 乐观锁），预览用 `policy preview`。
 
 ```json
 {"codex_owner": {"enabled": true, "engine": "codex", "model": "gpt-6.1-sol", "effort": "xhigh", "max_parallel": 4,
   "workers": ["grok_worker","pi_worker","codex_worker","opencode_worker"]},
- "opencode_worker": {"enabled": true, "engine": "opencode", "model": "opencode/glm-5.3-flash-free", "effort": "max", "tags": ["mechanical"]},
- "pi_worker": {"enabled": true, "engine": "pi", "model": "cc-switch-agentplan/glm-5.3-flash", "effort": "high", "tags": ["backend","docs","test"]},
- "grok_worker": {"enabled": true, "engine": "grok", "model": "grok-4.7", "effort": "high", "tags": ["research"]},
- "codex_worker": {"enabled": true, "engine": "codex", "model": "gpt-6.1-sol", "effort": "xhigh", "tags": ["backend","algorithm","refactor","long-test"]}}
+ "opencode_worker": {"enabled": true, "engine": "opencode", "model": "opencode/glm-5.3-flash-free", "effort": "max"},
+ "pi_worker": {"enabled": true, "engine": "pi", "model": "cc-switch-agentplan/glm-5.3-flash", "effort": "high"},
+ "grok_worker": {"enabled": true, "engine": "grok", "model": "grok-4.7", "effort": "high"},
+ "codex_worker": {"enabled": true, "engine": "codex", "model": "gpt-6.1-sol", "effort": "xhigh"}}
 ```
 
 模型/effort 配置只声明"请求的引擎/model/effort"；vendor 自报什么,任务记录保留什么（可选 `evidence`），未报告即"未知"。保存的配置本身不宣称任何 engine/model/effort 可用；各模型 effort 的实证以 [VERIFICATION.md](../VERIFICATION.md) 为准。
@@ -58,7 +58,7 @@ codex 0.163.0:    exec --json --ephemeral --skip-git-repo-check --sandbox worksp
 | `APP_NOT_RUNNING` | 没有运行中实例；先 `weaver web --no-open`（可用 `--data-dir` 指定状态目录） |
 | `EADDRINUSE 127.0.0.1:<port>` | 已有进程占用；换 `--port` 或停掉旧实例 |
 | `CAPABILITY_UNAVAILABLE`（deferred Claude / non-real kind / launcher 未加载） | 请求被拒且无回退；检查 `engines scan` 的 readiness 与 `capabilities.realExecution` |
-| 派发报无可用 worker | 权重全 0、pin/only_engine 过滤后为空、角色未启用或配额 block；按 `skipped`/报错明细修 policy，别绕过 pin |
+| 派发报无可用 worker | 权重全 0、角色未启用、引擎停用或有生效 block；按 `skipped`/报错明细修 policy |
 | `POLICY_DENIED` | owner profile 不可用（disabled/引擎停用/block）；先修角色或双 owner 指派 |
 | 任务一直 queued 且 `queueReason` 变化 | 容量/配额/冻结路由/失效 workspace/启动失败之一；读 `observability get` 的 `queueReason` 与 route，修对应项；取消是显式动作 |
 | workspace 报错 | 真实执行需要存在中的绝对路径；在上游 CLI 用调用方 cwd（`tasks create`）或显式绝对路径 |
