@@ -153,7 +153,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   async function dispatch(method: string, args: unknown[]): Promise<unknown> {
     const active = requireReady();
     switch (method) {
-      case 'command': return active.commands.handle(args[0]);
+      case 'command': return active.commands.handleAsync(args[0]);
       case 'getPolicy': return active.policy.snapshot();
       case 'getQuota': return { ...quotaProber.get(), schedule: scheduler.status() };
       case 'getStall': return stall.status();
@@ -248,7 +248,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     if (!ready) return failure('APP_STARTING', 'Weaver is still starting');
     if (!request || typeof request !== 'object' || Array.isArray(request)) return failure('INVALID_REQUEST', 'Invalid request');
     const record = request as Record<string, unknown>;
-    if (Object.hasOwn(record, 'apiVersion') || Object.hasOwn(record, 'command')) return commands!.handle(request);
+    if (Object.hasOwn(record, 'apiVersion') || Object.hasOwn(record, 'command')) return commands!.handleAsync(request);
     try {
       const parsed = parseRpcBody(request);
       return { apiVersion: API_VERSION, commandId: null, ok: true, data: await dispatch(parsed.method, parsed.args) };
@@ -314,11 +314,12 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     closed = true;
     draining = true;
     ready = false;
-    if (commands) commands.draining = true;
+    const ownerDrain = commands?.drain();
     await scheduler.stop().catch(() => {});
     await stall.stop().catch(() => {});
     await quotaProber.close().catch(() => {});
     greetings.abort();
+    await ownerDrain;
     await Promise.allSettled([...inflight]);
     try { await manager?.shutdown(); } catch (error) { console.error(error instanceof Error ? error.message : 'shutdown failed'); }
     await vite?.close().catch(() => {});

@@ -100,3 +100,55 @@ test('CLI subprocess prints a single JSON response when app is not running', asy
  const response=JSON.parse(result.stdout);assert.equal(response.apiVersion,'weaver.v1');assert.equal(response.error.code,'APP_NOT_RUNNING');
  assert.match(response.error.message,/weaver server start/);
 });
+
+test('only complete launch envelopes receive the fixed startup allowance', async()=>{
+ const {requestTimeoutMs,TRANSPORT_TIMEOUT_MS,OWNER_LAUNCH_REQUEST_TIMEOUT_MS}=await import('../src/main/local-ipc');
+ const args={taskId:'12345678-1234-4234-8234-123456789abc',expectedRevision:1};
+ const launch={apiVersion:'weaver.v1',command:'owners.launch',commandId:'launch-fixture',args};
+ const switchLaunch={...launch,command:'owners.switch',args:{...args,launch:true}};
+ for(const request of [launch,switchLaunch,{method:'command',args:[launch]}])assert.equal(requestTimeoutMs(request),OWNER_LAUNCH_REQUEST_TIMEOUT_MS);
+ for(const request of [{},null,{...launch,apiVersion:'wrong'},{...launch,commandId:''},{...launch,args:{...args,taskId:'bad'}},{...launch,args:{...args,expectedRevision:'1'}},{...switchLaunch,args:{...switchLaunch.args,launch:'true'}},{...switchLaunch,args:{...switchLaunch.args,reason:'unknown'}},{...launch,command:'tasks.list'},{method:'command',args:[launch,launch]},{method:'command',args:[launch],extra:true}])assert.equal(requestTimeoutMs(request),TRANSPORT_TIMEOUT_MS);
+});
+
+test('IPC extends wall and inactivity deadlines only after a complete authenticated launch frame',async t=>{
+ const {Socket}=await import('node:net');
+ const socketTimeout=t.mock.method(Socket.prototype,'setTimeout');
+ const wallTimeout=t.mock.method(globalThis,'setTimeout');
+ const directory=await mkdtemp(join(tmpdir(),'wv-'));
+ const app=await startLocalIPC(directory,response);
+ try{
+  const {discovery,token}=await readDiscovery(directory);
+  const launch={apiVersion:'weaver.v1',command:'owners.launch',commandId:'launch-fixture',args:{taskId:'12345678-1234-4234-8234-123456789abc',expectedRevision:1}};
+  const reset=()=>{socketTimeout.mock.resetCalls();wallTimeout.mock.resetCalls();};
+  const extended=()=>({socket:socketTimeout.mock.calls.some(call=>call.arguments[0]===210000),wall:wallTimeout.mock.calls.some(call=>call.arguments[1]===210000)});
+  const raw=(frame:string,partial=false)=>new Promise<any>((resolve,reject)=>{
+   const socket=connect(discovery.socketPath);let text='';socket.on('error',reject);
+   socket.once('connect',()=>{socket.write(frame);if(partial)setImmediate(()=>{socket.destroy();resolve(undefined);});});
+   socket.on('data',chunk=>text+=chunk);socket.on('end',()=>resolve(JSON.parse(text)));
+  });
+  for(const [frame,partial] of [
+   [JSON.stringify({version:1,token,request:launch}).slice(0,-1),true],
+   ['{broken}\n',false],
+   [JSON.stringify({version:1,token:'0'.repeat(64),request:launch})+'\n',false],
+   [JSON.stringify({version:1,token,request:{...launch,args:{}}})+'\n',false],
+   [JSON.stringify({version:1,token,request:{...launch,command:'tasks.list'}})+'\n',false],
+  ] as const){reset();await raw(frame,partial);assert.deepEqual(extended(),{socket:false,wall:false});}
+  for(const request of [launch,{method:'command',args:[launch]}]){
+   reset();await raw(JSON.stringify({version:1,token,request})+'\n');assert.deepEqual(extended(),{socket:true,wall:true});
+  }
+  reset();await assert.rejects(sendRequest(directory,launch,0),{code:'TIMEOUT'});assert.equal(wallTimeout.mock.calls.some(call=>call.arguments[1]===210000),false);
+ }finally{await app.close();await rm(directory,{recursive:true,force:true});}
+});
+
+test('explicit shorter client deadlines remain binding for launch and ordinary requests',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'wv-'));
+ const replies:(()=>void)[]=[];
+ const app=await startLocalIPC(directory,request=>new Promise(resolve=>replies.push(()=>resolve(response(request)))));
+ try{
+  const launch={apiVersion:'weaver.v1',command:'owners.launch',commandId:'short-launch',args:{taskId:'12345678-1234-4234-8234-123456789abc',expectedRevision:1}};
+  for(const request of [launch,{apiVersion:'weaver.v1',command:'tasks.list',args:{}}]){
+   await assert.rejects(sendRequest(directory,request,30),{code:'TIMEOUT'});
+   assert.equal(replies.length,1);replies.shift()!();
+  }
+ }finally{for(const reply of replies)reply();await app.close();await rm(directory,{recursive:true,force:true});}
+});

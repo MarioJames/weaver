@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, resolve, sep } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { Duplex } from 'node:stream';
-import { MAX_FRAME_BYTES, TRANSPORT_TIMEOUT_MS } from './local-ipc';
+import { MAX_FRAME_BYTES, TRANSPORT_TIMEOUT_MS, requestTimeoutMs } from './local-ipc';
 import { parseRpcBody, RpcError, statusFor } from './rpc';
 
 export const SECURITY_HEADERS = {
@@ -192,6 +192,14 @@ export async function startHttpServer(options: {
         let parsed: unknown;
         try { parsed = JSON.parse(bytes.toString('utf8')); } catch { throw new RpcError('INVALID_REQUEST', 'Request must be JSON'); }
         const { method, args } = parseRpcBody(parsed);
+        const allowance=requestTimeoutMs(parsed);
+        if(allowance!==TRANSPORT_TIMEOUT_MS){
+          const socket=req.socket;
+          socket.setTimeout(allowance);
+          const deadline=setTimeout(()=>socket.destroy(),allowance);
+          const restore=()=>{clearTimeout(deadline);if(!socket.destroyed)socket.setTimeout(TRANSPORT_TIMEOUT_MS);};
+          res.once('finish',restore);res.once('close',restore);
+        }
         const result = await options.call(method, args);
         send(res, 200, { result });
         return;

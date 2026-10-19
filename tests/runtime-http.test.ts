@@ -541,3 +541,20 @@ test('dev mode serves the renderer on the owned origin', { timeout: 60_000 }, as
     assert.equal(rejected.closed, true);
   } finally { await runtime?.close(); await rm(dataDir, { recursive: true, force: true }); }
 });
+
+test('HTTP startup timeout begins after origin and complete RPC validation and restores on response',async t=>{
+ const {Socket}=await import('node:net');const {startHttpServer}=await import('../src/main/http');
+ const timeout=t.mock.method(Socket.prototype,'setTimeout');
+ const server=await startHttpServer({port:0,call:async()=>({ok:true})});
+ const launch={apiVersion:'weaver.v1',command:'owners.launch',commandId:'http-launch',args:{taskId:'12345678-1234-4234-8234-123456789abc',expectedRevision:1}};
+ try{
+  for(const options of [
+   {headers:rpcHeaders(server.port,{origin:'http://foreign.example'}),body:JSON.stringify({method:'command',args:[launch]})},
+   {headers:rpcHeaders(server.port),body:'{broken}'},
+   {headers:rpcHeaders(server.port),body:JSON.stringify({method:'command',args:[{...launch,args:{}}]})},
+   {headers:rpcHeaders(server.port),body:JSON.stringify({method:'command',args:[{...launch,command:'tasks.list'}]})},
+  ]){timeout.mock.resetCalls();await httpCall(server.port,{method:'POST',path:'/api/rpc',...options});assert.equal(timeout.mock.calls.some(call=>call.arguments[0]===210000),false);}
+  timeout.mock.resetCalls();const response=await httpCall(server.port,{method:'POST',path:'/api/rpc',headers:rpcHeaders(server.port),body:JSON.stringify({method:'command',args:[launch]})});
+  assert.equal(response.status,200);const timeouts=timeout.mock.calls.map(call=>call.arguments[0]);assert.ok(timeouts.includes(210000));assert.ok(timeouts.lastIndexOf(15000)>timeouts.indexOf(210000));
+ }finally{await server.close();}
+});

@@ -6,7 +6,7 @@ import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { failure, LocalIPCError, MAX_FRAME_BYTES, readDiscovery, TRANSPORT_TIMEOUT_MS } from '../main/local-ipc';
+import { failure, LocalIPCError, MAX_FRAME_BYTES, readDiscovery, TRANSPORT_TIMEOUT_MS, requestTimeoutMs } from '../main/local-ipc';
 import { openBrowser, startRuntime } from '../main/runtime';
 import { VERSION } from '../shared/version';
 import { installSkill, SKILL_AGENTS, SKILL_NAME, sourceSkill, type SkillAgent } from './skills';
@@ -326,8 +326,8 @@ export function renderEnvelope(format: OutputFormat, envelope: { ok?: boolean; e
 function writeEnvelope(format: OutputFormat, envelope: { ok?: boolean; error?: { code?: string; message?: string }; data?: unknown; apiVersion?: string; commandId?: string | null }): void {
   process.stdout.write(renderEnvelope(format, envelope) + '\n');
 }
-export async function sendRequest(dataDir: string, request: unknown, timeoutMs = TRANSPORT_TIMEOUT_MS): Promise<unknown> {
-  const deadline = Date.now() + Math.min(TRANSPORT_TIMEOUT_MS, timeoutMs);
+export async function sendRequest(dataDir: string, request: unknown, timeoutMs = requestTimeoutMs(request)): Promise<unknown> {
+  const deadline = Date.now() + Math.min(requestTimeoutMs(request), timeoutMs);
   if(timeoutMs <= 0) throw new LocalIPCError('TIMEOUT', 'Bounded wait deadline reached');
   let endpoint: Awaited<ReturnType<typeof readDiscovery>>;
   try { endpoint = await readDiscovery(dataDir); }

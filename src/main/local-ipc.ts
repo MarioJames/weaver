@@ -6,6 +6,24 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 
 export const MAX_FRAME_BYTES = 1024 * 1024;
 export const TRANSPORT_TIMEOUT_MS = 15_000;
+export const OWNER_LAUNCH_REQUEST_TIMEOUT_MS = 210_000;
+const record = (value:unknown):value is Record<string,unknown> => !!value && typeof value==='object' && !Array.isArray(value);
+const shortText = (value:unknown, max:number):value is string => typeof value==='string' && !!value.trim() && value.length<=max;
+/** Only a complete, cheap-validated launch envelope earns the fixed startup allowance. Authentication stays at the caller boundary. */
+export function requestTimeoutMs(value:unknown):number {
+  if(!record(value))return TRANSPORT_TIMEOUT_MS;
+  if(value.method==='command'){
+    if(Object.keys(value).length!==2||!Array.isArray(value.args)||value.args.length!==1)return TRANSPORT_TIMEOUT_MS;
+    value=value.args[0];
+  }
+  if(!record(value)||value.apiVersion!=='weaver.v1'||!shortText(value.commandId,120)||!record(value.args))return TRANSPORT_TIMEOUT_MS;
+  const args=value.args;
+  if(!shortText(args.taskId,36)||! /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(args.taskId)||!Number.isSafeInteger(args.expectedRevision)||Number(args.expectedRevision)<0)return TRANSPORT_TIMEOUT_MS;
+  if(value.command!=='owners.launch'&&!(value.command==='owners.switch'&&args.launch===true))return TRANSPORT_TIMEOUT_MS;
+  if(value.command==='owners.switch'&&((args.expectedEpoch!==undefined&&(!Number.isSafeInteger(args.expectedEpoch)||Number(args.expectedEpoch)<0))||(args.reason!==undefined&&args.reason!=='manual'&&args.reason!=='idle')||(args.profileId!==undefined&&!shortText(args.profileId,120))))return TRANSPORT_TIMEOUT_MS;
+  try{if(Buffer.byteLength(JSON.stringify(value))>128*1024)return TRANSPORT_TIMEOUT_MS;}catch{return TRANSPORT_TIMEOUT_MS;}
+  return OWNER_LAUNCH_REQUEST_TIMEOUT_MS;
+}
 export interface Discovery { version: 1; instanceId: string; socketPath: string; tokenPath: string }
 export class LocalIPCError extends Error {
   constructor(public code: string, message: string) { super(message); this.name = 'LocalIPCError'; }
@@ -135,7 +153,7 @@ export async function startLocalIPC(userData: string, handle: (request: unknown)
   const server = createServer(socket => {
     clients.add(socket);
     socket.on('error', () => {});
-    const deadline = setTimeout(() => socket.destroy(), TRANSPORT_TIMEOUT_MS);
+    let deadline = setTimeout(() => socket.destroy(), TRANSPORT_TIMEOUT_MS);
     socket.on('close', () => { clearTimeout(deadline); clients.delete(socket); });
     socket.setTimeout(TRANSPORT_TIMEOUT_MS, () => socket.destroy());
     let bytes = Buffer.alloc(0);
@@ -161,6 +179,11 @@ export async function startLocalIPC(userData: string, handle: (request: unknown)
         if (frame.version !== 1 || typeof frame.token !== 'string' || frame.token.length !== token.length ||
             !timingSafeEqual(Buffer.from(frame.token), Buffer.from(token))) {
           reply(failure('UNAUTHORIZED', 'Local authentication failed')); return;
+        }
+        const allowance=requestTimeoutMs(frame.request);
+        if(allowance!==TRANSPORT_TIMEOUT_MS){
+          clearTimeout(deadline);deadline=setTimeout(()=>socket.destroy(),allowance);
+          socket.setTimeout(allowance);
         }
         Promise.resolve().then(() => handle(frame.request)).then(reply, () => reply(failure('INTERNAL_ERROR', 'Command handler failed')));
       } catch { reply(failure('INVALID_REQUEST', 'Invalid transport request')); }
