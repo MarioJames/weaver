@@ -30,7 +30,7 @@ CLI 直接用 `--input <file|->` 传 JSON（args 对象或完整信封均可；�
 
 - **commandId 是幂等键**，不是参数的一部分：写命令带稳定 commandId，同键同参重发拿回同一张收据（幂等与收据语义见第 4 节）。一次会话内为同一意图复用同一个 `--command-id`，回复丢失时先 `weaver operations get --command-id <id>`，不要换新 ID 盲重试。
 - **expectedRevision 是乐观锁**：任务级修改命令读到的 `revision` 写回时必须还是那个值，否则 `REVISION_CONFLICT` 附当前 revision。它与 commandId 作用不同，不能互相替代。
-- **`next` 是派发后负责人唯一要做的一步**：`workers.spawn` 在响应里给出 `next`，运行中的 native 任务 `tasks.get` 会重新给出同一个 `next`，`tasks.retry` 自动派发也返回同一形状。非 native 的执行（real/mock）和尚未拿到容量的排队任务给 `{action:'wait', command:'weaver tasks wait --task-id <id>'}`；native 派发（工作代理就是负责人自己引擎的内建子代理）给 `{action:'run_subagent', model, effort, prompt, then}`，其中 `prompt` 与真实工作代理收到的执行说明逐字相同，做完后用 `then` 那条 `workers.complete` 命令回报。负责人不需要理解引擎、适配器或权重，照 `next` 执行即可；`next` 缺失只表示还没有派发结论，不表示失败。
+- **`next` 是派发后 父 Agent 唯一要做的一步**：`workers.spawn` 在响应里给出 `next`，运行中的 native 任务 `tasks.get` 会重新给出同一个 `next`，`tasks.retry` 自动派发也返回同一形状。非 native 的执行（real/mock）和尚未拿到容量的排队任务给 `{action:'wait', command:'weaver tasks wait --task-id <id>'}`；native 派发（子 Agent 就是 父 Agent 自己引擎的内建子代理）给 `{action:'run_subagent', model, effort, prompt, then}`，其中 `prompt` 与真实 子 Agent 收到的执行说明逐字相同，做完后用 `then` 那条 `workers.complete` 命令回报。父 Agent 不需要理解引擎、适配器或权重，照 `next` 执行即可；`next` 缺失只表示还没有派发结论，不表示失败。
 
 ## 2. CLI 解析与输出
 
@@ -57,18 +57,18 @@ CLI 直接用 `--input <file|->` 传 JSON（args 对象或完整信封均可；�
 | `owners.continuation.configure` | `{expectedRevision, idleRotationMinutes}`：整数，或 `null`（关闭），1–10080 分钟 |
 | `owners.attach` | `{name, profileId, session?, pane?}`；纯元数据登记，`verified:false`，不联系宿主也不起进程。`profileId`+`name`+`session` 三元组就是实例身份：同键同参重发（换一个 commandId 也一样）返回那同一个已登记实例而不再建一行；`pane` 只留档、不参与身份。缺省 `session` 补 `'external-cli'`、缺省 `pane` 补 `'unverified'`，补全后的值才参与判断，所以两次都省略 session 仍是同一实例。会话标签持久保存在 `session` 字段，早于该字段的旧记录仍从 `host.session` 取到（见下方两层身份） |
 | `owners.spawn` | `{name, profileId}`；缺省也是 manual 逻辑登记，不启动宿主；显式 `provider:"mock"` 保留进程内测试宿主 |
-| `owners.switch` | `{expectedRevision(必填), expectedEpoch?, reason? 'manual'/'idle', profileId?, launch?}`；轮换负责人并生成接续包，响应含 `contextPack` 与 `prompt`（脱敏、≤6000 字符的接手说明）。mock 宿主原子握手；manual 分支只生成接续包。`launch:true` 是显式追加的一步：轮换提交之后再去 Herdr 默认会话拉起新宿主，失败也只回 `launch:{ok:false,code,message}`，已生效的轮换不回滚 |
-| `owners.launch` | `{taskId, expectedRevision(必填，写在 JSON 体里)}`；对**已有**接续包再拉起一次宿主，不重复轮换。返回 `{taskId, prompt, launch, task}`，`launch` 为 `{ok:true, ownerHost}` 或 `{ok:false, code, message}`（`OWNER_LAUNCH_FAILED`/`OWNER_LAUNCH_UNAVAILABLE`/`OWNER_LAUNCH_UNSUPPORTED`）。细节见下方「拉起负责人宿主」 |
+| `owners.switch` | `{expectedRevision(必填), expectedEpoch?, reason? 'manual'/'idle', profileId?, launch?}`；轮换 父 Agent 并生成接续包，响应含 `contextPack` 与 `prompt`（脱敏、≤6000 字符的接手说明）。mock 宿主原子握手；manual 分支只生成接续包。`launch:true` 是显式追加的一步：轮换提交之后再去 Herdr 默认会话拉起新宿主，失败也只回 `launch:{ok:false,code,message}`，已生效的轮换不回滚 |
+| `owners.launch` | `{taskId, expectedRevision(必填，写在 JSON 体里)}`；对**已有**接续包再拉起一次宿主，不重复轮换。返回 `{taskId, prompt, launch, task}`，`launch` 为 `{ok:true, ownerHost}` 或 `{ok:false, code, message}`（`OWNER_LAUNCH_FAILED`/`OWNER_LAUNCH_UNAVAILABLE`/`OWNER_LAUNCH_UNSUPPORTED`）。细节见下方「拉起 父 Agent 宿主」 |
 | `tasks.create` | `{title, instruction或goal, ownerProfileId或ownerId(+ownerName/ownerProvider), workspace?, acceptanceCriteria?, constraints?}`；≤30 条明细；省略 workspace 时 CLI 用调用方 cwd 补，显式相对路径相对调用方解析；服务端不用自己的 repo 填空 |
 | `tasks.get` / `tasks.list` / `tasks.events` | get `{taskId}`，对**运行中的 native 任务**另附 `next`（spawn 回复丢了也从这里取回同一条子代理说明与收尾命令）；list `{offset,limit?,ownerId?}`（≤100/页）；events `{limit?1-100, after?}`，游标过期 `CURSOR_EXPIRED` |
 | `tasks.retry` | `{taskId, cancel?, expectedRevision?}`：接续重跑并自动派发的一步式命令，见下方「接续重跑」 |
 | `tasks.cancel` | `{taskId, expectedRevision?}`；终态返回 `alreadyTerminal:true` |
-| `tasks.health` | `{taskId}`；只读该任务在监控器样本下的判定，见 [3.3 卡住健康与引擎惩罚命令](#33-卡住健康与引擎惩罚命令) |
+| `tasks.health` | `{taskId}`；首个输出前为 `starting`，已结束任务为 `state:'ended'` 并带最终 `taskStatus`；只读该任务在监控器样本下的判定，见 [3.3 卡住健康与引擎惩罚命令](#33-卡住健康与引擎惩罚命令) |
 | `tasks.results` | `{taskId}`；非终态 `RESULT_NOT_READY`；manifest 含 artifact sha256 与 `manifestDigest` |
 | `artifacts.read` | `{taskId, artifactId}`；内容 ≤32,000 字符 |
 | `packages.create` | `{scope, acceptanceCriteria}`（task 由 `--task-id` 给出，可选 `expectedRevision`）；scope/明细各 1–30 条 |
 | `packages.get` | `{packageId}` |
-| `workers.spawn` | 可选 `{worker?, owner?, provider?('mock-jsonl'才合法), packageId?, expectedRevision?}`；省略 `worker` 时在 owner 可用且权重非 0（权重整数 0..10，缺省 5）的 worker 里选全局负载最低的一个：比较 `(running+cancelling+1)/weight`，平手取权重高者，再平手按策略列表顺序，其中 `running+cancelling` 是跨全部 owner 的全局计数。容量按 owner **实例**的 `max_parallel` 准入；拿不到槽位时 `scheduled:true` + `queueReason{code:'waiting_for_capacity'}` 且路由已冻结。响应除任务快照外还附 `next`（负责人要做的那一步）与 `excludedEngines`（本次被重试链排除的引擎，非空才出现）；显式 provider 非 mock 直接拒绝 |
+| `workers.spawn` | 可选 `{worker?, owner?, provider?('mock-jsonl'才合法), packageId?, expectedRevision?}`；省略 `worker` 时在 owner 可用且权重非 0（权重整数 0..10，缺省 5）的 worker 里选全局负载最低的一个：比较 `(running+cancelling+1)/weight`，平手取权重高者，再平手按策略列表顺序，其中 `running+cancelling` 是跨全部 owner 的全局计数。容量按 owner **实例**的 `max_parallel` 准入；拿不到槽位时 `scheduled:true` + `queueReason{code:'waiting_for_capacity'}` 且路由已冻结。真实 子 Agent 首个有效供应商输出后才算启动；spawn/retry 在请求总计 8 秒的预算内等待并返回 `started`，尚无输出时为 false，120 秒无有效输出以 `no_output` 失败；供应商限流/额度错误立即失败，`task.failure` 含 `kind`、`message`，以及有证据时的 `stderrTail`、`vendorError`、`retryAt`。响应除任务快照外还附 `next`（父 Agent 要做的那一步）与 `excludedEngines`（本次被重试链排除的引擎，非空才出现）；显式 provider 非 mock 直接拒绝 |
 | `workers.complete` | `{taskId, expectedRevision?, outcome:'completed'/'failed', summary≤8000, artifacts?≤20}`；只接受运行中的 native 任务，且只接受一次 |
 | `results.deliver` | `{taskId}`；manual owner 显式 `CAPABILITY_UNAVAILABLE`，只有 mock owner 有投递 |
 | `results.ack` | `{expectedRevision(必), manifestDigest(当前)}`；ack ≠ 验收 |
@@ -81,9 +81,9 @@ CLI 直接用 `--input <file|->` 传 JSON（args 对象或完整信封均可；�
 
 **owner 的两层身份**：策略里的 `owners.<id>` 是 *profile*（每台宿主引擎至多启用一个）；真正派发前要先用 `owners attach` 把当前 agent 会话登记成一个 *owner 实例*，一次会话登记一次，返回的 `id` 全会话复用。输入约定：`name` 为 `<宿主> · <工作区目录名> · <HH:MM 会话开始>`（如 `Claude · weaver · 14:20`），`session` 取 `$CODEX_THREAD_ID`，否则 `$HERDR_PANE_ID`，否则工作区绝对路径；`--command-id` 在同一会话内保持稳定，回复丢失时同键同参取回原收据，仍不确定就 `weaver owners list` 按 name/session 找回那个实例。之后 `tasks create` 一律带 `ownerId`；带 `ownerProfileId` 走的是临时登记路径，服务端为该任务另建一个新的逻辑 owner（默认名 `Task owner`），任务因此散落到互不相干的 owner 行、不再共享同一会话的并发与上报。attach 始终是 `verified:false` 的元数据登记，服务端不联系宿主、不起进程、也不验证那个 session 标签是否真的对应一个活着的会话。
 
-容量也是按**实例**算的：每个登记好的 owner 实例各自持有其 profile 的 `max_parallel` 个槽位，任务绑定 `ownerId` 后就一直用那个具体实例（`owners.list`/`owners.get` 的 `runningTaskCount` 就是它占用的槽位数）。没有 `ownerId` 的遗留任务退回按 profile 分组计数。`capabilities.maxParallel` 因此只是规模提示（各 profile 上限之和），不是全局并发上限；工作代理之间的负载均衡仍是全局的，不受 owner 实例边界影响。
+容量也是按**实例**算的：每个登记好的 owner 实例各自持有其 profile 的 `max_parallel` 个槽位，任务绑定 `ownerId` 后就一直用那个具体实例（`owners.list`/`owners.get` 的 `runningTaskCount` 就是它占用的槽位数）。没有 `ownerId` 的遗留任务退回按 profile 分组计数。`capabilities.maxParallel` 因此只是规模提示（各 profile 上限之和），不是全局并发上限；子 Agent 之间的负载均衡仍是全局的，不受 owner 实例边界影响。
 
-**拉起负责人宿主（显式一步）**：`owners switch` 带 `launch:true`、以及 `owners launch`，都会经 `src/main/owner-host.ts` 在 Herdr 里做一次真实拉起——按 owner profile 引擎的 kind 只支持 `claude` 与 `codex`，其他 kind 直接 `OWNER_LAUNCH_UNSUPPORTED`。序列固定：`herdr --session default workspace create --cwd <任务工作区> --label <标题> --no-focus` → 读响应里的 `result.workspace.workspace_id` 与 `result.root_pane.pane_id`（拿不到 workspace id 就报失败且不认领任何资源；拿不到 root pane id 会先关掉已建 workspace）→ `herdr agent start owner-<任务 id 前 8 位>-<epoch> --kind <kind> --pane <pane> --timeout 60000 -- <模型参数>` → `herdr agent prompt <name> <接手说明>`。Herdr 会把被拒的命令印成 `{"error":{...}}` 却仍然退出 0，所以退出码 0 加信封错误同样算失败。失败时只清理这次创建的 workspace，并把 `code`/`message` 放进 `launch` 返回，不回滚已经提交的轮换；清理失败也保留在同一错误中，不假称资源已释放。成功写进任务的 `ownerHost`（`{kind:'herdr', session, workspaceId, paneId, agentName, launchedAt}`），它是宿主在哪的引用，不是宿主在推理的证明。`owners launch` 用**已有**接续包重试，不再生成第二份接续上下文。`capabilities.ownerSpawn` 为 `'herdr'` 只说明 PATH 上找得到可执行的 `herdr`，不证明有活着的模型、登录或宿主；登记本身仍然只是元数据（`manualAttach:'metadata-only'`、`ownerModelSpawned:false`、`attachmentVerified:false` 不因 launch 结果改变）。
+**拉起 父 Agent 宿主（显式一步）**：`owners switch` 带 `launch:true`、以及 `owners launch`，都会经 `src/main/owner-host.ts` 在 Herdr 里做一次真实拉起——按 owner profile 引擎的 kind 只支持 `claude` 与 `codex`，其他 kind 直接 `OWNER_LAUNCH_UNSUPPORTED`。序列固定：`herdr --session default workspace create --cwd <任务工作区> --label <标题> --no-focus` → 读响应里的 `result.workspace.workspace_id` 与 `result.root_pane.pane_id`（拿不到 workspace id 就报失败且不认领任何资源；拿不到 root pane id 会先关掉已建 workspace）→ `herdr agent start owner-<任务 id 前 8 位>-<epoch> --kind <kind> --pane <pane> --timeout 60000 -- <模型参数>` → `herdr agent prompt <name> <接手说明>`。Herdr 会把被拒的命令印成 `{"error":{...}}` 却仍然退出 0，所以退出码 0 加信封错误同样算失败。失败时只清理这次创建的 workspace，并把 `code`/`message` 放进 `launch` 返回，不回滚已经提交的轮换；清理失败也保留在同一错误中，不假称资源已释放。成功写进任务的 `ownerHost`（`{kind:'herdr', session, workspaceId, paneId, agentName, launchedAt}`），它是宿主在哪的引用，不是宿主在推理的证明。`owners launch` 用**已有**接续包重试，不再生成第二份接续上下文。`capabilities.ownerSpawn` 为 `'herdr'` 只说明 PATH 上找得到可执行的 `herdr`，不证明有活着的模型、登录或宿主；登记本身仍然只是元数据（`manualAttach:'metadata-only'`、`ownerModelSpawned:false`、`attachmentVerified:false` 不因 launch 结果改变）。
 
 **接续重跑（`tasks.retry`）**：`{taskId, cancel?, expectedRevision?}` 一次完成链接子任务、冻结新包与自动派发。默认只接受终态原任务；`cancel:true`（CLI `--cancel`）允许放弃在途尝试，先完成全部预检才取消它。预检包括 revision、路由与候选引擎、worker 执行能力、workspace、冻结包存在性、指令 ≤16000 字符、任务 <200 和包 <1000；原任务已有冻结包仍要新建包，满 1000 包时拒绝，原任务状态/事件/产物/派发保持原状。
 
@@ -91,9 +91,9 @@ CLI 直接用 `--input <file|->` 传 JSON（args 对象或完整信封均可；�
 
 RPC 动词（method-wrapped，目录条目带 `rpc:{method,arity}`）：`policy get`（无参，即 `weaver policy get`）、`policy validate --input`（config 文档本体，≤256 KiB，返回 issue 数组，空即通过）、`policy save --input`（`{revision,config,blocks}`，revision 乐观锁，返回新 snapshot）、`policy preview --input`（目录输入 `{owner, worker?, runningCount?}`；校验层还接受 `excludeEngines` 与 `workerLoad`，但服务端的 `previewRoute` 一律用实时全局负载覆盖传入的 `workerLoad`。它和 `workers.spawn` 走同一个比较器，所以预览的说法不会与实际选择两样）、`engines scan`（无参）、`engines set-enabled --input`（`{id,enabled,revision}`）、`quota get`（无参）、`quota refresh [--input]`（可选 `{engine}`）。这些命令不接受 `--command-id`/`--task-id`；有输入时直接提交 usage 所示 JSON 对象，不接逻辑命令信封。仅 `quota refresh` 的单参数 RPC 允许省略 `--input`，此时传 `{}`；其余单参数 RPC 继续要求输入。注意 `engines` 下两种形态并存：`scan`/`set-enabled` 是 RPC 动词，而 `engines health`/`penalty`/`unblock` 是逻辑命令，其中 `unblock` 是写命令、必须带 `--command-id`。
 
-网页另有两个不进 CLI 目录的 RPC 用于工作代理可用性探测：`sayHi`（`{engine, model, effort}`，engine 为已保存配置里的引擎 id）立即返回 `{id, status:'running', startedAt}`，`sayHiResult(id)` 轮询到 `status:'done'` 后带 `result {ok, reply?, model?, error?, durationMs, checkedAt}`。探测在 `agent-state/` 下的空临时目录里用各 CLI 最轻的一次性调用发一句 hi：不带工具、MCP、插件/hooks 与用户 settings（CLI 支持时），不保存会话，不经过工作代理执行适配，因此 Claude Code 也能探测。claude 不用 `--bare`，因为它不读 OAuth。120 秒超时即停止进程，同时最多 3 个，结果保留 10 分钟，结束后删除临时目录。这是一次真实推理，会消耗少量额度；成功只说明此刻可用。
+网页任务列表 RPC `listTasks` 只返回摘要（最近 3 条事件及产物元数据，不含产物正文），详情通过 `getTask(id)` 按需读取完整任务。网页另有两个不进 CLI 目录的 RPC 用于 子 Agent 可用性探测：`sayHi`（`{engine, model, effort}`，engine 为已保存配置里的引擎 id）立即返回 `{id, status:'running', startedAt}`，`sayHiResult(id)` 轮询到 `status:'done'` 后带 `result {ok, reply?, model?, error?, durationMs, checkedAt}`。探测在 `agent-state/` 下的空临时目录里用各 CLI 最轻的一次性调用发一句 hi：不带工具、MCP、插件/hooks 与用户 settings（CLI 支持时），不保存会话，不经过 子 Agent 执行适配，因此 Claude Code 也能探测。claude 不用 `--bare`，因为它不读 OAuth。120 秒超时即停止进程，同时最多 3 个，结果保留 10 分钟，结束后删除临时目录。这是一次真实推理，会消耗少量额度；成功只说明此刻可用。
 
-本地 wait/watch：`tasks wait --task-id` 与 `tasks watch --task-id` 的 `--for` 都是 1–600 **秒**，省略时两条命令共用同一个缺省 `min(600 秒, herdr.max_wait_minutes × 60 秒)`（先把分钟换算成秒，再压到 600 秒上限），读不到策略时退回 30 秒；缺省 `max_wait_minutes` 为 15，于是缺省等待 600 秒。两者轮询 `tasks get`，任务一进入终态就写出那份快照并以 0 退出；`watch` 另外增量拉 `tasks events`，事件只在 `--output jsonl|text` 下逐行输出。它们只是轮询，不是第二调度器；超时按 `TIMEOUT` 失败退出，退出不取消任务。`herdr.max_wait_minutes` 是「负责人查看间隔上限」这一个设置，Weaver 从不把它当工作代理的执行 kill 时限——真实执行不会因为到这个分钟数就被停止（见 [architecture](architecture.md)）。
+本地 wait/watch：`tasks wait --task-id` 与 `tasks watch --task-id` 的 `--for` 都是 1–600 **秒**，省略时两条命令共用同一个缺省 `min(600 秒, herdr.max_wait_minutes × 60 秒)`（先把分钟换算成秒，再压到 600 秒上限），读不到策略时退回 30 秒；缺省 `max_wait_minutes` 为 15，于是缺省等待 600 秒。两者轮询 `tasks get`，任务一进入终态就写出那份快照并以 0 退出；`tasks wait` 遇到 health 为 `stalled` 时也以 0 提前返回，带 `reason:'stalled'`、health 和重试/取消提示，`watch` 仅在 text/jsonl 提示卡住转变并继续观察；`watch` 另外增量拉 `tasks events`，事件只在 `--output jsonl|text` 下逐行输出。它们只是轮询，不是第二调度器；超时按 `TIMEOUT` 失败退出，退出不取消任务。`herdr.max_wait_minutes` 是「父 Agent 查看间隔上限」这一个设置，Weaver 从不把它当 子 Agent 的执行 kill 时限——真实执行不会因为到这个分钟数就被停止（见 [architecture](architecture.md)）。
 
 ### 3.1 原生账户额度
 
@@ -145,8 +145,10 @@ weaver quota refresh --help --output json
 
 `tasks health`、`engines health`、`engines penalty`、`engines unblock` 已在 `CLI_CATALOG` 与 `CommandHandler` 接通，经同一 HTTP/Unix 逻辑命令通道调用监控器；网页 `getStall` 仍是单独的 method-wrapped RPC。`--engine` 只属于 penalty/unblock；unblock 是需 commandId 的写命令。没有监控器的进程以 `CAPABILITY_UNAVAILABLE` 明确拒绝诊断或解除，不伪造健康读数。
 
-**判定（`tasks health`，逻辑输入 `{taskId}`）**：只有 running 且 `dispatch.execution === 'real'` 的任务有健康读数，其余任务的 `silenceMs`/`cpuActive`/`cpuIdleMs` 保留 `null` 而不是猜。静默从最后一个事件的时间起算，没有事件时退回 `run.startedAt`。CPU 只测该任务自己 worker scope 的累计 CPU（systemd `CPUUsageNSec`，取不到时读 cgroup `cpu.stat`），比较相邻两个 60 秒样本的增量占比，低于单核 5% 算这一个区间空闲。三种状态共用同一个分类器：
+**判定（`tasks health`，逻辑输入 `{taskId}`）**：只有 running 且 `dispatch.execution === 'real'` 的任务有健康读数，其余任务的 `silenceMs`/`cpuActive`/`cpuIdleMs` 保留 `null` 而不是猜。静默从最后一个事件的时间起算，没有事件时退回 `run.startedAt`。CPU 只测该任务自己 worker scope 的累计 CPU（systemd `CPUUsageNSec`，取不到时读 cgroup `cpu.stat`），比较相邻两个 60 秒样本的增量占比，低于单核 5% 算这一个区间空闲。以下状态共用同一个分类器：
 
+- `ended`：已完成、失败或取消，`taskStatus` 保留最终状态。
+- `starting`：running 的真实 子 Agent 尚无首个有效供应商输出。
 - `stalled`：静默 ≥5 分钟**且**连续观测到空闲 ≥5 分钟，两条同时成立。
 - `waiting_model`：静默 ≥5 分钟，且 CPU 没有证明在忙（包含完全读不到的情况）。
 - `working`：其余。
@@ -157,7 +159,7 @@ weaver quota refresh --help --output json
 
 `engines.penalty` 返回 `{engine,...statusRecord}`，在上述字段外给出该引擎完整保留的 `history`。history 包含触发（`tasks`、`taskCount`、`stalledMinutes`）、探测（`probe:{ok,ms,error?}` 与 model/effort）、恢复（message）记录；存储全局只保留最近 50 条，每条至多 50 个完整任务 ID，`taskCount` 保留真实任务总数，探测错误脱敏且有界。`stall.v1.json` 上限 256 KiB，重启后沿用期限、连击与记录；非法整数级别/连击或超出 Date 范围的时间等语义错误按损坏文件整份回退，已存在的策略 stall block 保留并在 tick 中接管重武装，不静默放行。penalty/unblock 用 own-property 成员校验，不接受 `Object.prototype` 上的名字作为已知引擎。
 
-**阶梯怎么走上走下**：一台引擎要**同一时刻有至少 2 个** stalled 任务才受罚（`quorum`），偶发一个不动路由。L1 暂停 5 分钟、L2 暂停 10 分钟、L3 只标 `needsAttention` 并每 10 分钟探测一次；同一引擎在 2 小时内重复触发就再往上一级，超过 2 小时安静级别才回到历史。惩罚写进策略的是 `by:"weaver-stall"` 的 engine 级阻断，**不带 `release_at`**：时间流逝永远不会自动解除它，`blockedUntil` 只是「到点该去探测」。L1/L2 到点、以及 L3 的每轮，都只发一次最轻的真实调用——取该引擎上第一个启用 worker 的 model/effort，走一次工作代理可用性问候那条路（命令目录末尾那段 `sayHi` 说明），不产生任务、不占 worker 槽位。通过就只删自己这条阻断，`level` 与触发时间原样保留，于是下一次直接升一级；不通过就立刻升一级并重写阻断的理由。L3 要**连续 3 次**通过才自动恢复，恢复时在历史里记一条 `自动恢复，请留意`，任何一次失败都把连击清零。引擎被停用、或该引擎上找不到启用的 worker 时探测发不出去，同样按一次失败记录（`这台引擎没有可用的工作代理，无法探测。`）。整个过程**从不取消任务、从不杀进程**，它只让新派发绕开这台引擎；真实执行没有超时 deadline，这是设计选择而不是遗漏。别的来源（人工、额度）已经在这台引擎上挂着 engine 级阻断时不再叠加惩罚；惩罚解除或自动恢复后会触发一次重新 pump，排队中的任务因此继续走。
+**阶梯怎么走上走下**：一台引擎要**同一时刻有至少 2 个** stalled 任务才受罚（`quorum`），偶发一个不动路由。L1 暂停 5 分钟、L2 暂停 10 分钟、L3 只标 `needsAttention` 并每 10 分钟探测一次；同一引擎在 2 小时内重复触发就再往上一级，超过 2 小时安静级别才回到历史。惩罚写进策略的是 `by:"weaver-stall"` 的 engine 级阻断，**不带 `release_at`**：时间流逝永远不会自动解除它，`blockedUntil` 只是「到点该去探测」。L1/L2 到点、以及 L3 的每轮，都只发一次最轻的真实调用——取该引擎上第一个启用 worker 的 model/effort，走一次 子 Agent 可用性问候那条路（命令目录末尾那段 `sayHi` 说明），不产生任务、不占 worker 槽位。通过就只删自己这条阻断，`level` 与触发时间原样保留，于是下一次直接升一级；不通过就立刻升一级并重写阻断的理由。L3 要**连续 3 次**通过才自动恢复，恢复时在历史里记一条 `自动恢复，请留意`，任何一次失败都把连击清零。引擎被停用、或该引擎上找不到启用的 worker 时探测发不出去，同样按一次失败记录（`这台引擎没有可用的 子 Agent，无法探测。`）。整个过程**从不取消任务、从不杀进程**，它只让新派发绕开这台引擎；首个有效输出后不设总执行 deadline；启动阶段仍有 120 秒无输出失败检查。别的来源（人工、额度）已经在这台引擎上挂着 engine 级阻断时不再叠加惩罚；惩罚解除或自动恢复后会触发一次重新 pump，排队中的任务因此继续走。
 
 **人工解除（`engines unblock`，写命令 `{engine}`）**：删除所选引擎的**全部**策略阻断，包含人工、额度、model 级及监控器自己的条目；复位阶梯、连击和期限，保留历史、配置、其他引擎与任务事件。自动恢复仅删除自己写入的 stall block，两条路径权限范围不同。响应为 `{engine,wasBlocked,cleared,retainedHistory,otherEngines}`：`wasBlocked` 是解除前该引擎自己的 stall 阻断状态，不是所有来源的阻断或整体可用性；`cleared` 是复位后的摘要，`retainedHistory` 是保留记录，`otherEngines` 是其他引擎摘要。相同 commandId 同参回放收据，不重复解除。未知 engine 在任何写入前拒绝。解除后接着的一次 tick 不会立即再罚该引擎；下次新惩罚从 L1 起算。解除不证明认证、模型或当前可用性。
 
@@ -193,7 +195,7 @@ weaver workers spawn --task-id <taskId> --input dispatch.json --command-id spawn
 # → data.dispatch.{owner,worker,engine,model,effort,execution,workspace,...} 加 data.next；
 #   容量满时 data.scheduled=true + queueReason{code:'waiting_for_capacity'}，此时 next 就是 wait；
 #   execution 为 native 时 next 是 {action:'run_subagent', model, effort, prompt, then}：
-#   按 prompt 用负责人自己引擎的内建子代理跑，再用 then 那条 workers complete 回报
+#   按 prompt 用 父 Agent 自己引擎的内建子代理跑，再用 then 那条 workers complete 回报
 
 weaver tasks wait --task-id <taskId> --for 300
 # → 轮询至终态；300 秒内未结束返回 TIMEOUT（任务仍在继续，未被取消）
@@ -237,7 +239,7 @@ review.json
 ```sh
 weaver owners continuation get --task-id <taskId>
 # → data.{history:[...], contextPack:{..., limitations:[...]}, prompt}（prompt 是脱敏后 ≤6000 字符的接手说明，与 owners launch 拿同一份接续包投给宿主的说明逐字相同；
-#   manual 接续包的 acknowledgementId 为 null，mock 宿主握手才有真实 ack。Weaver 只在负责人显式发起时（owners switch 带 launch:true，或 owners launch）才在 Herdr 里拉起可见宿主并投递这份说明，不自己决定何时轮换，也不为接续包伪造确认）
+#   manual 接续包的 acknowledgementId 为 null，mock 宿主握手才有真实 ack。Weaver 只在 父 Agent 显式发起时（owners switch 带 launch:true，或 owners launch）才在 Herdr 里拉起可见宿主并投递这份说明，不自己决定何时轮换，也不为接续包伪造确认）
 
 weaver owners continuation configure --task-id <taskId> --input cfg.json --command-id keep-001
 # cfg.json: {"expectedRevision":2,"idleRotationMinutes":90}（null=关闭；1–10080 分钟）
@@ -251,7 +253,7 @@ weaver reviews submit --task-id <taskId> --input review.json --command-id review
 
 ## 6. 能力声明
 
-`capabilities.get` 返回的是本进程现状，不是愿景：`workerProviders` 为 `["mock-jsonl","opencode","pi","grok","codex","qodercli"]`（真实 launcher 加载后）或 `["mock-jsonl"]`，顺序与 `REAL_ENGINE_KINDS` 一致；`realExecution` 布尔表示 launcher 已加载，不表示跑通过一次推理或证明过登录；`mcp:false`。负责人侧是 `ownerSpawn`（PATH 上找得到 `herdr` 时为 `'herdr'`，否则 `'logical-registration'`——这只证明有一个可执行文件，不证明有活着的宿主、模型或登录）、`manualAttach:'metadata-only'`、`ownerModelSpawned:false`、`attachmentVerified:false`；显式发起的 launch 成功也不会翻转这几个字段，宿主是否真在推理由你在 Herdr 里看。安全边界是 `authentication:'ephemeral-local-trusted-user-demo'`、`ownerScopedAuthorization:false`、`authenticated:false`、`modelUsable:false`。容量口径是 `capacity:{unit:'owner-instance', aggregate:'sum of enabled owner profile max_parallel', admission:'…'}` 加 `maxParallel`（各启用 profile 上限之和，规模提示而非全局上限，见上文两层身份）；`policyAdmission:true`、`durability:'durable intent before effect; …'`、`cliTransport` 描述当前传输。`commands` 数组只列逻辑读命令与写命令，method-wrapped RPC 动词与本地 `tasks wait/watch` 不在其中——完整 CLI 目录一律读 `weaver --help --output json`，本文不复制任何一个数量。
+`capabilities.get` 返回的是本进程现状，不是愿景：`workerProviders` 为 `["mock-jsonl","opencode","pi","grok","codex","qodercli"]`（真实 launcher 加载后）或 `["mock-jsonl"]`，顺序与 `REAL_ENGINE_KINDS` 一致；`realExecution` 布尔表示 launcher 已加载，不表示跑通过一次推理或证明过登录；`mcp:false`。父 Agent 侧是 `ownerSpawn`（PATH 上找得到 `herdr` 时为 `'herdr'`，否则 `'logical-registration'`——这只证明有一个可执行文件，不证明有活着的宿主、模型或登录）、`manualAttach:'metadata-only'`、`ownerModelSpawned:false`、`attachmentVerified:false`；显式发起的 launch 成功也不会翻转这几个字段，宿主是否真在推理由你在 Herdr 里看。安全边界是 `authentication:'ephemeral-local-trusted-user-demo'`、`ownerScopedAuthorization:false`、`authenticated:false`、`modelUsable:false`。容量口径是 `capacity:{unit:'owner-instance', aggregate:'sum of enabled owner profile max_parallel', admission:'…'}` 加 `maxParallel`（各启用 profile 上限之和，规模提示而非全局上限，见上文两层身份）；`policyAdmission:true`、`durability:'durable intent before effect; …'`、`cliTransport` 描述当前传输。`commands` 数组只列逻辑读命令与写命令，method-wrapped RPC 动词与本地 `tasks wait/watch` 不在其中——完整 CLI 目录一律读 `weaver --help --output json`，本文不复制任何一个数量。
 
 `quota` 提供额外发现入口：`engines:["codex","claude","grok"]`，`get` 的 CLI/RPC 名及 `network:false`，`refresh` 的 CLI/RPC 名及 `updatesPolicyBlocks:true/inference:false`。
 

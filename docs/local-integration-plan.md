@@ -28,14 +28,14 @@
 
 1. launcher 模块已加载（`capabilities.realExecution:true`；加载失败 → `CAPABILITY_UNAVAILABLE`，无回退）。
 2. workspace 必须是已存在的绝对路径：省略时 `tasks create` 用 CLI 调用方 cwd 补齐，显式相对路径相对调用方解析；服务端不会拿自己的仓库填空。真实派发把 workspace 与 `workspaceIdentity` 冻结进 dispatch，泵复核期间若失效记 `workspace_changed`。
-3. 引擎/角色/配额/pin 当前有效：路由改变（worker/engine/kind/model/effort 或 kind 不符）、容量不足、配额 block 都会记 `queueReason`（`policy_blocked / waiting_for_capacity / frozen_route_changed / workspace_changed / launch_blocked`），排队路由不被默默改派或换引擎。
-4. `herdr.max_wait_minutes`（1–1440）是负责人对同一工作代理两次检查之间的最长间隔：等待只用 `weaver tasks wait --task-id`（不带 `--for` 时按 min(600 秒， max_wait_minutes) 取上限，任务一结束就返回），超过后由负责人决定继续等待、取消或收回；Weaver 不设执行超时，也不会据此停止工作代理。
+3. 引擎/角色/配额/pin 当前有效：路由改变（worker/engine/kind/model/effort 或 kind 不符）、容量不足、配额 block 都会记 `queueReason`（`policy_blocked / waiting_for_capacity / frozen_route_changed / workspace_changed / launch_blocked`），除供应商限流/额度阻断会将排队任务路由到其他可用引擎外，排队路由不被默默改派或换引擎。
+4. `herdr.max_wait_minutes`（1–1440）是 父 Agent 对同一 子 Agent 两次检查之间的最长间隔：等待只用 `weaver tasks wait --task-id`（不带 `--for` 时按 `min(600 秒, max_wait_minutes × 60 秒)` 取上限，任务一结束就返回），超过后由 父 Agent 决定继续等待、取消或收回；该设置不构成执行时限；真实执行仍有启动阶段 120 秒无输出失败检查。
 5. 认证复用各引擎自身本机配置；Weaver 从不复制/改写/打印密钥，也没有 global 工具安装。启动用受管 user scope 包裹进程（Linux/systemd 主机上每个 launch 一个唯一 scope），子进程随 scope 收尾。
 
 固定 argv builder（真实核实的调用形态）：
 
 ```text
-opencode 1.19.3:  run --format json --model <provider/model> --variant <effort> --pure --auto --dir <workspace>
+opencode 1.19.3:  run --format json --model <provider/model> --variant <effort> --pure --auto --print-logs --log-level ERROR --dir <workspace>
 pi 1.3.0:         --print --mode json --model <model> --thinking <effort> --no-session --session-dir <private>
                   --no-extensions --no-mcp --no-skills --no-prompt-templates --no-context-files
                   --tools read,write,edit,bash --approve
@@ -47,8 +47,9 @@ codex 0.163.0:    exec --json --ephemeral --skip-git-repo-check --sandbox danger
 
 ## 4. 终态、结果与取消
 
+- 真实 子 Agent 首个有效供应商输出后才算启动；spawn/retry 在请求总计 8 秒内等待并返回 `started`，120 秒无有效输出以 `no_output` 失败。限流/额度错误立即失败，`task.failure` 保留 `kind`、`message` 及可用的 `stderrTail`、`vendorError`、`retryAt`；失败尝试不自动重试，供应商阻断会使排队任务转到其他可用引擎。
 - 成功终态 = vendor 真实成功 final + 最终助手文本 + 零退出。缺 final/截断/非零退出/错误终态一律 failed，绝不映射为成功；部分输出与脱敏诊断保留（有界 `result.md`/artifact 与 observability）。
-- 失败与取消如实区分：quota/认证失败按 provider 错误信息报告，不自动改派模型/引擎或回退 mock。取消/超时保存已产出记录并停止本 launch 的 scope；排队任务可直接取消。服务重启/断开不删除记录，也不复接未知 PID 重复跑。
+- 失败与取消如实区分：quota/认证失败按 provider 错误信息报告，已失败尝试不自动重试或回退 mock；供应商阻断仅重路由排队任务。取消/超时保存已产出记录并停止本 launch 的 scope；排队任务可直接取消。服务重启/断开不删除记录，也不复接未知 PID 重复跑。
 - 结果验收按 [agent-interface](agent-interface.md) §5：`tasks results` → 独立核文件/测试 → `results.ack` → `reviews.submit`。`execution/ack/review` 是三个独立状态。
 
 ## 5. 排障清单

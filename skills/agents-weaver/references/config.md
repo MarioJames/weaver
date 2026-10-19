@@ -9,7 +9,7 @@
 | `owners.<id>.max_parallel` | Running/cancelling packages each owner **instance** may hold at once; more are queued with `scheduled: true`. `<id>` is the policy *profile*; each agent session registers its own owner *instance* under it with `owners attach` (durable identity: `profileId` + `name` + `session`) and dispatches by `ownerId`; the profile is not a shared capacity cap ([handoff](handoff.md)). |
 | `herdr.max_wait_minutes` | (1–1440) The longest interval between two checks on a worker: wait only with `weaver tasks wait`, which returns as soon as the task ends. Weaver never stops a worker on it. |
 | `workers.<id>` | `engine`, `model`, `effort`, `enabled`, and a `description` of what the worker is good at. A worker on your own engine runs natively. |
-| `blocks` | Active manual, quota or stall pauses. A matching engine/model block skips the worker; `policy preview` names the reason and any release time. Stall blocks have no time-based expiry; see below. |
+| `blocks` | Active manual, quota, vendor-limit or stall pauses. A matching engine/model block skips the worker; `policy preview` names the reason and any release time. Runtime vendor-limit blocks show a short reason (e.g. `限流：Rate limit exceeded…`). Rate limits within 2 h escalate release times 10 → 30 → 60 min; 2 h quiet resets the ladder, and a later vendor retry time wins. Quota without a retry time stays until manual unblock. Queued tasks on a vendor-blocked engine reroute to another eligible engine; failed attempts still need explicit retry. Stall blocks have no time-based expiry; see below. |
 | `chatgpt_review` | `true`: apply the gates in [convorel](convorel.md). `false`: skip ChatGPT Pro review; local review and tests still apply. |
 
 ## Stall penalties

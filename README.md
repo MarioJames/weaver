@@ -2,7 +2,7 @@
 
 # Weaver
 
-**让负责人 Agent，把任务编织给不同引擎的工作代理。**
+**让父 Agent，把任务编织给不同引擎的子 Agent。**
 
 [品牌素材与使用规范](docs/assets/brand/README.md)
 
@@ -165,18 +165,22 @@ dispatch.json
 {}
 ```
 
-`workers spawn` returns the frozen dispatch and a `next` action: real execution or queued work gives a wait command; native execution gives `run_subagent` with model, effort, the full prompt and the completion command (`then`). The owner follows `next`. For native work Weaver launches nothing: the task holds an owner slot while the owner uses its built-in subagent tool, then reports with `weaver workers complete` and a stable `--command-id`. Work queues when that owner instance reaches its profile's `max_parallel`; the chosen route stays frozen. After waiting on queued work, read `tasks get` again: a now-running native task returns its `next` there too, so a lost spawn response is recoverable. `--input -` reads JSON from stdin; a full `{apiVersion:"weaver.v1",commandId,command,args}` envelope is accepted the same way.
+`workers spawn` returns the frozen dispatch, `started`, and a `next` action: real execution or queued work gives a wait command; native execution gives `run_subagent` with model, effort, the full prompt and the completion command (`then`). The owner follows `next`.
+
+Real workers count as started only after their first valid vendor output; spawn and retry wait within an 8 s total request budget and return `started:false` if output has not arrived yet. No valid vendor output within 120 s fails the attempt as `no_output`. Vendor rate-limit and quota errors fail fast; `task.failure` carries `kind`, `message`, and, when available, `stderrTail`, `vendorError` and `retryAt`. OpenCode uses `--print-logs --log-level ERROR` to surface limit errors promptly (commit `76933be` reports about 2 s; this is not a timing guarantee). Codex uses `--sandbox danger-full-access`, giving workers host access to Docker, ports and network, like the other engines’ bypass modes.
+
+For native work Weaver launches nothing: the task holds an owner slot while the owner uses its built-in subagent tool, then reports with `weaver workers complete` and a stable `--command-id`. Work queues when that owner instance reaches its profile's `max_parallel`; the chosen route stays frozen except when a vendor-limit block reroutes queued work. After waiting on queued work, read `tasks get` again: a now-running native task returns its `next` there too, so a lost spawn response is recoverable. `--input -` reads JSON from stdin; a full `{apiVersion:"weaver.v1",commandId,command,args}` envelope is accepted the same way.
 
 If a mutation reply is lost, do not retry with a new ID: `weaver operations get --command-id <id>` reads the durable receipt for the same command ID. Unknown commands are rejected before any dispatch; a command executed but not acknowledged returns `COMMAND_INDETERMINATE` and requires inspecting state, not blind replay.
 
 ## Configure: weights
 
-Policy is one validated document saved atomically with a revision check. It holds enabled engines, owners (`workers` list, `worker_weights`, `max_parallel`), workers (engine, model, effort, description), and manual, quota and stall `blocks`.
+Policy is one validated document saved atomically with a revision check. It holds enabled engines, owners (`workers` list, `worker_weights`, `max_parallel`), workers (engine, model, effort, description), and manual, quota, vendor-limit and stall `blocks`.
 
 - Dispatch balances load by weight: Weaver picks the available worker with the lowest `(running + cancelling + 1) / weight`, counting tasks per worker across all owners. Idle work goes to the highest weight; concurrent work spreads in proportion to the weights (10 and 5 split about 2:1). Ties go to the higher weight, then the owner's `workers` order. Weights are integers 0..10, default 5. A saved policy with older 0..100 weights is converted once on load (rounded /10, minimum 1, 0 stays 0) and the previous file is kept as `policy.v1.json.pre-weight10-<timestamp>`; new input above 10 is rejected. Weight `0` excludes the worker, and an explicitly named worker cannot bypass weight 0.
-- A disabled worker, a disabled engine, or an active block on the engine/model skips that worker. Pause an engine from its card on the Engines page; exhausted quota adds and removes its own block.
+- A disabled worker, a disabled engine, or an active block on the engine/model skips that worker. Pause an engine from its card on the Engines page; exhausted quota adds and removes its own block. Runtime vendor-limit blocks show a short reason, e.g. `限流：Rate limit exceeded…`. Repeated rate limits within 2 h use a 10 → 30 → 60 min release ladder, reset after 2 h quiet; a later vendor retry time wins. Quota errors without a retry time stay blocked until manual unblock. Queued tasks on a vendor-blocked engine reroute to another eligible engine; the failed attempt itself is not automatically retried.
 - Concurrency is per owner **instance**: each instance has its profile's `max_parallel` slots. `owners attach` identifies an instance by `profileId` + `name` + `session`; multiple sessions on one profile have independent capacity. The reported total is the sum of enabled profile limits, a scale hint rather than a global capacity cap. Lowering `max_parallel` leaves running tasks alone.
-- `herdr.max_wait_minutes` (1-1440) is the longest interval between two checks on a worker: wait only with `weaver tasks wait --task-id` — it returns as soon as the task ends, and without `--for` one call waits min(600 s, `herdr.max_wait_minutes` × 60) at most (30 s if policy is unreadable). Never sleep or set a longer timer instead. Weaver never stops a worker by time; inspect `tasks health` before deciding whether to keep waiting, cancel, or retry.
+- `herdr.max_wait_minutes` (1-1440) is the longest interval between two checks on a worker: wait only with `weaver tasks wait --task-id` — it returns as soon as the task ends, and without `--for` one call waits min(600 s, `herdr.max_wait_minutes` × 60) at most (30 s if policy is unreadable). Never sleep or set a longer timer instead. This setting does not impose an execution deadline; inspect `tasks health` before deciding whether to keep waiting, cancel, or retry.
 
 ```sh
 weaver policy validate --input config.json   # config.json is the config document itself
@@ -185,7 +189,7 @@ weaver policy save     --input save.json     # save.json is {revision, config, b
 weaver engines set-enabled --input toggle.json
 ```
 
-Route preview is non-executing; dispatch separately applies current policy. Editing a weight or model later does not rewrite an already-queued route; blocked work stays queued with a bounded `queueReason` (capacity, policy, frozen route, workspace, launch).
+Route preview is non-executing; dispatch separately applies current policy. Editing a weight or model later does not rewrite an already-queued route; blocked work stays queued with a bounded `queueReason` (capacity, policy, frozen route, workspace, launch), except that vendor-limit blocks reroute queued work to another eligible engine.
 
 ```json
 { "owner": "codex_owner", "worker": "codex_worker", "runningCount": 2 }
@@ -234,7 +238,7 @@ A revision copied from the pre-ack step is already stale for the review and retu
 
 ## Health and continuation retries
 
-`weaver tasks health --task-id <id>` reports `working`, `waiting_model` or `stalled`, with silence time and CPU activity from the worker's own scope. A stall requires both silence and continuous CPU-idle for 5 minutes; missing CPU evidence never proves a stall. Check health before declaring a worker stuck.
+`weaver tasks health --task-id <id>` reports `starting` before a real worker’s first output, then `working`, `waiting_model` or `stalled` with silence time and CPU activity from its own scope. Finished tasks return `ended` with their final `taskStatus`. A stall requires both silence and continuous CPU-idle for 5 minutes; missing CPU evidence never proves a stall. Check health before declaring a worker stuck. `tasks wait` returns early with reason `stalled`, health and a retry/cancel hint; `tasks watch` reports the transition and keeps watching.
 
 ```sh
 weaver tasks retry --task-id <id> --command-id retry-0731
