@@ -96,7 +96,7 @@ export interface StallStatus {
 /** What a running worker looks like from the outside: the monitor's own samples, no second classifier. */
 export interface TaskHealth {
   taskId: string;
-  state: 'working' | 'waiting_model' | 'stalled';
+  state: 'starting' | 'working' | 'waiting_model' | 'stalled';
   taskStatus: Task['status'];
   engine: string | null;
   lastEventAt: string | null;
@@ -395,7 +395,7 @@ export class StallMonitor {
     const stalled = isStalled(task, now, Object.fromEntries(this.samples));
     return {
       taskId: task.id,
-      state: stalled ? 'stalled' : silence !== null && silence >= STALL_MS && active !== true ? 'waiting_model' : 'working',
+      state: task.status==='running'&&task.dispatch?.execution==='real'&&!task.run?.firstOutputAt ? 'starting' : stalled ? 'stalled' : silence !== null && silence >= STALL_MS && active !== true ? 'waiting_model' : 'working',
       taskStatus: task.status,
       engine: task.dispatch?.engine ?? null,
       lastEventAt: task.events.at(-1)?.at ?? task.run?.startedAt ?? null,

@@ -40,7 +40,7 @@ const digest=(value:unknown)=>createHash('sha256').update(canonical(value)).dige
 const terminal=(t:Task)=>['completed','failed','cancelled'].includes(t.status);
 /** A single app-owned handler shared by the loopback UI and CLI. The local principal is deliberately
  * trusted-local-machine scope, not an OS-user login or a real-agent grant. */
-type OwnerEffect = { kind:'launch'; input:OwnerLaunchInput } | { kind:'close'; host:OwnerLaunchResult };
+type OwnerEffect = { kind:'launch'; input:OwnerLaunchInput } | { kind:'close'; host:OwnerLaunchResult } | {kind:'first-output';taskId:string};
 type CommandFlow<T> = Generator<OwnerEffect,T,OwnerLaunchResult | undefined>;
 export interface AsyncOwnerHost { launcher?:typeof launchOwnerAsync; closer?:typeof closeOwnerHostAsync }
 export class CommandHandler {
@@ -52,6 +52,8 @@ export class CommandHandler {
    private readonly hostLauncher: typeof launchOwner = launchOwner, private readonly herdrPresent: () => boolean = () => herdrOnPath(),
    private readonly diagnostics?: TaskDiagnostics, private readonly asyncHost:AsyncOwnerHost = {}){
    this.continuation=new ContinuationService(manager.store,this.ownerHost);
+   // Historical failures must not recreate a block after an explicit unblock or restart.
+   for(const task of manager.store.list())if(task.failure)this.vendorBlockedAttempts.add(task.run?.id??task.id);
   manager.listeners.add(()=>queueMicrotask(()=>this.pump()));
   for(const owner of manager.store.getMetadata().owners) if(owner.host)this.ownerHost.restore(owner.host as OwnerHostEvidence,(owner.messages??[]) as OwnerMessage[]);
   queueMicrotask(()=>this.pump());
@@ -64,7 +66,8 @@ export class CommandHandler {
   while(!step.done){
    let host:OwnerLaunchResult|undefined;
    try {
-    if(step.value.kind==='close')closeOwnerHost(step.value.host);
+    if(step.value.kind==='first-output'){ /* Synchronous internal callers receive the current snapshot. RPC uses handleAsync. */ }
+    else if(step.value.kind==='close')closeOwnerHost(step.value.host);
     else host=this.hostLauncher(step.value.input);
    }catch(error){step=flow.throw(error);continue;}
    step=flow.next(host);
@@ -84,7 +87,8 @@ export class CommandHandler {
    let host:OwnerLaunchResult|undefined;
    try {
     const effect=step.value;
-    if(effect.kind==='close')await (this.asyncHost.closer??closeOwnerHostAsync)(effect.host);
+    if(effect.kind==='first-output')await this.manager.waitForFirstOutput(effect.taskId);
+    else if(effect.kind==='close')await (this.asyncHost.closer??closeOwnerHostAsync)(effect.host);
     else host=await (this.asyncHost.launcher??(this.hostLauncher===launchOwner?launchOwnerAsync:async input=>this.hostLauncher(input)))({...effect.input,signal});
    }catch(error){step=flow.throw(error);continue;}
    step=flow.next(host);
@@ -111,7 +115,14 @@ export class CommandHandler {
     // Durable intent first: a crash can block a retry, but cannot silently repeat a spawn.
     meta.receipts[receiptKey]={hash};this.manager.store.setMetadata(meta);
    }
-   const response:CommandResponse={apiVersion:API_VERSION,commandId,ok:true,data:command==='owners.launch'||command==='owners.switch'?yield* this.executeOwner(command,args):this.execute(command,args)};
+   let data=command==='owners.launch'||command==='owners.switch'?yield* this.executeOwner(command,args):this.execute(command,args);
+   if(command==='workers.spawn' && data && typeof data==='object' && 'id' in data){
+    const snapshot=data as Task; if(snapshot.dispatch?.execution==='real'&&snapshot.status==='running'){
+     yield {kind:'first-output',taskId:snapshot.id};
+     data={...data,...this.publicTask(this.manager.store.get(snapshot.id)),started:!!this.manager.store.get(snapshot.id).run?.firstOutputAt};
+    }
+   }
+   const response:CommandResponse={apiVersion:API_VERSION,commandId,ok:true,data};
    effected=true;if(writes.has(command))this.manager.notify();if(receiptKey)this.finish(receiptKey,response);return response;
   }catch(error){
    if(effected)return {apiVersion:API_VERSION,commandId,ok:false,error:{code:'COMMAND_INDETERMINATE',message:'Command applied but receipt persistence failed; inspect current state before retrying',retryable:false}};
@@ -173,6 +184,20 @@ export class CommandHandler {
     return {failure:{code,message}};
    }finally{this.launchingEpochs.delete(key);}
   }
+ private readonly vendorBlockedAttempts=new Set<string>();
+ private applyVendorBlocks():void {
+  for(const task of this.manager.store.list()){
+   const f=task.failure;const engine=task.dispatch?.engine;const key=task.run?.id??task.id;
+   if(!engine||!f||!['rate_limit','quota'].includes(f.kind)||this.vendorBlockedAttempts.has(key))continue;
+   const snapshot=this.policy.snapshot();
+   const existing=snapshot.blocks.find(block=>block.engine===engine&&block.model===undefined);
+   if(existing&&existing.by!=='weaver-vendor-limit'){this.vendorBlockedAttempts.add(key);continue;}
+   const release_at=f.retryAt??(f.kind==='rate_limit'?new Date(Date.now()+600000).toISOString():undefined);
+   const block={engine,reason:f.message.slice(-2000),since:new Date().toISOString(),by:'weaver-vendor-limit',...(release_at?{release_at}:{})};
+   this.policy.save({revision:snapshot.revision,config:snapshot.config,blocks:[...snapshot.blocks.filter(item=>item!==existing),block]});
+   this.vendorBlockedAttempts.add(key);
+  }
+ }
  private pumping=false;
  checkIdleOwners():string[] {return this.manager.store.list().filter(task=>task.ownerId&&this.continuation.due(task.id)).map(task=>task.id);}
  private prepareOwnerActivity(command:string,args:Record<string,unknown>):void {
@@ -196,12 +221,21 @@ export class CommandHandler {
  }
  pump():void {
   if(this.pumping||this.draining)return;this.pumping=true;
-  try{for(const task of this.manager.store.list().reverse()){
+  try{this.applyVendorBlocks();for(const task of this.manager.store.list().reverse()){
    if(terminal(task)&&task.ownerId){try{this.execute('results.deliver',{taskId:task.id});}catch{/* Manual owners pull results. */}}
    if(task.status!=='queued'||!task.scheduled||!task.dispatch)continue;
    let phase:NonNullable<Task['queueReason']>['code']='policy_blocked';
    try{
     const frozen=task.dispatch;
+    const vendorBlock=this.policy.snapshot().blocks.find(block=>block.engine===frozen.engine&&block.by==='weaver-vendor-limit'&&(!block.release_at||Date.parse(block.release_at)>Date.now()));
+    if(vendorBlock){
+      if(frozen.execution==='real'){phase='workspace_changed';assertFrozenWorkspace(frozen);phase='policy_blocked';}
+      const reroute=this.routeOf(frozen.owner,slotGroupCount(this.manager.store.list(),slotGroupFor(task.ownerId,frozen.owner)),[frozen.engine]);
+      const decision=this.decideExecution(reroute.engine,undefined,{...task,workspace:frozen.workspace??task.workspace},this.policy.snapshot().config.owners[reroute.owner]?.engine);
+      task.dispatch={...frozen,worker:reroute.worker,engine:reroute.engine,model:reroute.model,effort:reroute.effort,execution:decision.execution,adapter:decision.adapter,engineKind:decision.engineKind,maxParallel:reroute.maxParallel,...(decision.workspace?{workspace:decision.workspace,workspaceIdentity:workspaceIdentity(decision.workspace)}:{})};
+      event(task,'lifecycle',`Vendor limit rerouted queued worker to ${reroute.engine}`);this.put(task);queueMicrotask(()=>this.pump());continue;
+    }
+
     const running=slotGroupCount(this.manager.store.list(),slotGroupFor(task.ownerId,frozen.owner));
     const route=this.policy.preview({owner:frozen.owner,worker:frozen.worker,runningCount:running});
     const kind=this.policy.snapshot().config.engines[route.engine]?.kind;
@@ -220,7 +254,7 @@ export class CommandHandler {
   }}finally{this.pumping=false;}
  }
  private publicTask(task:Task){const {owner,run,...rest}=task;if(!run)return rest;const visible={...run};delete visible.pid;return {...rest,run:visible};}
- private manifest(task:Task){if(!terminal(task))fail('RESULT_NOT_READY','Execution has not reached a terminal state');const manifest={taskId:task.id,attemptId:task.run?.id??null,packageId:task.packageId??null,execution:task.status,summary:task.summary??null,artifacts:task.artifacts.map(a=>({id:a.id,name:a.name,mediaType:a.mediaType,sha256:createHash('sha256').update(a.content).digest('hex')})),exitCode:task.run?.exitCode??null};return {...manifest,manifestDigest:digest(manifest),delivery:task.acknowledged?'acknowledged':'pending',acceptance:task.reviewState??'pending'};}
+ private manifest(task:Task){if(!terminal(task))fail('RESULT_NOT_READY','Execution has not reached a terminal state');const manifest={taskId:task.id,attemptId:task.run?.id??null,packageId:task.packageId??null,execution:task.status,summary:task.summary??null,artifacts:task.artifacts.map(a=>({id:a.id,name:a.name,mediaType:a.mediaType,sha256:createHash('sha256').update(a.content).digest('hex')})),exitCode:task.run?.exitCode??null,...(task.failure?{failure:task.failure}:{})};return {...manifest,manifestDigest:digest(manifest),delivery:task.acknowledged?'acknowledged':'pending',acceptance:task.reviewState??'pending'};}
  /** maxWaitMinutes is frozen for the owner and the UI as their polling bound; Weaver never stops a worker with it. */
  private decideExecution(engine:string,provider:unknown,task:Task,ownerEngine?:string):{execution:'real'|'mock'|'native';adapter:string;maxWaitMinutes:number;workspace?:string;engineKind?:string} {
   const minutes=this.policy.snapshot().config.herdr.max_wait_minutes;
@@ -296,7 +330,7 @@ export class CommandHandler {
  /** Dispatch response: the task snapshot, the owner's next step, and the engines this retry chain excluded. */
  private dispatchResponse(task:Task,excluded:string[]) {
   const next=this.nextFor(task);
-  return {...this.publicTask(task),...(next?{next}:{}),...(excluded.length?{excludedEngines:excluded}:{})};
+  return {...this.publicTask(task),started:task.dispatch?.execution==='real'?!!task.run?.firstOutputAt:task.status==='running',...(next?{next}:{}),...(excluded.length?{excludedEngines:excluded}:{})};
  }
  /**
   * Route, freeze and admit one queued task, then hand the owner the single next step. workers.spawn calls it

@@ -207,7 +207,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       }
       case 'startTask': {
         const id = parseId(args[0]);
-        const response = active.commands.handle({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'workers.spawn', args: { taskId: id } });
+        const response = await active.commands.handleAsync({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'workers.spawn', args: { taskId: id } });
         if (!response.ok) throw new RpcError(response.error?.code ?? 'COMMAND_FAILED', response.error?.message ?? 'Command failed');
         return active.store.get(id);
       }

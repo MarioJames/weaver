@@ -1,3 +1,4 @@
+import { classifyVendorError } from './vendor-errors';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { chmodSync, lstatSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
@@ -118,22 +119,34 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
   private normalizer: ReturnType<typeof createNormalizer>;
   private lines: ReturnType<typeof decodeLines>;
   private stderrBytes = 0;
+  private stderrTail = '';
+  private lastVendorError?: string;
+  private stderrProbe = '';
+  private firstOutput = false;
+  private engine: RealEngineKind;
   private vendorBytes = 0;
   private vendorFrames = 0;
   private stderrBuffer: ReturnType<typeof createRedactedLineBuffer>;
   constructor(prepared: PreparedCliAgent) {
     super();
+    this.engine = prepared.engine;
     this.scopeUnit = prepared.unit;
     this.evidence = { engine: prepared.engine, requestedModel: prepared.model, requestedEffort: prepared.effort, workspace: prepared.workspace, role: prepared.role, terminal: 'pending' };
     this.normalizer = createNormalizer(prepared.engine);
     this.stderrBuffer = createRedactedLineBuffer(text => this.writeStderrText(text));
     this.lines = decodeLines(line => {
       this.vendorFrames = Math.min(Number.MAX_SAFE_INTEGER, this.vendorFrames + 1);
-      this.emitRecords(this.normalizer.push(line));
+      const records=this.normalizer.push(line);
+      if(records.length && !this.firstOutput){this.firstOutput=true;this.emit('first-output',new Date().toISOString());}
+      let value: Record<string,unknown>|undefined;try{value=JSON.parse(line);}catch{}
+      if(value && (/error|fail/i.test(String(value.type)) || value.error || value.is_error || (value.type==='result'&&value.subtype!=='success') || (value.message && typeof value.message==='object' && ['error','aborted'].includes(String((value.message as Record<string,unknown>).stopReason))))) {
+        const safe=redact(line);const message=safe.slice(0,2048);this.lastVendorError=message;this.emit('vendor-error',message,classifyVendorError(this.engine,safe));
+      }
+      this.emitRecords(records);
     }, detail => this.logOversizedLine(detail));
     const env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
-    this.scope = startOwnedScope({ command: prepared.argv, cwd: prepared.workspace, env, stdin: prepared.stdin, unit: prepared.unit });
+    this.scope = startOwnedScope({ command: prepared.argv, cwd: prepared.workspace, env, stdin: prepared.stdin, ...(prepared.stdin!==null?{stdinPath:prepared.promptPath}:{}), unit: prepared.unit });
     this.pid = this.scope.pid;
     this.emitRecords([
       { type: 'log', message: `Launching ${prepared.engine} with requested model ${prepared.model}` },
@@ -146,7 +159,16 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
       this.vendorBytes = Math.min(Number.MAX_SAFE_INTEGER, this.vendorBytes + chunk.length);
       this.lines.write(chunk);
     });
-    this.scope.stderr.on('data', (chunk: Buffer) => this.stderrBuffer.write(chunk));
+    this.scope.stderr.on('data', (chunk: Buffer) => {
+      this.stderrBuffer.write(chunk);
+      // Some CLIs print a limit message without a newline and then wait forever.
+      // Probe only the bounded unfinished line, using the same redaction framing.
+      this.stderrProbe=(this.stderrProbe+chunk.toString('utf8')).split('\n').pop()!.slice(-8192);
+      if(classifyVendorError(this.engine,this.stderrProbe)){
+        const safe=createRedactedLineBuffer(text=>{const failure=classifyVendorError(this.engine,text);if(failure)this.emit('vendor-error',failure.message,failure);});
+        safe.write(this.stderrProbe+'\n');safe.flush();
+      }
+    });
     this.scope.on('error', error => { this.failed = true; this.emit('error', error); });
     this.scope.on('close', (code: number | null) => this.complete(code));
   }
@@ -159,6 +181,9 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
     this.emitRecords([{ type: 'log', message: `vendor protocol frame exceeded limit: phase=${detail.phase} limitBytes=${detail.limitBytes} observedBytes=${detail.observedBytes} observedVendorBytes=${this.vendorBytes} parsedFrames=${this.vendorFrames}` }]);
   }
   private writeStderrText(text: string): void {
+    this.stderrTail=(this.stderrTail+text).slice(-2048);this.emit('stderr-tail',this.stderrTail);
+    const failure=classifyVendorError(this.engine,text);
+    if(failure)this.emit('vendor-error',text.slice(-2048),failure);
     if (this.stderrBytes >= STDERR_CAP) return;
     const room = STDERR_CAP - this.stderrBytes;
     const slice = text.slice(0, room);
@@ -181,6 +206,7 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
     this.evidence.vendorModel = finished.evidence.vendorModel;
     this.evidence.usage = finished.evidence.usage;
     this.evidence.terminal = finished.evidence.terminal;
+    if(finished.evidence.terminal!=='success'){for(const item of finished.records)if(item.type==='log'&&/terminal /.test(item.message))item.message=[item.message,this.stderrTail?`stderr tail: ${this.stderrTail}`:undefined,this.lastVendorError?`last vendor error: ${this.lastVendorError}`:undefined].filter(Boolean).join('; ').slice(-8000);}
     this.emitRecords(finished.records);
     this.stdout.end();
     this.stderr.end();

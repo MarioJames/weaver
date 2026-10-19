@@ -82,7 +82,9 @@ test('tasks.health is the monitor\'s own reading of the stored task, and unobser
     assert.equal(health.taskStatus, 'running');
     assert.equal(health.scopeUnit, task.run?.scopeUnit);
     assert.equal(health.silenceMs, STALL_MS + 60_000);
-    assert.equal(health.state, 'waiting_model');
+    assert.equal(health.state, 'starting');
+    const output=f.store.get(task.id);output.run!.firstOutputAt=output.run!.startedAt;f.store.put(output);
+    assert.equal(f.monitor.taskHealth(output).state,'waiting_model');
     // Nothing sampled yet: null is the honest answer, not a fabricated idle or busy reading.
     assert.equal(health.cpuActive, null);
     assert.equal(health.cpuIdleMs, null);

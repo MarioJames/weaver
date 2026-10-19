@@ -43,11 +43,21 @@ export function parseStoredTask(value: unknown): Task {
   // Runs no longer write a timeout; older stores may still carry one, so it stays accepted here.
   if(value.timeoutMs!==undefined){if(!Number.isSafeInteger(value.timeoutMs)||Number(value.timeoutMs)<1)throw new Error('Invalid timeout');run.timeoutMs=Number(value.timeoutMs);}
   if(value.pid!==undefined) {if(typeof value.pid!=='number'||!Number.isSafeInteger(value.pid)||value.pid<=0)throw new Error('Invalid PID');run.pid=value.pid;}
+  if(value.firstOutputAt!==undefined)run.firstOutputAt=date(value.firstOutputAt);
   if(value.startedAt!==undefined)run.startedAt=date(value.startedAt);
   if(value.endedAt!==undefined)run.endedAt=date(value.endedAt);
   if(value.exitCode!==undefined) {if(value.exitCode!==null&&(typeof value.exitCode!=='number'||!Number.isSafeInteger(value.exitCode)))throw new Error('Invalid exit code');run.exitCode=value.exitCode as number|null;}
  }
  const extra: Partial<Task>=validateContinuationFields(raw);
+ if(raw.failure!==undefined){
+  const f=object(raw.failure);
+  if(!['early_exit','no_output','rate_limit','quota','auth','vendor','cancelled','other'].includes(String(f.kind)))throw new Error('Invalid failure kind');
+  extra.failure={kind:f.kind as NonNullable<Task['failure']>['kind'],message:text(f.message,'failure message',8000)};
+  for(const key of ['stderrTail','vendorError'] as const)if(f[key]!==undefined)extra.failure[key]=text(f[key],key,2048,true);
+  if(f.retryAt!==undefined)extra.failure.retryAt=date(f.retryAt);
+  if(f.exitCode!==undefined){if(!Number.isSafeInteger(f.exitCode))throw new Error('Invalid failure exit code');extra.failure.exitCode=Number(f.exitCode);}
+ }
+
  if(raw.revision!==undefined) {if(!Number.isSafeInteger(raw.revision)||Number(raw.revision)<0)throw new Error('Invalid revision');extra.revision=Number(raw.revision);}
  if(raw.queueReason!==undefined){const q=object(raw.queueReason);if(!['waiting_for_capacity','policy_blocked','frozen_route_changed','workspace_changed','launch_blocked'].includes(String(q.code)))throw new Error('Invalid queue reason');extra.queueReason={code:q.code as NonNullable<Task['queueReason']>['code'],message:text(q.message,'queue reason',700)};}
  if(raw.scheduled!==undefined) {if(typeof raw.scheduled!=='boolean')throw new Error('Invalid scheduled flag');extra.scheduled=raw.scheduled;}

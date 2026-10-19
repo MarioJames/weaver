@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import type { Artifact, Task, TaskInput, WorkerRecord } from '../shared/types';
+import type { Artifact, Task, TaskInput, TaskFailure, WorkerRecord } from '../shared/types';
 import { parseTaskInput } from '../shared/validation';
 import type { ManagedProcess, WorkerAdapter } from './adapters/worker';
 import { JsonlParser } from './protocol';
 import { TaskStore, event, slotGroupCount, slotGroupName, slotGroupOf } from './store';
+import { classifyVendorError } from './adapters/cli/vendor-errors';
+import { redact } from './adapters/cli/redact';
 import { redactContext } from './continuation';
 
-interface Running { child: ManagedProcess; timeout?: NodeJS.Timeout; killTimer?: NodeJS.Timeout; error?: string; result?: string; cancelled: boolean; stderrBytes: number }
+interface Running { child: ManagedProcess; timeout?: NodeJS.Timeout; killTimer?: NodeJS.Timeout; error?: string; result?: string; cancelled: boolean; stderrBytes: number; stderrTail: string; adapterTail?: boolean; vendorError?: string; firstTimer?: NodeJS.Timeout }
 
 /** `herdr.max_wait_minutes` is the owner's polling bound, never an execution deadline: only a direct mock test may pass the short hook. */
 export function executionTimeoutMs(task: Pick<Task, 'dispatch'>, fallback?: number): number | undefined {
@@ -44,6 +46,7 @@ export class TaskManager {
     }
     const timeoutMs = executionTimeoutMs(task, this.timeoutMs);
     const execution = task.dispatch?.execution ?? 'mock';
+    delete task.failure;
     task.scheduled = false;
     delete task.queueReason;
     task.status = 'running';
@@ -67,10 +70,17 @@ export class TaskManager {
     this.persist(task);
     let child: ManagedProcess;
     try { child = this.adapter.start(task); } catch (error) {
-      task.status = 'failed'; task.run.status = 'stopped'; task.run.endedAt = new Date().toISOString(); event(task, 'error', error instanceof Error ? error.message : String(error)); this.persist(task); return task;
+      task.failure={kind:'early_exit',message:redact(error instanceof Error?error.message:String(error)).slice(-4000)}; task.status = 'failed'; task.run.status = 'stopped'; task.run.endedAt = new Date().toISOString(); event(task, 'error', task.failure.message); this.persist(task); return task;
     }
-    const run: Running = { child, cancelled: false, stderrBytes: 0, ...(timeoutMs === undefined ? {} : { timeout: setTimeout(() => this.stop(id, 'Mock worker exceeded its test timeout'), timeoutMs) }) };
+    const run: Running = { child, cancelled: false, stderrBytes: 0, stderrTail: '', ...(timeoutMs === undefined ? {} : { timeout: setTimeout(() => this.stop(id, 'Mock worker exceeded its test timeout'), timeoutMs) }) };
     this.running.set(id, run);
+    if(execution==='real'){
+      run.firstTimer=setTimeout(()=>this.failAttempt(id,{kind:'no_output',message:'Worker produced no valid vendor output within 120 seconds'}),120000);
+      child.on('first-output',(at:string)=>{const current=this.store.get(id);if(run.error||run.cancelled||current.run?.firstOutputAt)return;clearTimeout(run.firstTimer);if(current.run)current.run.firstOutputAt=at;this.persist(current,'stream');});
+      child.on('stderr-tail',(tail:string)=>{run.adapterTail=true;run.stderrTail=tail;});
+      child.on('vendor-error',(message:string,failure?:TaskFailure)=>{run.vendorError=redact(message).slice(-2048);if(failure)this.failAttempt(id,{...failure,vendorError:run.vendorError});});
+    }
+
     const parser = new JsonlParser(record => this.record(id, record));
     child.stdout.on('data', (chunk: Buffer) => {
       if (run.error || run.cancelled) return;
@@ -78,21 +88,32 @@ export class TaskManager {
     });
     child.stderr.on('data', (chunk: Buffer) => {
       if (run.error || run.cancelled) return;
+      const safe=redact(chunk.toString('utf8'));
+      if(!run.adapterTail)run.stderrTail=(run.stderrTail+safe).slice(-2048);
+      if(execution==='real'){
+        const failure=classifyVendorError(task.dispatch?.engineKind??task.run?.adapter??'',run.stderrTail);
+        if(failure){this.failAttempt(id,{...failure,stderrTail:run.stderrTail});return;}
+      }
       run.stderrBytes += chunk.length;
-      if (run.stderrBytes > 32768) { this.stop(id, 'Worker stderr exceeds 32 KiB limit'); return; }
-      try { const current = this.store.get(id); event(current, 'log', `stderr: ${chunk.toString('utf8')}`); this.persist(current, 'stream'); } catch (error) { this.stop(id, 'Unable to persist stderr'); this.fatal(error); }
+      if (execution!=='real' && run.stderrBytes > 32768) { this.stop(id, 'Worker stderr exceeds 32 KiB limit'); return; }
+      try { const current = this.store.get(id); event(current, 'log', `stderr: ${safe}`); this.persist(current, 'stream'); } catch (error) { this.stop(id, 'Unable to persist stderr'); this.fatal(error); }
     });
-    child.on('error', (error: Error) => { run.error = error.message; });
+    child.on('error', (error: Error) => { this.failAttempt(id,{kind:task.run?.firstOutputAt?'other':'early_exit',message:redact(error.message).slice(-4000)}); });
     child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
-      clearTimeout(run.timeout); clearTimeout(run.killTimer);
+      clearTimeout(run.timeout); clearTimeout(run.killTimer); clearTimeout(run.firstTimer);
       if (!run.error && !run.cancelled) { try { parser.finish(); } catch (error) { run.error = `Invalid worker output: ${String(error)}`; } }
       this.running.delete(id);
       try {
         const current = this.store.get(id);
         if (current.run) { this.observe(current, child); current.run.status = 'stopped'; current.run.endedAt = new Date().toISOString(); current.run.exitCode = code; delete current.run.pid; }
-        if (run.cancelled) { current.status = 'cancelled'; event(current, 'lifecycle', 'Worker stopped after cancellation'); }
+        if (run.cancelled) { current.failure??={kind:'cancelled',message:'Worker cancelled',...(run.stderrTail?{stderrTail:run.stderrTail}:{})}; current.status = 'cancelled'; event(current, 'lifecycle', 'Worker stopped after cancellation'); }
         else if (run.error || code !== 0 || !run.result) {
-          current.status = 'failed'; event(current, 'error', run.error || `Worker exited without successful result (code ${code}, signal ${signal ?? 'none'})`);
+          current.status = 'failed';
+          const existing=current.failure;
+          current.failure={...(existing??{kind:current.run?.firstOutputAt?'vendor':'early_exit',message:run.error||`Worker exited without successful result (code ${code}, signal ${signal??'none'})`}),...(code!==null?{exitCode:code}:{}),...(run.stderrTail?{stderrTail:run.stderrTail}:{}),...(run.vendorError?{vendorError:run.vendorError}:{})};
+          if(!existing)event(current,'error',this.failureDetail(current.failure));
+          else {const errorEvent=[...current.events].reverse().find(item=>item.kind==='error');if(errorEvent)errorEvent.message=this.failureDetail(current.failure);}
+
         } else { current.status = 'completed'; current.progress = 100; current.summary = run.result; event(current, 'lifecycle', 'Worker exited successfully; output is ready for owner review'); }
         this.persist(current);
       } catch (error) { this.fatal(error); }
@@ -131,18 +152,32 @@ export class TaskManager {
   async shutdown(): Promise<void> {
     const exits = [...this.running.values()].map(run => new Promise<void>(resolve => run.child.once('close', () => resolve())));
     for (const id of this.running.keys()) {
-      try { this.cancel(id); } catch (error) { const run = this.running.get(id); if (run) { run.cancelled = true; this.terminate(run); } this.fatal(error); }
+      try { this.cancel(id); } catch (error) { const run = this.running.get(id); if (run) { run.cancelled = !this.store.get(id).failure; this.terminate(run); } this.fatal(error); }
     }
     await Promise.all(exits);
     this.store.flush();
+  }
+  private failureDetail(failure:TaskFailure):string {
+    return [failure.message,failure.exitCode!==undefined?`exit code: ${failure.exitCode}`:undefined,failure.stderrTail?`stderr tail: ${failure.stderrTail}`:undefined,failure.vendorError?`last vendor error: ${failure.vendorError}`:undefined].filter(Boolean).join('; ').slice(-8000);
+  }
+  private failAttempt(id:string,failure:TaskFailure):void {
+    const run=this.running.get(id);if(!run||run.cancelled||run.error)return;
+    const task=this.store.get(id);task.failure={...failure,...(run.stderrTail?{stderrTail:run.stderrTail}:{}),...(run.vendorError?{vendorError:run.vendorError}:{})};
+    run.error=failure.message;task.status='failed';clearTimeout(run.firstTimer);event(task,'error',this.failureDetail(task.failure));this.persist(task);if(this.running.has(id))this.terminate(run);
+  }
+  waitForFirstOutput(id:string,waitMs=10000):Promise<boolean>{
+    const ready=()=>{const task=this.store.get(id);return !!task.run?.firstOutputAt;};
+    if(ready())return Promise.resolve(true);
+    if(this.store.get(id).status!=='running')return Promise.resolve(false);
+    return new Promise(resolve=>{const check=()=>{if(ready()||this.store.get(id).status!=='running')finish(ready());};const finish=(started:boolean)=>{clearTimeout(timer);this.listeners.delete(check);resolve(started);};const timer=setTimeout(()=>finish(ready()),waitMs);this.listeners.add(check);check();});
   }
   private stop(id: string, message: string): void {
     const run = this.running.get(id); if (!run) return;
     run.error ??= message; this.terminate(run);
   }
   private terminate(run: Running): void {
-    run.child.kill('SIGTERM');
     run.killTimer ??= setTimeout(() => run.child.kill('SIGKILL'), 1500);
+    run.child.kill('SIGTERM');
   }
   private record(id: string, record: WorkerRecord): void {
     const run = this.running.get(id); if (!run || run.cancelled || run.error) return;

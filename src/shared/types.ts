@@ -22,9 +22,10 @@ export interface AgentRun {
   id: string; adapter: string; execution?: 'real' | 'mock' | 'native'; status: AgentStatus;
   engine?: string; model?: string; effort?: string; workspace?: string; timeoutMs?: number;
   scopeUnit?: string; evidence?: import('../main/adapters/cli/types').CliAgentEvidence;
-  pid?: number; startedAt?: string; endedAt?: string; exitCode?: number | null;
+  pid?: number; firstOutputAt?: string; startedAt?: string; endedAt?: string; exitCode?: number | null;
 }
-export interface Task extends TaskInput { ownerEpoch?: number; ownerLastActivityAt?: string; continuationPolicy?: import('../main/continuation').ContinuationPolicy; continuationHistory?: import('../main/continuation').HandoffRecord[]; contextPack?: import('../main/continuation').ContextPack; ownerHost?: TaskOwnerHost; revision?: number; scheduled?: boolean; queueReason?: { code: 'waiting_for_capacity' | 'policy_blocked' | 'frozen_route_changed' | 'workspace_changed' | 'launch_blocked'; message: string }; retryOf?: string; ownerId?: string; packageId?: string; acknowledged?: boolean; reviewState?: 'pending' | 'accepted' | 'rejected'; reviewComment?: string; dispatch?: TaskDispatch; id: string; createdAt: string; updatedAt: string; status: TaskStatus; progress: number; events: TaskEvent[]; artifacts: Artifact[]; run?: AgentRun; summary?: string }
+export interface TaskFailure { kind: 'early_exit'|'no_output'|'rate_limit'|'quota'|'auth'|'vendor'|'cancelled'|'other'; message: string; exitCode?: number; stderrTail?: string; vendorError?: string; retryAt?: string }
+export interface Task extends TaskInput { failure?: TaskFailure; ownerEpoch?: number; ownerLastActivityAt?: string; continuationPolicy?: import('../main/continuation').ContinuationPolicy; continuationHistory?: import('../main/continuation').HandoffRecord[]; contextPack?: import('../main/continuation').ContextPack; ownerHost?: TaskOwnerHost; revision?: number; scheduled?: boolean; queueReason?: { code: 'waiting_for_capacity' | 'policy_blocked' | 'frozen_route_changed' | 'workspace_changed' | 'launch_blocked'; message: string }; retryOf?: string; ownerId?: string; packageId?: string; acknowledged?: boolean; reviewState?: 'pending' | 'accepted' | 'rejected'; reviewComment?: string; dispatch?: TaskDispatch; id: string; createdAt: string; updatedAt: string; status: TaskStatus; progress: number; events: TaskEvent[]; artifacts: Artifact[]; run?: AgentRun; summary?: string }
 export type WorkerRecord =
  | { type: 'log'; message: string }
  | { type: 'progress'; percent: number; message: string }

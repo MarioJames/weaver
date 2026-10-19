@@ -1,3 +1,4 @@
+import { openSync, closeSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -70,7 +71,7 @@ function owns(unit: string, info: ScopeInfo | undefined, invocation: string | un
 }
 
 /** One systemd user scope around a fixed argv. Descendants stay in the cgroup and die with it. */
-export function startOwnedScope(options: { command: readonly string[]; cwd: string; env: NodeJS.ProcessEnv; stdin: string | null; unit: string }): OwnedScope {
+export function startOwnedScope(options: { command: readonly string[]; cwd: string; env: NodeJS.ProcessEnv; stdin: string | null; stdinPath?: string; unit: string }): OwnedScope {
   if (process.platform !== 'linux') throw new Error('Owned CLI scope requires Linux systemd user sessions');
   const handle = new EventEmitter() as OwnedScope;
   let invocation: string | undefined;
@@ -84,18 +85,23 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
   let closed = false;
   let stopPromise: Promise<void> | undefined;
   const unit = options.unit;
-  const child = spawn('systemd-run', [
+  let promptFd: number | undefined;
+  try { if(options.stdinPath)promptFd=openSync(options.stdinPath,'r'); } catch(error) { throw new Error(`Prompt delivery failed: ${String(error)}`); }
+  let child: ChildProcessWithoutNullStreams;
+  try { child = spawn('systemd-run', [
     '--user', '--scope', '--collect', '--quiet', `--unit=${unit}`, `--working-directory=${options.cwd}`,
     '-p', 'MemoryHigh=8G', '-p', 'MemoryMax=10G', '-p', 'KillMode=control-group',
     '--', ...options.command,
-  ], { cwd: options.cwd, env: options.env, shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] }) as ChildProcessWithoutNullStreams;
+  ], { cwd: options.cwd, env: options.env, shell: false, windowsHide: true, stdio: [promptFd ?? 'pipe', 'pipe', 'pipe'] }) as ChildProcessWithoutNullStreams;
+  } finally { if(promptFd!==undefined)closeSync(promptFd); }
   (handle as { unit: string }).unit = unit;
   handle.pid = child.pid;
   handle.stdout = child.stdout;
   handle.stderr = child.stderr;
-  if (options.stdin === null) child.stdin.end();
+  if (promptFd !== undefined) { /* inherited read-only prompt file */ }
+  else if (options.stdin === null) child.stdin.end();
   else {
-    child.stdin.on('error', () => { /* close owns the outcome */ });
+    child.stdin.on('error', error => handle.emit('error', new Error(`Prompt delivery failed: ${error.message}`)));
     child.stdin.end(options.stdin);
   }
   let verifyStopped = false;

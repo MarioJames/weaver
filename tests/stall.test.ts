@@ -37,7 +37,7 @@ function makeTask(options: { engine?: string; scope?: string; silentMs?: number;
     events: [{ id: randomUUID(), at, kind: 'lifecycle', message: 'started' }],
     artifacts: [],
     dispatch: { owner: `${engine}_owner`, worker: `${engine}_worker`, engine, model: 'm', effort: 'high', execution, maxParallel: 2 },
-    run: { id: randomUUID(), adapter: engine, execution, status: 'running', startedAt: at, ...(execution === 'real' ? { scopeUnit: options.scope ?? `weaver-cli-${engine}-${id.slice(0, 8)}` } : {}) },
+    run: { id: randomUUID(), adapter: engine, execution, status: 'running', startedAt: at, firstOutputAt: at, ...(execution === 'real' ? { scopeUnit: options.scope ?? `weaver-cli-${engine}-${id.slice(0, 8)}` } : {}) },
   };
 }
 
