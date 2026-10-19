@@ -1,8 +1,8 @@
 import { NamedSwitch } from '../components/NamedControls';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pause, Play, RefreshCw, ScanSearch } from 'lucide-react';
+import { Play, RefreshCw, ScanSearch } from 'lucide-react';
 import { PageHeader, Surface } from '@lobehub/ui/dashboard';
-import { ActionIcon, Alert, Button, Input, Modal, Progress, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
+import { ActionIcon, Alert, Button, Progress, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
 import { ENGINE_CATALOG, catalogEntry, engineDisableConflict, type EngineProbeRecord } from '../../shared/engines';
 import type { EngineQuotaRecord, QuotaEngine, QuotaWindow } from '../../shared/quota';
 import { QUOTA_KINDS, quotaRefreshEnabled, type Block, type Engine } from '../../main/policy/routing';
@@ -75,7 +75,6 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
   const [scanError, setScanError] = useState('');
   const [busyId, setBusyId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [pausing, setPausing] = useState<string>();
   const quota = useQuota(policy);
   const scan = useCallback(async () => {
     if (!window.weaver) { setScanError('控制面不可用，请通过 weaver web 打开页面。'); return; }
@@ -107,7 +106,7 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
   const savedBlocks = policy.snapshot?.blocks ?? [];
   const unsupported = Object.entries(saved?.engines ?? {}).filter(([id]) => !catalogEntry(id));
   return <>
-    <PageHeader title="引擎" description="本机已安装的 Agent CLI。这里的开关和暂停都立即生效。" action={<Button icon={ScanSearch} loading={scanning} onClick={() => void scan()}>重新探测</Button>} />
+    <PageHeader title="引擎" description="本机已安装的 Agent CLI。这里的开关立即生效；是否派发还看额度是否自动暂停了这台引擎。" action={<Button icon={ScanSearch} loading={scanning} onClick={() => void scan()}>重新探测</Button>} />
     {scanError && <Alert type="error" title="引擎探测失败" description={scanError} action={<Button size="small" onClick={() => void scan()}>重试</Button>} />}
     {quota.loadError && <Alert type="error" title="额度读取失败" description={quota.loadError} action={<Button size="small" onClick={() => void quota.load()}>重试</Button>} />}
     {policy.loadError && <Alert type="error" title="配置读取失败" description={policy.loadError} action={<Button size="small" onClick={() => void policy.load(true)}>重新读取</Button>} />}
@@ -129,7 +128,7 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
           <div className={styles.cardBody}>
             {isQuotaKind(kind) ? <QuotaSummary engine={kind} record={quota.records.find(item => item.engine === kind)} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === kind ? quota.feedback : undefined} onRefresh={() => void quota.refresh(kind)} />
               : <Text type="secondary" className={styles.meta}>免费模型，不探测额度。</Text>}
-            <BlockList blocks={engineBlocks} disabled={busyId !== '' || !record} onPause={() => setPausing(entry.id)} onRemove={block => void change(entry.id, doc => ({ ...doc, blocks: doc.blocks.filter(item => !(item.engine === block.engine && item.model === block.model)) }))} />
+            <BlockList blocks={engineBlocks} disabled={busyId !== '' || !record} onRemove={block => void change(entry.id, doc => ({ ...doc, blocks: doc.blocks.filter(item => !(item.engine === block.engine && item.model === block.model)) }))} />
             <div className={styles.cardFoot}>
               <div className={styles.spread}>
                 <Text>主动刷新额度</Text>
@@ -147,14 +146,13 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
         <Text type="secondary" className={styles.wrap}>类型 {record.kind}。这条记录原样保留，不能在这里启用。{record.enabled ? '当前为启用状态。' : ''}</Text>
       </Surface>)}
     </div>}
-    <PauseDialog engine={pausing} onClose={() => setPausing(undefined)} onPause={async block => { await policy.commit(doc => ({ ...doc, blocks: [...doc.blocks.filter(item => !(item.engine === block.engine && item.model === undefined)), block] })); }} />
   </>;
 }
 
-function BlockList({ blocks, disabled, onPause, onRemove }: { blocks: Block[]; disabled: boolean; onPause: () => void; onRemove: (block: Block) => void }) {
+function BlockList({ blocks, disabled, onRemove }: { blocks: Block[]; disabled: boolean; onRemove: (block: Block) => void }) {
   const now = Date.now();
   const active = blocks.filter(block => !block.release_at || Date.parse(block.release_at) > now);
-  const engineLevel = active.some(block => block.model === undefined);
+  if (!active.length) return null;
   return <section aria-label="派发限制" className={styles.tight}>
     {active.map(block => <div key={`${block.engine}:${block.model ?? ''}`} className={styles.spread} style={{ flexWrap: 'nowrap' }}>
       <span className={styles.tight}>
@@ -163,35 +161,7 @@ function BlockList({ blocks, disabled, onPause, onRemove }: { blocks: Block[]; d
       </span>
       <Tooltip title="恢复派发"><ActionIcon size="small" icon={Play} aria-label="恢复派发" disabled={disabled} onClick={() => onRemove(block)} /></Tooltip>
     </div>)}
-    {!engineLevel && <Button size="small" icon={Pause} disabled={disabled} onClick={onPause}>暂停派发</Button>}
   </section>;
-}
-
-function PauseDialog({ engine, onClose, onPause }: { engine?: string; onClose: () => void; onPause: (block: Block) => Promise<void> }) {
-  const [reason, setReason] = useState('');
-  const [until, setUntil] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  useEffect(() => { if (engine) { setReason(''); setUntil(''); setError(''); } }, [engine]);
-  const releaseAt = until ? new Date(until) : undefined;
-  const invalid = releaseAt !== undefined && (!Number.isFinite(releaseAt.getTime()) || releaseAt.getTime() <= Date.now());
-  async function submit() {
-    if (!engine || busy || invalid) return;
-    setBusy(true); setError('');
-    try {
-      await onPause({ engine, reason: reason.trim() || '手动暂停', since: new Date().toISOString(), ...(releaseAt ? { release_at: releaseAt.toISOString() } : {}) });
-      onClose();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
-    finally { setBusy(false); }
-  }
-  return <Modal open={engine !== undefined} title={`暂停派发 ${engine ?? ''}`} okText="暂停" cancelText="取消" confirmLoading={busy} okButtonProps={{ disabled: invalid }} onCancel={() => { if (!busy) onClose(); }} onOk={() => void submit()}>
-    <div className={styles.stack}>
-      <Text type="secondary">暂停期间不会把新任务派给这个引擎，已在运行的任务不受影响。</Text>
-      <label className={styles.tight}><Text>原因</Text><Input aria-label="暂停原因" value={reason} placeholder="例如：额度紧张，先让给其他引擎" onChange={event => setReason(event.target.value)} /></label>
-      <label className={styles.tight}><Text>恢复时间</Text><Input aria-label="恢复时间" type="datetime-local" value={until} onChange={event => setUntil(event.target.value)} /><Text type={invalid ? 'danger' : 'secondary'} className={styles.meta}>{invalid ? '恢复时间需要晚于现在。' : '留空表示需要手动恢复。'}</Text></label>
-      {error && <Text role="alert" type="danger">{error}</Text>}
-    </div>
-  </Modal>;
 }
 
 function QuotaSummary({ engine, record, now, busy, policyBusy, feedback, onRefresh }: { engine: QuotaEngine; record?: EngineQuotaRecord; now: number; busy: QuotaEngine | null; policyBusy: boolean; feedback?: { text: string; error: boolean }; onRefresh: () => void }) {
