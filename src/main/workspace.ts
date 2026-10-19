@@ -5,7 +5,7 @@ import type { RealEngineKind } from './adapters/cli/index';
 export type { RealEngineKind } from './adapters/cli/index';
 
 /** Kinds with a real worker launcher. Claude Code stays deferred. */
-export const REAL_ENGINE_KINDS = ['opencode', 'pi', 'grok', 'codex'] as const;
+export const REAL_ENGINE_KINDS = ['opencode', 'pi', 'grok', 'codex', 'qodercli'] as const;
 
 export function isRealEngineKind(kind: string): kind is RealEngineKind {
   return (REAL_ENGINE_KINDS as readonly string[]).includes(kind);

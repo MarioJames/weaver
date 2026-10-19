@@ -195,7 +195,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       }
       case 'capabilities': return {
         worker: active.manager.canLaunchReal
-          ? 'Saved opencode, pi, grok, and codex routes launch that engine. mock-jsonl runs only when requested. Failures do not fall back.'
+          ? 'Saved opencode, pi, grok, codex, and qodercli routes launch that engine. mock-jsonl runs only when requested. Failures do not fall back.'
           : 'mock-jsonl is the explicit test provider. A real route fails until the engine launcher is loaded and does not fall back to mock.',
         owner: 'Logical registration only. The owner is the agent in the skill host and calls this CLI. This process does not spawn an owner model.',
         maxParallel: configuredParallel(active.policy),

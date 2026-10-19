@@ -42,7 +42,7 @@ export interface EngineReadiness {
   probe: EngineProbeRecord;
 }
 
-const REAL_ADAPTER_KINDS = new Set(['opencode', 'pi', 'grok', 'codex']);
+const REAL_ADAPTER_KINDS = new Set(['opencode', 'pi', 'grok', 'codex', 'qodercli']);
 
 function adapterStatusFor(kind: string): EngineReadiness['adapterStatus'] {
   if (kind === 'claude') return 'deferred';

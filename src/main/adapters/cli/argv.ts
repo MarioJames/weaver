@@ -35,6 +35,12 @@ export function buildLaunchSpec(input: {
         stdin: null,
         argv: ['grok', '--prompt-file', input.promptPath, '--output-format', 'streaming-messages-json', '--model', input.model, '--effort', input.effort, '--no-subagents', '--no-leader', '--leader-socket', input.leaderSocket, '--permission-mode', 'bypassPermissions'],
       };
+    case 'qodercli':
+      // User-level settings carry personal hooks and plugins; a worker runs without them, like opencode --pure.
+      return {
+        stdin: input.instruction,
+        argv: ['qodercli', '-p', '-o', 'stream-json', '-m', input.model, '--reasoning-effort', input.effort, '-w', input.workspace, '--permission-mode', 'bypass_permissions', '--setting-sources', '', '--strict-mcp-config', '--no-session-persistence'],
+      };
     case 'codex':
       return {
         stdin: input.instruction,

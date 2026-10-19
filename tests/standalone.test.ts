@@ -49,3 +49,11 @@ test('weaver --version prints the package version', async () => {
   try { assert.equal(await runCLI(['--version']), 0); } finally { (process.stdout as any).write = write; }
   assert.equal(written.join(''), `weaver ${VERSION}\n`);
 });
+
+test('--input takes a file, stdin, or the JSON object inline, and names a missing file', async () => {
+  const { readInput } = await import('../src/cli/main');
+  assert.deepEqual(await readInput('{"owner":"codex_owner"}'), { owner: 'codex_owner' });
+  assert.deepEqual(await readInput('  {"a":[1]}'), { a: [1] });
+  await assert.rejects(readInput('{"owner":'), /Inline --input must be valid JSON/);
+  await assert.rejects(readInput('/nonexistent/weaver-input.json'), /Input file not found: \/nonexistent\/weaver-input.json/);
+});

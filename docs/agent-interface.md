@@ -69,7 +69,7 @@ CLI 目录共 38 条命令：读取（15）与写入（13）共 28 条逻辑命�
 
 八个 RPC 动词：`policy get`（无参，即 `weaver policy get`）、`policy validate --input`（config 文档本体，≤256 KiB，返回 issue 数组，空即通过）、`policy save --input`（`{revision,config,blocks}`，revision 乐观锁，返回新 snapshot）、`policy preview --input`（`{owner, worker?, runningCount?}`）、`engines scan`（无参）、`engines set-enabled --input`（`{id,enabled,revision}`）、`quota get`（无参）、`quota refresh [--input]`（可选 `{engine}`）。这些命令不接受 `--command-id`/`--task-id`；有输入时直接提交 usage 所示 JSON 对象，不接逻辑命令信封。仅 `quota refresh` 的单参数 RPC 允许省略 `--input`，此时传 `{}`；其余单参数 RPC 继续要求输入。
 
-网页另有两个不进 CLI 目录的 RPC 用于工作代理可用性探测：`sayHi`（`{engine, model, effort}`，engine 为已保存配置里的引擎 id）立即返回 `{id, status:'running', startedAt}`，`sayHiResult(id)` 轮询到 `status:'done'` 后带 `result {ok, reply?, model?, error?, durationMs, checkedAt}`。探测在 `agent-state/` 下的空临时目录里用各 CLI 最轻的一次性调用发一句 hi：不带工具、MCP、插件/hooks 与用户 settings（CLI 支持时），不保存会话，不经过工作代理执行适配，因此 Claude Code 与 qodercli 也能探测。claude 不用 `--bare`，因为它不读 OAuth。120 秒超时即停止进程，同时最多 3 个，结果保留 10 分钟，结束后删除临时目录。这是一次真实推理，会消耗少量额度；成功只说明此刻可用。
+网页另有两个不进 CLI 目录的 RPC 用于工作代理可用性探测：`sayHi`（`{engine, model, effort}`，engine 为已保存配置里的引擎 id）立即返回 `{id, status:'running', startedAt}`，`sayHiResult(id)` 轮询到 `status:'done'` 后带 `result {ok, reply?, model?, error?, durationMs, checkedAt}`。探测在 `agent-state/` 下的空临时目录里用各 CLI 最轻的一次性调用发一句 hi：不带工具、MCP、插件/hooks 与用户 settings（CLI 支持时），不保存会话，不经过工作代理执行适配，因此 Claude Code 也能探测。claude 不用 `--bare`，因为它不读 OAuth。120 秒超时即停止进程，同时最多 3 个，结果保留 10 分钟，结束后删除临时目录。这是一次真实推理，会消耗少量额度；成功只说明此刻可用。
 
 本地 wait/watch：`tasks wait --task-id` / `tasks watch --task-id`，`--for` 1–600 秒（缺省 30）；轮询 `tasks get`（watch 另加 `tasks events` 增量），不是第二调度器；超时按 `TIMEOUT` 失败退出，退出不取消任务。
 

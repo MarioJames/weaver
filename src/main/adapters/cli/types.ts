@@ -1,7 +1,7 @@
 import type { EventEmitter } from 'node:events';
 import type { Readable } from 'node:stream';
 
-export type RealEngineKind = 'opencode' | 'pi' | 'grok' | 'codex';
+export type RealEngineKind = 'opencode' | 'pi' | 'grok' | 'codex' | 'qodercli';
 
 export interface CliAgentInput {
   engine: RealEngineKind;

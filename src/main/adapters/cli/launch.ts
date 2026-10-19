@@ -11,7 +11,7 @@ import { clip, createRedactedLineBuffer, redact } from './redact';
 import { decodeLines, startOwnedScope, type LineOverflow, type OwnedScope } from './scope';
 import type { CliAgentEvidence, CliAgentInput, ManagedAgentProcess, RealEngineKind } from './types';
 
-const ENGINES = new Set<RealEngineKind>(['opencode', 'pi', 'grok', 'codex']);
+const ENGINES = new Set<RealEngineKind>(['opencode', 'pi', 'grok', 'codex', 'qodercli']);
 const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/;
 const EFFORT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
 const STDERR_CAP = 24 * 1024;
@@ -44,7 +44,7 @@ function fail(field: string, message: string): never {
 
 function credentialRoots(): string[] {
   const home = homedir();
-  return ['.codex', '.grok', '.pi', '.opencode', '.ssh'].map(name => path.join(home, name)).concat([
+  return ['.codex', '.grok', '.pi', '.opencode', '.qoder', '.qoder-cli', '.ssh'].map(name => path.join(home, name)).concat([
     path.join(home, '.config', 'opencode'),
     path.join(home, '.config', 'agents-cooperation'),
   ]);
@@ -79,7 +79,7 @@ function existingDirectory(field: string, value: string): string {
 
 /** Validate input and write the private prompt. Does not start a process. */
 export function prepareCliAgentInput(input: CliAgentInput): PreparedCliAgent {
-  if (!ENGINES.has(input.engine)) fail('engine', 'Engine must be opencode, pi, grok, or codex');
+  if (!ENGINES.has(input.engine)) fail('engine', 'Engine must be opencode, pi, grok, codex, or qodercli');
   if (typeof input.model !== 'string' || !MODEL.test(input.model) || input.model.includes('..')) fail('model', 'Model must be a bounded identifier');
   if (typeof input.effort !== 'string' || !EFFORT.test(input.effort)) fail('effort', 'Effort must be a bounded identifier');
   if (typeof input.instruction !== 'string' || !input.instruction.trim() || input.instruction.length > 16000) fail('instruction', 'Instruction must be 1–16000 characters');
@@ -201,6 +201,7 @@ function permissionNote(engine: RealEngineKind): string {
     case 'codex': return 'codex sandbox workspace-write is the vendor profile, not a separate OS claim';
     case 'opencode': return 'opencode --auto approves permissions inside the CLI; it is not OS isolation';
     case 'pi': return 'pi --approve trusts project files for this run; it is not OS isolation';
+    case 'qodercli': return 'qodercli permission mode bypass_permissions is a CLI policy, not OS filesystem isolation';
   }
 }
 

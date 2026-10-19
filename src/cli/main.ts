@@ -219,14 +219,24 @@ export function parseCLI(argv: string[]): CLIOptions {
   options.dataDir = resolve(options.dataDir);
   return options;
 }
-async function readInput(path: string): Promise<unknown> {
+/** --input is a JSON file, "-" for stdin, or the JSON object itself when it starts with "{". */
+export async function readInput(path: string): Promise<unknown> {
+  if (path.trimStart().startsWith('{')) {
+    if (Buffer.byteLength(path) > MAX_FRAME_BYTES - 1024) throw new LocalIPCError('INVALID_ARGUMENT', 'Input exceeds transport limit');
+    try { return JSON.parse(path); } catch { throw new LocalIPCError('INVALID_ARGUMENT', 'Inline --input must be valid JSON'); }
+  }
   const chunks: Buffer[] = [];
   let size = 0;
   const add = (chunk: Buffer) => { size += chunk.length; if (size > MAX_FRAME_BYTES - 1024) throw new LocalIPCError('INVALID_ARGUMENT', 'Input exceeds transport limit'); chunks.push(chunk); };
   if (path === '-') {
     for await (const chunk of process.stdin) add(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   } else {
-    const file = await open(path, 'r');
+    let file;
+    try { file = await open(path, 'r'); }
+    catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      throw new LocalIPCError('INVALID_ARGUMENT', code === 'ENOENT' ? `Input file not found: ${path}. Pass a JSON file, - for stdin, or the JSON object itself.` : `Input file could not be read (${code ?? 'error'}): ${path}`);
+    }
     try {
       const info = await file.stat();
       if (!info.isFile() || info.size > MAX_FRAME_BYTES - 1024) throw new LocalIPCError('INVALID_ARGUMENT', 'Input must be a regular JSON file within transport limit');

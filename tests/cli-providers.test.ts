@@ -350,3 +350,42 @@ test('retained text windows redact a whole credential before clipping through it
   assert.doesNotMatch(JSON.stringify(done), /secretvalue123456|value123456/);
   assert.ok(done.evidence.assistantText.length <= 30000);
 });
+
+test('qodercli runs headless from stdin without user hooks, MCP or a saved session, and its stream is normalized', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'weaver-qoder-'));
+  try {
+    const prepared = prepareCliAgentInput({ engine: 'qodercli', model: 'Qwen3.8-Flash', effort: 'xhigh', workspace: dir, instruction: 'qodercli', stateDir: join(dir, 'state') });
+    assert.equal(prepared.argv[0], 'qodercli');
+    assert.equal(prepared.stdin, 'qodercli', 'the prompt goes through stdin, never argv');
+    assert.equal(prepared.argv.slice(1).includes('qodercli'), false);
+    const argv = prepared.argv.join(' ');
+    for (const flag of ['-p', '-o stream-json', '-m Qwen3.8-Flash', '--reasoning-effort xhigh', '--permission-mode bypass_permissions', '--strict-mcp-config', '--no-session-persistence']) assert.ok(argv.includes(flag), flag);
+    assert.ok(prepared.argv.includes('--setting-sources') && prepared.argv[prepared.argv.indexOf('--setting-sources') + 1] === '');
+    assert.equal(prepared.argv[prepared.argv.indexOf('-w') + 1], prepared.workspace);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+
+  const ok = createNormalizer('qodercli');
+  const lines = [
+    { type: 'system', subtype: 'hook_started', hook_name: 'session', session_id: 'sess-q' },
+    { type: 'system', subtype: 'init', session_id: 'sess-q', cwd: '/w', tools: ['Bash'] },
+    { type: 'assistant', message: { model: 'Qwen3.8-Flash', stop_reason: 'tool_use', content: [{ type: 'thinking', thinking: 'plan' }, { type: 'tool_use', name: 'Write', input: {} }] } },
+    { type: 'user', message: { role: 'user', content: [{ type: 'tool_result', content: 'File created' }] } },
+    { type: 'assistant', message: { model: 'Qwen3.8-Flash', stop_reason: 'end_turn', content: [{ type: 'text', text: 'DONE' }], usage: { input_tokens: 12, output_tokens: 3 } } },
+    { type: 'result', subtype: 'success', is_error: false, result: 'DONE', session_id: 'sess-q', usage: { input_tokens: 12, output_tokens: 3 } },
+  ];
+  const records = lines.flatMap(line => ok.push(JSON.stringify(line)));
+  assert.ok(records.some(item => item.type === 'log' && /tool started Write/.test(item.message)));
+  assert.equal(records.filter(item => item.type === 'progress').length, 1, 'hook events are not session starts');
+  const done = ok.finish({ exitCode: 0, cancelled: false, truncated: false });
+  assert.equal(done.evidence.terminal, 'success');
+  assert.equal(done.evidence.vendorSessionId, 'sess-q');
+  assert.equal(done.evidence.vendorModel, 'Qwen3.8-Flash');
+  assert.deepEqual(done.evidence.usage, { inputTokens: 12, outputTokens: 3 });
+  assert.equal(done.records.find(item => item.type === 'result')?.summary, 'DONE');
+
+  const failed = createNormalizer('qodercli');
+  failed.push(JSON.stringify({ type: 'result', subtype: 'error_during_execution', is_error: true, result: 'model not available' }));
+  const end = failed.finish({ exitCode: 1, cancelled: false, truncated: false });
+  assert.equal(end.evidence.terminal, 'error');
+  assert.ok(end.records.some(item => item.type === 'log' && /model not available/.test(item.message)));
+});

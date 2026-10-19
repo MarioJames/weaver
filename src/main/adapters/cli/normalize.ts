@@ -164,6 +164,7 @@ function accept(engine: RealEngineKind, state: MutableEvidence, event: Record<st
     case 'opencode': return acceptOpencode(state, event, markError);
     case 'grok': return acceptGrok(state, event, markError);
     case 'codex': return acceptCodex(state, event, markError);
+    case 'qodercli': return acceptQoder(state, event, markError);
   }
 }
 
@@ -322,6 +323,53 @@ function acceptCodex(state: MutableEvidence, event: Record<string, unknown>, mar
     markError();
     const error = asRecord(event.error);
     const message = textOf(event.message) || textOf(error?.message) || event.type;
+    noteFailure(state, message);
+    out.push(record('log', message));
+  }
+  return out;
+}
+
+/** qodercli stream-json follows the Claude Code shape: system init, assistant/user turns, one result. */
+function acceptQoder(state: MutableEvidence, event: Record<string, unknown>, markError: () => void): WorkerRecord[] {
+  const out: WorkerRecord[] = [];
+  if (event.type === 'system') {
+    if (event.subtype !== 'init') return out;
+    if (typeof event.session_id === 'string') state.vendorSessionId = identifier(state, 'vendor_session_id', event.session_id);
+    out.push(record('progress', 'qodercli session started', 20));
+  } else if (event.type === 'assistant') {
+    const message = asRecord(event.message);
+    if (typeof message?.model === 'string') state.vendorModel = identifier(state, 'vendor_model', message.model);
+    const usage = asRecord(message?.usage);
+    rememberUsage(state, usage?.input_tokens, usage?.output_tokens);
+    if (Array.isArray(message?.content)) {
+      for (const part of message.content) {
+        const item = asRecord(part);
+        if (item?.type === 'tool_use') { const note = toolNote(item.name, 'started'); if (note) out.push(note); }
+      }
+    }
+    const text = contentText(message?.content);
+    if (text.trim()) rememberAssistant(state, text);
+    if (typeof message?.stop_reason === 'string') state.stopReason = stopReason(state, message.stop_reason);
+  } else if (event.type === 'result') {
+    if (typeof event.session_id === 'string') state.vendorSessionId = identifier(state, 'vendor_session_id', event.session_id);
+    const usage = asRecord(event.usage);
+    rememberUsage(state, usage?.input_tokens, usage?.output_tokens);
+    const text = textOf(event.result);
+    if (event.is_error === true || event.subtype !== 'success') {
+      state.failure = 'result';
+      markError();
+      noteFailure(state, text.trim() || textOf(event.subtype) || 'unknown qodercli error');
+      out.push(record('log', state.failureDetail || 'unknown qodercli error'));
+    } else {
+      if (text.trim()) rememberAssistant(state, text);
+      const stop = typeof event.stop_reason === 'string' ? event.stop_reason : '';
+      if (stop) state.stopReason = stopReason(state, stop);
+      state.vendorTerminal = true;
+    }
+  } else if (event.type === 'error') {
+    state.failure = 'error';
+    markError();
+    const message = textOf(event.message) || 'qodercli error';
     noteFailure(state, message);
     out.push(record('log', message));
   }

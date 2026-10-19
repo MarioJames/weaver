@@ -95,6 +95,8 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 
 固定 catalog（`src/shared/engines.ts`）：claude/codex/grok/opencode/pi/qoder/gemini 七个 id，kind 分别 claude/codex/grok/opencode/pi/qodercli/gemini。探测只做 PATH 可执行文件 + 带超时 `--version`（shell:false、ANSI 去除、4s 超时、进程组收尾）；结果永远 `authenticated:false`、`modelUsable:false`。启用权威是 PolicyStore `engines[id].enabled`（`engines set-enabled` 需 installed 探测 + revision）；启用引擎不会创建任何角色。adapter 状态分 `real`（opencode/pi/grok/codex）、`deferred`（claude）、`not_implemented`（qodercli/gemini）；`realExecution` = 启用且启用 worker 使用该引擎且 launcher 已加载，探测≠可用。
 
+真实执行适配（`src/main/adapters/cli/argv.ts` + `normalize.ts`）覆盖 opencode、pi、grok、codex、qodercli。qodercli 以 `-p -o stream-json` 从 stdin 读任务，`--permission-mode bypass_permissions`（CLI 策略，不是 OS 隔离），`--setting-sources ""` 与 `--strict-mcp-config` 跳过用户级 hooks、插件与 MCP，`--no-session-persistence` 不落会话；输出按 Claude Code 风格的 system/assistant/result 事件归一化。claude 与 gemini 仍无执行适配。
+
 ## 8. 已知限制（不是未来路线）
 
 - 没有按 owner 的认证/对象级权限；本地凭据是 trusted-user 级（`capabilities.authentication` 声明）。
