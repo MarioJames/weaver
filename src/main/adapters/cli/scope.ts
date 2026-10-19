@@ -241,38 +241,69 @@ export interface LineOverflow {
 }
 
 export function decodeLines(push: (line: string) => void, overflow: (detail: LineOverflow) => void): { write(chunk: Buffer): void; end(): void } {
-  const decoder = new StringDecoder('utf8');
-  const limitBytes = 128 * 1024;
-  let buffer = '';
-  let discarded = false;
-  const withinLimit = (line: string, phase: LineOverflow['phase']): boolean => {
-    const observedBytes = Buffer.byteLength(line);
-    if (observedBytes <= limitBytes) return true;
-    discarded = true;
-    buffer = '';
-    overflow({ phase, limitBytes, observedBytes });
-    return false;
+  const limitBytes = 8 * 1024 * 1024;
+  let decoder = new StringDecoder('utf8');
+  let parts: string[] = [];
+  let observedBytes = 0;
+  let skipping = false;
+  let ended = false;
+  const reset = () => {
+    decoder = new StringDecoder('utf8');
+    parts = [];
+    observedBytes = 0;
   };
+  const append = (text: string) => {
+    observedBytes += Buffer.byteLength(text);
+    if (observedBytes <= limitBytes) {
+      if (text) parts.push(text);
+    }
+    else parts = [];
+  };
+  const report = (phase: LineOverflow['phase']) => overflow({ phase, limitBytes, observedBytes });
   return {
     write(chunk) {
-      if (discarded) return;
-      buffer += decoder.write(chunk);
-      let newline = buffer.indexOf('\n');
-      while (newline >= 0) {
-        const line = buffer.slice(0, newline);
-        if (!withinLimit(line, 'complete')) return;
-        push(line);
-        buffer = buffer.slice(newline + 1);
-        newline = buffer.indexOf('\n');
+      if (ended) return;
+      let offset = 0;
+      while (offset < chunk.length) {
+        const newline = chunk.indexOf(10, offset);
+        const end = newline < 0 ? chunk.length : newline;
+        if (!skipping) {
+          // Decode bounded slices even if a caller supplies one huge chunk.
+          // Retain at most one permitted line, and only count any excess.
+          for (let cursor = offset; cursor < end; cursor += 64 * 1024) {
+            append(decoder.write(chunk.subarray(cursor, Math.min(cursor + 64 * 1024, end))));
+          }
+          if (newline >= 0) append(decoder.end());
+          if (observedBytes > limitBytes) {
+            report(newline >= 0 ? 'complete' : 'unterminated');
+            skipping = newline < 0;
+            reset();
+          } else if (newline >= 0) {
+            const line = parts.join('');
+            reset();
+            push(line);
+          }
+        }
+        if (newline < 0) return;
+        if (skipping) {
+          skipping = false;
+          reset();
+        }
+        offset = newline + 1;
       }
-      withinLimit(buffer, 'unterminated');
     },
     end() {
-      if (discarded) return;
-      buffer += decoder.end();
-      if (!withinLimit(buffer, 'unterminated')) return;
-      if (buffer.trim()) push(buffer);
-      buffer = '';
+      if (ended) return;
+      ended = true;
+      if (!skipping) {
+        append(decoder.end());
+        if (observedBytes > limitBytes) report('unterminated');
+        else {
+          const line = parts.join('');
+          if (line.trim()) push(line);
+        }
+      }
+      reset();
     },
   };
 }

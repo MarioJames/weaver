@@ -85,16 +85,26 @@ process.stdout.write(JSON.stringify({type:'agent_end'})+'\\n');
   t.diagnostic(JSON.stringify({ ...observed, records: observed.records.map(record => record.type === 'artifact' ? { ...record, content: `[${record.content.length} characters]` } : record.type === 'result' ? { type: record.type, summary: `[${record.summary.length} characters]` } : record) }));
 });
 
-test('an oversized unterminated vendor frame reports its exact budget and closes its owned scope', { timeout: 20_000 }, async t => {
-  const observed = await fixture(`process.stdout.write('x'.repeat(200000));setInterval(()=>{},1000);`);
+test('an oversized vendor frame is skipped and a later result is delivered without termination', { timeout: 20_000 }, async t => {
+  const observed = await fixture(`
+const {once} = require('node:events');
+async function emit(text) { if (!process.stdout.write(text)) await once(process.stdout, 'drain'); }
+(async () => {
+ await emit('x'.repeat(8 * 1024 * 1024 + 1));
+ await emit('\\n');
+ await emit(JSON.stringify({type:'message_end',message:{role:'assistant',stopReason:'stop',content:[{type:'text',text:'SURVIVED'}]}})+'\\n');
+ await emit(JSON.stringify({type:'agent_end'})+'\\n');
+})().catch(error => { console.error(error); process.exitCode = 1; });
+`);
   const diagnostics = JSON.stringify(observed.records);
   t.diagnostic(JSON.stringify(observed));
-  assert.equal(observed.evidence.terminal, 'truncated');
-  assert.notEqual(observed.code, 0);
-  assert.equal(observed.records.some(record => record.type === 'result'), false);
-  assert.match(diagnostics, /vendor protocol frame exceeded limit: phase=unterminated limitBytes=131072 observedBytes=\d+ observedVendorBytes=\d+ parsedFrames=0/);
-  assert.match(diagnostics, /local protocol terminal truncated/);
-  assert.doesNotMatch(diagnostics, /vendor terminal truncated/);
+  assert.equal(observed.evidence.terminal, 'success');
+  assert.equal(observed.code, 0);
+  assert.equal(observed.signal, null);
+  assert.ok(observed.records.some(record => record.type === 'result' && record.summary.includes('SURVIVED')));
+  assert.equal(observed.records.filter(record => record.type === 'log' && record.message.includes('vendor protocol frame exceeded limit')).length, 1);
+  assert.match(diagnostics, /vendor protocol frame exceeded limit: phase=(complete|unterminated) limitBytes=8388608 observedBytes=\d+/);
+  assert.doesNotMatch(diagnostics, /local protocol terminal truncated/);
 });
 
 test('zero/nonzero exit and final records keep their failure meaning after stream changes', { timeout: 20_000 }, async t => {

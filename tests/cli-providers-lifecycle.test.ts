@@ -194,33 +194,79 @@ test('missing launcher executable reports an error and closes without waiting fo
 });
 
 
-test('oversized complete frames split across chunks never reach the parser',t=>{
-  const pushed:number[]=[];const overflows:unknown[]=[];
-  const decoder=decodeLines(line=>pushed.push(Buffer.byteLength(line)),(...details:unknown[])=>overflows.push(details[0]));
-  decoder.write(Buffer.concat([Buffer.from('before\n'),Buffer.alloc(120*1024,97)]));
-  decoder.write(Buffer.concat([Buffer.alloc(60*1024,98),Buffer.from('\nafter\n')]));
-  decoder.write(Buffer.from('ignored\n'));decoder.end();
-  t.diagnostic(JSON.stringify({case:'split-complete',pushedBytes:pushed,overflows}));
-  assert.deepEqual(pushed,[6]);assert.deepEqual(overflows,[{phase:'complete',limitBytes:128*1024,observedBytes:180*1024}]);
+const LINE_LIMIT = 8 * 1024 * 1024;
+
+test('oversized complete frames are skipped and decoding resumes in the same chunk', () => {
+  const pushed: string[] = [];
+  const overflows: unknown[] = [];
+  const decoder = decodeLines(line => pushed.push(line), detail => overflows.push(detail));
+  decoder.write(Buffer.concat([Buffer.from('before\n'), Buffer.alloc(LINE_LIMIT + 1, 97), Buffer.from('\nafter\n')]));
+  decoder.write(Buffer.from('next\n'));
+  decoder.end();
+  assert.deepEqual(pushed, ['before', 'after', 'next']);
+  assert.deepEqual(overflows, [{ phase: 'complete', limitBytes: LINE_LIMIT, observedBytes: LINE_LIMIT + 1 }]);
 });
 
-for(const mode of ['unterminated','end-flush'] as const)test(`frame byte limit also applies to ${mode}`,t=>{
-    const pushed:number[]=[];const overflows:unknown[]=[];
-    const decoder=decodeLines(line=>pushed.push(Buffer.byteLength(line)),(...details:unknown[])=>overflows.push(details[0]));
-    decoder.write(mode==='unterminated'?Buffer.alloc(128*1024+1,97):Buffer.concat([Buffer.alloc(128*1024-2,97),Buffer.from([0xe2])]));
-    decoder.end();decoder.write(Buffer.from('ignored\n'));decoder.end();
-    t.diagnostic(JSON.stringify({case:mode,pushedBytes:pushed,overflows}));
-    assert.deepEqual(pushed,[]);assert.deepEqual(overflows,[{phase:'unterminated',limitBytes:128*1024,observedBytes:128*1024+1}]);
+test('oversized complete frames split across chunks preserve surrounding lines', () => {
+  const pushed: string[] = [];
+  const overflows: unknown[] = [];
+  const decoder = decodeLines(line => pushed.push(line), detail => overflows.push(detail));
+  decoder.write(Buffer.concat([Buffer.from('before\n'), Buffer.alloc(LINE_LIMIT - 10, 97)]));
+  decoder.write(Buffer.concat([Buffer.alloc(11, 98), Buffer.from('\nafter\n')]));
+  decoder.end();
+  assert.deepEqual(pushed, ['before', 'after']);
+  assert.deepEqual(overflows, [{ phase: 'complete', limitBytes: LINE_LIMIT, observedBytes: LINE_LIMIT + 1 }]);
 });
 
-test('exact byte-limit UTF-8 frames are accepted when split inside a multibyte character',t=>{
-  for(const terminated of [true,false]){
-    const line=Buffer.from('汉'.repeat(Math.floor(128*1024/3))+'aa');
-    assert.equal(line.length,128*1024);
-    const pushed:number[]=[];const overflows:unknown[]=[];
-    const decoder=decodeLines(value=>pushed.push(Buffer.byteLength(value)),(...details:unknown[])=>overflows.push(details[0]));
-    decoder.write(line.subarray(0,1));decoder.write(line.subarray(1));if(terminated)decoder.write(Buffer.from('\n'));decoder.end();
-    t.diagnostic(JSON.stringify({case:'exact-utf8',terminated,pushedBytes:pushed,overflows}));
-    assert.deepEqual(pushed,[128*1024]);assert.deepEqual(overflows,[]);
+test('oversized unterminated frames drop later chunks until newline, then resume once', () => {
+  const pushed: string[] = [];
+  const overflows: unknown[] = [];
+  const decoder = decodeLines(line => pushed.push(line), detail => overflows.push(detail));
+  decoder.write(Buffer.from('before\n'));
+  decoder.write(Buffer.alloc(LINE_LIMIT, 97));
+  assert.deepEqual(overflows, []);
+  decoder.write(Buffer.from('x'));
+  assert.deepEqual(overflows, [{ phase: 'unterminated', limitBytes: LINE_LIMIT, observedBytes: LINE_LIMIT + 1 }]);
+  for (let i = 0; i < 16; i++) decoder.write(Buffer.alloc(1024 * 1024, 98));
+  decoder.write(Buffer.from('discarded\nafter\n'));
+  decoder.write(Buffer.from('tail'));
+  decoder.end();
+  assert.deepEqual(pushed, ['before', 'after', 'tail']);
+  assert.equal(overflows.length, 1);
+});
+
+test('oversized end-flush replacement is reported once without delivering the line', () => {
+  const pushed: number[] = [];
+  const overflows: unknown[] = [];
+  const decoder = decodeLines(line => pushed.push(Buffer.byteLength(line)), detail => overflows.push(detail));
+  decoder.write(Buffer.concat([Buffer.alloc(LINE_LIMIT - 2, 97), Buffer.from([0xe2])]));
+  decoder.end();
+  assert.deepEqual(pushed, []);
+  assert.deepEqual(overflows, [{ phase: 'unterminated', limitBytes: LINE_LIMIT, observedBytes: LINE_LIMIT + 1 }]);
+});
+
+test('exact byte-limit UTF-8 frames are accepted when split inside a multibyte character', () => {
+  for (const terminated of [true, false]) {
+    const line = Buffer.from('汉'.repeat(Math.floor(LINE_LIMIT / 3)) + 'aa');
+    assert.equal(line.length, LINE_LIMIT);
+    const pushed: number[] = [];
+    const overflows: unknown[] = [];
+    const decoder = decodeLines(value => pushed.push(Buffer.byteLength(value)), detail => overflows.push(detail));
+    decoder.write(line.subarray(0, 1));
+    decoder.write(line.subarray(1));
+    if (terminated) decoder.write(Buffer.from('\n'));
+    decoder.end();
+    assert.deepEqual(pushed, [LINE_LIMIT]);
+    assert.deepEqual(overflows, []);
   }
+});
+
+test('each oversized line gets one diagnostic without suppressing later lines', () => {
+  const pushed: string[] = [];
+  const overflows: unknown[] = [];
+  const decoder = decodeLines(line => pushed.push(line), detail => overflows.push(detail));
+  decoder.write(Buffer.concat([Buffer.alloc(LINE_LIMIT + 1, 97), Buffer.from('\nkept\n'), Buffer.alloc(LINE_LIMIT + 1, 98), Buffer.from('\nlast\n')]));
+  decoder.end();
+  assert.deepEqual(pushed, ['kept', 'last']);
+  assert.equal(overflows.length, 2);
 });

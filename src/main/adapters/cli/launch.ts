@@ -114,7 +114,6 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
   readonly evidence: CliAgentEvidence;
   private scope: OwnedScope;
   private cancelled = false;
-  private truncated = false;
   private failed = false;
   private normalizer: ReturnType<typeof createNormalizer>;
   private lines: ReturnType<typeof decodeLines>;
@@ -129,10 +128,9 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
     this.normalizer = createNormalizer(prepared.engine);
     this.stderrBuffer = createRedactedLineBuffer(text => this.writeStderrText(text));
     this.lines = decodeLines(line => {
-      if (this.truncated) return;
       this.vendorFrames = Math.min(Number.MAX_SAFE_INTEGER, this.vendorFrames + 1);
       this.emitRecords(this.normalizer.push(line));
-    }, detail => this.markTruncated(detail));
+    }, detail => this.logOversizedLine(detail));
     const env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
     this.scope = startOwnedScope({ command: prepared.argv, cwd: prepared.workspace, env, stdin: prepared.stdin, unit: prepared.unit });
@@ -143,7 +141,6 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
       { type: 'progress', percent: 10, message: 'owned scope started' },
     ]);
     this.scope.stdout.on('data', (chunk: Buffer) => {
-      if (this.truncated) return;
       // Transport volume includes ignored vendor token snapshots. Only frame
       // size and retained normalized evidence are budgets; this is telemetry.
       this.vendorBytes = Math.min(Number.MAX_SAFE_INTEGER, this.vendorBytes + chunk.length);
@@ -158,11 +155,8 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
     this.cancelled = true;
     return this.scope.kill(signal);
   }
-  private markTruncated(detail: LineOverflow): void {
-    if (this.truncated) return;
-    this.truncated = true;
+  private logOversizedLine(detail: LineOverflow): void {
     this.emitRecords([{ type: 'log', message: `vendor protocol frame exceeded limit: phase=${detail.phase} limitBytes=${detail.limitBytes} observedBytes=${detail.observedBytes} observedVendorBytes=${this.vendorBytes} parsedFrames=${this.vendorFrames}` }]);
-    this.scope.kill('SIGTERM');
   }
   private writeStderrText(text: string): void {
     if (this.stderrBytes >= STDERR_CAP) return;
@@ -182,7 +176,7 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
     if (this.evidence.terminal !== 'pending') return;
     this.lines.end();
     this.stderrBuffer.flush();
-    const finished = this.normalizer.finish({ exitCode: this.failed ? 1 : code, cancelled: this.cancelled && !this.truncated, truncated: this.truncated });
+    const finished = this.normalizer.finish({ exitCode: this.failed ? 1 : code, cancelled: this.cancelled, truncated: false });
     this.evidence.vendorSessionId = finished.evidence.vendorSessionId;
     this.evidence.vendorModel = finished.evidence.vendorModel;
     this.evidence.usage = finished.evidence.usage;
@@ -190,7 +184,7 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
     this.emitRecords(finished.records);
     this.stdout.end();
     this.stderr.end();
-    const signal = this.cancelled || this.truncated ? 'SIGTERM' as const : null;
+    const signal = this.cancelled ? 'SIGTERM' as const : null;
     this.emit('close', this.evidence.terminal === 'success' ? 0 : code === 0 || code === null ? 1 : code, signal);
   }
 }
