@@ -5,12 +5,18 @@
 | Field | Meaning for you |
 |---|---|
 | `owners.<id>.engine` | The owner profile for your host is the enabled owner on that engine (`claude`, `codex`, ...); Weaver allows at most one enabled owner per engine. |
-| `owners.<id>.workers` / `worker_weights` | Weaver balances dispatch by weight: it picks the available worker with the lowest (running tasks + 1) / weight, so idle work goes to the highest weight and concurrent work spreads in proportion to the weights. Missing weight means 100; weight `0` means never dispatched, and an explicitly named worker cannot bypass it. You do not pick workers; omit `worker` when dispatching. |
-| `owners.<id>.max_parallel` | Running packages this owner may hold at once; more are queued with `scheduled: true`. `<id>` is the policy *profile*; each agent session registers its own owner *instance* under it with `owners attach` and dispatches by `ownerId` ([handoff](handoff.md)). |
+| `owners.<id>.workers` / `worker_weights` | Weaver balances dispatch by weight: it picks the available worker with the lowest `(running + cancelling + 1) / weight`, counting each worker across all owners; ties go to higher weight, then policy list order. Idle work goes to the highest weight and concurrent work spreads in proportion to the weights. Missing weight means 100; weight `0` means never dispatched, and an explicitly named worker cannot bypass it. You do not pick workers; omit `worker` when dispatching. |
+| `owners.<id>.max_parallel` | Running/cancelling packages each owner **instance** may hold at once; more are queued with `scheduled: true`. `<id>` is the policy *profile*; each agent session registers its own owner *instance* under it with `owners attach` (durable identity: `profileId` + `name` + `session`) and dispatches by `ownerId`; the profile is not a shared capacity cap ([handoff](handoff.md)). |
 | `herdr.max_wait_minutes` | (1–1440) The longest interval between two checks on a worker: wait only with `weaver tasks wait`, which returns as soon as the task ends. Weaver never stops a worker on it. |
 | `workers.<id>` | `engine`, `model`, `effort`, `enabled`, and a `description` of what the worker is good at. A worker on your own engine runs natively. |
-| `blocks` | Active pauses, manual or quota. A blocked engine or worker is skipped; `policy preview` names the reason and release time. |
+| `blocks` | Active manual, quota or stall pauses. A matching engine/model block skips the worker; `policy preview` names the reason and any release time. Stall blocks have no time-based expiry; see below. |
 | `chatgpt_review` | `true`: apply the gates in [convorel](convorel.md). `false`: skip ChatGPT Pro review; local review and tests still apply. |
+
+## Stall penalties
+
+`weaver tasks health --task-id <id>` uses silence and owned-scope CPU activity: `stalled` requires both silence and continuous CPU-idle for at least 5 minutes; missing CPU evidence never proves a stall. At least two stalled workers on the same engine trigger its penalty. Level 1 probes after 5 minutes, level 2 after 10; one successful probe lifts either. Level 3 probes every 10 minutes and needs three consecutive successes or the user. These are probe times, not block expiry times; automatic recovery removes only its own stall block.
+
+`weaver engines health` returns summaries without history; `weaver engines penalty --engine <id>` includes retained history. `weaver engines unblock --engine <id> --command-id <stable-id>` manually clears **all** blocks on that exact engine, including manual, quota, model and stall, and resets the penalty while retaining history. This is the user's call; an owner must not do it unless the user asked.
 
 ## Preview a route before dispatch
 

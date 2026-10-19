@@ -6,9 +6,9 @@
 
 [品牌素材与使用规范](docs/assets/brand/README.md)
 
-Weaver is a local Node control plane for owner-led agent work. It ships as one public skill (`skills/agents-weaver`, skill name `agents-weaver`), one `weaver` CLI, and one Weaver service — running in the background with `weaver server start`, or in the foreground as `weaver web` for development and debugging. The browser UI and the CLI call the same `CommandHandler`: the web serves loopback HTTP on `127.0.0.1`, the CLI connects through an authenticated Unix-socket transport, and both speak `weaver.v1`. There is no second daemon — the service is that one process — no separate owner-model process, no MCP service, no remote API, and no database: state is a versioned JSON store owned by the running service.
+Weaver is a local Node control plane for owner-led agent work. It ships as one public skill (`skills/agents-weaver`, skill name `agents-weaver`), one `weaver` CLI, and one Weaver service — running in the background with `weaver server start`, or in the foreground as `weaver web` for development and debugging. The browser UI and the CLI call the same `CommandHandler`: the web serves loopback HTTP on `127.0.0.1`, the CLI connects through an authenticated Unix-socket transport, and both speak `weaver.v1`. There is no second daemon — the service is that one process — no MCP service, no remote API, and no database: state is a versioned JSON store owned by the running service.
 
-The owner is the real agent that hosts the skill. It registers logical ownership in Weaver through the CLI and dispatches workers from there; Weaver never spawns an owner model itself. Saved routes launch real OpenCode, Pi, Grok, Codex, and Qoder (`qodercli`) launchers through fixed argument adapters. `mock-jsonl` runs only when explicitly requested. A failed or unloaded real engine fails the dispatch; it never falls back to mock, Claude Code, or another engine. Claude Code real execution is deferred. Engine scan checks `PATH` and `--version` only.
+The owner is the real agent that hosts the skill. It registers logical ownership in Weaver through the CLI and dispatches workers from there. Registration is metadata only; explicitly requesting `owners switch` with `launch:true`, or `owners launch`, makes Weaver prepare the continuation prompt, start the new owner in Herdr and deliver that prompt (Claude Code and Codex hosts). These commands return the final launch result; a failed launch leaves the ownership switch in place. Saved routes launch real OpenCode, Pi, Grok, Codex, and Qoder (`qodercli`) launchers through fixed argument adapters. `mock-jsonl` runs only when explicitly requested. A failed or unloaded real engine fails the dispatch; real execution never falls back to mock. An explicit `tasks retry` can dispatch a continuation on another eligible engine. Claude Code real execution is deferred. Engine scan checks `PATH` and `--version` only.
 
 ## Install
 
@@ -95,10 +95,13 @@ It is the same single writer and supervisor: it binds `127.0.0.1` only (default 
 The skill instructs the owner to use Weaver CLI for capability inspection, routing, bounded packages, dispatch, and result verification; workers never delegate. Before any dispatch the owner checks existing state with the CLI:
 
 ```sh
-weaver capabilities           # command catalog, limits, realExecution
+weaver --help --output json    # complete command catalog and exact inputs
+weaver capabilities           # process capabilities, limits, realExecution
 weaver engines scan           # PATH + --version probe of the fixed engine catalog
 weaver policy get             # saved owners, workers, weights, blocks, revision
 weaver quota get              # 只读内存中的 Codex / Claude Code / Grok 额度，不联网
+weaver engines health         # stall penalty summaries; no history
+weaver engines penalty --engine <id>  # retained history for one engine
 ```
 
 `capabilities.realExecution` means the real launcher module is loaded, not that a model ran or a login was proven. Engine scan proves an installed executable and version only; enabling an engine (`engines set-enabled`) still requires the probe and never creates a worker or owner role. Worker, model, and effort configuration is separate policy work, and real dispatch additionally requires an existing absolute workspace.
@@ -123,13 +126,16 @@ weaver tasks create --input task.json --command-id create-0731
 weaver packages create --task-id <taskId> --input package.json --command-id package-0731
 
 # 4. Dispatch: Weaver picks the worker by balancing weights against the
-#    running load. Omit `worker`; an explicit one is accepted.
+#    global running + cancelling load. Omit `worker`; follow returned `next`.
 weaver workers spawn --task-id <taskId> --input dispatch.json --command-id dispatch-0731
 
-# 5. Wait returns as soon as the task ends; without `--for` one call
-#    waits min(600 s, herdr.max_wait_minutes) at most. Exiting wait or
-#    watch never cancels the task.
-weaver tasks wait --task-id <taskId> --for 120
+# 5. For a wait action, check first events within 1–2 minutes of spawn.
+weaver tasks wait --task-id <taskId> --for 60
+weaver tasks events --task-id <taskId>
+# No worker output yet is suspect: inspect health before deciding it is stuck.
+weaver tasks health --task-id <taskId>
+# Then keep waiting at the default interval. Exiting wait/watch never cancels.
+weaver tasks wait --task-id <taskId>
 ```
 
 ```json
@@ -159,18 +165,18 @@ dispatch.json
 {}
 ```
 
-`workers spawn` returns the frozen dispatch (owner, worker, engine, model, effort, execution, max_parallel bounds, max wait, workspace) and either starts the worker or queues it when the owner is at its `max_parallel`. When the worker runs on the owner's own engine the dispatch is `execution: "native"`: Weaver launches nothing, the task holds an owner slot, and the owner runs the package with its built-in subagent tool, then reports with `weaver workers complete`. Queued work freezes the chosen route: it is never silently reselected or moved to another engine. `--input -` reads JSON from stdin; a full `{apiVersion:"weaver.v1",commandId,command,args}` envelope is accepted the same way.
+`workers spawn` returns the frozen dispatch and a `next` action: real execution or queued work gives a wait command; native execution gives `run_subagent` with model, effort, the full prompt and the completion command (`then`). The owner follows `next`. For native work Weaver launches nothing: the task holds an owner slot while the owner uses its built-in subagent tool, then reports with `weaver workers complete` and a stable `--command-id`. Work queues when that owner instance reaches its profile's `max_parallel`; the chosen route stays frozen. After waiting on queued work, read `tasks get` again: a now-running native task returns its `next` there too, so a lost spawn response is recoverable. `--input -` reads JSON from stdin; a full `{apiVersion:"weaver.v1",commandId,command,args}` envelope is accepted the same way.
 
 If a mutation reply is lost, do not retry with a new ID: `weaver operations get --command-id <id>` reads the durable receipt for the same command ID. Unknown commands are rejected before any dispatch; a command executed but not acknowledged returns `COMMAND_INDETERMINATE` and requires inspecting state, not blind replay.
 
 ## Configure: weights
 
-Policy is one validated document saved atomically with a revision check. It holds enabled engines, owners (`workers` list, `worker_weights`, `max_parallel`), workers (engine, model, effort, description), and quota `blocks`.
+Policy is one validated document saved atomically with a revision check. It holds enabled engines, owners (`workers` list, `worker_weights`, `max_parallel`), workers (engine, model, effort, description), and manual, quota and stall `blocks`.
 
-- Dispatch balances load by weight: Weaver picks the available worker with the lowest (running tasks + 1) / weight, counting running tasks per worker across all owners. Idle work goes to the highest weight; concurrent work spreads in proportion to the weights (100 and 50 split about 2:1). Ties go to the higher weight, then the owner's `workers` order. Weights are integers 0..1000, default 100. Weight `0` excludes the worker, and an explicitly named worker cannot bypass weight 0.
+- Dispatch balances load by weight: Weaver picks the available worker with the lowest `(running + cancelling + 1) / weight`, counting tasks per worker across all owners. Idle work goes to the highest weight; concurrent work spreads in proportion to the weights (100 and 50 split about 2:1). Ties go to the higher weight, then the owner's `workers` order. Weights are integers 0..1000, default 100. Weight `0` excludes the worker, and an explicitly named worker cannot bypass weight 0.
 - A disabled worker, a disabled engine, or an active block on the engine/model skips that worker. Pause an engine from its card on the Engines page; exhausted quota adds and removes its own block.
-- Concurrency is per owner: `max_parallel`. The reported total is the sum of enabled owners, not a separate global limit. Lowering `max_parallel` leaves running tasks alone.
-- `herdr.max_wait_minutes` (1-1440) is the longest interval between two checks on a worker: wait only with `weaver tasks wait --task-id` — it returns as soon as the task ends, and without `--for` one call waits min(600 s, `herdr.max_wait_minutes`) at most. Never sleep or set a longer timer instead. Weaver never stops a worker by time; when a worker is stuck or off track the owner decides to keep waiting, cancel it, or take the package back.
+- Concurrency is per owner **instance**: each instance has its profile's `max_parallel` slots. `owners attach` identifies an instance by `profileId` + `name` + `session`; multiple sessions on one profile have independent capacity. The reported total is the sum of enabled profile limits, a scale hint rather than a global capacity cap. Lowering `max_parallel` leaves running tasks alone.
+- `herdr.max_wait_minutes` (1-1440) is the longest interval between two checks on a worker: wait only with `weaver tasks wait --task-id` — it returns as soon as the task ends, and without `--for` one call waits min(600 s, `herdr.max_wait_minutes` × 60) at most (30 s if policy is unreadable). Never sleep or set a longer timer instead. Weaver never stops a worker by time; inspect `tasks health` before deciding whether to keep waiting, cancel, or retry.
 
 ```sh
 weaver policy validate --input config.json   # config.json is the config document itself
@@ -197,7 +203,7 @@ printf '{"engine":"claude"}\n' | weaver quota refresh --input - --output json
 weaver quota refresh --help --output json
 ```
 
-两条命令都支持 `json`、`jsonl`、`text`；刷新缺省探测全部三家，输入只接受可选的 `engine: codex|claude|grok`，不接受 command/task ID。当前机器目录共 38 条命令（28 个逻辑命令、8 个 RPC 动词、2 个本地等待动词），可用 `weaver --help --output json` 读取完整目录与参数；`capabilities.quota` 提供发现入口。
+两条命令都支持 `json`、`jsonl`、`text`；刷新缺省探测全部三家，输入只接受可选的 `engine: codex|claude|grok`，不接受 command/task ID。可用 `weaver --help --output json` 读取完整目录与参数；`capabilities.quota` 提供发现入口。
 
 成功观测在内存中保鲜 5 分钟，每家网络请求至少间隔 60 秒，并遵守接口的 `Retry-After`。没有后台轮询或强制绕过。只有新鲜、明确的账户耗尽会增加自有阻断，只有新鲜 `available` 会解除自有阻断；未知、失败或过期观测保留旧阻断。人工和其他来源的阻断保持原样；已过期的人工引擎阻断妨碍自动阻断时，刷新返回 `QUOTA_POLICY_CONFLICT`（HTTP 409），整次策略合并不落盘。
 
@@ -215,7 +221,7 @@ weaver results ack --task-id <taskId> --input ack.json --command-id ack-0731    
 weaver reviews submit --task-id <taskId> --input review.json --command-id review-0731
 ```
 
-`results.ack` and `reviews.submit` must reference the current `manifestDigest` and expected task revision; stale digests are rejected. For manual owners `results.deliver` is unavailable by design: there is no push channel, the owner pulls. A rejected review does not rerun silently: `tasks retry` creates a new task linked to the previous one via `retryOf`, reusing owner binding.
+`results.ack` and `reviews.submit` must reference the current `manifestDigest` and expected task revision; stale digests are rejected. For manual owners `results.deliver` is unavailable by design: there is no push channel, the owner pulls. A rejected review does not rerun silently: use the explicit retry command below.
 
 ```text
 ack:    { "expectedRevision": <read the current revision from tasks results / tasks get>,
@@ -225,6 +231,22 @@ review: { "expectedRevision": <read the current revision again after ack; ack it
 ```
 
 A revision copied from the pre-ack step is already stale for the review and returns `REVISION_CONFLICT`; read it fresh before each submission.
+
+## Health and continuation retries
+
+`weaver tasks health --task-id <id>` reports `working`, `waiting_model` or `stalled`, with silence time and CPU activity from the worker's own scope. A stall requires both silence and continuous CPU-idle for 5 minutes; missing CPU evidence never proves a stall. Check health before declaring a worker stuck.
+
+```sh
+weaver tasks retry --task-id <id> --command-id retry-0731
+# For an in-flight attempt, add --cancel to abandon it after preflight.
+weaver tasks retry --task-id <id> --cancel --command-id retry-0732
+```
+
+Retry is one step: preflight, optional cancellation, a linked task and cloned frozen package with a continuation note, then dispatch and `next`. It keeps the owner binding, workspace, constraints, scope and acceptance criteria. Follow `next`; no second spawn is needed. Engines from failed/cancelled/cancelling attempts in that retry chain are excluded; completed engines remain eligible. With no eligible alternative, `NO_ALTERNATIVE_ENGINE` is returned before cancelling or creating anything. Real retries never fall back to mock.
+
+At least two workers on one engine silent and CPU-idle for 5 minutes trigger a stall penalty, pausing new dispatch to that engine without cancelling its workers. Penalties do not expire with time: level 1 probes after 5 minutes, level 2 after 10, and one successful recovery probe lifts either. Level 3 probes every 10 minutes and requires three consecutive successes or user intervention. Automatic recovery removes only its own stall block.
+
+`weaver engines health` summarizes penalties without history; `weaver engines penalty --engine <id>` includes retained history. `weaver engines unblock --engine <id> --command-id <id>` is a manual full unblock: it clears all manual, quota, model and stall blocks on that exact engine and resets its penalty, retaining history. This is the user's call; owners use it only when the user has asked.
 
 ## Data and process boundary
 

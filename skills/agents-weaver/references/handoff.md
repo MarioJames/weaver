@@ -81,6 +81,6 @@ Only a running native task accepts one report; cancelling ends the task without 
 
 ## Continuation pointer
 
-`weaver owners continuation get --task-id <id>` returns the manual context pack (`acknowledgementId` is `null`: you arrange any real context switch in your CLI host). `weaver owners continuation configure --task-id <id> --input cfg.json` sets or clears idle rotation (`{"expectedRevision":2,"idleRotationMinutes":90}`, `null` disables, 1–10080); `weaver owners switch` hands ownership over. See each command's help for current fields.
+`weaver owners continuation get --task-id <id>` returns the manual context pack and handoff prompt (`acknowledgementId` is `null`, not a host confirmation). `weaver owners continuation configure --task-id <id> --input cfg.json` sets or clears idle rotation (`{"expectedRevision":2,"idleRotationMinutes":90}`, `null` disables, 1–10080); `weaver owners switch` hands ownership over. With `launch:true`, it also starts the new owner in Herdr and delivers the continuation prompt; `weaver owners launch` uses the existing context pack to retry that host launch without switching again. Both return the final launch result; a failed launch does not roll back the switch. See each command's help for current fields.
 
 No credential or executable argv belongs in any request. A host session reference belongs only in the owner attach registration above, where it is stored as an unverified label — never in task input, scope or artifacts. The task workspace is the authorized project, not Weaver's private state directory.

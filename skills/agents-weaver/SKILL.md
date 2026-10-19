@@ -44,25 +44,29 @@ Read IDs, revisions and digests from the JSON responses instead of predicting th
 
 1. `weaver tasks create --input task.json --command-id <stable-id>` — `ownerId` from preflight, goal, absolute workspace, constraints, acceptance criteria ([shapes](references/handoff.md)).
 2. `weaver packages create --task-id <id> --input package.json --command-id <stable-id>` — freezes the exact read/write scope.
-3. `weaver workers spawn --input dispatch.json --command-id <stable-id>` — inspect the returned frozen worker/engine/model/effort before trusting it.
-4. `weaver tasks wait --task-id <id>` — the only way to wait; see the next section.
+3. `weaver workers spawn --task-id <id> --input dispatch.json --command-id <stable-id>` — follow the returned `next` action.
+4. For a wait action, check first events within 1–2 minutes, then `weaver tasks wait --task-id <id>` at its default interval; see below.
 5. `weaver tasks results --task-id <id>` and `weaver artifacts read --task-id <id> --input read.json` — then read the real changed files and run the checks yourself; a worker's success text is evidence, not proof.
 6. `weaver results ack --task-id <id> --input ack.json --command-id <stable-id>` — records receipt only.
 7. `weaver reviews submit --task-id <id> --input review.json --command-id <stable-id>` — your `accepted`/`rejected` decision after independent review.
 
-In the spawn response: `execution: "real"` means Weaver launched the worker process; `execution: "native"` means nothing was launched — run the package with your built-in subagent tool at the frozen model/effort, then report with `weaver workers complete`; `scheduled: true` means queued for capacity or policy (`queueReason` explains) — never create duplicate attempts.
+`workers spawn` and `tasks retry` return `next`: real or queued work gives a wait command; native gives `run_subagent` with model, effort, the full prompt and a completion command (`then`). For `run_subagent`, use your built-in subagent tool, then report with `weaver workers complete` using a stable command ID ([report](references/handoff.md#native-execution-report)). Queued routes stay frozen; after a wait, `weaver tasks get --task-id <id>` recovers `next` for a now-running native dispatch. Never create duplicate attempts.
 
 A package must be finishable by a worker with no conversation context: goal, absolute workspace, exact read/write scope, constraints (no delegation, no commits, the task scratch root), acceptance checks you can verify, and expected artifacts. Split independent problems into separate packages; never give two writers the same file.
 
 ## Waiting rule
 
-`herdr.max_wait_minutes` is the longest interval between two checks on a worker. Wait only with `weaver tasks wait --task-id <id>`: it returns as soon as the task ends, and without `--for` one call waits min(600 s, max_wait_minutes) before returning the current snapshot. Claude Code may run it in the background and act on the notification. Never sleep or set a longer timer instead.
+For a wait action after spawn, use `weaver tasks wait --task-id <id> --for 60` and check `weaver tasks events --task-id <id>` within 1–2 minutes. No worker output by then is suspect: inspect `weaver tasks health --task-id <id>` before deciding it is stuck. Then keep waiting with `weaver tasks wait --task-id <id>` at its default interval: it returns on completion or after min(600 s, `herdr.max_wait_minutes` × 60), or 30 s if policy is unreadable. This setting is the longest interval between checks; never sleep or set a longer timer instead. Claude Code may run wait in the background and act on its notification.
 
-After each return, look at the task status and `weaver tasks events`. Weaver never stops a worker by time; if it is stuck or off track, you decide: run `weaver tasks cancel`, then continue from partial output or re-dispatch, and say why.
+After each return, inspect status and events. `tasks health` reports `working` / `waiting_model` / `stalled`, silence and CPU activity; unreadable CPU never proves a stall. Weaver never stops workers by time. Decide from that evidence whether to keep waiting, cancel, or retry, and say why.
 
 ## Failures and retries
 
-A failed real worker never falls back to another engine; read the failure, fix the package, or do the work yourself — and record which. Mutations carry stable `--command-id`s; after an uncertain response, inspect `weaver operations get --command-id <same-id>` before anything else. Never retry blindly with a new ID.
+`weaver tasks retry --task-id <id> [--cancel] --command-id <stable-id>` is one step: after preflight, optionally cancel an in-flight attempt, clone its frozen package with a continuation note, dispatch and return `next`. Omit `--cancel` for a terminal task. Follow `next`; do not spawn again. The retry chain excludes failed/cancelled/cancelling engines; completed engines remain eligible. `NO_ALTERNATIVE_ENGINE` leaves the original unchanged when none remain. Real never falls back to mock.
+
+`weaver engines health` summarizes penalties; `weaver engines penalty --engine <id>` includes history. At least two workers on one engine silent **and CPU-idle** for 5 minutes pause it. Penalties do not expire: levels 1/2 require one successful recovery probe; level 3 requires three consecutive successes or the user. `weaver engines unblock --engine <id> --command-id <stable-id>` clears **all** blocks on that engine (manual, quota, model and stall) and resets its penalty; this is the user's call, never yours unless requested.
+
+Mutations carry stable `--command-id`s; after an uncertain response, inspect `weaver operations get --command-id <same-id>` before anything else. Never retry blindly with a new ID.
 
 ## Report
 
