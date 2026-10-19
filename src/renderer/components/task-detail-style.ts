@@ -1,6 +1,33 @@
 import { createStaticStyles } from 'antd-style';
 
 export const styles = createStaticStyles(({ css, cssVar }) => ({
+  header: css`
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: ${cssVar.marginSM};
+  `,
+  heading: css`
+    display: flex;
+    flex-direction: column;
+    gap: ${cssVar.marginXS};
+    min-inline-size: 0;
+    flex: 1;
+  `,
+  actions: css`
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    align-items: flex-end;
+    gap: ${cssVar.marginXS};
+    button { font: inherit; }
+  `,
+  markdown: css`
+    min-inline-size: 0;
+    padding: ${cssVar.padding};
+    overflow-wrap: anywhere;
+  `,
   tabs: css`
     min-inline-size: 0;
     inline-size: 100%;
@@ -9,6 +36,7 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     overflow-x: auto;
     max-inline-size: 100%;
     flex-wrap: nowrap;
+    button { flex-shrink: 0; font: inherit; }
   `,
   panel: css`
     min-inline-size: 0;

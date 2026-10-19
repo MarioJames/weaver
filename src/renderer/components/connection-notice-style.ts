@@ -12,5 +12,6 @@ export const connectionStyles = createStaticStyles(({ css, cssVar }) => ({
     flex-direction: column;
     gap: 4px;
     min-inline-size: 0;
+    white-space: nowrap;
   `,
 }));

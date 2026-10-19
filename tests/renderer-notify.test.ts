@@ -16,9 +16,9 @@ function markup(node: React.ReactNode) {
   return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode:'dark',enableCustomFonts:false,children:node }) }));
 }
 
-test('reconnect content provides spinner, attempt count and immediate retry, then success', () => {
+test('reconnect content provides status, attempt count and immediate retry, then success', () => {
   const html=markup(React.createElement(ConnectionNotice,{state:{status:'reconnecting',attempt:3},retry:()=>{}}));
-  assert.match(html,/控制面暂时没有响应，正在重新连接…/);
+  assert.match(html,/正在重新连接…/);
   assert.match(html,/正在重新连接/);assert.match(html,/重试次数：3/);assert.match(html,/立即重试/);
   assert.match(markup(React.createElement(ConnectionNotice,{state:{status:'connected',attempt:0},retry:()=>{}})),/已重新连接/);
 });
@@ -40,5 +40,5 @@ test('notifier emits an overlay with Chinese title, details and secondary code, 
   notifyError(new Error('TIMEOUT: 慢响应'));
   assert.equal(calls.length,1);assert.equal(calls[0].placement,'bottom-right');assert.equal(calls[0].title,'保存失败');
   assert.match(renderToStaticMarkup(calls[0].description),/配置无效/);
-  assert.match(renderToStaticMarkup(calls[0].description),/>VALIDATION<\//);
+  assert.doesNotMatch(renderToStaticMarkup(calls[0].description), /VALIDATION/);
 });

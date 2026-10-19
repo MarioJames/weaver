@@ -1,6 +1,7 @@
+import { formatDate } from '../log-view';
 import { notifyError, useNotifyError } from '../notify';
 import { NamedSelect, NamedSwitch, NamedInputNumber } from '../components/NamedControls';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Plus, Trash2, Zap } from 'lucide-react';
 import { Empty } from '@lobehub/ui';
 import { Surface } from '@lobehub/ui/dashboard';
@@ -15,10 +16,10 @@ import { PolicyHeader } from '../components/PolicyHeader';
 import type { PolicyDraft } from '../usePolicyDraft';
 import { styles } from '../style';
 
-const NAMES: Record<RoleSection, string> = { owners: '负责人', workers: '工作代理' };
+const NAMES: Record<RoleSection, string> = { owners: '父 Agent', workers: '子 Agent' };
 const DESCRIPTIONS: Record<RoleSection, string> = {
-  owners: '负责人接收任务并派发给工作代理。每个引擎最多启用一个负责人。',
-  workers: '工作代理执行负责人派发的任务包。',
+  owners: '父 Agent接收任务并派发给子 Agent。每个引擎最多启用一个父 Agent。',
+  workers: '子 Agent执行父 Agent派发的任务包。',
 };
 
 /** What the saved policy lets dispatch do with this role right now. */
@@ -27,7 +28,7 @@ export function availabilityText(availability: Availability | undefined): string
   if (availability.status === 'available') return '可派发';
   if (availability.status === 'disabled') return '已停用';
   if (availability.status === 'engine_disabled') return `引擎未启用`;
-  return `已限制：${availability.reason ?? '未说明原因'}${availability.release_at ? `，${new Date(availability.release_at).toLocaleString()} 恢复` : ''}`;
+  return `已限制：${availability.reason ?? '未说明原因'}${availability.release_at ? `，${formatDate(availability.release_at)} 恢复` : ''}`;
 }
 
 /** The one line a list item needs beyond its switch: only states the switch does not already show. */
@@ -39,6 +40,8 @@ export function roleNote(availability: Availability | undefined, unsaved: boolea
 }
 
 export function RolesPage({ section, policy }: { section: RoleSection; policy: PolicyDraft }) {
+  const editor = useRef<HTMLDivElement>(null);
+  const scrollToEditor = () => { if (window.matchMedia('(max-width: 768px)').matches) requestAnimationFrame(() => editor.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })); };
   const config = policy.config;
   const ids = Object.keys(config?.[section] ?? {});
   const [selected, setSelected] = useState('');
@@ -66,12 +69,13 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
     if (!config) return;
     const id = uniqueId(section, config);
     policy.setConfig({ ...config, [section]: { ...config[section], [id]: section === 'owners' ? blankOwner(config) : blankWorker(config) } });
-    setSelected(id); setPendingId(id);
+    setSelected(id); setPendingId(id); scrollToEditor();
   }
   function update(next: Owner | Worker) { if (!current) return; policy.setConfig({ ...config!, [section]: { ...config![section], [current]: next } }); }
   function acceptId() {
     const error = roleIdError(section, pendingId, config!, current);
     setIdError(error);
+    if (error) notifyError(error, '配置 ID 有误');
     if (error || !current || pendingId === current) return;
     policy.setConfig(renameRole(config!, section, current, pendingId));
     setSelected(pendingId);
@@ -92,13 +96,11 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
         {!ids.length && <Text type="secondary" className={styles.meta}>还没有{name}。</Text>}
         {ids.map(id => {
           const item = config[section][id]!;
-          const saved = policy.snapshot?.config[section][id];
-          const unsaved = !saved || JSON.stringify(saved) !== JSON.stringify(item);
           const engineOn = config.engines[item.engine]?.enabled === true;
-          const note = roleNote(policy.snapshot?.[section][id], unsaved);
+          const note = roleNote(policy.snapshot?.[section][id], false);
           return <div key={id} className={styles.roleItem} aria-current={id === current ? 'true' : undefined}>
             <NamedSwitch size="small" aria-label={`启用 ${id}`} checked={item.enabled} loading={toggling === id} disabled={!engineOn || !!toggling} title={engineOn ? undefined : `引擎 ${item.engine || '未选择'} 未启用，先在引擎页打开它`} onChange={checked => void toggle(id, checked)} />
-            <button type="button" className={styles.roleButton} onClick={() => { acceptId(); setSelected(id); setPendingId(id); setIdError(''); }}>
+            <button type="button" className={styles.roleButton} style={{ font: 'inherit' }} onClick={() => { acceptId(); setSelected(id); setPendingId(id); setIdError(''); scrollToEditor(); }}>
               <strong className={styles.wrap}>{id}</strong>
               <span className={`${styles.wrap} ${styles.meta}`}>{item.engine} · {item.model || '未填模型'}</span>
               {note && <span className={`${styles.wrap} ${styles.meta} ${note.warning ? styles.warn : ''}`}>{note.text}</span>}
@@ -106,15 +108,15 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           </div>;
         })}
       </nav>
-      <Surface padded>
+      <div ref={editor} tabIndex={-1}><Surface padded>
         {!record || !current ? <Empty title={`还没有${name}`} description={`新建一个${name}，选择引擎和模型后保存。`} action={<Button icon={Plus} onClick={add}>新建{name}</Button>} /> : <Form form={form} layout="vertical" className={styles.stack}>
           <div className={styles.spread}>
-            <Text strong className={styles.wrap}>{current}</Text>
+            <Text strong>{name}配置</Text>
             <Button danger size="small" icon={Trash2} disabled={policy.busy} onClick={() => setAskDelete(true)}>删除</Button>
           </div>
           <div className={styles.pair}>
-          <Form.Field label="配置 ID" required desc={idError ? <span id={`${fieldId}-id-error`} role="alert" className={styles.error}>{idError}</span> : '改名后按 Enter 或离开输入框，引用处一起更新。'}>
-            <Input id={`${fieldId}-id`} aria-label="配置 ID" aria-invalid={!!idError} aria-describedby={idError ? `${fieldId}-id-error` : undefined} value={pendingId} placeholder={section === 'workers' ? '例如：research_worker' : '例如：codex_owner'} onChange={event => setPendingId(event.target.value)} onBlur={acceptId} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); acceptId(); } }} />
+          <Form.Field label="配置 ID" required desc="改名后按 Enter 或离开输入框，引用处一起更新。">
+            <Input id={`${fieldId}-id`} aria-label="配置 ID" aria-invalid={!!idError} value={pendingId} placeholder={section === 'workers' ? '例如：research_worker' : '例如：codex_owner'} onChange={event => setPendingId(event.target.value)} onBlur={acceptId} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); acceptId(); } }} />
           </Form.Field>
             <Form.Field label="所属引擎" required><NamedSelect id={`${fieldId}-engine`} aria-label="所属引擎" value={record.engine || undefined} options={Object.keys(config.engines).map(id => ({ value: id, label: `${id}${config.engines[id]?.enabled ? '' : '（未启用）'}` }))} onChange={value => { if (typeof value === 'string') update({ ...record, engine: value, enabled: config.engines[value]?.enabled ? record.enabled : false }); }} /></Form.Field>
           </div>
@@ -127,7 +129,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
             <Text>{impact.detail}</Text>
           </Modal>}
         </Form>}
-      </Surface>
+      </Surface></div>
     </div>
   </>;
 }
@@ -155,9 +157,9 @@ function HelloCheck({ id, record }: { id: string; record: Worker }) {
     <div className={styles.spread} style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
       <div className={styles.tight}>
         <Text strong>可用性</Text>
-        <Text type="secondary" className={styles.meta}>用当前填写的引擎、模型和推理强度发一句 hi，走最轻的调用：不带工具、MCP 和插件，不保存会话。会消耗极少额度。</Text>
+        <Text type="secondary" className={styles.meta}>用当前填写的引擎、模型和推理强度发送一条简短问候，检查能否正常回复。不调用工具，不保存会话，会消耗少量额度。</Text>
       </div>
-      <Button icon={Zap} loading={run?.running} disabled={!ready} onClick={() => void startHello(id, { engine: record.engine, model: record.model.trim(), effort: record.effort.trim() }, `${record.engine} · ${record.model.trim()} · ${record.effort.trim()}`)}>发送 say hi</Button>
+      <Button icon={Zap} loading={run?.running} disabled={!ready} onClick={() => void startHello(id, { engine: record.engine, model: record.model.trim(), effort: record.effort.trim() }, `${record.engine} · ${record.model.trim()} · ${record.effort.trim()}`)}>连通测试</Button>
     </div>
     {run?.running && <Text type="secondary" className={styles.meta} role="status">正在等待 {run.route.split(' · ')[0]} 回复… {elapsed} 秒</Text>}
     {run?.result && !run.running && <ReplyCard result={{ ...run.result, route: run.route }} />}
@@ -169,13 +171,13 @@ function ReplyCard({ result }: { result: HelloResult & { route: string } }) {
   useNotifyError(!result.ok ? result.error : '', '探测失败');
   if (!result.ok) return null;
   const seconds = result.durationMs ? `${(result.durationMs / 1000).toFixed(1)} 秒` : '';
-  return <article role="status" aria-label="say hi 结果" className={styles.replyCard} data-ok={result.ok ? 'true' : 'false'}>
+  return <article role="status" aria-label="连通测试结果" className={styles.replyCard} data-ok={result.ok ? 'true' : 'false'}>
     <header className={styles.spread} style={{ flexWrap: 'nowrap' }}>
       <span className={styles.row} style={{ flexWrap: 'nowrap', minInlineSize: 0 }}>
         <Tag size="small" color={result.ok ? 'success' : 'error'}>{result.ok ? '可用' : '不可用'}</Tag>
         <Text strong className={styles.wrap}>{result.route}</Text>
       </span>
-      <Text type="secondary" className={`${styles.meta} ${styles.numbers}`} style={{ whiteSpace: 'nowrap' }}>{[seconds, new Date(result.checkedAt).toLocaleTimeString()].filter(Boolean).join(' · ')}</Text>
+      <Text type="secondary" className={`${styles.meta} ${styles.numbers}`} style={{ whiteSpace: 'nowrap' }}>{[seconds, formatDate(result.checkedAt)].filter(Boolean).join(' · ')}</Text>
     </header>
     <p className={styles.replyText}>{result.reply}</p>
     {result.model && <Text type="secondary" className={styles.meta}>实际应答模型：{result.model}</Text>}
@@ -184,7 +186,7 @@ function ReplyCard({ result }: { result: HelloResult & { route: string } }) {
 
 function OwnerFields({ config, blocks, record, update }: { config: NonNullable<PolicyDraft['config']>; blocks: PolicyDraft['blocks']; record: Owner; update: (next: Owner) => void }) {
   return <>
-    <Form.Field label="并行上限" required desc="这个负责人同时运行的工作代理数量。"><NamedInputNumber id="owner-parallel" aria-label="并行上限" min={1} step={1} value={record.max_parallel} placeholder="例如：4" onChange={value => update({ ...record, max_parallel: value ?? 1 })} /></Form.Field>
+    <Form.Field label="并行上限" required desc="这个父 Agent同时运行的子 Agent数量。"><NamedInputNumber id="owner-parallel" aria-label="并行上限" min={1} step={1} value={record.max_parallel} placeholder="例如：4" onChange={value => update({ ...record, max_parallel: value ?? 1 })} /></Form.Field>
     <OwnerScheduleFields config={config} blocks={blocks} record={record} update={update} />
   </>;
 }

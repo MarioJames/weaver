@@ -15,7 +15,7 @@ export function PolicyHeader({ title, description, policy, extra }: { title: str
   return <>
     <PageHeader title={title} description={description} action={<div className={styles.row}>
       {extra}
-      <Text type={policy.dirty ? 'warning' : 'secondary'} role="status" aria-live="polite">{state}</Text>
+      <Text type={policy.dirty ? 'warning' : 'secondary'} role="status" aria-live="polite" style={{ inlineSize: 126, flexShrink: 0 }}>{state}</Text>
       <Button disabled={!policy.dirty || policy.busy || policy.loading} onClick={() => void policy.load(true)}>放弃修改</Button>
       <Button type="primary" icon={Save} loading={policy.busy} disabled={!policy.config || !policy.dirty} onClick={() => void policy.save()}>保存</Button>
     </div>} />

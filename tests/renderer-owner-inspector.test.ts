@@ -48,7 +48,7 @@ test('an idle reminder switched off never reports a due owner', () => {
 test('worker activity blocks the action', () => {
   for (const task of [{ ...base, status: 'running' as const }, { ...base, status: 'cancelling' as const }, { ...base, scheduled: true }]) {
     const html = row(task);
-    assert.match(html, /工作代理执行中，暂不可接续/);
+    assert.match(html, /子 Agent执行中，暂不可接续/);
     assert.match(html, /<button[^>]*disabled=""/);
     assert.doesNotMatch(html, /已空闲/);
   }
@@ -80,13 +80,13 @@ test('the dialog picks among enabled owner profiles with the handover sentence',
   for (const id of ['claude_owner', 'codex_owner', 'pi_owner']) assert.match(labels, new RegExp(id));
   assert.equal((labels.match(/<svg/g) ?? []).length, 3);
   const html = markup(React.createElement(ContinuationDialog, { profiles: owners, value: 'codex_owner', sending: false, failure: '', onChange: () => {}, onRetry: () => {} }));
-  assert.match(html, /接手负责人/);
-  assert.match(html, /Weaver 会生成接续说明，并在 Herdr 中启动新的负责人接手这个任务。/);
+  assert.match(html, /接手父 Agent/);
+  assert.match(html, /Weaver 会生成接续说明，并在 Herdr 中启动新的父 Agent接手这个任务。/);
   assert.match(html, /codex_owner/);
   assert.match(html, /<svg/);
   assert.doesNotMatch(html, /重试启动/);
   const unselected = markup(React.createElement(ContinuationDialog, { profiles: owners, sending: false, failure: '', onChange: () => {}, onRetry: () => {} }));
-  assert.match(unselected, /选择接手负责人/);
+  assert.match(unselected, /选择接手父 Agent/);
 });
 
 test('a failed launch keeps the dialog open without inline error feedback', () => {

@@ -164,3 +164,22 @@ export function formatDuration(ms: number): string {
 
 /** Tag color preset of a status tone; the neutral tone uses the Tag default. */
 export function toneColor(tone: StatusTone): string | undefined { return tone === 'default' ? undefined : tone; }
+
+/** Locale-independent layout, local timezone, shared by renderer detail and configuration pages. */
+export function formatDate(at: string): string {
+  const date = new Date(at);
+  if (!Number.isFinite(date.getTime())) return '时间未知';
+  const parts = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find(part => part.type === type)?.value ?? '';
+  return `${value('year')}-${value('month')}-${value('day')} ${value('hour')}:${value('minute')}`;
+}
+
+/** Translate known lifecycle messages only at the display boundary; exports preserve source text. */
+export function displayLog(value: string): string {
+  return redactLog(value)
+    .replace(/^Owner runs ([a-zA-Z0-9_-]+).*$/, '父 Agent 派发给子 Agent $1')
+    .replace(/Owner reference is metadata only/g, '父 Agent 引用仅用于记录')
+    .replace(/^Task queued\.?\s*/, '任务待执行。')
+    .replace(/^Owner review: accepted/, '父 Agent 验收：已通过')
+    .replace(/^Owner review: rejected/, '父 Agent 验收：需修改');
+}

@@ -1,3 +1,4 @@
+import { formatDate } from '../log-view';
 import type { ReactNode } from 'react';
 import { CopyButton } from '@lobehub/ui';
 import { Descriptions, Text } from '@lobehub/ui/base-ui';
@@ -36,7 +37,7 @@ export function AgentFacts({ task, ownerKind, compact }: { task: Task; ownerKind
   const first = [
     dispatch?.worker ? { key: 'worker', label: '子 Agent', children: <AgentLabel kind={dispatchKind(task)} name={dispatch.worker} /> } : undefined,
     model ? { key: 'model', label: '模型', children: <Text ellipsis={{ rows: 1, tooltip: model }}>{model}</Text> } : undefined,
-    { key: 'updated', label: '更新时间', children: <time dateTime={task.updatedAt}>{new Date(task.updatedAt).toLocaleString()}</time> },
+    { key: 'updated', label: '更新时间', children: <time dateTime={task.updatedAt}>{formatDate(task.updatedAt)}</time> },
   ].filter(item => !!item);
   // The last item of a short first row takes the free columns so the second row always starts on a new line.
   const items = [

@@ -86,7 +86,7 @@ test('the worker mark follows the dispatch engine kind, the owner mark the polic
 
 test('facts drop the rows a task has no value for', () => {
   const html = markup(React.createElement(AgentFacts, { task: bare }));
-  assert.match(html, /未指定负责人/);
+  assert.match(html, /未指定父 Agent/);
   assert.doesNotMatch(html, /子 Agent|模型|工作目录/);
   assert.match(html, /<dt[^>]*>更新时间<\/dt>/);
   assert.match(markup(React.createElement(AgentFacts, { task: { ...bare, workspace: '/tmp/weaver-tasks/server-4VDE' } })), /\/tmp\/weaver-tasks\/server-4VDE/);
@@ -125,7 +125,7 @@ test('the compact block shows only the parent agent even with a worker and works
 
 test('the compact block resolves an unassigned parent and omits standalone workspace', () => {
   const html = markup(React.createElement(AgentFacts, { task: { ...bare, workspace: '/tmp/standalone' }, compact: true }));
-  assert.match(html, /未指定负责人/);
+  assert.match(html, /未指定父 Agent/);
   assert.equal((html.match(/<dt/g) ?? []).length, 1);
   assert.doesNotMatch(html, /standalone|目录|子 Agent/);
 });

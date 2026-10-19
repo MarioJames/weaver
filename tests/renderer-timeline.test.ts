@@ -158,7 +158,7 @@ test('all-events mode keeps today view with export note and load control', () =>
 
 test('condensed empty state still explains the timeline when nothing loaded', () => {
   const html = markup(React.createElement(EventsPanel, { events: [], taskId: 't' }));
-  assert.match(html, /暂无事件。任务状态和 worker 输出会记在这里。/);
+  assert.match(html, /暂无事件。任务状态和子 Agent 输出会记在这里。/);
 });
 
 
@@ -196,7 +196,7 @@ test('lifecycle steps carry status tags, outcomes carry outlined outcome tags', 
   assert.deepEqual(eventBadge(event('1', 'lifecycle', 'Policy selected codex; launching')), { label: '执行中', tone: 'processing', outcome: false });
   assert.deepEqual(eventBadge(event('2', 'lifecycle', 'Worker exited successfully; output is ready for owner review')), { label: '待验收', tone: 'warning', outcome: false });
   assert.deepEqual(eventBadge(event('3', 'lifecycle', 'Task queued. Owner reference is metadata only')), { label: '待执行', tone: 'default', outcome: false });
-  assert.deepEqual(eventBadge(event('4', 'lifecycle', 'Cancellation requested; waiting for worker exit')), { label: '停止中', tone: 'warning', outcome: false });
+  assert.deepEqual(eventBadge(event('4', 'lifecycle', 'Cancellation requested; waiting for worker exit')), { label: '停止中', tone: 'orange', outcome: false });
   assert.deepEqual(eventBadge(event('5', 'lifecycle', 'Cancelled before dispatch')), { label: '已取消', tone: 'default', outcome: true });
   assert.deepEqual(eventBadge(event('6', 'lifecycle', 'Owner review: accepted')), { label: '通过', tone: 'success', outcome: true });
   assert.deepEqual(eventBadge(event('7', 'error', 'boom')), { label: '失败', tone: 'error', outcome: true });

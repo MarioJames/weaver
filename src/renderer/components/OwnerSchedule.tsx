@@ -5,6 +5,7 @@ import { Form } from '@lobehub/ui/base-ui/form';
 import { activeBlocks, availabilityOf, type Block, type Config, type Owner } from '../../main/policy/routing';
 import { DEFAULT_WEIGHT, WEIGHT_MAX, appendWorker, withWorkerWeight, withoutListedWorker, workerWeight } from '../policy-edit';
 import { styles } from '../style';
+import { scheduleStyles } from './owner-schedule-style';
 
 /** Why dispatch would skip this worker right now, as a short tag. */
 export function workerStatusTag(config: Config, blocks: Block[], workerId: string, weight: number): { label: string; color?: string } | undefined {
@@ -33,13 +34,14 @@ export function OwnerScheduleFields({ config, blocks, record, update }: { config
       </DropdownMenu>
     </div>
     <div className={styles.stack}>
+      <Text className={scheduleStyles.heading}>权重</Text>
       <div className={styles.listRows}>{ordered.map(({ id, weight }) => {
         const status = workerStatusTag(config, blocks, id, weight);
-        return <div key={id} className={styles.listRow}>
+        return <div key={id} className={`${styles.listRow} ${scheduleStyles.row}`}>
           <span className={styles.row} style={{ minInlineSize: 0 }}><Text className={styles.wrap}>{id}</Text>{status && <Tag size="small" color={status.color}>{status.label}</Tag>}</span>
-          <span className={styles.row} style={{ flexWrap: 'nowrap' }}>
+          <span className={scheduleStyles.controls}>
             <NamedInputNumber aria-label={`${id} 的权重`} size="small" min={0} max={WEIGHT_MAX} step={1} precision={0} value={weight} style={{ inlineSize: 72 }} onChange={value => update(withWorkerWeight(record, id, typeof value === 'number' ? value : DEFAULT_WEIGHT))} />
-            {PRESETS.map(preset => <Button key={preset.value} size="small" type={weight === preset.value ? 'primary' : 'text'} aria-pressed={weight === preset.value} aria-label={`${id} ${preset.label}`} onClick={() => update(withWorkerWeight(record, id, preset.value))}>{preset.label}</Button>)}
+            <span role="group" aria-label={`${id} 权重预设`} className={scheduleStyles.presets}>{PRESETS.map(preset => <Button key={preset.value} size="small" type="text" aria-pressed={weight === preset.value} aria-label={`${id} ${preset.label}`} onClick={() => update(withWorkerWeight(record, id, preset.value))}>{preset.label}</Button>)}</span>
             <ActionIcon size="small" icon={X} aria-label={`移除 ${id}`} onClick={() => update(withoutListedWorker(record, id))} />
           </span>
         </div>;

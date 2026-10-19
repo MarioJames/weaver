@@ -17,15 +17,15 @@ const PAGES = ['tasks', 'engines', 'owners', 'workers', 'settings'] as const;
 type Page = typeof PAGES[number];
 
 const NAVIGATION = [
-  { href: 'tasks', label: '任务', icon: ListTodo },
-  { href: 'engines', label: '引擎', icon: Cpu },
-  { href: 'owners', label: '负责人', icon: UserRound },
-  { href: 'workers', label: '工作代理', icon: Bot },
-  { href: 'settings', label: '设置', icon: Settings2 },
+  { href: '/#/tasks', label: '任务', icon: ListTodo },
+  { href: '/#/engines', label: '引擎', icon: Cpu },
+  { href: '/#/owners', label: '父 Agent', icon: UserRound },
+  { href: '/#/workers', label: '子 Agent', icon: Bot },
+  { href: '/#/settings', label: '设置', icon: Settings2 },
 ];
 
-function pageFromHash(): Page {
-  const value = window.location.hash.replace(/^#\/?/, '');
+export function pageFromHash(): Page {
+  const value = (window.location.hash || window.location.pathname).replace(/^[#/]*/, '');
   return (PAGES as readonly string[]).includes(value) ? value as Page : 'tasks';
 }
 
@@ -35,7 +35,7 @@ function usePage(): [Page, (next: Page) => void] {
   useEffect(() => {
     const sync = () => {
       const next = pageFromHash();
-      if (window.location.hash !== `#/${next}`) window.history.replaceState(null, '', `#/${next}`);
+      if (window.location.pathname !== '/' || window.location.hash !== `#/${next}`) window.history.replaceState(null, '', `/${window.location.search}#/${next}`);
       setPage(next);
     };
     sync();
@@ -46,6 +46,20 @@ function usePage(): [Page, (next: Page) => void] {
 }
 
 export function App() {
+  useEffect(() => {
+    // Focus each newly opened panel once; keyboard navigation within it remains unrestricted.
+    const focused = new WeakSet<HTMLElement>();
+    const focusPanel = (event: FocusEvent) => {
+      if (!(event.target instanceof HTMLElement)) return;
+      const panel = event.target.closest<HTMLElement>('[role="dialog"]');
+      if (!panel || focused.has(panel)) return;
+      focused.add(panel);
+      panel.tabIndex = -1;
+      panel.focus({ preventScroll: true });
+    };
+    document.addEventListener('focusin', focusPanel);
+    return () => document.removeEventListener('focusin', focusPanel);
+  }, []);
   const work = useWorkbench();
   const policy = usePolicyDraft();
   const [page, open] = usePage();
@@ -56,8 +70,8 @@ export function App() {
     brand={<ConsoleBrand label="Weaver 任务" logo={<>
       <img className={styles.brandLockup} src={weaverLockup} width={128} height={27} alt="" aria-hidden="true" draggable={false} />
       <img className={styles.mark} src={weaverIcon} width={24} height={24} alt="" aria-hidden="true" draggable={false} />
-    </>} href="#/tasks" />}
-    navigation={<ConsoleNav label="主导航" items={NAVIGATION} pathname={page} onNavigate={href => open(href as Page)} />}
+    </>} href="/#/tasks" />}
+    navigation={<ConsoleNav label="主导航" items={NAVIGATION} pathname={`/#/${page}`} onNavigate={href => open(href.replace(/^\/#\//, '') as Page)} />}
     openNavigationLabel="打开导航" closeNavigationLabel="关闭导航" collapseLabel="收起导航" expandLabel="展开导航" skipToContentLabel="跳到内容"
   >
     <ToastHost position="bottom-right" />

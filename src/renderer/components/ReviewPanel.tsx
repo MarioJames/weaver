@@ -1,3 +1,4 @@
+import { formatDate } from '../log-view';
 import { useNotifyError } from '../notify';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Descriptions, Modal, Tag, Text, TextArea } from '@lobehub/ui/base-ui';
@@ -31,13 +32,13 @@ export function ReviewView({ task, manifest, busy, ownerKind, open, comment, onO
     { key: 'decision', label: '验收结论', children: <Tag size="small" variant="solid" color={toneColor(DISPLAY_TONES[status])}>{DISPLAY_LABELS[status]}</Tag> },
     ...(decided ? [
       { key: 'by', label: '决定者', children: <AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerLabel(task)} /> },
-      ...(decision ? [{ key: 'at', label: '决定时间', children: <time dateTime={decision.at}>{new Date(decision.at).toLocaleString()}</time> }] : []),
+      ...(decision ? [{ key: 'at', label: '决定时间', children: <time dateTime={decision.at}>{formatDate(decision.at)}</time> }] : []),
     ] : []),
     ...(task.reviewComment ? [{ key: 'comment', label: '验收说明', span: 2, children: <Text className={styles.wrap}>{task.reviewComment}</Text> }] : []),
   ];
   return <>
     <Descriptions colon={false} column={2} items={items} />
-    <div className={styles.row}><Button disabled={busy} onClick={onOpen}>手动验收</Button></div>
+    <div className={styles.row}><Button type="text" disabled={busy} onClick={onOpen}>手动验收</Button></div>
     <Modal open={open} title="手动验收" onCancel={onClose} footer={<div className={detailStyles.modalFooter}>
       {manifest.delivery !== 'acknowledged' && <Button disabled={busy} onClick={() => onSubmit('results.ack', {})}>确认收到</Button>}
       <Button disabled={busy || manifest.acceptance === 'rejected'} onClick={() => onSubmit('reviews.submit', { decision: 'rejected', ...note })}>要求修改</Button>

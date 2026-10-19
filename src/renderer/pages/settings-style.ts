@@ -22,7 +22,7 @@ export const settingsStyles = createStaticStyles(({ css, cssVar }) => ({
   /** Group context on the left, its rows on the right; the two bands share the group height. */
   group: css`
     display: grid;
-    grid-template-columns: minmax(260px, 32%) minmax(0, 1fr);
+    grid-template-columns: minmax(180px, 24%) minmax(0, 1fr);
     align-items: stretch;
 
     & + & {
@@ -36,9 +36,9 @@ export const settingsStyles = createStaticStyles(({ css, cssVar }) => ({
   `,
   /** The column separator becomes the band separator once the group stacks. */
   groupCell: css`
-    justify-content: center;
-    padding: 16px 20px;
-    background: ${cssVar.colorFillTertiary};
+    justify-content: flex-start;
+    padding: 12px 20px;
+    background: ${cssVar.colorBgContainer};
     border-inline-end: 1px solid ${cssVar.colorBorder};
 
     @container (max-width: 860px) {
@@ -54,7 +54,7 @@ export const settingsStyles = createStaticStyles(({ css, cssVar }) => ({
   /** Field text and control share one row; the control track is fixed so the separators line up across rows. */
   row: css`
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 240px;
+    grid-template-columns: minmax(0, 480px) minmax(180px, 1fr);
     flex: 1 1 auto;
 
     & + & {
@@ -76,7 +76,7 @@ export const settingsStyles = createStaticStyles(({ css, cssVar }) => ({
     flex-wrap: nowrap;
     gap: 8px;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: flex-start;
     padding: 12px 20px;
     border-inline-start: 1px solid ${cssVar.colorBorder};
 

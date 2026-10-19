@@ -1,3 +1,4 @@
+import { formatDate } from '../log-view';
 import { notifyError } from '../notify';
 import { NamedSelect } from './NamedControls';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -6,7 +7,7 @@ import { Button, Input, Segmented, Steps, Tag, Text, Tooltip } from '@lobehub/ui
 import { ChevronRight, FilePen, FileText, Loader2, Search, Terminal, Wrench } from 'lucide-react';
 import type { TaskEvent, TaskFailure } from '../../shared/types';
 import { command } from '../commands';
-import { condenseEvents, eventBadge, exportEvents, filterCondensed, formatDuration, kindLabels, redactLog, relativeTime, selectEvents, toneColor, toolSteps, type TimelineItem } from '../log-view';
+import { condenseEvents, displayLog, eventBadge, exportEvents, filterCondensed, formatDuration, kindLabels, redactLog, relativeTime, selectEvents, toneColor, toolSteps, type TimelineItem } from '../log-view';
 import { styles } from '../style';
 import { styles as eventStyles } from './events-style';
 
@@ -21,11 +22,11 @@ function readMode(): Mode {
   try { return localStorage.getItem(MODE_KEY) === 'all' ? 'all' : 'condensed'; } catch { return 'condensed'; }
 }
 function saveMode(mode: Mode) { try { localStorage.setItem(MODE_KEY, mode); } catch {} }
-function timeLabel(at: string) { return new Date(at).toLocaleTimeString(); }
+function timeLabel(at: string) { return formatDate(at); }
 
 /** Relative time, right aligned, with the absolute time in a tooltip. */
 function RelativeTime({ at }: { at: string }) {
-  return <Tooltip title={new Date(at).toLocaleString()}>
+  return <Tooltip title={formatDate(at)}>
     <time className={eventStyles.time} dateTime={at}>{relativeTime(at)}</time>
   </Tooltip>;
 }
@@ -34,7 +35,7 @@ function EventRow({ event }: { event: TaskEvent }) {
   return <div className={eventStyles.rawRow}>
     <time className={eventStyles.rawTime} dateTime={event.at}>{timeLabel(event.at)}</time>
     <Tag size="small" className={eventStyles.tag}>{kindLabels[event.kind]}</Tag>
-    <Text className={styles.wrap} type={event.kind === 'error' ? 'danger' : 'secondary'}>{redactLog(event.message)}</Text>
+    <Text className={styles.wrap} type={event.kind === 'error' ? 'danger' : 'secondary'}>{displayLog(event.message)}</Text>
   </div>;
 }
 
@@ -49,7 +50,7 @@ function FoldText({ text, label }: { text: string; label: string }) {
 }
 
 function ResultCard({ event }: { event: TaskEvent }) {
-  const text = redactLog(event.message);
+  const text = displayLog(event.message);
   return <div className={`${eventStyles.card} ${eventStyles.cardSuccess}`}>
     <div className={eventStyles.cardHead}>
       <Text style={{ fontWeight: 600 }}>执行结果</Text>
@@ -91,7 +92,7 @@ function dotClass(event: TaskEvent): string {
 const Dot = ({ className = '' }: { className?: string }) => <span aria-hidden="true" className={`${eventStyles.dot} ${className}`} />;
 
 function EventNode({ event, failure }: { event: TaskEvent; failure?: TaskFailure }) {
-  const message = redactLog(event.message);
+  const message = displayLog(event.message);
   const covered = event.kind === 'error' && !!failure && redactLog(failure.message) === message;
   return <div>
     <div className={eventStyles.head}>
@@ -161,7 +162,7 @@ export function EventsPanel({ events, taskId, active = false, failure }: { event
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   function toggleGroup(id: string) { setOpenGroups(current => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; }); }
-  const empty = query.trim() ? '没有匹配的已加载事件。' : busy ? '正在加载事件…' : '暂无事件。任务状态和 worker 输出会记在这里。';
+  const empty = query.trim() ? '没有匹配的已加载事件。' : busy ? '正在加载事件…' : '暂无事件。任务状态和子 Agent 输出会记在这里。';
   return <div aria-busy={busy} className={styles.stack}>
     <div role="group" aria-label="时间线视图" className={styles.row}>
       <Segmented options={[...MODE_OPTIONS]} value={mode} onChange={value => { setMode(value); saveMode(value); }} />
