@@ -1,0 +1,892 @@
+{
+  "date": "2026-10-19",
+  "scope": [
+    "src/renderer/pages/SettingsPage.tsx",
+    "src/renderer/pages/settings-style.ts"
+  ],
+  "weaverTasks": [
+    "6abce86d-768b-4a4c-929b-93f6e255445c",
+    "aec22a4b-751e-4728-b09e-f6987abfd0dd",
+    "47b3c348-327b-4eec-b7da-c0b653ba3f64",
+    "98891bc3-72df-450b-a415-aeb1345ccbf2"
+  ],
+  "sourceSha256": {
+    "src/renderer/pages/SettingsPage.tsx": "d6e01b51fbf4b903182bc104d45b3ce399a3b0d4f387d2455a1ce70366ee0086",
+    "src/renderer/pages/settings-style.ts": "c10db418ba05f8192cff9b34916e4d67dcc5e85ee254f44ee1980baffcbd50ed"
+  },
+  "checks": {
+    "isolatedCommitTreeTypecheck": "passed",
+    "relatedTests": {
+      "pass": 15,
+      "fail": 0
+    },
+    "browserHarness": {
+      "artifactErrors": [],
+      "networkErrors": 0,
+      "browserErrors": {
+        "success": true,
+        "data": {
+          "errors": [],
+          "lifecycle": {
+            "effectiveLaunch": {
+              "browserLaunched": true,
+              "engine": "chrome",
+              "launchHash": 4453429155665459186
+            },
+            "launched": false,
+            "relaunchedBrowser": false,
+            "restartedBackground": false,
+            "restoreStatus": "not_configured",
+            "reused": true,
+            "saveStatus": "not_attempted"
+          }
+        },
+        "error": null
+      }
+    }
+  },
+  "layout": {
+    "light": {
+      "alerts": [],
+      "documentWidth": 1440,
+      "groups": [
+        {
+          "context": {
+            "height": 138.6875,
+            "width": 362.234375,
+            "x": 274,
+            "y": 172.390625
+          },
+          "contextFill": "rgba(5, 5, 17, 0.08)",
+          "groupDescription": {
+            "background": [
+              235.00000000000003,
+              235.00000000000003,
+              235.96000000000004
+            ],
+            "foreground": [
+              17,
+              17,
+              17
+            ],
+            "ratio": 15.849656013035345,
+            "text": "只刷新已启用、并在引擎卡片上打开「主动刷新额度」的引擎。额度耗尽时自动暂停派发，恢复或到重置时间后自动解除。"
+          },
+          "rect": {
+            "height": 138.6875,
+            "width": 1132,
+            "x": 274,
+            "y": 172.390625
+          },
+          "rows": [
+            {
+              "control": {
+                "height": 68.84375,
+                "width": 240,
+                "x": 1166,
+                "y": 172.390625
+              },
+              "controlFill": "rgba(0, 0, 0, 0.016)",
+              "field": {
+                "height": 68.84375,
+                "width": 529.765625,
+                "x": 636.234375,
+                "y": 172.390625
+              },
+              "fieldDescription": {
+                "background": [
+                  249,
+                  249,
+                  249.99
+                ],
+                "foreground": [
+                  17,
+                  17,
+                  17
+                ],
+                "ratio": 17.94656916956804,
+                "text": "已关闭，只在引擎卡片上手动刷新。"
+              },
+              "fieldFill": "rgba(55, 55, 88, 0.03)",
+              "rect": {
+                "height": 68.84375,
+                "width": 769.765625,
+                "x": 636.234375,
+                "y": 172.390625
+              }
+            },
+            {
+              "control": {
+                "height": 68.84375,
+                "width": 240,
+                "x": 1166,
+                "y": 242.234375
+              },
+              "controlFill": "rgba(0, 0, 0, 0.016)",
+              "field": {
+                "height": 68.84375,
+                "width": 529.765625,
+                "x": 636.234375,
+                "y": 242.234375
+              },
+              "fieldDescription": {
+                "background": [
+                  249,
+                  249,
+                  249.99
+                ],
+                "foreground": [
+                  17,
+                  17,
+                  17
+                ],
+                "ratio": 17.94656916956804,
+                "text": "5 到 1440 分钟。"
+              },
+              "fieldFill": "rgba(55, 55, 88, 0.03)",
+              "rect": {
+                "height": 69.84375,
+                "width": 769.765625,
+                "x": 636.234375,
+                "y": 241.234375
+              }
+            }
+          ],
+          "title": "额度"
+        },
+        {
+          "context": {
+            "height": 76.84375,
+            "width": 362.234375,
+            "x": 274,
+            "y": 312.078125
+          },
+          "contextFill": "rgba(5, 5, 17, 0.08)",
+          "groupDescription": {
+            "background": [
+              235.00000000000003,
+              235.00000000000003,
+              235.96000000000004
+            ],
+            "foreground": [
+              17,
+              17,
+              17
+            ],
+            "ratio": 15.849656013035345,
+            "text": "负责人验收工作代理结果时的额外审查。"
+          },
+          "rect": {
+            "height": 77.84375,
+            "width": 1132,
+            "x": 274,
+            "y": 311.078125
+          },
+          "rows": [
+            {
+              "control": {
+                "height": 76.84375,
+                "width": 240,
+                "x": 1166,
+                "y": 312.078125
+              },
+              "controlFill": "rgba(0, 0, 0, 0.016)",
+              "field": {
+                "height": 76.84375,
+                "width": 529.765625,
+                "x": 636.234375,
+                "y": 312.078125
+              },
+              "fieldDescription": {
+                "background": [
+                  249,
+                  249,
+                  249.99
+                ],
+                "foreground": [
+                  17,
+                  17,
+                  17
+                ],
+                "ratio": 17.94656916956804,
+                "text": "关闭后负责人跳过 ChatGPT Pro 自动审查，本地审查和测试照常进行。"
+              },
+              "fieldFill": "rgba(55, 55, 88, 0.03)",
+              "rect": {
+                "height": 76.84375,
+                "width": 769.765625,
+                "x": 636.234375,
+                "y": 312.078125
+              }
+            }
+          ],
+          "title": "审查"
+        },
+        {
+          "context": {
+            "height": 87.6875,
+            "width": 362.234375,
+            "x": 274,
+            "y": 389.921875
+          },
+          "contextFill": "rgba(5, 5, 17, 0.08)",
+          "groupDescription": {
+            "background": [
+              235.00000000000003,
+              235.00000000000003,
+              235.96000000000004
+            ],
+            "foreground": [
+              17,
+              17,
+              17
+            ],
+            "ratio": 15.849656013035345,
+            "text": "负责人观测和等待工作代理的方式。"
+          },
+          "rect": {
+            "height": 88.6875,
+            "width": 1132,
+            "x": 274,
+            "y": 388.921875
+          },
+          "rows": [
+            {
+              "control": {
+                "height": 87.6875,
+                "width": 240,
+                "x": 1166,
+                "y": 389.921875
+              },
+              "controlFill": "rgba(0, 0, 0, 0.016)",
+              "field": {
+                "height": 87.6875,
+                "width": 529.765625,
+                "x": 636.234375,
+                "y": 389.921875
+              },
+              "fieldDescription": {
+                "background": [
+                  249,
+                  249,
+                  249.99
+                ],
+                "foreground": [
+                  17,
+                  17,
+                  17
+                ],
+                "ratio": 17.94656916956804,
+                "text": "负责人两次查看工作代理状态之间的最长间隔；工作代理完成后负责人能及时发现。不会停止工作代理。"
+              },
+              "fieldFill": "rgba(55, 55, 88, 0.03)",
+              "rect": {
+                "height": 87.6875,
+                "width": 769.765625,
+                "x": 636.234375,
+                "y": 389.921875
+              }
+            }
+          ],
+          "title": "负责人"
+        }
+      ],
+      "outerBorders": [
+        "1px",
+        "1px",
+        "1px",
+        "1px"
+      ],
+      "surface": {
+        "height": 307.21875,
+        "width": 1134,
+        "x": 273,
+        "y": 171.390625
+      },
+      "theme": "light-app",
+      "viewport": [
+        1440,
+        1000
+      ]
+    },
+    "mobile": {
+      "alerts": [],
+      "documentWidth": 390,
+      "groups": [
+        {
+          "context": {
+            "height": 115.53125,
+            "width": 356,
+            "x": 17,
+            "y": 151.390625
+          },
+          "contextFill": "rgba(5, 5, 17, 0.08)",
+          "groupDescription": {
+            "background": [
+              235.00000000000003,
+              235.00000000000003,
+              235.96000000000004
+            ],
+            "foreground": [
+              17,
+              17,
+              17
+            ],
+            "ratio": 15.849656013035345,
+            "text": "只刷新已启用、并在引擎卡片上打开「主动刷新额度」的引擎。额度耗尽时自动暂停派发，恢复或到重置时间后自动解除。"
+          },
+          "rect": {
+            "height": 358.21875,
+            "width": 356,
+            "x": 17,
+            "y": 151.390625
+          },
+          "rows": [
+            {
+              "control": {
+                "height": 47,
+                "width": 356,
+                "x": 17,
+                "y": 335.765625
+              },
+              "controlFill": "rgba(0, 0, 0, 0.016)",
+              "field": {
+                "height": 68.84375,
+                "width": 356,
+                "x": 17,
+                "y": 266.921875
+              },
+              "fieldDescription": {
+                "background": [
+                  249,
+                  249,
+                  249.99
+                ],
+                "foreground": [
+                  17,
+                  17,
+                  17
+                ],
+                "ratio": 17.94656916956804,
+                "text": "已关闭，只在引擎卡片上手动刷新。"
+              },
+              "fieldFill": "rgba(55, 55, 88, 0.03)",
+              "rect": {
+                "height": 115.84375,
+                "width": 356,
+                "x": 17,
+                "y": 266.921875
+              }
+            },
+            {
+              "control": {
+                "height": 57,
+                "width": 356,
+                "x": 17,
+                "y": 452.609375
+              },
+              "controlFill": "rgba(0, 0, 0, 0.016)",
+              "field": {
+                "height": 68.84375,
+                "width": 356,
+                "x": 17,
+                "y": 383.765625
+              },
+              "fieldDescription": {
+                "background": [
+                  249,
+                  249,
+                  249.99
+                ],
+                "foreground": [
+                  17,
+                  17,
+                  17
+                ],
+                "ratio": 17.94656916956804,
+                "text": "5 到 1440 分钟。"
+              },
+              "fieldFill": "rgba(55, 55, 88, 0.03)",
+              "rect": {
+                "height": 126.84375,
+                "width": 356,
+                "x": 17,
+                "y": 382.765625
+              }
+            }
+          ],
+          "title": "额度"
+        },
+        {
+          "context": {
+            "height": 77.84375,
+            "width": 356,
+            "x": 17,
+            "y": 510.609375
+          },
+          "contextFill": "rgba(5, 5, 17, 0.08)",
+          "groupDescription": {
+            "background": [
+              235.00000000000003,
+              235.00000000000003,
+              235.96000000000004
+            ],
+            "foreground": [
+              17,
+              17,
+              17
+            ],
+            "ratio": 15.849656013035345,
+            "text": "负责人验收工作代理结果时的额外审查。"
+          },
+          "rect": {
+            "height": 213.53125,
+            "width": 356,
+            "x": 17,
+            "y": 509.609375
+          },
+          "rows": [
+            {
+              "control": {
+                "height": 47,
+                "width": 356,
+                "x": 17,
+                "y": 676.140625
+              },
+              "controlFill": "rgba(0, 0, 0, 0.016)",
+              "field": {
+                "height": 87.6875,
+                "width": 356,
+                "x": 17,
+                "y": 588.453125
+              },
+              "fieldDescription": {
+                "background": [
+                  249,
+                  249,
+                  249.99
+                ],
+                "foreground": [
+                  17,
+                  17,
+                  17
+                ],
+                "ratio": 17.94656916956804,
+                "text": "关闭后负责人跳过 ChatGPT Pro 自动审查，本地审查和测试照常进行。"
+              },
+              "fieldFill": "rgba(55, 55, 88, 0.03)",
+              "rect": {
+                "height": 134.6875,
+                "width": 356,
+                "x": 17,
+                "y": 588.453125
+              }
+            }
+          ],
+          "title": "审查"
+        },
+        {
+          "context": {
+            "height": 77.84375,
+            "width": 356,
+            "x": 17,
+            "y": 724.140625
+          },
+          "contextFill": "rgba(5, 5, 17, 0.08)",
+          "groupDescription": {
+            "background": [
+              235.00000000000003,
+              235.00000000000003,
+              235.96000000000004
+            ],
+            "foreground": [
+              17,
+              17,
+              17
+            ],
+            "ratio": 15.849656013035345,
+            "text": "负责人观测和等待工作代理的方式。"
+          },
+          "rect": {
+            "height": 223.53125,
+            "width": 356,
+            "x": 17,
+            "y": 723.140625
+          },
+          "rows": [
+            {
+              "control": {
+                "height": 57,
+                "width": 356,
+                "x": 17,
+                "y": 889.671875
+              },
+              "controlFill": "rgba(0, 0, 0, 0.016)",
+              "field": {
+                "height": 87.6875,
+                "width": 356,
+                "x": 17,
+                "y": 801.984375
+              },
+              "fieldDescription": {
+                "background": [
+                  249,
+                  249,
+                  249.99
+                ],
+                "foreground": [
+                  17,
+                  17,
+                  17
+                ],
+                "ratio": 17.94656916956804,
+                "text": "负责人两次查看工作代理状态之间的最长间隔；工作代理完成后负责人能及时发现。不会停止工作代理。"
+              },
+              "fieldFill": "rgba(55, 55, 88, 0.03)",
+              "rect": {
+                "height": 144.6875,
+                "width": 356,
+                "x": 17,
+                "y": 801.984375
+              }
+            }
+          ],
+          "title": "负责人"
+        }
+      ],
+      "outerBorders": [
+        "1px",
+        "1px",
+        "1px",
+        "1px"
+      ],
+      "surface": {
+        "height": 797.28125,
+        "width": 358,
+        "x": 16,
+        "y": 150.390625
+      },
+      "theme": "light-app",
+      "viewport": [
+        390,
+        844
+      ]
+    },
+    "dark": {
+      "alerts": [],
+      "documentWidth": 1440,
+      "groups": [
+        {
+          "context": {
+            "height": 138.6875,
+            "width": 388.46875,
+            "x": 113,
+            "y": 95.390625
+          },
+          "contextFill": "rgba(225, 231, 244, 0.16)",
+          "groupDescription": {
+            "background": [
+              58.68,
+              60.48,
+              63.4
+            ],
+            "foreground": [
+              255,
+              255,
+              255
+            ],
+            "ratio": 10.97675634994486,
+            "text": "只刷新已启用、并在引擎卡片上打开「主动刷新额度」的引擎。额度耗尽时自动暂停派发，恢复或到重置时间后自动解除。"
+          },
+          "rect": {
+            "height": 138.6875,
+            "width": 1214,
+            "x": 113,
+            "y": 95.390625
+          },
+          "rows": [
+            {
+              "control": {
+                "height": 68.84375,
+                "width": 240,
+                "x": 1087,
+                "y": 95.390625
+              },
+              "controlFill": "rgba(255, 255, 255, 0.02)",
+              "field": {
+                "height": 68.84375,
+                "width": 585.53125,
+                "x": 501.46875,
+                "y": 95.390625
+              },
+              "fieldDescription": {
+                "background": [
+                  50.760000000000005,
+                  52.599999999999994,
+                  54.56
+                ],
+                "foreground": [
+                  255,
+                  255,
+                  255
+                ],
+                "ratio": 12.383371683636636,
+                "text": "已关闭，只在引擎卡片上手动刷新。"
+              },
+              "fieldFill": "rgba(225, 233, 242, 0.12)",
+              "rect": {
+                "height": 68.84375,
+                "width": 825.53125,
+                "x": 501.46875,
+                "y": 95.390625
+              }
+            },
+            {
+              "control": {
+                "height": 68.84375,
+                "width": 240,
+                "x": 1087,
+                "y": 165.234375
+              },
+              "controlFill": "rgba(255, 255, 255, 0.02)",
+              "field": {
+                "height": 68.84375,
+                "width": 585.53125,
+                "x": 501.46875,
+                "y": 165.234375
+              },
+              "fieldDescription": {
+                "background": [
+                  50.760000000000005,
+                  52.599999999999994,
+                  54.56
+                ],
+                "foreground": [
+                  255,
+                  255,
+                  255
+                ],
+                "ratio": 12.383371683636636,
+                "text": "5 到 1440 分钟。"
+              },
+              "fieldFill": "rgba(225, 233, 242, 0.12)",
+              "rect": {
+                "height": 69.84375,
+                "width": 825.53125,
+                "x": 501.46875,
+                "y": 164.234375
+              }
+            }
+          ],
+          "title": "额度"
+        },
+        {
+          "context": {
+            "height": 76.84375,
+            "width": 388.46875,
+            "x": 113,
+            "y": 235.078125
+          },
+          "contextFill": "rgba(225, 231, 244, 0.16)",
+          "groupDescription": {
+            "background": [
+              58.68,
+              60.48,
+              63.4
+            ],
+            "foreground": [
+              255,
+              255,
+              255
+            ],
+            "ratio": 10.97675634994486,
+            "text": "负责人验收工作代理结果时的额外审查。"
+          },
+          "rect": {
+            "height": 77.84375,
+            "width": 1214,
+            "x": 113,
+            "y": 234.078125
+          },
+          "rows": [
+            {
+              "control": {
+                "height": 76.84375,
+                "width": 240,
+                "x": 1087,
+                "y": 235.078125
+              },
+              "controlFill": "rgba(255, 255, 255, 0.02)",
+              "field": {
+                "height": 76.84375,
+                "width": 585.53125,
+                "x": 501.46875,
+                "y": 235.078125
+              },
+              "fieldDescription": {
+                "background": [
+                  50.760000000000005,
+                  52.599999999999994,
+                  54.56
+                ],
+                "foreground": [
+                  255,
+                  255,
+                  255
+                ],
+                "ratio": 12.383371683636636,
+                "text": "关闭后负责人跳过 ChatGPT Pro 自动审查，本地审查和测试照常进行。"
+              },
+              "fieldFill": "rgba(225, 233, 242, 0.12)",
+              "rect": {
+                "height": 76.84375,
+                "width": 825.53125,
+                "x": 501.46875,
+                "y": 235.078125
+              }
+            }
+          ],
+          "title": "审查"
+        },
+        {
+          "context": {
+            "height": 87.6875,
+            "width": 388.46875,
+            "x": 113,
+            "y": 312.921875
+          },
+          "contextFill": "rgba(225, 231, 244, 0.16)",
+          "groupDescription": {
+            "background": [
+              58.68,
+              60.48,
+              63.4
+            ],
+            "foreground": [
+              255,
+              255,
+              255
+            ],
+            "ratio": 10.97675634994486,
+            "text": "负责人观测和等待工作代理的方式。"
+          },
+          "rect": {
+            "height": 88.6875,
+            "width": 1214,
+            "x": 113,
+            "y": 311.921875
+          },
+          "rows": [
+            {
+              "control": {
+                "height": 87.6875,
+                "width": 240,
+                "x": 1087,
+                "y": 312.921875
+              },
+              "controlFill": "rgba(255, 255, 255, 0.02)",
+              "field": {
+                "height": 87.6875,
+                "width": 585.53125,
+                "x": 501.46875,
+                "y": 312.921875
+              },
+              "fieldDescription": {
+                "background": [
+                  50.760000000000005,
+                  52.599999999999994,
+                  54.56
+                ],
+                "foreground": [
+                  255,
+                  255,
+                  255
+                ],
+                "ratio": 12.383371683636636,
+                "text": "负责人两次查看工作代理状态之间的最长间隔；工作代理完成后负责人能及时发现。不会停止工作代理。"
+              },
+              "fieldFill": "rgba(225, 233, 242, 0.12)",
+              "rect": {
+                "height": 87.6875,
+                "width": 825.53125,
+                "x": 501.46875,
+                "y": 312.921875
+              }
+            }
+          ],
+          "title": "负责人"
+        }
+      ],
+      "outerBorders": [
+        "1px",
+        "1px",
+        "1px",
+        "1px"
+      ],
+      "surface": {
+        "height": 307.21875,
+        "width": 1216,
+        "x": 112,
+        "y": 94.390625
+      },
+      "theme": "dark-component-fixture",
+      "viewport": [
+        1440,
+        1000
+      ]
+    }
+  },
+  "mobileScroll": {
+    "documentWidth": 390,
+    "lastGroupBottom": 946.671875,
+    "main": {
+      "clientHeight": 788,
+      "scrollHeight": 908
+    },
+    "panel": {
+      "bottom": 947.671875,
+      "clientHeight": 795,
+      "flexShrink": "0",
+      "scrollHeight": 795
+    },
+    "viewportWidth": 390
+  },
+  "mobileSave": {
+    "mainScrollTop": 120,
+    "persistedWait": 16,
+    "saved": true,
+    "visible": true
+  },
+  "invalidSave": {
+    "alerts": [
+      {
+        "color": "rgb(236, 94, 65)",
+        "text": "请输入 1 到 1440 之间的整数。"
+      }
+    ],
+    "persistedWait": 15
+  },
+  "validSave": {
+    "persistedWait": 16,
+    "status": [
+      {
+        "color": "rgb(55, 157, 74)",
+        "text": " 已保存"
+      }
+    ]
+  },
+  "reloadValue": 16,
+  "restoredOwnedPolicy": {
+    "alerts": [],
+    "quotaAuto": false,
+    "review": false,
+    "wait": 15
+  },
+  "darkEvidence": "Read-only SettingsPage component rendered in a real dark ThemeProvider. The application remains configured for light mode; this does not add an application theme switch.",
+  "screenshots": [
+    "desktop.png",
+    "mobile-top.png",
+    "mobile-saved.png",
+    "dark-component.png"
+  ]
+}

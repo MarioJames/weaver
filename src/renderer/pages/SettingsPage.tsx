@@ -9,6 +9,7 @@ import { NamedInputNumber, NamedSwitch } from '../components/NamedControls';
 import { dateText } from '../quota-view';
 import type { PolicyDraft } from '../usePolicyDraft';
 import { styles } from '../style';
+import { settingsStyles } from './settings-style';
 
 type SaveState = { status: 'saving' } | { status: 'saved' } | { status: 'error'; message: string };
 
@@ -34,30 +35,30 @@ function useSaver(policy: PolicyDraft) {
 function Outcome({ state }: { state?: SaveState }) {
   if (!state) return null;
   if (state.status === 'saving') return <Spin size="small" aria-label="正在保存" />;
-  if (state.status === 'saved') return <Text type="success" className={styles.meta} role="status"><Icon icon={Check} size="small" /> 已保存</Text>;
+  if (state.status === 'saved') return <Text type="success" fontSize={12} role="status"><Icon icon={Check} size="small" /> 已保存</Text>;
   return null;
 }
 
 function Setting({ label, desc, htmlFor, state, error, children }: { label: string; desc: ReactNode; htmlFor: string; state?: SaveState; error?: string; children: ReactNode }) {
   const message = error || (state?.status === 'error' ? `保存失败：${state.message}` : '');
-  return <div className={styles.setting}>
-    <div className={styles.tight}>
+  return <div className={settingsStyles.row}>
+    <div className={`${settingsStyles.fieldCell} ${styles.tight}`}>
       <label htmlFor={htmlFor}><Text strong>{label}</Text></label>
-      <Text type="secondary" className={styles.meta}>{desc}</Text>
-      {message && <Text type="danger" className={styles.meta} role="alert">{message}</Text>}
+      <Text fontSize={12}>{desc}</Text>
+      {message && <Text type="danger" fontSize={12} role="alert">{message}</Text>}
     </div>
-    <div className={styles.row} style={{ flexWrap: 'nowrap' }}><Outcome state={state} />{children}</div>
+    <div className={settingsStyles.controlCell}><Outcome state={state} />{children}</div>
   </div>;
 }
 
-/** One group: its title and explanation on the left, its settings on the right. No card frame. */
+/** One group: its title and explanation in the left column, its settings in the field and control columns. */
 function Group({ title, desc, children }: { title: string; desc?: ReactNode; children: ReactNode }) {
-  return <section aria-label={title} className={styles.settingsGroup}>
-    <div className={styles.tight}>
+  return <section aria-label={title} className={settingsStyles.group}>
+    <div className={`${settingsStyles.groupCell} ${styles.tight}`}>
       <Text strong>{title}</Text>
-      {desc && <Text type="secondary" className={styles.meta}>{desc}</Text>}
+      {desc && <Text fontSize={12}>{desc}</Text>}
     </div>
-    <div className={styles.settingsRows}>{children}</div>
+    <div className={settingsStyles.rows}>{children}</div>
   </section>;
 }
 
@@ -102,7 +103,7 @@ export function SettingsPage({ policy }: { policy: PolicyDraft }) {
   const scheduleText = !quota.auto_refresh ? '已关闭，只在引擎卡片上手动刷新。' : schedule?.nextRunAt ? `下次 ${dateText(schedule.nextRunAt)}${schedule.lastRunAt ? ` · 上次 ${dateText(schedule.lastRunAt)}` : ''}` : '按下方间隔自动查询订阅额度，不会调用模型。';
   return <>
     {header}
-    <div className={styles.settings}>
+    <div className={settingsStyles.surface}>
       <Group title="额度" desc="只刷新已启用、并在引擎卡片上打开「主动刷新额度」的引擎。额度耗尽时自动暂停派发，恢复或到重置时间后自动解除。">
         <Setting label="定时刷新额度" htmlFor={`${id}-auto`} desc={scheduleText} state={saver.states.auto}>
           <NamedSwitch id={`${id}-auto`} aria-label="定时刷新额度" checked={quota.auto_refresh} disabled={saver.states.auto?.status === 'saving'} onChange={checked => void saver.save('auto', config => ({ quota: { ...quotaSettings(config), auto_refresh: checked } }))} />
