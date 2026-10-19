@@ -1,5 +1,6 @@
 import type { EngineQuotaRecord, QuotaEngine, QuotaRefreshInput, QuotaSnapshot, QuotaStatus } from '../../shared/quota';
 import { QUOTA_FRESH_MS } from '../../shared/quota';
+import { VERSION } from '../../shared/version';
 import { QuotaFailure, QuotaRenewalPending, readNativeCredential, type NativeCredential } from './credentials';
 import { normalizeUsage, PROVIDERS } from './providers';
 
@@ -157,7 +158,7 @@ export class QuotaProber {
   }
 
   private async request(engine: QuotaEngine, credential: NativeCredential, signal: AbortSignal): Promise<unknown> {
-    const headers: Record<string, string> = { Authorization: `Bearer ${credential.token}`, Accept: 'application/json', 'User-Agent': 'Weaver/0.1.0' };
+    const headers: Record<string, string> = { Authorization: `Bearer ${credential.token}`, Accept: 'application/json', 'User-Agent': `Weaver/${VERSION}` };
     if (engine === 'codex') headers['ChatGPT-Account-Id'] = credential.accountId!;
     if (engine === 'claude') headers['anthropic-beta'] = 'oauth-2025-04-20';
     if (engine === 'grok') headers['x-xai-token-auth'] = 'xai-grok-cli';
