@@ -67,11 +67,13 @@ CLI 目录共 38 条命令：读取（15）与写入（13）共 28 条逻辑命�
 | `operations.get` | `{commandId}` |
 | `observability.get` / `observability.export` | `{taskId, kind?}`；export 返回 JSON 文本形式的完整 trace |
 
+**owner 的两层身份**：策略里的 `owners.<id>` 是 *profile*（每台宿主引擎至多启用一个）；真正派发前要先用 `owners attach` 把当前 agent 会话登记成一个 *owner 实例*，一次会话登记一次，返回的 `id` 全会话复用。输入约定：`name` 为 `<宿主> · <工作区目录名> · <HH:MM 会话开始>`（如 `Claude · weaver · 14:20`），`session` 取 `$CODEX_THREAD_ID`，否则 `$HERDR_PANE_ID`，否则工作区绝对路径；`--command-id` 在同一会话内保持稳定，回复丢失时同键同参取回原收据，仍不确定就 `weaver owners list` 按 name/session 找回那个实例。之后 `tasks create` 一律带 `ownerId`；带 `ownerProfileId` 走的是临时登记路径，服务端为该任务另建一个新的逻辑 owner（默认名 `Task owner`），任务因此散落到互不相干的 owner 行、不再共享同一会话的并发与上报。attach 始终是 `verified:false` 的元数据登记，服务端不联系宿主。
+
 八个 RPC 动词：`policy get`（无参，即 `weaver policy get`）、`policy validate --input`（config 文档本体，≤256 KiB，返回 issue 数组，空即通过）、`policy save --input`（`{revision,config,blocks}`，revision 乐观锁，返回新 snapshot）、`policy preview --input`（`{owner, worker?, runningCount?}`）、`engines scan`（无参）、`engines set-enabled --input`（`{id,enabled,revision}`）、`quota get`（无参）、`quota refresh [--input]`（可选 `{engine}`）。这些命令不接受 `--command-id`/`--task-id`；有输入时直接提交 usage 所示 JSON 对象，不接逻辑命令信封。仅 `quota refresh` 的单参数 RPC 允许省略 `--input`，此时传 `{}`；其余单参数 RPC 继续要求输入。
 
 网页另有两个不进 CLI 目录的 RPC 用于工作代理可用性探测：`sayHi`（`{engine, model, effort}`，engine 为已保存配置里的引擎 id）立即返回 `{id, status:'running', startedAt}`，`sayHiResult(id)` 轮询到 `status:'done'` 后带 `result {ok, reply?, model?, error?, durationMs, checkedAt}`。探测在 `agent-state/` 下的空临时目录里用各 CLI 最轻的一次性调用发一句 hi：不带工具、MCP、插件/hooks 与用户 settings（CLI 支持时），不保存会话，不经过工作代理执行适配，因此 Claude Code 也能探测。claude 不用 `--bare`，因为它不读 OAuth。120 秒超时即停止进程，同时最多 3 个，结果保留 10 分钟，结束后删除临时目录。这是一次真实推理，会消耗少量额度；成功只说明此刻可用。
 
-本地 wait/watch：`tasks wait --task-id` / `tasks watch --task-id`，`--for` 1–600 秒（缺省 30）；轮询 `tasks get`（watch 另加 `tasks events` 增量），不是第二调度器；超时按 `TIMEOUT` 失败退出，退出不取消任务。
+本地 wait/watch：`tasks watch --task-id` 的 `--for` 为 1–600 秒（缺省 30）；`tasks wait --task-id` 的 `--for` 同为 1–600 秒，省略时按策略 `herdr.max_wait_minutes` 取上限 min(600 秒, max_wait_minutes)，且任务一结束立即返回当前快照。两者轮询 `tasks get`（watch 另加 `tasks events` 增量），不是第二调度器；超时按 `TIMEOUT` 失败退出，退出不取消任务。
 
 ### 3.1 原生账户额度
 
@@ -130,8 +132,11 @@ weaver quota refresh --help --output json
 说明：`<taskId>`、`<digest>` 等占位来自命令真实响应中的字段，本文不虚构具体 UUID 或 digest。空行之间是同一任务的连续步骤；每条 mutation 用稳定 commandId 便于幂等。
 
 ```sh
+weaver owners attach --input owner.json --command-id owner-001
+# → data.{id, name, profileId, mode:'manual', state:'attached', host}（一次会话登记一次，`<ownerId>` = data.id）
+
 weaver tasks create --input task.json --command-id create-001
-# → data.{id, workspace, ownerId, continuationPolicy{idleRotationMinutes:60}}（ownerProfileId 登记时自动绑定）
+# → data.{id, workspace, ownerId, continuationPolicy{idleRotationMinutes:60}}（ownerId 用 attach 返回的实例 id）
 
 weaver packages create --task-id <taskId> --input package.json --command-id package-001
 # → data.{id, revision:1, scope, acceptanceCriteria, instruction}（包冻结）
@@ -152,11 +157,14 @@ weaver artifacts read --task-id <taskId> --input read.json
 ```
 
 ```json
+owner.json
+{ "profileId": "codex_owner", "name": "Codex · your-repo · 14:20", "session": "/home/you/your-repo" }
+
 task.json
 {
   "title": "Add retry unit test",
   "instruction": "Add a bounded test covering flake reproduction and result-only-on-zero-exit.",
-  "ownerProfileId": "codex_owner",
+  "ownerId": "<ownerId>",
   "workspace": "/home/you/your-repo",
   "acceptanceCriteria": ["suite passes locally", "revision kept minimal"]
 }

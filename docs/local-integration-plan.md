@@ -4,14 +4,14 @@
 
 ## 1. 安装与探测
 
-引擎探测只做两件事：`PATH` 里的固定命令名 + 带超时的 `--version`（`weaver engines scan`）。它不登录、不调用模型、不证明认证或模型可用（`authenticated:false`/`modelUsable:false` 恒定）。固定目录为七个 id：`claude / codex / grok / opencode / pi / qoder / gemini`（kind 分别为 claude/codex/grok/opencode/pi/qodercli/gemini）。目录外的命令不会被探测：不允许调用方传入可执行路径。
+引擎探测只做两件事：`PATH` 里的固定命令名 + 带超时的 `--version`（`weaver engines scan`）。它不登录、不调用模型、不证明认证或模型可用（`authenticated:false`/`modelUsable:false` 恒定）。固定目录为六个 id：`claude / codex / grok / opencode / pi / qoder`（kind 分别为 claude/codex/grok/opencode/pi/qodercli）。目录外的命令不会被探测：不允许调用方传入可执行路径。
 
-本机已核实版本（安装事实，不是可用性承诺）：OpenCode 1.19.3、Pi 1.3.0、Grok 1.0.62、Codex 0.163.0。Claude Code 探测存在但真实执行延期（`deferred`）；`qodercli`/`gemini` 是 `not_implemented`，可以出现在探测记录里但不能配置真实路由角色。Pi `--offline --list-models` 的本机目录含 `cc-switch-agentplan` 的 `ark-code-latest / deepseek-v4.1-flash / glm-5.3-flash / kimi-k3`。
+本机已核实版本（安装事实，不是可用性承诺）：OpenCode 1.19.3、Pi 1.3.0、Grok 1.0.62、Codex 0.163.0。Claude Code 探测存在但真实执行延期（`deferred`）；`qodercli` 是 `not_implemented`，可以出现在探测记录里但不能配置真实路由角色。Pi `--offline --list-models` 的本机目录含 `cc-switch-agentplan` 的 `ark-code-latest / deepseek-v4.1-flash / glm-5.3-flash / kimi-k3`。
 
 ## 2. 启用与角色配置（两步，不互换）
 
 - 第一步 `weaver engines set-enabled --input toggle.json`，body `{"id":"codex","enabled":true,"revision":<current>}`。启用要求已有 installed 探测与当前 revision；停用有启用的 owner/worker 时被拒绝并要求先单独停用角色，引擎记录与角色历史保留，不级联。启用成功后 pump 让排队任务按新准入重估。用 `policy save`/高级 JSON 把停用引擎改成启用是不允许的，同样必须走这里。
-- 第二步是角色配置：worker（`engine/model/effort/description`）与 owner（`engine/model/effort/workers/worker_weights/max_parallel`）都是 policy 字段。每个引擎 kind 有固定 effort 词表（`EFFORTS`：claude/codex low…max、grok none…max、pi off…max、qodercli auto…ultracode；opencode 不限定词表）。启用引擎不会自动建任何角色；派发取权重最高的可用 worker，权重 0 排除。保存走 `policy validate` → `policy save`（revision 乐观锁），预览用 `policy preview`。
+- 第二步是角色配置：worker（`engine/model/effort/description`）与 owner（`engine/model/effort/workers/worker_weights/max_parallel`）都是 policy 字段。每个引擎 kind 有固定 effort 词表（`EFFORTS`：claude/codex low…max、grok none…max、pi off…max、qodercli auto…ultracode；opencode 不限定词表）。启用引擎不会自动建任何角色；派发按权重做负载均衡：选（运行中任务数 + 1）/ 权重最小的可用 worker，空闲时先给权重高的，并发时按权重比例分摊；权重 0 排除。保存走 `policy validate` → `policy save`（revision 乐观锁），预览用 `policy preview`。
 
 ```json
 {"codex_owner": {"enabled": true, "engine": "codex", "model": "gpt-6.1-sol", "effort": "xhigh", "max_parallel": 4,
@@ -29,7 +29,7 @@
 1. launcher 模块已加载（`capabilities.realExecution:true`；加载失败 → `CAPABILITY_UNAVAILABLE`，无回退）。
 2. workspace 必须是已存在的绝对路径：省略时 `tasks create` 用 CLI 调用方 cwd 补齐，显式相对路径相对调用方解析；服务端不会拿自己的仓库填空。真实派发把 workspace 与 `workspaceIdentity` 冻结进 dispatch，泵复核期间若失效记 `workspace_changed`。
 3. 引擎/角色/配额/pin 当前有效：路由改变（worker/engine/kind/model/effort 或 kind 不符）、容量不足、配额 block 都会记 `queueReason`（`policy_blocked / waiting_for_capacity / frozen_route_changed / workspace_changed / launch_blocked`），排队路由不被默默改派或换引擎。
-4. `herdr.max_wait_minutes`（1–1440）是负责人轮询等待一个工作包的最长时间，超过后由负责人决定继续等待、取消或收回；Weaver 不设执行超时，也不会据此停止工作代理。
+4. `herdr.max_wait_minutes`（1–1440）是负责人对同一工作代理两次检查之间的最长间隔：等待只用 `weaver tasks wait --task-id`（不带 `--for` 时按 min(600 秒， max_wait_minutes) 取上限，任务一结束就返回），超过后由负责人决定继续等待、取消或收回；Weaver 不设执行超时，也不会据此停止工作代理。
 5. 认证复用各引擎自身本机配置；Weaver 从不复制/改写/打印密钥，也没有 global 工具安装。启动用受管 user scope 包裹进程（Linux/systemd 主机上每个 launch 一个唯一 scope），子进程随 scope 收尾。
 
 固定 argv builder（真实核实的调用形态）：
@@ -55,7 +55,7 @@ codex 0.163.0:    exec --json --ephemeral --skip-git-repo-check --sandbox worksp
 
 | 现象 | 含义与处理 |
 |---|---|
-| `APP_NOT_RUNNING` | 没有运行中实例；先 `weaver web --no-open`（可用 `--data-dir` 指定状态目录） |
+| `APP_NOT_RUNNING` | 没有运行中实例；先 `weaver server start`（可用 `--data-dir` 指定状态目录） |
 | `EADDRINUSE 127.0.0.1:<port>` | 已有进程占用；换 `--port` 或停掉旧实例 |
 | `CAPABILITY_UNAVAILABLE`（deferred Claude / non-real kind / launcher 未加载） | 请求被拒且无回退；检查 `engines scan` 的 readiness 与 `capabilities.realExecution` |
 | 派发报无可用 worker | 权重全 0、角色未启用、引擎停用或有生效 block；按 `skipped`/报错明细修 policy |

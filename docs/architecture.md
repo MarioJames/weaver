@@ -60,10 +60,10 @@ JSON 双文件即全部持久状态：
 路由基于 policy 配置（`engines`/`owners`/`workers`/`herdr` + `blocks`）：
 
 - `resolveDispatch` 只按权重：owner.workers 中权重最高且可用（worker 启用、引擎启用、无生效 block）的 worker 胜出；同权重按 owner.workers 声明顺序。
-- `worker_weights`：整数 0..1000，缺省 100；0 直接排除该 worker，显式 worker 指定也不能绕过权重 0。
+- `worker_weights`：整数 0..1000，缺省 100；0 直接排除该 worker，显式 worker 指定也不能绕过权重 0。派发按权重做负载均衡：选（该 worker 在所有 owner 下运行中的任务数 + 1）/ 权重最小者，相同时取权重高者，再按列表顺序。
 - 配额 block 按引擎/model 精确匹配，绝对时间戳 `release_at` 只有明确恢复时间才自动到期，其余手动解除。
 - 准入与派发同一 resolve 函数：`policy preview` 只读（`dispatch:"preview"`、`execution:"disabled"`）不执行；`workers.spawn` 实际校验 workspace/provider/容量后按结果 start 或入队。
-- 并发按 owner 的 `max_parallel`；报告总数是 enabled owner 的 `max_parallel` 之和，没有独立全局上限。`herdr.max_wait_minutes`（1-1440）只是负责人轮询等待一个工作包的最长时间，超过后由负责人查看进展并决定继续等待、取消或收回，Weaver 不会据此停止工作代理。
+- 并发按 owner 的 `max_parallel`；报告总数是 enabled owner 的 `max_parallel` 之和，没有独立全局上限。`herdr.max_wait_minutes`（1-1440）是负责人对同一工作代理两次检查之间的最长间隔：等待只用 `weaver tasks wait --task-id`（不带 `--for` 时即按该间隔取等待上限 min(600 秒， max_wait_minutes)，任务一结束就返回），期间负责人查看进展并决定继续等待、取消或收回，Weaver 不会据此停止工作代理。
 
 队列与冻结：
 
@@ -82,7 +82,7 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 - 请求的真实引擎/model/effort、adapter、workspace、scopeUnit 和 observed evidence 都记录在 `run` 与 observability 里；mock 显式记录 `execution:'mock'`。没有静默回退：CC 报 `CAPABILITY_UNAVAILABLE`（deferred），unknown kind 同拒，launcher 未加载同拒。
 - 生命周期收尾只清理本 launch 拥有的进程；Linux/systemd host 上每个真实 launch 使用唯一命名 user scope，取消/超时/完成前先关闭自身 scope。没有共享 leader/daemon。
 
-真实与 native 执行在 Weaver 侧没有任何停止定时器；`herdr.max_wait_minutes` 只是负责人的轮询等待上限，直接单测的 mock adapter 才允许一个更短的测试等待。
+真实与 native 执行在 Weaver 侧没有任何停止定时器；`herdr.max_wait_minutes` 只是负责人两次检查之间的最长间隔（`weaver tasks wait` 不带 `--for` 即按 min(600 秒， max_wait_minutes) 取上限，任务一结束就返回），Weaver 不据此停止工作代理，直接单测的 mock adapter 才允许一个更短的测试等待。
 
 ## 6. Owner 手动上下文与结果（ContinuationService）
 
@@ -93,9 +93,9 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 
 ## 7. 引擎目录与探测
 
-固定 catalog（`src/shared/engines.ts`）：claude/codex/grok/opencode/pi/qoder/gemini 七个 id，kind 分别 claude/codex/grok/opencode/pi/qodercli/gemini。探测只做 PATH 可执行文件 + 带超时 `--version`（shell:false、ANSI 去除、4s 超时、进程组收尾）；结果永远 `authenticated:false`、`modelUsable:false`。启用权威是 PolicyStore `engines[id].enabled`（`engines set-enabled` 需 installed 探测 + revision）；启用引擎不会创建任何角色。adapter 状态分 `real`（opencode/pi/grok/codex）、`deferred`（claude）、`not_implemented`（qodercli/gemini）；`realExecution` = 启用且启用 worker 使用该引擎且 launcher 已加载，探测≠可用。
+固定 catalog（`src/shared/engines.ts`）：claude/codex/grok/opencode/pi/qoder 六个 id，kind 分别 claude/codex/grok/opencode/pi/qodercli。探测只做 PATH 可执行文件 + 带超时 `--version`（shell:false、ANSI 去除、4s 超时、进程组收尾）；结果永远 `authenticated:false`、`modelUsable:false`。启用权威是 PolicyStore `engines[id].enabled`（`engines set-enabled` 需 installed 探测 + revision）；启用引擎不会创建任何角色。adapter 状态分 `real`（opencode/pi/grok/codex）、`deferred`（claude）、`not_implemented`（qodercli）；`realExecution` = 启用且启用 worker 使用该引擎且 launcher 已加载，探测≠可用。
 
-真实执行适配（`src/main/adapters/cli/argv.ts` + `normalize.ts`）覆盖 opencode、pi、grok、codex、qodercli。qodercli 以 `-p -o stream-json` 从 stdin 读任务，`--permission-mode bypass_permissions`（CLI 策略，不是 OS 隔离），`--setting-sources ""` 与 `--strict-mcp-config` 跳过用户级 hooks、插件与 MCP，`--no-session-persistence` 不落会话；输出按 Claude Code 风格的 system/assistant/result 事件归一化。claude 与 gemini 仍无执行适配。
+真实执行适配（`src/main/adapters/cli/argv.ts` + `normalize.ts`）覆盖 opencode、pi、grok、codex、qodercli。qodercli 以 `-p -o stream-json` 从 stdin 读任务，`--permission-mode bypass_permissions`（CLI 策略，不是 OS 隔离），`--setting-sources ""` 与 `--strict-mcp-config` 跳过用户级 hooks、插件与 MCP，`--no-session-persistence` 不落会话；输出按 Claude Code 风格的 system/assistant/result 事件归一化。claude 仍无执行适配。
 
 ## 8. 已知限制（不是未来路线）
 
@@ -108,4 +108,4 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 
 ## 9. 来源与出处
 
-沿用 skill-foundry 上游 provenance（Apache-2.0）：上游仓库 [MarioJames/skill-foundry](https://github.com/MarioJames/skill-foundry/tree/61989b11a5d0565d2a6630833e64a2d73769a947/skills/agents-cooperation)，`scripts/agents-config.ts` 与 `scripts/lib/json-schema.ts` 迁入 `src/main/policy/*`，详见 [script-migration](script-migration.md)。Weaver 自有扩产（权重/pin/真实 launcher/CLI 面等）是本仓库独立实现。公开技能见 [skills/weaver/SKILL.md](../skills/weaver/SKILL.md) 与 [provenance](../skills/weaver/references/provenance.md)。
+沿用 skill-foundry 上游 provenance（Apache-2.0）：上游仓库 [MarioJames/skill-foundry](https://github.com/MarioJames/skill-foundry/tree/61989b11a5d0565d2a6630833e64a2d73769a947/skills/agents-cooperation)，`scripts/agents-config.ts` 与 `scripts/lib/json-schema.ts` 迁入 `src/main/policy/*`，详见 [script-migration](script-migration.md)。Weaver 自有扩产（权重/pin/真实 launcher/CLI 面等）是本仓库独立实现。公开技能见 [skills/agents-weaver/SKILL.md](../skills/agents-weaver/SKILL.md) 与 [provenance](../skills/agents-weaver/references/provenance.md)。

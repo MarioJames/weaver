@@ -25,7 +25,7 @@ export function OwnerScheduleFields({ config, blocks, record, update }: { config
   // A titled section rather than a Form.Field: the add button sits beside the title, and a label element would forward clicks on the title to it.
   return <section aria-label="工作代理" className={styles.tight}>
     <div className={styles.spread} style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
-      <Form.Title title="工作代理" desc="派发时按权重从高到低尝试，跳过停用或受限的工作代理；权重相同按加入先后。权重 0 表示不派给它。" />
+      <Form.Title title="工作代理" desc="派发按权重分摊：空闲时先给权重高的，并发时按权重比例分配到各工作代理；跳过停用或受限的工作代理。权重 0 表示不派给它。" />
       <DropdownMenu placement="bottomRight" items={available.length ? available.map(id => ({ key: id, label: id, desc: [config.workers[id]?.engine, config.workers[id]?.model].filter(Boolean).join(' · '), onClick: () => { const next = appendWorker(record.workers, available, id); if (next) update({ ...record, workers: next }); } })) : [{ key: 'none', label: '没有可添加的工作代理', disabled: true }]}>
         <Button size="small" icon={Plus}>添加工作代理</Button>
       </DropdownMenu>
