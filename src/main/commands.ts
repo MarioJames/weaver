@@ -1,17 +1,17 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { API_VERSION, type CommandResponse, type DispatchNext, type LogicalOwner, type WorkPackage } from '../shared/commands';
+import { API_VERSION, ownerSession, sameOwnerInstance, type CommandResponse, type DispatchNext, type LogicalOwner, type OwnerInstance, type WorkPackage } from '../shared/commands';
 import type { Task } from '../shared/types';
 import { object, parseId, parseTaskInput, parseWorkerRecord, text } from '../shared/validation';
 import { TaskManager } from './manager';
-import { event } from './store';
+import { event, slotGroupCount, slotGroupFor, slotGroupName } from './store';
 import { ContinuationService, ContinuationError, handoffPrompt, redactContext } from './continuation';
 import { MockOwnerHostAdapter, type OwnerHostEvidence, type OwnerMessage } from './adapters/logical';
 import { launchOwner, herdrOnPath, OwnerLaunchError } from './owner-host';
 import type { TaskOwnerHost } from '../shared/types';
 import { PolicyStore } from './policy/store';
-import { EXCLUDED_ENGINE_REASON } from './policy/routing';
 import type { RoutePreview } from '../shared/policy';
 import { QUOTA_CAPABILITIES } from './policy/quota';
+import { EXCLUDED_ENGINE_REASON } from './policy/routing';
 import { absoluteExistingWorkspace, assertFrozenWorkspace, workspaceIdentity, isRealEngineKind, REAL_ENGINE_KINDS } from './workspace';
 import { workerInstruction } from './adapters/instruction';
 export const WRITE_COMMANDS = ['owners.attach','owners.spawn','owners.switch','owners.launch','owners.continuation.configure','tasks.create','tasks.retry','tasks.cancel','packages.create','workers.spawn','workers.complete','results.deliver','results.ack','reviews.submit'] as const;
@@ -23,6 +23,7 @@ export function workerLoad(tasks: Task[]): Record<string, number> {
  for (const task of tasks) if ((task.status === 'running' || task.status === 'cancelling') && task.dispatch?.worker) load[task.dispatch.worker] = (load[task.dispatch.worker] ?? 0) + 1;
  return load;
 }
+/** Scale hint, not an admission rule: admission is per owner instance, so this sum over enabled profiles caps nothing by itself. */
 export function configuredParallel(policy: PolicyStore): number {
  return Object.values(policy.snapshot().config.owners).filter(owner => owner.enabled).reduce((sum, owner) => sum + owner.max_parallel, 0);
 }
@@ -76,9 +77,13 @@ export class CommandHandler {
  }
  private finish(key:string,response:CommandResponse){const meta=this.manager.store.getMetadata();meta.receipts[key].response=response;this.manager.store.setMetadata(meta);}
  private owner(id:unknown):LogicalOwner {const owner=this.manager.store.getMetadata().owners.find(o=>o.id===parseId(id));if(!owner)fail('NOT_FOUND','Owner not found');return owner!;}
+ /** Work holding this instance's own slots: running plus cancelling. Queued and terminal tasks hold none. */
+ private runningOn(owner:LogicalOwner):number {return slotGroupCount(this.manager.store.list(),slotGroupFor(owner.id,owner.profileId));}
+ /** Every registered instance, its profile, its caller session label and how much of it is busy. */
+ private ownerInstances():OwnerInstance[]{return this.manager.store.getMetadata().owners.map(owner=>({...owner,runningTaskCount:this.runningOn(owner)}));}
  private task(a:Record<string,unknown>):Task {try{return this.manager.store.get(parseId(a.taskId));}catch{ return fail('NOT_FOUND','Task not found');}}
- private revise(task:Task,a:Record<string,unknown>){if(a.expectedRevision!==undefined && a.expectedRevision!==(task.revision??0))fail('REVISION_CONFLICT',`Current revision is ${task.revision??0}`);}
- private put(task:Task){this.manager.update(task);}
+  private revise(task:Task,a:Record<string,unknown>){if(a.expectedRevision!==undefined && a.expectedRevision!==(task.revision??0))fail('REVISION_CONFLICT',`Current revision is ${task.revision??0}`);}
+  private put(task:Task){this.manager.update(task);}
   private startOwnerHost(task:Task,profile:string,prompt:string):{ownerHost?:TaskOwnerHost;failure?:{code:string;message:string}} {
    try {
     const workspace=task.dispatch?.workspace??task.workspace;
@@ -114,6 +119,10 @@ export class CommandHandler {
   if(task.queueReason?.code===code&&task.queueReason.message===bounded)return;
   task.queueReason={code,message:bounded};this.put(task);
  }
+ /** Capacity is per owner instance, so a waiting message names the binding whose slots are held. */
+ private capacityWait(profile:string, ownerId:string|undefined, limit:number):string {
+  return `${slotGroupName(this.manager.store.getMetadata().owners,ownerId,profile)} is at its current concurrency limit (${limit}).`;
+ }
  pump():void {
   if(this.pumping||this.draining)return;this.pumping=true;
   try{for(const task of this.manager.store.list().reverse()){
@@ -122,13 +131,13 @@ export class CommandHandler {
    let phase:NonNullable<Task['queueReason']>['code']='policy_blocked';
    try{
     const frozen=task.dispatch;
-    const running=this.manager.store.list().filter(t=>(t.status==='running'||t.status==='cancelling')&&t.dispatch?.owner===frozen.owner).length;
+    const running=slotGroupCount(this.manager.store.list(),slotGroupFor(task.ownerId,frozen.owner));
     const route=this.policy.preview({owner:frozen.owner,worker:frozen.worker,runningCount:running});
     const kind=this.policy.snapshot().config.engines[route.engine]?.kind;
     if(route.worker!==frozen.worker||route.engine!==frozen.engine||route.model!==frozen.model||route.effort!==frozen.effort||(frozen.engineKind!==undefined&&kind!==frozen.engineKind)){
      this.queueBlocked(task,'frozen_route_changed','Current worker engine, kind, model or effort no longer matches the frozen dispatch; restore the route or cancel and create a new task.');continue;
     }
-    if(!route.capacityAvailable){this.queueBlocked(task,'waiting_for_capacity',`Owner ${frozen.owner} is at its current concurrency limit (${route.maxParallel}).`);continue;}
+    if(!route.capacityAvailable){this.queueBlocked(task,'waiting_for_capacity',this.capacityWait(frozen.owner,task.ownerId,route.maxParallel));continue;}
     phase='workspace_changed';if(frozen.execution==='real')assertFrozenWorkspace(frozen);
     phase='launch_blocked';this.manager.start(task.id,route.maxParallel);
    }catch(error){
@@ -185,22 +194,33 @@ export class CommandHandler {
  }
  private execute(command:string,a:Record<string,unknown>):unknown {
   switch(command){
-   case 'sync.snapshot':return {revision:this.manager.store.revision,tasks:this.manager.store.list().map(t=>({id:t.id,title:t.title,status:t.status,revision:t.revision??0,ownerId:t.ownerId,updatedAt:t.updatedAt,reviewState:t.reviewState??'pending'})),owners:this.manager.store.getMetadata().owners.map(o=>({id:o.id,name:o.name,profileId:o.profileId,mode:o.mode,state:o.state}))};
+   case 'sync.snapshot':return {revision:this.manager.store.revision,tasks:this.manager.store.list().map(t=>({id:t.id,title:t.title,status:t.status,revision:t.revision??0,ownerId:t.ownerId,updatedAt:t.updatedAt,reviewState:t.reviewState??'pending'})),owners:this.manager.store.getMetadata().owners.map(o=>({id:o.id,name:o.name,profileId:o.profileId,session:ownerSession(o),mode:o.mode,state:o.state}))};
    case 'sync.status':return {revision:this.manager.store.revision,changed:a.after!==this.manager.store.revision,recovery:'refresh sync.snapshot; push invalidation is not a durable event stream'};
-   case 'capabilities.get':return {apiVersion:API_VERSION,cliTransport:this.transportStatus,authentication:'ephemeral-local-trusted-user-demo',ownerScopedAuthorization:false,ownerSpawn:this.herdrPresent()?'herdr':'logical-registration',manualAttach:'metadata-only',ownerModelSpawned:false,attachmentVerified:false,authenticated:false,modelUsable:false,workerProviders:this.manager.canLaunchReal?['mock-jsonl',...REAL_ENGINE_KINDS]:['mock-jsonl'],realExecution:this.manager.canLaunchReal,mcp:false,maxParallel:configuredParallel(this.policy),policyAdmission:true,quota:QUOTA_CAPABILITIES,commands:[...READ_COMMANDS,...WRITE_COMMANDS],limits:{tasks:200,owners:200,packages:1000,receipts:5000,eventsPerPage:100},durability:'durable intent before effect; interrupted commands require reconciliation, not automatic replay'};
+   case 'capabilities.get':return {apiVersion:API_VERSION,cliTransport:this.transportStatus,authentication:'ephemeral-local-trusted-user-demo',ownerScopedAuthorization:false,ownerSpawn:this.herdrPresent()?'herdr':'logical-registration',manualAttach:'metadata-only',ownerModelSpawned:false,attachmentVerified:false,authenticated:false,modelUsable:false,workerProviders:this.manager.canLaunchReal?['mock-jsonl',...REAL_ENGINE_KINDS]:['mock-jsonl'],realExecution:this.manager.canLaunchReal,mcp:false,maxParallel:configuredParallel(this.policy),capacity:{unit:'owner-instance',aggregate:'sum of enabled owner profile max_parallel',admission:'Each attached owner instance holds its own profile max_parallel slots, so maxParallel is a scale hint, not a profile-wide or global cap.'},policyAdmission:true,quota:QUOTA_CAPABILITIES,commands:[...READ_COMMANDS,...WRITE_COMMANDS],limits:{tasks:200,owners:200,packages:1000,receipts:5000,eventsPerPage:100},durability:'durable intent before effect; interrupted commands require reconciliation, not automatic replay'};
    case 'owners.continuation.get':return this.continuation.get(parseId(a.taskId));
    case 'owners.continuation.configure':{if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');return this.continuation.configure(parseId(a.taskId),a.expectedRevision as number,a.idleRotationMinutes as number|null);}
    case 'owners.switch':{if(!Number.isSafeInteger(a.expectedRevision)||(a.expectedEpoch!==undefined&&!Number.isSafeInteger(a.expectedEpoch)))fail('INVALID_REQUEST','Revision and epoch must be integers');if(a.reason!==undefined&&a.reason!=='manual'&&a.reason!=='idle')fail('INVALID_REQUEST','Invalid switch reason');if(a.launch!==undefined&&typeof a.launch!=='boolean')fail('INVALID_REQUEST','launch must be a boolean');const task=this.task(a);const owner=this.owner(task.ownerId);const profile=text(a.profileId??owner.profileId,'profileId',120);if(this.policy.snapshot().owners[profile]?.status!=='available')fail('POLICY_DENIED','Target owner profile unavailable');const result=this.continuation.rotate(task.id,Number(a.expectedRevision),a.reason==='idle'?'idle':'manual',a.expectedEpoch===undefined?undefined:Number(a.expectedEpoch),profile);if(a.launch!==true)return result;const launched=this.startOwnerHost(this.manager.store.get(task.id),profile,typeof result.prompt==='string'?result.prompt:'');(result as {launch?:unknown}).launch=launched.ownerHost?{ok:true,ownerHost:launched.ownerHost}:{ok:false,code:launched.failure!.code,message:launched.failure!.message};return result;}
    case 'owners.launch':{if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');const task=this.task(a);this.revise(task,a);if(!task.contextPack)return fail('INVALID_STATE','No context pack to launch the owner from');const owner=task.ownerId?this.owner(task.ownerId):undefined;if(!owner)return fail('INVALID_STATE','Task has no logical owner');const profile=owner.profileId;if(this.policy.snapshot().owners[profile]?.status!=='available')fail('POLICY_DENIED','Owner profile is unavailable');const prompt=handoffPrompt(task,task.contextPack);const launched=this.startOwnerHost(this.manager.store.get(task.id),profile,prompt);return {taskId:task.id,prompt,...launched.ownerHost?{launch:{ok:true,ownerHost:launched.ownerHost}}:{launch:{ok:false,code:launched.failure!.code,message:launched.failure!.message}},task:this.publicTask(this.manager.store.get(task.id))};}
-   case 'owners.list':return {owners:this.manager.store.getMetadata().owners};
-   case 'owners.get':return this.owner(a.ownerId);
+   case 'owners.list':return {owners:this.ownerInstances()};
+   case 'owners.get':{const owner=this.owner(a.ownerId);return {...owner,runningTaskCount:this.runningOn(owner)};}
    case 'owners.attach':case 'owners.spawn':{
     const mode=command==='owners.spawn'&&a.provider==='mock'?'mock':'manual';if(a.provider!==undefined&&a.provider!=='mock')fail('CAPABILITY_UNAVAILABLE','This process does not spawn an owner model');
-    const profileId=text(a.profileId,'profileId',120);const snapshot=this.policy.snapshot();if(snapshot.owners[profileId]?.status!=='available')fail('POLICY_DENIED','Owner profile is unavailable');
-    const meta=this.manager.store.getMetadata();if(meta.owners.length>=200)fail('RESOURCE_LIMIT','Owner limit reached');
-    const owner:LogicalOwner={id:randomUUID(),name:text(a.name,'name',120),profileId,mode,state:mode==='mock'?'ready':'attached',createdAt:new Date().toISOString()};
+    // Inputs are validated before the registry is read, so a malformed request can never reach an existing instance.
+    const profileId=text(a.profileId,'profileId',120);const name=text(a.name,'name',120);
+    const session=a.session===undefined?'external-cli':text(a.session,'session',120);
+    const pane=a.pane===undefined?'unverified':text(a.pane,'pane',120);
+    const meta=this.manager.store.getMetadata();
+    // The profile is the policy role; this caller's profile + name + session is one instance of it. A repeat attach is that same durable registration.
+    if(command==='owners.attach'&&mode==='manual'){
+     const attached=meta.owners.find(owner=>sameOwnerInstance(owner,{profileId,name,session}));
+     if(attached)return attached;
+    }
+    // Admission and limits decide whether a new instance may be created; a duplicate has nothing to admit.
+    if(this.policy.snapshot().owners[profileId]?.status!=='available')fail('POLICY_DENIED','Owner profile is unavailable');
+    if(meta.owners.length>=200)fail('RESOURCE_LIMIT','Owner limit reached');
+    const owner:LogicalOwner={id:randomUUID(),name,profileId,mode,state:mode==='mock'?'ready':'attached',createdAt:new Date().toISOString(),...(mode==='manual'?{session}:{})};
     if(mode==='mock'){if(a.session!==undefined||a.pane!==undefined)fail('INVALID_REQUEST','Logical registration has no session or pane');owner.host=this.ownerHost.spawn({ownerId:owner.id,name:owner.name,profileId});}
-    else owner.host=this.ownerHost.attach({ownerId:owner.id,name:owner.name,profileId,session:a.session===undefined?'external-cli':text(a.session,'session',120),pane:a.pane===undefined?'unverified':text(a.pane,'pane',120)});
+    else owner.host=this.ownerHost.attach({ownerId:owner.id,name:owner.name,profileId,session,pane});
     meta.owners.push(owner);this.manager.store.setMetadata(meta);return owner;
    }
    case 'tasks.create':return this.manager.store.transaction(()=>{
@@ -236,7 +256,7 @@ export class CommandHandler {
     const owner=text(a.owner??logical?.profileId??Object.keys(this.policy.snapshot().config.owners)[0],'owner profile',120);
     if(logical&&owner!==logical.profileId)fail('POLICY_DENIED','Task owner profile cannot be changed at dispatch');
     const excluded=this.chainEngines(task);
-    const running=this.manager.store.list().filter(t=>(t.status==='running'||t.status==='cancelling')&&t.dispatch?.owner===owner).length;
+    const running=slotGroupCount(this.manager.store.list(),slotGroupFor(task.ownerId,owner));
     let route:RoutePreview;
     try {
      route=this.policy.preview({owner,...(a.worker!==undefined?{worker:a.worker}:{}),runningCount:running,workerLoad:workerLoad(this.manager.store.list()),...(excluded.length?{excludeEngines:excluded}:{})});
@@ -256,7 +276,7 @@ export class CommandHandler {
     task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,...(decision.execution==='real'?{workspaceIdentity:workspaceIdentity(decision.workspace)}:{})}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
     const selected=decision.execution==='real'?`Policy selected ${route.worker}; launching ${decision.engineKind} in ${decision.workspace}`:decision.execution==='native'?`Policy selected ${route.worker} on the owner's engine; the owner runs it with its built-in subagent tool (${route.model}, ${route.effort})`:`Policy selected ${route.worker}; explicit mock-jsonl provider`;
     event(task,'lifecycle',`${selected}${excluded.length?`; engines excluded because they ${EXCLUDED_ENGINE_REASON}: ${excluded.join(', ')}`:''}`);
-    if(!route.capacityAvailable){task.scheduled=true;task.queueReason={code:'waiting_for_capacity',message:`Owner ${route.owner} is at its current concurrency limit (${route.maxParallel}).`};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.put(task);return this.dispatchResponse(task,excluded);}this.put(task);return this.dispatchResponse(this.manager.start(task.id,route.maxParallel),excluded);
+    if(!route.capacityAvailable){task.scheduled=true;task.queueReason={code:'waiting_for_capacity',message:this.capacityWait(route.owner,task.ownerId,route.maxParallel)};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.put(task);return this.dispatchResponse(task,excluded);}this.put(task);return this.dispatchResponse(this.manager.start(task.id,route.maxParallel),excluded);
    }
    case 'workers.complete':{
     const task=this.task(a);this.revise(task,a);

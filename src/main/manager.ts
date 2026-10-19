@@ -3,7 +3,7 @@ import type { Artifact, Task, TaskInput, WorkerRecord } from '../shared/types';
 import { parseTaskInput } from '../shared/validation';
 import type { ManagedProcess, WorkerAdapter } from './adapters/worker';
 import { JsonlParser } from './protocol';
-import { TaskStore, event } from './store';
+import { TaskStore, event, slotGroupCount, slotGroupName, slotGroupOf } from './store';
 import { redactContext } from './continuation';
 
 interface Running { child: ManagedProcess; timeout?: NodeJS.Timeout; killTimer?: NodeJS.Timeout; error?: string; result?: string; cancelled: boolean; stderrBytes: number }
@@ -38,8 +38,9 @@ export class TaskManager {
     if (task.dispatch) {
       const limit = liveMaxParallel ?? task.dispatch.maxParallel;
       if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('Configured max_parallel is invalid');
-      const running = this.store.list().filter(item => (item.status === 'running' || item.status === 'cancelling') && item.dispatch?.owner === task.dispatch!.owner).length;
-      if (running >= limit) throw new Error(`Owner ${task.dispatch.owner} is at its configured concurrency limit (${limit})`);
+      const group = slotGroupOf(task);
+      const running = slotGroupCount(this.store.list(), group);
+      if (running >= limit) throw new Error(`${slotGroupName(this.store.getMetadata().owners, task.ownerId, task.dispatch.owner)} is at its configured concurrency limit (${limit})`);
     }
     const timeoutMs = executionTimeoutMs(task, this.timeoutMs);
     const execution = task.dispatch?.execution ?? 'mock';

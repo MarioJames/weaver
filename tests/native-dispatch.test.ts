@@ -24,7 +24,8 @@ function setup() {
   const handler = new CommandHandler(manager, policy);
   const raw = (command: string, args: Record<string, unknown> = {}) => handler.handle({ apiVersion: 'weaver.v1', commandId: randomUUID(), command, args });
   const call = (command: string, args: Record<string, unknown> = {}): any => { const r = raw(command, args); assert.equal(r.ok, true, JSON.stringify(r)); return r.data; };
-  const task = () => call('tasks.create', { title: 'Native', goal: 'edit a file', ownerProfileId: 'claude_owner', workspace: dir });
+  // Without an ownerId each create registers its own owner instance; passing one keeps the work on that instance.
+  const task = (ownerId?: string) => call('tasks.create', { title: 'Native', goal: 'edit a file', workspace: dir, ...(ownerId === undefined ? { ownerProfileId: 'claude_owner' } : { ownerId }) });
   return { dir, store, policy, call, raw, task, close: async () => { handler.draining = true; await manager.shutdown(); rmSync(dir, { recursive: true, force: true }); } };
 }
 
@@ -89,7 +90,8 @@ test('native work holds an owner slot, can be cancelled, and survives a restart'
   const f = setup();
   try {
     const s = f.policy.snapshot(); s.config.owners.claude_owner.max_parallel = 1; f.policy.save({ revision: s.revision, config: s.config, blocks: [] });
-    const a = f.task(); const b = f.task();
+    const a = f.task(); const b = f.task(a.ownerId);
+    assert.equal(b.ownerId, a.ownerId, 'one owner instance holds one slot budget');
     f.call('workers.spawn', { taskId: a.id });
     assert.equal(f.call('workers.spawn', { taskId: b.id }).scheduled, true);
     const reloaded = new TaskStore(join(f.dir, 'tasks.json')); reloaded.recover();
@@ -130,12 +132,36 @@ test('native work that has not been admitted into a slot is only waited for', as
     const s = f.policy.snapshot();
     s.config.owners.claude_owner.max_parallel = 1;
     f.policy.save({ revision: s.revision, config: s.config, blocks: [] });
-    const a = f.task(); const b = f.task();
+    const a = f.task(); const b = f.task(a.ownerId);
+    assert.equal(b.ownerId, a.ownerId, 'a queued slot is the same owner instance waiting for itself');
     assert.equal(f.call('workers.spawn', { taskId: a.id }).next.action, 'run_subagent');
     const queued = f.call('workers.spawn', { taskId: b.id });
     assert.equal(queued.scheduled, true);
     assert.equal(queued.dispatch.execution, 'native');
     assert.deepEqual(queued.next, { action: 'wait', command: `weaver tasks wait --task-id ${b.id}` });
     assert.equal(f.call('tasks.get', { taskId: b.id }).next, undefined);
+  } finally { await f.close(); }
+});
+
+test('two instances of one profile hold separate native slots and a cancellation frees only its own instance', async () => {
+  const f = setup();
+  try {
+    const s = f.policy.snapshot(); s.config.owners.claude_owner.max_parallel = 1;
+    f.policy.save({ revision: s.revision, config: s.config, blocks: [] });
+    const a = f.call('owners.attach', { name: 'pane A', profileId: 'claude_owner', session: 'session-a' });
+    const b = f.call('owners.attach', { name: 'pane B', profileId: 'claude_owner', session: 'session-b' });
+    const [a1, a2, b1] = [f.task(a.id), f.task(a.id), f.task(b.id)];
+    assert.equal(f.call('workers.spawn', { taskId: a1.id }).status, 'running');
+    const waiting = f.call('workers.spawn', { taskId: a2.id });
+    assert.equal(waiting.scheduled, true, 'instance A is full');
+    assert.match(waiting.queueReason.message, /pane A/);
+    assert.equal(f.call('workers.spawn', { taskId: b1.id }).status, 'running', 'instance B has its own slot while A is full');
+    assert.deepEqual(f.call('owners.list').owners.map((owner: { runningTaskCount: number }) => owner.runningTaskCount), [1, 1]);
+    assert.equal(f.call('tasks.cancel', { taskId: a1.id }).status, 'cancelled');
+    for (let i = 0; i < 50 && f.store.get(a2.id).status !== 'running'; i++) await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(f.store.get(a2.id).status, 'running', 'A releases a slot to its own waiting work');
+    assert.equal(f.store.get(b1.id).status, 'running');
+    assert.equal(f.store.get(b1.id).run?.execution, 'native');
+    assert.deepEqual(launches, []);
   } finally { await f.close(); }
 });
