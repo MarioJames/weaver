@@ -218,7 +218,7 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
 function permissionNote(engine: RealEngineKind): string {
   switch (engine) {
     case 'grok': return 'grok permission mode bypassPermissions is a CLI policy, not OS filesystem isolation';
-    case 'codex': return 'codex sandbox workspace-write is the vendor profile, not a separate OS claim';
+    case 'codex': return 'codex runs with danger-full-access (no vendor sandbox); this is not OS isolation';
     case 'opencode': return 'opencode --auto approves permissions inside the CLI; it is not OS isolation';
     case 'pi': return 'pi --approve trusts project files for this run; it is not OS isolation';
     case 'qodercli': return 'qodercli permission mode bypass_permissions is a CLI policy, not OS filesystem isolation';

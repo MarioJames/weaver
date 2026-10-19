@@ -41,7 +41,7 @@ pi 1.3.0:         --print --mode json --model <model> --thinking <effort> --no-s
                   --tools read,write,edit,bash --approve
 grok 1.0.62:      --prompt-file <private> --output-format streaming-messages-json --model <model> --effort <effort>
                   --no-subagents --no-leader --leader-socket <per-job> --permission-mode bypassPermissions
-codex 0.163.0:    exec --json --ephemeral --skip-git-repo-check --sandbox workspace-write --cd <workspace>
+codex 0.163.0:    exec --json --ephemeral --skip-git-repo-check --sandbox danger-full-access --cd <workspace>
                   --model <model> -c model_reasoning_effort="<effort>" -
 ```
 

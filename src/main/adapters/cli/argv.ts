@@ -44,7 +44,7 @@ export function buildLaunchSpec(input: {
     case 'codex':
       return {
         stdin: input.instruction,
-        argv: ['codex', 'exec', '--json', '--ephemeral', '--skip-git-repo-check', '--sandbox', 'workspace-write', '--cd', input.workspace, '--model', input.model, '-c', `model_reasoning_effort="${input.effort}"`, '-'],
+        argv: ['codex', 'exec', '--json', '--ephemeral', '--skip-git-repo-check', '--sandbox', 'danger-full-access', '--cd', input.workspace, '--model', input.model, '-c', `model_reasoning_effort="${input.effort}"`, '-'],
       };
   }
 }

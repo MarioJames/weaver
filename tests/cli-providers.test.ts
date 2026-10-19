@@ -44,7 +44,8 @@ test('prepared argv is fixed, keeps the prompt off the command line, and refuses
       } else assert.equal(prepared.stdin, instruction);
       if (engine === 'codex') {
         assert.equal(prepared.argv.at(-1), '-');
-        assert.ok(prepared.argv.includes('workspace-write'));
+        assert.ok(prepared.argv.includes('danger-full-access'));
+        assert.equal(prepared.argv.includes('workspace-write'), false);
         assert.equal(prepared.argv.includes('--dangerously-bypass-approvals-and-sandbox'), false);
       }
       if (engine === 'pi') assert.ok(prepared.argv.includes('--no-session') && prepared.argv.includes('--mode') && prepared.argv.includes('json'));
