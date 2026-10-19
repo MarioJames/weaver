@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync, existsSync, openSyn
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { ownerSession, type LogicalOwner, type WorkPackage, type CommandReceipt } from '../shared/commands';
-import type { Task, TaskEvent } from '../shared/types';
+import type { Task, TaskEvent, TaskSummary } from '../shared/types';
 import { object } from '../shared/validation';
 import { parseStoredTask } from './stored-task';
 export const active = (task: Task) => task.status === 'running' || task.status === 'cancelling';
@@ -74,6 +74,13 @@ export class TaskStore {
  getMetadata() { return structuredClone(this.metadata); }
  setMetadata(value: typeof this.metadata): void { const previous=this.metadata; this.metadata=structuredClone(value); try {this.save();} catch(error) {this.metadata=previous;throw error;} }
  list(): Task[] { return structuredClone([...this.tasks.values()].reverse()); }
+ /** Project before cloning: list reads must not traverse historical events or artifact bodies. */
+ listSummaries(): TaskSummary[] {
+  return structuredClone([...this.tasks.values()].reverse().map(task => ({
+   ...task, events: task.events.slice(-3), eventCount: task.events.length,
+   artifacts: task.artifacts.map(({content, ...metadata}) => metadata),
+  })));
+ }
  get(id: string): Task { const task = this.tasks.get(id); if (!task) throw new Error('Task not found'); return structuredClone(task); }
  put(task: Task, durability: 'sync' | 'stream' = 'sync', onError: (error: unknown) => void = console.error): void {
   const previous = this.tasks.get(task.id); this.tasks.set(task.id, structuredClone(task));

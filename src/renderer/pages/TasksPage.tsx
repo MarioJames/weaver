@@ -2,9 +2,10 @@ import { notifyError } from '../notify';
 import { useEffect, useRef, useState } from 'react';
 import { Archive, Plus } from 'lucide-react';
 import { PageHeader } from '@lobehub/ui/dashboard';
-import { Button, Drawer } from '@lobehub/ui/base-ui';
+import { Button, Drawer, Skeleton } from '@lobehub/ui/base-ui';
 import { command } from '../commands';
 import type { OwnerInstance } from '../../shared/commands';
+import type { Task } from '../../shared/types';
 import { archivedTasks, readTaskFilters, withOwnerProfiles } from '../task-view';
 import { ArchiveDrawer } from '../components/ArchiveDrawer';
 import { NewTaskDialog } from '../components/NewTaskDialog';
@@ -28,6 +29,17 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
   }, [work.tasks]);
   const tasks = withOwnerProfiles(work.tasks, owners);
   const task = tasks.find(item => item.id === selected);
+  const [detail, setDetail] = useState<Task>();
+  const [detailAttempt, setDetailAttempt] = useState(0);
+  useEffect(() => {
+    let current = true;
+    if (!task) { setDetail(undefined); return; }
+    void window.weaver.getTask(task.id).then(value => {
+      if (current) setDetail(value);
+    }).catch(error => { if (current) notifyError(error, '任务详情读取失败', { label: '重试', run: () => setDetailAttempt(value => value + 1) }); });
+    return () => { current = false; };
+  }, [task?.id, task?.revision, task?.updatedAt, detailAttempt]);
+  const fullTask = detail?.id === task?.id ? detail : undefined;
   const now = Date.now();
   const archived = archivedTasks(tasks, now).length;
   return <>
@@ -38,7 +50,8 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
     <TaskBoard filters={filters} onFiltersChange={setFilters} now={now} tasks={tasks} selected={selected} loading={work.loading} onSelect={setSelected} ownerKind={ownerKind} />
     <ArchiveDrawer now={now} tasks={tasks} selected={selected} open={archiving} onClose={() => setArchiving(false)} onSelect={setSelected} ownerKind={ownerKind} />
     <Drawer open={!!task} title="任务详情" placement="right" width="min(960px, 92vw)" onClose={() => setSelected(undefined)}>
-      {task && <TaskDetail key={task.id} task={task} busy={work.busy || !work.caps} action={work.action} ownerKind={ownerKind}
+      {task && !fullTask && <div role="status" aria-label="正在加载任务详情"><Skeleton animated /></div>}
+      {task && fullTask && <TaskDetail key={task.id} task={{...fullTask, owner: task.owner}} busy={work.busy || !work.caps} action={work.action} ownerKind={ownerKind}
         onStart={id => void work.action(() => window.weaver.startTask(id))}
         onCancel={id => void work.action(() => window.weaver.cancelTask(id))}
         onRetry={id => void work.action(async () => { const next = await command<{ id: string }>('tasks.retry', { taskId: id }, true); setSelected(next.id); })} />}

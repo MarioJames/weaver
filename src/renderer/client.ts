@@ -238,7 +238,7 @@ function importHandoff(create: (input: TaskInput) => Promise<Task>): Promise<Tas
 }
 
 export function createBrowserClient(): RendererAPI {
-  const reads = new Set(['getPolicy','getQuota','getStall','listTasks','capabilities','validatePolicy','previewRoute','sayHiResult']);
+  const reads = new Set(['getPolicy','getQuota','getStall','listTasks','getTask','capabilities','validatePolicy','previewRoute','sayHiResult']);
   const commandReads = new Set(['sync.status','tasks.list','tasks.get','tasks.events','tasks.results','owners.list','owners.continuation.get']);
   const checked = async (method: string, args: unknown[], signal?: AbortSignal) => {
     const result = await rpc(method,args,signal);
@@ -259,9 +259,9 @@ export function createBrowserClient(): RendererAPI {
       if(read) return reconnect.recover(()=>checked(method,args,signal),signal).catch(cause=>{notifyError(cause);throw cause;});
       notifyInfo('操作结果未确认，正在核对…', 'operation-reconcile', 0);
       // A fresh authoritative read reconciles the UI, but cannot prove which writer changed it.
-      void Promise.all([call('listTasks',[]),call('getPolicy',[])]).then(()=>{
+      void call('getPolicy',[]).then(()=>{
         for(const listener of invalidations) listener();
-        notifyInfo('状态已重新读取，请核对操作是否生效。未自动重复操作。', 'operation-reconcile');
+        notifyInfo('连接已恢复，正在刷新状态，请核对操作是否生效。未自动重复操作。', 'operation-reconcile');
       }).catch(cause=>{notifyInfo('无法核对操作结果，请检查当前状态。', 'operation-reconcile');notifyError(cause,'状态核对失败');});
       throw error;
     }
@@ -290,6 +290,7 @@ export function createBrowserClient(): RendererAPI {
     sayHiResult: id => call('sayHiResult', [id]) as ReturnType<WeaverAPI['sayHiResult']>,
     setEngineEnabled: input => call('setEngineEnabled', [input]) as ReturnType<WeaverAPI['setEngineEnabled']>,
     listTasks: () => call('listTasks', []) as ReturnType<WeaverAPI['listTasks']>,
+    getTask: id => call('getTask', [id]) as ReturnType<WeaverAPI['getTask']>,
     createTask: input => call('createTask', [input]) as ReturnType<WeaverAPI['createTask']>,
     startTask: id => call('startTask', [id]) as ReturnType<WeaverAPI['startTask']>,
     cancelTask: id => call('cancelTask', [id]) as ReturnType<WeaverAPI['cancelTask']>,

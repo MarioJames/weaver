@@ -14,6 +14,7 @@ Object.assign(ARITY, {
   sayHiResult: 1,
   setEngineEnabled: 1,
   listTasks: 0,
+  getTask: 1,
   createTask: 1,
   startTask: 1,
   cancelTask: 1,

@@ -401,8 +401,8 @@ test('read deadlines reconnect while write deadlines reconcile without replay', 
     const rejected=assert.rejects(write,/TIMEOUT/);
     t.mock.timers.tick(RPC_DEADLINE_MS); await rejected; await flush();
     assert.equal(gate.calls.filter(call=>call.body.method==='savePolicy').length,1);
-    assert.deepEqual(gate.calls.slice(3).map(call=>call.body.method).sort(),['getPolicy','listTasks']);
-    gate.calls[3].resolve(jsonResponse({result:[]})); gate.calls[4].resolve(jsonResponse({result:{revision:2}})); await flush();
+    assert.deepEqual(gate.calls.slice(3).map(call=>call.body.method).sort(),['getPolicy']);
+    gate.calls[3].resolve(jsonResponse({result:{revision:2}})); await flush();
     t.mock.timers.tick(15000); await flush();
     assert.equal(gate.calls.filter(call=>call.body.method==='savePolicy').length,1);
   } finally { gate.restore(); cleanup(); }
@@ -447,10 +447,23 @@ test('uncertain command envelopes trigger read reconciliation without replaying 
     const failed=assert.rejects(pending,/APP_NOT_RUNNING/);
     gate.calls[0].resolve(jsonResponse({result:{ok:false,error:{code:'APP_NOT_RUNNING',message:'temporarily unavailable'}}}));
     await failed; await flush();
-    assert.deepEqual(gate.calls.map(call=>call.body.method),['command','listTasks','getPolicy']);
-    gate.calls[1].resolve(jsonResponse({result:[]}));gate.calls[2].resolve(jsonResponse({result:{revision:3}}));await flush();
+    assert.deepEqual(gate.calls.map(call=>call.body.method),['command','getPolicy']);
+    gate.calls[1].resolve(jsonResponse({result:{revision:3}}));await flush();
     t.mock.timers.tick(15000);await flush();
     assert.equal(gate.calls.filter(call=>call.body.method==='command').length,1);
     assert.ok(client);
   } finally { gate.restore(); cleanup(); }
+});
+
+test('selected task read receives complete events and artifact bodies separately from list previews',async()=>{
+ installOrigin();const gate=installFetch();
+ try {
+  const client=createBrowserClient();
+  const preview={id:'t',events:[{id:'e297'},{id:'e298'},{id:'e299'}],eventCount:300,artifacts:[{id:'a',name:'result.md'}]};
+  const full={...preview,events:Array.from({length:300},(_,i)=>({id:`e${i}`})),artifacts:[{id:'a',name:'result.md',content:'full result'}]};
+  const list=client.listTasks();gate.calls[0].resolve(jsonResponse({result:[preview]}));assert.deepEqual(await list,[preview]);
+  const detail=client.getTask('t');assert.deepEqual(gate.calls[1].body,{method:'getTask',args:['t']});
+  gate.calls[1].resolve(jsonResponse({result:full}));const result=await detail;
+  assert.equal(result.events.length,300);assert.equal(result.artifacts[0].content,'full result');
+ } finally {gate.restore();cleanup();}
 });

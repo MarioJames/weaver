@@ -16,7 +16,8 @@ export function useWorkbench() {
  useEffect(()=>{
   mounted.current=true;
   if(!window.weaver){void connect();return()=>{mounted.current=false;};}
-  const channel=createTaskSynchronizer(()=>window.weaver.listTasks(),value=>{if(mounted.current)setTasks(value);},error=>{if(mounted.current){ if(!isTransientError(error)){setError(String(error));} }});sync.current=channel;
+  // Board copies contain preview events and metadata only; TasksPage loads detail through getTask.
+  const channel=createTaskSynchronizer(()=>window.weaver.listTasks(),value=>{if(mounted.current)setTasks(value.map(task=>({...task,artifacts:task.artifacts.map(artifact=>({...artifact,content:''}))})));},error=>{if(mounted.current){ if(!isTransientError(error)){setError(String(error));} }},{isVisible:()=>!document.hidden});sync.current=channel;
   // Subscribe before requesting the initial authoritative snapshot to avoid a startup gap.
   const invalidate=()=>{void channel.refresh().catch(()=>{});};
   const unsubscribe=window.weaver.onTasksChanged(invalidate);

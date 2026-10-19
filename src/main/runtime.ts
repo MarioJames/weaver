@@ -198,7 +198,8 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
         const known = remember(result.probe) ?? [];
         return { snapshot: result.snapshot, probe: result.probe, readiness: readinessFor(known, result.snapshot.config) };
       }
-      case 'listTasks': return active.store.list();
+      case 'listTasks': return active.store.listSummaries();
+      case 'getTask': return active.store.get(parseId(args[0]));
       case 'createTask': {
         const input = parseTaskInput(args[0]);
         const response = active.commands.handle({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'tasks.create', args: input as unknown as Record<string, unknown> });

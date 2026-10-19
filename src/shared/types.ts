@@ -31,6 +31,8 @@ export type WorkerRecord =
  | { type: 'progress'; percent: number; message: string }
  | { type: 'artifact'; name: string; mediaType: Artifact['mediaType']; content: string }
  | { type: 'result'; summary: string };
+/** List preview only: events are the last three retained records, artifacts have no body. */
+export type TaskSummary = Omit<Task, 'artifacts'> & { eventCount: number; artifacts: Omit<Artifact, 'content'>[] };
 export interface Capabilities { worker: string; owner: string; maxParallel: number; storePath: string }
 export interface WeaverAPI {
  command(request: import('./commands').CommandRequest): Promise<import('./commands').CommandResponse>;
@@ -44,7 +46,8 @@ export interface WeaverAPI {
  setEngineEnabled(input: EngineToggleInput): Promise<EngineToggleResult>;
  sayHi(input: import('./engines').HelloInput): Promise<import('./engines').HelloJob>;
  sayHiResult(id: string): Promise<import('./engines').HelloJob>;
- listTasks(): Promise<Task[]>;
+ listTasks(): Promise<TaskSummary[]>;
+ getTask(id: string): Promise<Task>;
  createTask(input: TaskInput): Promise<Task>;
  importTask(): Promise<Task | null>;
  startTask(id: string): Promise<Task>;
