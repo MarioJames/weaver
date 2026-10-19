@@ -6,18 +6,13 @@ import { JsonlParser } from './protocol';
 import { TaskStore, event } from './store';
 import { redactContext } from './continuation';
 
-interface Running { child: ManagedProcess; timeout: NodeJS.Timeout; killTimer?: NodeJS.Timeout; error?: string; result?: string; cancelled: boolean; stderrBytes: number }
+interface Running { child: ManagedProcess; timeout?: NodeJS.Timeout; killTimer?: NodeJS.Timeout; error?: string; result?: string; cancelled: boolean; stderrBytes: number }
 
-/** Real runs use frozen max_wait_minutes. Direct mock tests may pass a short fallback. There is no 60s default. */
-export function executionTimeoutMs(task: Pick<Task, 'dispatch'>, fallback?: number): number {
-  const minutes = task.dispatch?.maxWaitMinutes;
-  if (typeof minutes === 'number') {
-    if (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > 1440) throw new Error('Configured max_wait_minutes is invalid');
-    return minutes * 60_000;
-  }
-  if (task.dispatch?.execution === 'real') throw new Error('Real execution requires configured max_wait_minutes');
+/** `herdr.max_wait_minutes` is the owner's polling bound, never an execution deadline: only a direct mock test may pass the short hook. */
+export function executionTimeoutMs(task: Pick<Task, 'dispatch'>, fallback?: number): number | undefined {
+  if ((task.dispatch?.execution ?? 'mock') !== 'mock') return undefined;
   if (fallback !== undefined && Number.isSafeInteger(fallback) && fallback > 0) return fallback;
-  throw new Error('Execution timeout is not configured');
+  return undefined;
 }
 
 export class TaskManager {
@@ -57,12 +52,10 @@ export class TaskManager {
       execution,
       status: 'running',
       startedAt: new Date().toISOString(),
-      timeoutMs,
       ...(task.dispatch ? { engine: task.dispatch.engine, model: task.dispatch.model, effort: task.dispatch.effort, workspace: task.dispatch.workspace ?? task.workspace } : {}),
     };
     if (execution === 'native') {
       // The owner runs this worker itself and reports back through completeNative; there is no process or timer here.
-      delete task.run.timeoutMs;
       event(task, 'lifecycle', `Owner runs ${task.dispatch?.worker} with its built-in subagent tool; waiting for its report`);
       this.persist(task);
       return this.store.get(id);
@@ -75,7 +68,7 @@ export class TaskManager {
     try { child = this.adapter.start(task); } catch (error) {
       task.status = 'failed'; task.run.status = 'stopped'; task.run.endedAt = new Date().toISOString(); event(task, 'error', error instanceof Error ? error.message : String(error)); this.persist(task); return task;
     }
-    const run: Running = { child, timeout: setTimeout(() => this.stop(id, 'Worker exceeded its execution timeout'), timeoutMs), cancelled: false, stderrBytes: 0 };
+    const run: Running = { child, cancelled: false, stderrBytes: 0, ...(timeoutMs === undefined ? {} : { timeout: setTimeout(() => this.stop(id, 'Mock worker exceeded its test timeout'), timeoutMs) }) };
     this.running.set(id, run);
     const parser = new JsonlParser(record => this.record(id, record));
     child.stdout.on('data', (chunk: Buffer) => {

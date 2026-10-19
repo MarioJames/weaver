@@ -42,15 +42,17 @@ test('configured owner concurrency replaces the old global cap of two',async () 
   const tasks=[manager.create(input),manager.create(input),manager.create(input)];
   for (const task of tasks) { task.dispatch={owner:'owner',worker:'worker',engine:'codex',model:'m',effort:'high',execution:'mock',maxParallel:2}; manager.update(task); }
   manager.start(tasks[0].id);manager.start(tasks[1].id);assert.throws(()=>manager.start(tasks[2].id),/configured concurrency limit \(2\)/);assert.equal(store.get(tasks[2].id).status,'queued');
-  const done=await terminal(store,tasks[0].id);assert.equal(done.status,'failed');assert.match(done.events.at(-1)!.message,/timeout/);
-  assert.equal(done.run?.timeoutMs,100);
+  const done=await terminal(store,tasks[0].id);assert.equal(done.status,'failed');assert.match(done.events.at(-1)!.message,/test timeout/);
+  assert.equal(done.run?.timeoutMs,undefined);
  },100);
 });
-test('real timeout uses configured minutes and ignores a 60s fallback',() => {
- const real={dispatch:{owner:'o',worker:'w',engine:'codex',model:'m',effort:'high',execution:'real' as const,maxParallel:1,maxWaitMinutes:15}};
- assert.equal(executionTimeoutMs(real,60_000),15*60_000);
- assert.equal(executionTimeoutMs({dispatch:{owner:'o',worker:'w',engine:'codex',model:'m',effort:'high',execution:'mock',maxParallel:1}},100),100);
- assert.throws(()=>executionTimeoutMs({dispatch:{owner:'o',worker:'w',engine:'codex',model:'m',effort:'high',execution:'real',maxParallel:1}}),/max_wait_minutes/);
+test('only a mock run may take the test-hook timer; real and native never do',() => {
+ const route=(execution:'real'|'mock'|'native')=>({dispatch:{owner:'o',worker:'w',engine:'codex',model:'m',effort:'high',execution,maxParallel:1,maxWaitMinutes:15}});
+ assert.equal(executionTimeoutMs(route('real'),60_000),undefined);
+ assert.equal(executionTimeoutMs(route('native'),60_000),undefined);
+ assert.equal(executionTimeoutMs(route('mock'),100),100);
+ assert.equal(executionTimeoutMs(route('mock')),undefined);
+ assert.equal(executionTimeoutMs({},100),100);
 });
 test('shutdown terminates active workers and persists cancelled states',async () => {
  await harness(fixture('setInterval(()=>{},1000)'),async(manager,store)=>{const task=manager.create(input);manager.start(task.id);await manager.shutdown();assert.equal(store.get(task.id).status,'cancelled');});

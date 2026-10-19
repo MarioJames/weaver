@@ -269,7 +269,8 @@ test('headless CLI can create, dispatch, review, and leaving does not cancel wor
     await writeFile(spawnInput, JSON.stringify({ provider: 'mock-jsonl' }));
     const spawned = await cli(dataDir, ['workers', 'spawn', '--task-id', id, '--input', spawnInput, '--command-id', 'dispatch-1']);
     assert.equal(spawned.json.data.dispatch.execution, 'mock');
-    assert.equal(spawned.json.data.run?.timeoutMs ?? spawned.json.data.dispatch.maxWaitMinutes * 60_000, 15 * 60_000);
+    assert.equal(spawned.json.data.dispatch.maxWaitMinutes, 15);
+    assert.equal(spawned.json.data.run?.timeoutMs, undefined);
     assert.equal(spawned.status, 0, spawned.stdout + spawned.stderr);
     assert.equal(spawned.json.data.status === 'running' || spawned.json.data.status === 'completed', true);
     let finished: any;

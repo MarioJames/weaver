@@ -117,7 +117,7 @@ export function SettingsPage({ policy }: { policy: PolicyDraft }) {
         </Setting>
       </Group>
       <Group title="负责人" desc="负责人观测和等待工作代理的方式。">
-        <Setting label="单次等待上限（分钟）" htmlFor={`${id}-wait`} desc="负责人每次等待工作代理回报的最长时间。真实执行超过这个时长会被停止。" state={saver.states.wait} error={inputErrors.wait}>
+        <Setting label="单次等待上限（分钟）" htmlFor={`${id}-wait`} desc="负责人轮询等待一个工作代理的最长时间，超过后由负责人查看进展并决定继续等待、取消或收回；不会自动停止工作代理。" state={saver.states.wait} error={inputErrors.wait}>
           <MinutesInput id={`${id}-wait`} label="单次等待上限（分钟）" value={saved.herdr.max_wait_minutes} min={1} max={1440} step={5} onError={inputError('wait')} onCommit={value => void saver.save('wait', () => ({ herdr: { max_wait_minutes: value } }))} />
         </Setting>
       </Group>

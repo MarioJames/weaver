@@ -40,6 +40,7 @@ export function parseStoredTask(value: unknown): Task {
    run.evidence=evidence;
   }
   for (const key of ['engine','model','effort','workspace'] as const) if(value[key]!==undefined) run[key]=text(value[key],key,key==='workspace'?2000:200);
+  // Runs no longer write a timeout; older stores may still carry one, so it stays accepted here.
   if(value.timeoutMs!==undefined){if(!Number.isSafeInteger(value.timeoutMs)||Number(value.timeoutMs)<1)throw new Error('Invalid timeout');run.timeoutMs=Number(value.timeoutMs);}
   if(value.pid!==undefined) {if(typeof value.pid!=='number'||!Number.isSafeInteger(value.pid)||value.pid<=0)throw new Error('Invalid PID');run.pid=value.pid;}
   if(value.startedAt!==undefined)run.startedAt=date(value.startedAt);

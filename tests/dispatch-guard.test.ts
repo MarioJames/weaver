@@ -39,14 +39,14 @@ function successProcess(): ManagedProcess {
   return proc;
 }
 
-function setup(launch?: StartCliAgent) {
+function setup(launch?: StartCliAgent, mockTestTimeoutMs?: number) {
   const dir = mkdtempSync(join(tmpdir(), 'weaver-dispatch-'));
   const store = new TaskStore(join(dir, 'tasks.json'));
   let mockStarts = 0;
   const mock = { id: 'mock-jsonl', start() { mockStarts += 1; throw new Error('mock fallback'); } };
   const seen: CliAgentInput[] = [];
   const adapter = new RoutingWorkerAdapter(mock, launch ? (input) => { seen.push(input); return launch(input); } : undefined, join(dir, 'agent-state'), id => store.getMetadata().packages.find(pkg => pkg.id === id));
-  const manager = new TaskManager(store, adapter, () => {}, undefined, error => { throw error; });
+  const manager = new TaskManager(store, adapter, () => {}, mockTestTimeoutMs, error => { throw error; });
   const policy = new PolicyStore(join(dir, 'policy.json'));
   const handler = new CommandHandler(manager, policy);
   const raw = (command: string, args: Record<string, unknown> = {}, commandId = randomUUID()): any => handler.handle({ apiVersion: 'weaver.v1', commandId, command, args });
@@ -106,7 +106,8 @@ test('real dispatch freezes an existing absolute workspace and does not launch w
     assert.equal(spawned.data.dispatch.workspace, realpathSync(workspace));
     assert.equal(spawned.data.dispatch.model, 'gpt-6.1-sol');
     assert.equal(spawned.data.run.adapter, 'codex');
-    assert.equal(spawned.data.run.timeoutMs, 15 * 60_000);
+    assert.equal(spawned.data.dispatch.maxWaitMinutes, 15);
+    assert.equal(spawned.data.run.timeoutMs, undefined);
     assert.equal(f.mockStarts(), 0);
     assert.equal(f.seen[0].engine, 'codex');
     assert.equal(f.seen[0].workspace, realpathSync(workspace));
@@ -123,6 +124,26 @@ test('real dispatch freezes an existing absolute workspace and does not launch w
     assert.equal(done.dispatch?.worker, 'codex_worker');
     assert.equal(done.dispatch?.model, 'gpt-6.1-sol');
   } finally { await f.close(); rmSync(workspace, { recursive: true, force: true }); }
+});
+
+test('a real run outlives its frozen wait bound and the mock test hook; only the owner stops it', async () => {
+  const f = setup(() => hangProcess(), 50);
+  try {
+    const created = f.raw('tasks.create', { title: 'Patient', instruction: 'fixture', owner, workspace: f.dir });
+    const spawned = f.raw('workers.spawn', { taskId: created.data.id, owner: 'claude_owner', worker: 'codex_worker' });
+    assert.equal(spawned.ok, true, JSON.stringify(spawned));
+    assert.equal(spawned.data.dispatch.execution, 'real');
+    assert.equal(spawned.data.dispatch.maxWaitMinutes, 15);
+    assert.equal(spawned.data.run.timeoutMs, undefined);
+    await new Promise(resolve => setTimeout(resolve, 400));
+    const running = f.store.get(created.data.id);
+    assert.equal(running.status, 'running');
+    assert.equal(running.events.some(e => e.kind === 'error'), false);
+    assert.equal(f.seen.length, 1);
+    assert.equal(f.raw('tasks.cancel', { taskId: created.data.id }).data.status, 'cancelling');
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(f.store.get(created.data.id).status, 'cancelled');
+  } finally { await f.close(); }
 });
 
 test('a queued route stays frozen when the saved model changes', async () => {
@@ -222,7 +243,7 @@ test('explicit mock provider still runs the mock worker from the real runtime ad
     while (!['completed', 'failed', 'cancelled'].includes(done.status) && Date.now() < deadline) { await new Promise(r => setTimeout(r, 15)); done = store.get(createdId); }
     assert.equal(done.status, 'completed');
     assert.equal(done.run?.adapter, 'mock-jsonl');
-    assert.equal(done.run?.timeoutMs, 15 * 60_000);
+    assert.equal(done.run?.timeoutMs, undefined);
   } finally { handler.draining = true; await manager.shutdown(); rmSync(dir, { recursive: true, force: true }); }
 });
 
