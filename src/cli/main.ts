@@ -44,8 +44,8 @@ export const CLI_CATALOG: CatalogCommand[] = [
   { command: 'tasks.list', inputFields: {"required": {}, "optional": {"offset": "integer ≥0 (default 0)", "limit": "integer 1–100 (default 25)", "ownerId": "UUID"}}, mutation: false, usage: 'tasks list [--input <json>]' },
   { command: 'tasks.events', inputFields: {"required": {"taskId": "UUID"}, "optional": {"after": "event cursor UUID", "limit": "integer 1–100 (default 50)"}}, mutation: false, usage: 'tasks events --task-id <id> [--input <json>]' },
   { command: 'tasks.results', inputFields: {"required": {"taskId": "UUID"}, "optional": {}}, mutation: false, usage: 'tasks results --task-id <id>' },
-  { command: 'tasks.wait', inputFields: {"required": {"--task-id": "UUID"}, "optional": {"--for": "seconds 1–600 (default min(600, herdr.max_wait_minutes×60), else 30)"}}, mutation: false, local: 'wait', usage: 'tasks wait --task-id <id> [--for <seconds>]' },
-  { command: 'tasks.watch', inputFields: {"required": {"--task-id": "UUID"}, "optional": {"--for": "seconds 1–600 (default min(600, herdr.max_wait_minutes×60), else 30)"}}, mutation: false, local: 'watch', usage: 'tasks watch --task-id <id> [--for <seconds>]' },
+  { command: 'tasks.wait', inputFields: {"required": {"--task-id": "UUID"}, "optional": {"--for": "seconds 1–600 (default min(600, herdr.max_wait_minutes×60), else 30)"}}, mutation: false, local: 'wait', usage: 'tasks wait --task-id <id> [--for <seconds>]    Returns on terminal state, timeout, or stalled worker; includes reason and stalled health with a retry/cancel hint.' },
+  { command: 'tasks.watch', inputFields: {"required": {"--task-id": "UUID"}, "optional": {"--for": "seconds 1–600 (default min(600, herdr.max_wait_minutes×60), else 30)"}}, mutation: false, local: 'watch', usage: 'tasks watch --task-id <id> [--for <seconds>]    Reports stalled transitions in text/jsonl and continues watching.' },
   { command: 'packages.create', inputFields: {"required": {"taskId": "UUID", "scope": "string[1–30] (each ≤1000)", "acceptanceCriteria": "string[1–30] (each ≤1000)"}, "optional": {"expectedRevision": "integer"}}, mutation: true, usage: 'packages create --task-id <id> --input <json> --command-id <id>' },
   { command: 'packages.get', inputFields: {"required": {"packageId": "UUID"}, "optional": {}}, mutation: false, usage: 'packages get --input <json>' },
   { command: 'workers.spawn', inputFields: {"required": {"taskId": "UUID"}, "optional": {"expectedRevision": "integer", "packageId": "frozen package UUID", "owner": "profile ID (must match task owner)", "worker": "explicit worker ID (omitted picks the owner's least-loaded worker relative to its weight: lowest (running+1)/weight wins, ties go to higher weight, then list order)", "provider": "mock-jsonl only for explicit fixture execution"}}, mutation: true, usage: 'workers spawn --task-id <id> [--input <json>] --command-id <id>' },
@@ -89,7 +89,7 @@ If a client command reports APP_NOT_RUNNING, start: weaver server start
 
 tasks create: an omitted workspace becomes this CLI process's working directory before the request is sent. An explicit path wins. A relative explicit path is resolved against that same caller directory. The server does not fill a workspace from its own directory. Real dispatch still requires the directory to exist.
 
-tasks wait and tasks watch poll tasks get and tasks events. --for is 1 through 600 seconds; omitted, it defaults to min(600, herdr.max_wait_minutes × 60) from the policy, or 30 seconds when the policy cannot be read. They do not start a second scheduler.
+tasks wait and tasks watch poll tasks get and tasks events. They check tasks health initially, every 30 seconds, and just before timeout; older servers without tasks health keep polling silently. tasks wait returns early with exit code 0 when health is stalled, including health and a retry/cancel hint. Snapshot data includes reason: terminal, timeout, or stalled. Timeout keeps exit code 1 and TIMEOUT. tasks watch reports each transition to stalled in text/jsonl and continues. --for is 1 through 600 seconds; omitted, it defaults to min(600, herdr.max_wait_minutes × 60) from the policy, or 30 seconds when the policy cannot be read. They do not start a second scheduler.
 
 --engine <id> is the engine argument of engines penalty and engines unblock. --cancel is a valueless flag that sets cancel on tasks retry. Both are rejected on any other command, repeated, missing their value, or when the --input body already carries a different one. tasks retry returns the linked task already dispatched, together with the one thing to do next.
 
@@ -307,6 +307,12 @@ function renderNext(next: Record<string, unknown>): string[] {
 function renderData(data: unknown): string {
   if (!data || typeof data !== 'object') return data === undefined ? '' : String(data);
   const record = data as Record<string, unknown>;
+  if (record.reason === 'stalled' && record.health && typeof record.health === 'object') {
+    const health = record.health as Record<string, unknown>;
+    return [`${record.id ?? ''} stalled (task status: ${record.status ?? 'unknown'})`,
+      `health: silenceMs=${health.silenceMs ?? 'unknown'} cpuIdleMs=${health.cpuIdleMs ?? 'unknown'} cpuActive=${health.cpuActive ?? 'unknown'} engine=${health.engine ?? 'unknown'}`,
+      `hint: ${record.hint ?? ''}`].join('\n');
+  }
   if (typeof record.status === 'string' && typeof record.title === 'string') {
     const lines = [`${record.id ?? ''} ${record.status} ${record.title}`.trim()];
     if (record.next && typeof record.next === 'object') lines.push(...renderNext(record.next as Record<string, unknown>));
@@ -372,34 +378,82 @@ export async function defaultForSeconds(dataDir: string): Promise<number> {
   } catch { /* keep the fallback below */ }
   return 30;
 }
-async function pollTask(options: CLIOptions, mode: 'wait' | 'watch'): Promise<number> {
-  const deadline = Date.now() + (options.forSeconds ?? await defaultForSeconds(options.dataDir)) * 1000;
-  const request = (command:string,args:Record<string,unknown>) => sendRequest(options.dataDir, makeRequest({...options,command},args), deadline-Date.now());
+export interface PollRuntime {
+  now: () => number;
+  sleep: (milliseconds: number) => Promise<void>;
+  request: typeof sendRequest;
+}
+
+async function pollTask(options: CLIOptions, mode: 'wait' | 'watch', runtime: Partial<PollRuntime> = {}): Promise<number> {
+  const now = runtime.now ?? Date.now;
+  const sleep = runtime.sleep ?? (milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)));
+  const send = runtime.request ?? sendRequest;
+  const deadline = now() + (options.forSeconds ?? await defaultForSeconds(options.dataDir)) * 1000;
+  const request = (command:string,args:Record<string,unknown>) => send(options.dataDir, makeRequest({...options,command},args), deadline-now());
   let after: string | undefined;
-  for (;;) {
-    const snapshot = await request('tasks.get', {}) as { ok: boolean; data?: { status?: string } };
-    if (!snapshot.ok) { writeEnvelope(options.output, snapshot); return 1; }
-    if (mode === 'watch') {
-      let more: boolean;
-      do {
-        const events = await request('tasks.events', {limit:100,...(after?{after}:{})}) as {ok:boolean;data?:{events?:{id?:string;kind?:string;message?:string}[];nextCursor?:string|null;hasMore?:boolean}};
-        if (!events.ok) { writeEnvelope(options.output, events); return 1; }
-        for (const item of events.data?.events ?? []) {
-          if (options.output === 'jsonl') writeEnvelope('jsonl', {apiVersion:'weaver.v1',commandId:null,ok:true,data:item});
-          else if (options.output === 'text') process.stdout.write(`${item.kind ?? 'event'}: ${item.message ?? ''}\n`);
+  let snapshot: { ok: boolean; data?: { status?: string; [key: string]: unknown } } | undefined;
+  let health: Record<string, unknown> | undefined;
+  let healthSupported = true;
+  let nextHealthAt = 0;
+  let wasStalled = false;
+  const hint = `weaver tasks retry --task-id ${options.taskId} --cancel or weaver tasks cancel --task-id ${options.taskId}`;
+  const finish = (reason: 'terminal' | 'timeout' | 'stalled') => {
+    const data = { ...snapshot?.data, reason, ...(reason === 'stalled' ? { health, hint } : {}) };
+    writeEnvelope(options.output, reason === 'timeout'
+      ? { ...failure('TIMEOUT', 'Stopped polling before the task reached a terminal state'), data }
+      : { ...snapshot, data });
+    return reason === 'timeout' ? 1 : 0;
+  };
+  try {
+    for (;;) {
+      snapshot = await request('tasks.get', {}) as NonNullable<typeof snapshot>;
+      if (!snapshot.ok) { writeEnvelope(options.output, snapshot); return 1; }
+      if (mode === 'watch') {
+        let more: boolean;
+        do {
+          const events = await request('tasks.events', {limit:100,...(after?{after}:{})}) as {ok:boolean;data?:{events?:{id?:string;kind?:string;message?:string}[];nextCursor?:string|null;hasMore?:boolean}};
+          if (!events.ok) { writeEnvelope(options.output, events); return 1; }
+          for (const item of events.data?.events ?? []) {
+            if (options.output === 'jsonl') writeEnvelope('jsonl', {apiVersion:'weaver.v1',commandId:null,ok:true,data:item});
+            else if (options.output === 'text') process.stdout.write(`${item.kind ?? 'event'}: ${item.message ?? ''}\n`);
+          }
+          more = events.data?.hasMore === true;
+          const next = events.data?.nextCursor ?? events.data?.events?.at(-1)?.id;
+          if(more && (!next || next===after)) throw new LocalIPCError('INVALID_RESPONSE','Event pagination did not advance');
+          if(next) after=next;
+        } while(more);
+      }
+      if (['completed','failed','cancelled'].includes(snapshot.data?.status ?? '')) {
+        return finish('terminal');
+      }
+      // Reserve the last polling interval for a final health read inside the same deadline.
+      const finalInterval = deadline - now() <= 250;
+      if (healthSupported && (now() >= nextHealthAt || finalInterval)) {
+        nextHealthAt = now() + 30_000;
+        const response = await request('tasks.health', {}) as { ok: boolean; data?: Record<string, unknown>; error?: { code?: string; message?: string } };
+        if (!response.ok) {
+          const code = response.error?.code;
+          if (code === 'COMMAND_UNKNOWN' || code === 'UNKNOWN_METHOD' || code === 'METHOD_NOT_FOUND' ||
+            (code === 'INVALID_REQUEST' && /^unknown method\b/i.test(response.error?.message ?? ''))) healthSupported = false;
+          else { writeEnvelope(options.output, response); return 1; }
+        } else {
+          health = response.data;
+          const stalled = health?.state === 'stalled';
+          if (stalled && mode === 'wait') return finish('stalled');
+          if (stalled && !wasStalled && options.output !== 'json') {
+            writeEnvelope(options.output, { apiVersion: 'weaver.v1', ok: true, data: { ...snapshot.data, reason: 'stalled', health, hint } });
+          }
+          wasStalled = stalled;
         }
-        more = events.data?.hasMore === true;
-        const next = events.data?.nextCursor ?? events.data?.events?.at(-1)?.id;
-        if(more && (!next || next===after)) throw new LocalIPCError('INVALID_RESPONSE','Event pagination did not advance');
-        if(next) after=next;
-      } while(more);
+      }
+      const remaining=deadline-now();
+      if(remaining<=0)return finish('timeout');
+      await sleep(Math.min(250,remaining));
+      if(finalInterval || now() >= deadline)return finish('timeout');
     }
-    if (['completed','failed','cancelled'].includes(snapshot.data?.status ?? '')) {
-      writeEnvelope(options.output,snapshot);return 0;
-    }
-    const remaining=deadline-Date.now();
-    if(remaining<=0)throw new LocalIPCError('TIMEOUT','Stopped polling before the task reached a terminal state');
-    await new Promise(resolveWait=>setTimeout(resolveWait,Math.min(250,remaining)));
+  } catch (error) {
+    if (snapshot?.ok && error instanceof LocalIPCError && error.code === 'TIMEOUT') return finish('timeout');
+    throw error;
   }
 }
 /** Read a valid requested format before parsing can fail, independent of flag ordering. */
@@ -463,7 +517,7 @@ function runSkills(argv: string[], words: string[]): number {
   return 0;
 }
 
-export async function runCLI(argv: string[]): Promise<number> {
+export async function runCLI(argv: string[], pollRuntime: Partial<PollRuntime> = {}): Promise<number> {
   let commandId: string | undefined;
   let errorFormat: OutputFormat = requestedOutput(argv);
   try {
@@ -530,7 +584,7 @@ export async function runCLI(argv: string[]): Promise<number> {
     const item = CLI_CATALOG.find(entry => entry.command === options.command);
     if (item?.local) {
       if (!options.taskId) throw new LocalIPCError('INVALID_ARGUMENT', `${item.usage} requires --task-id`);
-      return await pollTask(options, item.local);
+      return await pollTask(options, item.local, pollRuntime);
     }
     const rpc = item?.rpc;
     let request: Record<string, unknown>;
