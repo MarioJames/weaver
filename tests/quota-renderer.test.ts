@@ -5,7 +5,7 @@ import type { PolicySnapshot } from '../src/shared/policy';
 import type { EngineQuotaRecord, QuotaRefreshResult, QuotaWindow } from '../src/shared/quota';
 import {
   acceptQuotaPolicy, quotaCountText, quotaNextUpdateMs, quotaPercentText, quotaProgressPercent, quotaRecordStale,
-  quotaRetryMs, quotaScopeText, quotaStatusText, quotaWindowStale,
+  quotaRecoveryText, quotaRetryMs, quotaScopeText, quotaStatusText, quotaWindowStale,
 } from '../src/renderer/quota-view';
 
 const NOW = Date.parse('2026-10-19T02:00:00Z');
@@ -117,4 +117,23 @@ test('quota refresh preserves dirty or newer policy and exposes reload/conflict 
   assert.match(acceptQuotaPolicy({ dirty: false, snapshot: previous, applyServerSnapshot }, result), /已按额度更新自动限制/);
   assert.deepEqual(accepted, [result.snapshot]);
   assert.match(acceptQuotaPolicy({ dirty: false, snapshot: result.snapshot, applyServerSnapshot }, { ...result, policyChanged: false }), /^额度已刷新。$/);
+});
+
+test('an expired token waiting for native renewal shows kept windows or the no-data state without login wording', () => {
+  const wait = '原生访问令牌已到期，等待原生 CLI 续期后再读取';
+  // Mirrors what the engines page renders: the status tag, the detail line only when no window survived, and recovery advice only for non-unknown states.
+  const pageText = (value: EngineQuotaRecord) => [
+    quotaStatusText(value, quotaRecordStale(value, NOW)),
+    value.windows.length || value.status === 'unknown' ? '' : value.detail,
+    value.status === 'unknown' ? '' : quotaRecoveryText(value),
+  ].filter(Boolean).join(' ');
+  const kept = record({ status: 'exhausted', stale: true, observedAt: time(-600_000), windows: [window({ usedPercent: 100, resetsAt: time(3_600_000) })], detail: wait });
+  assert.equal(quotaRecordStale(kept, NOW), true);
+  assert.match(pageText(kept), /上次观测：账户额度耗尽/);
+  assert.doesNotMatch(pageText(kept), /登录/);
+  const none = record({ status: 'unknown', stale: true, checkedAt: null, observedAt: null, windows: [], detail: wait });
+  assert.equal(pageText(none), '额度未知');
+  assert.doesNotMatch(pageText(none), /登录/);
+  const logout = record({ status: 'unauthenticated', stale: true, windows: [], detail: '原生登录已过期，请在对应工具中重新登录' });
+  assert.match(pageText(logout), /登录状态不可用.*请在原生 CLI 中确认登录/);
 });

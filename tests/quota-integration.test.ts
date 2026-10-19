@@ -369,3 +369,38 @@ test('fresh global restriction with expired included windows blocks without an i
     assert.equal(data.snapshot.owners.codex_owner.status, 'blocked');
   } finally { await runtime?.close(); await f.close(); }
 });
+
+test('an expired but renewable native token keeps the last published reading instead of reporting a logout over HTTP', async () => {
+  const f = await fixture();
+  let runtime: WeaverRuntime | undefined;
+  let clock = now; let requests = 0;
+  try {
+    const home = join(f.dir, 'home');
+    const codexHome = join(home, '.codex');
+    await mkdir(codexHome, { recursive: true });
+    const file = join(codexHome, 'auth.json');
+    const session = (exp: number, renewable: boolean) => JSON.stringify({ auth_mode: 'chatgpt', tokens: { access_token: `e30.${Buffer.from(JSON.stringify({ exp })).toString('base64url')}.fixture`, account_id: 'fixture-account', ...(renewable ? { refresh_token: 'never-send' } : {}) } });
+    await writeFile(file, session(Date.parse('2100-01-01') / 1000, true));
+    const quotaProber = new QuotaProber({ env: { HOME: home, CODEX_HOME: codexHome }, now: () => new Date(clock), fetch: async () => { requests++; return usage(100); } });
+    runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber });
+    const exhausted = await rpc(runtime, 'refreshQuota', [{ engine: 'codex' }]);
+    assert.equal(exhausted.status, 200);
+    assert.equal(exhausted.json.result.snapshot.blocks.length, 1);
+    await writeFile(file, session(Math.floor(clock / 1000) - 1, true));
+    clock += 60_001;
+    const pending = await rpc(runtime, 'refreshQuota', [{ engine: 'codex' }]);
+    assert.equal(pending.status, 200);
+    assert.equal(requests, 1, 'an expired token the native CLI can renew must never reach the quota API');
+    const record = pending.json.result.records.find((item: EngineQuotaRecord) => item.engine === 'codex');
+    assert.equal(record.status, 'exhausted');
+    assert.equal(record.stale, true);
+    assert.equal(record.observedAt, new Date(now).toISOString());
+    assert.deepEqual(pending.json.result.snapshot.blocks, exhausted.json.result.snapshot.blocks, 'a stale kept reading neither adds nor removes a dispatch block');
+    assert.doesNotMatch(JSON.stringify(pending.json.result), /登录|never-send/);
+    await writeFile(file, session(Math.floor(clock / 1000) - 1, false));
+    clock += 60_001;
+    const logout = await rpc(runtime, 'refreshQuota', [{ engine: 'codex' }]);
+    assert.equal(logout.json.result.records.find((item: EngineQuotaRecord) => item.engine === 'codex').status, 'unauthenticated');
+    assert.match(JSON.stringify(logout.json.result.records), /登录/);
+  } finally { await runtime?.close(); await f.close(); }
+});

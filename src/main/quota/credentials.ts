@@ -10,12 +10,17 @@ const MAX_FILE_BYTES = 256 * 1024;
 export type JsonObject = Record<string, unknown>;
 export const object = (value: unknown): JsonObject | undefined => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : undefined;
 const nonempty = (value: unknown, max = 16384): string | undefined => typeof value === 'string' && value.length > 0 && value.length <= max && !/[\s\x00-\x1f\x7f]/.test(value) ? value : undefined;
+const hasText = (value: unknown): boolean => typeof value === 'string' && value.trim() !== '';
 
 export class QuotaFailure extends Error {
   constructor(readonly status: QuotaStatus, message: string, readonly retryAt: number | null = null) { super(message); }
 }
 
-export interface NativeCredential { token: string; accountId?: string; fingerprint: string }
+/** A lapsed short-lived access token whose entry still holds a refresh token. The native CLI renews it on its next run, so this is a wait, not a logout. */
+export class QuotaRenewalPending extends QuotaFailure {
+  constructor(readonly account: string) { super('unknown', '原生访问令牌已到期，等待原生 CLI 续期后再读取'); }
+}
+export interface NativeCredential { token: string; accountId?: string; fingerprint: string; account: string }
 
 async function readObject(file: string): Promise<JsonObject> {
   let handle;
@@ -66,6 +71,7 @@ export async function readNativeCredential(engine: QuotaEngine, env: NodeJS.Proc
   let accountId: string | undefined;
   let identity = '';
   let expires: number | undefined;
+  let renewable = false;
   if (engine === 'codex') {
     if (root.auth_mode !== undefined && root.auth_mode !== 'chatgpt') throw new QuotaFailure('unsupported', '仅支持 Codex 原生 ChatGPT 登录');
     if (root.auth_mode === undefined && [root.OPENAI_API_KEY, root.personal_access_token, root.agent_identity, root.bedrock_api_key, root.bedrock_access_keys].some(value => value !== undefined && value !== null && value !== '')) throw new QuotaFailure('unsupported', 'Codex 当前认证模式不明确');
@@ -76,10 +82,12 @@ export async function readNativeCredential(engine: QuotaEngine, env: NodeJS.Proc
     const expiry = jwtExpiry(token);
     if (expiry === null) throw new QuotaFailure('unsupported', '无法确认 Codex 原生登录有效期');
     expires = expiry;
+    if (hasText(tokens?.refresh_token)) renewable = true;
   } else if (engine === 'claude') {
     const oauth = object(root.claudeAiOauth);
     token = nonempty(oauth?.accessToken);
     if (!token) throw new QuotaFailure('unauthenticated', '缺少 Claude Code 原生登录凭据');
+    if (hasText(oauth?.refreshToken)) renewable = true;
     if (oauth?.expiresAt !== undefined) {
       if (typeof oauth.expiresAt !== 'number' || !Number.isFinite(oauth.expiresAt) || oauth.expiresAt <= 0) throw new QuotaFailure('unsupported', '无法确认 Claude Code 登录有效期');
       expires = oauth.expiresAt;
@@ -95,8 +103,13 @@ export async function readNativeCredential(engine: QuotaEngine, env: NodeJS.Proc
     if (expiry === null) throw new QuotaFailure('unsupported', '无法确认 Grok 登录有效期');
     expires = expiry;
     identity = `${candidates[0][0]}\0${nonempty(entry.team_id, 256) ?? ''}`;
+    if (hasText(entry.refresh_token)) renewable = true;
   }
-  if (expires !== undefined && expires <= now) throw new QuotaFailure('unauthenticated', '原生登录已过期，请在对应工具中重新登录');
-  const fingerprint = createHash('sha256').update(engine).update('\0').update(token).update('\0').update(accountId ?? '').update('\0').update(identity).digest('hex');
-  return { token, accountId, fingerprint };
+  const account = createHash('sha256').update(engine).update('\0').update(accountId ?? '').update('\0').update(identity).digest('hex');
+  if (expires !== undefined && expires <= now) {
+    if (renewable) throw new QuotaRenewalPending(account);
+    throw new QuotaFailure('unauthenticated', '原生登录已过期，请在对应工具中重新登录');
+  }
+  const fingerprint = createHash('sha256').update(account).update('\0').update(token).digest('hex');
+  return { token, accountId, fingerprint, account };
 }

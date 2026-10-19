@@ -1,9 +1,10 @@
-import type { EngineQuotaRecord, QuotaEngine, QuotaRefreshInput, QuotaSnapshot } from '../../shared/quota';
+import type { EngineQuotaRecord, QuotaEngine, QuotaRefreshInput, QuotaSnapshot, QuotaStatus } from '../../shared/quota';
 import { QUOTA_FRESH_MS } from '../../shared/quota';
-import { QuotaFailure, readNativeCredential, type NativeCredential } from './credentials';
+import { QuotaFailure, QuotaRenewalPending, readNativeCredential, type NativeCredential } from './credentials';
 import { normalizeUsage, PROVIDERS } from './providers';
 
 const ENGINES: QuotaEngine[] = ['codex', 'claude', 'grok'];
+const OBSERVED: QuotaStatus[] = ['available', 'exhausted', 'unknown'];
 const MIN_INTERVAL_MS = 60_000;
 const MAX_BODY_BYTES = 256 * 1024;
 
@@ -32,6 +33,7 @@ function retryAfter(value: string | null, now: number): number | null {
 export class QuotaProber {
   private readonly records = new Map(ENGINES.map(engine => [engine, initial(engine)]));
   private readonly fingerprints = new Map<QuotaEngine, string>();
+  private readonly lastAccounts = new Map<QuotaEngine, string>();
   private readonly nextRequests = new Map<QuotaEngine, number>();
   private readonly inflight = new Map<QuotaEngine, Promise<void>>();
   private readonly controllers = new Set<AbortController>();
@@ -96,13 +98,27 @@ export class QuotaProber {
       if (this.closed) return;
       const failure = error instanceof QuotaFailure ? error : new QuotaFailure('error', '额度接口请求失败');
       const previous = this.records.get(engine)!;
-      const sameCredential = fingerprint !== undefined && fingerprint === this.fingerprints.get(engine);
       if (failure.retryAt !== null) this.nextRequests.set(engine, Math.max(this.nextRequests.get(engine) ?? 0, failure.retryAt));
+      const cooldown = this.nextRequests.has(engine) ? new Date(this.nextRequests.get(engine)!).toISOString() : null;
+      if (failure instanceof QuotaRenewalPending) {
+        // The native CLI renews its short-lived access token on the next run, so a lapsed token is a wait, not a logout: keep the same account's last observation as stale.
+        const sameAccount = this.lastAccounts.get(engine) === failure.account;
+        const observation = sameAccount && OBSERVED.includes(previous.status) ? previous : undefined;
+        this.records.set(engine, {
+          ...initial(engine), status: observation?.status ?? 'unknown',
+          ...(observation?.statusBasis ? { statusBasis: observation.statusBasis } : {}),
+          checkedAt: new Date(started).toISOString(),
+          observedAt: sameAccount ? previous.observedAt : null,
+          windows: sameAccount ? previous.windows : [], stale: true, detail: observation?.detail ?? '', retryAt: cooldown,
+        });
+        return;
+      }
+      const sameCredential = fingerprint !== undefined && fingerprint === this.fingerprints.get(engine);
       this.records.set(engine, {
         ...initial(engine), status: failure.status, checkedAt: new Date(started).toISOString(),
         observedAt: sameCredential ? previous.observedAt : null,
         windows: sameCredential ? previous.windows : [], stale: true, detail: failure.message,
-        retryAt: this.nextRequests.has(engine) ? new Date(this.nextRequests.get(engine)!).toISOString() : null,
+        retryAt: cooldown,
       });
     } finally {
       clearTimeout(timer);
@@ -116,6 +132,7 @@ export class QuotaProber {
     const credential = await readNativeCredential(engine, this.env, now);
     identify(credential.fingerprint);
     if (signal.aborted || this.closed) throw new QuotaFailure('error', '额度探测已取消');
+    this.lastAccounts.set(engine, credential.account);
     if (this.fingerprints.get(engine) !== credential.fingerprint) {
       this.records.set(engine, initial(engine));
       this.fingerprints.set(engine, credential.fingerprint);

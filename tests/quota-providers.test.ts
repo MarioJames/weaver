@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { QuotaProber } from '../src/main/quota';
+import { QuotaFailure, QuotaRenewalPending, readNativeCredential } from '../src/main/quota/credentials';
 import type { QuotaEngine } from '../src/shared/quota';
 
 const start = Date.parse('2026-10-18T12:00:00Z');
@@ -23,14 +24,21 @@ function fixture(t: { after(fn: () => void | Promise<void>): void }) {
     const dir = join(root, engine === 'codex' ? '.codex' : engine === 'claude' ? '.claude' : '.grok');
     mkdirSync(dir, { recursive: true });
     const file = join(dir, engine === 'claude' ? '.credentials.json' : 'auth.json');
-    const defaults = engine === 'codex' ? { auth_mode: 'chatgpt', tokens: { access_token: token('secret-native'), account_id: 'account-secret' } }
-      : engine === 'claude' ? { claudeAiOauth: { accessToken: 'secret-claude', expiresAt: start + 86400000 }, mcpOAuth: { accessToken: 'wrong-mcp-secret' } }
+    const defaults = engine === 'codex' ? { auth_mode: 'chatgpt', tokens: { access_token: token('secret-native'), account_id: 'account-secret', refresh_token: 'never-use' } }
+      : engine === 'claude' ? { claudeAiOauth: { accessToken: 'secret-claude', expiresAt: start + 86400000, refreshToken: 'never-use' }, mcpOAuth: { accessToken: 'wrong-mcp-secret' } }
         : { 'https://auth.x.ai::official-client': { auth_mode: 'oidc', key: 'secret-grok', expires_at: reset, refresh_token: 'never-use' } };
     writeFileSync(file, JSON.stringify(body ?? defaults));
     return file;
   };
   return { root, env, credential };
 }
+
+/** The same account, past the short-lived access token, with or without the native CLI refresh token. */
+const expiredCredential = (engine: QuotaEngine, renewable: boolean) => engine === 'codex'
+  ? { auth_mode: 'chatgpt', tokens: { access_token: token('expired-native', start / 1000 - 1), account_id: 'account-secret', ...(renewable ? { refresh_token: 'never-use' } : {}) } }
+  : engine === 'claude'
+    ? { claudeAiOauth: { accessToken: 'expired-claude', expiresAt: start - 1, ...(renewable ? { refreshToken: 'never-use' } : {}) } }
+    : { 'https://auth.x.ai::official-client': { auth_mode: 'oidc', key: 'expired-grok', expires_at: new Date(start - 1).toISOString(), ...(renewable ? { refresh_token: 'never-use' } : {}) } };
 
 test('quota get starts unknown and never reads credentials or requests a provider', async t => {
   const { env } = fixture(t);
@@ -411,4 +419,102 @@ test('fresh independent account restriction survives included-window resets whil
   record = (await prober.refresh({ engine: 'codex' })).records[0];
   assert.equal(record.status, 'error');
   assert.equal(record.stale, true);
+});
+
+test('an expired access token the native CLI can renew keeps the last reading without any login report', async t => {
+  const f = fixture(t);
+  for (const engine of ['codex', 'claude', 'grok'] as const) f.credential(engine);
+  let now = start; let calls = 0;
+  const bodies = (url: string) => url.includes('chatgpt.com') ? codexBody(20)
+    : url.includes('anthropic.com') ? { five_hour: { utilization: 30, resets_at: reset }, extra_usage: { is_enabled: false } }
+      : { config: { creditUsagePercent: 40, currentPeriod: { end: reset } } };
+  const prober = new QuotaProber({ env: f.env, now: () => new Date(now), fetch: async url => { calls++; return json(bodies(String(url))); } });
+  t.after(() => prober.close());
+  const observed = (await prober.refresh({})).records;
+  assert.equal(calls, 3);
+  assert.deepEqual(observed.map(r => [r.status, r.stale]), [['available', false], ['available', false], ['available', false]]);
+  for (const engine of ['codex', 'claude', 'grok'] as const) f.credential(engine, expiredCredential(engine, true));
+  now += 60_001;
+  const pending = (await prober.refresh({})).records;
+  assert.equal(calls, 3, 'an expired token that the native CLI can renew must never reach the quota API');
+  for (const [index, record] of pending.entries()) {
+    assert.equal(record.status, observed[index].status, 'the last observation is kept, not replaced by a logout');
+    assert.deepEqual(record.windows, observed[index].windows);
+    assert.equal(record.observedAt, observed[index].observedAt);
+    assert.equal(record.stale, true);
+    assert.doesNotMatch(record.detail, /登录|重新登录|确认/);
+  }
+  assert.doesNotMatch(JSON.stringify(pending), /never-use|expired-|secret/);
+});
+
+test('a renewal wait without any earlier reading stays the ordinary no-data state', async t => {
+  const f = fixture(t);
+  for (const engine of ['codex', 'claude', 'grok'] as const) f.credential(engine, expiredCredential(engine, true));
+  let calls = 0;
+  const prober = new QuotaProber({ env: f.env, now: () => new Date(start), fetch: async () => { calls++; return json(codexBody()); } });
+  t.after(() => prober.close());
+  const records = (await prober.refresh({})).records;
+  assert.equal(calls, 0);
+  assert.deepEqual(records.map(r => [r.status, r.stale, r.windows.length, r.observedAt]), [['unknown', true, 0, null], ['unknown', true, 0, null], ['unknown', true, 0, null]]);
+  assert.ok(records.every(r => !/登录|重新登录|确认/.test(r.detail)));
+});
+
+test('an expired token with no refresh token is still a real logout that drops earlier readings', async t => {
+  const f = fixture(t);
+  for (const engine of ['codex', 'claude', 'grok'] as const) f.credential(engine);
+  let now = start; let calls = 0;
+  const prober = new QuotaProber({ env: f.env, now: () => new Date(now), fetch: async url => { calls++; return json(String(url).includes('chatgpt.com') ? codexBody(20) : String(url).includes('anthropic.com') ? { five_hour: { utilization: 30, resets_at: reset }, extra_usage: { is_enabled: false } } : { config: { creditUsagePercent: 40, currentPeriod: { end: reset } } }); } });
+  t.after(() => prober.close());
+  await prober.refresh({});
+  assert.equal(calls, 3);
+  for (const engine of ['codex', 'claude', 'grok'] as const) f.credential(engine, expiredCredential(engine, false));
+  now += 60_001;
+  const records = (await prober.refresh({})).records;
+  assert.equal(calls, 3, 'a logout must not reach the quota API either');
+  for (const record of records) {
+    assert.equal(record.status, 'unauthenticated');
+    assert.equal(record.windows.length, 0);
+    assert.equal(record.observedAt, null);
+    assert.match(record.detail, /登录/);
+  }
+});
+
+test('a renewal wait for a different native account does not reuse the previous account readings', async t => {
+  const f = fixture(t); f.credential('grok');
+  let now = start; let calls = 0;
+  const prober = new QuotaProber({ env: f.env, now: () => new Date(now), fetch: async () => { calls++; return json({ config: { creditUsagePercent: 14, currentPeriod: { end: reset } } }); } });
+  t.after(() => prober.close());
+  const observed = (await prober.refresh({ engine: 'grok' })).records[2];
+  assert.equal(observed.status, 'available');
+  f.credential('grok', { 'https://auth.x.ai::official-client': { auth_mode: 'oidc', key: 'expired-grok', expires_at: new Date(start - 1).toISOString(), refresh_token: 'never-use', team_id: 'another-team' } });
+  now += 60_001;
+  const changed = (await prober.refresh({ engine: 'grok' })).records[2];
+  assert.equal(calls, 1);
+  assert.equal(changed.status, 'unknown');
+  assert.equal(changed.windows.length, 0);
+  assert.equal(changed.observedAt, null);
+  assert.equal(changed.stale, true);
+  assert.doesNotMatch(changed.detail, /登录|确认/);
+});
+
+test('credential reading separates a renewably expired token from a logout and never touches the file', async t => {
+  const f = fixture(t);
+  const file = f.credential('claude', expiredCredential('claude', true));
+  const bytes = readFileSync(file, 'utf8');
+  await assert.rejects(() => readNativeCredential('claude', f.env, start), (error: unknown) => {
+    if (!(error instanceof QuotaRenewalPending)) throw new Error('expected a renewal wait');
+    assert.doesNotMatch(`${error.message}${error.account}`, /never-use|expired-claude|secret/);
+    assert.doesNotMatch(error.message, /登录|确认/);
+    return true;
+  });
+  f.credential('codex', expiredCredential('codex', true));
+  f.credential('grok', expiredCredential('grok', true));
+  for (const engine of ['codex', 'grok'] as QuotaEngine[]) {
+    await assert.rejects(() => readNativeCredential(engine, f.env, start), (error: unknown) => error instanceof QuotaRenewalPending && /^[0-9a-f]{64}$/.test(error.account));
+  }
+  assert.equal(readFileSync(file, 'utf8'), bytes, 'Weaver only reads the native credential');
+  for (const engine of ['codex', 'claude', 'grok'] as QuotaEngine[]) {
+    f.credential(engine, expiredCredential(engine, false));
+    await assert.rejects(() => readNativeCredential(engine, f.env, start), (error: unknown) => error instanceof QuotaFailure && !(error instanceof QuotaRenewalPending) && error.status === 'unauthenticated' && /登录/.test(error.message));
+  }
 });
