@@ -1,4 +1,5 @@
 import { validateContinuationFields } from './continuation';
+import { isRealEngineKind } from './workspace';
 import type { Task, TaskEvent, AgentRun } from '../shared/types';
 import { object, parseId, parseTaskInput, parseWorkerRecord, text } from '../shared/validation';
 function date(value: unknown): string {const raw=text(value,'timestamp',40);if (!Number.isFinite(Date.parse(raw))) throw new Error('Invalid timestamp');return raw;}
@@ -26,12 +27,12 @@ export function parseStoredTask(value: unknown): Task {
   if((execution!=='mock'&&execution!=='real'&&execution!=='native') || !['idle','running','stopping','stopped'].includes(String(value.status))) throw new Error('Invalid stored agent run');
   if(execution==='native'&&adapter!=='native') throw new Error('Invalid stored agent run');
   if(execution==='mock'&&adapter!=='mock-jsonl') throw new Error('Invalid stored agent run');
-  if(execution==='real'&&!['opencode','pi','grok','codex'].includes(adapter)) throw new Error('Invalid stored agent run');
+  if(execution==='real'&&!isRealEngineKind(adapter)) throw new Error('Invalid stored agent run');
   run={id:parseId(value.id),adapter,execution,status:value.status as AgentRun['status']};
   if(value.scopeUnit!==undefined)run.scopeUnit=text(value.scopeUnit,'scopeUnit',200);
   if(value.evidence!==undefined){
    const e=object(value.evidence);
-   if(!['opencode','pi','grok','codex'].includes(String(e.engine))||!['pending','success','error','cancelled','missing','truncated'].includes(String(e.terminal)))throw new Error('Invalid provider evidence');
+   if(!isRealEngineKind(String(e.engine))||!['pending','success','error','cancelled','missing','truncated'].includes(String(e.terminal)))throw new Error('Invalid provider evidence');
    const evidence:NonNullable<AgentRun['evidence']>={engine:e.engine as NonNullable<AgentRun['evidence']>['engine'],requestedModel:text(e.requestedModel,'requestedModel',200),requestedEffort:text(e.requestedEffort,'requestedEffort',120),workspace:text(e.workspace,'workspace',2000),terminal:e.terminal as NonNullable<AgentRun['evidence']>['terminal']};
    if(e.role!==undefined){if(e.role!=='worker'&&e.role!=='owner')throw new Error('Invalid evidence role');evidence.role=e.role;}
    for(const key of ['vendorSessionId','vendorModel'] as const)if(e[key]!==undefined)evidence[key]=text(e[key],key,512);
