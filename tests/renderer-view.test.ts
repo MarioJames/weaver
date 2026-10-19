@@ -12,6 +12,9 @@ import { workspacePathError } from '../src/renderer/components/TaskComposer';
 import { ArtifactsPanel } from '../src/renderer/components/ArtifactsPanel';
 import { NamedInputNumber, NamedSelect, NamedSwitch } from '../src/renderer/components/NamedControls';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
+import { EnginesPage } from '../src/renderer/pages/EnginesPage';
+import { defaultConfig, type Block } from '../src/main/policy/routing';
+import type { PolicyDraft } from '../src/renderer/usePolicyDraft';
 function markup(node: React.ReactNode) {
   const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;
   return renderToStaticMarkup(React.createElement(ConfigProvider, props));
@@ -32,7 +35,7 @@ test('every task lands in exactly one kanban column by where it is in its lifecy
 });
 test('board lays tasks out in columns with counts',()=>{const html=markup(React.createElement(TaskBoard,{tasks:[task,{...task,id:'q',title:'排队任务',status:'queued' as const}],loading:false,onSelect:()=>{}}));assert.match(html,/待执行/);assert.match(html,/待验收/);assert.match(html,/排队任务/);assert.match(html,/中文任务/);});
 test('board has distinct loading and empty states',()=>{const props={tasks:[],onSelect:()=>{}};assert.match(markup(React.createElement(TaskBoard,{...props,loading:true})),/正在加载/);assert.match(markup(React.createElement(TaskBoard,{...props,loading:false})),/还没有任务/);});
-test('task view separates execution and review, escapes instruction',()=>{const html=markup(React.createElement(TaskDetail,{task:{...task,instruction:'<script>bad()</script>'},busy:false,onStart:()=>{},onCancel:()=>{},action:async()=>true}));assert.match(html,/执行完成/);assert.match(html,/待验收/);assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.doesNotMatch(html,/开始 mock 执行/);assert.doesNotMatch(html,/真实 provider 未连接/);assert.doesNotMatch(html,/本地 mock/);assert.match(html,/Owner · 更新于/);assert.doesNotMatch(html,/执行进度/);assert.doesNotMatch(html,/role="progressbar"/);assert.match(html,/id="task-tab-events"/);assert.match(html,/aria-controls="task-panel-events"/);assert.match(html,/aria-labelledby="task-tab-events"/);assert.match(html,/tabindex="0"/);assert.match(html,/tabindex="-1"/);});
+test('task view separates execution and review, escapes instruction',()=>{const html=markup(React.createElement(TaskDetail,{task:{...task,instruction:'<script>bad()</script>'},busy:false,onStart:()=>{},onCancel:()=>{},action:async()=>true}));assert.match(html,/执行完成/);assert.match(html,/待验收/);assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.doesNotMatch(html,/开始 mock 执行/);assert.doesNotMatch(html,/真实 provider 未连接/);assert.doesNotMatch(html,/本地 mock/);assert.match(html,/<dt[^>]*>Owner<\/dt><dd[^>]*>[\s\S]*?>Owner<\/span><\/dd>/);assert.match(html,/更新于/);assert.doesNotMatch(html,/执行进度/);assert.doesNotMatch(html,/role="progressbar"/);assert.match(html,/id="task-tab-events"/);assert.match(html,/aria-controls="task-panel-events"/);assert.match(html,/aria-labelledby="task-tab-events"/);assert.match(html,/tabindex="0"/);assert.match(html,/tabindex="-1"/);});
 test('task workspace must be an absolute directory',()=>{assert.equal(workspacePathError(''), '填写目标项目的绝对路径。');assert.match(workspacePathError('.'),/绝对路径/);assert.match(workspacePathError('docs'),/绝对路径/);assert.equal(workspacePathError('/home/user/project'),'');});
 test('task tabs move by arrow, home and end',()=>{const keys=['events','artifacts','review'];assert.equal(nextTab(keys,'events','ArrowRight'),'artifacts');assert.equal(nextTab(keys,'events','ArrowLeft'),'review');assert.equal(nextTab(keys,'artifacts','Home'),'events');assert.equal(nextTab(keys,'artifacts','End'),'review');assert.equal(nextTab(keys,'events','Enter'),undefined);});
 test('artifact preview renders hostile markup as text only',()=>{const html=markup(React.createElement(ArtifactsPanel,{artifacts:[{id:'a',name:'test.html',mediaType:'text/plain',createdAt:task.createdAt,content:'<img src=x onerror=alert(1)>'}]}));assert.match(html,/&lt;img/);assert.doesNotMatch(html,/<img/);});
@@ -60,6 +63,25 @@ test('visible Form labels link to the named select trigger and number input once
   assert.equal([...html.matchAll(/<label[^>]*for="named-wait"/g)].length, 1);
   assert.match(html, /<button[^>]*id="named-owner"[^>]*role="combobox"/);
   assert.match(html, /<input[^>]*id="named-wait"/);
+});
+test('manual engine pause is gone, dispatch stays governed by switches, weight and quota blocks', () => {
+  const since = '2026-01-01T00:00:00.000Z';
+  const blocks: Block[] = [
+    { engine: 'grok', reason: 'HTTP 402 payment required', since },
+    { engine: 'codex', reason: '额度耗尽', since, by: 'weaver-quota:codex' },
+  ];
+  const config = defaultConfig();
+  const policy = {
+    snapshot: { revision: 1, config, blocks, activeBlocks: blocks, owners: {}, workers: {}, execution: 'disabled' },
+    config, blocks, loading: false, busy: false, dirty: false, loadError: '', saveError: '', issues: [], conflict: false,
+    setConfig: () => {}, setBlocks: () => {}, load: async () => true, save: async () => true, commit: async () => {}, rebase: () => {}, applyServerSnapshot: () => true,
+  } as unknown as PolicyDraft;
+  const html = markup(React.createElement(EnginesPage, { policy }));
+  assert.equal((html.match(/aria-label="恢复派发"/g) ?? []).length, 2);
+  assert.match(html, /HTTP 402 payment required/);
+  assert.match(html, /需手动恢复/);
+  assert.doesNotMatch(html, /lucide-pause|暂停原因|留空表示需要手动恢复|role="dialog"/);
+  assert.equal((html.match(/<button[^>]*>[\s\S]{0,120}?暂停派发<\/button>/g) ?? []).length, 0);
 });
 test('queued task shows the current queue reason without inventing capacity wait', () => {
   for (const [code, label] of Object.entries({ policy_blocked: '当前策略阻止派发', frozen_route_changed: '已冻结路由发生变化', workspace_changed: '工作目录发生变化', launch_blocked: '执行启动受阻' })) {

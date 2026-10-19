@@ -168,36 +168,44 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
       grid-template-columns: minmax(0, 1fr);
     }
   `,
-  /** Kanban: lanes stacked below the search row. */
+  /** Kanban: the filter row above one column grid. */
   board: css`
     display: flex;
     flex-direction: column;
     gap: 12px;
     min-inline-size: 0;
   `,
-  /** Task board: one owner swimlane after another, stacked vertically. */
-  lanes: css`
-    display: flex;
-    flex-direction: column;
+  /** The four status columns side by side, stacked on small screens. */
+  columns: css`
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
+    align-items: start;
     min-inline-size: 0;
+
+    ${responsive.laptop} {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    ${responsive.mobile} {
+      grid-template-columns: minmax(0, 1fr);
+    }
   `,
-  lane: css`
+  column: css`
     display: flex;
     flex-direction: column;
+    gap: 6px;
     min-inline-size: 0;
-    border-radius: ${cssVar.borderRadiusLG};
-    background: ${cssVar.colorFillQuaternary};
   `,
-  laneHead: css`
+  columnHead: css`
     display: flex;
     gap: 8px;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
-    padding: 8px 12px 8px;
+    padding-block-end: 2px;
   `,
-  /** The owner name and fold chevron sit in one clickable row. */
-  laneToggle: css`
+  /** The 已结束 count is also its fold: label, number and chevron in one clickable row. */
+  fold: css`
     display: inline-flex;
     gap: 6px;
     align-items: center;
@@ -214,36 +222,6 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
       outline: 2px solid ${cssVar.colorPrimaryBorder};
       outline-offset: 1px;
     }
-  `,
-  /** Inside one owner lane: its four status columns side by side, stacked on small screens. */
-  laneBody: css`
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
-    align-items: start;
-    min-inline-size: 0;
-    padding: 4px 12px 12px;
-
-    ${responsive.laptop} {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    ${responsive.mobile} {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  `,
-  laneColumn: css`
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-inline-size: 0;
-  `,
-  laneColHead: css`
-    display: flex;
-    gap: 8px;
-    align-items: baseline;
-    justify-content: space-between;
-    padding-block-end: 2px;
   `,
   taskCard: css`
     display: flex;
@@ -390,6 +368,33 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     gap: 4px;
     align-items: center;
     min-inline-size: 0;
+  `,
+  /** Owner and worker side by side in one archive row cell. */
+  agentPair: css`
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    min-inline-size: 0;
+  `,
+  /** Archive drawer: filters above the table. */
+  archiveBody: css`
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-inline-size: 0;
+  `,
+  /** An archived row opens the full record: whole-row click, so it reads and looks clickable. */
+  archiveRow: css`
+    cursor: pointer;
+
+    &[aria-current='true'] td {
+      background: ${cssVar.colorFillQuaternary};
+    }
+
+    &:focus-visible {
+      outline: 2px solid ${cssVar.colorPrimaryBorder};
+      outline-offset: -2px;
+    }
   `,
   error: css`
     margin: 0;

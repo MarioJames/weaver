@@ -4,9 +4,9 @@ import { Alert, Button, Tag, Text } from '@lobehub/ui/base-ui';
 import { Loader2 } from 'lucide-react';
 import type { Task } from '../../shared/types';
 import { redactLog } from '../log-view';
-import { isActive, nextTab, dispatchKind, ownerLabel, projectLabel, reviewLabel, statusLabels, taskOwnerId } from '../task-view';
+import { isActive, nextTab, reviewLabel, statusLabels } from '../task-view';
 import { styles } from '../style';
-import { AgentLabel } from './EngineIcon';
+import { AgentFacts } from './AgentFacts';
 import { ArtifactsPanel } from './ArtifactsPanel';
 import { EventsPanel } from './EventsPanel';
 import { OwnerInspector } from './OwnerInspector';
@@ -26,14 +26,7 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
   const latest = task.events.at(-1);
   const failure = [...task.events].reverse().find(event => event.kind === 'error');
   const dispatch = task.dispatch;
-  const project = projectLabel(task);
-  const rest = [dispatch && `${dispatch.engine} / ${dispatch.model}`, dispatch?.effort, project, `更新于 ${new Date(task.updatedAt).toLocaleString()}`].filter(Boolean).join(' · ');
-  const ownerIconKind = ownerKind?.(taskOwnerId(task));
-  const meta = <>
-    {ownerIconKind || dispatch ? <AgentLabel kind={ownerIconKind} name={ownerLabel(task)} /> : ownerLabel(task)}
-    {dispatch ? <> → <AgentLabel kind={dispatchKind(task)} name={dispatch.worker} /></> : ''}
-    {rest ? ` · ${rest}` : ''}
-  </>;
+  const rest = [dispatch && `${dispatch.engine} / ${dispatch.model}`, dispatch?.effort, `更新于 ${new Date(task.updatedAt).toLocaleString()}`].filter(Boolean).join(' · ');
   const queueNotice = task.scheduled || (task.status === 'queued' && task.queueReason);
   return <section aria-label="任务详情" className={styles.stack}>
     <div className={styles.spread}>
@@ -50,7 +43,8 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
         {!isActive(task) && onRetry && <Button disabled={busy} onClick={() => onRetry(task.id)}>新建重试任务</Button>}
       </div>
     </div>
-    <Text type="secondary" className={styles.wrap}>{meta}</Text>
+    <AgentFacts task={task} ownerKind={ownerKind} />
+    <Text type="secondary" className={styles.wrap}>{rest}</Text>
     {queueNotice ? <Alert type="info" title="调度请求已排队" description={task.queueReason ? `${queueLabels[task.queueReason.code]}：${redactLog(task.queueReason.message)}` : '等待调度检查。'} />
       : task.status === 'failed' ? <Alert type="error" title="执行失败" description={redactLog(failure?.message ?? latest?.message ?? '查看时间线。')} />
         : task.status === 'cancelled' ? <Alert type="secondary" title="执行已取消" description={redactLog(failure?.message ?? latest?.message ?? '查看时间线。')} /> : undefined}
