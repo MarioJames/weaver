@@ -84,11 +84,36 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     padding-block-start: 12px;
     border-block-start: 1px solid ${cssVar.colorBorderSecondary};
   `,
+  /** Settings groups stacked with hairlines between them, full width. */
   settings: css`
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    max-inline-size: 720px;
+  `,
+  /** The group column takes a third (bounded) so long group descriptions wrap to a few lines. */
+  settingsGroup: css`
+    display: grid;
+    grid-template-columns: minmax(280px, 36%) minmax(0, 1fr);
+    gap: 8px 48px;
+    padding-block: 20px;
+
+    & + & {
+      border-block-start: 1px solid ${cssVar.colorBorderSecondary};
+    }
+
+    /* Collapse on the content width, not the viewport: the sidebar already takes part of the screen. */
+    @container (max-width: 860px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  `,
+  settingsRows: css`
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+
+    & > :first-child {
+      padding-block-start: 0;
+    }
   `,
   stack: css`
     display: flex;
@@ -256,6 +281,16 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     justify-content: space-between;
     min-inline-size: 0;
     padding-block: 12px;
+
+    /* The text wraps; the control keeps its size and stays at the right edge. */
+    & > :first-child {
+      flex: 1 1 0;
+      min-inline-size: 0;
+    }
+
+    & > :last-child {
+      flex: none;
+    }
 
     & + & {
       border-block-start: 1px solid ${cssVar.colorBorderSecondary};

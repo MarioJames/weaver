@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Check } from 'lucide-react';
-import { PageHeader, Surface } from '@lobehub/ui/dashboard';
+import { PageHeader } from '@lobehub/ui/dashboard';
 import { Icon } from '@lobehub/ui';
 import { Alert, Button, Skeleton, Spin, Text } from '@lobehub/ui/base-ui';
 import type { QuotaSchedule } from '../../shared/quota';
@@ -50,6 +50,17 @@ function Setting({ label, desc, htmlFor, state, error, children }: { label: stri
   </div>;
 }
 
+/** One group: its title and explanation on the left, its settings on the right. No card frame. */
+function Group({ title, desc, children }: { title: string; desc?: ReactNode; children: ReactNode }) {
+  return <section aria-label={title} className={styles.settingsGroup}>
+    <div className={styles.tight}>
+      <Text strong>{title}</Text>
+      {desc && <Text type="secondary" className={styles.meta}>{desc}</Text>}
+    </div>
+    <div className={styles.settingsRows}>{children}</div>
+  </section>;
+}
+
 /** A number that is committed on blur or Enter, never on every keystroke. Out-of-range input stays local with a message. */
 function MinutesInput({ id, label, value, min, max, step, disabled, onCommit, onError }: { id: string; label: string; value: number; min: number; max: number; step: number; disabled?: boolean; onCommit: (value: number) => void; onError: (message: string) => void }) {
   const [draft, setDraft] = useState<number | null>(value);
@@ -92,24 +103,24 @@ export function SettingsPage({ policy }: { policy: PolicyDraft }) {
   return <>
     {header}
     <div className={styles.settings}>
-      <Surface title="额度" description="只刷新已启用、并在引擎卡片上打开「主动刷新额度」的引擎。额度耗尽时自动暂停派发，额度恢复或到重置时间后自动解除。">
+      <Group title="额度" desc="只刷新已启用、并在引擎卡片上打开「主动刷新额度」的引擎。额度耗尽时自动暂停派发，恢复或到重置时间后自动解除。">
         <Setting label="定时刷新额度" htmlFor={`${id}-auto`} desc={scheduleText} state={saver.states.auto}>
           <NamedSwitch id={`${id}-auto`} aria-label="定时刷新额度" checked={quota.auto_refresh} disabled={saver.states.auto?.status === 'saving'} onChange={checked => void saver.save('auto', config => ({ quota: { ...quotaSettings(config), auto_refresh: checked } }))} />
         </Setting>
         <Setting label="刷新间隔（分钟）" htmlFor={`${id}-interval`} desc={`${QUOTA_INTERVAL_RANGE.min} 到 ${QUOTA_INTERVAL_RANGE.max} 分钟。`} state={saver.states.interval} error={inputErrors.interval}>
           <MinutesInput id={`${id}-interval`} label="刷新间隔（分钟）" value={quota.interval_minutes} min={QUOTA_INTERVAL_RANGE.min} max={QUOTA_INTERVAL_RANGE.max} step={5} disabled={!quota.auto_refresh} onError={inputError('interval')} onCommit={value => void saver.save('interval', config => ({ quota: { ...quotaSettings(config), interval_minutes: value } }))} />
         </Setting>
-      </Surface>
-      <Surface title="审查">
+      </Group>
+      <Group title="审查" desc="负责人验收工作代理结果时的额外审查。">
         <Setting label="ChatGPT Pro 自动审查" htmlFor={`${id}-review`} desc="关闭后负责人跳过 ChatGPT Pro 自动审查，本地审查和测试照常进行。" state={saver.states.review}>
           <NamedSwitch id={`${id}-review`} aria-label="ChatGPT Pro 自动审查" checked={chatgptReviewEnabled(saved)} disabled={saver.states.review?.status === 'saving'} onChange={checked => void saver.save('review', () => ({ chatgpt_review: checked }))} />
         </Setting>
-      </Surface>
-      <Surface title="负责人">
+      </Group>
+      <Group title="负责人" desc="负责人观测和等待工作代理的方式。">
         <Setting label="单次等待上限（分钟）" htmlFor={`${id}-wait`} desc="负责人每次等待工作代理回报的最长时间。真实执行超过这个时长会被停止。" state={saver.states.wait} error={inputErrors.wait}>
           <MinutesInput id={`${id}-wait`} label="单次等待上限（分钟）" value={saved.herdr.max_wait_minutes} min={1} max={1440} step={5} onError={inputError('wait')} onCommit={value => void saver.save('wait', () => ({ herdr: { max_wait_minutes: value } }))} />
         </Setting>
-      </Surface>
+      </Group>
     </div>
   </>;
 }
