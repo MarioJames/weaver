@@ -144,6 +144,9 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     policy: () => policy!,
     statePath: join(dataDir, STALL_FILE),
     ready: () => ready && !draining,
+    // Recovery is verified with the same light greeting the engines page runs, in this data dir's own scratch.
+    probe: (route, signal) => track(sayHi({ engine: route.engine, model: route.model, effort: route.effort, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal })
+      .then(result => ({ ok: result.ok, ms: result.durationMs, error: result.error }))),
     onBlocksChanged: () => commands?.pump(),
     log: message => console.error(`Stall monitor: ${message}`),
   });
