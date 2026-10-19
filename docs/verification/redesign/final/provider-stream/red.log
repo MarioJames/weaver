@@ -1,0 +1,32 @@
+✖ normal bounded Pi updates can exceed the old total transport byte cap (58.950336ms)
+ℹ {"transportBytes":1936000,"maxFrameBytes":2419,"unit":"weaver-cli-pi-1c27f312","code":1,"signal":"SIGTERM","evidence":{"engine":"pi","requestedModel":"fixture/pi","requestedEffort":"high","workspace":"/tmp/weaver-redesign-3QuXVe/provider-stream/stream-QEYE2I","terminal":"truncated"},"errors":[],"stderr":"","records":[{"type":"log","message":"Launching pi with requested model fixture/pi"},{"type":"log","message":"pi --approve trusts project files for this run; it is not OS isolation"},{"type":"progress","percent":10,"message":"owned scope started"},{"type":"log","message":"ignored 1 non-JSON vendor lines"},{"type":"log","message":"vendor terminal truncated exit 0"}],"active":"ActiveState=inactive\n"}
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 158.337774
+
+✖ failing tests:
+
+test at tests/cli-providers-streaming.test.ts:2:1409
+✖ normal bounded Pi updates can exceed the old total transport byte cap (58.950336ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'truncated'
+  - 'success'
+  
+      at TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/cli-providers-streaming.test.ts:60:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'truncated',
+    expected: 'success',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

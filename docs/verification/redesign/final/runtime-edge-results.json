@@ -1,0 +1,393 @@
+[
+  {
+    "case": "same data second instance",
+    "exit": 1,
+    "stdout": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":false,\"error\":{\"code\":\"ENDPOINT_EXISTS\",\"message\":\"Discovery already exists; another app or a stale endpoint must be resolved before startup\",\"retryable\":false}}\n",
+    "tasksHashUnchanged": true
+  },
+  {
+    "case": "bind failure",
+    "exit": 1,
+    "stdout": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":false,\"error\":{\"code\":\"EADDRINUSE\",\"message\":\"127.0.0.1:41949 is already in use. Stop the other process or choose a free port with --port.\",\"retryable\":false}}\n",
+    "discoveryAbsent": true,
+    "actualControlDiscoveryAbsent": true,
+    "remainingOwnedEntries": []
+  },
+  {
+    "case": "HTTP guards",
+    "checks": [
+      {
+        "method": "GET",
+        "path": "/api/rpc",
+        "status": 405,
+        "body": "{\"error\":{\"code\":\"METHOD_NOT_ALLOWED\",\"message\":\"Only POST is accepted\"}}"
+      },
+      {
+        "method": "POST",
+        "path": "/api/rpc",
+        "status": 403,
+        "body": "{\"error\":{\"code\":\"INVALID_ORIGIN\",\"message\":\"Origin must be this loopback endpoint\"}}"
+      },
+      {
+        "method": "POST",
+        "path": "/api/rpc",
+        "status": 403,
+        "body": "{\"error\":{\"code\":\"INVALID_ORIGIN\",\"message\":\"Origin must be this loopback endpoint\"}}"
+      },
+      {
+        "method": "POST",
+        "path": "/api/rpc",
+        "status": 415,
+        "body": "{\"error\":{\"code\":\"UNSUPPORTED_MEDIA_TYPE\",\"message\":\"Content-Type must be application/json\"}}"
+      },
+      {
+        "method": "GET",
+        "path": "/%2e%2e/package.json",
+        "status": 404,
+        "body": "{\"error\":{\"code\":\"NOT_FOUND\",\"message\":\"Not found\"}}"
+      },
+      {
+        "method": "GET",
+        "path": "/",
+        "status": 403,
+        "body": "{\"error\":{\"code\":\"INVALID_HOST\",\"message\":\"Host must be the loopback endpoint\"}}"
+      }
+    ]
+  },
+  {
+    "case": "queued workspace identity guard",
+    "task": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/workspace-replaced",
+      "acceptanceCriteria": [
+        "proof.txt contains exactly workspace guard no launch and a newline"
+      ],
+      "constraints": [
+        "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+      ],
+      "title": "workspace guard no launch",
+      "instruction": "Create proof.txt containing exactly workspace guard no launch and newline. Read it back. Do not touch any other file.",
+      "id": "2534056e-dc37-45fc-b730-0e02f92a1191",
+      "createdAt": "2026-10-18T23:56:50.098Z",
+      "updatedAt": "2026-10-18T23:56:50.317Z",
+      "status": "queued",
+      "revision": 5,
+      "reviewState": "pending",
+      "progress": 0,
+      "events": [
+        {
+          "id": "7f7fac80-5e62-4828-9ba2-c8bb2c99f466",
+          "at": "2026-10-18T23:56:50.098Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "9b3b2c3a-2e91-4341-a393-62e994fa9630",
+          "at": "2026-10-18T23:56:50.193Z",
+          "kind": "lifecycle",
+          "message": "Frozen work package created"
+        },
+        {
+          "id": "0989e8b1-d195-41d8-b5a7-de90e346cd56",
+          "at": "2026-10-18T23:56:50.317Z",
+          "kind": "lifecycle",
+          "message": "Policy selected qa_a_worker; launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/workspace-replaced"
+        },
+        {
+          "id": "745178ad-24fd-47af-a290-c330bef16edf",
+          "at": "2026-10-18T23:56:50.317Z",
+          "kind": "lifecycle",
+          "message": "Dispatch admitted to queue; waiting for an execution slot"
+        }
+      ],
+      "artifacts": [],
+      "ownerId": "efe29d5b-00e3-4202-b2ff-ce2182e9a378",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:56:50.098Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "packageId": "d91a40de-acf7-4da4-ad1e-0650e1791014",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "qa_a_worker",
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "execution": "real",
+        "maxParallel": 1,
+        "maxWaitMinutes": 1,
+        "adapter": "codex",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/workspace-replaced",
+        "workspaceIdentity": "38:1728587",
+        "engineKind": "codex"
+      },
+      "scheduled": true,
+      "queueReason": {
+        "code": "workspace_changed",
+        "message": "Frozen workspace changed or was replaced; cancel this queued dispatch and create a new task for the intended directory."
+      }
+    }
+  },
+  {
+    "case": "two owners capacity independent",
+    "tasks": [
+      {
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+        "title": "codex_owner capacity 0",
+        "instruction": "explicit mock",
+        "id": "8969b940-e114-4295-bdbe-6198233d7375",
+        "createdAt": "2026-10-18T23:56:52.917Z",
+        "updatedAt": "2026-10-18T23:56:53.025Z",
+        "status": "running",
+        "revision": 6,
+        "reviewState": "pending",
+        "progress": 0,
+        "events": [
+          {
+            "id": "869643a9-334f-4b81-80bc-85659e362817",
+            "at": "2026-10-18T23:56:52.917Z",
+            "kind": "lifecycle",
+            "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+          },
+          {
+            "id": "e84078a3-1862-4171-998a-2c720cec56c4",
+            "at": "2026-10-18T23:56:53.022Z",
+            "kind": "lifecycle",
+            "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+          },
+          {
+            "id": "3cc52467-98b0-4d21-8bde-8486f9be7242",
+            "at": "2026-10-18T23:56:53.025Z",
+            "kind": "lifecycle",
+            "message": "Launching explicit mock-jsonl provider"
+          }
+        ],
+        "artifacts": [],
+        "ownerId": "ffbbbeb3-96fa-4837-b97d-b6f58e7c1269",
+        "ownerEpoch": 0,
+        "ownerLastActivityAt": "2026-10-18T23:56:52.917Z",
+        "continuationPolicy": {
+          "idleRotationMinutes": 60
+        },
+        "packageId": "0e42ce22-253d-4b82-aaf7-33e370f25d8d",
+        "dispatch": {
+          "owner": "codex_owner",
+          "worker": "qa_a_worker",
+          "engine": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "xhigh",
+          "execution": "mock",
+          "maxParallel": 1,
+          "maxWaitMinutes": 1,
+          "adapter": "mock-jsonl"
+        },
+        "scheduled": false,
+        "run": {
+          "id": "53557424-b5af-43d9-b27f-ad38db7a8aad",
+          "adapter": "mock-jsonl",
+          "execution": "mock",
+          "status": "running",
+          "startedAt": "2026-10-18T23:56:53.025Z",
+          "timeoutMs": 60000,
+          "engine": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "xhigh",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final"
+        }
+      },
+      {
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+        "title": "codex_owner capacity 1",
+        "instruction": "explicit mock",
+        "id": "6506e3f2-d396-42b0-a216-24c006b21fe7",
+        "createdAt": "2026-10-18T23:56:53.164Z",
+        "updatedAt": "2026-10-18T23:56:53.271Z",
+        "status": "queued",
+        "revision": 4,
+        "reviewState": "pending",
+        "progress": 0,
+        "events": [
+          {
+            "id": "0db462dd-7646-4a24-bf31-5b11323333aa",
+            "at": "2026-10-18T23:56:53.164Z",
+            "kind": "lifecycle",
+            "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+          },
+          {
+            "id": "02086a29-d4d8-4cee-be01-fbe754c9173a",
+            "at": "2026-10-18T23:56:53.271Z",
+            "kind": "lifecycle",
+            "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+          },
+          {
+            "id": "ff9ca414-9246-4a96-b05f-7ccd209cab9c",
+            "at": "2026-10-18T23:56:53.271Z",
+            "kind": "lifecycle",
+            "message": "Dispatch admitted to queue; waiting for an execution slot"
+          }
+        ],
+        "artifacts": [],
+        "ownerId": "3773946d-453f-4224-be6f-a7cad1e76061",
+        "ownerEpoch": 0,
+        "ownerLastActivityAt": "2026-10-18T23:56:53.164Z",
+        "continuationPolicy": {
+          "idleRotationMinutes": 60
+        },
+        "packageId": "fdd8759d-d82b-42fb-841a-559a6cb1e88c",
+        "dispatch": {
+          "owner": "codex_owner",
+          "worker": "qa_a_worker",
+          "engine": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "xhigh",
+          "execution": "mock",
+          "maxParallel": 1,
+          "maxWaitMinutes": 1,
+          "adapter": "mock-jsonl"
+        },
+        "scheduled": true,
+        "queueReason": {
+          "code": "waiting_for_capacity",
+          "message": "Owner codex_owner is at its current concurrency limit (1)."
+        }
+      },
+      {
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+        "title": "qa_owner capacity 0",
+        "instruction": "explicit mock",
+        "id": "13a217bc-1698-4f1c-8fae-a28a0466fee2",
+        "createdAt": "2026-10-18T23:56:53.379Z",
+        "updatedAt": "2026-10-18T23:56:53.493Z",
+        "status": "running",
+        "revision": 6,
+        "reviewState": "pending",
+        "progress": 0,
+        "events": [
+          {
+            "id": "c9ccfa1c-0dc9-40ef-81c8-1a2e5d8ffbc1",
+            "at": "2026-10-18T23:56:53.379Z",
+            "kind": "lifecycle",
+            "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+          },
+          {
+            "id": "fc26ed19-edfb-4fe6-bc97-c74eadff5327",
+            "at": "2026-10-18T23:56:53.490Z",
+            "kind": "lifecycle",
+            "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+          },
+          {
+            "id": "46b99f54-55d0-4e6b-a62c-8f9918cfeecd",
+            "at": "2026-10-18T23:56:53.493Z",
+            "kind": "lifecycle",
+            "message": "Launching explicit mock-jsonl provider"
+          }
+        ],
+        "artifacts": [],
+        "ownerId": "bd406125-b0a7-4c1f-947e-b1cfec8f9e50",
+        "ownerEpoch": 0,
+        "ownerLastActivityAt": "2026-10-18T23:56:53.379Z",
+        "continuationPolicy": {
+          "idleRotationMinutes": 60
+        },
+        "packageId": "8bcc9e41-718d-48a5-b478-21e331b6ad0d",
+        "dispatch": {
+          "owner": "qa_owner",
+          "worker": "qa_a_worker",
+          "engine": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "xhigh",
+          "execution": "mock",
+          "maxParallel": 1,
+          "maxWaitMinutes": 1,
+          "adapter": "mock-jsonl"
+        },
+        "scheduled": false,
+        "run": {
+          "id": "5e8da90c-b8fb-4d8d-959d-1e8289a05c80",
+          "adapter": "mock-jsonl",
+          "execution": "mock",
+          "status": "running",
+          "startedAt": "2026-10-18T23:56:53.493Z",
+          "timeoutMs": 60000,
+          "engine": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "xhigh",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final"
+        }
+      },
+      {
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+        "title": "qa_owner capacity 1",
+        "instruction": "explicit mock",
+        "id": "6f5c429b-0820-4943-ade9-e4d127a75844",
+        "createdAt": "2026-10-18T23:56:53.636Z",
+        "updatedAt": "2026-10-18T23:56:53.748Z",
+        "status": "queued",
+        "revision": 4,
+        "reviewState": "pending",
+        "progress": 0,
+        "events": [
+          {
+            "id": "e1d0f495-6363-4115-a9b1-297902b0b660",
+            "at": "2026-10-18T23:56:53.636Z",
+            "kind": "lifecycle",
+            "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+          },
+          {
+            "id": "34a29605-1837-4568-8ea1-d08dd9527d8b",
+            "at": "2026-10-18T23:56:53.748Z",
+            "kind": "lifecycle",
+            "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+          },
+          {
+            "id": "bbffd2fe-375d-46fd-a334-adc61aed0ae1",
+            "at": "2026-10-18T23:56:53.748Z",
+            "kind": "lifecycle",
+            "message": "Dispatch admitted to queue; waiting for an execution slot"
+          }
+        ],
+        "artifacts": [],
+        "ownerId": "726fedef-7eb9-458a-b731-8374003f3f03",
+        "ownerEpoch": 0,
+        "ownerLastActivityAt": "2026-10-18T23:56:53.636Z",
+        "continuationPolicy": {
+          "idleRotationMinutes": 60
+        },
+        "packageId": "2e4184a1-4a19-41ef-b1c8-eea048d19581",
+        "dispatch": {
+          "owner": "qa_owner",
+          "worker": "qa_a_worker",
+          "engine": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "xhigh",
+          "execution": "mock",
+          "maxParallel": 1,
+          "maxWaitMinutes": 1,
+          "adapter": "mock-jsonl"
+        },
+        "scheduled": true,
+        "queueReason": {
+          "code": "waiting_for_capacity",
+          "message": "Owner qa_owner is at its current concurrency limit (1)."
+        }
+      }
+    ]
+  },
+  {
+    "case": "missing real workspace",
+    "response": {
+      "exit": 1,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": "qa-ab1f94f1-e1b3-4bfd-bb4e-845392e2ea4e",
+        "ok": false,
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Workspace must be an absolute project directory. This server does not substitute its own repository or working directory.",
+          "retryable": false
+        }
+      },
+      "stderr": ""
+    }
+  }
+]

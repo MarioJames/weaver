@@ -1,0 +1,568 @@
+[
+  {
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative",
+    "acceptanceCriteria": [
+      "src/index.mjs 导出 createIndex，实例具有 add/get/list；正常添加后可查询原 id/title。",
+      "未知 id 返回 null，空 id 抛 Error。",
+      "重复 id 抛 Error，原任务未覆盖，顺序不受失败添加影响。",
+      "list 对多任务按插入顺序返回且多次调用确定一致。",
+      "node --test tests/index.test.mjs 全部通过，测试使用 node:test，无依赖。",
+      "只新增指定两个文件及必要目录，其他原有文件不变，未提交 Git。"
+    ],
+    "constraints": [
+      "只允许写入 /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative/src/index.mjs 和 /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative/tests/index.test.mjs；只允许为这两个文件建立必要的 src 与 tests 目录。其他路径全部只读。",
+      "不得修改 README.md、fixture/ACCESS.md、fixture/smoke、其他 fixture 或工作目录以外文件；不创建 package.json、锁文件、报告、临时文件或额外配置。",
+      "不安装依赖，不提交 Git，不执行 Git 写操作。",
+      "作为 Worker 不再委派，不调用 Weaver/Herdr/其他调度器，不与用户通信，不修改调度配置或停止共享服务。",
+      "保持实现简单，优先使用内置 Map 保持插入顺序；不增加排序策略、持久化、异步接口或无关 API。",
+      "id 使用非空字符串，拒绝空字符串、空白及缺失 id；错误必须是 Error。不要隐式修剪正常 id、改变 title 或强制用户未要求的 title 校验。",
+      "测试必须调用真实模块并检查公开行为，覆盖正常添加查询、未知 id、确定插入顺序、重复 id 不覆盖且不改变顺序、空 id 拒绝和两个实例独立；不 mock 实现，不测试内部结构。",
+      "最终回报实际修改、测试命令、失败/通过的真实结果与剩余风险；报告通过 Weaver 结果返回，不写成磁盘文件。"
+    ],
+    "title": "实现本地任务索引与 Node 测试",
+    "instruction": "读取 README.md，按需求实现 ESM 本地任务索引。只创建 src/index.mjs 与 tests/index.test.mjs（及它们必要的 src、tests 目录）。src/index.mjs 导出 createIndex()，返回 add({id,title})、get(id)、list()。add 添加任务；重复 id 抛 Error 并保持原记录与顺序不变；空 id 抛 Error；get 未找到返回 null；list 保持任务添加顺序并可重复得到同样顺序。每次 createIndex() 相互独立。沿用 JavaScript/Node 内置能力，不加依赖。测试使用 node:test 和 node:assert/strict，导入 ../src/index.mjs，用 node --test tests/index.test.mjs 验证。先写行为测试并记录缺失实现的失败，再完成实现并跑通过。",
+    "id": "0a68044f-8d5c-43b3-93e7-2f6088dafb1b",
+    "createdAt": "2026-10-18T23:56:04.352Z",
+    "updatedAt": "2026-10-18T23:59:30.251Z",
+    "status": "completed",
+    "revision": 47,
+    "reviewState": "accepted",
+    "progress": 100,
+    "events": [
+      {
+        "id": "51848c23-6c88-466d-8d35-1b339f94b0b3",
+        "at": "2026-10-18T23:56:04.352Z",
+        "kind": "lifecycle",
+        "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+      },
+      {
+        "id": "0e1519b3-98a9-41fe-b0ed-2a339827c8b9",
+        "at": "2026-10-18T23:56:16.991Z",
+        "kind": "lifecycle",
+        "message": "Frozen work package created"
+      },
+      {
+        "id": "c10fc42e-d809-4358-9dbd-4eeb28bc0b2b",
+        "at": "2026-10-18T23:56:17.075Z",
+        "kind": "lifecycle",
+        "message": "Policy selected qa_b_worker; launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative"
+      },
+      {
+        "id": "b603a58c-2647-409f-ad0d-419781daa223",
+        "at": "2026-10-18T23:56:17.075Z",
+        "kind": "lifecycle",
+        "message": "Launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative"
+      },
+      {
+        "id": "c691baae-c06e-47ca-a11c-97b425a93e97",
+        "at": "2026-10-18T23:56:17.078Z",
+        "kind": "log",
+        "message": "Launching codex with requested model gpt-6.1-sol"
+      },
+      {
+        "id": "a880c35a-5307-4998-8b02-52be2524cf04",
+        "at": "2026-10-18T23:56:17.079Z",
+        "kind": "log",
+        "message": "codex sandbox workspace-write is the vendor profile, not a separate OS claim"
+      },
+      {
+        "id": "2041dbb5-20e2-4ddf-ba20-ce98c86698c4",
+        "at": "2026-10-18T23:56:17.079Z",
+        "kind": "progress",
+        "message": "owned scope started"
+      },
+      {
+        "id": "286982db-ff3c-4065-ba9b-620315efe4b0",
+        "at": "2026-10-18T23:56:17.309Z",
+        "kind": "progress",
+        "message": "codex thread started"
+      },
+      {
+        "id": "9399151c-6a3c-4e40-aa94-a472def10a5c",
+        "at": "2026-10-18T23:56:50.009Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "1fc79a5d-aba2-4618-bea5-c655f4041338",
+        "at": "2026-10-18T23:56:50.009Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "b15b7fde-1c34-4ce6-86d4-99b883d9744e",
+        "at": "2026-10-18T23:56:56.600Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "177f2c3a-15d7-4f0c-9aac-905599b94118",
+        "at": "2026-10-18T23:56:56.600Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "b49c41e2-462c-45c4-9b00-37c2c1c91ee5",
+        "at": "2026-10-18T23:56:56.601Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "5f2ddc91-cfe3-4a8f-b515-3b9575e1571b",
+        "at": "2026-10-18T23:56:56.602Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "1d73560a-ca21-40ff-94c6-6125a726368a",
+        "at": "2026-10-18T23:56:56.603Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "d44917d4-2b0a-4fbb-8f30-b4692c3b226a",
+        "at": "2026-10-18T23:56:56.603Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "cb12969c-0d48-4fee-9f77-d271c2b4cfa1",
+        "at": "2026-10-18T23:56:56.603Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "e0a9085f-4949-45c0-8292-ef75570a73da",
+        "at": "2026-10-18T23:56:56.603Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "df4d4722-244f-4423-a645-9f614fcb2afe",
+        "at": "2026-10-18T23:57:05.442Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "8ae46f65-4140-4a08-be27-6df5c6589203",
+        "at": "2026-10-18T23:57:05.443Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "3c5e01ad-3610-4dfe-a767-00446a354387",
+        "at": "2026-10-18T23:57:33.867Z",
+        "kind": "log",
+        "message": "tool started file_change"
+      },
+      {
+        "id": "a33a6c5e-5e8b-46d3-a29f-0454ef559673",
+        "at": "2026-10-18T23:57:33.958Z",
+        "kind": "log",
+        "message": "tool finished file_change"
+      },
+      {
+        "id": "7d36997b-61de-4f4c-8ce6-892c41530076",
+        "at": "2026-10-18T23:57:34.087Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "1db46f70-0255-409f-8f11-3de5d28f4fc6",
+        "at": "2026-10-18T23:57:34.088Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "890a9edc-c82c-40c4-a3e4-c7788d88447e",
+        "at": "2026-10-18T23:57:40.505Z",
+        "kind": "log",
+        "message": "tool started file_change"
+      },
+      {
+        "id": "8add3d2d-e255-4a13-8858-3e11832ba29c",
+        "at": "2026-10-18T23:57:40.586Z",
+        "kind": "log",
+        "message": "tool finished file_change"
+      },
+      {
+        "id": "daaadba3-4396-49e1-96c4-42a53e0146c3",
+        "at": "2026-10-18T23:57:40.718Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "f145d395-4421-48b6-b62c-4c5787a0e092",
+        "at": "2026-10-18T23:57:40.719Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "074db223-f89b-4597-ae29-876942273590",
+        "at": "2026-10-18T23:57:48.237Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "9c92a667-25de-4170-a234-d40062a5f19c",
+        "at": "2026-10-18T23:57:48.238Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "c3ce20b4-3241-4d65-9334-e97d04f5a0dc",
+        "at": "2026-10-18T23:57:48.297Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "eac06806-3bd5-4056-aa3a-6de48fb871c6",
+        "at": "2026-10-18T23:57:48.298Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "93583ee2-6c6b-42a1-9436-b5a18504b6ec",
+        "at": "2026-10-18T23:58:01.084Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "20a96479-7574-42ca-99b0-9177ea7e4c48",
+        "at": "2026-10-18T23:58:01.084Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "30089cb0-822f-4e9f-85b7-5785b0b18855",
+        "at": "2026-10-18T23:58:08.097Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "8b66f0d4-5822-4ddc-a1fc-5acba2108543",
+        "at": "2026-10-18T23:58:08.097Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "f3ef2ee8-88f7-4fd7-9abd-d46b1a73f9af",
+        "at": "2026-10-18T23:58:08.097Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "4d651efc-eb67-463e-8b6d-22e2ca91aca3",
+        "at": "2026-10-18T23:58:08.098Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "1fcc940f-4b4b-443d-bbea-7c5de5dc298b",
+        "at": "2026-10-18T23:58:08.100Z",
+        "kind": "log",
+        "message": "tool started command_execution"
+      },
+      {
+        "id": "ce7edfa3-3b0e-4acf-b2fe-6f874ac745c4",
+        "at": "2026-10-18T23:58:08.101Z",
+        "kind": "log",
+        "message": "tool finished command_execution"
+      },
+      {
+        "id": "5bd24927-5eca-4ed5-89c8-7fea08c271dc",
+        "at": "2026-10-18T23:58:41.733Z",
+        "kind": "artifact",
+        "message": "Received result.md"
+      },
+      {
+        "id": "4844274a-5e53-4b53-b81b-3092dc20f5b1",
+        "at": "2026-10-18T23:58:41.733Z",
+        "kind": "result",
+        "message": "我会在指定范围内读取 README，先写行为测试并记录缺失实现时的失败，再实现模块并运行验收；不委派、不提交。\n\n我会读取适用的技能指令；执行范围仍限定为这两个文件，按 Worker 约束不调用调度器。\n\n测试已先行运行，因 `src/index.mjs` 不存在而报 `ERR_MODULE_NOT_FOUND`，退出码为 1。现在实现基于 `Map` 的索引，再复跑同一组测试。\n\n复跑命令退出码为 0，但报告只显示一个文件级测试，未列出文件中的 8 个行为用例。我正在核实这些断言是否实际执行，暂不将其计为全部通过。\n\n已完成，仅新增 `src/index.mjs`、`tests/index.test.mjs` 及必要目录。\n\n- 实现基于 `Map` 的独立索引，覆盖添加、查询、稳定顺序、重复及非法 ID 拒绝。\n- 先运行测试：实现缺失，报 `ERR_MODULE_NOT_FOUND`，退出码 1。\n- 实现后运行 `node --test tests/index.test.mjs`：退出码 0，显示文件级通过；补充直接执行及无隔离模式，均确认 8/8 行为测试通过。\n- 未新增依赖、配置或报告，未委派、提交或推送。未发现功能风险；默认测试报告仅显示文件级结果。"
+      },
+      {
+        "id": "1e5db774-827e-480e-97bc-9c79f41eae9c",
+        "at": "2026-10-18T23:58:41.734Z",
+        "kind": "lifecycle",
+        "message": "Worker exited successfully; output is ready for owner review"
+      },
+      {
+        "id": "8686d7e7-9b1e-47db-9d96-a1305a02c6c5",
+        "at": "2026-10-18T23:59:30.166Z",
+        "kind": "lifecycle",
+        "message": "Result receipt acknowledged; acceptance unchanged"
+      },
+      {
+        "id": "85e39447-3718-4341-88e0-10ebadc89e3a",
+        "at": "2026-10-18T23:59:30.251Z",
+        "kind": "lifecycle",
+        "message": "Owner review: accepted"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "bb65c586-3c6e-4e20-9419-a91fbb9687cb",
+        "name": "result.md",
+        "mediaType": "text/markdown",
+        "content": "我会在指定范围内读取 README，先写行为测试并记录缺失实现时的失败，再实现模块并运行验收；不委派、不提交。\n\n我会读取适用的技能指令；执行范围仍限定为这两个文件，按 Worker 约束不调用调度器。\n\n测试已先行运行，因 `src/index.mjs` 不存在而报 `ERR_MODULE_NOT_FOUND`，退出码为 1。现在实现基于 `Map` 的索引，再复跑同一组测试。\n\n复跑命令退出码为 0，但报告只显示一个文件级测试，未列出文件中的 8 个行为用例。我正在核实这些断言是否实际执行，暂不将其计为全部通过。\n\n已完成，仅新增 `src/index.mjs`、`tests/index.test.mjs` 及必要目录。\n\n- 实现基于 `Map` 的独立索引，覆盖添加、查询、稳定顺序、重复及非法 ID 拒绝。\n- 先运行测试：实现缺失，报 `ERR_MODULE_NOT_FOUND`，退出码 1。\n- 实现后运行 `node --test tests/index.test.mjs`：退出码 0，显示文件级通过；补充直接执行及无隔离模式，均确认 8/8 行为测试通过。\n- 未新增依赖、配置或报告，未委派、提交或推送。未发现功能风险；默认测试报告仅显示文件级结果。",
+        "createdAt": "2026-10-18T23:58:41.733Z"
+      }
+    ],
+    "ownerId": "aae3b0f9-0f7b-43e8-907f-2b4bb4decc34",
+    "ownerEpoch": 0,
+    "ownerLastActivityAt": "2026-10-18T23:59:30.251Z",
+    "continuationPolicy": {
+      "idleRotationMinutes": 60
+    },
+    "packageId": "2976a2c6-ca49-4143-9667-553fd3942859",
+    "dispatch": {
+      "owner": "codex_owner",
+      "worker": "qa_b_worker",
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "execution": "real",
+      "maxParallel": 2,
+      "maxWaitMinutes": 3,
+      "adapter": "codex",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative",
+      "workspaceIdentity": "38:1726988",
+      "engineKind": "codex"
+    },
+    "scheduled": false,
+    "summary": "我会在指定范围内读取 README，先写行为测试并记录缺失实现时的失败，再实现模块并运行验收；不委派、不提交。\n\n我会读取适用的技能指令；执行范围仍限定为这两个文件，按 Worker 约束不调用调度器。\n\n测试已先行运行，因 `src/index.mjs` 不存在而报 `ERR_MODULE_NOT_FOUND`，退出码为 1。现在实现基于 `Map` 的索引，再复跑同一组测试。\n\n复跑命令退出码为 0，但报告只显示一个文件级测试，未列出文件中的 8 个行为用例。我正在核实这些断言是否实际执行，暂不将其计为全部通过。\n\n已完成，仅新增 `src/index.mjs`、`tests/index.test.mjs` 及必要目录。\n\n- 实现基于 `Map` 的独立索引，覆盖添加、查询、稳定顺序、重复及非法 ID 拒绝。\n- 先运行测试：实现缺失，报 `ERR_MODULE_NOT_FOUND`，退出码 1。\n- 实现后运行 `node --test tests/index.test.mjs`：退出码 0，显示文件级通过；补充直接执行及无隔离模式，均确认 8/8 行为测试通过。\n- 未新增依赖、配置或报告，未委派、提交或推送。未发现功能风险；默认测试报告仅显示文件级结果。",
+    "acknowledged": true,
+    "reviewComment": "Owner 已独立读取最终实现和测试。node --test tests/index.test.mjs 与无隔离模式均实际执行 8 个行为测试，8 通过、0 失败。正常添加/查询/未知查询、稳定插入顺序、重复拒绝且状态不变、空 ID、实例独立均覆盖。静态扫描无 findings，人工审查完成。对工作目录树的修改前后哈希和 mtime 对比，仅新增 src/index.mjs 与 tests/index.test.mjs，其余文件无新增、删除或修改。无依赖、无提交；Worker 已退出。运行证据为真实 Codex，请求模型 gpt-6.1-sol，供应商实际模型字段未提供，不声称已核实。",
+    "run": {
+      "id": "431fd81c-0ae1-4898-8786-1881836a5d02",
+      "adapter": "codex",
+      "execution": "real",
+      "status": "stopped",
+      "startedAt": "2026-10-18T23:56:17.075Z",
+      "timeoutMs": 180000,
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative",
+      "scopeUnit": "weaver-cli-codex-eb6d1c47",
+      "evidence": {
+        "engine": "codex",
+        "requestedModel": "gpt-6.1-sol",
+        "requestedEffort": "xhigh",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative",
+        "terminal": "success",
+        "role": "worker",
+        "vendorSessionId": "01a15171-d5a4-71d0-8e5a-ddef8e5bf874",
+        "usage": {
+          "inputTokens": 375326,
+          "outputTokens": 5154
+        }
+      },
+      "endedAt": "2026-10-18T23:58:41.734Z",
+      "exitCode": 0
+    }
+  },
+  {
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke",
+    "acceptanceCriteria": [
+      "health.txt 为普通文件，实际字节精确等于 ready（5 字节）。",
+      "工作目录文件清单仅有 health.txt。",
+      "只写入授权文件，不创建 Git 提交。"
+    ],
+    "constraints": [
+      "唯一允许写入的项目文件是 /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke/health.txt；不得创建其他文件或目录，不得修改工作目录外的文件。",
+      "不提交 Git，不执行任何 Git 写操作。",
+      "不要委派，不调用 Weaver 或其他调度器，不修改配置，不停止共享 Weaver 服务。",
+      "直接完成单次文件创建与读取核验，不新增测试、报告或辅助文件。"
+    ],
+    "title": "创建 smoke health.txt",
+    "instruction": "在工作目录中创建 health.txt，内容精确为 ready（UTF-8，5 字节，无换行）。仅执行这一文件修改，完成后读取实际文件核对。",
+    "id": "9f23564d-f284-483c-8b08-e03814e76c73",
+    "createdAt": "2026-10-18T23:52:48.513Z",
+    "updatedAt": "2026-10-18T23:53:44.534Z",
+    "status": "completed",
+    "revision": 21,
+    "reviewState": "accepted",
+    "progress": 100,
+    "events": [
+      {
+        "id": "017ab3b2-9e63-44f7-8af8-f435da091c89",
+        "at": "2026-10-18T23:52:48.513Z",
+        "kind": "lifecycle",
+        "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+      },
+      {
+        "id": "40d66139-3ad8-420c-8651-5d246b4cec53",
+        "at": "2026-10-18T23:52:56.271Z",
+        "kind": "lifecycle",
+        "message": "Frozen work package created"
+      },
+      {
+        "id": "9f026a74-e594-48c0-ad1d-576dbe4db598",
+        "at": "2026-10-18T23:53:03.053Z",
+        "kind": "lifecycle",
+        "message": "Policy selected qa_a_worker; launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke"
+      },
+      {
+        "id": "3866f2b4-4131-47a8-b621-8205156a03c7",
+        "at": "2026-10-18T23:53:03.053Z",
+        "kind": "lifecycle",
+        "message": "Launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke"
+      },
+      {
+        "id": "c494b567-0d79-4136-be2e-68ef3dc83b72",
+        "at": "2026-10-18T23:53:03.057Z",
+        "kind": "log",
+        "message": "Launching pi with requested model cc-switch-agentplan/glm-5.3-flash"
+      },
+      {
+        "id": "a388a4ca-0327-4c70-9d72-fc92a295fb21",
+        "at": "2026-10-18T23:53:03.057Z",
+        "kind": "log",
+        "message": "pi --approve trusts project files for this run; it is not OS isolation"
+      },
+      {
+        "id": "50db766e-2709-49af-acae-5d7fae942e7d",
+        "at": "2026-10-18T23:53:03.057Z",
+        "kind": "progress",
+        "message": "owned scope started"
+      },
+      {
+        "id": "055d9918-5620-4a8b-a80e-e1e3808928f0",
+        "at": "2026-10-18T23:53:03.257Z",
+        "kind": "progress",
+        "message": "pi agent started"
+      },
+      {
+        "id": "f5bbc6d4-e87e-4bfc-851f-b46f93af61dc",
+        "at": "2026-10-18T23:53:09.241Z",
+        "kind": "log",
+        "message": "tool started bash"
+      },
+      {
+        "id": "af3c9bb0-100b-4d03-9a8b-704f95f90485",
+        "at": "2026-10-18T23:53:09.253Z",
+        "kind": "log",
+        "message": "tool finished bash"
+      },
+      {
+        "id": "77086fc6-cf1a-47c6-a9df-fbb4b722317e",
+        "at": "2026-10-18T23:53:15.037Z",
+        "kind": "log",
+        "message": "tool started write"
+      },
+      {
+        "id": "89ed256b-bc9f-4926-9cdb-08b6d144d0d9",
+        "at": "2026-10-18T23:53:15.040Z",
+        "kind": "log",
+        "message": "tool finished write"
+      },
+      {
+        "id": "978b21b5-acaa-4b45-ae0e-0be094688f1a",
+        "at": "2026-10-18T23:53:18.325Z",
+        "kind": "log",
+        "message": "tool started bash"
+      },
+      {
+        "id": "53fc8dd6-04de-44ba-b792-60197242ec85",
+        "at": "2026-10-18T23:53:18.331Z",
+        "kind": "log",
+        "message": "tool finished bash"
+      },
+      {
+        "id": "82d3f369-80e9-44d3-8cd7-120ee4068929",
+        "at": "2026-10-18T23:53:24.324Z",
+        "kind": "artifact",
+        "message": "Received result.md"
+      },
+      {
+        "id": "e17e3df2-11f4-405a-9e00-a8c447298a59",
+        "at": "2026-10-18T23:53:24.325Z",
+        "kind": "result",
+        "message": "## 报告\n\n**实际改动**\n- 新建 `health.txt`（唯一写入的文件），无其他任何文件或目录被创建/修改。\n\n**核验（读取实际文件）**\n- `stat`：regular file，大小 5 字节 ✓\n- `od -An -c`：字节精确为 `r e a d y`，无换行、无 BOM ✓\n- `ls -la`：workspace 下仅有 `health.txt`，无辅助文件/目录 ✓\n- 未执行任何 Git 写操作，未委派或调用调度器 ✓\n\n**产物**\n- `/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke/health.txt`\n\n**未解决风险**\n- 无。所有验收标准均已通过实际读取核验。"
+      },
+      {
+        "id": "8ad8d925-e79e-44f0-9657-69f9489e7b94",
+        "at": "2026-10-18T23:53:24.325Z",
+        "kind": "lifecycle",
+        "message": "Worker exited successfully; output is ready for owner review"
+      },
+      {
+        "id": "99c6672e-1839-4d60-9b92-965cab5a6963",
+        "at": "2026-10-18T23:53:44.446Z",
+        "kind": "lifecycle",
+        "message": "Result receipt acknowledged; acceptance unchanged"
+      },
+      {
+        "id": "91f0ac5b-e429-49be-a680-ddbf71c0a826",
+        "at": "2026-10-18T23:53:44.534Z",
+        "kind": "lifecycle",
+        "message": "Owner review: accepted"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "3063ae3c-26e2-42b5-a19f-830b18230778",
+        "name": "result.md",
+        "mediaType": "text/markdown",
+        "content": "## 报告\n\n**实际改动**\n- 新建 `health.txt`（唯一写入的文件），无其他任何文件或目录被创建/修改。\n\n**核验（读取实际文件）**\n- `stat`：regular file，大小 5 字节 ✓\n- `od -An -c`：字节精确为 `r e a d y`，无换行、无 BOM ✓\n- `ls -la`：workspace 下仅有 `health.txt`，无辅助文件/目录 ✓\n- 未执行任何 Git 写操作，未委派或调用调度器 ✓\n\n**产物**\n- `/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke/health.txt`\n\n**未解决风险**\n- 无。所有验收标准均已通过实际读取核验。",
+        "createdAt": "2026-10-18T23:53:24.324Z"
+      }
+    ],
+    "ownerId": "7ed260a4-527c-4877-8daa-fbe030e59356",
+    "ownerEpoch": 0,
+    "ownerLastActivityAt": "2026-10-18T23:53:44.534Z",
+    "continuationPolicy": {
+      "idleRotationMinutes": 60
+    },
+    "packageId": "0191405e-7bbd-4f20-8f1d-df365a672f0d",
+    "dispatch": {
+      "owner": "codex_owner",
+      "worker": "qa_a_worker",
+      "engine": "pi",
+      "model": "cc-switch-agentplan/glm-5.3-flash",
+      "effort": "high",
+      "execution": "real",
+      "maxParallel": 2,
+      "maxWaitMinutes": 3,
+      "adapter": "pi",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke",
+      "workspaceIdentity": "38:1726990",
+      "engineKind": "pi"
+    },
+    "scheduled": false,
+    "summary": "## 报告\n\n**实际改动**\n- 新建 `health.txt`（唯一写入的文件），无其他任何文件或目录被创建/修改。\n\n**核验（读取实际文件）**\n- `stat`：regular file，大小 5 字节 ✓\n- `od -An -c`：字节精确为 `r e a d y`，无换行、无 BOM ✓\n- `ls -la`：workspace 下仅有 `health.txt`，无辅助文件/目录 ✓\n- 未执行任何 Git 写操作，未委派或调用调度器 ✓\n\n**产物**\n- `/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke/health.txt`\n\n**未解决风险**\n- 无。所有验收标准均已通过实际读取核验。",
+    "acknowledged": true,
+    "reviewComment": "Owner 已独立使用 lstat 与 read_bytes 核验实际 health.txt 为普通文件，5 字节精确等于 ready（7265616479），无换行；目录清单仅 health.txt。Worker 实际执行成功并已退出。未提交 Git。",
+    "run": {
+      "id": "30ee3f0b-08c8-41e6-bcbf-cc7e9c1d3721",
+      "adapter": "pi",
+      "execution": "real",
+      "status": "stopped",
+      "startedAt": "2026-10-18T23:53:03.053Z",
+      "timeoutMs": 180000,
+      "engine": "pi",
+      "model": "cc-switch-agentplan/glm-5.3-flash",
+      "effort": "high",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke",
+      "scopeUnit": "weaver-cli-pi-4cdd35da",
+      "evidence": {
+        "engine": "pi",
+        "requestedModel": "cc-switch-agentplan/glm-5.3-flash",
+        "requestedEffort": "high",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke",
+        "terminal": "success",
+        "role": "worker",
+        "vendorModel": "cc-switch-agentplan/glm-5.3-flash",
+        "vendorSessionId": "01a1516e-dff9-743a-8174-abc178c99952",
+        "usage": {
+          "inputTokens": 207,
+          "outputTokens": 192
+        }
+      },
+      "endedAt": "2026-10-18T23:53:24.325Z",
+      "exitCode": 0
+    }
+  }
+]

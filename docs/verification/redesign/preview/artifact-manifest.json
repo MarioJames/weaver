@@ -1,0 +1,15 @@
+{
+  "source": "/home/mocha/opensource/weaver",
+  "preview": "/tmp/weaver-redesign-3QuXVe/acceptance/preview-build",
+  "files": {
+    "dist/cli/main.mjs": "ec6ec5f230b4f93633452eb559360aec6ea897228aace9283a6cea99b9d6f021",
+    "dist/main/main.cjs": "378dbd22544f5016b3c499be35999f43e6dbf36953ddb28fc2f71e2ab229e535",
+    "dist/main/preload.cjs": "5e671dec4a59b1933a34baf4c9a7839061dc61e826c550e42a51a93b91c9a853",
+    "dist/renderer/assets/index-CiRCPwxt.css": "1bfa182081e5ee726b94d1358ae50cef5e9ca63c72c25c181a216f73e95d57e1",
+    "dist/renderer/assets/index-CpbWZG6J.js": "b18e3a2634171054bf6cdc6073d8bce35dd28822b7994ecda08556c80a2a0bb3",
+    "dist/renderer/index.html": "0658b6b8300f96eef9b58ae8d5db370399a0adfd09251763543974c6a2ef47e3",
+    "dist/workers/mock-worker.mjs": "849f305b7e2e84417d7d3c05a06e25951dbc90f0e30aa9d1756a01b003cc659d",
+    "package.json": "76b5ee6b170d1fccdf15ded5c425c5c64a37c6463bb1a114b756b1ee106a4cf7"
+  },
+  "digest": "b49004ae0af676bfb6d659939e08e5e65869ac81dcbfe282af83760d7414837b"
+}

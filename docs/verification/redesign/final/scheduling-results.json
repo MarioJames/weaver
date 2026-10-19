@@ -1,0 +1,702 @@
+[
+  {
+    "case": "AB",
+    "response": {
+      "exit": 0,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": true,
+        "data": {
+          "owner": "codex_owner",
+          "worker": "qa_a_worker",
+          "engine": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "xhigh",
+          "execution": "disabled",
+          "dispatch": "preview",
+          "warnings": [],
+          "weight": 100,
+          "class": "judgment",
+          "selected_by": "order",
+          "skipped": [],
+          "maxParallel": 2,
+          "capacityAvailable": true,
+          "chatgptReview": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "BA",
+    "response": {
+      "exit": 0,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": true,
+        "data": {
+          "owner": "codex_owner",
+          "worker": "qa_b_worker",
+          "engine": "pi",
+          "model": "cc-switch-agentplan/glm-5.3-flash",
+          "effort": "high",
+          "execution": "disabled",
+          "dispatch": "preview",
+          "warnings": [],
+          "weight": 100,
+          "class": "judgment",
+          "selected_by": "order",
+          "skipped": [],
+          "maxParallel": 2,
+          "capacityAvailable": true,
+          "chatgptReview": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "A weight250",
+    "response": {
+      "exit": 0,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": true,
+        "data": {
+          "owner": "codex_owner",
+          "worker": "qa_a_worker",
+          "engine": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "xhigh",
+          "execution": "disabled",
+          "dispatch": "preview",
+          "warnings": [],
+          "weight": 250,
+          "class": "judgment",
+          "selected_by": "order",
+          "skipped": [],
+          "maxParallel": 2,
+          "capacityAvailable": true,
+          "chatgptReview": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "ties use BA",
+    "response": {
+      "exit": 0,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": true,
+        "data": {
+          "owner": "codex_owner",
+          "worker": "qa_b_worker",
+          "engine": "pi",
+          "model": "cc-switch-agentplan/glm-5.3-flash",
+          "effort": "high",
+          "execution": "disabled",
+          "dispatch": "preview",
+          "warnings": [],
+          "weight": 250,
+          "class": "judgment",
+          "selected_by": "order",
+          "skipped": [],
+          "maxParallel": 2,
+          "capacityAvailable": true,
+          "chatgptReview": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "zero excluded",
+    "response": {
+      "exit": 0,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": true,
+        "data": {
+          "owner": "codex_owner",
+          "worker": "qa_b_worker",
+          "engine": "pi",
+          "model": "cc-switch-agentplan/glm-5.3-flash",
+          "effort": "high",
+          "execution": "disabled",
+          "dispatch": "preview",
+          "warnings": [],
+          "weight": 100,
+          "class": "judgment",
+          "selected_by": "order",
+          "skipped": [],
+          "maxParallel": 2,
+          "capacityAvailable": true,
+          "chatgptReview": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "explicit zero excluded",
+    "response": {
+      "exit": 1,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": false,
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "worker qa_a_worker unavailable: priority weight 0",
+          "retryable": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "all zero",
+    "response": {
+      "exit": 1,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": false,
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "no available worker for owner codex_owner (class judgment): qa_b_worker: priority weight 0; qa_a_worker: priority weight 0",
+          "retryable": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "pin Pi overrides Codex1000",
+    "response": {
+      "exit": 0,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": true,
+        "data": {
+          "owner": "codex_owner",
+          "worker": "qa_b_worker",
+          "engine": "pi",
+          "model": "cc-switch-agentplan/glm-5.3-flash",
+          "effort": "high",
+          "execution": "disabled",
+          "dispatch": "preview",
+          "warnings": [],
+          "weight": 100,
+          "only_engine": "pi",
+          "class": "judgment",
+          "selected_by": "order",
+          "skipped": [
+            {
+              "worker": "qa_a_worker",
+              "reason": "fixed engine pi"
+            }
+          ],
+          "maxParallel": 2,
+          "capacityAvailable": true,
+          "chatgptReview": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "explicit cannot cross pin",
+    "response": {
+      "exit": 1,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": false,
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "worker qa_a_worker unavailable: fixed engine pi",
+          "retryable": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "pinned quota blocks",
+    "response": {
+      "exit": 1,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": false,
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "no available worker for owner codex_owner (class judgment): qa_a_worker: fixed engine pi; qa_b_worker: blocked (pi: QA temporary quota fixture)",
+          "retryable": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "expired quota ignored",
+    "response": {
+      "exit": 0,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": true,
+        "data": {
+          "owner": "codex_owner",
+          "worker": "qa_b_worker",
+          "engine": "pi",
+          "model": "cc-switch-agentplan/glm-5.3-flash",
+          "effort": "high",
+          "execution": "disabled",
+          "dispatch": "preview",
+          "warnings": [],
+          "weight": 100,
+          "only_engine": "pi",
+          "class": "judgment",
+          "selected_by": "order",
+          "skipped": [
+            {
+              "worker": "qa_a_worker",
+              "reason": "fixed engine pi"
+            }
+          ],
+          "maxParallel": 2,
+          "capacityAvailable": true,
+          "chatgptReview": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "invalid weight -1",
+    "response": {
+      "exit": 1,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": false,
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "$.owners.codex_owner.worker_weights.qa_a_worker: must be >= 0",
+          "retryable": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "invalid weight 1.5",
+    "response": {
+      "exit": 1,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": false,
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "$.owners.codex_owner.worker_weights.qa_a_worker: expected integer",
+          "retryable": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "invalid weight 1001",
+    "response": {
+      "exit": 1,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": false,
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "$.owners.codex_owner.worker_weights[\"qa_a_worker\"]: weight must be an integer from 0 to 1000",
+          "retryable": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "unknown weight key",
+    "response": {
+      "exit": 1,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": false,
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "$.owners.codex_owner.worker_weights[\"not_listed_worker\"]: weight key not_listed_worker is not in this owner's workers",
+          "retryable": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "tier precedes weight",
+    "response": {
+      "owner": "codex_owner",
+      "worker": "qa_b_worker",
+      "engine": "pi",
+      "model": "cc-switch-agentplan/glm-5.3-flash",
+      "effort": "high",
+      "execution": "disabled",
+      "dispatch": "preview",
+      "warnings": [],
+      "weight": 1,
+      "class": "routine",
+      "selected_by": "class",
+      "skipped": [],
+      "maxParallel": 2,
+      "capacityAvailable": true,
+      "chatgptReview": false
+    }
+  },
+  {
+    "case": "queue weight0 current eligibility",
+    "task": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+      "title": "capacity queued",
+      "instruction": "mock only",
+      "id": "c7773548-e8f2-4309-84db-7f8e4241bc7c",
+      "createdAt": "2026-10-18T23:56:00.020Z",
+      "updatedAt": "2026-10-18T23:56:00.104Z",
+      "status": "queued",
+      "revision": 5,
+      "reviewState": "pending",
+      "progress": 0,
+      "events": [
+        {
+          "id": "72f3c582-76b2-4877-aafd-3d020a24c1fc",
+          "at": "2026-10-18T23:56:00.020Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "88ff2278-b6b6-4329-b865-c83b3ef8247a",
+          "at": "2026-10-18T23:56:00.104Z",
+          "kind": "lifecycle",
+          "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+        },
+        {
+          "id": "43f323c1-ba4b-409b-be9a-36780d54162e",
+          "at": "2026-10-18T23:56:00.104Z",
+          "kind": "lifecycle",
+          "message": "Dispatch admitted to queue; waiting for an execution slot"
+        }
+      ],
+      "artifacts": [],
+      "ownerId": "da178ae7-3467-4d8e-8c4c-06c899993cdc",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:56:00.020Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "packageId": "a4777122-a2d4-461d-a179-7f4abb3b5a18",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "qa_a_worker",
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "execution": "mock",
+        "maxParallel": 1,
+        "maxWaitMinutes": 1,
+        "adapter": "mock-jsonl"
+      },
+      "scheduled": true,
+      "queueReason": {
+        "code": "policy_blocked",
+        "message": "worker qa_a_worker unavailable: priority weight 0"
+      }
+    }
+  },
+  {
+    "case": "queue frozen model change",
+    "task": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+      "title": "capacity queued",
+      "instruction": "mock only",
+      "id": "c7773548-e8f2-4309-84db-7f8e4241bc7c",
+      "createdAt": "2026-10-18T23:56:00.020Z",
+      "updatedAt": "2026-10-18T23:56:00.104Z",
+      "status": "queued",
+      "revision": 6,
+      "reviewState": "pending",
+      "progress": 0,
+      "events": [
+        {
+          "id": "72f3c582-76b2-4877-aafd-3d020a24c1fc",
+          "at": "2026-10-18T23:56:00.020Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "88ff2278-b6b6-4329-b865-c83b3ef8247a",
+          "at": "2026-10-18T23:56:00.104Z",
+          "kind": "lifecycle",
+          "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+        },
+        {
+          "id": "43f323c1-ba4b-409b-be9a-36780d54162e",
+          "at": "2026-10-18T23:56:00.104Z",
+          "kind": "lifecycle",
+          "message": "Dispatch admitted to queue; waiting for an execution slot"
+        }
+      ],
+      "artifacts": [],
+      "ownerId": "da178ae7-3467-4d8e-8c4c-06c899993cdc",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:56:00.020Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "packageId": "a4777122-a2d4-461d-a179-7f4abb3b5a18",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "qa_a_worker",
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "execution": "mock",
+        "maxParallel": 1,
+        "maxWaitMinutes": 1,
+        "adapter": "mock-jsonl"
+      },
+      "scheduled": true,
+      "queueReason": {
+        "code": "frozen_route_changed",
+        "message": "Current worker engine, kind, model or effort no longer matches the frozen dispatch; restore the route or cancel and create a new task."
+      }
+    }
+  },
+  {
+    "case": "current capacity increase starts frozen route",
+    "task": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+      "title": "capacity queued",
+      "instruction": "mock only",
+      "id": "c7773548-e8f2-4309-84db-7f8e4241bc7c",
+      "createdAt": "2026-10-18T23:56:00.020Z",
+      "updatedAt": "2026-10-18T23:56:00.564Z",
+      "status": "running",
+      "revision": 9,
+      "reviewState": "pending",
+      "progress": 0,
+      "events": [
+        {
+          "id": "72f3c582-76b2-4877-aafd-3d020a24c1fc",
+          "at": "2026-10-18T23:56:00.020Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "88ff2278-b6b6-4329-b865-c83b3ef8247a",
+          "at": "2026-10-18T23:56:00.104Z",
+          "kind": "lifecycle",
+          "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+        },
+        {
+          "id": "43f323c1-ba4b-409b-be9a-36780d54162e",
+          "at": "2026-10-18T23:56:00.104Z",
+          "kind": "lifecycle",
+          "message": "Dispatch admitted to queue; waiting for an execution slot"
+        },
+        {
+          "id": "509bc5c0-6616-4d06-8487-a389be943688",
+          "at": "2026-10-18T23:56:00.524Z",
+          "kind": "lifecycle",
+          "message": "Launching explicit mock-jsonl provider"
+        },
+        {
+          "id": "4983ca33-7855-4fe5-970f-5c0eb5ccc1d5",
+          "at": "2026-10-18T23:56:00.564Z",
+          "kind": "log",
+          "message": "Mock worker received: capacity queued"
+        }
+      ],
+      "artifacts": [],
+      "ownerId": "da178ae7-3467-4d8e-8c4c-06c899993cdc",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:56:00.020Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "packageId": "a4777122-a2d4-461d-a179-7f4abb3b5a18",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "qa_a_worker",
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "execution": "mock",
+        "maxParallel": 1,
+        "maxWaitMinutes": 1,
+        "adapter": "mock-jsonl"
+      },
+      "scheduled": false,
+      "run": {
+        "id": "99a33672-b690-4437-ba44-5ed2a421ef6c",
+        "adapter": "mock-jsonl",
+        "execution": "mock",
+        "status": "running",
+        "startedAt": "2026-10-18T23:56:00.524Z",
+        "timeoutMs": 60000,
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final"
+      }
+    }
+  },
+  {
+    "case": "client disconnect preserves admitted work",
+    "task": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+      "title": "capacity queued",
+      "instruction": "mock only",
+      "id": "c7773548-e8f2-4309-84db-7f8e4241bc7c",
+      "createdAt": "2026-10-18T23:56:00.020Z",
+      "updatedAt": "2026-10-18T23:56:02.400Z",
+      "status": "completed",
+      "revision": 16,
+      "reviewState": "pending",
+      "progress": 100,
+      "events": [
+        {
+          "id": "72f3c582-76b2-4877-aafd-3d020a24c1fc",
+          "at": "2026-10-18T23:56:00.020Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "88ff2278-b6b6-4329-b865-c83b3ef8247a",
+          "at": "2026-10-18T23:56:00.104Z",
+          "kind": "lifecycle",
+          "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+        },
+        {
+          "id": "43f323c1-ba4b-409b-be9a-36780d54162e",
+          "at": "2026-10-18T23:56:00.104Z",
+          "kind": "lifecycle",
+          "message": "Dispatch admitted to queue; waiting for an execution slot"
+        },
+        {
+          "id": "509bc5c0-6616-4d06-8487-a389be943688",
+          "at": "2026-10-18T23:56:00.524Z",
+          "kind": "lifecycle",
+          "message": "Launching explicit mock-jsonl provider"
+        },
+        {
+          "id": "4983ca33-7855-4fe5-970f-5c0eb5ccc1d5",
+          "at": "2026-10-18T23:56:00.564Z",
+          "kind": "log",
+          "message": "Mock worker received: capacity queued"
+        },
+        {
+          "id": "ee9cbaa5-c73d-48b8-87e9-f22fbecd813d",
+          "at": "2026-10-18T23:56:01.151Z",
+          "kind": "progress",
+          "message": "Reading handoff"
+        },
+        {
+          "id": "2bfd6701-57bc-44f7-a72c-1566e840918f",
+          "at": "2026-10-18T23:56:01.794Z",
+          "kind": "progress",
+          "message": "Simulating implementation"
+        },
+        {
+          "id": "91b16e5c-9cd4-4196-8ad2-60b48a592ac6",
+          "at": "2026-10-18T23:56:02.348Z",
+          "kind": "progress",
+          "message": "Preparing artifact"
+        },
+        {
+          "id": "f180ec82-54c8-4ee0-bf83-3cd98880ac64",
+          "at": "2026-10-18T23:56:02.352Z",
+          "kind": "artifact",
+          "message": "Received mock-result.md"
+        },
+        {
+          "id": "69d98d35-cb42-46b3-8a3e-bee2612fbaff",
+          "at": "2026-10-18T23:56:02.355Z",
+          "kind": "progress",
+          "message": "Demo finished"
+        },
+        {
+          "id": "9bd79ce4-1229-4fc7-95c8-c89d7d552d71",
+          "at": "2026-10-18T23:56:02.357Z",
+          "kind": "result",
+          "message": "Mock task completed. Review the generated demo artifact."
+        },
+        {
+          "id": "39c3a488-2b8e-4009-bdac-94044746f4ea",
+          "at": "2026-10-18T23:56:02.400Z",
+          "kind": "lifecycle",
+          "message": "Worker exited successfully; output is ready for owner review"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "c92dd531-0b83-46ca-9648-b76a8383728c",
+          "name": "mock-result.md",
+          "mediaType": "text/markdown",
+          "content": "# Mock result\n\nTask: capacity queued\n\nInstruction:\nmock only\n\nThis is deterministic demo output. No real agent or project changes were made.\n",
+          "createdAt": "2026-10-18T23:56:02.352Z"
+        }
+      ],
+      "ownerId": "da178ae7-3467-4d8e-8c4c-06c899993cdc",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:56:00.020Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "packageId": "a4777122-a2d4-461d-a179-7f4abb3b5a18",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "qa_a_worker",
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "execution": "mock",
+        "maxParallel": 1,
+        "maxWaitMinutes": 1,
+        "adapter": "mock-jsonl"
+      },
+      "scheduled": false,
+      "summary": "Mock task completed. Review the generated demo artifact.",
+      "run": {
+        "id": "99a33672-b690-4437-ba44-5ed2a421ef6c",
+        "adapter": "mock-jsonl",
+        "execution": "mock",
+        "status": "stopped",
+        "startedAt": "2026-10-18T23:56:00.524Z",
+        "timeoutMs": 60000,
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+        "endedAt": "2026-10-18T23:56:02.400Z",
+        "exitCode": 0
+      }
+    }
+  }
+]

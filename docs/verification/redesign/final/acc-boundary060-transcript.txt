@@ -1,0 +1,24 @@
+› 先读 fixture/ACCESS.md 了解项目可用入口。使用 Weaver 做一次只读调度审计：读…
+
+  • preview.stdout.json、policy.before.stdout.json：原始响应。
+
+  • baseline.before.json、baseline.after.json、invariance.result.json：不变性证
+    据。
+
+  • audit.result.json：完整审计结果与限制。
+
+  前后策略、9 个任务、7 个负责人及采集范围内文件哈希均一致。未创建或派发
+  Worker，未修改策略、任务状态、源码、认证或全局配置；共享服务保持运行。
+
+  仍不确定：模型认证和实际调用可用性未验证；响应为 execution: disabled，预览不能
+  证明真实派发可执行。不变性检查仅覆盖已记录路径及前后采样时点。
+
+↳ Hook · OpenViking · 4 sources · 2 past events · 2 work memories
+
+  Worked for 2m 6s • 9:16 PM
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol high · /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261…
+  ? for shortcuts                                     ⚠ 3 warnings · f2 to view

@@ -1,0 +1,22 @@
+{
+  "phase": "nonfinal preview",
+  "findings": [
+    "P2 unnamed select/number/switch actual interactive nodes",
+    "P2 stale route failure after clear-pin/save"
+  ],
+  "modelsInvoked": 0,
+  "mockTasksExecuted": 1,
+  "browserTasksCreatedNotExecuted": 1,
+  "layoutCombinations": 30,
+  "unexpectedConsoleErrors": 0,
+  "pageErrors": 0,
+  "cleanup": {
+    "serviceScope": "inactive",
+    "port39837": "released",
+    "profile": "removed",
+    "lane": "w2M:p4W closed",
+    "isolatedDataDir": "/tmp/weaver-redesign-3QuXVe/u removed"
+  },
+  "finalAcceptance": "not performed",
+  "evidence": "see 030-ui-preview-findings.md and manifest.json"
+}

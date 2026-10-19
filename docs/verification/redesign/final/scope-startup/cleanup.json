@@ -1,0 +1,66 @@
+{
+  "units": [
+    {
+      "unit": "weaver-cli-end-0769af193948",
+      "exitCode": 0,
+      "show": "ControlGroup=\nLoadState=not-found\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-end-ccd17bcba01b",
+      "exitCode": 0,
+      "show": "ControlGroup=\nLoadState=not-found\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-kill-13c77e96da59",
+      "exitCode": 0,
+      "show": "ControlGroup=\nLoadState=not-found\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-miss-b8905f608221",
+      "exitCode": 0,
+      "show": "ControlGroup=\nLoadState=not-found\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-start-054397405ba5",
+      "exitCode": 0,
+      "show": "ControlGroup=\nLoadState=not-found\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-start-51f489e9d83d",
+      "exitCode": 0,
+      "show": "ControlGroup=\nLoadState=not-found\nActiveState=inactive\nInvocationID=\n"
+    }
+  ],
+  "pids": [
+    {
+      "pid": 3405545,
+      "alive": false
+    },
+    {
+      "pid": 3405571,
+      "alive": false
+    },
+    {
+      "pid": 3411478,
+      "alive": false
+    },
+    {
+      "pid": 3411522,
+      "alive": false
+    },
+    {
+      "pid": 3411562,
+      "alive": false
+    },
+    {
+      "pid": 3411584,
+      "alive": false
+    },
+    {
+      "pid": 3411643,
+      "alive": false
+    }
+  ],
+  "listUnits": "UNIT LOAD ACTIVE SUB DESCRIPTION\n\n0 loaded units listed.\nTo show all installed unit files use 'systemctl list-unit-files'.\n",
+  "listExitCode": 0
+}

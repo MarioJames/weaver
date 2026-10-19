@@ -1,0 +1,216 @@
+{
+  "build": "055",
+  "kind": "No-model built CLI synthetic Pi plus private PATH 400ms delayed exec actual systemd-run; immediate cancel",
+  "taskAtDispatch": {
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/hold",
+    "acceptanceCriteria": [
+      "proof.txt contains exactly built delayed scope immediate cancellation and a newline"
+    ],
+    "constraints": [
+      "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+    ],
+    "title": "built delayed scope immediate cancellation",
+    "instruction": "Create proof.txt containing exactly built delayed scope immediate cancellation and newline. Read it back. Do not touch any other file.",
+    "id": "72ff322f-07a9-4182-83a4-8df59dab4dfb",
+    "createdAt": "2026-10-19T00:51:26.662Z",
+    "updatedAt": "2026-10-19T00:51:26.799Z",
+    "status": "running",
+    "revision": 6,
+    "reviewState": "pending",
+    "progress": 0,
+    "events": [
+      {
+        "id": "4034364e-3686-4434-aaab-0a76682951f8",
+        "at": "2026-10-19T00:51:26.662Z",
+        "kind": "lifecycle",
+        "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+      },
+      {
+        "id": "9640665c-0229-4d4c-a6a0-e3f62c09c0b1",
+        "at": "2026-10-19T00:51:26.711Z",
+        "kind": "lifecycle",
+        "message": "Frozen work package created"
+      },
+      {
+        "id": "402511d5-c4c3-4ab4-9798-216f88166620",
+        "at": "2026-10-19T00:51:26.799Z",
+        "kind": "lifecycle",
+        "message": "Policy selected pi_worker; launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/built-stream/hold"
+      },
+      {
+        "id": "ea3e0bf7-9819-4437-b2d0-6a55a7f50fcf",
+        "at": "2026-10-19T00:51:26.799Z",
+        "kind": "lifecycle",
+        "message": "Launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/built-stream/hold"
+      }
+    ],
+    "artifacts": [],
+    "ownerId": "35c49d54-b28d-49fe-aa21-33a71d469ba1",
+    "ownerEpoch": 0,
+    "ownerLastActivityAt": "2026-10-19T00:51:26.662Z",
+    "continuationPolicy": {
+      "idleRotationMinutes": 60
+    },
+    "packageId": "bccd2716-f589-45ac-b359-03fbe78d1fde",
+    "dispatch": {
+      "owner": "codex_owner",
+      "worker": "pi_worker",
+      "engine": "pi",
+      "model": "fixture/pi",
+      "effort": "high",
+      "execution": "real",
+      "maxParallel": 4,
+      "maxWaitMinutes": 15,
+      "adapter": "pi",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/hold",
+      "workspaceIdentity": "38:1735014",
+      "engineKind": "pi"
+    },
+    "scheduled": false,
+    "run": {
+      "id": "1a6284c1-c404-4baa-9a72-c92c8453daa2",
+      "adapter": "pi",
+      "execution": "real",
+      "status": "running",
+      "startedAt": "2026-10-19T00:51:26.799Z",
+      "timeoutMs": 900000,
+      "engine": "pi",
+      "model": "fixture/pi",
+      "effort": "high",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/hold",
+      "scopeUnit": "weaver-cli-pi-c9ce85d5",
+      "evidence": {
+        "engine": "pi",
+        "requestedModel": "fixture/pi",
+        "requestedEffort": "high",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/hold",
+        "terminal": "pending",
+        "role": "worker"
+      }
+    }
+  },
+  "final": {
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/hold",
+    "acceptanceCriteria": [
+      "proof.txt contains exactly built delayed scope immediate cancellation and a newline"
+    ],
+    "constraints": [
+      "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+    ],
+    "title": "built delayed scope immediate cancellation",
+    "instruction": "Create proof.txt containing exactly built delayed scope immediate cancellation and newline. Read it back. Do not touch any other file.",
+    "id": "72ff322f-07a9-4182-83a4-8df59dab4dfb",
+    "createdAt": "2026-10-19T00:51:26.662Z",
+    "updatedAt": "2026-10-19T00:51:28.367Z",
+    "status": "cancelled",
+    "revision": 11,
+    "reviewState": "pending",
+    "progress": 10,
+    "events": [
+      {
+        "id": "4034364e-3686-4434-aaab-0a76682951f8",
+        "at": "2026-10-19T00:51:26.662Z",
+        "kind": "lifecycle",
+        "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+      },
+      {
+        "id": "9640665c-0229-4d4c-a6a0-e3f62c09c0b1",
+        "at": "2026-10-19T00:51:26.711Z",
+        "kind": "lifecycle",
+        "message": "Frozen work package created"
+      },
+      {
+        "id": "402511d5-c4c3-4ab4-9798-216f88166620",
+        "at": "2026-10-19T00:51:26.799Z",
+        "kind": "lifecycle",
+        "message": "Policy selected pi_worker; launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/built-stream/hold"
+      },
+      {
+        "id": "ea3e0bf7-9819-4437-b2d0-6a55a7f50fcf",
+        "at": "2026-10-19T00:51:26.799Z",
+        "kind": "lifecycle",
+        "message": "Launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/built-stream/hold"
+      },
+      {
+        "id": "19c238cc-5370-4be3-977a-3790c36a1a3a",
+        "at": "2026-10-19T00:51:26.804Z",
+        "kind": "log",
+        "message": "Launching pi with requested model fixture/pi"
+      },
+      {
+        "id": "0c1a410d-dadb-4136-bb58-c96aeb664ff3",
+        "at": "2026-10-19T00:51:26.805Z",
+        "kind": "log",
+        "message": "pi --approve trusts project files for this run; it is not OS isolation"
+      },
+      {
+        "id": "c6899832-a061-47ee-86f0-5e63ab6a3c5f",
+        "at": "2026-10-19T00:51:26.805Z",
+        "kind": "progress",
+        "message": "owned scope started"
+      },
+      {
+        "id": "3a114f0a-0a2d-41ad-8603-2588a2a5b744",
+        "at": "2026-10-19T00:51:26.846Z",
+        "kind": "lifecycle",
+        "message": "Cancellation requested; waiting for worker exit"
+      },
+      {
+        "id": "2976ea3e-195f-4803-89f3-d4b2c4fa28c6",
+        "at": "2026-10-19T00:51:28.367Z",
+        "kind": "lifecycle",
+        "message": "Worker stopped after cancellation"
+      }
+    ],
+    "artifacts": [],
+    "ownerId": "35c49d54-b28d-49fe-aa21-33a71d469ba1",
+    "ownerEpoch": 0,
+    "ownerLastActivityAt": "2026-10-19T00:51:26.662Z",
+    "continuationPolicy": {
+      "idleRotationMinutes": 60
+    },
+    "packageId": "bccd2716-f589-45ac-b359-03fbe78d1fde",
+    "dispatch": {
+      "owner": "codex_owner",
+      "worker": "pi_worker",
+      "engine": "pi",
+      "model": "fixture/pi",
+      "effort": "high",
+      "execution": "real",
+      "maxParallel": 4,
+      "maxWaitMinutes": 15,
+      "adapter": "pi",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/hold",
+      "workspaceIdentity": "38:1735014",
+      "engineKind": "pi"
+    },
+    "scheduled": false,
+    "run": {
+      "id": "1a6284c1-c404-4baa-9a72-c92c8453daa2",
+      "adapter": "pi",
+      "execution": "real",
+      "status": "stopped",
+      "startedAt": "2026-10-19T00:51:26.799Z",
+      "timeoutMs": 900000,
+      "engine": "pi",
+      "model": "fixture/pi",
+      "effort": "high",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/hold",
+      "scopeUnit": "weaver-cli-pi-c9ce85d5",
+      "evidence": {
+        "engine": "pi",
+        "requestedModel": "fixture/pi",
+        "requestedEffort": "high",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/hold",
+        "terminal": "cancelled",
+        "role": "worker"
+      },
+      "endedAt": "2026-10-19T00:51:28.367Z",
+      "exitCode": 1
+    }
+  },
+  "scopeFinal": "ControlGroup=\nActiveState=inactive\n",
+  "observedPids": {},
+  "allObservedPidsGone": true,
+  "elapsedSeconds": 5.0982110319891945
+}

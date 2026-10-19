@@ -1,0 +1,1513 @@
+{
+  "summary": {
+    "f": {
+      "exactTaskListUnchanged": true
+    },
+    "a": {
+      "exactTaskListUnchanged": true
+    }
+  },
+  "after": {
+    "f": {
+      "tasks": [
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "downcap queue",
+          "instruction": "explicit mock",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:27:31.035Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 14,
+          "scheduled": false,
+          "ownerId": "cd563bc5-1196-4596-8ae7-17a4dba7a66f",
+          "packageId": "e52d9f83-868d-4bc2-bbe3-eba83c438464",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "73bf9d70-8280-4f38-88e2-b7ca19e24447",
+          "createdAt": "2026-10-19T00:27:31.035Z",
+          "updatedAt": "2026-10-19T00:27:33.718Z",
+          "status": "completed",
+          "progress": 100,
+          "summary": "Mock task completed. Review the generated demo artifact.",
+          "run": {
+            "id": "a1db9c46-27a3-4ee5-8bb9-7cf05bdb9f65",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-19T00:27:31.733Z",
+            "endedAt": "2026-10-19T00:27:33.718Z",
+            "exitCode": 0
+          },
+          "artifactCount": 1
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "downcap second",
+          "instruction": "explicit mock",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:27:30.481Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 10,
+          "scheduled": false,
+          "ownerId": "41495df6-4f46-4f87-b32c-6b317cab0a13",
+          "packageId": "cdabe93b-4430-4e92-a71d-0ded826a40e4",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 2,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "97ba3b98-5b3a-4d0b-9137-0a77e11fc4ef",
+          "createdAt": "2026-10-19T00:27:30.481Z",
+          "updatedAt": "2026-10-19T00:27:31.691Z",
+          "status": "cancelled",
+          "progress": 15,
+          "run": {
+            "id": "76a59e3e-3107-4541-a90c-d00cc1362ba3",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-19T00:27:30.652Z",
+            "endedAt": "2026-10-19T00:27:31.691Z",
+            "exitCode": null
+          },
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "downcap first",
+          "instruction": "explicit mock",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:27:30.070Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 10,
+          "scheduled": false,
+          "ownerId": "d254acde-35e3-4d49-a6ad-4a3aafbbbd87",
+          "packageId": "15a0e323-5a3d-410f-a6f5-b6f41f87e008",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 2,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "6a6cbafa-dacc-48a4-bc8c-7ee83510548f",
+          "createdAt": "2026-10-19T00:27:30.070Z",
+          "updatedAt": "2026-10-19T00:27:31.528Z",
+          "status": "cancelled",
+          "progress": 15,
+          "run": {
+            "id": "a98df13f-5bf4-40e4-a542-828548f47bce",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-19T00:27:30.240Z",
+            "endedAt": "2026-10-19T00:27:31.528Z",
+            "exitCode": null
+          },
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "uncertain receipt fixture",
+          "instruction": "not executed",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:27:04.715Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 2,
+          "ownerId": "98d438d7-02c1-4783-9150-3f2fd2770b81",
+          "reviewState": "pending",
+          "id": "27dbe36b-efc7-41be-9575-e1f612ced625",
+          "createdAt": "2026-10-19T00:27:04.715Z",
+          "updatedAt": "2026-10-19T00:27:04.715Z",
+          "status": "queued",
+          "progress": 0,
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "priority freeze queued",
+          "instruction": "explicit mock only",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:21:18.615Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 14,
+          "scheduled": false,
+          "ownerId": "71082426-fa15-46a8-a194-333f204b6f34",
+          "packageId": "f27764da-6bea-4787-aade-9fc23d6589cc",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "36d94052-3f87-449e-a42e-2b52d5649d00",
+          "createdAt": "2026-10-19T00:21:18.615Z",
+          "updatedAt": "2026-10-19T00:21:20.963Z",
+          "status": "completed",
+          "progress": 100,
+          "summary": "Mock task completed. Review the generated demo artifact.",
+          "run": {
+            "id": "4215adaa-d51f-440a-b94c-ebb2d03242db",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-19T00:21:18.998Z",
+            "endedAt": "2026-10-19T00:21:20.963Z",
+            "exitCode": 0
+          },
+          "artifactCount": 1
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "priority freeze active",
+          "instruction": "explicit mock only",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:21:18.219Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 14,
+          "scheduled": false,
+          "ownerId": "18bf5a21-bd40-4720-8d0c-0191a37e1015",
+          "packageId": "545e7c13-f704-4b18-b112-5544e6ba3bf8",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "2c36ab9e-4a5b-4d20-92c2-de33b24742d5",
+          "createdAt": "2026-10-19T00:21:18.219Z",
+          "updatedAt": "2026-10-19T00:21:20.377Z",
+          "status": "completed",
+          "progress": 100,
+          "summary": "Mock task completed. Review the generated demo artifact.",
+          "run": {
+            "id": "26ffb3de-d5a7-48d3-a121-7010f74500af",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-19T00:21:18.381Z",
+            "endedAt": "2026-10-19T00:21:20.377Z",
+            "exitCode": 0
+          },
+          "artifactCount": 1
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "bounded wait queued fixture",
+          "instruction": "not executed",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:19:45.376Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 3,
+          "scheduled": false,
+          "ownerId": "9237f399-2f3a-495c-971c-b19143856878",
+          "reviewState": "pending",
+          "id": "90a81855-1e16-462b-bc1c-9e8b8992aaa3",
+          "createdAt": "2026-10-19T00:19:45.376Z",
+          "updatedAt": "2026-10-19T00:19:46.566Z",
+          "status": "cancelled",
+          "progress": 0,
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/kind-guard",
+          "acceptanceCriteria": [
+            "proof.txt contains exactly kind freeze guard and a newline"
+          ],
+          "constraints": [
+            "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+          ],
+          "title": "kind freeze guard",
+          "instruction": "Create proof.txt containing exactly kind freeze guard and newline. Read it back. Do not touch any other file.",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:18:54.311Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 6,
+          "scheduled": false,
+          "ownerId": "6c7f0fb4-2745-4d7a-a200-eccdd937fc76",
+          "packageId": "c678d384-d95f-4944-8965-01fe31bb314e",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "real",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "codex",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/kind-guard",
+            "engineKind": "codex",
+            "workspaceIdentity": "38:1730072"
+          },
+          "id": "a3be0660-38a3-4ff5-b83a-0900eac8a07c",
+          "createdAt": "2026-10-19T00:18:54.311Z",
+          "updatedAt": "2026-10-19T00:18:54.922Z",
+          "status": "cancelled",
+          "progress": 0,
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "kind slot",
+          "instruction": "no real launch authorized for guard test",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:18:53.979Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 14,
+          "scheduled": false,
+          "ownerId": "5abf40cf-aa86-46f4-ab39-13ceccc03647",
+          "packageId": "ffdaf267-bfa5-4eeb-9997-b43d267aec7f",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "0c4a5009-0f47-408c-83b3-52bad601b686",
+          "createdAt": "2026-10-19T00:18:53.979Z",
+          "updatedAt": "2026-10-19T00:18:56.072Z",
+          "status": "completed",
+          "progress": 100,
+          "summary": "Mock task completed. Review the generated demo artifact.",
+          "run": {
+            "id": "40e3c075-7e7d-450c-9efe-e8a1439378b0",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-19T00:18:54.122Z",
+            "endedAt": "2026-10-19T00:18:56.072Z",
+            "exitCode": 0
+          },
+          "artifactCount": 1
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "admission all-zero",
+          "instruction": "no real launch authorized for guard test",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:18:53.397Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 3,
+          "scheduled": false,
+          "ownerId": "4a8770dc-d0d3-4f96-aa0a-1a8190b01c9e",
+          "reviewState": "pending",
+          "id": "c4359942-a1ef-4a6a-a7db-1777664c2de8",
+          "createdAt": "2026-10-19T00:18:53.397Z",
+          "updatedAt": "2026-10-19T00:18:53.657Z",
+          "status": "cancelled",
+          "progress": 0,
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "admission pin",
+          "instruction": "no real launch authorized for guard test",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:18:52.917Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 3,
+          "scheduled": false,
+          "ownerId": "34400dbb-f870-4127-b308-b70499aded4f",
+          "reviewState": "pending",
+          "id": "984bbf1d-9aa0-4221-a922-c1f63b4764ac",
+          "createdAt": "2026-10-19T00:18:52.917Z",
+          "updatedAt": "2026-10-19T00:18:53.181Z",
+          "status": "cancelled",
+          "progress": 0,
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "admission zero",
+          "instruction": "no real launch authorized for guard test",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:18:52.451Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 3,
+          "scheduled": false,
+          "ownerId": "7fefbbca-6997-4ce1-b1e9-9b88160f5984",
+          "reviewState": "pending",
+          "id": "e19c5ce6-c953-4b7f-96d4-05c0a7d90648",
+          "createdAt": "2026-10-19T00:18:52.451Z",
+          "updatedAt": "2026-10-19T00:18:52.707Z",
+          "status": "cancelled",
+          "progress": 0,
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "SIGTERM active mock",
+          "instruction": "explicit mock shutdown fixture",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:18:16.869Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 9,
+          "scheduled": false,
+          "ownerId": "a9e2cfb6-5cc5-43d4-8cd9-93bbf669ec27",
+          "packageId": "a47328b3-a1b8-4f5d-bb88-748e57816c19",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "c7ba6803-43b7-4874-95cd-c310a6834e4c",
+          "createdAt": "2026-10-19T00:18:16.869Z",
+          "updatedAt": "2026-10-19T00:18:17.150Z",
+          "status": "cancelled",
+          "progress": 0,
+          "run": {
+            "id": "b0e8205e-246f-41ab-8772-3b7e57d6c193",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-19T00:18:17.000Z",
+            "endedAt": "2026-10-19T00:18:17.150Z",
+            "exitCode": null
+          },
+          "artifactCount": 0
+        },
+        {
+          "title": "missing workspace",
+          "instruction": "must not execute",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:56:54.297Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 2,
+          "ownerId": "fc0759cf-dfba-4f00-9b1b-4f768875fd39",
+          "reviewState": "pending",
+          "id": "4f7faacd-e87a-4bd0-92da-8198a3043105",
+          "createdAt": "2026-10-18T23:56:54.297Z",
+          "updatedAt": "2026-10-18T23:56:54.297Z",
+          "status": "queued",
+          "progress": 0,
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "qa_owner capacity 1",
+          "instruction": "explicit mock",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:56:53.636Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 9,
+          "scheduled": false,
+          "ownerId": "726fedef-7eb9-458a-b731-8374003f3f03",
+          "packageId": "2e4184a1-4a19-41ef-b1c8-eea048d19581",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "qa_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "6f5c429b-0820-4943-ade9-e4d127a75844",
+          "createdAt": "2026-10-18T23:56:53.636Z",
+          "updatedAt": "2026-10-18T23:56:54.264Z",
+          "status": "cancelled",
+          "progress": 0,
+          "run": {
+            "id": "97c6203f-2b7f-4b31-8703-d5b6888700ce",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-18T23:56:54.145Z",
+            "endedAt": "2026-10-18T23:56:54.264Z",
+            "exitCode": null
+          },
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "qa_owner capacity 0",
+          "instruction": "explicit mock",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:56:53.379Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 9,
+          "scheduled": false,
+          "ownerId": "bd406125-b0a7-4c1f-947e-b1cfec8f9e50",
+          "packageId": "8bcc9e41-718d-48a5-b478-21e331b6ad0d",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "qa_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "13a217bc-1698-4f1c-8fae-a28a0466fee2",
+          "createdAt": "2026-10-18T23:56:53.379Z",
+          "updatedAt": "2026-10-18T23:56:54.121Z",
+          "status": "cancelled",
+          "progress": 0,
+          "run": {
+            "id": "5e8da90c-b8fb-4d8d-959d-1e8289a05c80",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-18T23:56:53.493Z",
+            "endedAt": "2026-10-18T23:56:54.121Z",
+            "exitCode": null
+          },
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "codex_owner capacity 1",
+          "instruction": "explicit mock",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:56:53.164Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 9,
+          "scheduled": false,
+          "ownerId": "3773946d-453f-4224-be6f-a7cad1e76061",
+          "packageId": "fdd8759d-d82b-42fb-841a-559a6cb1e88c",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "6506e3f2-d396-42b0-a216-24c006b21fe7",
+          "createdAt": "2026-10-18T23:56:53.164Z",
+          "updatedAt": "2026-10-18T23:56:54.031Z",
+          "status": "cancelled",
+          "progress": 0,
+          "run": {
+            "id": "bfd13bb4-2384-4d02-866f-59c9fac64249",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-18T23:56:53.919Z",
+            "endedAt": "2026-10-18T23:56:54.031Z",
+            "exitCode": null
+          },
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "codex_owner capacity 0",
+          "instruction": "explicit mock",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:56:52.917Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 10,
+          "scheduled": false,
+          "ownerId": "ffbbbeb3-96fa-4837-b97d-b6f58e7c1269",
+          "packageId": "0e42ce22-253d-4b82-aaf7-33e370f25d8d",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "8969b940-e114-4295-bdbe-6198233d7375",
+          "createdAt": "2026-10-18T23:56:52.917Z",
+          "updatedAt": "2026-10-18T23:56:53.898Z",
+          "status": "cancelled",
+          "progress": 15,
+          "run": {
+            "id": "53557424-b5af-43d9-b27f-ad38db7a8aad",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-18T23:56:53.025Z",
+            "endedAt": "2026-10-18T23:56:53.898Z",
+            "exitCode": null
+          },
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/workspace-replaced",
+          "acceptanceCriteria": [
+            "proof.txt contains exactly workspace guard no launch and a newline"
+          ],
+          "constraints": [
+            "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+          ],
+          "title": "workspace guard no launch",
+          "instruction": "Create proof.txt containing exactly workspace guard no launch and newline. Read it back. Do not touch any other file.",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:56:50.098Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 6,
+          "scheduled": false,
+          "ownerId": "efe29d5b-00e3-4202-b2ff-ce2182e9a378",
+          "packageId": "d91a40de-acf7-4da4-ad1e-0650e1791014",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "real",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "codex",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/workspace-replaced",
+            "engineKind": "codex",
+            "workspaceIdentity": "38:1728587"
+          },
+          "id": "2534056e-dc37-45fc-b730-0e02f92a1191",
+          "createdAt": "2026-10-18T23:56:50.098Z",
+          "updatedAt": "2026-10-18T23:56:52.738Z",
+          "status": "cancelled",
+          "progress": 0,
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "occupy workspace slot",
+          "instruction": "mock only",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:56:49.865Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 14,
+          "scheduled": false,
+          "ownerId": "99fb8198-07c8-4e61-8f37-0e9c45ed7723",
+          "packageId": "613c41ac-d8bb-4292-955e-7589c07951aa",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "52b05b52-68f1-4a0f-a51b-10e2a9eaff8a",
+          "createdAt": "2026-10-18T23:56:49.865Z",
+          "updatedAt": "2026-10-18T23:56:51.869Z",
+          "status": "completed",
+          "progress": 100,
+          "summary": "Mock task completed. Review the generated demo artifact.",
+          "run": {
+            "id": "5d493454-570f-4655-8268-fa3a28e80cd4",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-18T23:56:49.968Z",
+            "endedAt": "2026-10-18T23:56:51.869Z",
+            "exitCode": 0
+          },
+          "artifactCount": 1
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/workspace-replaced",
+          "acceptanceCriteria": [
+            "proof.txt contains exactly workspace guard no launch and a newline"
+          ],
+          "constraints": [
+            "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+          ],
+          "title": "workspace guard no launch",
+          "instruction": "Create proof.txt containing exactly workspace guard no launch and newline. Read it back. Do not touch any other file.",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:56:34.286Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 6,
+          "scheduled": false,
+          "ownerId": "cf43b107-db8f-423d-bd7a-ab2c1e3a1659",
+          "packageId": "b0c88177-3b97-4328-a352-e36840ed9921",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "real",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "codex",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/workspace-replaced",
+            "engineKind": "codex",
+            "workspaceIdentity": "38:1728505"
+          },
+          "id": "724b51d6-138f-41c4-98e8-b7415d84b833",
+          "createdAt": "2026-10-18T23:56:34.286Z",
+          "updatedAt": "2026-10-18T23:56:36.917Z",
+          "status": "cancelled",
+          "progress": 0,
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "occupy workspace slot",
+          "instruction": "mock only",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:56:34.078Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 14,
+          "scheduled": false,
+          "ownerId": "c7fc9cc5-51d4-4fbb-8a33-40c01fcac2be",
+          "packageId": "d0b6ccfb-38cd-4c18-8c6d-86892a3d52ff",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "d94d568c-45ee-4a73-86be-8f50bdd46e37",
+          "createdAt": "2026-10-18T23:56:34.078Z",
+          "updatedAt": "2026-10-18T23:56:36.048Z",
+          "status": "completed",
+          "progress": 100,
+          "summary": "Mock task completed. Review the generated demo artifact.",
+          "run": {
+            "id": "d0e4bf04-6d82-449f-8246-35d7fbe31828",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-18T23:56:34.170Z",
+            "endedAt": "2026-10-18T23:56:36.048Z",
+            "exitCode": 0
+          },
+          "artifactCount": 1
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "capacity queued",
+          "instruction": "mock only",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:56:00.020Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 16,
+          "scheduled": false,
+          "ownerId": "da178ae7-3467-4d8e-8c4c-06c899993cdc",
+          "packageId": "a4777122-a2d4-461d-a179-7f4abb3b5a18",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "c7773548-e8f2-4309-84db-7f8e4241bc7c",
+          "createdAt": "2026-10-18T23:56:00.020Z",
+          "updatedAt": "2026-10-18T23:56:02.400Z",
+          "status": "completed",
+          "progress": 100,
+          "summary": "Mock task completed. Review the generated demo artifact.",
+          "run": {
+            "id": "99a33672-b690-4437-ba44-5ed2a421ef6c",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-18T23:56:00.524Z",
+            "endedAt": "2026-10-18T23:56:02.400Z",
+            "exitCode": 0
+          },
+          "artifactCount": 1
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+          "title": "capacity first",
+          "instruction": "mock only",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:55:59.832Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 14,
+          "scheduled": false,
+          "ownerId": "1a07c476-d2ca-4ce3-81b7-e69a6bf18ddf",
+          "packageId": "f28b4d9b-0d97-4f80-a03d-dc7b27644d58",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "mock",
+            "maxParallel": 1,
+            "maxWaitMinutes": 1,
+            "adapter": "mock-jsonl"
+          },
+          "id": "414a902f-714b-411f-986f-293e16de2b7e",
+          "createdAt": "2026-10-18T23:55:59.832Z",
+          "updatedAt": "2026-10-18T23:56:01.807Z",
+          "status": "completed",
+          "progress": 100,
+          "summary": "Mock task completed. Review the generated demo artifact.",
+          "run": {
+            "id": "3293fe38-8f80-4431-b778-d30bbc309c2b",
+            "adapter": "mock-jsonl",
+            "execution": "mock",
+            "status": "stopped",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-18T23:55:59.918Z",
+            "endedAt": "2026-10-18T23:56:01.807Z",
+            "exitCode": 0
+          },
+          "artifactCount": 1
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-timeout",
+          "acceptanceCriteria": [
+            "hold.mjs executed as given"
+          ],
+          "constraints": [
+            "Only operate inside this fixture. No delegation/commit/push. The wait is intentional and must be run exactly."
+          ],
+          "title": "Actual Pi timeout",
+          "instruction": "Run `node hold.mjs` in this fixture and wait for it to finish. This is an authorized cancellation/timeout lifecycle check. Do not edit or replace the script, do not bypass or shorten its wait, and do not spawn other work. After command completion read proof.txt and report.",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:53:37.540Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 18,
+          "scheduled": false,
+          "ownerId": "5ef3545a-81c1-4b26-850b-c0e044c0c1a6",
+          "packageId": "6a168ff1-9350-45d1-bc76-fb8f77382546",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "pi_worker",
+            "engine": "pi",
+            "model": "cc-switch-agentplan/glm-5.3-flash",
+            "effort": "high",
+            "execution": "real",
+            "maxParallel": 4,
+            "maxWaitMinutes": 1,
+            "adapter": "pi",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-timeout",
+            "engineKind": "pi",
+            "workspaceIdentity": "38:1728231"
+          },
+          "id": "ffaff7b9-bfc0-4baf-b174-43a23c8ddc5d",
+          "createdAt": "2026-10-18T23:53:37.540Z",
+          "updatedAt": "2026-10-18T23:54:39.260Z",
+          "status": "failed",
+          "progress": 20,
+          "run": {
+            "id": "de8403ea-b71f-4092-92cb-3a40b7b340be",
+            "adapter": "pi",
+            "execution": "real",
+            "status": "stopped",
+            "scopeUnit": "weaver-cli-pi-0a289da8",
+            "evidence": {
+              "engine": "pi",
+              "requestedModel": "cc-switch-agentplan/glm-5.3-flash",
+              "requestedEffort": "high",
+              "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-timeout",
+              "terminal": "cancelled",
+              "role": "worker",
+              "vendorSessionId": "01a1516f-6768-7640-995c-77328157c104",
+              "vendorModel": "cc-switch-agentplan/glm-5.3-flash",
+              "usage": {
+                "inputTokens": 272,
+                "outputTokens": 101
+              }
+            },
+            "engine": "pi",
+            "model": "cc-switch-agentplan/glm-5.3-flash",
+            "effort": "high",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-timeout",
+            "timeoutMs": 60000,
+            "startedAt": "2026-10-18T23:53:37.725Z",
+            "endedAt": "2026-10-18T23:54:39.260Z",
+            "exitCode": 143
+          },
+          "artifactCount": 0
+        }
+      ],
+      "nextOffset": 25
+    },
+    "a": {
+      "tasks": [
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery",
+          "acceptanceCriteria": [
+            "原有 test.mjs 第一行逐字保留，原有样例与断言不变；node --test test.mjs 最终全部通过。",
+            "importRows 正确返回 {items,errors}，已有记录按原顺序保留，合法新行按输入顺序追加。",
+            "非法行/缺失或空 id/title/已有及本批重复 ID 各自返回可定位错误，拒绝项不覆盖已有任务，后续合法行继续且成功项不回滚。",
+            "existing/rows 及记录不变，空输入和失败后的相邻逻辑有真实回归测试。",
+            "只修改 importer.mjs 和 test.mjs，不改数据样例、不加依赖、不提交。"
+          ],
+          "constraints": [
+            "唯一允许修改的文件是本目录 importer.mjs 与 test.mjs。其他任何文件（包括 README.md、原有数据样例、其他 fixture）全部只读；不创建新文件、配置、依赖、报告、临时文件。",
+            "test.mjs 现有第一行必须逐字保留，含已有样例、import、测试名称及所有断言，只允许在文件末尾追加新的行为测试；不得删除、改写、跳过或弱化已有断言，不通过更改期望掩盖错误。",
+            "先复现已有测试，并实际运行 node --test test.mjs。测试仅调用真实导出函数，使用现有 node:test、node:assert 的 test 与 a 别名，不 mock 实现、不加依赖。",
+            "新增边界测试覆盖空existing/空rows、已有顺序和新行顺序、null/非对象/数组行、缺失或空/非法id/title、与existing和本批重复、重复后原记录不变、坏行之后有效行继续、每条错误索引/ID/可读信息、原输入不变（可冻结输入验证）及原有字段保留。",
+            "同一 ID 的非法新行不得占用 ID 阻止后续合法行；合法新行也不得修改已有任务。仅以成功接受的 ID 更新本批唯一集合。",
+            "不重构或修改其他 fixture 模块，不依赖其他 fixture 源码，不更换框架，不加依赖，不访问网络业务服务，不提交或推送 Git。",
+            "你是 Worker：不再委派、不调用 Weaver/Herdr 或其他调度器、不执行 Owner 操作、不修改调度配置、不停止共享验收服务、不与用户通信。",
+            "完成后以 Weaver 结果返回简洁实际改动、原测试失败证据、修复后的完整测试命令与通过/失败计数、限制；不写磁盘报告。"
+          ],
+          "title": "修复任务导入：保留有效行并报告逐行错误",
+          "instruction": "在 fixture/recovery 中修复 importer.mjs 的 importRows(existing,rows)。先运行 node --test test.mjs 确认原失败（Owner 已独立复现：1项失败，r.items 为 undefined），再追加真实边界测试并修复。返回 {items,errors}，items 按原顺序保留所有 existing 任务，追加有效且 ID 不重复的新行。每个新行必须是非 null、非数组的对象，id/title 均为非空字符串（空白字符串也拒绝，正常字符串不修剪或转换）；重复 ID 包括与 existing 及此前已成功新行重复者，一律拒绝，不覆盖。逐行处理，坏行返回明确可定位错误，但不撤销其他合法项且继续处理后续行。errors 为每个拒绝行一项，含从0开始的 index、id（缺失用null）和可读非空 message。保持 existing/rows 数组和记录原样，不修改、排序或清理原输入；保留输入记录的其他字段。空rows原样保留existing，空existing支持正常导入。仅修改 importer.mjs 和 test.mjs。",
+          "revision": 32,
+          "scheduled": false,
+          "ownerId": "976f10d7-5b67-4d3d-be5e-89d62ce7dd5a",
+          "packageId": "6146b047-27be-4e2c-8ab8-c873812de163",
+          "retryOf": "a146d348-8ab2-4b81-b4d1-295b39725d6a",
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "pi",
+            "model": "cc-switch-agentplan/glm-5.3-flash",
+            "effort": "high",
+            "execution": "real",
+            "maxParallel": 2,
+            "maxWaitMinutes": 10,
+            "adapter": "pi",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery",
+            "engineKind": "pi",
+            "workspaceIdentity": "38:1726982"
+          },
+          "id": "b9e7b26e-025d-4f54-b800-337e58e039ba",
+          "createdAt": "2026-10-19T00:30:35.861Z",
+          "updatedAt": "2026-10-19T00:32:09.199Z",
+          "status": "failed",
+          "progress": 20,
+          "run": {
+            "id": "7442d1cf-9789-4093-8bd8-fecec5e32021",
+            "adapter": "pi",
+            "execution": "real",
+            "status": "stopped",
+            "scopeUnit": "weaver-cli-pi-41c27736",
+            "evidence": {
+              "engine": "pi",
+              "requestedModel": "cc-switch-agentplan/glm-5.3-flash",
+              "requestedEffort": "high",
+              "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery",
+              "terminal": "error",
+              "role": "worker",
+              "vendorSessionId": "01a15191-4098-720e-a837-b5e6e14ae443",
+              "vendorModel": "cc-switch-agentplan/glm-5.3-flash",
+              "usage": {
+                "inputTokens": 522,
+                "outputTokens": 675
+              }
+            },
+            "engine": "pi",
+            "model": "cc-switch-agentplan/glm-5.3-flash",
+            "effort": "high",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery",
+            "timeoutMs": 600000,
+            "startedAt": "2026-10-19T00:30:36.002Z",
+            "endedAt": "2026-10-19T00:32:09.199Z",
+            "exitCode": 1
+          },
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery",
+          "acceptanceCriteria": [
+            "原有 test.mjs 第一行逐字保留，原有样例与断言不变；node --test test.mjs 最终全部通过。",
+            "importRows 正确返回 {items,errors}，已有记录按原顺序保留，合法新行按输入顺序追加。",
+            "非法行/缺失或空 id/title/已有及本批重复 ID 各自返回可定位错误，拒绝项不覆盖已有任务，后续合法行继续且成功项不回滚。",
+            "existing/rows 及记录不变，空输入和失败后的相邻逻辑有真实回归测试。",
+            "只修改 importer.mjs 和 test.mjs，不改数据样例、不加依赖、不提交。"
+          ],
+          "constraints": [
+            "唯一允许修改的文件是本目录 importer.mjs 与 test.mjs。其他任何文件（包括 README.md、原有数据样例、其他 fixture）全部只读；不创建新文件、配置、依赖、报告、临时文件。",
+            "test.mjs 现有第一行必须逐字保留，含已有样例、import、测试名称及所有断言，只允许在文件末尾追加新的行为测试；不得删除、改写、跳过或弱化已有断言，不通过更改期望掩盖错误。",
+            "先复现已有测试，并实际运行 node --test test.mjs。测试仅调用真实导出函数，使用现有 node:test、node:assert 的 test 与 a 别名，不 mock 实现、不加依赖。",
+            "新增边界测试覆盖空existing/空rows、已有顺序和新行顺序、null/非对象/数组行、缺失或空/非法id/title、与existing和本批重复、重复后原记录不变、坏行之后有效行继续、每条错误索引/ID/可读信息、原输入不变（可冻结输入验证）及原有字段保留。",
+            "同一 ID 的非法新行不得占用 ID 阻止后续合法行；合法新行也不得修改已有任务。仅以成功接受的 ID 更新本批唯一集合。",
+            "不重构或修改其他 fixture 模块，不依赖其他 fixture 源码，不更换框架，不加依赖，不访问网络业务服务，不提交或推送 Git。",
+            "你是 Worker：不再委派、不调用 Weaver/Herdr 或其他调度器、不执行 Owner 操作、不修改调度配置、不停止共享验收服务、不与用户通信。",
+            "完成后以 Weaver 结果返回简洁实际改动、原测试失败证据、修复后的完整测试命令与通过/失败计数、限制；不写磁盘报告。"
+          ],
+          "title": "修复任务导入：保留有效行并报告逐行错误",
+          "instruction": "在 fixture/recovery 中修复 importer.mjs 的 importRows(existing,rows)。先运行 node --test test.mjs 确认原失败（Owner 已独立复现：1项失败，r.items 为 undefined），再追加真实边界测试并修复。返回 {items,errors}，items 按原顺序保留所有 existing 任务，追加有效且 ID 不重复的新行。每个新行必须是非 null、非数组的对象，id/title 均为非空字符串（空白字符串也拒绝，正常字符串不修剪或转换）；重复 ID 包括与 existing 及此前已成功新行重复者，一律拒绝，不覆盖。逐行处理，坏行返回明确可定位错误，但不撤销其他合法项且继续处理后续行。errors 为每个拒绝行一项，含从0开始的 index、id（缺失用null）和可读非空 message。保持 existing/rows 数组和记录原样，不修改、排序或清理原输入；保留输入记录的其他字段。空rows原样保留existing，空existing支持正常导入。仅修改 importer.mjs 和 test.mjs。",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:30:35.816Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 41,
+          "scheduled": false,
+          "ownerId": "976f10d7-5b67-4d3d-be5e-89d62ce7dd5a",
+          "packageId": "4da0d03d-0d33-45f5-a805-cb5c80dce5ea",
+          "acknowledged": true,
+          "reviewState": "pending",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "pi",
+            "model": "cc-switch-agentplan/glm-5.3-flash",
+            "effort": "high",
+            "execution": "real",
+            "maxParallel": 2,
+            "maxWaitMinutes": 10,
+            "adapter": "pi",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery",
+            "engineKind": "pi",
+            "workspaceIdentity": "38:1726982"
+          },
+          "id": "a146d348-8ab2-4b81-b4d1-295b39725d6a",
+          "createdAt": "2026-10-19T00:26:44.584Z",
+          "updatedAt": "2026-10-19T00:30:35.815Z",
+          "status": "failed",
+          "progress": 20,
+          "run": {
+            "id": "09fed6aa-2465-4e03-bc4e-fee59bce40f9",
+            "adapter": "pi",
+            "execution": "real",
+            "status": "stopped",
+            "scopeUnit": "weaver-cli-pi-1e06b552",
+            "evidence": {
+              "engine": "pi",
+              "requestedModel": "cc-switch-agentplan/glm-5.3-flash",
+              "requestedEffort": "high",
+              "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery",
+              "terminal": "truncated",
+              "role": "worker",
+              "vendorSessionId": "01a1518d-b92c-7471-9d8c-ae17e8d7eaa9",
+              "vendorModel": "cc-switch-agentplan/glm-5.3-flash",
+              "usage": {
+                "inputTokens": 325,
+                "outputTokens": 1388
+              }
+            },
+            "engine": "pi",
+            "model": "cc-switch-agentplan/glm-5.3-flash",
+            "effort": "high",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery",
+            "timeoutMs": 600000,
+            "startedAt": "2026-10-19T00:26:44.734Z",
+            "endedAt": "2026-10-19T00:29:10.715Z",
+            "exitCode": 143
+          },
+          "artifactCount": 0
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/complex",
+          "acceptanceCriteria": [
+            "node --test tests/store.test.mjs 通过；createStore 正常 add/get/list 与独立实例行为正确，ID 唯一且失败不覆盖。",
+            "import(tasks) 成功计数和逐项 index/id/message 正确，成功与失败行混合时后续继续，已有/本批重复始终拒绝。",
+            "跨模块测试真实调用 createStore 与 query，覆盖稳定分页、状态过滤与全量统计、空列表、越界与重复导入后的状态。",
+            "仅新增本包指定3个文件，不修改 view 包或其他文件；不加依赖、不联网业务服务、不提交。"
+          ],
+          "constraints": [
+            "只允许创建/修改本工作目录下 src/store.mjs、tests/store.test.mjs、tests/integration.test.mjs 及必要的 src/、tests/目录。不得写 src/view.mjs、tests/view.test.mjs，它们由另一个正在运行的工作包独占。其他路径全部只读。",
+            "不更换框架、不加依赖、不创建 package.json、锁文件、配置、报告或辅助临时文件，不访问网络业务服务，不提交或推送 Git。",
+            "作为 Worker 不再委派，不调用 Weaver/Herdr 或其他调度器，不修改调度配置、不停止共享服务、不直接与用户通信。完全遵守角色，不执行 Owner 流程。",
+            "查询模块接口冻结为 query(tasks,{status,offset=0,limit=10}={}) -> {items,total,stats}。items 对筛选后的任务按字符串 id 确定升序后分页；total 为匹配总数，stats={todo,done} 始终统计所有任务并含零值；不修改输入；负 offset 或 limit<1 抛 Error；空输入items=[] total=0 stats零；越界items=[] 但 total/stats 保留。",
+            "接口与导入契约已经冻结，不增加 addMany 等同义入口或额外业务校验，不把 bulk 变为全有或全无，不依赖其他 fixture 的源码或新增框架。",
+            "测试覆盖正常索引、唯一ID与拒绝后状态不变、无效状态、默认todo、实例独立、输入与返回记录修改隔离；bulk 混合成功/失败、与已有和本批重复、空/非数组、准确逐项错误索引；跨模块真实 import -> store.list -> query 的排序分页/筛选统计、空/越界及拒绝后不覆盖。",
+            "先执行 node --test tests/store.test.mjs 形成行为验证。跨模块代码导入 ../src/store.mjs 与 ../src/view.mjs；仅在 view 模块已存在时运行 node --test tests/integration.test.mjs，否则如实回报需 Owner 集成执行，不等待、不修改 view、不 mock 依赖。",
+            "完成后返回简洁实际修改、真实测试命令与计数、限制。所有报告通过 Weaver 返回，不写磁盘报告。"
+          ],
+          "title": "离线任务看板：唯一索引、批量导入与跨模块验证",
+          "instruction": "读取本目录 README.md，实现 src/store.mjs 导出 createStore()，独立内存索引具有 add({id,title,status='todo'})、get(id)、list()、import(tasks)。任务 status 支持 todo/done，未提供时默认 todo；id 是非空字符串，空白也拒绝但正常 id 不修剪；唯一 ID，不允许覆盖；get 未找到返回 null，list 按添加顺序。无额外 title 校验或转换。索引与返回记录应避免外部修改 id/status 导致内部 ID 冲突或状态串改：保存输入副本，get/list 返回记录浅副本。add 对无效任务/ID/状态或重复 ID 抛 Error，失败不得改变任何已有记录或顺序。批量入口 import(tasks) 接受数组，逐条使用同一 add 规则，保留成功项、继续后续项，返回 {added:成功数量,errors:[{index:从0开始的输入索引,id:该行ID或缺失时null,message:非空错误字符串}]}；包含与现有索引重复及本批内重复的错误，失败不得覆盖原记录。空数组返回 {added:0,errors:[]}，非数组抛 Error 且不更改索引。仅写 src/store.mjs、tests/store.test.mjs、tests/integration.test.mjs。使用 node:test、node:assert/strict 真实行为测试，先测试再实现。负责跨模块测试，但 src/view.mjs 由另一包独占写入，你只读使用。",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:24:50.440Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 59,
+          "scheduled": false,
+          "ownerId": "f91490b1-42af-4bba-be8a-070afde15c76",
+          "packageId": "85848c5a-0f4d-4742-a3db-0c181d104ffe",
+          "acknowledged": true,
+          "reviewState": "accepted",
+          "reviewComment": "Owner 独立读取 store、view 及3个测试文件。node --test tests/*.test.mjs 实际执行39项，39通过0失败，其中store17、view16、跨模块6。确认逐条导入保留合法成功项，非法行/缺失ID/已有及本批重复均返回可定位错误，后续合法项继续，已有ID无覆盖；筛选/排序/稳定分页/全量状态统计/空及越界行为通过真实 import -> list -> query 验证。静态扫描无 findings 且人工审查完成。最终目录树哈希及mtime与被测版本完全一致；仅新增两个src与三个tests文件，其他原有文件无修改或删除，无依赖/业务联网/Git提交。两个Worker均已退出。限制：纯内存状态；非数值或非整数分页输入未定义与覆盖；真实Codex请求gpt-6.1-sol/xhigh，vendorModel未回报。",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_b_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "real",
+            "maxParallel": 2,
+            "maxWaitMinutes": 10,
+            "adapter": "codex",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/complex",
+            "engineKind": "codex",
+            "workspaceIdentity": "38:1726986"
+          },
+          "id": "1bbac1ec-3132-458e-94f1-bef0605421c6",
+          "createdAt": "2026-10-19T00:19:59.104Z",
+          "updatedAt": "2026-10-19T00:24:50.440Z",
+          "status": "completed",
+          "progress": 100,
+          "summary": "按冻结工作包执行：先读取本目录说明并编写行为测试，再实现 store；只改指定三个文件，不委派、不提交，view 存在时运行真实跨模块测试。\n\n已读取 README，并按 `tdd`、`feature-acceptance` 检查测试范围；角色按 `agents-cooperation` 的 Worker 边界执行。现在先写 store 单元测试和真实跨模块测试，验证失败不会改变记录、批量导入会继续处理后续行。\n\nstore 的 17 个单元测试已实际通过，view 也已出现。默认 Node 命令只汇报文件级计数，已用 `--test-isolation=none` 确认用例执行；接着核验跨模块的排序、分页、统计和重复导入行为。\n\n已完成，仅新增三个文件：\n\n- [src/store.mjs](/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/complex/src/store.mjs)：独立索引、唯一 ID、状态校验、浅拷贝隔离及逐项导入反馈。\n- [tests/store.test.mjs](/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/complex/tests/store.test.mjs)：17 个单元用例。\n- [tests/integration.test.mjs](/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/complex/tests/integration.test.mjs)：6 个真实跨模块用例。\n\n已先测试后实现，首次测试因 store 模块缺失失败。验证结果：\n\n| 命令 | 结果 |\n|---|---|\n| `node --test tests/store.test.mjs` | 通过 |\n| `node --test tests/integration.test.mjs` | 通过 |\n| `node --test --test-isolation=none tests/store.test.mjs tests/integration.test.mjs tests/view.test.mjs` | 39/39 通过 |\n\n默认隔离模式仅报告文件级计数，已用 `--test-isolation=none` 确认实际用例执行。未修改 view、添加依赖、访问网络业务服务或提交 Git；无未解决阻塞。",
+          "run": {
+            "id": "212609bc-c109-4c24-9ce2-086fbc5a0cf5",
+            "adapter": "codex",
+            "execution": "real",
+            "status": "stopped",
+            "scopeUnit": "weaver-cli-codex-4fe6bd80",
+            "evidence": {
+              "engine": "codex",
+              "requestedModel": "gpt-6.1-sol",
+              "requestedEffort": "xhigh",
+              "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/complex",
+              "terminal": "success",
+              "role": "worker",
+              "vendorSessionId": "01a15187-88fd-79f3-91cb-0474924ce58b",
+              "usage": {
+                "inputTokens": 394032,
+                "outputTokens": 12561
+              }
+            },
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/complex",
+            "timeoutMs": 600000,
+            "startedAt": "2026-10-19T00:19:59.237Z",
+            "endedAt": "2026-10-19T00:24:07.093Z",
+            "exitCode": 0
+          },
+          "artifactCount": 1
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/complex",
+          "acceptanceCriteria": [
+            "node --test tests/view.test.mjs 通过。",
+            "query 对 todo/done 过滤正确；stats 统计全部输入，total 统计全部匹配，分页排序按 ID 确定且不修改输入。",
+            "空列表与越界分页、默认 limit=10、负 offset/limit<1 的行为符合冻结契约。",
+            "仅新增 src/view.mjs 与 tests/view.test.mjs，不加依赖，不联网业务服务，不提交。"
+          ],
+          "constraints": [
+            "只允许创建/修改 workspace 下 src/view.mjs 与 tests/view.test.mjs，以及必要的 src/、tests/目录；其他路径只读。不得写 src/store.mjs、tests/store.test.mjs、tests/integration.test.mjs，它们由另一个工作包负责。",
+            "不更换框架、不安装依赖、不创建 package.json/锁文件/配置/报告或临时文件，不访问网络业务服务，不提交或推送 Git。",
+            "作为 Worker 不再委派，不调用 Weaver、Herdr 或其他调度器，不改调度配置，不停止共享 Weaver 服务，不向用户通信。",
+            "使用 JavaScript ESM、node:test、node:assert/strict。测试真实导出接口，不 mock 实现或锁定内部结构；覆盖筛选与全部统计的区分、默认参数、稳定 ID 排序、分页拼接、空列表、超出与等于末尾的 offset、负 offset、limit 0 与负值、输入不被排序修改。",
+            "接口与语义已经冻结；不要引入 locale 排序、额外状态或依赖，不擅自改变另一个包契约。未定义的非数值/非整数分页输入不是此次必需范围。",
+            "完成后返回简洁实际修改、完整测试命令与通过/失败计数及限制，报告只通过 Weaver 返回。"
+          ],
+          "title": "离线任务看板：筛选、分页与状态统计",
+          "instruction": "读取本目录 README.md，实现 src/view.mjs，导出 query(tasks, {status, offset=0, limit=10}={})，返回 {items,total,stats}。tasks 为 createStore().list() 的任务数组，任务具有字符串 id/title 与 todo 或 done 状态。stats 始终按全部输入任务计数，为 {todo:数量,done:数量}，含零值；先按可选 status 筛选（省略为全部），total 为筛选后且分页前的数量，items 按 id 的确定字符串升序稳定排序后分页。排序不依赖系统 locale，不原地排序或修改输入任务数组。offset<0 或 limit<1 抛 Error，包括空输入场景；空任务数组返回 {items:[],total:0,stats:{todo:0,done:0}}；offset 等于或大于匹配总数时 items=[]，total 与全量 stats 保持正确。不增加依赖或无关 API。仅写 src/view.mjs 与 tests/view.test.mjs，先写 node:test 行为测试再实现，运行 node --test tests/view.test.mjs。",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-19T00:23:48.149Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 43,
+          "scheduled": false,
+          "ownerId": "88cc88e2-2c4e-445c-9f27-158f55e5f10e",
+          "packageId": "cf91e055-c6b6-4f28-a39d-e87d61329736",
+          "acknowledged": true,
+          "reviewState": "accepted",
+          "reviewComment": "Owner 独立读取 view 实现与全部测试，node --test tests/view.test.mjs 实际执行 16/16 通过。筛选在分页前、total 为匹配总数、stats 为全部任务计数、确定字符串 ID 稳定排序、不修改输入，默认/空/越界/负值边界均通过。当前工作目录树哈希与 mtime 对比仅有两个包授权的5个新文件，无原有文件修改/删除。查询包自身验收通过；跨模块集成由 store 包完成后另行执行。真实 Codex 执行已退出，实际 vendorModel 字段未回报。",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_b_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "real",
+            "maxParallel": 2,
+            "maxWaitMinutes": 10,
+            "adapter": "codex",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/complex",
+            "engineKind": "codex",
+            "workspaceIdentity": "38:1726986"
+          },
+          "id": "8bc8d2b0-2572-40bf-8fc2-d6d49186ce1e",
+          "createdAt": "2026-10-19T00:18:55.640Z",
+          "updatedAt": "2026-10-19T00:23:48.149Z",
+          "status": "completed",
+          "progress": 100,
+          "summary": "按冻结工作包执行：先读取 README 和相关约束，再编写行为测试、实现 `query` 并运行指定测试；仅修改两个授权文件。\n\n已读取 README，并应用 `tdd` 与 `agents-cooperation` 的 Worker 规则。接下来先写行为测试，覆盖全量统计、筛选、排序稳定性、分页边界和输入不变性；不委派、不提交。\n\n仅新增 `src/view.mjs` 和 `tests/view.test.mjs`，完成筛选、全量统计、稳定 ID 排序、分页及参数校验，输入保持不变。\n\n先写测试再实现。验证结果：\n\n- `node --test tests/view.test.mjs`：1 个文件通过，0 失败。\n- `node --test --test-isolation=none --test-reporter=tap tests/view.test.mjs`：16 项通过，0 失败。\n\n未添加依赖、调用调度器、联网业务服务或提交。未运行跨模块集成测试；非数值、非整数分页输入按约定未覆盖。",
+          "run": {
+            "id": "5788a9c1-b6bb-44de-bda4-529f900dc5c2",
+            "adapter": "codex",
+            "execution": "real",
+            "status": "stopped",
+            "scopeUnit": "weaver-cli-codex-b86a98ab",
+            "evidence": {
+              "engine": "codex",
+              "requestedModel": "gpt-6.1-sol",
+              "requestedEffort": "xhigh",
+              "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/complex",
+              "terminal": "success",
+              "role": "worker",
+              "vendorSessionId": "01a15186-910e-7861-812e-8c4c5aa2758b",
+              "usage": {
+                "inputTokens": 258115,
+                "outputTokens": 5907
+              }
+            },
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/complex",
+            "timeoutMs": 600000,
+            "startedAt": "2026-10-19T00:18:55.773Z",
+            "endedAt": "2026-10-19T00:21:17.460Z",
+            "exitCode": 0
+          },
+          "artifactCount": 1
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative",
+          "acceptanceCriteria": [
+            "src/index.mjs 导出 createIndex，实例具有 add/get/list；正常添加后可查询原 id/title。",
+            "未知 id 返回 null，空 id 抛 Error。",
+            "重复 id 抛 Error，原任务未覆盖，顺序不受失败添加影响。",
+            "list 对多任务按插入顺序返回且多次调用确定一致。",
+            "node --test tests/index.test.mjs 全部通过，测试使用 node:test，无依赖。",
+            "只新增指定两个文件及必要目录，其他原有文件不变，未提交 Git。"
+          ],
+          "constraints": [
+            "只允许写入 /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative/src/index.mjs 和 /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative/tests/index.test.mjs；只允许为这两个文件建立必要的 src 与 tests 目录。其他路径全部只读。",
+            "不得修改 README.md、fixture/ACCESS.md、fixture/smoke、其他 fixture 或工作目录以外文件；不创建 package.json、锁文件、报告、临时文件或额外配置。",
+            "不安装依赖，不提交 Git，不执行 Git 写操作。",
+            "作为 Worker 不再委派，不调用 Weaver/Herdr/其他调度器，不与用户通信，不修改调度配置或停止共享服务。",
+            "保持实现简单，优先使用内置 Map 保持插入顺序；不增加排序策略、持久化、异步接口或无关 API。",
+            "id 使用非空字符串，拒绝空字符串、空白及缺失 id；错误必须是 Error。不要隐式修剪正常 id、改变 title 或强制用户未要求的 title 校验。",
+            "测试必须调用真实模块并检查公开行为，覆盖正常添加查询、未知 id、确定插入顺序、重复 id 不覆盖且不改变顺序、空 id 拒绝和两个实例独立；不 mock 实现，不测试内部结构。",
+            "最终回报实际修改、测试命令、失败/通过的真实结果与剩余风险；报告通过 Weaver 结果返回，不写成磁盘文件。"
+          ],
+          "title": "实现本地任务索引与 Node 测试",
+          "instruction": "读取 README.md，按需求实现 ESM 本地任务索引。只创建 src/index.mjs 与 tests/index.test.mjs（及它们必要的 src、tests 目录）。src/index.mjs 导出 createIndex()，返回 add({id,title})、get(id)、list()。add 添加任务；重复 id 抛 Error 并保持原记录与顺序不变；空 id 抛 Error；get 未找到返回 null；list 保持任务添加顺序并可重复得到同样顺序。每次 createIndex() 相互独立。沿用 JavaScript/Node 内置能力，不加依赖。测试使用 node:test 和 node:assert/strict，导入 ../src/index.mjs，用 node --test tests/index.test.mjs 验证。先写行为测试并记录缺失实现的失败，再完成实现并跑通过。",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:59:30.251Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 47,
+          "scheduled": false,
+          "ownerId": "aae3b0f9-0f7b-43e8-907f-2b4bb4decc34",
+          "packageId": "2976a2c6-ca49-4143-9667-553fd3942859",
+          "acknowledged": true,
+          "reviewState": "accepted",
+          "reviewComment": "Owner 已独立读取最终实现和测试。node --test tests/index.test.mjs 与无隔离模式均实际执行 8 个行为测试，8 通过、0 失败。正常添加/查询/未知查询、稳定插入顺序、重复拒绝且状态不变、空 ID、实例独立均覆盖。静态扫描无 findings，人工审查完成。对工作目录树的修改前后哈希和 mtime 对比，仅新增 src/index.mjs 与 tests/index.test.mjs，其余文件无新增、删除或修改。无依赖、无提交；Worker 已退出。运行证据为真实 Codex，请求模型 gpt-6.1-sol，供应商实际模型字段未提供，不声称已核实。",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_b_worker",
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "execution": "real",
+            "maxParallel": 2,
+            "maxWaitMinutes": 3,
+            "adapter": "codex",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative",
+            "engineKind": "codex",
+            "workspaceIdentity": "38:1726988"
+          },
+          "id": "0a68044f-8d5c-43b3-93e7-2f6088dafb1b",
+          "createdAt": "2026-10-18T23:56:04.352Z",
+          "updatedAt": "2026-10-18T23:59:30.251Z",
+          "status": "completed",
+          "progress": 100,
+          "summary": "我会在指定范围内读取 README，先写行为测试并记录缺失实现时的失败，再实现模块并运行验收；不委派、不提交。\n\n我会读取适用的技能指令；执行范围仍限定为这两个文件，按 Worker 约束不调用调度器。\n\n测试已先行运行，因 `src/index.mjs` 不存在而报 `ERR_MODULE_NOT_FOUND`，退出码为 1。现在实现基于 `Map` 的索引，再复跑同一组测试。\n\n复跑命令退出码为 0，但报告只显示一个文件级测试，未列出文件中的 8 个行为用例。我正在核实这些断言是否实际执行，暂不将其计为全部通过。\n\n已完成，仅新增 `src/index.mjs`、`tests/index.test.mjs` 及必要目录。\n\n- 实现基于 `Map` 的独立索引，覆盖添加、查询、稳定顺序、重复及非法 ID 拒绝。\n- 先运行测试：实现缺失，报 `ERR_MODULE_NOT_FOUND`，退出码 1。\n- 实现后运行 `node --test tests/index.test.mjs`：退出码 0，显示文件级通过；补充直接执行及无隔离模式，均确认 8/8 行为测试通过。\n- 未新增依赖、配置或报告，未委派、提交或推送。未发现功能风险；默认测试报告仅显示文件级结果。",
+          "run": {
+            "id": "431fd81c-0ae1-4898-8786-1881836a5d02",
+            "adapter": "codex",
+            "execution": "real",
+            "status": "stopped",
+            "scopeUnit": "weaver-cli-codex-eb6d1c47",
+            "evidence": {
+              "engine": "codex",
+              "requestedModel": "gpt-6.1-sol",
+              "requestedEffort": "xhigh",
+              "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative",
+              "terminal": "success",
+              "role": "worker",
+              "vendorSessionId": "01a15171-d5a4-71d0-8e5a-ddef8e5bf874",
+              "usage": {
+                "inputTokens": 375326,
+                "outputTokens": 5154
+              }
+            },
+            "engine": "codex",
+            "model": "gpt-6.1-sol",
+            "effort": "xhigh",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/representative",
+            "timeoutMs": 180000,
+            "startedAt": "2026-10-18T23:56:17.075Z",
+            "endedAt": "2026-10-18T23:58:41.734Z",
+            "exitCode": 0
+          },
+          "artifactCount": 1
+        },
+        {
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke",
+          "acceptanceCriteria": [
+            "health.txt 为普通文件，实际字节精确等于 ready（5 字节）。",
+            "工作目录文件清单仅有 health.txt。",
+            "只写入授权文件，不创建 Git 提交。"
+          ],
+          "constraints": [
+            "唯一允许写入的项目文件是 /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke/health.txt；不得创建其他文件或目录，不得修改工作目录外的文件。",
+            "不提交 Git，不执行任何 Git 写操作。",
+            "不要委派，不调用 Weaver 或其他调度器，不修改配置，不停止共享 Weaver 服务。",
+            "直接完成单次文件创建与读取核验，不新增测试、报告或辅助文件。"
+          ],
+          "title": "创建 smoke health.txt",
+          "instruction": "在工作目录中创建 health.txt，内容精确为 ready（UTF-8，5 字节，无换行）。仅执行这一文件修改，完成后读取实际文件核对。",
+          "ownerEpoch": 0,
+          "ownerLastActivityAt": "2026-10-18T23:53:44.534Z",
+          "continuationPolicy": {
+            "idleRotationMinutes": 60
+          },
+          "revision": 21,
+          "scheduled": false,
+          "ownerId": "7ed260a4-527c-4877-8daa-fbe030e59356",
+          "packageId": "0191405e-7bbd-4f20-8f1d-df365a672f0d",
+          "acknowledged": true,
+          "reviewState": "accepted",
+          "reviewComment": "Owner 已独立使用 lstat 与 read_bytes 核验实际 health.txt 为普通文件，5 字节精确等于 ready（7265616479），无换行；目录清单仅 health.txt。Worker 实际执行成功并已退出。未提交 Git。",
+          "dispatch": {
+            "owner": "codex_owner",
+            "worker": "qa_a_worker",
+            "engine": "pi",
+            "model": "cc-switch-agentplan/glm-5.3-flash",
+            "effort": "high",
+            "execution": "real",
+            "maxParallel": 2,
+            "maxWaitMinutes": 3,
+            "adapter": "pi",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke",
+            "engineKind": "pi",
+            "workspaceIdentity": "38:1726990"
+          },
+          "id": "9f23564d-f284-483c-8b08-e03814e76c73",
+          "createdAt": "2026-10-18T23:52:48.513Z",
+          "updatedAt": "2026-10-18T23:53:44.534Z",
+          "status": "completed",
+          "progress": 100,
+          "summary": "## 报告\n\n**实际改动**\n- 新建 `health.txt`（唯一写入的文件），无其他任何文件或目录被创建/修改。\n\n**核验（读取实际文件）**\n- `stat`：regular file，大小 5 字节 ✓\n- `od -An -c`：字节精确为 `r e a d y`，无换行、无 BOM ✓\n- `ls -la`：workspace 下仅有 `health.txt`，无辅助文件/目录 ✓\n- 未执行任何 Git 写操作，未委派或调用调度器 ✓\n\n**产物**\n- `/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke/health.txt`\n\n**未解决风险**\n- 无。所有验收标准均已通过实际读取核验。",
+          "run": {
+            "id": "30ee3f0b-08c8-41e6-bcbf-cc7e9c1d3721",
+            "adapter": "pi",
+            "execution": "real",
+            "status": "stopped",
+            "scopeUnit": "weaver-cli-pi-4cdd35da",
+            "evidence": {
+              "engine": "pi",
+              "requestedModel": "cc-switch-agentplan/glm-5.3-flash",
+              "requestedEffort": "high",
+              "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke",
+              "terminal": "success",
+              "role": "worker",
+              "vendorSessionId": "01a1516e-dff9-743a-8174-abc178c99952",
+              "vendorModel": "cc-switch-agentplan/glm-5.3-flash",
+              "usage": {
+                "inputTokens": 207,
+                "outputTokens": 192
+              }
+            },
+            "engine": "pi",
+            "model": "cc-switch-agentplan/glm-5.3-flash",
+            "effort": "high",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/smoke",
+            "timeoutMs": 180000,
+            "startedAt": "2026-10-18T23:53:03.053Z",
+            "endedAt": "2026-10-18T23:53:24.325Z",
+            "exitCode": 0
+          },
+          "artifactCount": 1
+        }
+      ],
+      "nextOffset": null
+    }
+  }
+}

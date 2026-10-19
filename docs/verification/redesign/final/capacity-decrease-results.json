@@ -1,0 +1,449 @@
+{
+  "runningBeforeDecrease": [
+    {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+      "title": "downcap first",
+      "instruction": "explicit mock",
+      "id": "6a6cbafa-dacc-48a4-bc8c-7ee83510548f",
+      "createdAt": "2026-10-19T00:27:30.070Z",
+      "updatedAt": "2026-10-19T00:27:30.240Z",
+      "status": "running",
+      "revision": 6,
+      "reviewState": "pending",
+      "progress": 0,
+      "events": [
+        {
+          "id": "1e39d6f6-1028-4710-8a78-61f12d20a6c5",
+          "at": "2026-10-19T00:27:30.070Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "a3b251ee-8e15-475d-85e1-8edd8b73b67b",
+          "at": "2026-10-19T00:27:30.237Z",
+          "kind": "lifecycle",
+          "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+        },
+        {
+          "id": "753245ef-2c9f-4e6a-857a-8fb722ec5eb7",
+          "at": "2026-10-19T00:27:30.240Z",
+          "kind": "lifecycle",
+          "message": "Launching explicit mock-jsonl provider"
+        }
+      ],
+      "artifacts": [],
+      "ownerId": "d254acde-35e3-4d49-a6ad-4a3aafbbbd87",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-19T00:27:30.070Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "packageId": "15a0e323-5a3d-410f-a6f5-b6f41f87e008",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "qa_a_worker",
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "execution": "mock",
+        "maxParallel": 2,
+        "maxWaitMinutes": 1,
+        "adapter": "mock-jsonl"
+      },
+      "scheduled": false,
+      "run": {
+        "id": "a98df13f-5bf4-40e4-a542-828548f47bce",
+        "adapter": "mock-jsonl",
+        "execution": "mock",
+        "status": "running",
+        "startedAt": "2026-10-19T00:27:30.240Z",
+        "timeoutMs": 60000,
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final"
+      }
+    },
+    {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+      "title": "downcap second",
+      "instruction": "explicit mock",
+      "id": "97ba3b98-5b3a-4d0b-9137-0a77e11fc4ef",
+      "createdAt": "2026-10-19T00:27:30.481Z",
+      "updatedAt": "2026-10-19T00:27:30.652Z",
+      "status": "running",
+      "revision": 6,
+      "reviewState": "pending",
+      "progress": 0,
+      "events": [
+        {
+          "id": "0514a652-b353-4ed5-8760-244006528090",
+          "at": "2026-10-19T00:27:30.481Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "17169990-4285-4ac1-ac9d-51458f8cd338",
+          "at": "2026-10-19T00:27:30.648Z",
+          "kind": "lifecycle",
+          "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+        },
+        {
+          "id": "01cd75b2-4d19-4486-9ffe-9f484ce811b2",
+          "at": "2026-10-19T00:27:30.652Z",
+          "kind": "lifecycle",
+          "message": "Launching explicit mock-jsonl provider"
+        }
+      ],
+      "artifacts": [],
+      "ownerId": "41495df6-4f46-4f87-b32c-6b317cab0a13",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-19T00:27:30.481Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "packageId": "cdabe93b-4430-4e92-a71d-0ded826a40e4",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "qa_a_worker",
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "execution": "mock",
+        "maxParallel": 2,
+        "maxWaitMinutes": 1,
+        "adapter": "mock-jsonl"
+      },
+      "scheduled": false,
+      "run": {
+        "id": "76a59e3e-3107-4541-a90c-d00cc1362ba3",
+        "adapter": "mock-jsonl",
+        "execution": "mock",
+        "status": "running",
+        "startedAt": "2026-10-19T00:27:30.652Z",
+        "timeoutMs": 60000,
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final"
+      }
+    }
+  ],
+  "queuedAfterDecrease": {
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+    "title": "downcap queue",
+    "instruction": "explicit mock",
+    "id": "73bf9d70-8280-4f38-88e2-b7ca19e24447",
+    "createdAt": "2026-10-19T00:27:31.035Z",
+    "updatedAt": "2026-10-19T00:27:31.205Z",
+    "status": "queued",
+    "revision": 4,
+    "reviewState": "pending",
+    "progress": 0,
+    "events": [
+      {
+        "id": "44ada248-bd2a-4a6c-b642-73e10a457139",
+        "at": "2026-10-19T00:27:31.035Z",
+        "kind": "lifecycle",
+        "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+      },
+      {
+        "id": "f30badea-8631-481e-9290-6c2c12793ecc",
+        "at": "2026-10-19T00:27:31.205Z",
+        "kind": "lifecycle",
+        "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+      },
+      {
+        "id": "b2c71974-58d6-429c-b539-596aa15a74a5",
+        "at": "2026-10-19T00:27:31.205Z",
+        "kind": "lifecycle",
+        "message": "Dispatch admitted to queue; waiting for an execution slot"
+      }
+    ],
+    "artifacts": [],
+    "ownerId": "cd563bc5-1196-4596-8ae7-17a4dba7a66f",
+    "ownerEpoch": 0,
+    "ownerLastActivityAt": "2026-10-19T00:27:31.035Z",
+    "continuationPolicy": {
+      "idleRotationMinutes": 60
+    },
+    "packageId": "e52d9f83-868d-4bc2-bbe3-eba83c438464",
+    "dispatch": {
+      "owner": "codex_owner",
+      "worker": "qa_a_worker",
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "execution": "mock",
+      "maxParallel": 1,
+      "maxWaitMinutes": 1,
+      "adapter": "mock-jsonl"
+    },
+    "scheduled": true,
+    "queueReason": {
+      "code": "waiting_for_capacity",
+      "message": "Owner codex_owner is at its current concurrency limit (1)."
+    }
+  },
+  "afterOneSlotReleased": {
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+    "title": "downcap queue",
+    "instruction": "explicit mock",
+    "id": "73bf9d70-8280-4f38-88e2-b7ca19e24447",
+    "createdAt": "2026-10-19T00:27:31.035Z",
+    "updatedAt": "2026-10-19T00:27:31.205Z",
+    "status": "queued",
+    "revision": 4,
+    "reviewState": "pending",
+    "progress": 0,
+    "events": [
+      {
+        "id": "44ada248-bd2a-4a6c-b642-73e10a457139",
+        "at": "2026-10-19T00:27:31.035Z",
+        "kind": "lifecycle",
+        "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+      },
+      {
+        "id": "f30badea-8631-481e-9290-6c2c12793ecc",
+        "at": "2026-10-19T00:27:31.205Z",
+        "kind": "lifecycle",
+        "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+      },
+      {
+        "id": "b2c71974-58d6-429c-b539-596aa15a74a5",
+        "at": "2026-10-19T00:27:31.205Z",
+        "kind": "lifecycle",
+        "message": "Dispatch admitted to queue; waiting for an execution slot"
+      }
+    ],
+    "artifacts": [],
+    "ownerId": "cd563bc5-1196-4596-8ae7-17a4dba7a66f",
+    "ownerEpoch": 0,
+    "ownerLastActivityAt": "2026-10-19T00:27:31.035Z",
+    "continuationPolicy": {
+      "idleRotationMinutes": 60
+    },
+    "packageId": "e52d9f83-868d-4bc2-bbe3-eba83c438464",
+    "dispatch": {
+      "owner": "codex_owner",
+      "worker": "qa_a_worker",
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "execution": "mock",
+      "maxParallel": 1,
+      "maxWaitMinutes": 1,
+      "adapter": "mock-jsonl"
+    },
+    "scheduled": true,
+    "queueReason": {
+      "code": "waiting_for_capacity",
+      "message": "Owner codex_owner is at its current concurrency limit (1)."
+    }
+  },
+  "afterBothReleased": {
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+    "title": "downcap queue",
+    "instruction": "explicit mock",
+    "id": "73bf9d70-8280-4f38-88e2-b7ca19e24447",
+    "createdAt": "2026-10-19T00:27:31.035Z",
+    "updatedAt": "2026-10-19T00:27:31.816Z",
+    "status": "running",
+    "revision": 7,
+    "reviewState": "pending",
+    "progress": 0,
+    "events": [
+      {
+        "id": "44ada248-bd2a-4a6c-b642-73e10a457139",
+        "at": "2026-10-19T00:27:31.035Z",
+        "kind": "lifecycle",
+        "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+      },
+      {
+        "id": "f30badea-8631-481e-9290-6c2c12793ecc",
+        "at": "2026-10-19T00:27:31.205Z",
+        "kind": "lifecycle",
+        "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+      },
+      {
+        "id": "b2c71974-58d6-429c-b539-596aa15a74a5",
+        "at": "2026-10-19T00:27:31.205Z",
+        "kind": "lifecycle",
+        "message": "Dispatch admitted to queue; waiting for an execution slot"
+      },
+      {
+        "id": "918936c8-5db3-4db1-8f7f-8e84fd6638ea",
+        "at": "2026-10-19T00:27:31.733Z",
+        "kind": "lifecycle",
+        "message": "Launching explicit mock-jsonl provider"
+      },
+      {
+        "id": "7d7ca559-3c14-4a22-a204-2d5effb9b219",
+        "at": "2026-10-19T00:27:31.816Z",
+        "kind": "log",
+        "message": "Mock worker received: downcap queue"
+      }
+    ],
+    "artifacts": [],
+    "ownerId": "cd563bc5-1196-4596-8ae7-17a4dba7a66f",
+    "ownerEpoch": 0,
+    "ownerLastActivityAt": "2026-10-19T00:27:31.035Z",
+    "continuationPolicy": {
+      "idleRotationMinutes": 60
+    },
+    "packageId": "e52d9f83-868d-4bc2-bbe3-eba83c438464",
+    "dispatch": {
+      "owner": "codex_owner",
+      "worker": "qa_a_worker",
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "execution": "mock",
+      "maxParallel": 1,
+      "maxWaitMinutes": 1,
+      "adapter": "mock-jsonl"
+    },
+    "scheduled": false,
+    "run": {
+      "id": "a1db9c46-27a3-4ee5-8bb9-7cf05bdb9f65",
+      "adapter": "mock-jsonl",
+      "execution": "mock",
+      "status": "running",
+      "startedAt": "2026-10-19T00:27:31.733Z",
+      "timeoutMs": 60000,
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final"
+    }
+  },
+  "completedSameRun": {
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+    "title": "downcap queue",
+    "instruction": "explicit mock",
+    "id": "73bf9d70-8280-4f38-88e2-b7ca19e24447",
+    "createdAt": "2026-10-19T00:27:31.035Z",
+    "updatedAt": "2026-10-19T00:27:33.718Z",
+    "status": "completed",
+    "revision": 14,
+    "reviewState": "pending",
+    "progress": 100,
+    "events": [
+      {
+        "id": "44ada248-bd2a-4a6c-b642-73e10a457139",
+        "at": "2026-10-19T00:27:31.035Z",
+        "kind": "lifecycle",
+        "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+      },
+      {
+        "id": "f30badea-8631-481e-9290-6c2c12793ecc",
+        "at": "2026-10-19T00:27:31.205Z",
+        "kind": "lifecycle",
+        "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+      },
+      {
+        "id": "b2c71974-58d6-429c-b539-596aa15a74a5",
+        "at": "2026-10-19T00:27:31.205Z",
+        "kind": "lifecycle",
+        "message": "Dispatch admitted to queue; waiting for an execution slot"
+      },
+      {
+        "id": "918936c8-5db3-4db1-8f7f-8e84fd6638ea",
+        "at": "2026-10-19T00:27:31.733Z",
+        "kind": "lifecycle",
+        "message": "Launching explicit mock-jsonl provider"
+      },
+      {
+        "id": "7d7ca559-3c14-4a22-a204-2d5effb9b219",
+        "at": "2026-10-19T00:27:31.816Z",
+        "kind": "log",
+        "message": "Mock worker received: downcap queue"
+      },
+      {
+        "id": "5cb7888e-1827-43be-92f6-9a3a81b1a529",
+        "at": "2026-10-19T00:27:32.354Z",
+        "kind": "progress",
+        "message": "Reading handoff"
+      },
+      {
+        "id": "326cab06-9304-414a-afac-60c6fdb71629",
+        "at": "2026-10-19T00:27:32.956Z",
+        "kind": "progress",
+        "message": "Simulating implementation"
+      },
+      {
+        "id": "abcbf8b4-ffe7-4969-b7e4-a51198789c9a",
+        "at": "2026-10-19T00:27:33.557Z",
+        "kind": "progress",
+        "message": "Preparing artifact"
+      },
+      {
+        "id": "e6797716-c910-428c-91c8-e2e19b9af163",
+        "at": "2026-10-19T00:27:33.563Z",
+        "kind": "artifact",
+        "message": "Received mock-result.md"
+      },
+      {
+        "id": "2322146b-bfaf-4711-afef-e79bdf680df8",
+        "at": "2026-10-19T00:27:33.638Z",
+        "kind": "progress",
+        "message": "Demo finished"
+      },
+      {
+        "id": "d280505b-b85d-4f58-9d4c-711ba9952f1b",
+        "at": "2026-10-19T00:27:33.642Z",
+        "kind": "result",
+        "message": "Mock task completed. Review the generated demo artifact."
+      },
+      {
+        "id": "acf3ed07-001a-4cd2-bf78-71f6ac43d2a9",
+        "at": "2026-10-19T00:27:33.718Z",
+        "kind": "lifecycle",
+        "message": "Worker exited successfully; output is ready for owner review"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "8debd0ef-9d86-4728-8249-c54715978267",
+        "name": "mock-result.md",
+        "mediaType": "text/markdown",
+        "content": "# Mock result\n\nTask: downcap queue\n\nInstruction:\nexplicit mock\n\nThis is deterministic demo output. No real agent or project changes were made.\n",
+        "createdAt": "2026-10-19T00:27:33.563Z"
+      }
+    ],
+    "ownerId": "cd563bc5-1196-4596-8ae7-17a4dba7a66f",
+    "ownerEpoch": 0,
+    "ownerLastActivityAt": "2026-10-19T00:27:31.035Z",
+    "continuationPolicy": {
+      "idleRotationMinutes": 60
+    },
+    "packageId": "e52d9f83-868d-4bc2-bbe3-eba83c438464",
+    "dispatch": {
+      "owner": "codex_owner",
+      "worker": "qa_a_worker",
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "execution": "mock",
+      "maxParallel": 1,
+      "maxWaitMinutes": 1,
+      "adapter": "mock-jsonl"
+    },
+    "scheduled": false,
+    "summary": "Mock task completed. Review the generated demo artifact.",
+    "run": {
+      "id": "a1db9c46-27a3-4ee5-8bb9-7cf05bdb9f65",
+      "adapter": "mock-jsonl",
+      "execution": "mock",
+      "status": "stopped",
+      "startedAt": "2026-10-19T00:27:31.733Z",
+      "timeoutMs": 60000,
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+      "endedAt": "2026-10-19T00:27:33.718Z",
+      "exitCode": 0
+    }
+  }
+}

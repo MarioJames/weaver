@@ -1,0 +1,851 @@
+{
+  "catalogCommands": 35,
+  "rows": [
+    {
+      "command": "owners.spawn",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "owners.attach",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "tasks.create",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "packages.create",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "workers.spawn",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "capabilities.get",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "sync.snapshot",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "sync.status",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "owners.list",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "owners.get",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "owners.continuation.get",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "tasks.get",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "tasks.list",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "tasks.events",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "tasks.results",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "packages.get",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "artifacts.read",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "observability.get",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "observability.export",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "operations.get",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "tasks.wait",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "tasks.watch",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "results.deliver",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "results.ack",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "reviews.submit",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "owners.continuation.configure",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "owners.switch",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "tasks.retry",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "tasks.cancel",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "policy.get",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "policy.validate",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "policy.save",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "policy.preview",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "engines.scan",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "engines.set-enabled",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "owners.spawn",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "owners.spawn",
+      "format": "jsonl",
+      "exit": 0,
+      "stdout": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-6bc6cc7e-909f-4d5c-b674-45f8936ccf4f\",\"ok\":true,\"data\":{\"id\":\"8a63ef8b-10ba-42d4-933e-d32535959002\",\"name\":\"Catalog jsonl\",\"profileId\":\"codex_owner\",\"mod"
+    },
+    {
+      "command": "owners.attach",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-beba5d85-9a87-4f65-beac-473bcce4465f\",\"ok\":true,\"data\":{\"id\":\"52dbacb1-8fcf-40ea-89fe-93d455a51c84\",\"name\":\"Manual jsonl\",\"profileId\":\"codex_owner\",\"mode\":\"manual\",\"state\":\"attached\",\"createdAt\":\"2026-10-18T23:52:16.703Z\",\"host\":{\"ownerId\":\"52dbacb1-8fcf-40ea-89fe-93d455a51c84\",\"name\":\"Manual jsonl\",\"profileId\":\"codex_owner\",\"adapter\":\"mock-owner\",\"verified\":false,\"createdAt\":\"2026-10-18T23:52:16.703Z\",\"mode\":\"manual\",\"state\":\"attached\",\"visibility\""
+    },
+    {
+      "command": "tasks.create",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "tasks.create",
+      "format": "jsonl",
+      "exit": 0,
+      "stdout": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-63677303-06c9-4f68-923e-67d02c45109c\",\"ok\":true,\"data\":{\"workspace\":\"/tmp/weaver-redesign-3QuXVe/acceptance/final\",\"acceptanceCriteria\":[\"mock result exi"
+    },
+    {
+      "command": "packages.create",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "packages.create",
+      "format": "jsonl",
+      "exit": 0,
+      "stdout": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-2ed88e0d-41cc-43e6-a9fd-2f9aa76cbf7e\",\"ok\":true,\"data\":{\"id\":\"8cb96af0-a51a-4d51-9255-c073045993b1\",\"taskId\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"revi"
+    },
+    {
+      "command": "workers.spawn",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-b899e32a-d48f-416a-b704-90a0a3d1b2b9\",\"ok\":true,\"data\":{\"workspace\":\"/tmp/weaver-redesign-3QuXVe/acceptance/final\",\"acceptanceCriteria\":[\"mock result exists\"],\"title\":\"Catalog jsonl\",\"instruction\":\"Explicit mock fixture only\",\"id\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"createdAt\":\"2026-10-18T23:52:16.749Z\",\"updatedAt\":\"2026-10-18T23:52:16.966Z\",\"status\":\"running\",\"revision\":6,\"reviewState\":\"pending\",\"progress\":0,\"events\":[{\"id\":\"6f191245-c774-499d-"
+    },
+    {
+      "command": "capabilities.get",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"6e2d750f-3aa1-4322-a56b-8d3a8e2edffd\",\"ok\":true,\"data\":{\"apiVersion\":\"weaver.v1\",\"cliTransport\":\"ready\",\"authentication\":\"ephemeral-local-trusted-user-demo\",\"ownerScopedAuthorization\":false,\"ownerSpawn\":\"logical-registration\",\"manualAttach\":\"metadata-only\",\"ownerModelSpawned\":false,\"attachmentVerified\":false,\"authenticated\":false,\"modelUsable\":false,\"workerProviders\":[\"mock-jsonl\",\"opencode\",\"pi\",\"grok\",\"codex\"],\"realExecution\":true,\"mcp\":false,\"maxParallel"
+    },
+    {
+      "command": "sync.snapshot",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"9c26a8fe-be01-4c8b-a043-a2fcc7453699\",\"ok\":true,\"data\":{\"revision\":184,\"tasks\":[{\"id\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"title\":\"Catalog jsonl\",\"status\":\"completed\",\"revision\":14,\"ownerId\":\"8a63ef8b-10ba-42d4-933e-d32535959002\",\"updatedAt\":\"2026-10-18T23:52:18.799Z\",\"reviewState\":\"pending\"},{\"id\":\"2ed5c3bc-38a1-4591-a319-65d3c4e8256b\",\"title\":\"Catalog json\",\"status\":\"cancelled\",\"revision\":3,\"ownerId\":\"9bda5036-e2f6-4d04-8eb1-93ac20a719e4\",\"updatedAt\":\""
+    },
+    {
+      "command": "sync.status",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"40f53250-3bed-4748-9ad8-fc215b3b4535\",\"ok\":true,\"data\":{\"revision\":184,\"changed\":true,\"recovery\":\"refresh sync.snapshot; push invalidation is not a durable event stream\"}}\n"
+    },
+    {
+      "command": "owners.list",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"87d666b9-c91c-4508-b008-827df0b221be\",\"ok\":true,\"data\":{\"owners\":[{\"id\":\"45fceddc-f69e-421b-be93-658ebf05e7b6\",\"name\":\"Task owner\",\"profileId\":\"codex_owner\",\"mode\":\"manual\",\"state\":\"attached\",\"createdAt\":\"2026-10-18T23:45:04.181Z\",\"host\":{\"ownerId\":\"45fceddc-f69e-421b-be93-658ebf05e7b6\",\"name\":\"Task owner\",\"profileId\":\"codex_owner\",\"adapter\":\"mock-owner\",\"verified\":false,\"createdAt\":\"2026-10-18T23:45:04.181Z\",\"mode\":\"manual\",\"state\":\"attached\",\"visibility\":"
+    },
+    {
+      "command": "owners.get",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"b44a278c-e12c-4667-a9ef-d7eeed7275a7\",\"ok\":true,\"data\":{\"id\":\"8a63ef8b-10ba-42d4-933e-d32535959002\",\"name\":\"Catalog jsonl\",\"profileId\":\"codex_owner\",\"mode\":\"mock\",\"state\":\"ready\",\"createdAt\":\"2026-10-18T23:52:16.620Z\",\"host\":{\"ownerId\":\"8a63ef8b-10ba-42d4-933e-d32535959002\",\"name\":\"Catalog jsonl\",\"profileId\":\"codex_owner\",\"adapter\":\"mock-owner\",\"verified\":false,\"createdAt\":\"2026-10-18T23:52:16.620Z\",\"mode\":\"mock\",\"state\":\"ready\",\"visibility\":\"logical-demo\","
+    },
+    {
+      "command": "owners.continuation.get",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"2fa2eb44-bfd4-40c9-87f7-be9b9bf3731a\",\"ok\":true,\"data\":{\"taskId\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"ownerId\":\"8a63ef8b-10ba-42d4-933e-d32535959002\",\"ownerEpoch\":0,\"policy\":{\"idleRotationMinutes\":60},\"lastActivityAt\":\"2026-10-18T23:52:16.749Z\",\"due\":false,\"history\":[],\"contextPack\":null}}\n"
+    },
+    {
+      "command": "tasks.get",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"2b39d4b9-b794-4ad8-9a29-b1a92c73c040\",\"ok\":true,\"data\":{\"workspace\":\"/tmp/weaver-redesign-3QuXVe/acceptance/final\",\"acceptanceCriteria\":[\"mock result exists\"],\"title\":\"Catalog jsonl\",\"instruction\":\"Explicit mock fixture only\",\"id\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"createdAt\":\"2026-10-18T23:52:16.749Z\",\"updatedAt\":\"2026-10-18T23:52:18.799Z\",\"status\":\"completed\",\"revision\":14,\"reviewState\":\"pending\",\"progress\":100,\"events\":[{\"id\":\"6f191245-c774-499d-970"
+    },
+    {
+      "command": "tasks.list",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"8b19426f-4220-4205-a8a5-9fae2a995b21\",\"ok\":true,\"data\":{\"tasks\":[{\"workspace\":\"/tmp/weaver-redesign-3QuXVe/acceptance/final\",\"acceptanceCriteria\":[\"mock result exists\"],\"title\":\"Catalog jsonl\",\"instruction\":\"Explicit mock fixture only\",\"id\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"createdAt\":\"2026-10-18T23:52:16.749Z\",\"updatedAt\":\"2026-10-18T23:52:18.799Z\",\"status\":\"completed\",\"revision\":14,\"reviewState\":\"pending\",\"progress\":100,\"ownerId\":\"8a63ef8b-10ba-42d4"
+    },
+    {
+      "command": "tasks.events",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"d63efc4f-875d-4dab-8337-31cfbf2ce4d7\",\"ok\":true,\"data\":{\"events\":[{\"id\":\"6f191245-c774-499d-9704-4af686d99e94\",\"at\":\"2026-10-18T23:52:16.749Z\",\"kind\":\"lifecycle\",\"message\":\"Task queued. Owner reference is metadata only; no Herdr session was contacted.\"}],\"nextCursor\":\"6f191245-c774-499d-9704-4af686d99e94\",\"hasMore\":true}}\n"
+    },
+    {
+      "command": "tasks.results",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"6e5a1467-9466-4d99-b1f3-2905c6e0ca50\",\"ok\":true,\"data\":{\"taskId\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"attemptId\":\"0d3ed614-4049-41b2-ad5b-8949e9927438\",\"packageId\":\"8cb96af0-a51a-4d51-9255-c073045993b1\",\"execution\":\"completed\",\"summary\":\"Mock task completed. Review the generated demo artifact.\",\"artifacts\":[{\"id\":\"805214e5-73ad-457d-b7c3-2b8bac4771fe\",\"name\":\"mock-result.md\",\"mediaType\":\"text/markdown\",\"sha256\":\"7777c11fbc278cc122a9ca59f839e372db50f7aedb"
+    },
+    {
+      "command": "packages.get",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"76ab4a12-1064-4829-9c73-97b840f97268\",\"ok\":true,\"data\":{\"id\":\"8cb96af0-a51a-4d51-9255-c073045993b1\",\"taskId\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"revision\":1,\"instruction\":\"Explicit mock fixture only\",\"scope\":[\"Fixture only\"],\"acceptanceCriteria\":[\"mock artifact\"],\"createdAt\":\"2026-10-18T23:52:16.835Z\"}}\n"
+    },
+    {
+      "command": "artifacts.read",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"fbc473c8-a9ba-4d2c-9390-b9926da5c4e1\",\"ok\":true,\"data\":{\"id\":\"805214e5-73ad-457d-b7c3-2b8bac4771fe\",\"name\":\"mock-result.md\",\"mediaType\":\"text/markdown\",\"content\":\"# Mock result\\n\\nTask: Catalog jsonl\\n\\nInstruction:\\nExplicit mock fixture only\\n\\nThis is deterministic demo output. No real agent or project changes were made.\\n\",\"createdAt\":\"2026-10-18T23:52:18.790Z\"}}\n"
+    },
+    {
+      "command": "observability.get",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"1ab6ed10-f1b8-4fbf-affb-c3f55f9562e9\",\"ok\":true,\"data\":{\"taskId\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"ownerId\":\"8a63ef8b-10ba-42d4-933e-d32535959002\",\"packageId\":\"8cb96af0-a51a-4d51-9255-c073045993b1\",\"attemptId\":\"0d3ed614-4049-41b2-ad5b-8949e9927438\",\"revision\":14,\"execution\":\"completed\",\"stage\":\"awaiting_review\",\"lastActivityAt\":\"2026-10-18T23:52:18.799Z\",\"retryOf\":null,\"route\":{\"owner\":\"codex_owner\",\"worker\":\"codex_worker\",\"engine\":\"codex\",\"model\":\"gp"
+    },
+    {
+      "command": "observability.export",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"e0244a16-c16b-4db0-a21b-be8718f95dcf\",\"ok\":true,\"data\":{\"mediaType\":\"application/json\",\"name\":\"weaver-trace-8f43fc4d-8c94-4858-8557-500f8c7db53c.json\",\"content\":\"{\\n  \\\"taskId\\\": \\\"8f43fc4d-8c94-4858-8557-500f8c7db53c\\\",\\n  \\\"ownerId\\\": \\\"8a63ef8b-10ba-42d4-933e-d32535959002\\\",\\n  \\\"packageId\\\": \\\"8cb96af0-a51a-4d51-9255-c073045993b1\\\",\\n  \\\"attemptId\\\": \\\"0d3ed614-4049-41b2-ad5b-8949e9927438\\\",\\n  \\\"revision\\\": 14,\\n  \\\"execution\\\": \\\"completed\\\",\\n  \\\"sta"
+    },
+    {
+      "command": "operations.get",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"c8505d1f-274e-4a7c-83ec-4d960482fe7b\",\"ok\":true,\"data\":{\"commandId\":\"catalog-63677303-06c9-4f68-923e-67d02c45109c\",\"state\":\"settled\",\"response\":{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-63677303-06c9-4f68-923e-67d02c45109c\",\"ok\":true,\"data\":{\"workspace\":\"/tmp/weaver-redesign-3QuXVe/acceptance/final\",\"acceptanceCriteria\":[\"mock result exists\"],\"title\":\"Catalog jsonl\",\"instruction\":\"Explicit mock fixture only\",\"id\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\","
+    },
+    {
+      "command": "tasks.wait",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"0b5da82b-c55f-4792-882d-c294900bbc2a\",\"ok\":true,\"data\":{\"workspace\":\"/tmp/weaver-redesign-3QuXVe/acceptance/final\",\"acceptanceCriteria\":[\"mock result exists\"],\"title\":\"Catalog jsonl\",\"instruction\":\"Explicit mock fixture only\",\"id\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"createdAt\":\"2026-10-18T23:52:16.749Z\",\"updatedAt\":\"2026-10-18T23:52:18.799Z\",\"status\":\"completed\",\"revision\":14,\"reviewState\":\"pending\",\"progress\":100,\"events\":[{\"id\":\"6f191245-c774-499d-970"
+    },
+    {
+      "command": "tasks.watch",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 13,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":true,\"data\":{\"id\":\"6f191245-c774-499d-9704-4af686d99e94\",\"at\":\"2026-10-18T23:52:16.749Z\",\"kind\":\"lifecycle\",\"message\":\"Task queued. Owner reference is metadata only; no Herdr session was contacted.\"}}\n{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":true,\"data\":{\"id\":\"d1607b61-e5dd-4b8d-bb65-652f23384da9\",\"at\":\"2026-10-18T23:52:16.836Z\",\"kind\":\"lifecycle\",\"message\":\"Frozen work package created\"}}\n{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":true,"
+    },
+    {
+      "command": "results.deliver",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-e403a869-45a1-431e-8962-e023cad2f73a\",\"ok\":true,\"data\":{\"id\":\"c88481db-f01a-46d1-9fd4-47de71c6d1d4\",\"ownerId\":\"8a63ef8b-10ba-42d4-933e-d32535959002\",\"kind\":\"result\",\"taskId\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"manifestDigest\":\"9344e94c728a64092c3592af29ea734feb86d7e83b89dc950d4e1a7ca60c42f4\",\"transport\":\"mock-memory\",\"status\":\"delivered\",\"createdAt\":\"2026-10-18T23:52:18.801Z\"}}\n"
+    },
+    {
+      "command": "results.ack",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-a4de79ae-6ec2-4694-a52f-5649b1b1f06b\",\"ok\":true,\"data\":{\"taskId\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"attemptId\":\"0d3ed614-4049-41b2-ad5b-8949e9927438\",\"packageId\":\"8cb96af0-a51a-4d51-9255-c073045993b1\",\"execution\":\"completed\",\"summary\":\"Mock task completed. Review the generated demo artifact.\",\"artifacts\":[{\"id\":\"805214e5-73ad-457d-b7c3-2b8bac4771fe\",\"name\":\"mock-result.md\",\"mediaType\":\"text/markdown\",\"sha256\":\"7777c11fbc278cc122a9ca59f839e372db"
+    },
+    {
+      "command": "reviews.submit",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-930d6cae-7682-40a7-ad23-f9bf36dccf70\",\"ok\":true,\"data\":{\"taskId\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"attemptId\":\"0d3ed614-4049-41b2-ad5b-8949e9927438\",\"packageId\":\"8cb96af0-a51a-4d51-9255-c073045993b1\",\"execution\":\"completed\",\"summary\":\"Mock task completed. Review the generated demo artifact.\",\"artifacts\":[{\"id\":\"805214e5-73ad-457d-b7c3-2b8bac4771fe\",\"name\":\"mock-result.md\",\"mediaType\":\"text/markdown\",\"sha256\":\"7777c11fbc278cc122a9ca59f839e372db"
+    },
+    {
+      "command": "owners.continuation.configure",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-fdd62b62-e425-4e17-b981-acd78d001b26\",\"ok\":true,\"data\":{\"taskId\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"ownerId\":\"8a63ef8b-10ba-42d4-933e-d32535959002\",\"ownerEpoch\":0,\"policy\":{\"idleRotationMinutes\":null},\"lastActivityAt\":\"2026-10-18T23:52:19.904Z\",\"due\":false,\"history\":[],\"contextPack\":null}}\n"
+    },
+    {
+      "command": "owners.switch",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-7092d2a9-6fdf-4443-9896-d7548e01f2ec\",\"ok\":true,\"data\":{\"taskId\":\"8f43fc4d-8c94-4858-8557-500f8c7db53c\",\"ownerId\":\"060262c3-b849-45f9-8cad-18a795cb0316\",\"ownerEpoch\":1,\"policy\":{\"idleRotationMinutes\":null},\"lastActivityAt\":\"2026-10-18T23:52:19.994Z\",\"due\":false,\"history\":[{\"id\":\"aec326b5-0f62-4bbc-bbd9-247e1595711e\",\"at\":\"2026-10-18T23:52:19.994Z\",\"reason\":\"manual\",\"fromOwnerId\":\"8a63ef8b-10ba-42d4-933e-d32535959002\",\"toOwnerId\":\"060262c3-b849-45f9-"
+    },
+    {
+      "command": "tasks.retry",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "tasks.retry",
+      "format": "jsonl",
+      "exit": 0,
+      "stdout": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-82ee1c6b-cbf5-4c5d-b3c9-fab2010cbfbc\",\"ok\":true,\"data\":{\"workspace\":\"/tmp/weaver-redesign-3QuXVe/acceptance/final\",\"acceptanceCriteria\":[\"mock result exi"
+    },
+    {
+      "command": "tasks.cancel",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-40f91221-2647-4e58-b266-f6c5042ce1e5\",\"ok\":true,\"data\":{\"workspace\":\"/tmp/weaver-redesign-3QuXVe/acceptance/final\",\"acceptanceCriteria\":[\"mock result exists\"],\"title\":\"Catalog jsonl\",\"instruction\":\"Explicit mock fixture only\",\"id\":\"8b545e0c-6281-4381-9d17-c951bfed43d2\",\"createdAt\":\"2026-10-18T23:52:20.044Z\",\"updatedAt\":\"2026-10-18T23:52:20.135Z\",\"status\":\"cancelled\",\"revision\":3,\"reviewState\":\"pending\",\"progress\":0,\"events\":[{\"id\":\"d37b7e4e-0f4d-408"
+    },
+    {
+      "command": "policy.get",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":true,\"data\":{\"revision\":8,\"config\":{\"$schema\":\"./config.schema.json\",\"version\":1,\"chatgpt_review\":false,\"engines\":{\"claude\":{\"enabled\":false,\"kind\":\"claude\",\"native_subagents\":true},\"codex\":{\"enabled\":true,\"kind\":\"codex\",\"native_subagents\":true},\"grok\":{\"enabled\":true,\"kind\":\"grok\",\"native_subagents\":false},\"opencode\":{\"enabled\":true,\"kind\":\"opencode\",\"native_subagents\":false},\"pi\":{\"enabled\":true,\"kind\":\"pi\",\"native_subagents\":false},\"qoder\":{\"ena"
+    },
+    {
+      "command": "policy.validate",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":true,\"data\":[]}\n"
+    },
+    {
+      "command": "policy.save",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":true,\"data\":{\"revision\":9,\"config\":{\"$schema\":\"./config.schema.json\",\"version\":1,\"chatgpt_review\":false,\"engines\":{\"claude\":{\"enabled\":false,\"kind\":\"claude\",\"native_subagents\":true},\"codex\":{\"enabled\":true,\"kind\":\"codex\",\"native_subagents\":true},\"grok\":{\"enabled\":true,\"kind\":\"grok\",\"native_subagents\":false},\"opencode\":{\"enabled\":true,\"kind\":\"opencode\",\"native_subagents\":false},\"pi\":{\"enabled\":true,\"kind\":\"pi\",\"native_subagents\":false},\"qoder\":{\"ena"
+    },
+    {
+      "command": "policy.preview",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":true,\"data\":{\"owner\":\"codex_owner\",\"worker\":\"grok_worker\",\"engine\":\"grok\",\"model\":\"grok-4.7\",\"effort\":\"high\",\"execution\":\"disabled\",\"dispatch\":\"preview\",\"warnings\":[],\"weight\":100,\"class\":\"judgment\",\"selected_by\":\"order\",\"skipped\":[],\"maxParallel\":4,\"capacityAvailable\":true,\"chatgptReview\":false}}\n"
+    },
+    {
+      "command": "engines.scan",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":true,\"data\":{\"probedAt\":\"2026-10-18T23:52:20.751Z\",\"probes\":[{\"id\":\"claude\",\"kind\":\"claude\",\"command\":\"claude\",\"status\":\"installed\",\"probedAt\":\"2026-10-18T23:52:20.392Z\",\"authenticated\":false,\"modelUsable\":false,\"path\":\"/home/mocha/.local/share/claude/versions/2.1.302\",\"version\":\"2.1.302 (Claude Code)\"},{\"id\":\"codex\",\"kind\":\"codex\",\"command\":\"codex\",\"status\":\"installed\",\"probedAt\":\"2026-10-18T23:52:20.393Z\",\"authenticated\":false,\"modelUsable\":false"
+    },
+    {
+      "command": "engines.set-enabled",
+      "format": "jsonl",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": true,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":true,\"data\":{\"snapshot\":{\"revision\":10,\"config\":{\"$schema\":\"./config.schema.json\",\"version\":1,\"chatgpt_review\":false,\"engines\":{\"claude\":{\"enabled\":false,\"kind\":\"claude\",\"native_subagents\":true},\"codex\":{\"enabled\":true,\"kind\":\"codex\",\"native_subagents\":true},\"grok\":{\"enabled\":true,\"kind\":\"grok\",\"native_subagents\":false},\"opencode\":{\"enabled\":true,\"kind\":\"opencode\",\"native_subagents\":false},\"pi\":{\"enabled\":true,\"kind\":\"pi\",\"native_subagents\":false},"
+    },
+    {
+      "command": "owners.spawn",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "owners.spawn",
+      "format": "text",
+      "exit": 0,
+      "stdout": "{\"id\":\"eb62d595-36ee-474c-ad65-a03a62b7417a\",\"name\":\"Catalog text\",\"profileId\":\"codex_owner\",\"mode\":\"mock\",\"state\":\"ready\",\"createdAt\":\"2026-10-18T23:52:20.893Z\",\"host\":{\"ownerId\":\"eb62d595-36ee-474c-"
+    },
+    {
+      "command": "owners.attach",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"id\":\"37b7c34f-1a03-4d83-88a1-c59f1c2c1597\",\"name\":\"Manual text\",\"profileId\":\"codex_owner\",\"mode\":\"manual\",\"state\":\"attached\",\"createdAt\":\"2026-10-18T23:52:20.981Z\",\"host\":{\"ownerId\":\"37b7c34f-1a03-4d83-88a1-c59f1c2c1597\",\"name\":\"Manual text\",\"profileId\":\"codex_owner\",\"adapter\":\"mock-owner\",\"verified\":false,\"createdAt\":\"2026-10-18T23:52:20.981Z\",\"mode\":\"manual\",\"state\":\"attached\",\"visibility\":\"external-unverified\",\"ownsHost\":false,\"session\":\"external-cli\",\"pane\":\"unverified\"}}\n"
+    },
+    {
+      "command": "tasks.create",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "tasks.create",
+      "format": "text",
+      "exit": 0,
+      "stdout": "4e2efc9d-a994-41bd-a839-aa35a9f72bf2 queued Catalog text\n"
+    },
+    {
+      "command": "packages.create",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "packages.create",
+      "format": "text",
+      "exit": 0,
+      "stdout": "{\"id\":\"e48519ac-b6ce-4fae-b27f-156b80606040\",\"taskId\":\"4e2efc9d-a994-41bd-a839-aa35a9f72bf2\",\"revision\":1,\"instruction\":\"Explicit mock fixture only\",\"scope\":[\"Fixture only\"],\"acceptanceCriteria\":[\"moc"
+    },
+    {
+      "command": "workers.spawn",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "4e2efc9d-a994-41bd-a839-aa35a9f72bf2 running Catalog text\n"
+    },
+    {
+      "command": "capabilities.get",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"apiVersion\":\"weaver.v1\",\"cliTransport\":\"ready\",\"authentication\":\"ephemeral-local-trusted-user-demo\",\"ownerScopedAuthorization\":false,\"ownerSpawn\":\"logical-registration\",\"manualAttach\":\"metadata-only\",\"ownerModelSpawned\":false,\"attachmentVerified\":false,\"authenticated\":false,\"modelUsable\":false,\"workerProviders\":[\"mock-jsonl\",\"opencode\",\"pi\",\"grok\",\"codex\"],\"realExecution\":true,\"mcp\":false,\"maxParallel\":4,\"policyAdmission\":true,\"commands\":[\"capabilities.get\",\"sync.snapshot\",\"sync.status\",\"owner"
+    },
+    {
+      "command": "sync.snapshot",
+      "format": "text",
+      "exit": 0,
+      "lines": 9,
+      "parsedJsonl": false,
+      "sample": "4e2efc9d-a994-41bd-a839-aa35a9f72bf2 completed Catalog text\n8b545e0c-6281-4381-9d17-c951bfed43d2 cancelled Catalog jsonl\n8f43fc4d-8c94-4858-8557-500f8c7db53c completed Catalog jsonl\n2ed5c3bc-38a1-4591-a319-65d3c4e8256b cancelled Catalog json\nbabd096f-e21a-40e7-b693-a10e6960fc29 completed Catalog json\n35988b40-faee-44b3-9301-fb24cadcbce2 completed weaver-real-codex\n1c3b37ed-35f4-4748-a54c-e53c90e66b9f failed weaver-real-grok\na9d0bafc-7f20-47f3-a60a-9a393143449a completed weaver-real-pi\ned51853c-3"
+    },
+    {
+      "command": "sync.status",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"revision\":234,\"changed\":true,\"recovery\":\"refresh sync.snapshot; push invalidation is not a durable event stream\"}\n"
+    },
+    {
+      "command": "owners.list",
+      "format": "text",
+      "exit": 0,
+      "lines": 12,
+      "parsedJsonl": false,
+      "sample": "45fceddc-f69e-421b-be93-658ebf05e7b6 Task owner attached\n2841b0e3-5117-446c-9847-9dd10a11b4d3 Task owner attached\nf4073e3e-701f-4fb1-908c-2389b8e18240 Task owner attached\ne10d7179-11a7-43f7-867c-a6030dedaf0d Task owner attached\n7e96171e-bc8d-4758-9702-d7c5a3862bec Catalog json ready\nf2ca2f48-e0f6-49d8-9569-65c36b25ab74 Manual json attached\n9bda5036-e2f6-4d04-8eb1-93ac20a719e4 Catalog json ready\n8a63ef8b-10ba-42d4-933e-d32535959002 Catalog jsonl ready\n52dbacb1-8fcf-40ea-89fe-93d455a51c84 Manual j"
+    },
+    {
+      "command": "owners.get",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"id\":\"eb62d595-36ee-474c-ad65-a03a62b7417a\",\"name\":\"Catalog text\",\"profileId\":\"codex_owner\",\"mode\":\"mock\",\"state\":\"ready\",\"createdAt\":\"2026-10-18T23:52:20.893Z\",\"host\":{\"ownerId\":\"eb62d595-36ee-474c-ad65-a03a62b7417a\",\"name\":\"Catalog text\",\"profileId\":\"codex_owner\",\"adapter\":\"mock-owner\",\"verified\":false,\"createdAt\":\"2026-10-18T23:52:20.893Z\",\"mode\":\"mock\",\"state\":\"ready\",\"visibility\":\"logical-demo\",\"ownsHost\":true},\"messages\":[{\"id\":\"519029f2-582b-4e13-89fd-52de8c16922f\",\"ownerId\":\"eb62d595-36"
+    },
+    {
+      "command": "owners.continuation.get",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"taskId\":\"4e2efc9d-a994-41bd-a839-aa35a9f72bf2\",\"ownerId\":\"eb62d595-36ee-474c-ad65-a03a62b7417a\",\"ownerEpoch\":0,\"policy\":{\"idleRotationMinutes\":60},\"lastActivityAt\":\"2026-10-18T23:52:21.027Z\",\"due\":false,\"history\":[],\"contextPack\":null}\n"
+    },
+    {
+      "command": "tasks.get",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "4e2efc9d-a994-41bd-a839-aa35a9f72bf2 completed Catalog text\n"
+    },
+    {
+      "command": "tasks.list",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "4e2efc9d-a994-41bd-a839-aa35a9f72bf2 completed Catalog text\n"
+    },
+    {
+      "command": "tasks.events",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "lifecycle: Task queued. Owner reference is metadata only; no Herdr session was contacted.\n"
+    },
+    {
+      "command": "tasks.results",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"taskId\":\"4e2efc9d-a994-41bd-a839-aa35a9f72bf2\",\"attemptId\":\"16c898ec-f7d8-4e80-9ab0-b8d2ef0f4853\",\"packageId\":\"e48519ac-b6ce-4fae-b27f-156b80606040\",\"execution\":\"completed\",\"summary\":\"Mock task completed. Review the generated demo artifact.\",\"artifacts\":[{\"id\":\"0677dd4a-e561-4847-833c-0643fbc222aa\",\"name\":\"mock-result.md\",\"mediaType\":\"text/markdown\",\"sha256\":\"796c2b521c95dddceb4004d6c8d031bdee22d462dcf7b79b06b956888d5372a8\"}],\"exitCode\":0,\"manifestDigest\":\"dce17a627ae58c8d49824fb2651433d2a62e4"
+    },
+    {
+      "command": "packages.get",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"id\":\"e48519ac-b6ce-4fae-b27f-156b80606040\",\"taskId\":\"4e2efc9d-a994-41bd-a839-aa35a9f72bf2\",\"revision\":1,\"instruction\":\"Explicit mock fixture only\",\"scope\":[\"Fixture only\"],\"acceptanceCriteria\":[\"mock artifact\"],\"createdAt\":\"2026-10-18T23:52:21.115Z\"}\n"
+    },
+    {
+      "command": "artifacts.read",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"id\":\"0677dd4a-e561-4847-833c-0643fbc222aa\",\"name\":\"mock-result.md\",\"mediaType\":\"text/markdown\",\"content\":\"# Mock result\\n\\nTask: Catalog text\\n\\nInstruction:\\nExplicit mock fixture only\\n\\nThis is deterministic demo output. No real agent or project changes were made.\\n\",\"createdAt\":\"2026-10-18T23:52:23.087Z\"}\n"
+    },
+    {
+      "command": "observability.get",
+      "format": "text",
+      "exit": 0,
+      "lines": 12,
+      "parsedJsonl": false,
+      "sample": "lifecycle: Task queued. Owner reference is metadata only; no Herdr session was contacted.\nlifecycle: Frozen work package created\nlifecycle: Policy selected codex_worker; explicit mock-jsonl provider\nlifecycle: Launching explicit mock-jsonl provider\nlog: Mock worker received: Catalog text\nprogress: Reading handoff\nprogress: Simulating implementation\nprogress: Preparing artifact\nartifact: Received mock-result.md\nprogress: Demo finished\nresult: Mock task completed. Review the generated demo artifac"
+    },
+    {
+      "command": "observability.export",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"mediaType\":\"application/json\",\"name\":\"weaver-trace-4e2efc9d-a994-41bd-a839-aa35a9f72bf2.json\",\"content\":\"{\\n  \\\"taskId\\\": \\\"4e2efc9d-a994-41bd-a839-aa35a9f72bf2\\\",\\n  \\\"ownerId\\\": \\\"eb62d595-36ee-474c-ad65-a03a62b7417a\\\",\\n  \\\"packageId\\\": \\\"e48519ac-b6ce-4fae-b27f-156b80606040\\\",\\n  \\\"attemptId\\\": \\\"16c898ec-f7d8-4e80-9ab0-b8d2ef0f4853\\\",\\n  \\\"revision\\\": 14,\\n  \\\"execution\\\": \\\"completed\\\",\\n  \\\"stage\\\": \\\"awaiting_review\\\",\\n  \\\"lastActivityAt\\\": \\\"2026-10-18T23:52:23.096Z\\\",\\n  \\\"retryOf\\\""
+    },
+    {
+      "command": "operations.get",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"commandId\":\"catalog-f47e605e-2a7e-41cc-8ada-e8a292299ac9\",\"state\":\"settled\",\"response\":{\"apiVersion\":\"weaver.v1\",\"commandId\":\"catalog-f47e605e-2a7e-41cc-8ada-e8a292299ac9\",\"ok\":true,\"data\":{\"workspace\":\"/tmp/weaver-redesign-3QuXVe/acceptance/final\",\"acceptanceCriteria\":[\"mock result exists\"],\"title\":\"Catalog text\",\"instruction\":\"Explicit mock fixture only\",\"id\":\"4e2efc9d-a994-41bd-a839-aa35a9f72bf2\",\"createdAt\":\"2026-10-18T23:52:21.027Z\",\"updatedAt\":\"2026-10-18T23:52:21.027Z\",\"status\":\"queued\""
+    },
+    {
+      "command": "tasks.wait",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "4e2efc9d-a994-41bd-a839-aa35a9f72bf2 completed Catalog text\n"
+    },
+    {
+      "command": "tasks.watch",
+      "format": "text",
+      "exit": 0,
+      "lines": 13,
+      "parsedJsonl": false,
+      "sample": "lifecycle: Task queued. Owner reference is metadata only; no Herdr session was contacted.\nlifecycle: Frozen work package created\nlifecycle: Policy selected codex_worker; explicit mock-jsonl provider\nlifecycle: Launching explicit mock-jsonl provider\nlog: Mock worker received: Catalog text\nprogress: Reading handoff\nprogress: Simulating implementation\nprogress: Preparing artifact\nartifact: Received mock-result.md\nprogress: Demo finished\nresult: Mock task completed. Review the generated demo artifac"
+    },
+    {
+      "command": "results.deliver",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"id\":\"519029f2-582b-4e13-89fd-52de8c16922f\",\"ownerId\":\"eb62d595-36ee-474c-ad65-a03a62b7417a\",\"kind\":\"result\",\"taskId\":\"4e2efc9d-a994-41bd-a839-aa35a9f72bf2\",\"manifestDigest\":\"dce17a627ae58c8d49824fb2651433d2a62e4b0df7b841d8448a37c4076d70b0\",\"transport\":\"mock-memory\",\"status\":\"delivered\",\"createdAt\":\"2026-10-18T23:52:23.099Z\"}\n"
+    },
+    {
+      "command": "results.ack",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"taskId\":\"4e2efc9d-a994-41bd-a839-aa35a9f72bf2\",\"attemptId\":\"16c898ec-f7d8-4e80-9ab0-b8d2ef0f4853\",\"packageId\":\"e48519ac-b6ce-4fae-b27f-156b80606040\",\"execution\":\"completed\",\"summary\":\"Mock task completed. Review the generated demo artifact.\",\"artifacts\":[{\"id\":\"0677dd4a-e561-4847-833c-0643fbc222aa\",\"name\":\"mock-result.md\",\"mediaType\":\"text/markdown\",\"sha256\":\"796c2b521c95dddceb4004d6c8d031bdee22d462dcf7b79b06b956888d5372a8\"}],\"exitCode\":0,\"manifestDigest\":\"dce17a627ae58c8d49824fb2651433d2a62e4"
+    },
+    {
+      "command": "reviews.submit",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"taskId\":\"4e2efc9d-a994-41bd-a839-aa35a9f72bf2\",\"attemptId\":\"16c898ec-f7d8-4e80-9ab0-b8d2ef0f4853\",\"packageId\":\"e48519ac-b6ce-4fae-b27f-156b80606040\",\"execution\":\"completed\",\"summary\":\"Mock task completed. Review the generated demo artifact.\",\"artifacts\":[{\"id\":\"0677dd4a-e561-4847-833c-0643fbc222aa\",\"name\":\"mock-result.md\",\"mediaType\":\"text/markdown\",\"sha256\":\"796c2b521c95dddceb4004d6c8d031bdee22d462dcf7b79b06b956888d5372a8\"}],\"exitCode\":0,\"manifestDigest\":\"dce17a627ae58c8d49824fb2651433d2a62e4"
+    },
+    {
+      "command": "owners.continuation.configure",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"taskId\":\"4e2efc9d-a994-41bd-a839-aa35a9f72bf2\",\"ownerId\":\"eb62d595-36ee-474c-ad65-a03a62b7417a\",\"ownerEpoch\":0,\"policy\":{\"idleRotationMinutes\":null},\"lastActivityAt\":\"2026-10-18T23:52:24.199Z\",\"due\":false,\"history\":[],\"contextPack\":null}\n"
+    },
+    {
+      "command": "owners.switch",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"taskId\":\"4e2efc9d-a994-41bd-a839-aa35a9f72bf2\",\"ownerId\":\"e2d7b4e4-a7a6-4c82-96b6-d2064dd3be2f\",\"ownerEpoch\":1,\"policy\":{\"idleRotationMinutes\":null},\"lastActivityAt\":\"2026-10-18T23:52:24.283Z\",\"due\":false,\"history\":[{\"id\":\"a09abf23-6381-4cde-ac99-16faa52257f9\",\"at\":\"2026-10-18T23:52:24.283Z\",\"reason\":\"manual\",\"fromOwnerId\":\"eb62d595-36ee-474c-ad65-a03a62b7417a\",\"toOwnerId\":\"e2d7b4e4-a7a6-4c82-96b6-d2064dd3be2f\",\"fromProfileId\":\"codex_owner\",\"toProfileId\":\"codex_owner\",\"epoch\":1,\"packId\":\"29aab"
+    },
+    {
+      "command": "tasks.retry",
+      "format": "json",
+      "exit": 0,
+      "ok": true,
+      "code": null
+    },
+    {
+      "command": "tasks.retry",
+      "format": "text",
+      "exit": 0,
+      "stdout": "88531d7f-6971-49a4-be76-b2725a6a033b queued Catalog text\n"
+    },
+    {
+      "command": "tasks.cancel",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "88531d7f-6971-49a4-be76-b2725a6a033b cancelled Catalog text\n"
+    },
+    {
+      "command": "policy.get",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"revision\":10,\"config\":{\"$schema\":\"./config.schema.json\",\"version\":1,\"chatgpt_review\":false,\"engines\":{\"claude\":{\"enabled\":false,\"kind\":\"claude\",\"native_subagents\":true},\"codex\":{\"enabled\":true,\"kind\":\"codex\",\"native_subagents\":true},\"grok\":{\"enabled\":true,\"kind\":\"grok\",\"native_subagents\":false},\"opencode\":{\"enabled\":true,\"kind\":\"opencode\",\"native_subagents\":false},\"pi\":{\"enabled\":true,\"kind\":\"pi\",\"native_subagents\":false},\"qoder\":{\"enabled\":false,\"kind\":\"qodercli\",\"native_subagents\":false}},\"o"
+    },
+    {
+      "command": "policy.validate",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "[]\n"
+    },
+    {
+      "command": "policy.save",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"revision\":11,\"config\":{\"$schema\":\"./config.schema.json\",\"version\":1,\"chatgpt_review\":false,\"engines\":{\"claude\":{\"enabled\":false,\"kind\":\"claude\",\"native_subagents\":true},\"codex\":{\"enabled\":true,\"kind\":\"codex\",\"native_subagents\":true},\"grok\":{\"enabled\":true,\"kind\":\"grok\",\"native_subagents\":false},\"opencode\":{\"enabled\":true,\"kind\":\"opencode\",\"native_subagents\":false},\"pi\":{\"enabled\":true,\"kind\":\"pi\",\"native_subagents\":false},\"qoder\":{\"enabled\":false,\"kind\":\"qodercli\",\"native_subagents\":false}},\"o"
+    },
+    {
+      "command": "policy.preview",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"owner\":\"codex_owner\",\"worker\":\"grok_worker\",\"engine\":\"grok\",\"model\":\"grok-4.7\",\"effort\":\"high\",\"execution\":\"disabled\",\"dispatch\":\"preview\",\"warnings\":[],\"weight\":100,\"class\":\"judgment\",\"selected_by\":\"order\",\"skipped\":[],\"maxParallel\":4,\"capacityAvailable\":true,\"chatgptReview\":false}\n"
+    },
+    {
+      "command": "engines.scan",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"probedAt\":\"2026-10-18T23:52:25.050Z\",\"probes\":[{\"id\":\"claude\",\"kind\":\"claude\",\"command\":\"claude\",\"status\":\"installed\",\"probedAt\":\"2026-10-18T23:52:24.690Z\",\"authenticated\":false,\"modelUsable\":false,\"path\":\"/home/mocha/.local/share/claude/versions/2.1.302\",\"version\":\"2.1.302 (Claude Code)\"},{\"id\":\"codex\",\"kind\":\"codex\",\"command\":\"codex\",\"status\":\"installed\",\"probedAt\":\"2026-10-18T23:52:24.690Z\",\"authenticated\":false,\"modelUsable\":false,\"path\":\"/home/mocha/.codex/packages/standalone/releases/0.1"
+    },
+    {
+      "command": "engines.set-enabled",
+      "format": "text",
+      "exit": 0,
+      "lines": 1,
+      "parsedJsonl": false,
+      "sample": "{\"snapshot\":{\"revision\":12,\"config\":{\"$schema\":\"./config.schema.json\",\"version\":1,\"chatgpt_review\":false,\"engines\":{\"claude\":{\"enabled\":false,\"kind\":\"claude\",\"native_subagents\":true},\"codex\":{\"enabled\":true,\"kind\":\"codex\",\"native_subagents\":true},\"grok\":{\"enabled\":true,\"kind\":\"grok\",\"native_subagents\":false},\"opencode\":{\"enabled\":true,\"kind\":\"opencode\",\"native_subagents\":false},\"pi\":{\"enabled\":true,\"kind\":\"pi\",\"native_subagents\":false},\"qoder\":{\"enabled\":false,\"kind\":\"qodercli\",\"native_subagents"
+    }
+  ],
+  "missing": []
+}

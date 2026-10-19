@@ -1,0 +1,12 @@
+{
+  "changed": [
+    "skills/weaver/SKILL.md",
+    "skills/weaver/references/handoff.md"
+  ],
+  "unchangedCount": 104,
+  "hashes": {
+    "skills/weaver/SKILL.md": "e8659a8196db8032890718acd8972c118108b2dacacd85e99c7640cdf430414f",
+    "skills/weaver/references/handoff.md": "252baf8ed0e7164f12e8af0addd84b22ea4d9d1914a0060fbf3d6c6696e33433"
+  },
+  "distCliSha256": "42be2d9bc166a73edc252b4473b5332eaeb8b154d1b7d9f07748c56ccf0dd807"
+}

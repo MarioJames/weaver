@@ -1,0 +1,42 @@
+{
+  "status": "preview-failed-layout-not-final-acceptance",
+  "artifactDigest": "b49004ae0af676bfb6d659939e08e5e65869ac81dcbfe282af83760d7414837b",
+  "artifactStableAndCopyMatched": true,
+  "appUrl": "file:///tmp/weaver-redesign-3QuXVe/acceptance/preview-build/dist/renderer/index.html",
+  "checks": {
+    "startup": "passed",
+    "realPreloadIPC": "passed",
+    "navigationAllFivePages": "passed",
+    "engineProbe": "5 installed; gemini missing; all real adapters not_implemented",
+    "themeToggle": "passed",
+    "1440And960Captured": "passed",
+    "fullViewportLayout": "failed: ant-app flex 0 1 auto shrinks to content width",
+    "noPageHeader": "failed: ConsoleShell has 56px header",
+    "uniformBackground": "failed: outer black and content #1a1b1c in dark theme",
+    "consoleErrors": 0,
+    "pageErrors": 0,
+    "observedXHRFetch": 0,
+    "CSPViolationsObserved": 0
+  },
+  "testDataWrites": "none; no task created or policy saved",
+  "limitations": [
+    "Historical Electron preview CLI transport unavailable due long userData path; not applicable as verification of replacement web architecture",
+    "No full CRUD or final acceptance performed"
+  ],
+  "resources": {
+    "scope": "dev-weaver-redesign-preview.scope stopped/inactive",
+    "cdp19481": "released",
+    "agentBrowserSession": "weaver-redesign-acceptance disconnected",
+    "pane": "w2M:p4V closed",
+    "existingUserAppPid": 2919971,
+    "existingUserApp": "retained untouched",
+    "retained": [],
+    "retentionOwner": "parent Agent",
+    "releaseCondition": "met: architecture replaced; no remaining consumers",
+    "reclaimed": [
+      "/tmp/weaver-redesign-3QuXVe/acceptance/preview-build",
+      "/tmp/weaver-redesign-3QuXVe/acceptance/preview-user-data"
+    ]
+  },
+  "architecture": "historical Electron preview only; does not validate skill+CLI+web architecture"
+}

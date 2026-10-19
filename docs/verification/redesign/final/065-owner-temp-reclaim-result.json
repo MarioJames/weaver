@@ -1,0 +1,25 @@
+{
+  "at": "2026-10-19T01:25:42.513506+00:00",
+  "action": "reclaimed exact task-owned disposable temporary root",
+  "removedRoot": "/tmp/weaver-redesign-3QuXVe",
+  "rootAbsent": true,
+  "preflight": "064-owner-cleanup-preflight.json",
+  "consumersBeforeRemoval": [],
+  "mountsWithinRoot": [],
+  "ownedScopesInactive": 28,
+  "removedFiles": 1359,
+  "removedRegularFileBytes": 76467404,
+  "symlinkFileEntriesUnlinkedWithoutFollowing": 3,
+  "persistentPathsPreserved": [
+    "/home/mocha/.local/bin/weaver",
+    "/home/mocha/.local/lib/node_modules/weaver",
+    "/home/mocha/.agents/skills/weaver",
+    "/home/mocha/.local/share/weaver",
+    "/home/mocha/.config/weaver-desktop",
+    "/home/mocha/opensource/weaver/dist",
+    "/home/mocha/opensource/weaver/node_modules"
+  ],
+  "sourceAndEvidence": "repository source, frozen build and final evidence preserved; no project files modified",
+  "userService": "not started/stopped; last observation offline; p52 absent; no broad prefix cleanup",
+  "messages": "persistent coordination evidence retained"
+}

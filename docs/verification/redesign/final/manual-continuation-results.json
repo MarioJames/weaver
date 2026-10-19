@@ -1,0 +1,469 @@
+{
+  "before": {
+    "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+    "ownerId": "e10d7179-11a7-43f7-867c-a6030dedaf0d",
+    "ownerEpoch": 0,
+    "policy": {
+      "idleRotationMinutes": 60
+    },
+    "lastActivityAt": "2026-10-18T23:50:06.480Z",
+    "due": false,
+    "history": [],
+    "contextPack": null
+  },
+  "manualSwitch": {
+    "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+    "ownerId": "9b0cb457-416e-47bc-b4a7-2e66b81092b8",
+    "ownerEpoch": 1,
+    "policy": {
+      "idleRotationMinutes": 60
+    },
+    "lastActivityAt": "2026-10-19T00:26:27.998Z",
+    "due": false,
+    "history": [
+      {
+        "id": "9964cf02-d249-48d7-a96d-cd0b09ba8915",
+        "at": "2026-10-19T00:26:27.998Z",
+        "reason": "manual",
+        "fromOwnerId": "e10d7179-11a7-43f7-867c-a6030dedaf0d",
+        "toOwnerId": "9b0cb457-416e-47bc-b4a7-2e66b81092b8",
+        "fromProfileId": "codex_owner",
+        "toProfileId": "codex_owner",
+        "epoch": 1,
+        "packId": "a98a4983-225a-4ce8-92ed-6a45c0ef1829",
+        "acknowledgementId": null
+      }
+    ],
+    "contextPack": {
+      "version": 1,
+      "id": "a98a4983-225a-4ce8-92ed-6a45c0ef1829",
+      "createdAt": "2026-10-19T00:26:27.998Z",
+      "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+      "ownerEpoch": 1,
+      "goal": "Create proof.txt containing exactly weaver-real-codex and newline. Read it back. Do not touch any other file.",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+      "profile": "codex_owner",
+      "constraints": [
+        "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+      ],
+      "plan": [
+        "Read and write only /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt"
+      ],
+      "decisions": [
+        "Result review: accepted: QA independently verified fixture file and provider terminal output."
+      ],
+      "taskProgress": {
+        "status": "completed",
+        "percent": 100,
+        "summary": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。"
+      },
+      "acceptedArtifacts": [
+        {
+          "id": "b14c639a-1f71-4c76-83be-76f4b65cd77d",
+          "name": "result.md",
+          "mediaType": "text/markdown",
+          "sha256": "8596544fd5571d01a21435cb1ac5321d4e428803327dac666fd0c534a8128043"
+        }
+      ],
+      "pendingApprovals": [],
+      "recentMessages": [
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:04.756Z",
+          "message": "Frozen work package created"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:04.844Z",
+          "message": "Policy selected codex_worker; launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:04.844Z",
+          "message": "Launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex"
+        },
+        {
+          "kind": "artifact",
+          "at": "2026-10-18T23:45:52.381Z",
+          "message": "Received result.md"
+        },
+        {
+          "kind": "result",
+          "at": "2026-10-18T23:45:52.382Z",
+          "message": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:52.383Z",
+          "message": "Worker exited successfully; output is ready for owner review"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:50:06.398Z",
+          "message": "Result receipt acknowledged; acceptance unchanged"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:50:06.480Z",
+          "message": "Owner review: accepted"
+        }
+      ],
+      "baseReferences": {
+        "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+        "packageId": "e51eaf60-f729-4d35-b469-f7dc88de6221",
+        "previousPackId": null
+      },
+      "limitations": [
+        "Bounded snapshot; artifact bodies and full transcripts omitted",
+        "Plan contains recorded work-package scope only; no inferred decisions",
+        "Redaction is best-effort; host transport is not established by this pack",
+        "Idle interval is user policy, not vendor cache retention",
+        "External owner must read this context pack itself",
+        "The real CLI host performs any context switch; Weaver did not start a new AI or reset a vendor cache",
+        "No automatic delivery to, or acknowledgement from, the external host"
+      ]
+    }
+  },
+  "configured1Minute": {
+    "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+    "ownerId": "9b0cb457-416e-47bc-b4a7-2e66b81092b8",
+    "ownerEpoch": 1,
+    "policy": {
+      "idleRotationMinutes": 1
+    },
+    "lastActivityAt": "2026-10-19T00:26:28.134Z",
+    "due": false,
+    "history": [
+      {
+        "id": "9964cf02-d249-48d7-a96d-cd0b09ba8915",
+        "at": "2026-10-19T00:26:27.998Z",
+        "reason": "manual",
+        "fromOwnerId": "e10d7179-11a7-43f7-867c-a6030dedaf0d",
+        "toOwnerId": "9b0cb457-416e-47bc-b4a7-2e66b81092b8",
+        "fromProfileId": "codex_owner",
+        "toProfileId": "codex_owner",
+        "epoch": 1,
+        "packId": "a98a4983-225a-4ce8-92ed-6a45c0ef1829",
+        "acknowledgementId": null
+      }
+    ],
+    "contextPack": {
+      "version": 1,
+      "id": "a98a4983-225a-4ce8-92ed-6a45c0ef1829",
+      "createdAt": "2026-10-19T00:26:27.998Z",
+      "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+      "ownerEpoch": 1,
+      "goal": "Create proof.txt containing exactly weaver-real-codex and newline. Read it back. Do not touch any other file.",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+      "profile": "codex_owner",
+      "constraints": [
+        "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+      ],
+      "plan": [
+        "Read and write only /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt"
+      ],
+      "decisions": [
+        "Result review: accepted: QA independently verified fixture file and provider terminal output."
+      ],
+      "taskProgress": {
+        "status": "completed",
+        "percent": 100,
+        "summary": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。"
+      },
+      "acceptedArtifacts": [
+        {
+          "id": "b14c639a-1f71-4c76-83be-76f4b65cd77d",
+          "name": "result.md",
+          "mediaType": "text/markdown",
+          "sha256": "8596544fd5571d01a21435cb1ac5321d4e428803327dac666fd0c534a8128043"
+        }
+      ],
+      "pendingApprovals": [],
+      "recentMessages": [
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:04.756Z",
+          "message": "Frozen work package created"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:04.844Z",
+          "message": "Policy selected codex_worker; launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:04.844Z",
+          "message": "Launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex"
+        },
+        {
+          "kind": "artifact",
+          "at": "2026-10-18T23:45:52.381Z",
+          "message": "Received result.md"
+        },
+        {
+          "kind": "result",
+          "at": "2026-10-18T23:45:52.382Z",
+          "message": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:52.383Z",
+          "message": "Worker exited successfully; output is ready for owner review"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:50:06.398Z",
+          "message": "Result receipt acknowledged; acceptance unchanged"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:50:06.480Z",
+          "message": "Owner review: accepted"
+        }
+      ],
+      "baseReferences": {
+        "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+        "packageId": "e51eaf60-f729-4d35-b469-f7dc88de6221",
+        "previousPackId": null
+      },
+      "limitations": [
+        "Bounded snapshot; artifact bodies and full transcripts omitted",
+        "Plan contains recorded work-package scope only; no inferred decisions",
+        "Redaction is best-effort; host transport is not established by this pack",
+        "Idle interval is user policy, not vendor cache retention",
+        "External owner must read this context pack itself",
+        "The real CLI host performs any context switch; Weaver did not start a new AI or reset a vendor cache",
+        "No automatic delivery to, or acknowledgement from, the external host"
+      ]
+    }
+  },
+  "notRealHostReset": true,
+  "actualElapsedSeconds": 121.60393524169922,
+  "idleDueAfterRealWait": {
+    "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+    "ownerId": "9b0cb457-416e-47bc-b4a7-2e66b81092b8",
+    "ownerEpoch": 1,
+    "policy": {
+      "idleRotationMinutes": 1
+    },
+    "lastActivityAt": "2026-10-19T00:26:28.134Z",
+    "due": true,
+    "history": [
+      {
+        "id": "9964cf02-d249-48d7-a96d-cd0b09ba8915",
+        "at": "2026-10-19T00:26:27.998Z",
+        "reason": "manual",
+        "fromOwnerId": "e10d7179-11a7-43f7-867c-a6030dedaf0d",
+        "toOwnerId": "9b0cb457-416e-47bc-b4a7-2e66b81092b8",
+        "fromProfileId": "codex_owner",
+        "toProfileId": "codex_owner",
+        "epoch": 1,
+        "packId": "a98a4983-225a-4ce8-92ed-6a45c0ef1829",
+        "acknowledgementId": null
+      }
+    ],
+    "contextPack": {
+      "version": 1,
+      "id": "a98a4983-225a-4ce8-92ed-6a45c0ef1829",
+      "createdAt": "2026-10-19T00:26:27.998Z",
+      "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+      "ownerEpoch": 1,
+      "goal": "Create proof.txt containing exactly weaver-real-codex and newline. Read it back. Do not touch any other file.",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+      "profile": "codex_owner",
+      "constraints": [
+        "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+      ],
+      "plan": [
+        "Read and write only /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt"
+      ],
+      "decisions": [
+        "Result review: accepted: QA independently verified fixture file and provider terminal output."
+      ],
+      "taskProgress": {
+        "status": "completed",
+        "percent": 100,
+        "summary": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。"
+      },
+      "acceptedArtifacts": [
+        {
+          "id": "b14c639a-1f71-4c76-83be-76f4b65cd77d",
+          "name": "result.md",
+          "mediaType": "text/markdown",
+          "sha256": "8596544fd5571d01a21435cb1ac5321d4e428803327dac666fd0c534a8128043"
+        }
+      ],
+      "pendingApprovals": [],
+      "recentMessages": [
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:04.756Z",
+          "message": "Frozen work package created"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:04.844Z",
+          "message": "Policy selected codex_worker; launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:04.844Z",
+          "message": "Launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex"
+        },
+        {
+          "kind": "artifact",
+          "at": "2026-10-18T23:45:52.381Z",
+          "message": "Received result.md"
+        },
+        {
+          "kind": "result",
+          "at": "2026-10-18T23:45:52.382Z",
+          "message": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:52.383Z",
+          "message": "Worker exited successfully; output is ready for owner review"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:50:06.398Z",
+          "message": "Result receipt acknowledged; acceptance unchanged"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:50:06.480Z",
+          "message": "Owner review: accepted"
+        }
+      ],
+      "baseReferences": {
+        "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+        "packageId": "e51eaf60-f729-4d35-b469-f7dc88de6221",
+        "previousPackId": null
+      },
+      "limitations": [
+        "Bounded snapshot; artifact bodies and full transcripts omitted",
+        "Plan contains recorded work-package scope only; no inferred decisions",
+        "Redaction is best-effort; host transport is not established by this pack",
+        "Idle interval is user policy, not vendor cache retention",
+        "External owner must read this context pack itself",
+        "The real CLI host performs any context switch; Weaver did not start a new AI or reset a vendor cache",
+        "No automatic delivery to, or acknowledgement from, the external host"
+      ]
+    }
+  },
+  "afterOwnerActivity": {
+    "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+    "ownerId": "9b0cb457-416e-47bc-b4a7-2e66b81092b8",
+    "ownerEpoch": 1,
+    "policy": {
+      "idleRotationMinutes": 1
+    },
+    "lastActivityAt": "2026-10-19T00:28:29.911Z",
+    "due": false,
+    "history": [
+      {
+        "id": "9964cf02-d249-48d7-a96d-cd0b09ba8915",
+        "at": "2026-10-19T00:26:27.998Z",
+        "reason": "manual",
+        "fromOwnerId": "e10d7179-11a7-43f7-867c-a6030dedaf0d",
+        "toOwnerId": "9b0cb457-416e-47bc-b4a7-2e66b81092b8",
+        "fromProfileId": "codex_owner",
+        "toProfileId": "codex_owner",
+        "epoch": 1,
+        "packId": "a98a4983-225a-4ce8-92ed-6a45c0ef1829",
+        "acknowledgementId": null
+      }
+    ],
+    "contextPack": {
+      "version": 1,
+      "id": "a98a4983-225a-4ce8-92ed-6a45c0ef1829",
+      "createdAt": "2026-10-19T00:26:27.998Z",
+      "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+      "ownerEpoch": 1,
+      "goal": "Create proof.txt containing exactly weaver-real-codex and newline. Read it back. Do not touch any other file.",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+      "profile": "codex_owner",
+      "constraints": [
+        "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+      ],
+      "plan": [
+        "Read and write only /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt"
+      ],
+      "decisions": [
+        "Result review: accepted: QA independently verified fixture file and provider terminal output."
+      ],
+      "taskProgress": {
+        "status": "completed",
+        "percent": 100,
+        "summary": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。"
+      },
+      "acceptedArtifacts": [
+        {
+          "id": "b14c639a-1f71-4c76-83be-76f4b65cd77d",
+          "name": "result.md",
+          "mediaType": "text/markdown",
+          "sha256": "8596544fd5571d01a21435cb1ac5321d4e428803327dac666fd0c534a8128043"
+        }
+      ],
+      "pendingApprovals": [],
+      "recentMessages": [
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:04.756Z",
+          "message": "Frozen work package created"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:04.844Z",
+          "message": "Policy selected codex_worker; launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:04.844Z",
+          "message": "Launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex"
+        },
+        {
+          "kind": "artifact",
+          "at": "2026-10-18T23:45:52.381Z",
+          "message": "Received result.md"
+        },
+        {
+          "kind": "result",
+          "at": "2026-10-18T23:45:52.382Z",
+          "message": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:45:52.383Z",
+          "message": "Worker exited successfully; output is ready for owner review"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:50:06.398Z",
+          "message": "Result receipt acknowledged; acceptance unchanged"
+        },
+        {
+          "kind": "lifecycle",
+          "at": "2026-10-18T23:50:06.480Z",
+          "message": "Owner review: accepted"
+        }
+      ],
+      "baseReferences": {
+        "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+        "packageId": "e51eaf60-f729-4d35-b469-f7dc88de6221",
+        "previousPackId": null
+      },
+      "limitations": [
+        "Bounded snapshot; artifact bodies and full transcripts omitted",
+        "Plan contains recorded work-package scope only; no inferred decisions",
+        "Redaction is best-effort; host transport is not established by this pack",
+        "Idle interval is user policy, not vendor cache retention",
+        "External owner must read this context pack itself",
+        "The real CLI host performs any context switch; Weaver did not start a new AI or reset a vendor cache",
+        "No automatic delivery to, or acknowledgement from, the external host"
+      ]
+    }
+  },
+  "noAutomaticManualHostRotation": true
+}

@@ -1,0 +1,27 @@
+{
+  "finalSource": "060",
+  "runtimeBuild": "055",
+  "profile": "/tmp/weaver-redesign-3QuXVe/final-report",
+  "origin": "file:///home/mocha/opensource/weaver/docs/verification/redesign/final/REPORT.html",
+  "mainConclusion": "验收通过，保留供应商可用性限制。\n\nCLI、调度、普通网页、三家真实文件交付与 Codex Owner 恢复闭环均有实机证据。Grok 余额耗尽；Pi recovery 遇供应商连接失败；真实 Owner 的旧临时根越界已保留原 CONDITIONAL，并经技能边界修复及新 staged 只读实机复验闭环；最新 ACC 合法 PASS/cleanup。没有把供应商失败写成成功。",
+  "viewport900": {
+    "externalResources": 0,
+    "scroll": 900,
+    "width": 900
+  },
+  "viewport390": {
+    "scroll": 390,
+    "width": 390
+  },
+  "linksChecked": 63,
+  "brokenOrExternalLinks": [],
+  "print": {
+    "actualChromePDF": true,
+    "pages": 6,
+    "mainConclusionPresent": true,
+    "boundaryPassPresent": true,
+    "resourceSectionPresent": true,
+    "oldConditionalPreserved": true
+  },
+  "postReadResourceFactUpdate": "After final actual HTML/print read, resource-only wording replaced with observed Chrome/profile release and owner064/065 root reclaim. No layout/interaction/evaluation changes; no browser/service recreated."
+}

@@ -1,0 +1,118 @@
+{
+  "app": {
+    "background": "rgba(0, 0, 0, 0)",
+    "class": "css-dev-only-do-not-override-jdb7z4 ant-app acss-1t4jz3n css-var-_r_1_",
+    "display": "flex",
+    "flex": "1 1 auto",
+    "height": "800px",
+    "minHeight": "0px",
+    "minWidth": "0px",
+    "rect": {
+      "bottom": 800,
+      "height": 800,
+      "left": 0,
+      "right": 960,
+      "top": 0,
+      "width": 960,
+      "x": 0,
+      "y": 0
+    },
+    "tag": "DIV",
+    "width": "960px"
+  },
+  "aside": [
+    {
+      "background": "rgb(245, 250, 244)",
+      "class": "acss-7ozk3d",
+      "display": "flex",
+      "flex": "0 0 auto",
+      "height": "800px",
+      "minHeight": "0px",
+      "minWidth": "0px",
+      "rect": {
+        "bottom": 800,
+        "height": 800,
+        "left": 0,
+        "right": 208,
+        "top": 0,
+        "width": 208,
+        "x": 0,
+        "y": 0
+      },
+      "tag": "ASIDE",
+      "width": "208px"
+    },
+    {
+      "background": "rgba(0, 0, 0, 0)",
+      "class": "acss-51texs",
+      "display": "flex",
+      "flex": "0 1 auto",
+      "height": "680px",
+      "minHeight": "auto",
+      "minWidth": "0px",
+      "rect": {
+        "bottom": 1553.28125,
+        "height": 680,
+        "left": 468,
+        "right": 948,
+        "top": 873.28125,
+        "width": 480,
+        "x": 468,
+        "y": 873.28125
+      },
+      "tag": "ASIDE",
+      "width": "480px"
+    }
+  ],
+  "doc": [
+    960,
+    960
+  ],
+  "headerCount": 0,
+  "main": {
+    "background": "rgb(245, 250, 244)",
+    "class": "acss-14k9695",
+    "display": "flex",
+    "flex": "1 1 0%",
+    "height": "800px",
+    "minHeight": "0px",
+    "minWidth": "0px",
+    "rect": {
+      "bottom": 800,
+      "height": 800,
+      "left": 208,
+      "right": 960,
+      "top": 0,
+      "width": 752,
+      "x": 208,
+      "y": 0
+    },
+    "tag": "MAIN",
+    "width": "752px"
+  },
+  "root": {
+    "background": "rgba(0, 0, 0, 0)",
+    "class": "",
+    "display": "flex",
+    "flex": "0 1 auto",
+    "height": "800px",
+    "minHeight": "0px",
+    "minWidth": "0px",
+    "rect": {
+      "bottom": 800,
+      "height": 800,
+      "left": 0,
+      "right": 960,
+      "top": 0,
+      "width": 960,
+      "x": 0,
+      "y": 0
+    },
+    "tag": "DIV",
+    "width": "960px"
+  },
+  "viewport": [
+    960,
+    800
+  ]
+}

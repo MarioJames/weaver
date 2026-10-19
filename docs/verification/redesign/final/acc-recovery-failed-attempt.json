@@ -1,0 +1,311 @@
+{
+  "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery",
+  "acceptanceCriteria": [
+    "原有 test.mjs 第一行逐字保留，原有样例与断言不变；node --test test.mjs 最终全部通过。",
+    "importRows 正确返回 {items,errors}，已有记录按原顺序保留，合法新行按输入顺序追加。",
+    "非法行/缺失或空 id/title/已有及本批重复 ID 各自返回可定位错误，拒绝项不覆盖已有任务，后续合法行继续且成功项不回滚。",
+    "existing/rows 及记录不变，空输入和失败后的相邻逻辑有真实回归测试。",
+    "只修改 importer.mjs 和 test.mjs，不改数据样例、不加依赖、不提交。"
+  ],
+  "constraints": [
+    "唯一允许修改的文件是本目录 importer.mjs 与 test.mjs。其他任何文件（包括 README.md、原有数据样例、其他 fixture）全部只读；不创建新文件、配置、依赖、报告、临时文件。",
+    "test.mjs 现有第一行必须逐字保留，含已有样例、import、测试名称及所有断言，只允许在文件末尾追加新的行为测试；不得删除、改写、跳过或弱化已有断言，不通过更改期望掩盖错误。",
+    "先复现已有测试，并实际运行 node --test test.mjs。测试仅调用真实导出函数，使用现有 node:test、node:assert 的 test 与 a 别名，不 mock 实现、不加依赖。",
+    "新增边界测试覆盖空existing/空rows、已有顺序和新行顺序、null/非对象/数组行、缺失或空/非法id/title、与existing和本批重复、重复后原记录不变、坏行之后有效行继续、每条错误索引/ID/可读信息、原输入不变（可冻结输入验证）及原有字段保留。",
+    "同一 ID 的非法新行不得占用 ID 阻止后续合法行；合法新行也不得修改已有任务。仅以成功接受的 ID 更新本批唯一集合。",
+    "不重构或修改其他 fixture 模块，不依赖其他 fixture 源码，不更换框架，不加依赖，不访问网络业务服务，不提交或推送 Git。",
+    "你是 Worker：不再委派、不调用 Weaver/Herdr 或其他调度器、不执行 Owner 操作、不修改调度配置、不停止共享验收服务、不与用户通信。",
+    "完成后以 Weaver 结果返回简洁实际改动、原测试失败证据、修复后的完整测试命令与通过/失败计数、限制；不写磁盘报告。"
+  ],
+  "title": "修复任务导入：保留有效行并报告逐行错误",
+  "instruction": "在 fixture/recovery 中修复 importer.mjs 的 importRows(existing,rows)。先运行 node --test test.mjs 确认原失败（Owner 已独立复现：1项失败，r.items 为 undefined），再追加真实边界测试并修复。返回 {items,errors}，items 按原顺序保留所有 existing 任务，追加有效且 ID 不重复的新行。每个新行必须是非 null、非数组的对象，id/title 均为非空字符串（空白字符串也拒绝，正常字符串不修剪或转换）；重复 ID 包括与 existing 及此前已成功新行重复者，一律拒绝，不覆盖。逐行处理，坏行返回明确可定位错误，但不撤销其他合法项且继续处理后续行。errors 为每个拒绝行一项，含从0开始的 index、id（缺失用null）和可读非空 message。保持 existing/rows 数组和记录原样，不修改、排序或清理原输入；保留输入记录的其他字段。空rows原样保留existing，空existing支持正常导入。仅修改 importer.mjs 和 test.mjs。",
+  "id": "a146d348-8ab2-4b81-b4d1-295b39725d6a",
+  "createdAt": "2026-10-19T00:26:44.584Z",
+  "updatedAt": "2026-10-19T00:29:10.715Z",
+  "status": "failed",
+  "revision": 40,
+  "reviewState": "pending",
+  "progress": 20,
+  "events": [
+    {
+      "id": "320a4ff0-d84f-446d-b25f-bad7c2303f19",
+      "at": "2026-10-19T00:26:44.584Z",
+      "kind": "lifecycle",
+      "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+    },
+    {
+      "id": "056522b5-49a4-4b83-b8c0-0016be86720a",
+      "at": "2026-10-19T00:26:44.634Z",
+      "kind": "lifecycle",
+      "message": "Frozen work package created"
+    },
+    {
+      "id": "d91d8541-e9d1-4cf1-88bf-3716ed0d7b18",
+      "at": "2026-10-19T00:26:44.733Z",
+      "kind": "lifecycle",
+      "message": "Policy selected qa_a_worker; launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery"
+    },
+    {
+      "id": "16c55c3d-41fd-42b2-9dd6-f8a9ac0707a9",
+      "at": "2026-10-19T00:26:44.734Z",
+      "kind": "lifecycle",
+      "message": "Launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery"
+    },
+    {
+      "id": "94b34850-11de-4ae8-a4f4-c588ec8d9baf",
+      "at": "2026-10-19T00:26:44.744Z",
+      "kind": "log",
+      "message": "Launching pi with requested model cc-switch-agentplan/glm-5.3-flash"
+    },
+    {
+      "id": "42b36f15-9ad8-49ed-8e72-e46d35de5af9",
+      "at": "2026-10-19T00:26:44.745Z",
+      "kind": "log",
+      "message": "pi --approve trusts project files for this run; it is not OS isolation"
+    },
+    {
+      "id": "fb833f5c-3f52-493e-ac49-dd17145f8c5f",
+      "at": "2026-10-19T00:26:44.746Z",
+      "kind": "progress",
+      "message": "owned scope started"
+    },
+    {
+      "id": "b270fb20-b17b-4e65-8315-6c9edda7d4ab",
+      "at": "2026-10-19T00:26:44.942Z",
+      "kind": "progress",
+      "message": "pi agent started"
+    },
+    {
+      "id": "0e032e3f-f4e1-4b5a-92d6-3d26ec3f2e70",
+      "at": "2026-10-19T00:26:49.572Z",
+      "kind": "log",
+      "message": "tool started bash"
+    },
+    {
+      "id": "2b6ccd8c-8c5c-4246-95c9-cfa2558e0459",
+      "at": "2026-10-19T00:26:49.574Z",
+      "kind": "log",
+      "message": "tool started read"
+    },
+    {
+      "id": "cf1a767c-a690-444b-af3c-960ec9abe42a",
+      "at": "2026-10-19T00:26:49.575Z",
+      "kind": "log",
+      "message": "tool started read"
+    },
+    {
+      "id": "78bbd655-b15a-4732-b101-47da874221c6",
+      "at": "2026-10-19T00:26:49.581Z",
+      "kind": "log",
+      "message": "tool finished bash"
+    },
+    {
+      "id": "e33a5baa-80da-4f9e-8b17-42f64754d786",
+      "at": "2026-10-19T00:26:49.583Z",
+      "kind": "log",
+      "message": "tool finished read"
+    },
+    {
+      "id": "27b66234-9158-4f47-9112-4e69d0b10fe9",
+      "at": "2026-10-19T00:26:49.584Z",
+      "kind": "log",
+      "message": "tool finished read"
+    },
+    {
+      "id": "12259ae5-198e-4f4a-85aa-6d904621a8f6",
+      "at": "2026-10-19T00:26:53.836Z",
+      "kind": "log",
+      "message": "tool started bash"
+    },
+    {
+      "id": "d4a8ddc7-3574-46ee-8eaa-9f35702bd092",
+      "at": "2026-10-19T00:26:53.903Z",
+      "kind": "log",
+      "message": "tool finished bash"
+    },
+    {
+      "id": "278adad0-4f19-4c34-90a3-8e5d3d549ffc",
+      "at": "2026-10-19T00:27:01.227Z",
+      "kind": "log",
+      "message": "tool started write"
+    },
+    {
+      "id": "4e11bc58-3bce-423e-8db9-e9d71f5d86a5",
+      "at": "2026-10-19T00:27:01.229Z",
+      "kind": "log",
+      "message": "tool finished write"
+    },
+    {
+      "id": "ed74956e-6822-44c3-bc28-f3e0ecb28758",
+      "at": "2026-10-19T00:27:30.272Z",
+      "kind": "log",
+      "message": "tool started edit"
+    },
+    {
+      "id": "52838af4-9ac6-49cd-87db-bb24d02991ae",
+      "at": "2026-10-19T00:27:30.276Z",
+      "kind": "log",
+      "message": "tool finished edit"
+    },
+    {
+      "id": "db6b52ec-a718-4101-9def-869270442132",
+      "at": "2026-10-19T00:27:35.053Z",
+      "kind": "log",
+      "message": "tool started bash"
+    },
+    {
+      "id": "d2118a85-d0ec-49b7-9e0e-b620ed207619",
+      "at": "2026-10-19T00:27:35.118Z",
+      "kind": "log",
+      "message": "tool finished bash"
+    },
+    {
+      "id": "a3e10e11-0572-4007-9f33-ecd0cb99b5f6",
+      "at": "2026-10-19T00:27:41.417Z",
+      "kind": "log",
+      "message": "tool started edit"
+    },
+    {
+      "id": "5b3c2f69-e059-46d0-80f3-75e8a4e1aa80",
+      "at": "2026-10-19T00:27:41.420Z",
+      "kind": "log",
+      "message": "tool finished edit"
+    },
+    {
+      "id": "75303594-ddf5-4608-8421-4fdf18cc5dcf",
+      "at": "2026-10-19T00:27:45.551Z",
+      "kind": "log",
+      "message": "tool started bash"
+    },
+    {
+      "id": "58041ca7-2c31-4efd-8d57-42bc48745ee4",
+      "at": "2026-10-19T00:27:45.617Z",
+      "kind": "log",
+      "message": "tool finished bash"
+    },
+    {
+      "id": "8cb46f29-c3c9-474e-bbde-f3cdde719088",
+      "at": "2026-10-19T00:27:49.022Z",
+      "kind": "log",
+      "message": "tool started bash"
+    },
+    {
+      "id": "27323936-d654-4913-b7dc-691161b89c67",
+      "at": "2026-10-19T00:27:49.096Z",
+      "kind": "log",
+      "message": "tool failed bash"
+    },
+    {
+      "id": "abfb760e-eeac-45c0-b7b1-10bbbf0d459b",
+      "at": "2026-10-19T00:27:54.759Z",
+      "kind": "log",
+      "message": "tool started bash"
+    },
+    {
+      "id": "78d41d23-e83f-49c9-8751-1d75a7180da9",
+      "at": "2026-10-19T00:27:54.821Z",
+      "kind": "log",
+      "message": "tool finished bash"
+    },
+    {
+      "id": "e5c8281d-c5fb-4089-a13d-cf21a7d13ac6",
+      "at": "2026-10-19T00:28:03.221Z",
+      "kind": "log",
+      "message": "tool started bash"
+    },
+    {
+      "id": "0001fb5c-2081-40a1-ba55-3c2a97509741",
+      "at": "2026-10-19T00:28:03.229Z",
+      "kind": "log",
+      "message": "tool failed bash"
+    },
+    {
+      "id": "77df9a6f-3d35-4283-81f6-baacb064a3d3",
+      "at": "2026-10-19T00:28:14.314Z",
+      "kind": "log",
+      "message": "tool started bash"
+    },
+    {
+      "id": "9ef24bb4-a8bf-4a3f-bc48-4030e5784f27",
+      "at": "2026-10-19T00:28:14.323Z",
+      "kind": "log",
+      "message": "tool finished bash"
+    },
+    {
+      "id": "739a395b-f9d4-4a6e-9adf-9ef25a70112a",
+      "at": "2026-10-19T00:28:55.473Z",
+      "kind": "log",
+      "message": "tool started bash"
+    },
+    {
+      "id": "cd9f7941-0a2d-4a09-9e9f-134f1bc0aff5",
+      "at": "2026-10-19T00:28:55.543Z",
+      "kind": "log",
+      "message": "tool finished bash"
+    },
+    {
+      "id": "f1ce6da4-c1e5-4bfc-9cb5-ee256191f1be",
+      "at": "2026-10-19T00:29:10.714Z",
+      "kind": "log",
+      "message": "vendor terminal truncated exit 143"
+    },
+    {
+      "id": "22373717-5b98-4656-a3df-38fbe4300c59",
+      "at": "2026-10-19T00:29:10.715Z",
+      "kind": "error",
+      "message": "Worker exited without successful result (code 143, signal SIGTERM)"
+    }
+  ],
+  "artifacts": [],
+  "ownerId": "976f10d7-5b67-4d3d-be5e-89d62ce7dd5a",
+  "ownerEpoch": 0,
+  "ownerLastActivityAt": "2026-10-19T00:26:44.584Z",
+  "continuationPolicy": {
+    "idleRotationMinutes": 60
+  },
+  "packageId": "4da0d03d-0d33-45f5-a805-cb5c80dce5ea",
+  "dispatch": {
+    "owner": "codex_owner",
+    "worker": "qa_a_worker",
+    "engine": "pi",
+    "model": "cc-switch-agentplan/glm-5.3-flash",
+    "effort": "high",
+    "execution": "real",
+    "maxParallel": 2,
+    "maxWaitMinutes": 10,
+    "adapter": "pi",
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery",
+    "workspaceIdentity": "38:1726982",
+    "engineKind": "pi"
+  },
+  "scheduled": false,
+  "run": {
+    "id": "09fed6aa-2465-4e03-bc4e-fee59bce40f9",
+    "adapter": "pi",
+    "execution": "real",
+    "status": "stopped",
+    "startedAt": "2026-10-19T00:26:44.734Z",
+    "timeoutMs": 600000,
+    "engine": "pi",
+    "model": "cc-switch-agentplan/glm-5.3-flash",
+    "effort": "high",
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery",
+    "scopeUnit": "weaver-cli-pi-1e06b552",
+    "evidence": {
+      "engine": "pi",
+      "requestedModel": "cc-switch-agentplan/glm-5.3-flash",
+      "requestedEffort": "high",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-195103-c0ad8b/fixture/recovery",
+      "terminal": "truncated",
+      "role": "worker",
+      "vendorModel": "cc-switch-agentplan/glm-5.3-flash",
+      "vendorSessionId": "01a1518d-b92c-7471-9d8c-ae17e8d7eaa9",
+      "usage": {
+        "inputTokens": 325,
+        "outputTokens": 1388
+      }
+    },
+    "endedAt": "2026-10-19T00:29:10.715Z",
+    "exitCode": 143
+  }
+}

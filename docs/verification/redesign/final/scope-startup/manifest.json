@@ -1,0 +1,31 @@
+{
+  "sourceMessage": "049",
+  "kind": "owner-reviewed independent integration fixture; QA archives, does not claim QA executed these fixtures",
+  "files": [
+    {
+      "file": "red.json",
+      "sha256": "8d0c19bac9c8be68519cca0a97963f26608a941b6cadcedbe92ad692567e6888",
+      "source": "/tmp/weaver-redesign-3QuXVe/integration-scope-startup/red.json"
+    },
+    {
+      "file": "line-red.json",
+      "sha256": "fe08252c17b17931abae88e005bae19772517c611b293072fae75c8072d1547e",
+      "source": "/tmp/weaver-redesign-3QuXVe/integration-scope-startup/line-red.json"
+    },
+    {
+      "file": "green.json",
+      "sha256": "2b2a48662b122f2529a3fee4183d9923e1fd19acf61b558045fba77f16dff2b3",
+      "source": "/tmp/weaver-redesign-3QuXVe/integration-scope-startup/green.json"
+    },
+    {
+      "file": "cleanup.json",
+      "sha256": "565875c87e95519cafb315c2fd686746696dd00e6b54ac5fc08a7e79cc8730fd",
+      "source": "/tmp/weaver-redesign-3QuXVe/integration-scope-startup/cleanup.json"
+    },
+    {
+      "file": "decode-lines-probe.json",
+      "sha256": "5b96ed70e82a7538ff6c28195c29b1e270d673725c3175ea6d335098145a1271",
+      "source": "/tmp/weaver-redesign-3QuXVe/integration-scope-startup/decode-lines-probe.json"
+    }
+  ]
+}

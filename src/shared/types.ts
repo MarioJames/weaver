@@ -1,12 +1,27 @@
 import type { PolicySnapshot, SavePolicyInput, PreviewInput, RoutePreview, Issue } from "./policy";
+import type { EngineProbeRecord, EngineReadiness, ExecutionBoundary } from "./engines";
+export type { EngineProbeRecord, EngineReadiness };
+export interface EngineScan { probedAt: string; probes: EngineProbeRecord[]; readiness: EngineReadiness[]; boundary: ExecutionBoundary }
+export interface EngineToggleInput { id: string; enabled: boolean; revision: number }
+export interface EngineToggleResult { snapshot: PolicySnapshot; probe: EngineProbeRecord | null; readiness: EngineReadiness[] }
 export type TaskStatus = 'queued' | 'running' | 'cancelling' | 'completed' | 'failed' | 'cancelled';
 export type AgentStatus = 'idle' | 'running' | 'stopping' | 'stopped';
 export interface OwnerRef { name: string; transport: 'herdr-visible'; session: string; pane: string }
 export interface TaskInput { workspace?: string; acceptanceCriteria?: string[]; constraints?: string[]; title: string; instruction: string; owner: OwnerRef }
 export interface Artifact { id: string; name: string; mediaType: 'text/plain' | 'text/markdown' | 'application/json'; content: string; createdAt: string }
 export interface TaskEvent { id: string; at: string; kind: 'lifecycle' | 'log' | 'progress' | 'artifact' | 'result' | 'error'; message: string }
-export interface AgentRun { id: string; adapter: 'mock-jsonl'; status: AgentStatus; pid?: number; startedAt?: string; endedAt?: string; exitCode?: number | null }
-export interface Task extends TaskInput { ownerEpoch?: number; ownerLastActivityAt?: string; continuationPolicy?: import('../main/continuation').ContinuationPolicy; continuationHistory?: import('../main/continuation').HandoffRecord[]; contextPack?: import('../main/continuation').ContextPack; revision?: number; scheduled?: boolean; retryOf?: string; ownerId?: string; packageId?: string; acknowledged?: boolean; reviewState?: 'pending' | 'accepted' | 'rejected'; reviewComment?: string; dispatch?: {owner:string;worker:string;engine:string;model:string;effort:string;execution:'mock';maxParallel:number}; id: string; createdAt: string; updatedAt: string; status: TaskStatus; progress: number; events: TaskEvent[]; artifacts: Artifact[]; run?: AgentRun; summary?: string }
+export interface TaskDispatch {
+  owner: string; worker: string; engine: string; model: string; effort: string;
+  execution: 'real' | 'mock'; maxParallel: number; maxWaitMinutes?: number;
+  adapter?: string; workspace?: string; engineKind?: string; workspaceIdentity?: string;
+}
+export interface AgentRun {
+  id: string; adapter: string; execution?: 'real' | 'mock'; status: AgentStatus;
+  engine?: string; model?: string; effort?: string; workspace?: string; timeoutMs?: number;
+  scopeUnit?: string; evidence?: import('../main/adapters/cli/types').CliAgentEvidence;
+  pid?: number; startedAt?: string; endedAt?: string; exitCode?: number | null;
+}
+export interface Task extends TaskInput { ownerEpoch?: number; ownerLastActivityAt?: string; continuationPolicy?: import('../main/continuation').ContinuationPolicy; continuationHistory?: import('../main/continuation').HandoffRecord[]; contextPack?: import('../main/continuation').ContextPack; revision?: number; scheduled?: boolean; queueReason?: { code: 'waiting_for_capacity' | 'policy_blocked' | 'frozen_route_changed' | 'workspace_changed' | 'launch_blocked'; message: string }; retryOf?: string; ownerId?: string; packageId?: string; acknowledged?: boolean; reviewState?: 'pending' | 'accepted' | 'rejected'; reviewComment?: string; dispatch?: TaskDispatch; id: string; createdAt: string; updatedAt: string; status: TaskStatus; progress: number; events: TaskEvent[]; artifacts: Artifact[]; run?: AgentRun; summary?: string }
 export type WorkerRecord =
  | { type: 'log'; message: string }
  | { type: 'progress'; percent: number; message: string }
@@ -19,6 +34,8 @@ export interface WeaverAPI {
  validatePolicy(config: unknown): Promise<Issue[]>;
  savePolicy(input: SavePolicyInput): Promise<PolicySnapshot>;
  previewRoute(input: PreviewInput): Promise<RoutePreview>;
+ scanEngines(): Promise<EngineScan>;
+ setEngineEnabled(input: EngineToggleInput): Promise<EngineToggleResult>;
  listTasks(): Promise<Task[]>;
  createTask(input: TaskInput): Promise<Task>;
  importTask(): Promise<Task | null>;

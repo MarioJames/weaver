@@ -1,0 +1,369 @@
+{
+  "errors": [
+    {
+      "command": [
+        "not-a-command"
+      ],
+      "format": "json",
+      "result": {
+        "exit": 1,
+        "response": {
+          "apiVersion": "weaver.v1",
+          "commandId": null,
+          "ok": false,
+          "error": {
+            "code": "INVALID_ARGUMENT",
+            "message": "Unknown command. Run weaver --help for the catalog.",
+            "retryable": false
+          }
+        },
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "tasks",
+        "get",
+        "--bad-flag"
+      ],
+      "format": "json",
+      "result": {
+        "exit": 1,
+        "response": {
+          "apiVersion": "weaver.v1",
+          "commandId": null,
+          "ok": false,
+          "error": {
+            "code": "INVALID_ARGUMENT",
+            "message": "Unknown option --bad-flag",
+            "retryable": false
+          }
+        },
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "web",
+        "--port",
+        "-1"
+      ],
+      "format": "json",
+      "result": {
+        "exit": 1,
+        "response": {
+          "apiVersion": "weaver.v1",
+          "commandId": null,
+          "ok": false,
+          "error": {
+            "code": "INVALID_ARGUMENT",
+            "message": "Port must be an integer from 0 through 65535",
+            "retryable": false
+          }
+        },
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "owners",
+        "continuation",
+        "get"
+      ],
+      "format": "json",
+      "result": {
+        "exit": 1,
+        "response": {
+          "apiVersion": "weaver.v1",
+          "commandId": "57b9ba56-0575-4ecc-9fd8-28e95b736ad0",
+          "ok": false,
+          "error": {
+            "code": "INVALID_REQUEST",
+            "message": "Invalid task ID (maximum 36 characters)",
+            "retryable": false
+          }
+        },
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "tasks",
+        "watch",
+        "--for",
+        "0"
+      ],
+      "format": "json",
+      "result": {
+        "exit": 1,
+        "response": {
+          "apiVersion": "weaver.v1",
+          "commandId": null,
+          "ok": false,
+          "error": {
+            "code": "INVALID_ARGUMENT",
+            "message": "--for must be a whole number of seconds from 1 through 600",
+            "retryable": false
+          }
+        },
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "not-a-command"
+      ],
+      "format": "jsonl",
+      "result": {
+        "exit": 1,
+        "stdout": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":false,\"error\":{\"code\":\"INVALID_ARGUMENT\",\"message\":\"Unknown command. Run weaver --help for the catalog.\",\"retryable\":false}}\n",
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "tasks",
+        "get",
+        "--bad-flag"
+      ],
+      "format": "jsonl",
+      "result": {
+        "exit": 1,
+        "stdout": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":false,\"error\":{\"code\":\"INVALID_ARGUMENT\",\"message\":\"Unknown option --bad-flag\",\"retryable\":false}}\n",
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "web",
+        "--port",
+        "-1"
+      ],
+      "format": "jsonl",
+      "result": {
+        "exit": 1,
+        "stdout": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":false,\"error\":{\"code\":\"INVALID_ARGUMENT\",\"message\":\"Port must be an integer from 0 through 65535\",\"retryable\":false}}\n",
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "owners",
+        "continuation",
+        "get"
+      ],
+      "format": "jsonl",
+      "result": {
+        "exit": 1,
+        "stdout": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"70c2bbc8-8b87-46d0-a542-abc44fde20da\",\"ok\":false,\"error\":{\"code\":\"INVALID_REQUEST\",\"message\":\"Invalid task ID (maximum 36 characters)\",\"retryable\":false}}\n",
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "tasks",
+        "watch",
+        "--for",
+        "0"
+      ],
+      "format": "jsonl",
+      "result": {
+        "exit": 1,
+        "stdout": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":false,\"error\":{\"code\":\"INVALID_ARGUMENT\",\"message\":\"--for must be a whole number of seconds from 1 through 600\",\"retryable\":false}}\n",
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "not-a-command"
+      ],
+      "format": "text",
+      "result": {
+        "exit": 1,
+        "stdout": "INVALID_ARGUMENT: Unknown command. Run weaver --help for the catalog.\n",
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "tasks",
+        "get",
+        "--bad-flag"
+      ],
+      "format": "text",
+      "result": {
+        "exit": 1,
+        "stdout": "INVALID_ARGUMENT: Unknown option --bad-flag\n",
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "web",
+        "--port",
+        "-1"
+      ],
+      "format": "text",
+      "result": {
+        "exit": 1,
+        "stdout": "INVALID_ARGUMENT: Port must be an integer from 0 through 65535\n",
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "owners",
+        "continuation",
+        "get"
+      ],
+      "format": "text",
+      "result": {
+        "exit": 1,
+        "stdout": "INVALID_REQUEST: Invalid task ID (maximum 36 characters)\n",
+        "stderr": ""
+      }
+    },
+    {
+      "command": [
+        "tasks",
+        "watch",
+        "--for",
+        "0"
+      ],
+      "format": "text",
+      "result": {
+        "exit": 1,
+        "stdout": "INVALID_ARGUMENT: --for must be a whole number of seconds from 1 through 600\n",
+        "stderr": ""
+      }
+    },
+    {
+      "raw": [
+        "capabilities",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\"apiVersion\":\"weaver.v1\",\"commandId\":\"4b0cca8f-b95f-4eda-80a3-4e668cc937ba\",\"ok\":true,\"data\":{\"apiVersion\":\"weaver.v1\",\"cliTransport\":\"ready\",\"authentication\":\"ephemeral-local-trusted-user-demo\",\"ownerScopedAuthorization\":false,\"ownerSpawn\":\"logical-registration\",\"manualAttach\":\"metadata-only\",\"ownerModelSpawned\":false,\"attachmentVerified\":false,\"authenticated\":false,\"modelUsable\":false,\"workerProviders\":[\"mock-jsonl\",\"opencode\",\"pi\",\"grok\",\"codex\"],\"realExecution\":true,\"mcp\":false,\"maxParallel\":4,\"policyAdmission\":true,\"commands\":[\"capabilities.get\",\"sync.snapshot\",\"sync.status\",\"owners.list\",\"owners.get\",\"owners.continuation.get\",\"tasks.get\",\"tasks.list\",\"tasks.events\",\"tasks.results\",\"artifacts.read\",\"packages.get\",\"operations.get\",\"observability.get\",\"observability.export\",\"owners.attach\",\"owners.spawn\",\"owners.switch\",\"owners.continuation.configure\",\"tasks.create\",\"tasks.retry\",\"tasks.cancel\",\"packages.create\",\"workers.spawn\",\"results.deliver\",\"results.ack\",\"reviews.submit\"],\"limits\":{\"tasks\":200,\"owners\":200,\"packages\":1000,\"receipts\":5000,\"eventsPerPage\":100},\"durability\":\"durable intent before effect; interrupted commands require reconciliation, not automatic replay\"}}\n"
+    },
+    {
+      "raw": [
+        "capabilities",
+        "--json",
+        "--output",
+        "json"
+      ],
+      "exit": 1,
+      "stdout": "{\"apiVersion\":\"weaver.v1\",\"commandId\":null,\"ok\":false,\"error\":{\"code\":\"INVALID_ARGUMENT\",\"message\":\"--json cannot be combined with --output\",\"retryable\":false}}\n"
+    }
+  ],
+  "stdin": {
+    "apiVersion": "weaver.v1",
+    "commandId": "qa-fixed-idempotency",
+    "ok": true,
+    "data": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/caller-cwd",
+      "title": "stdin idempotency",
+      "instruction": "not executed",
+      "id": "8b8b0cfc-e284-4228-ad1e-7a8281cab66d",
+      "createdAt": "2026-10-18T23:53:07.816Z",
+      "updatedAt": "2026-10-18T23:53:07.816Z",
+      "status": "queued",
+      "revision": 2,
+      "reviewState": "pending",
+      "progress": 0,
+      "events": [
+        {
+          "id": "d7d8d45e-23a0-40e7-93b4-a8eaa723611b",
+          "at": "2026-10-18T23:53:07.816Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        }
+      ],
+      "artifacts": [],
+      "ownerId": "69e1c751-01c3-43a2-bff9-bae12eb58b46",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:53:07.817Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      }
+    }
+  },
+  "replay": {
+    "apiVersion": "weaver.v1",
+    "commandId": "qa-fixed-idempotency",
+    "ok": true,
+    "data": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/caller-cwd",
+      "title": "stdin idempotency",
+      "instruction": "not executed",
+      "id": "8b8b0cfc-e284-4228-ad1e-7a8281cab66d",
+      "createdAt": "2026-10-18T23:53:07.816Z",
+      "updatedAt": "2026-10-18T23:53:07.816Z",
+      "status": "queued",
+      "revision": 2,
+      "reviewState": "pending",
+      "progress": 0,
+      "events": [
+        {
+          "id": "d7d8d45e-23a0-40e7-93b4-a8eaa723611b",
+          "at": "2026-10-18T23:53:07.816Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        }
+      ],
+      "artifacts": [],
+      "ownerId": "69e1c751-01c3-43a2-bff9-bae12eb58b46",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:53:07.817Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      }
+    }
+  },
+  "conflict": {
+    "apiVersion": "weaver.v1",
+    "commandId": "qa-fixed-idempotency",
+    "ok": false,
+    "error": {
+      "code": "IDEMPOTENCY_CONFLICT",
+      "message": "commandId already used for different arguments",
+      "retryable": false
+    }
+  },
+  "receipt": {
+    "commandId": "qa-fixed-idempotency",
+    "state": "settled",
+    "response": {
+      "apiVersion": "weaver.v1",
+      "commandId": "qa-fixed-idempotency",
+      "ok": true,
+      "data": {
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/caller-cwd",
+        "title": "stdin idempotency",
+        "instruction": "not executed",
+        "id": "8b8b0cfc-e284-4228-ad1e-7a8281cab66d",
+        "createdAt": "2026-10-18T23:53:07.816Z",
+        "updatedAt": "2026-10-18T23:53:07.816Z",
+        "status": "queued",
+        "revision": 2,
+        "reviewState": "pending",
+        "progress": 0,
+        "events": [
+          {
+            "id": "d7d8d45e-23a0-40e7-93b4-a8eaa723611b",
+            "at": "2026-10-18T23:53:07.816Z",
+            "kind": "lifecycle",
+            "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+          }
+        ],
+        "artifacts": [],
+        "ownerId": "69e1c751-01c3-43a2-bff9-bae12eb58b46",
+        "ownerEpoch": 0,
+        "ownerLastActivityAt": "2026-10-18T23:53:07.817Z",
+        "continuationPolicy": {
+          "idleRotationMinutes": 60
+        }
+      }
+    }
+  }
+}

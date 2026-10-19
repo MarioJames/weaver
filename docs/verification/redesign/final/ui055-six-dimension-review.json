@@ -1,0 +1,151 @@
+{
+  "type": "产品控制台",
+  "build": "055",
+  "scope": "UI only; real engine/ACC availability judged separately",
+  "dimensions": [
+    {
+      "name": "产品意图",
+      "weightPercent": 22,
+      "checks": [
+        {
+          "claim": "五导航与任务详情主操作清楚，左右布局服务任务执行与审查",
+          "score0to2": 2,
+          "evidence": [
+            "ui055-tasks-light-1440.png",
+            "ui055-created-dom.json"
+          ]
+        },
+        {
+          "claim": "新建、结果、手动接续均有明确边界文案",
+          "score0to2": 2,
+          "evidence": [
+            "ui055-valid-review-continuation.json"
+          ]
+        }
+      ],
+      "score0to10": 10.0
+    },
+    {
+      "name": "业务可信",
+      "weightPercent": 18,
+      "checks": [
+        {
+          "claim": "实际mock/real执行分开，tokens费用未知不虚报",
+          "score0to2": 2,
+          "evidence": [
+            "ui055-mock-complete-dom.json",
+            "ui055-real-task-dom.json"
+          ]
+        },
+        {
+          "claim": "ack、accept、逻辑Owner接续与外部宿主确认明确分开",
+          "score0to2": 2,
+          "evidence": [
+            "ui055-accepted-before-ack-dom.json",
+            "ui055-continuation-real-cli.json"
+          ]
+        }
+      ],
+      "score0to10": 10.0
+    },
+    {
+      "name": "信息架构",
+      "weightPercent": 22,
+      "checks": [
+        {
+          "claim": "五页可导航、列表选择详情与路由分组对应",
+          "score0to2": 2,
+          "evidence": [
+            "ui055-viewport-matrix.json",
+            "ui055-routing-light-900.png"
+          ]
+        },
+        {
+          "claim": "900/960/1440保持可滚动内容、没有页面header与横向溢出",
+          "score0to2": 2,
+          "evidence": [
+            "ui055-viewport-matrix.json"
+          ]
+        }
+      ],
+      "score0to10": 10.0
+    },
+    {
+      "name": "交互就绪",
+      "weightPercent": 16,
+      "checks": [
+        {
+          "claim": "label实际聚焦、ID与目录校验有反馈，tags输入删除可保存",
+          "score0to2": 2,
+          "evidence": [
+            "ui055-label-results.json",
+            "ui055-composer-results.json",
+            "ui055-tags-results.json"
+          ]
+        },
+        {
+          "claim": "坏JSON、草稿、主离线重试、迟到预览、ack/review实际交互可恢复",
+          "score0to2": 2,
+          "evidence": [
+            "ui055-json-validation.json",
+            "ui055-offline-explicit-retry.json",
+            "ui055-late-response.json",
+            "ui055-valid-review-continuation.json"
+          ]
+        }
+      ],
+      "score0to10": 10.0
+    },
+    {
+      "name": "系统工艺",
+      "weightPercent": 14,
+      "checks": [
+        {
+          "claim": "同一组件体系、主题和viewport外壳一致，运行无CSP/未捕获错误",
+          "score0to2": 2,
+          "evidence": [
+            "ui055-tasks-dark-900.png",
+            "ui055-routing-light-900.png",
+            "ui055-final-health.json"
+          ]
+        },
+        {
+          "claim": "次要说明文字灰度偏淡、长说明较密；主内容仍可读",
+          "score0to2": 1,
+          "evidence": [
+            "ui055-routing-light-900.png",
+            "ui055-tasks-dark-900.png"
+          ]
+        }
+      ],
+      "score0to10": 7.5
+    },
+    {
+      "name": "视觉品牌",
+      "weightPercent": 8,
+      "checks": [
+        {
+          "claim": "低饱和统一底色与绿色动作，符合简朴操作台目标",
+          "score0to2": 2,
+          "evidence": [
+            "ui055-tasks-dark-900.png",
+            "ui055-routing-light-900.png"
+          ]
+        },
+        {
+          "claim": "图标与状态文字有一致语义，不靠颜色单独表达",
+          "score0to2": 2,
+          "evidence": [
+            "ui055-valid-review-continuation.json",
+            "ui055-tasks-light-1440.png"
+          ]
+        }
+      ],
+      "score0to10": 10.0
+    }
+  ],
+  "criticalBlockers": [],
+  "weightedScore0to10": 9.65,
+  "uiDeliveryThreshold": 8,
+  "uiVerdict": "PASS with minor secondary-copy contrast weakness"
+}

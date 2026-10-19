@@ -1,0 +1,262 @@
+{
+  "calls": [
+    {
+      "time": "2026-10-19T00:48:31.457Z",
+      "name": "exec",
+      "arguments": "const r = await tools.exec_command({cmd:\"cat fixture/ACCESS.md\",\"max_output_tokens\":6000}); text(r.output);\ntext(ALL_TOOLS.filter(x=>/weaver|herdr|openviking.*(search|read)|memory_recall/.test(x.name+\" \"+x.description)).map(x=>({name:x.name,description:x.description.slice(0,130)})));\nconst results = await Promise.allSettled([\n tools.exec_command({cmd:\"cat /home/mocha/.agents/skills/agents-cooperation/SKILL.md\",\"max_output_tokens\":12000}),\n tools.exec_command({cmd:\"cat .agents/skills/weaver/SKILL.md\",\"max_output_tokens\":12000}),\n tools.exec_command({cmd:\"cat /home/mocha/.agents/skills/herdr/SKILL.md\",\"max_output_tokens\":9000}),\n tools.exec_command({cmd:\"cat /home/mocha/.codex/plugins/cache/openviking/openviking-memory/0.11.11/skills/ov-experience-memory/SKILL.md\",\"max_output_tokens\":6000})\n]); results.forEach((r,i)=>text({i,...r}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:48:36.717Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"cat .agents/skills/weaver/SKILL.md\",\"max_output_tokens\":16000}));\ntext(await tools.exec_command({cmd:\"bun /home/mocha/.agents/skills/agents-cooperation/scripts/agents-config.ts show\",\"max_output_tokens\":6500}));\ntext(await tools.exec_command({cmd:\"bun /home/mocha/.agents/skills/herdr/scripts/name-codex-session.ts --type FIX --topic '修复任务批量导入'\",\"max_output_tokens\":1800}));\ntext(await tools.exec_command({cmd:\"rg --files fixture/recovery .agents/skills/weaver\",\"max_output_tokens\":3500}));\ntext(await tools.mcp__openviking_memory__find({query:\"Weaver recovery task importer preserve valid rows reject bad rows duplicate IDs\",target_uri:\"viking://~/memories/experiences\",limit:5}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:48:45.169Z",
+      "name": "exec",
+      "arguments": "const r = await Promise.allSettled([\n tools.exec_command({cmd:\"fixture/bin/weaver --help --output json\",\"max_output_tokens\":6500}),\n tools.exec_command({cmd:\"fixture/bin/weaver capabilities --output json\",\"max_output_tokens\":5000}),\n tools.exec_command({cmd:\"fixture/bin/weaver policy get --output json\",\"max_output_tokens\":6500}),\n tools.exec_command({cmd:\"cat .agents/skills/weaver/references/handoff.md fixture/recovery/README.md fixture/recovery/importer.mjs fixture/recovery/test.mjs\",\"max_output_tokens\":11000}),\n tools.exec_command({cmd:\"cat /home/mocha/.agents/skills/tdd/SKILL.md /home/mocha/.agents/skills/feature-acceptance/SKILL.md\",\"max_output_tokens\":11000}),\n tools.exec_command({cmd:\"git status --short\",\"max_output_tokens\":2000})\n]);r.forEach((r,i)=>text({i,...r}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:49:01.609Z",
+      "name": "exec",
+      "arguments": "const rs= await Promise.allSettled([\ntools.exec_command({cmd:\"node --test test.mjs\",workdir:\"/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-204635-c7f806/fixture/recovery\",max_output_tokens:5000}),\ntools.exec_command({cmd:\"fixture/bin/weaver policy preview --help --output json\",max_output_tokens:2000}),\ntools.exec_command({cmd:\"cat /home/mocha/.agents/skills/feature-acceptance/references/preferences.md /home/mocha/.agents/skills/feature-acceptance/references/review.md\",max_output_tokens:5500}),\ntools.exec_command({cmd:\"find fixture/recovery -maxdepth 2 -type f -exec sha256sum {} +\",max_output_tokens:2000})\n]);rs.forEach((r,i)=>text({i,...r}));\nstore(\"baselineTest\",\"import{test}from'node:test';import{strict as a}from'node:assert';import{importRows}from'./importer.mjs';test('preserves existing and reports invalid rows',()=>{const r=importRows([{id:'a',title:'old'}],[{id:'b',title:'new'},null,{id:'a',title:'override'}]);a.deepEqual(r.items,[{id:'a',title:'old'},{id:'b',title:'new'}]);a.equal(r.errors.length,2)});\");\ntext(await tools.exec_command({cmd:\"mktemp -d /tmp/recovery-import-owner-XXXXXX\",\"max_output_tokens\":500}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:49:16.057Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"python3 - <<'PY'\\nimport json\\nfrom pathlib import Path\\np=Path('/tmp/recovery-import-owner-OGjOBv')\\np.joinpath('preview.json').write_text(json.dumps({'owner':'codex_owner','class':'routine'}))\\np.joinpath('request.json').write_text(json.dumps({'title':'修复 recovery 任务批量导入','goal':'修复 importer.mjs 的 importRows(existing, rows)。必须先运行现有 node --test test.mjs 复现失败（Owner 已确认原始测试 0/1 通过，r.items 为 undefined），再实现并补边界测试。返回 {items, errors}；items 保留 existing 顺序、追加有效新行；逐行校验是非 null 非数组对象且 id/title 是非空白 string，坏行必须提供能定位输入行及原因的明确错误并继续处理后续有效行。重复 id（含 existing 及本批已接收行）拒绝，不能覆盖先前任务；坏行不应占用 id。原输入不得改变。保留原始行内容，不擅自 trim 有效值。README 未指定错误结构，采用简单且一致的行索引及原因结构即可。必须保留 test.mjs 原有完整测试与断言，追加必要边界测试；禁止删改期望掩盖问题。只能修改 importer.mjs 和 test.mjs，README 和其他数据样例完全保持。最终运行 node --test test.mjs 并如实报告。你是 Worker，不得调度、委派、提交或推送 Git。','workspace':'/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-204635-c7f806/fixture/recovery','ownerProfileId':'codex_owner','constraints':['只允许写 importer.mjs、test.mjs，其他文件不得修改、新增或删除','不得修改原有测试、断言和样例；只追加边界测试','不得提交或推送 Git；不得调度、委派或改调度配置','不要读取凭据或修改环境、持久数据；遵守 Worker 角色边界'],'acceptanceCriteria':['已有 node --test test.mjs 的失败被真实复现并修复，原有测试原文保留','混合好坏行保留有效行并逐个报告坏行的索引和明确原因','拒绝 existing 中的重复 ID 和同批重复 ID，保持 existing 顺序及首个有效新行','覆盖非对象、空字符串、纯空白和非字符串 id/title、无有效新行、输入不变的边界','最终 node --test test.mjs 全部通过，只有 importer.mjs 和 test.mjs 改动']}))\\nPY\",\"max_output_tokens\":1500}));\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver policy preview --input /tmp/recovery-import-owner-OGjOBv/preview.json --output json\",\"max_output_tokens\":4000}));\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver tasks create --input /tmp/recovery-import-owner-OGjOBv/request.json --command-id recovery-import-create-ogjobv-01 --output json\",\"max_output_tokens\":4500}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:49:25.068Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"python3 - <<'PY'\\nimport json\\nfrom pathlib import Path\\np=Path('/tmp/recovery-import-owner-OGjOBv')\\np.joinpath('package.json').write_text(json.dumps({'taskId':'9159779a-bcb1-406b-9a62-ebf2b31fd49b','expectedRevision':2,'scope':['只读本目录 README.md 与现有实现和测试','仅可写 importer.mjs 与 test.mjs；保留原始测试全文，追加边界测试；不得修改其他文件或样例','先 node --test test.mjs 复现，完成修复后复跑；不得委派、调度、提交或推送 Git'],'acceptanceCriteria':['返回 {items,errors}，有效行追加、既有行顺序保留；坏行逐条给出定位和原因且不阻断好行','拒绝覆盖 existing ID 和同批次重复 ID，坏行不占用 ID；id/title 拒绝空白和非字符串','输入不变，原有测试及样例不变，最终 node --test test.mjs 通过']}))\\nPY\",\"max_output_tokens\":1000}));\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver packages create --input /tmp/recovery-import-owner-OGjOBv/package.json --command-id recovery-import-package-ogjobv-01 --output json\",\"max_output_tokens\":4000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:49:28.189Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"fixture/bin/weaver tasks get --task-id 9159779a-bcb1-406b-9a62-ebf2b31fd49b --output json\",\"max_output_tokens\":3500}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:49:31.847Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"python3 - <<'PY'\\nimport json\\nfrom pathlib import Path\\nPath('/tmp/recovery-import-owner-OGjOBv/dispatch.json').write_text(json.dumps({'taskId':'9159779a-bcb1-406b-9a62-ebf2b31fd49b','expectedRevision':3,'packageId':'95dd61aa-e809-4818-9953-1c0ccf04bf51','class':'routine'}))\\nPY\",\"max_output_tokens\":500}));\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver workers spawn --input /tmp/recovery-import-owner-OGjOBv/dispatch.json --command-id recovery-import-dispatch-ogjobv-01 --output json\",\"max_output_tokens\":5500}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:49:36.915Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"fixture/bin/weaver tasks wait --task-id 9159779a-bcb1-406b-9a62-ebf2b31fd49b --for 30 --output json\",\"yield_time_ms\":1000,\"max_output_tokens\":5000}));\ntext(await tools.exec_command({cmd:\"cat /home/mocha/.agents/skills/feature-acceptance/references/backend.md /home/mocha/.agents/skills/cow-workspace/SKILL.md\",\"max_output_tokens\":8000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:49:43.309Z",
+      "name": "exec",
+      "arguments": "text(await tools.write_stdin({session_id:14181,chars:\"\",\"yield_time_ms\":1000,\"max_output_tokens\":6500}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:49:51.253Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"fixture/bin/weaver tasks events --task-id 9159779a-bcb1-406b-9a62-ebf2b31fd49b --output json\",\"max_output_tokens\":5000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:49:53.344Z",
+      "name": "exec",
+      "arguments": "text(await tools.write_stdin({session_id:14181,chars:\"\",\"yield_time_ms\":1000,\"max_output_tokens\":6000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:50:01.451Z",
+      "name": "exec",
+      "arguments": "text(await tools.write_stdin({session_id:14181,chars:\"\",\"yield_time_ms\":1000,\"max_output_tokens\":6500}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:50:10.847Z",
+      "name": "sleep",
+      "arguments": "{\"duration_ms\":20000}",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:50:33.525Z",
+      "name": "exec",
+      "arguments": "text(await tools.write_stdin({session_id:14181,chars:\"\",\"yield_time_ms\":1000,\"max_output_tokens\":8000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:50:37.017Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"fixture/bin/weaver tasks get --task-id 9159779a-bcb1-406b-9a62-ebf2b31fd49b --output json\",\"max_output_tokens\":7500}));\ntext(await tools.exec_command({cmd:\"cat fixture/recovery/importer.mjs fixture/recovery/test.mjs\",\"max_output_tokens\":8500}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:50:43.135Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"fixture/bin/weaver tasks wait --task-id 9159779a-bcb1-406b-9a62-ebf2b31fd49b --for 30 --output json\",\"yield_time_ms\":1000,\"max_output_tokens\":8000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:50:46.133Z",
+      "name": "sleep",
+      "arguments": "{\"duration_ms\":30000}",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:51:20.192Z",
+      "name": "exec",
+      "arguments": "text(await tools.write_stdin({session_id:68397,chars:\"\",\"yield_time_ms\":1000,\"max_output_tokens\":9500}));\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver tasks results --task-id 9159779a-bcb1-406b-9a62-ebf2b31fd49b --output json\",\"max_output_tokens\":6500}));\ntext(await tools.exec_command({cmd:\"cat fixture/recovery/importer.mjs fixture/recovery/test.mjs\",\"max_output_tokens\":9000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:51:35.941Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"python3 - <<'PY'\\nimport json\\nfrom pathlib import Path\\np=Path('/tmp/recovery-import-owner-OGjOBv')\\np.joinpath('artifact.json').write_text(json.dumps({'taskId':'9159779a-bcb1-406b-9a62-ebf2b31fd49b','artifactId':'eb1a46eb-d94e-4bcc-870d-dffddf0a88ce'}))\\np.joinpath('ack.json').write_text(json.dumps({'taskId':'9159779a-bcb1-406b-9a62-ebf2b31fd49b','expectedRevision':37,'manifestDigest':'ff96b4e0450b3c3a4f5ad21f171ac19ece79f66368eb2a878d42a92baf8e8a5d'}))\\nPY\",\"max_output_tokens\":500}));\nconst rs=await Promise.allSettled([\ntools.exec_command({cmd:\"fixture/bin/weaver artifacts read --input /tmp/recovery-import-owner-OGjOBv/artifact.json --output json\",\"max_output_tokens\":4000}),\ntools.exec_command({cmd:\"node --test test.mjs\",workdir:\"/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-204635-c7f806/fixture/recovery\",max_output_tokens:2500}),\ntools.exec_command({cmd:\"systemctl --user show weaver-cli-pi-b022fdf4.scope -p ActiveState -p SubState\",\"max_output_tokens\":1000})\n]);rs.forEach((r,i)=>text({i,...r}));\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver results ack --input /tmp/recovery-import-owner-OGjOBv/ack.json --command-id recovery-import-ack-ogjobv-01 --output json\",\"max_output_tokens\":3000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:52:01.703Z",
+      "name": "exec",
+      "arguments": "const r=await tools.exec_command({cmd:\"fixture/bin/weaver tasks get --task-id 9159779a-bcb1-406b-9a62-ebf2b31fd49b --output json\",\"max_output_tokens\":12000});\nconst t=JSON.parse(r.output).data;store(\"task1\",t);text({task:t.id,status:t.status,revision:t.revision,run:t.run.status,evidence:t.run.evidence});\nconst q=s=>\"'\"+s.replace(/'/g,\"'\\\\''\")+\"'\";\nconst p=\"/tmp/recovery-import-owner-OGjOBv\";\nconst files={\n \"reject.json\":{taskId:t.id,expectedRevision:t.revision,manifestDigest:\"ff96b4e0450b3c3a4f5ad21f171ac19ece79f66368eb2a878d42a92baf8e8a5d\",decision:\"rejected\",comment:\"实现与现有6项测试复跑通过，原始测试保留；不变性测试中 a.deepEqual(rows,rows) 是无效自比较且 rowsCopy 未使用。缺少非字符串字段、tab/换行纯空白、坏行后同ID有效行、空输入、明确错误原因断言，交由同一Worker补强后再验收。\"},\n \"preview2.json\":{owner:\"codex_owner\",worker:\"qa_a_worker\"},\n \"request2.json\":{title:\"补强 recovery 导入回归测试\",workspace:t.workspace,ownerId:t.ownerId,goal:\"继续刚才的导入修复，Owner独立运行 node --test test.mjs 为6/6通过，实现暂未发现功能问题。审查发现新加不变性测试 a.deepEqual(rows,rows) 为自比较，rowsCopy 没使用。只修改 test.mjs：把此断言加强为与 rowsCopy 的真正输入快照比较，保留原始第一行测试全文（所有原有断言和样例不变）。其余当前断言保持，追加必要的边界测试：1 非对象（null、undefined、数值、布尔、数组）与非字符串/缺失 id/title 逐行拒绝，并保留后续有效行；2 id/title 的 tab、换行等纯空白拒绝；3 坏行的id不占用，后续同id有效行可接收，第三个同id拒绝，断言明确 index 与 reason（类型/字段/重复原因）；4 空 rows 和全坏 rows 保留 existing，无有效行不丢原数据。对原输入不变可使用冻结对象/数组或真实快照。不要添加无意义重复测试。不改变 importer.mjs、README.md、数据样例和其他文件，不改任何期望掩盖实现错误。如果发现真实实现缺陷，停止并报告给Owner。先复跑现有6项测试，再加强，最后 node --test test.mjs，报告实际结果。你是Worker，不调度、不委派、不提交、不推送。\",constraints:[\"只能修改 test.mjs，其余文件（含 importer.mjs、README.md 和样例）保持不变\",\"原始测试全文和样例不变；加强自比较断言，不放宽任何现有期望\",\"不得调度、委派、提交、推送、修改配置或凭据\"],acceptanceCriteria:[\"不变性测试比较 rows 与独立快照，去除无效自比较\",\"边界覆盖非对象与非字符串、纯tab换行空白、坏行同ID恢复和批内去重、空输入及全坏行\",\"明确验证 errors 的行索引和具体原因并确保后续有效行被接收\",\"原始测试与数据样例保留，最终 node --test test.mjs 全通过\"]}\n};\nconst code=\"import json\\nfrom pathlib import Path\\np=Path(\"+JSON.stringify(p)+\")\\nfiles=json.loads(\"+JSON.stringify(JSON.stringify(files))+\")\\nfor name,body in files.items(): p.joinpath(name).write_text(json.dumps(body))\\n\";\ntext(await tools.exec_command({cmd:\"python3 -c \"+q(code),max_output_tokens:500}));\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver reviews submit --input /tmp/recovery-import-owner-OGjOBv/reject.json --command-id recovery-import-review-ogjobv-01 --output json\",\"max_output_tokens\":1800}));\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver policy preview --input /tmp/recovery-import-owner-OGjOBv/preview2.json --output json\",\"max_output_tokens\":1500}));\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver tasks create --input /tmp/recovery-import-owner-OGjOBv/request2.json --command-id recovery-import-create-ogjobv-02 --output json\",\"max_output_tokens\":4000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:52:13.997Z",
+      "name": "exec",
+      "arguments": "const q=s=>\"'\"+s.replace(/'/g,\"'\\\\''\")+\"'\";\nasync function put(name,body){const code=\"from pathlib import Path\\nPath('/tmp/recovery-import-owner-OGjOBv/\"+name+\"').write_text(\"+JSON.stringify(JSON.stringify(body))+\")\"; const r=await tools.exec_command({cmd:\"python3 -c \"+q(code),max_output_tokens:500}); if(r.exit_code)throw Error(r.output);}\nconst taskId=\"00d508a5-3c84-46a9-b5aa-b0781a90b898\";\nawait put(\"package2.json\",{taskId,expectedRevision:2,scope:[\"只读 importer.mjs、README.md\",\"仅写 test.mjs：纠正自比较断言、补齐回归测试，原始第一行及已有有效断言保持\",\"不改实现、样例或其他文件；不调度、委派、提交、推送\"],acceptanceCriteria:[\"输入快照比较有效，覆盖非对象/字段类型/纯空白、坏行后同ID有效行、空和全坏批次、明确错误原因\",\"最终 node --test test.mjs 全通过，原始测试原文不变\"]});\nconst p=await tools.exec_command({cmd:\"fixture/bin/weaver packages create --input /tmp/recovery-import-owner-OGjOBv/package2.json --command-id recovery-import-package-ogjobv-02 --output json\",max_output_tokens:6000});const pack=JSON.parse(p.output).data;text({package:pack.id});\nconst get=await tools.exec_command({cmd:\"fixture/bin/weaver tasks get --task-id \"+taskId+\" --output json\",max_output_tokens:10000}); const t=JSON.parse(get.output).data;store(\"task2\",t);\nawait put(\"dispatch2.json\",{taskId,expectedRevision:t.revision,packageId:pack.id,worker:\"qa_a_worker\"});\nconst spawn=await tools.exec_command({cmd:\"fixture/bin/weaver workers spawn --input /tmp/recovery-import-owner-OGjOBv/dispatch2.json --command-id recovery-import-dispatch-ogjobv-02 --output json\",max_output_tokens:15000});const data=JSON.parse(spawn.output);text({ok:data.ok,error:data.error,task:data.data?.id,status:data.data?.status,dispatch:data.data?.dispatch,run:data.data?.run});\nstore(\"firstRoundFiles\",await tools.exec_command({cmd:\"cat fixture/recovery/test.mjs\",\"max_output_tokens\":10000}));\ntext(await tools.exec_command({cmd:\"sha256sum fixture/recovery/importer.mjs fixture/recovery/README.md\",\"max_output_tokens\":1000}));\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver tasks wait --task-id 00d508a5-3c84-46a9-b5aa-b0781a90b898 --for 30 --output json\",\"yield_time_ms\":1000,\"max_output_tokens\":1500}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:52:22.932Z",
+      "name": "sleep",
+      "arguments": "{\"duration_ms\":30000}",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:52:58.242Z",
+      "name": "exec",
+      "arguments": "text(await tools.write_stdin({session_id:68318,chars:\"\",\"yield_time_ms\":1000,\"max_output_tokens\":1500}));\nconst r=await tools.exec_command({cmd:\"fixture/bin/weaver tasks get --task-id 00d508a5-3c84-46a9-b5aa-b0781a90b898 --output json\",\"max_output_tokens\":20000});const t=JSON.parse(r.output).data;store(\"task2\",t);text({task:t.id,status:t.status,revision:t.revision,run:t.run?.status,events:t.events.slice(-8),artifacts:t.artifacts,evidence:t.run?.evidence});\ntext(await tools.exec_command({cmd:\"cat fixture/recovery/test.mjs\",\"max_output_tokens\":9000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:53:07.453Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"fixture/bin/weaver tasks wait --task-id 00d508a5-3c84-46a9-b5aa-b0781a90b898 --for 30 --output json\",\"yield_time_ms\":1000,\"max_output_tokens\":1500}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:53:12.599Z",
+      "name": "sleep",
+      "arguments": "{\"duration_ms\":30000}",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:53:48.157Z",
+      "name": "exec",
+      "arguments": "text(await tools.write_stdin({session_id:77280,chars:\"\",\"yield_time_ms\":1000,\"max_output_tokens\":1500}));\nconst r=await tools.exec_command({cmd:\"fixture/bin/weaver tasks get --task-id 00d508a5-3c84-46a9-b5aa-b0781a90b898 --output json\",\"max_output_tokens\":25000});const t=JSON.parse(r.output).data;store(\"task2\",t);text({task:t.id,status:t.status,revision:t.revision,run:t.run?.status,events:t.events.slice(-8),artifacts:t.artifacts,evidence:t.run?.evidence});\ntext(await tools.exec_command({cmd:\"cat fixture/recovery/test.mjs\",\"max_output_tokens\":11000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:53:52.295Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"fixture/bin/weaver tasks wait --task-id 00d508a5-3c84-46a9-b5aa-b0781a90b898 --for 30 --output json\",\"yield_time_ms\":1000,\"max_output_tokens\":1500}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:53:55.834Z",
+      "name": "sleep",
+      "arguments": "{\"duration_ms\":20000}",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:54:18.715Z",
+      "name": "exec",
+      "arguments": "const r=await tools.exec_command({cmd:\"fixture/bin/weaver tasks get --task-id 00d508a5-3c84-46a9-b5aa-b0781a90b898 --output json\",\"max_output_tokens\":25000});const t=JSON.parse(r.output).data;store(\"task2\",t);text({task:t.id,status:t.status,revision:t.revision,run:t.run?.status,events:t.events.slice(-6),artifacts:t.artifacts,evidence:t.run?.evidence});\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:54:27.915Z",
+      "name": "exec",
+      "arguments": "text(await tools.write_stdin({session_id:35387,chars:\"\",\"yield_time_ms\":1000,\"max_output_tokens\":1000}));\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver tasks wait --task-id 00d508a5-3c84-46a9-b5aa-b0781a90b898 --for 30 --output json\",\"yield_time_ms\":1000,\"max_output_tokens\":1500}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:54:31.782Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"cat fixture/recovery/test.mjs\",\"max_output_tokens\":11000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:54:33.893Z",
+      "name": "sleep",
+      "arguments": "{\"duration_ms\":20000}",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:54:57.859Z",
+      "name": "exec",
+      "arguments": "text(await tools.write_stdin({session_id:91760,chars:\"\",\"yield_time_ms\":1000,\"max_output_tokens\":1500}));\nconst r=await tools.exec_command({cmd:\"fixture/bin/weaver tasks get --task-id 00d508a5-3c84-46a9-b5aa-b0781a90b898 --output json\",\"max_output_tokens\":28000});const t=JSON.parse(r.output).data;store(\"task2\",t);text({task:t.id,status:t.status,revision:t.revision,run:t.run?.status,events:t.events.slice(-4),artifacts:t.artifacts?.map(a=>({id:a.id,name:a.name})),evidence:t.run?.evidence});\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver tasks results --task-id 00d508a5-3c84-46a9-b5aa-b0781a90b898 --output json\",\"max_output_tokens\":5500}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:55:08.810Z",
+      "name": "exec",
+      "arguments": "const r=await tools.exec_command({cmd:\"node --test test.mjs\",\"workdir\":\"/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-204635-c7f806/fixture/recovery\",\"max_output_tokens\":4500});text(r);store(\"finalTest\",r);\ntext(await tools.exec_command({cmd:\"python3 - <<'PY'\\nfrom pathlib import Path\\nfrom hashlib import sha256\\nimport difflib\\np=Path('fixture/recovery')\\noriginal=\\\"import{test}from'node:test';import{strict as a}from'node:assert';import{importRows}from'./importer.mjs';test('preserves existing and reports invalid rows',()=>{const r=importRows([{id:'a',title:'old'}],[{id:'b',title:'new'},null,{id:'a',title:'override'}]);a.deepEqual(r.items,[{id:'a',title:'old'},{id:'b',title:'new'}]);a.equal(r.errors.length,2)});\\\\n\\\"\\nassert p.joinpath('test.mjs').read_text().startswith(original), 'original test changed'\\nassert sha256(p.joinpath('README.md').read_bytes()).hexdigest() == '1539e4710be21f2397adde438ea4128f32c225c1696e7fa734c90468ca4b3840', 'README changed'\\nassert sha256(p.joinpath('importer.mjs').read_bytes()).hexdigest() == '17f68349a3d53832a5c238d6abe8a1c3599de1a2a48c16805341b3d94a966e8d', 'implementation changed in test-only package'\\nassert sorted(x.name for x in p.iterdir()) == ['README.md','importer.mjs','test.mjs'], 'unexpected files'\\nprint('Original test bytes preserved; README unchanged; implementation unchanged in second package; directory contains only original 3 files.')\\nfor name in ['importer.mjs','test.mjs']:\\n print(name, sha256(p.joinpath(name).read_bytes()).hexdigest())\\nprint(''.join(difflib.unified_diff(['export function importRows(existing,rows){return rows.map(x=>({...x}));}\\\\n'], p.joinpath('importer.mjs').read_text().splitlines(keepends=True), fromfile='original/importer.mjs',tofile='current/importer.mjs')))\\nPY\",\"max_output_tokens\":4500}));\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver tasks wait --task-id 00d508a5-3c84-46a9-b5aa-b0781a90b898 --for 30 --output json\",\"yield_time_ms\":1000,\"max_output_tokens\":1000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:55:16.092Z",
+      "name": "sleep",
+      "arguments": "{\"duration_ms\":20000}",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:55:43.803Z",
+      "name": "exec",
+      "arguments": "text(await tools.write_stdin({session_id:79091,chars:\"\",\"yield_time_ms\":1000,\"max_output_tokens\":1000}));\nconst r=await tools.exec_command({cmd:\"fixture/bin/weaver tasks get --task-id 00d508a5-3c84-46a9-b5aa-b0781a90b898 --output json\",\"max_output_tokens\":28000});const t=JSON.parse(r.output).data;store(\"task2\",t);text({task:t.id,status:t.status,revision:t.revision,run:t.run?.status,events:t.events.slice(-5),artifacts:t.artifacts?.map(a=>({id:a.id,name:a.name})),evidence:t.run?.evidence});\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:55:55.701Z",
+      "name": "exec",
+      "arguments": "const rs=await Promise.allSettled([\ntools.exec_command({cmd:\"fixture/bin/weaver tasks results --task-id 00d508a5-3c84-46a9-b5aa-b0781a90b898 --output json\",\"max_output_tokens\":4500}),\ntools.exec_command({cmd:\"node --test test.mjs\",\"workdir\":\"/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-204635-c7f806/fixture/recovery\",\"max_output_tokens\":3500}),\ntools.exec_command({cmd:\"systemctl --user show weaver-cli-pi-b022fdf4.scope weaver-cli-pi-2fffbae0.scope -p Id -p ActiveState -p SubState\",\"max_output_tokens\":1200}),\ntools.exec_command({cmd:\"sha256sum fixture/recovery/importer.mjs fixture/recovery/test.mjs fixture/recovery/README.md\",\"max_output_tokens\":1000})\n]);rs.forEach((r,i)=>text({i,...r}));\nif(rs[0].status===\"fulfilled\"){const result=JSON.parse(rs[0].value.output);store(\"result2\",result);}\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:56:08.367Z",
+      "name": "exec",
+      "arguments": "const result=load(\"result2\").data;const task=load(\"task2\");const q=s=>\"'\"+s.replace(/'/g,\"'\\\\''\")+\"'\";\nconst body={taskId:task.id,expectedRevision:task.revision,manifestDigest:result.manifestDigest};\nconst code=\"from pathlib import Path\\nPath('/tmp/recovery-import-owner-OGjOBv/ack2.json').write_text(\"+JSON.stringify(JSON.stringify(body))+\")\";\ntext(await tools.exec_command({cmd:\"python3 -c \"+q(code),\"max_output_tokens\":500}));\ntext(await tools.exec_command({cmd:\"fixture/bin/weaver results ack --input /tmp/recovery-import-owner-OGjOBv/ack2.json --command-id recovery-import-ack-ogjobv-02 --output json\",\"max_output_tokens\":2000}));\ntext(await tools.exec_command({cmd:\"python3 - <<'PY'\\nfrom pathlib import Path\\nimport shutil\\np=Path('/tmp/recovery-import-owner-OGjOBv')\\nexpected={'preview.json','request.json','package.json','dispatch.json','artifact.json','ack.json','reject.json','preview2.json','request2.json','package2.json','dispatch2.json','ack2.json'}\\nassert p.is_dir() and {x.name for x in p.iterdir()}==expected\\nassert all(x.is_file() and not x.is_symlink() for x in p.iterdir())\\nshutil.rmtree(p)\\nprint('Removed task-owned scratch JSON directory. Fixture source and shared Weaver service retained.')\\nPY\",\"max_output_tokens\":1000}));\n",
+      "negativePhase": false
+    },
+    {
+      "time": "2026-10-19T00:58:00.409Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"rg --files fixture -g '*README*' -g '*readme*'\",\"max_output_tokens\":3000}));\n",
+      "negativePhase": true
+    },
+    {
+      "time": "2026-10-19T00:58:04.174Z",
+      "name": "exec",
+      "arguments": "text(await tools.exec_command({cmd:\"cat fixture/README.md fixture/representative/README.md fixture/complex/README.md fixture/recovery/README.md\",\"max_output_tokens\":9000}));\n",
+      "negativePhase": true
+    }
+  ],
+  "runtimeSettings": [
+    {
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reasoning_effort": null
+    },
+    {
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reasoning_effort": null
+    }
+  ]
+}

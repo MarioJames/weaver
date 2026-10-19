@@ -1,0 +1,51 @@
+{
+  "status": "pre-final-refreeze mapping; not final PASS",
+  "originalBuild": "045/f35370f650f5774ebbe7be8c338166f962d0466b84b3055538c142945fb1e78f",
+  "failedRound": "round_85a961ee70",
+  "preservedPositiveEvidence": [
+    {
+      "stage": "smoke",
+      "route": "AB equal weights -> qa_a_worker = Pi high",
+      "acceptedPackages": 1,
+      "evidence": [
+        "acc-smoke-weaver-tasks.json",
+        "acc-smoke-observed-calls.json"
+      ]
+    },
+    {
+      "stage": "representative",
+      "route": "BA equal weights -> qa_b_worker = Codex xhigh",
+      "acceptedPackages": 1,
+      "independentTests": "8/8",
+      "evidence": [
+        "acc-representative-weaver-tasks.json",
+        "acc-representative-independent.json"
+      ]
+    },
+    {
+      "stage": "complex",
+      "route": "AB, B weight250 -> qa_b_worker = Codex xhigh",
+      "acceptedPackages": 2,
+      "independentTests": "39/39",
+      "evidence": [
+        "acc-complex-weaver-tasks.json",
+        "acc-complex-independent.json"
+      ]
+    }
+  ],
+  "failedEvidencePreserved": [
+    "acc-recovery-failed-attempt.json",
+    "acc-recovery-second-failed.json",
+    "acc-functional-round-verdict.json",
+    "acc-functional-transcript.txt"
+  ],
+  "requiredAffectedRevalidation": [
+    "Fresh recovery fixture: real Codex Owner reads staged weaver skill and autonomously dispatches real Pi through Weaver; successful provider terminal plus independent files/tests then ack and accepted review. Partial tests alone are insufficient.",
+    "049 scope race: final build actual delayed registration systemd/PID boundary; real Pi immediate cancel and unrelated-process isolation.",
+    "050 stream: final build normal cumulative native snapshots beyond old total cap reach valid final; bounded oversize diagnostic; exact old real-attempt raw bytes remain unknown.",
+    "047 UI label clicks and related final browser interaction paths.",
+    "Read-only negative boundary actual external Codex Owner, no dispatch/writes."
+  ],
+  "provenance": "Parent explicitly authorizes unaffected successful positive stages reuse after scoped scope/stream/UI boundary fixes; fresh final freeze must confirm actual changed-file boundary. Old failed round stays FAIL; no criteria reduced.",
+  "aliasWarning": "ACC data /a: qa_a=Pi,qa_b=Codex; deterministic routing data /f: qa_a=Codex,qa_b=Pi."
+}

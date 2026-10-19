@@ -1,0 +1,187 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 9599166362864130260
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:44583/",
+  "refs": {
+    "e1": {
+      "name": "",
+      "role": "generic"
+    },
+    "e10": {
+      "name": "工作代理",
+      "role": "link"
+    },
+    "e11": {
+      "name": "路由与配额",
+      "role": "link"
+    },
+    "e12": {
+      "name": "新建任务",
+      "role": "button"
+    },
+    "e13": {
+      "name": "任务列表",
+      "role": "region"
+    },
+    "e14": {
+      "name": "任务详情",
+      "role": "region"
+    },
+    "e15": {
+      "name": "搜索任务",
+      "role": "textbox"
+    },
+    "e16": {
+      "name": "新建重试任务",
+      "role": "button"
+    },
+    "e17": {
+      "name": "全部",
+      "role": "button"
+    },
+    "e18": {
+      "name": "进行中",
+      "role": "button"
+    },
+    "e19": {
+      "name": "待验收",
+      "role": "button"
+    },
+    "e2": {
+      "name": "跳到内容",
+      "role": "link"
+    },
+    "e20": {
+      "name": "已结束",
+      "role": "button"
+    },
+    "e21": {
+      "name": "执行完成 100% 修复任务导入并补齐边界测试 Task owner · 已通过",
+      "role": "button"
+    },
+    "e22": {
+      "name": "执行失败 20% 补强 recovery 导入回归测试 Task owner · 10/18/2026, 8:52:02 PM",
+      "role": "button"
+    },
+    "e23": {
+      "name": "执行完成 100% 修复 recovery 任务批量导入 Task owner · 需修改",
+      "role": "button"
+    },
+    "e24": {
+      "name": "执行失败 20% 修复任务导入：保留有效行并报告逐行错误 recovery importer Owner · 10/18/2026, 8:30:35 PM",
+      "role": "button"
+    },
+    "e25": {
+      "name": "执行失败 20% 修复任务导入：保留有效行并报告逐行错误 recovery importer Owner · 10/18/2026, 8:26:44 PM",
+      "role": "button"
+    },
+    "e26": {
+      "name": "执行完成 100% 离线任务看板：唯一索引、批量导入与跨模块验证 complex store Owner · 已通过",
+      "role": "button"
+    },
+    "e27": {
+      "name": "执行完成 100% 离线任务看板：筛选、分页与状态统计 complex view Owner · 已通过",
+      "role": "button"
+    },
+    "e28": {
+      "name": "执行完成 100% 实现本地任务索引与 Node 测试 representative index Owner · 已通过",
+      "role": "button"
+    },
+    "e29": {
+      "name": "执行完成 100% 创建 smoke health.txt smoke health Owner · 已通过",
+      "role": "button"
+    },
+    "e3": {
+      "name": "Weaver",
+      "role": "button"
+    },
+    "e30": {
+      "name": "时间线 41",
+      "role": "tab"
+    },
+    "e31": {
+      "name": "产物 1",
+      "role": "tab"
+    },
+    "e32": {
+      "name": "验收",
+      "role": "tab"
+    },
+    "e33": {
+      "name": "",
+      "role": "LabelText"
+    },
+    "e34": {
+      "name": "空闲阈值（分钟）",
+      "role": "textbox"
+    },
+    "e35": {
+      "name": "Increase",
+      "role": "button"
+    },
+    "e36": {
+      "name": "Decrease",
+      "role": "button"
+    },
+    "e37": {
+      "name": "保存空闲策略",
+      "role": "button"
+    },
+    "e38": {
+      "name": "登记手动接续",
+      "role": "button"
+    },
+    "e39": {
+      "name": "事件类型",
+      "role": "combobox"
+    },
+    "e4": {
+      "name": "主导航",
+      "role": "navigation"
+    },
+    "e40": {
+      "name": "导出已筛选日志",
+      "role": "button"
+    },
+    "e41": {
+      "name": "启用空闲接续提醒",
+      "role": "checkbox"
+    },
+    "e42": {
+      "name": "搜索已加载事件",
+      "role": "textbox"
+    },
+    "e5": {
+      "name": "收起导航",
+      "role": "button"
+    },
+    "e6": {
+      "name": "切换到浅色",
+      "role": "button"
+    },
+    "e7": {
+      "name": "任务",
+      "role": "link"
+    },
+    "e8": {
+      "name": "引擎",
+      "role": "link"
+    },
+    "e9": {
+      "name": "负责人",
+      "role": "link"
+    }
+  },
+  "snapshot": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - link \"跳到内容\" [ref=e2]\n    - complementary\n      - button \"Weaver\" [ref=e3]\n        - StaticText \"Weaver\"\n      - navigation \"主导航\" [ref=e4]\n        - link \"任务\" [ref=e7]\n          - image\n          - StaticText \"任务\"\n        - link \"引擎\" [ref=e8]\n          - image\n          - StaticText \"引擎\"\n        - link \"负责人\" [ref=e9]\n          - image\n          - StaticText \"负责人\"\n        - link \"工作代理\" [ref=e10]\n          - image\n          - StaticText \"工作代理\"\n        - link \"路由与配额\" [ref=e11]\n          - image\n          - StaticText \"路由与配额\"\n      - button \"收起导航\" [ref=e5]\n        - image\n      - button \"切换到浅色\" [ref=e6]\n        - image\n      - status\n        - StaticText \"2 个并行槽位 · 已同步\"\n    - main\n      - generic\n        - button \"新建任务\" [ref=e12]\n        - region \"任务列表\" [ref=e13]\n          - textbox \"搜索任务\" [ref=e15]\n          - group\n            - button \"全部\" [ref=e17]\n              - StaticText \"全部\"\n            - button \"进行中\" [ref=e18]\n              - StaticText \"进行中\"\n            - button \"待验收\" [ref=e19]\n              - StaticText \"待验收\"\n            - button \"已结束\" [ref=e20]\n              - StaticText \"已结束\"\n          - generic\n            - button \"执行完成 100% 修复任务导入并补齐边界测试 Task owner · 已通过\" [ref=e21]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"修复任务导入并补齐边界测试\"\n              - generic\n                - StaticText \"Task owner · 已通过\"\n            - button \"执行失败 20% 补强 recovery 导入回归测试 Task owner · 10/18/2026, 8:52:02 PM\" [ref=e22]\n              - StaticText \"执行失败\"\n              - generic\n                - StaticText \"20%\"\n              - strong\n                - StaticText \"补强 recovery 导入回归测试\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 8:52:02 PM\"\n            - button \"执行完成 100% 修复 recovery 任务批量导入 Task owner · 需修改\" [ref=e23]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"修复 recovery 任务批量导入\"\n              - generic\n                - StaticText \"Task owner · 需修改\"\n            - button \"执行失败 20% 修复任务导入：保留有效行并报告逐行错误 recovery importer Owner · 10/18/2026, 8:30:35 PM\" [ref=e24]\n              - StaticText \"执行失败\"\n              - generic\n                - StaticText \"20%\"\n              - strong\n                - StaticText \"修复任务导入：保留有效行并报告逐行错误\"\n              - generic\n                - StaticText \"recovery importer Owner · 10/18/2026, 8:30:35 PM\"\n            - button \"执行失败 20% 修复任务导入：保留有效行并报告逐行错误 recovery importer Owner · 10/18/2026, 8:26:44 PM\" [ref=e25]\n              - StaticText \"执行失败\"\n              - generic\n                - StaticText \"20%\"\n              - strong\n                - StaticText \"修复任务导入：保留有效行并报告逐行错误\"\n              - generic\n                - StaticText \"recovery importer Owner · 10/18/2026, 8:26:44 PM\"\n            - button \"执行完成 100% 离线任务看板：唯一索引、批量导入与跨模块验证 complex store Owner · 已通过\" [ref=e26]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"离线任务看板：唯一索引、批量导入与跨模块验证\"\n              - generic\n                - StaticText \"complex store Owner · 已通过\"\n            - button \"执行完成 100% 离线任务看板：筛选、分页与状态统计 complex view Owner · 已通过\" [ref=e27]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"离线任务看板：筛选、分页与状态统计\"\n              - generic\n                - StaticText \"complex view Owner · 已通过\"\n            - button \"执行完成 100% 实现本地任务索引与 Node 测试 representative index Owner · 已通过\" [ref=e28]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"实现本地任务索引与 Node 测试\"\n              - generic\n                - StaticText \"representative index Owner · 已通过\"\n            - button \"执行完成 100% 创建 smoke health.txt smoke health Owner · 已通过\" [ref=e29]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"创建 smoke health.txt\"\n              - generic\n                - StaticText \"smoke health Owner · 已通过\"\n      - region \"任务详情\" [ref=e14]\n        - StaticText \"修复任务导入并补齐边界测试\"\n        - StaticText \"执行完成\"\n        - StaticText \"已通过\"\n        - generic\n          - StaticText \"更新于 9:04:48 PM\"\n        - button \"新建重试任务\" [ref=e16]\n        - generic\n          - StaticText \"已创建 · 有执行记录 · 执行完成 · 已确认收到结果 · 已验收\"\n        - StaticText \"执行进度\"\n        - generic\n          - StaticText \"100%\"\n        - progressbar \"执行进度\": 100\n        - StaticText \"目标与约束\"\n        - StaticText \"修复 importer.mjs 的 importRows(existing,rows)。Owner 已运行 node --test test.mjs，1/1失败，r.items为undefined。先阅读README及原测试；保留原测试全部断言和数据样例，只追加回归测试。返回{items,errors}；items保留existing顺序，按输入顺序追加有效行；拒绝null、数组、非对象行，id/title必须是非空字符串（包含纯空白应拒绝）。重复ID包括existing和本批已接收行，拒绝而不覆盖，每个坏行返回{index,reason}，index为rows零基下标，reason非空且明确表明原因；坏行不能阻断后续有效行，不占用未接收ID。保持所有原输入不变，不规范化或丢失有效行字段。按项目现有node:test补针对行为的边界测试，执行node --test test.mjs。报告实际变更及测试结果。\"\n        - list\n          - listitem [level=1]\n            - ListMarker \"1. \"\n            - StaticText \"原有测试原封不动保留并通过；node --test test.mjs全部通过。\"\n          - listitem [level=1]\n            - ListMarker \"2. \"\n            - StaticText \"有效行保留，坏行逐条带正确index和明确reason；existing和批内重复ID不覆盖已有数据。\"\n          - listitem [level=1]\n            - ListMarker \"3. \"\n            - StaticText \"覆盖无效行/字段类型/空白、重复及后续有效行、空输入和原输入不变等边界。\"\n          - listitem [level=1]\n            - ListMarker \"4. \"\n            - StaticText \"文件修改仅限importer.mjs和test.mjs；不提交Git，不修改数据样例。\"\n        - StaticText \"策略：qa_b_worker · codex / gpt-6.1-sol · xhigh。实际执行：real。\"\n        - StaticText \"执行结果\"\n        - StaticText \"我会按冻结工作包读取三个指定文件，仅修改 `importer.mjs` 和追加回归测试；不委派、不提交或推送。 基线测试为 0/1 通过。已读取 `agents-cooperation`、`tdd` 和 `feature-acceptance`；按 Worker 边界执行，只追加行为测试，覆盖无效输入、重复 ID、处理顺序及输入不变。 已完成修复，仅修改 `importer.mjs` 和向 `test.mjs` 追加 9 项回归测试。 - 返回 `{items,errors}`，保留顺序及有效行字段；拒绝无效行、空白字段和重复 ID，逐条返回正确下标与明确原因，不修改输入。 - 原测试逐字保留，README 未变。 - `node --test test.mjs` 通过；直接运行 `node test.mjs`，10/10 测试通过。 - 无额外文件产物，未委派、提交或推送；未发现范围内未解决风险。\"\n        - StaticText \"执行完成与验收通过分别记录。\"\n        - generic\n          - StaticText \"最近活动 · 9:04:48 PM · Owner review: accepted\"\n        - tablist \"任务记录\"\n          - tab \"时间线 41\" [selected, ref=e30]\n          - tab \"产物 1\" [ref=e31]\n          - tab \"验收\" [ref=e32]\n        - tabpanel \"时间线 41\"\n          - generic\n            - LabelText\n              - StaticText \"事件类型\"\n            - combobox \"事件类型\" [expanded=false, ref=e39]: 全部\n              - StaticText \"全部\"\n            - textbox \"搜索已加载事件\" [ref=e42]\n            - button \"导出已筛选日志\" [ref=e40]\n            - generic\n              - StaticText \"显示和导出会遮盖常见凭据格式，分享前仍需检查。已加载 41 条，筛选后 41 条。\"\n            - time\n              - StaticText \"9:01:36 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Task queued. Owner reference is metadata only; no Herdr session was contacted.\"\n            - time\n              - StaticText \"9:01:41 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Frozen work package created\"\n            - time\n              - StaticText \"9:01:51 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Policy selected qa_b_worker; launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-210003-8da82d/fixture/recovery\"\n            - time\n              - StaticText \"9:01:51 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-210003-8da82d/fixture/recovery\"\n            - time\n              - StaticText \"9:01:51 PM\"\n            - StaticText \"log\"\n            - StaticText \"Launching codex with requested model gpt-6.1-sol\"\n            - time\n              - StaticText \"9:01:51 PM\"\n            - StaticText \"log\"\n            - StaticText \"codex sandbox workspace-write is the vendor profile, not a separate OS claim\"\n            - time\n              - StaticText \"9:01:51 PM\"\n            - StaticText \"progress\"\n            - StaticText \"owned scope started\"\n            - time\n              - StaticText \"9:01:51 PM\"\n            - StaticText \"progress\"\n            - StaticText \"codex thread started\"\n            - time\n              - StaticText \"9:02:28 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started command_execution\"\n            - time\n              - StaticText \"9:02:28 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started command_execution\"\n            - time\n              - StaticText \"9:02:28 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started command_execution\"\n            - time\n              - StaticText \"9:02:28 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished command_execution\"\n            - time\n              - StaticText \"9:02:28 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished command_execution\"\n            - time\n              - StaticText \"9:02:28 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished command_execution\"\n            - time\n              - StaticText \"9:02:38 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started command_execution\"\n            - time\n              - StaticText \"9:02:38 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started command_execution\"\n            - time\n              - StaticText \"9:02:38 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started command_execution\"\n            - time\n              - StaticText \"9:02:38 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished command_execution\"\n            - time\n              - StaticText \"9:02:38 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished command_execution\"\n            - time\n              - StaticText \"9:02:38 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished command_execution\"\n            - time\n              - StaticText \"9:02:38 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started command_execution\"\n            - time\n              - StaticText \"9:02:38 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished command_execution\"\n            - time\n              - StaticText \"9:03:28 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started file_change\"\n            - time\n              - StaticText \"9:03:28 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished file_change\"\n            - time\n              - StaticText \"9:03:28 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started command_execution\"\n            - time\n              - StaticText \"9:03:28 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished command_execution\"\n            - time\n              - StaticText \"9:03:43 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started file_change\"\n            - time\n              - StaticText \"9:03:43 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished file_change\"\n            - time\n              - StaticText \"9:03:44 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started command_execution\"\n            - time\n              - StaticText \"9:03:44 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished command_execution\"\n            - time\n              - StaticText \"9:03:44 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started command_execution\"\n            - time\n              - StaticText \"9:03:44 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished command_execution\"\n            - time\n              - StaticText \"9:03:59 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started command_execution\"\n            - time\n              - StaticText \"9:03:59 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished command_execution\"\n            - time\n              - StaticText \"9:03:59 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started command_execution\"\n            - time\n              - StaticText \"9:03:59 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished command_execution\"\n            - time\n              - StaticText \"9:04:18 PM\"\n            - StaticText \"artifact\"\n            - StaticText \"Received result.md\"\n            - time\n              - StaticText \"9:04:18 PM\"\n            - StaticText \"result\"\n            - StaticText \"我会按冻结工作包读取三个指定文件，仅修改 `importer.mjs` 和追加回归测试；不委派、不提交或推送。 基线测试为 0/1 通过。已读取 `agents-cooperation`、`tdd` 和 `feature-acceptance`；按 Worker 边界执行，只追加行为测试，覆盖无效输入、重复 ID、处理顺序及输入不变。 已完成修复，仅修改 `importer.mjs` 和向 `test.mjs` 追加 9 项回归测试。 - 返回 `{items,errors}`，保留顺序及有效行字段；拒绝无效行、空白字段和重复 ID，逐条返回正确下标与明确原因，不修改输入。 - 原测试逐字保留，README 未变。 - `node --test test.mjs` 通过；直接运行 `node test.mjs`，10/10 测试通过。 - 无额外文件产物，未委派、提交或推送；未发现范围内未解决风险。\"\n            - time\n              - StaticText \"9:04:18 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Worker exited successfully; output is ready for owner review\"\n            - time\n              - StaticText \"9:04:37 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Result receipt acknowledged; acceptance unchanged\"\n            - time\n              - StaticText \"9:04:48 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Owner review: accepted\"\n        - complementary \"执行上下文\"\n          - StaticText \"执行上下文\"\n          - generic\n            - StaticText \"Owner Task owner\"\n          - generic\n            - StaticText \"Worker qa_b_worker\"\n          - generic\n            - StaticText \"Worker 执行记录 real · 适配器 codex\"\n          - StaticText \"Owner 是逻辑登记。外部 CLI 宿主引用未经验证，登记不代表已启动新的 AI。\"\n          - generic\n            - StaticText \"工作目录 /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-210003-8da82d/fixture/recovery\"\n          - StaticText \"Token 和费用未知。worker 未报告实际计量。\"\n          - StaticText \"Owner 手动接续\"\n          - StaticText \"空闲到期仅提醒外部 Owner 手动接续。真实 CLI 负责切换上下文并自行读取接续包；Weaver 不会自动替换外部 AI、投递接续包或确认宿主收到。\"\n          - generic\n            - StaticText \"Epoch 0 · 未达到空闲阈值\"\n          - LabelText [ref=e33] clickable [cursor:pointer]\n            - checkbox \"启用空闲接续提醒\" [checked=true, ref=e41]\n            - StaticText \"启用空闲接续提醒\"\n          - LabelText\n            - StaticText \"空闲阈值（分钟）\"\n          - textbox \"空闲阈值（分钟）\" [ref=e34]: 60\n            - StaticText \"60\"\n          - button \"Increase\" [ref=e35]\n            - image\n          - button \"Decrease\" [ref=e36]\n            - image\n          - button \"保存空闲策略\" [ref=e37]\n          - button \"登记手动接续\" [ref=e38]\n          - generic\n            - StaticText \"Task 5f813e19-5466-4eac-8e41-da4a2e6e5f56\"\n          - generic\n            - StaticText \"Owner handle 66f96a8c-c49a-461b-9a72-9163b2165cb5 · Attempt 361e2d6a-1bba-4179-b30a-d3cae3501735\"\n          - generic\n            - StaticText \"Package 55824a17-2091-478d-8f36-70ee50a9e8f3 · Revision 43\""
+}

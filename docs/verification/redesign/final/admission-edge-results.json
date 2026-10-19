@@ -1,0 +1,162 @@
+[
+  {
+    "case": "actual admission zero",
+    "response": {
+      "exit": 1,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": "qa-fe2c14c4-c5c0-48f4-9e39-ef7a733dda68",
+        "ok": false,
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "worker qa_a_worker unavailable: priority weight 0",
+          "retryable": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "actual admission pin",
+    "response": {
+      "exit": 1,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": "qa-1fd03449-e6ab-4050-bd12-f1ac1a376bbf",
+        "ok": false,
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "worker qa_a_worker unavailable: fixed engine pi",
+          "retryable": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "actual admission all-zero",
+    "response": {
+      "exit": 1,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": "qa-dc5250a2-0ffb-462c-a5ba-7e3934eb5c6b",
+        "ok": false,
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "no available worker for owner codex_owner (class judgment): qa_b_worker: priority weight 0; qa_a_worker: priority weight 0",
+          "retryable": false
+        }
+      },
+      "stderr": ""
+    }
+  },
+  {
+    "case": "frozen kind before launch",
+    "task": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/kind-guard",
+      "acceptanceCriteria": [
+        "proof.txt contains exactly kind freeze guard and a newline"
+      ],
+      "constraints": [
+        "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+      ],
+      "title": "kind freeze guard",
+      "instruction": "Create proof.txt containing exactly kind freeze guard and newline. Read it back. Do not touch any other file.",
+      "id": "a3be0660-38a3-4ff5-b83a-0900eac8a07c",
+      "createdAt": "2026-10-19T00:18:54.311Z",
+      "updatedAt": "2026-10-19T00:18:54.603Z",
+      "status": "queued",
+      "revision": 5,
+      "reviewState": "pending",
+      "progress": 0,
+      "events": [
+        {
+          "id": "46506330-67da-4566-b71d-24d514a4bed5",
+          "at": "2026-10-19T00:18:54.311Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "2157e352-d9f3-42e8-8530-ddab21548e73",
+          "at": "2026-10-19T00:18:54.448Z",
+          "kind": "lifecycle",
+          "message": "Frozen work package created"
+        },
+        {
+          "id": "17773a47-a8f7-4a46-a96c-0cc5199981b7",
+          "at": "2026-10-19T00:18:54.603Z",
+          "kind": "lifecycle",
+          "message": "Policy selected qa_a_worker; launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/kind-guard"
+        },
+        {
+          "id": "ddb6704d-65bd-4dc8-8b8c-49eef62245f2",
+          "at": "2026-10-19T00:18:54.603Z",
+          "kind": "lifecycle",
+          "message": "Dispatch admitted to queue; waiting for an execution slot"
+        }
+      ],
+      "artifacts": [],
+      "ownerId": "6c7f0fb4-2745-4d7a-a200-eccdd937fc76",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-19T00:18:54.311Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "packageId": "c678d384-d95f-4944-8965-01fe31bb314e",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "qa_a_worker",
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "execution": "real",
+        "maxParallel": 1,
+        "maxWaitMinutes": 1,
+        "adapter": "codex",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/kind-guard",
+        "workspaceIdentity": "38:1730072",
+        "engineKind": "codex"
+      },
+      "scheduled": true,
+      "queueReason": {
+        "code": "frozen_route_changed",
+        "message": "Current worker engine, kind, model or effort no longer matches the frozen dispatch; restore the route or cancel and create a new task."
+      }
+    }
+  },
+  {
+    "case": "real wallclock quota expiry",
+    "before": {
+      "exit": 1,
+      "response": {
+        "apiVersion": "weaver.v1",
+        "commandId": null,
+        "ok": false,
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "no available worker for owner codex_owner (class judgment): qa_b_worker: blocked (pi: actual short expiry fixture, release_at 2026-10-19T00:18:56.096828+00:00); qa_a_worker: fixed engine pi",
+          "retryable": false
+        }
+      },
+      "stderr": ""
+    },
+    "after": {
+      "owner": "codex_owner",
+      "worker": "qa_b_worker",
+      "engine": "pi",
+      "model": "cc-switch-agentplan/glm-5.3-flash",
+      "effort": "high",
+      "execution": "disabled",
+      "dispatch": "preview",
+      "warnings": [],
+      "weight": 100,
+      "only_engine": "pi",
+      "class": "judgment",
+      "selected_by": "order",
+      "skipped": [],
+      "maxParallel": 1,
+      "capacityAvailable": true,
+      "chatgptReview": false
+    }
+  }
+]

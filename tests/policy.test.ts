@@ -103,3 +103,60 @@ test('capacity is hypothetical preview only, never execution permission',()=>fix
 test('corrupt policy file is rejected and retained',()=>fixture((_store,path)=>{
  writeFileSync(path,'{"version":2}');assert.throws(()=>new PolicyStore(path),/Unsupported/);assert.equal(readFileSync(path,'utf8'),'{"version":2}');
 }));
+test('disabled pi template validates without native subagents and stays out of claude routing',()=>{
+ const c=defaultConfig(); assert.deepEqual(validateConfig(c),[]);
+ assert.equal(c.engines.pi?.enabled,false); assert.equal(c.engines.pi?.kind,'pi'); assert.equal(c.engines.pi?.native_subagents,false);
+ assert.equal(c.workers.pi_worker?.enabled,false); assert.equal(c.workers.pi_worker?.model,'glm-5.3-flash'); assert.equal(c.owners.pi_owner?.enabled,false); assert.deepEqual(EFFORTS.pi,['off','minimal','low','medium','high','xhigh','max']);
+ for (const effort of EFFORTS.pi) { const sample=defaultConfig(); sample.workers.pi_worker.effort=effort; sample.owners.pi_owner.effort=effort; assert.deepEqual(validateConfig(sample),[]); }
+ const badEffort=defaultConfig(); badEffort.workers.pi_worker.effort='ultra'; assert.ok(validateConfig(badEffort).some(issue=>issue.path.includes('pi_worker')&&issue.message.includes('effort')));
+ assert.equal(c.owners.claude_owner.workers.includes('pi_worker'),false);
+ const open=defaultConfig(); open.engines.opencode.enabled=true; open.workers.opencode_worker.enabled=true;
+ open.owners.opencode_owner={enabled:true,engine:'opencode',model:'opencode/glm-5.3-flash-free',effort:'max',workers:['opencode_worker'],max_parallel:1};
+ assert.equal(open.engines.opencode.native_subagents,false); assert.deepEqual(validateConfig(open),[]);
+ assert.equal(route(all()).worker,'claude_worker'); assert.equal(route(all()).weight,100); assert.equal(route(all()).only_engine,undefined);
+});
+test('weight reorders inside a tier, keeps ties in list order, and does not cross class',()=>{
+ const c=all(); c.workers.qoder_worker.tags=['mechanical']; c.owners.claude_owner.workers=['opencode_worker','qoder_worker','claude_worker'];
+ c.owners.claude_owner.worker_weights={qoder_worker:100}; assert.equal(route(c,'mechanical').worker,'opencode_worker');
+ c.owners.claude_owner.worker_weights={qoder_worker:200,opencode_worker:100}; const ranked=route(c,'mechanical');
+ assert.equal(ranked.worker,'qoder_worker'); assert.equal(ranked.weight,200); assert.equal(ranked.selected_by,'class');
+ const capped=all(); capped.owners.claude_owner.worker_weights={claude_worker:1000,opencode_worker:1};
+ assert.equal(route(capped,'mechanical').worker,'opencode_worker'); assert.equal(route(capped,'mechanical').weight,1);
+});
+test('weight 0 and a fixed engine are hard exclusions with no cross-engine fallback',()=>{
+ const c=all(); c.owners.claude_owner.worker_weights={opencode_worker:0};
+ const fell=route(c,'mechanical'); assert.equal(fell.worker,'qoder_worker'); assert.ok(fell.skipped?.some(item=>item.worker==='opencode_worker'&&item.reason==='priority weight 0'));
+ assert.throws(()=>resolveDispatch(c,[],{owner:'claude_owner',worker:'opencode_worker'}),/priority weight 0/);
+ assert.equal(route(all(),'judgment','research').worker,'grok_worker');
+ const pinned=all(); pinned.owners.claude_owner.only_engine='opencode'; pinned.owners.claude_owner.worker_weights={grok_worker:1000};
+ assert.throws(()=>route(pinned,'judgment','research'),/no available worker/); assert.throws(()=>route(pinned,'judgment','research'),/fixed engine opencode/);
+ assert.throws(()=>resolveDispatch(pinned,[],{owner:'claude_owner',worker:'grok_worker'}),/fixed engine opencode/);
+ pinned.workers.opencode_worker.tags=['research']; const selected=route(pinned,'judgment','research');
+ assert.equal(selected.worker,'opencode_worker'); assert.equal(selected.engine,'opencode'); assert.equal(selected.only_engine,'opencode'); assert.equal(selected.execution,'disabled'); assert.equal(selected.dispatch,'preview');
+ const loose=defaultConfig(); const outside=resolveDispatch(loose,[],{owner:'claude_owner',worker:'codex_worker'}); assert.equal(outside.worker,'codex_worker'); assert.ok(outside.warnings.length);
+});
+test('invalid weights and unknown pins are rejected; all-zero and unavailable pins still save',()=>{
+ const missing=defaultConfig(); missing.owners.claude_owner.worker_weights={missing_worker:10}; assert.ok(validateConfig(missing).some(issue=>issue.message.includes("not in this owner's workers")));
+ const high=defaultConfig(); high.owners.claude_owner.worker_weights={claude_worker:1001}; assert.ok(validateConfig(high).some(issue=>issue.message.includes('0 to 1000')));
+ const low=defaultConfig(); low.owners.claude_owner.worker_weights={claude_worker:-1}; assert.ok(validateConfig(low).length);
+ const fraction=defaultConfig(); fraction.owners.claude_owner.worker_weights={claude_worker:1.5}; assert.ok(validateConfig(fraction).length);
+ const unknown=defaultConfig(); unknown.owners.claude_owner.only_engine='cursor'; assert.ok(validateConfig(unknown).some(issue=>issue.message.includes('unknown engine')));
+ const zero=all(); for (const id of zero.owners.claude_owner.workers) zero.owners.claude_owner.worker_weights={...zero.owners.claude_owner.worker_weights,[id]:0};
+ assert.deepEqual(validateConfig(zero),[]); assert.throws(()=>route(zero),/no available worker/); assert.throws(()=>route(zero),/priority weight 0/);
+ zero.owners.claude_owner.worker_weights={opencode_worker:0,qoder_worker:0,grok_worker:0}; assert.equal(route(zero).worker,'claude_worker');
+ const pinnedOff=all(); pinnedOff.engines.opencode.enabled=false; pinnedOff.workers.opencode_worker.enabled=false; pinnedOff.owners.claude_owner.only_engine='opencode';
+ assert.deepEqual(validateConfig(pinnedOff),[]); assert.throws(()=>route(pinnedOff),/no available worker/); assert.throws(()=>route(pinnedOff),/fixed engine opencode/);
+ delete pinnedOff.owners.claude_owner.only_engine; assert.equal(route(pinnedOff).worker,'claude_worker');
+});
+test('saved preview uses the same weight and pin resolver',()=>fixture((store)=>{
+ const config=store.snapshot().config; config.owners.claude_owner.workers=['claude_worker','codex_worker']; config.owners.claude_owner.only_engine='codex'; config.owners.claude_owner.worker_weights={codex_worker:10};
+ store.save({revision:0,config,blocks:[]}); const preview=store.preview({owner:'claude_owner',class:'judgment',runningCount:0});
+ assert.equal(preview.worker,'codex_worker'); assert.equal(preview.engine,'codex'); assert.equal(preview.weight,10); assert.equal(preview.only_engine,'codex');
+ assert.equal(preview.execution,'disabled'); assert.equal(preview.dispatch,'preview'); assert.ok(preview.skipped?.some(item=>item.worker==='claude_worker'&&item.reason==='fixed engine codex'));
+ assert.throws(()=>store.preview({owner:'claude_owner',worker:'claude_worker'}),/fixed engine codex/);
+ const blocked=store.snapshot().config; blocked.owners.claude_owner.worker_weights={claude_worker:0,codex_worker:0};
+ store.save({revision:1,config:blocked,blocks:[{engine:'codex',reason:'quota',since:new Date(now).toISOString()}]});
+ assert.throws(()=>store.preview({owner:'claude_owner',class:'judgment'}),/no available worker/);
+ delete blocked.owners.claude_owner.worker_weights; delete blocked.owners.claude_owner.only_engine;
+ store.save({revision:2,config:blocked,blocks:[]}); assert.equal(store.preview({owner:'claude_owner',class:'judgment'}).worker,'claude_worker');
+}));

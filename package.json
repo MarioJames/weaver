@@ -1,13 +1,13 @@
 {
-  "name": "weaver-desktop",
+  "name": "weaver",
   "version": "0.1.0",
   "private": true,
-  "description": "Local desktop control plane for owner-led agent work",
+  "description": "Local control plane for owner-led agent work",
   "license": "Apache-2.0",
-  "main": "dist/main/main.cjs",
+  "main": "dist/cli/main.mjs",
   "scripts": {
-    "dev": "npm run build && electron .",
-    "start": "electron .",
+    "dev": "tsx src/cli/main.ts web --dev",
+    "start": "node dist/cli/main.mjs web",
     "build": "tsc --noEmit && vite build && node scripts/build-main.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
@@ -17,6 +17,14 @@
     "node": ">=22.12.0"
   },
   "dependencies": {
+    "@base-ui/react": "1.8.0",
+    "@lobehub/fluent-emoji": "^4.1.1",
+    "@lobehub/icons": "^5.23.1",
+    "@lobehub/ui": "^5.58.0",
+    "antd": "^6.6.6",
+    "antd-style": "^4.1.0",
+    "lucide-react": "^1.59.0",
+    "motion": "^12.43.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
@@ -24,7 +32,6 @@
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "electron": "^44.9.0",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

@@ -1,0 +1,39 @@
+{
+  "aside": {
+    "bottom": 650,
+    "height": 650,
+    "left": 0,
+    "right": 56,
+    "top": 0,
+    "width": 56,
+    "x": 0,
+    "y": 0
+  },
+  "links": [
+    {
+      "name": "任务",
+      "text": "任务",
+      "title": null
+    },
+    {
+      "name": "引擎",
+      "text": "引擎",
+      "title": null
+    },
+    {
+      "name": "负责人",
+      "text": "负责人",
+      "title": null
+    },
+    {
+      "name": "工作代理",
+      "text": "工作代理",
+      "title": null
+    },
+    {
+      "name": "路由与配额",
+      "text": "路由与配额",
+      "title": null
+    }
+  ]
+}

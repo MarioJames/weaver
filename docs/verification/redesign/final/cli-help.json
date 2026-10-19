@@ -1,0 +1,472 @@
+{
+  "catalog": [
+    {
+      "command": "capabilities.get",
+      "mutation": false,
+      "usage": "capabilities | capabilities get",
+      "inputFields": {
+        "required": {}
+      }
+    },
+    {
+      "command": "sync.snapshot",
+      "mutation": false,
+      "usage": "sync snapshot",
+      "inputFields": {
+        "required": {}
+      }
+    },
+    {
+      "command": "sync.status",
+      "inputFields": {
+        "required": {},
+        "optional": {
+          "after": "integer"
+        }
+      },
+      "mutation": false,
+      "usage": "sync status [--input <json>]"
+    },
+    {
+      "command": "owners.list",
+      "mutation": false,
+      "usage": "owners list",
+      "inputFields": {
+        "required": {}
+      }
+    },
+    {
+      "command": "owners.get",
+      "inputFields": {
+        "required": {
+          "ownerId": "UUID"
+        },
+        "optional": {}
+      },
+      "mutation": false,
+      "usage": "owners get --input <json>"
+    },
+    {
+      "command": "owners.continuation.get",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID"
+        },
+        "optional": {}
+      },
+      "mutation": false,
+      "usage": "owners continuation get --task-id <id>"
+    },
+    {
+      "command": "owners.attach",
+      "inputFields": {
+        "required": {
+          "name": "string (1–120)",
+          "profileId": "available owner profile ID"
+        },
+        "optional": {
+          "session": "unverified reference string",
+          "pane": "unverified reference string"
+        }
+      },
+      "mutation": true,
+      "usage": "owners attach --input <json> --command-id <id>    json: name, profileId, optional session, optional pane. Metadata only; verified stays false."
+    },
+    {
+      "command": "owners.spawn",
+      "inputFields": {
+        "required": {
+          "name": "string (1–120)",
+          "profileId": "available owner profile ID"
+        },
+        "optional": {
+          "provider": "mock (explicit fixture only); omitted registers manual external owner",
+          "session": "unverified reference string (manual only)",
+          "pane": "unverified reference string (manual only)"
+        }
+      },
+      "mutation": true,
+      "usage": "owners spawn --input <json> --command-id <id>    json: name, profileId. Logical registration; no owner model and no session."
+    },
+    {
+      "command": "owners.switch",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID",
+          "expectedRevision": "integer"
+        },
+        "optional": {
+          "expectedEpoch": "integer",
+          "reason": "manual | idle",
+          "profileId": "available owner profile ID"
+        }
+      },
+      "mutation": true,
+      "usage": "owners switch --task-id <id> --input <json> --command-id <id>"
+    },
+    {
+      "command": "owners.continuation.configure",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID",
+          "expectedRevision": "integer",
+          "idleRotationMinutes": "integer 1–10080 | null"
+        },
+        "optional": {}
+      },
+      "mutation": true,
+      "usage": "owners continuation configure --task-id <id> --input <json> --command-id <id>"
+    },
+    {
+      "command": "tasks.create",
+      "inputFields": {
+        "required": {
+          "title": "string (1–160)",
+          "instruction | goal": "string (1–16000)",
+          "ownerId | ownerProfileId | owner": "one existing logical owner UUID, profile ID, or legacy OwnerRef"
+        },
+        "optional": {
+          "workspace": "nonempty path; omitted uses caller cwd",
+          "ownerName": "string (1–120)",
+          "ownerProvider": "mock only when intentionally using mock Owner",
+          "acceptanceCriteria": "string[] (≤30; each ≤1000)",
+          "constraints": "string[] (≤30; each ≤1000)"
+        }
+      },
+      "mutation": true,
+      "usage": "tasks create --input <json> --command-id <id>"
+    },
+    {
+      "command": "tasks.retry",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID"
+        },
+        "optional": {}
+      },
+      "mutation": true,
+      "usage": "tasks retry --task-id <id> --command-id <id>"
+    },
+    {
+      "command": "tasks.cancel",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID"
+        },
+        "optional": {
+          "expectedRevision": "integer"
+        }
+      },
+      "mutation": true,
+      "usage": "tasks cancel --task-id <id> --command-id <id>"
+    },
+    {
+      "command": "tasks.get",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID"
+        },
+        "optional": {}
+      },
+      "mutation": false,
+      "usage": "tasks get --task-id <id>"
+    },
+    {
+      "command": "tasks.list",
+      "inputFields": {
+        "required": {},
+        "optional": {
+          "offset": "integer ≥0 (default 0)",
+          "limit": "integer 1–100 (default 25)",
+          "ownerId": "UUID"
+        }
+      },
+      "mutation": false,
+      "usage": "tasks list [--input <json>]"
+    },
+    {
+      "command": "tasks.events",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID"
+        },
+        "optional": {
+          "after": "event cursor UUID",
+          "limit": "integer 1–100 (default 50)"
+        }
+      },
+      "mutation": false,
+      "usage": "tasks events --task-id <id> [--input <json>]"
+    },
+    {
+      "command": "tasks.results",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID"
+        },
+        "optional": {}
+      },
+      "mutation": false,
+      "usage": "tasks results --task-id <id>"
+    },
+    {
+      "command": "tasks.wait",
+      "inputFields": {
+        "required": {
+          "--task-id": "UUID"
+        },
+        "optional": {
+          "--for": "seconds 1–600 (default 30)"
+        }
+      },
+      "mutation": false,
+      "local": "wait",
+      "usage": "tasks wait --task-id <id> [--for <seconds>]"
+    },
+    {
+      "command": "tasks.watch",
+      "inputFields": {
+        "required": {
+          "--task-id": "UUID"
+        },
+        "optional": {
+          "--for": "seconds 1–600 (default 30)"
+        }
+      },
+      "mutation": false,
+      "local": "watch",
+      "usage": "tasks watch --task-id <id> [--for <seconds>]"
+    },
+    {
+      "command": "packages.create",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID",
+          "scope": "string[1–30] (each ≤1000)",
+          "acceptanceCriteria": "string[1–30] (each ≤1000)"
+        },
+        "optional": {
+          "expectedRevision": "integer"
+        }
+      },
+      "mutation": true,
+      "usage": "packages create --task-id <id> --input <json> --command-id <id>"
+    },
+    {
+      "command": "packages.get",
+      "inputFields": {
+        "required": {
+          "packageId": "UUID"
+        },
+        "optional": {}
+      },
+      "mutation": false,
+      "usage": "packages get --input <json>"
+    },
+    {
+      "command": "workers.spawn",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID"
+        },
+        "optional": {
+          "expectedRevision": "integer",
+          "packageId": "frozen package UUID",
+          "owner": "profile ID (must match task owner)",
+          "worker": "explicit worker ID (excludes class)",
+          "class": "mechanical | routine | judgment (default routine)",
+          "tag": "judgment domain tag",
+          "provider": "mock-jsonl only for explicit fixture execution"
+        }
+      },
+      "mutation": true,
+      "usage": "workers spawn --task-id <id> [--input <json>] --command-id <id>"
+    },
+    {
+      "command": "results.deliver",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID"
+        },
+        "optional": {}
+      },
+      "mutation": true,
+      "usage": "results deliver --task-id <id> --command-id <id>"
+    },
+    {
+      "command": "results.ack",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID",
+          "expectedRevision": "integer",
+          "manifestDigest": "current manifest SHA-256"
+        },
+        "optional": {}
+      },
+      "mutation": true,
+      "usage": "results ack --task-id <id> --input <json> --command-id <id>"
+    },
+    {
+      "command": "reviews.submit",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID",
+          "expectedRevision": "integer",
+          "manifestDigest": "current manifest SHA-256",
+          "decision": "accepted | rejected"
+        },
+        "optional": {
+          "comment": "string (≤4000)"
+        }
+      },
+      "mutation": true,
+      "usage": "reviews submit --task-id <id> --input <json> --command-id <id>"
+    },
+    {
+      "command": "artifacts.read",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID",
+          "artifactId": "UUID"
+        },
+        "optional": {}
+      },
+      "mutation": false,
+      "usage": "artifacts read --task-id <id> --input <json>"
+    },
+    {
+      "command": "operations.get",
+      "inputFields": {
+        "required": {
+          "commandId": "stable mutation command ID"
+        },
+        "optional": {}
+      },
+      "mutation": false,
+      "usage": "operations get --command-id <id>"
+    },
+    {
+      "command": "observability.get",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID"
+        },
+        "optional": {
+          "kind": "event kind"
+        }
+      },
+      "mutation": false,
+      "usage": "observability get --task-id <id>"
+    },
+    {
+      "command": "observability.export",
+      "inputFields": {
+        "required": {
+          "taskId": "UUID"
+        },
+        "optional": {
+          "kind": "event kind"
+        }
+      },
+      "mutation": false,
+      "usage": "observability export --task-id <id>"
+    },
+    {
+      "command": "policy.get",
+      "mutation": false,
+      "rpc": {
+        "method": "getPolicy",
+        "arity": 0
+      },
+      "usage": "policy get",
+      "inputFields": {
+        "required": {}
+      }
+    },
+    {
+      "command": "policy.validate",
+      "inputFields": {
+        "required": {
+          "engines": "engine map",
+          "owners": "owner profile map",
+          "workers": "worker profile map",
+          "herdr": "runtime wait settings"
+        },
+        "optional": {},
+        "notes": "Body is the full policy config; inspect policy get and src/main/policy/config.schema.json for exact schema."
+      },
+      "mutation": false,
+      "rpc": {
+        "method": "validatePolicy",
+        "arity": 1
+      },
+      "usage": "policy validate --input <config.json>"
+    },
+    {
+      "command": "policy.save",
+      "inputFields": {
+        "required": {
+          "revision": "current policy revision integer",
+          "config": "full policy config",
+          "blocks": "quota block array (≤500)"
+        },
+        "optional": {}
+      },
+      "mutation": true,
+      "rpc": {
+        "method": "savePolicy",
+        "arity": 1
+      },
+      "usage": "policy save --input <save.json>"
+    },
+    {
+      "command": "policy.preview",
+      "inputFields": {
+        "required": {
+          "owner": "owner profile ID"
+        },
+        "optional": {
+          "worker": "explicit worker ID",
+          "class": "mechanical | routine | judgment",
+          "tag": "judgment domain tag",
+          "runningCount": "integer ≥0"
+        }
+      },
+      "mutation": false,
+      "rpc": {
+        "method": "previewRoute",
+        "arity": 1
+      },
+      "usage": "policy preview --input <preview.json>"
+    },
+    {
+      "command": "engines.scan",
+      "mutation": false,
+      "rpc": {
+        "method": "scanEngines",
+        "arity": 0
+      },
+      "usage": "engines scan",
+      "inputFields": {
+        "required": {}
+      }
+    },
+    {
+      "command": "engines.set-enabled",
+      "inputFields": {
+        "required": {
+          "id": "engine ID",
+          "enabled": "boolean",
+          "revision": "current policy revision integer"
+        },
+        "optional": {}
+      },
+      "mutation": true,
+      "rpc": {
+        "method": "setEngineEnabled",
+        "arity": 1
+      },
+      "usage": "engines set-enabled --input <toggle.json>"
+    }
+  ]
+}

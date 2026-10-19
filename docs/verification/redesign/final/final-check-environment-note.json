@@ -1,0 +1,18 @@
+{
+  "source": "Owner message before 055",
+  "status": "Corrected run PASS",
+  "initialTmpdir": "/tmp/weaver-redesign-3QuXVe/final-check-tmp",
+  "failure": "14 socket tests ENDPOINT_PATH_TOO_LONG: 108 bytes > 103; 171 tests passed and typecheck passed; no build yet",
+  "correctedTmpdir": "/tmp/weaver-redesign-3QuXVe/i",
+  "sourceUnchanged": true,
+  "interpretation": "Verification environment path length exceeded existing protected socket limit; retain failure and corrected result. Not a product regression or permission to raise endpoint limit.",
+  "correctedResults": {
+    "tests": 185,
+    "pass": 185,
+    "fail": 0,
+    "skip": 0,
+    "typecheck": "pass",
+    "build": "pass",
+    "log": "final-check-short.log"
+  }
+}

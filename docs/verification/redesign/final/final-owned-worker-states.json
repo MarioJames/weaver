@@ -1,0 +1,514 @@
+{
+  "at": "2026-10-19T01:07:21.219926+00:00",
+  "runtimes": [
+    {
+      "dataDir": "/tmp/weaver-redesign-3QuXVe/f",
+      "taskCount": 45,
+      "running": [],
+      "tasks": [
+        {
+          "id": "9881d6d7-8fe1-4997-8e58-9175906a6b4a",
+          "title": "ui055 policy blocked queue",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "853160b7-9f7e-433b-bb65-7b36f90ed91e",
+          "title": "ui055 policy blocked holder",
+          "status": "completed",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "d3973111-d90a-4f63-804b-cdfe0f2834cf",
+          "title": "ui055 blocked explicit mock",
+          "status": "queued",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "bbfe9d71-187c-4682-ae3c-7044fc02cec2",
+          "title": "ui055 valid demo artifact",
+          "status": "completed",
+          "review": "accepted",
+          "scopeUnit": null
+        },
+        {
+          "id": "26f094d9-c554-4ddf-a8e8-51fb82ad0c20",
+          "title": "ui055 mock lifecycle",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "9694df9f-0646-4843-87c9-f7a5bb9647d9",
+          "title": "ui055 mock lifecycle",
+          "status": "completed",
+          "review": "rejected",
+          "scopeUnit": null
+        },
+        {
+          "id": "efdee112-169c-4e25-900f-b9e9fde79682",
+          "title": "UI055 create only, no model",
+          "status": "queued",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "22501800-02fc-4f77-9496-03d24b650edf",
+          "title": "Real Pi immediate cancel 055",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": "weaver-cli-pi-b8ce55e9"
+        },
+        {
+          "id": "73bf9d70-8280-4f38-88e2-b7ca19e24447",
+          "title": "downcap queue",
+          "status": "completed",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "97ba3b98-5b3a-4d0b-9137-0a77e11fc4ef",
+          "title": "downcap second",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "6a6cbafa-dacc-48a4-bc8c-7ee83510548f",
+          "title": "downcap first",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "27dbe36b-efc7-41be-9575-e1f612ced625",
+          "title": "uncertain receipt fixture",
+          "status": "queued",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "36d94052-3f87-449e-a42e-2b52d5649d00",
+          "title": "priority freeze queued",
+          "status": "completed",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "2c36ab9e-4a5b-4d20-92c2-de33b24742d5",
+          "title": "priority freeze active",
+          "status": "completed",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "90a81855-1e16-462b-bc1c-9e8b8992aaa3",
+          "title": "bounded wait queued fixture",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "a3be0660-38a3-4ff5-b83a-0900eac8a07c",
+          "title": "kind freeze guard",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "0c4a5009-0f47-408c-83b3-52bad601b686",
+          "title": "kind slot",
+          "status": "completed",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "c4359942-a1ef-4a6a-a7db-1777664c2de8",
+          "title": "admission all-zero",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "984bbf1d-9aa0-4221-a922-c1f63b4764ac",
+          "title": "admission pin",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "e19c5ce6-c953-4b7f-96d4-05c0a7d90648",
+          "title": "admission zero",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "c7ba6803-43b7-4874-95cd-c310a6834e4c",
+          "title": "SIGTERM active mock",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "4f7faacd-e87a-4bd0-92da-8198a3043105",
+          "title": "missing workspace",
+          "status": "queued",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "6f5c429b-0820-4943-ade9-e4d127a75844",
+          "title": "qa_owner capacity 1",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "13a217bc-1698-4f1c-8fae-a28a0466fee2",
+          "title": "qa_owner capacity 0",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "6506e3f2-d396-42b0-a216-24c006b21fe7",
+          "title": "codex_owner capacity 1",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "8969b940-e114-4295-bdbe-6198233d7375",
+          "title": "codex_owner capacity 0",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "2534056e-dc37-45fc-b730-0e02f92a1191",
+          "title": "workspace guard no launch",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "52b05b52-68f1-4a0f-a51b-10e2a9eaff8a",
+          "title": "occupy workspace slot",
+          "status": "completed",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "724b51d6-138f-41c4-98e8-b7415d84b833",
+          "title": "workspace guard no launch",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "d94d568c-45ee-4a73-86be-8f50bdd46e37",
+          "title": "occupy workspace slot",
+          "status": "completed",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "c7773548-e8f2-4309-84db-7f8e4241bc7c",
+          "title": "capacity queued",
+          "status": "completed",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "414a902f-714b-411f-986f-293e16de2b7e",
+          "title": "capacity first",
+          "status": "completed",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "ffaff7b9-bfc0-4baf-b174-43a23c8ddc5d",
+          "title": "Actual Pi timeout",
+          "status": "failed",
+          "review": "pending",
+          "scopeUnit": "weaver-cli-pi-0a289da8"
+        },
+        {
+          "id": "44fa7e7e-80e4-4717-9ed2-19cc6b079de4",
+          "title": "Actual Pi cancel",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": "weaver-cli-pi-b8f01198"
+        },
+        {
+          "id": "8b8b0cfc-e284-4228-ad1e-7a8281cab66d",
+          "title": "stdin idempotency",
+          "status": "queued",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "88531d7f-6971-49a4-be76-b2725a6a033b",
+          "title": "Catalog text",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "4e2efc9d-a994-41bd-a839-aa35a9f72bf2",
+          "title": "Catalog text",
+          "status": "completed",
+          "review": "accepted",
+          "scopeUnit": null
+        },
+        {
+          "id": "8b545e0c-6281-4381-9d17-c951bfed43d2",
+          "title": "Catalog jsonl",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "8f43fc4d-8c94-4858-8557-500f8c7db53c",
+          "title": "Catalog jsonl",
+          "status": "completed",
+          "review": "accepted",
+          "scopeUnit": null
+        },
+        {
+          "id": "2ed5c3bc-38a1-4591-a319-65d3c4e8256b",
+          "title": "Catalog json",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": null
+        },
+        {
+          "id": "babd096f-e21a-40e7-b693-a10e6960fc29",
+          "title": "Catalog json",
+          "status": "completed",
+          "review": "rejected",
+          "scopeUnit": null
+        },
+        {
+          "id": "35988b40-faee-44b3-9301-fb24cadcbce2",
+          "title": "weaver-real-codex",
+          "status": "completed",
+          "review": "accepted",
+          "scopeUnit": "weaver-cli-codex-4e181c67"
+        },
+        {
+          "id": "1c3b37ed-35f4-4748-a54c-e53c90e66b9f",
+          "title": "weaver-real-grok",
+          "status": "failed",
+          "review": "pending",
+          "scopeUnit": "weaver-cli-grok-5a6568fa"
+        },
+        {
+          "id": "a9d0bafc-7f20-47f3-a60a-9a393143449a",
+          "title": "weaver-real-pi",
+          "status": "completed",
+          "review": "accepted",
+          "scopeUnit": "weaver-cli-pi-7d14f290"
+        },
+        {
+          "id": "ed51853c-3a5f-4a8f-8662-9acd91d4882c",
+          "title": "weaver-real-opencode",
+          "status": "completed",
+          "review": "accepted",
+          "scopeUnit": "weaver-cli-opencode-b7d49b78"
+        }
+      ]
+    },
+    {
+      "dataDir": "/tmp/weaver-redesign-3QuXVe/a",
+      "taskCount": 9,
+      "running": [],
+      "tasks": [
+        {
+          "id": "5f813e19-5466-4eac-8e41-da4a2e6e5f56",
+          "title": "修复任务导入并补齐边界测试",
+          "status": "completed",
+          "review": "accepted",
+          "scopeUnit": "weaver-cli-codex-9b3e4b21"
+        },
+        {
+          "id": "00d508a5-3c84-46a9-b5aa-b0781a90b898",
+          "title": "补强 recovery 导入回归测试",
+          "status": "failed",
+          "review": "pending",
+          "scopeUnit": "weaver-cli-pi-2fffbae0"
+        },
+        {
+          "id": "9159779a-bcb1-406b-9a62-ebf2b31fd49b",
+          "title": "修复 recovery 任务批量导入",
+          "status": "completed",
+          "review": "rejected",
+          "scopeUnit": "weaver-cli-pi-b022fdf4"
+        },
+        {
+          "id": "b9e7b26e-025d-4f54-b800-337e58e039ba",
+          "title": "修复任务导入：保留有效行并报告逐行错误",
+          "status": "failed",
+          "review": "pending",
+          "scopeUnit": "weaver-cli-pi-41c27736"
+        },
+        {
+          "id": "a146d348-8ab2-4b81-b4d1-295b39725d6a",
+          "title": "修复任务导入：保留有效行并报告逐行错误",
+          "status": "failed",
+          "review": "pending",
+          "scopeUnit": "weaver-cli-pi-1e06b552"
+        },
+        {
+          "id": "1bbac1ec-3132-458e-94f1-bef0605421c6",
+          "title": "离线任务看板：唯一索引、批量导入与跨模块验证",
+          "status": "completed",
+          "review": "accepted",
+          "scopeUnit": "weaver-cli-codex-4fe6bd80"
+        },
+        {
+          "id": "8bc8d2b0-2572-40bf-8fc2-d6d49186ce1e",
+          "title": "离线任务看板：筛选、分页与状态统计",
+          "status": "completed",
+          "review": "accepted",
+          "scopeUnit": "weaver-cli-codex-b86a98ab"
+        },
+        {
+          "id": "0a68044f-8d5c-43b3-93e7-2f6088dafb1b",
+          "title": "实现本地任务索引与 Node 测试",
+          "status": "completed",
+          "review": "accepted",
+          "scopeUnit": "weaver-cli-codex-eb6d1c47"
+        },
+        {
+          "id": "9f23564d-f284-483c-8b08-e03814e76c73",
+          "title": "创建 smoke health.txt",
+          "status": "completed",
+          "review": "accepted",
+          "scopeUnit": "weaver-cli-pi-4cdd35da"
+        }
+      ]
+    },
+    {
+      "dataDir": "/tmp/weaver-redesign-3QuXVe/s",
+      "taskCount": 4,
+      "running": [],
+      "tasks": [
+        {
+          "id": "72ff322f-07a9-4182-83a4-8df59dab4dfb",
+          "title": "built delayed scope immediate cancellation",
+          "status": "cancelled",
+          "review": "pending",
+          "scopeUnit": "weaver-cli-pi-c9ce85d5"
+        },
+        {
+          "id": "8d989380-9d01-42b7-a397-e93aa3d86ee4",
+          "title": "built-overflow",
+          "status": "failed",
+          "review": "pending",
+          "scopeUnit": "weaver-cli-pi-fa1f98fd"
+        },
+        {
+          "id": "56d368ce-30fe-435c-b230-27f032392791",
+          "title": "built-retained",
+          "status": "completed",
+          "review": "pending",
+          "scopeUnit": "weaver-cli-pi-d364dd74"
+        },
+        {
+          "id": "1515ae02-a55c-49cf-b4b5-f534c9c74c2f",
+          "title": "built-normal",
+          "status": "completed",
+          "review": "pending",
+          "scopeUnit": "weaver-cli-pi-a2294809"
+        }
+      ]
+    }
+  ],
+  "workerScopes": [
+    {
+      "unit": "weaver-cli-codex-4e181c67.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-codex-4fe6bd80.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-codex-9b3e4b21.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-codex-b86a98ab.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-codex-eb6d1c47.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-grok-5a6568fa.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-opencode-b7d49b78.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-pi-0a289da8.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-pi-1e06b552.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-pi-2fffbae0.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-pi-41c27736.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-pi-4cdd35da.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-pi-7d14f290.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-pi-a2294809.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-pi-b022fdf4.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-pi-b8ce55e9.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-pi-b8f01198.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-pi-c9ce85d5.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-pi-d364dd74.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "unit": "weaver-cli-pi-fa1f98fd.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+    }
+  ]
+}

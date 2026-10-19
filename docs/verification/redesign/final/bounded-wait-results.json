@@ -1,0 +1,17 @@
+{
+  "elapsedSeconds": 1.0487052670214325,
+  "response": {
+    "exit": 1,
+    "response": {
+      "apiVersion": "weaver.v1",
+      "commandId": null,
+      "ok": false,
+      "error": {
+        "code": "TIMEOUT",
+        "message": "Bounded wait deadline reached",
+        "retryable": true
+      }
+    },
+    "stderr": ""
+  }
+}

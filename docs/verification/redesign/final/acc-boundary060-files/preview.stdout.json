@@ -1,0 +1,1 @@
+{"apiVersion":"weaver.v1","commandId":null,"ok":true,"data":{"owner":"codex_owner","worker":"qa_b_worker","engine":"codex","model":"gpt-6.1-sol","effort":"xhigh","execution":"disabled","dispatch":"preview","warnings":[],"weight":250,"only_engine":"codex","class":"routine","selected_by":"class","skipped":[],"maxParallel":2,"capacityAvailable":true,"chatgptReview":false}}

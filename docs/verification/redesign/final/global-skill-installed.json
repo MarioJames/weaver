@@ -1,0 +1,7 @@
+{
+  "path": "/home/mocha/.agents/skills/weaver",
+  "isSymlink": true,
+  "target": "/home/mocha/opensource/weaver/skills/weaver",
+  "frontmatterName": "weaver",
+  "installedAfterCleanBoundaryPASS": true
+}

@@ -1,0 +1,13 @@
+[
+  {
+    "taskId": "b9e7b26e-025d-4f54-b800-337e58e039ba",
+    "scope": "weaver-cli-pi-41c27736.scope",
+    "processes": [
+      {
+        "pid": 3406713,
+        "args": "pi                                                                                                                                                                                                                                                                                                                                                              ",
+        "io": "rchar: 8409671\nwchar: 606482\nsyscr: 1893\nsyscw: 2326\nread_bytes: 0\nwrite_bytes: 0\ncancelled_write_bytes: 0\n"
+      }
+    ]
+  }
+]

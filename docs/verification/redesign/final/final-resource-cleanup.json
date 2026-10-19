@@ -1,0 +1,24 @@
+{
+  "removedTaskPrivateFailedRunFixturesAndCaches": [
+    "/tmp/weaver-redesign-3QuXVe/final-check-tmp/wv-stream-MCRCoR",
+    "/tmp/weaver-redesign-3QuXVe/final-check-tmp/wv-close-6mtKwG",
+    "/tmp/weaver-redesign-3QuXVe/final-check-tmp/wv-reject-ygyVNj",
+    "/tmp/weaver-redesign-3QuXVe/final-check-tmp/wv-engines-02zVQT",
+    "/tmp/weaver-redesign-3QuXVe/final-check-tmp/wv-cli-cmLnAX",
+    "/tmp/weaver-redesign-3QuXVe/final-check-tmp/wv-http-Q9XHG1",
+    "/tmp/weaver-redesign-3QuXVe/final-check-tmp/wv-poll-We5jFV",
+    "/tmp/weaver-redesign-3QuXVe/final-check-tmp/wv-poll-SKqYtI",
+    "/tmp/weaver-redesign-3QuXVe/final-check-tmp/wv-poll-HTvg3Z",
+    "/tmp/weaver-redesign-3QuXVe/final-check-tmp/tsx-1000",
+    "/tmp/weaver-redesign-3QuXVe/final-check-tmp/node-compile-cache"
+  ],
+  "retainedUnknown": [],
+  "existingShortTmpRetainedByInstruction": [
+    "/tmp/weaver-redesign-3QuXVe/i/opencode",
+    "/tmp/weaver-redesign-3QuXVe/i/qodercli-natives-v1.1.73-mocha",
+    "/tmp/weaver-redesign-3QuXVe/i/tsx-1000",
+    "/tmp/weaver-redesign-3QuXVe/i/node-compile-cache"
+  ],
+  "scopeStateLog": "/tmp/weaver-redesign-3QuXVe/final-scope-state.log",
+  "sourceEdits": false
+}

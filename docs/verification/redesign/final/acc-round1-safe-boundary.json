@@ -1,0 +1,28 @@
+{
+  "checkedAt": "2026-10-19T00:36:39.852479+00:00",
+  "round": "round_85a961ee70",
+  "runtimes": [
+    {
+      "dataDir": "/tmp/weaver-redesign-3QuXVe/f",
+      "taskCount": 25,
+      "statusCounts": {
+        "cancelled": 14,
+        "completed": 8,
+        "failed": 1,
+        "queued": 2
+      },
+      "activeTaskIds": []
+    },
+    {
+      "dataDir": "/tmp/weaver-redesign-3QuXVe/a",
+      "taskCount": 6,
+      "statusCounts": {
+        "completed": 4,
+        "failed": 2
+      },
+      "activeTaskIds": []
+    }
+  ],
+  "scopeState": "Id=dev-weaver-acc-round1.scope\nActiveState=inactive\nSubState=dead\n\nId=dev-weaver-final.scope\nActiveState=active\nSubState=running\n\nId=dev-weaver-owner-acc.scope\nActiveState=active\nSubState=running\n",
+  "oldSandboxExists": false
+}

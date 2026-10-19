@@ -1,0 +1,36 @@
+{
+  "commandId": "qa-fixed-idempotency",
+  "state": "settled",
+  "response": {
+    "apiVersion": "weaver.v1",
+    "commandId": "qa-fixed-idempotency",
+    "ok": true,
+    "data": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/caller-cwd",
+      "title": "stdin idempotency",
+      "instruction": "not executed",
+      "id": "8b8b0cfc-e284-4228-ad1e-7a8281cab66d",
+      "createdAt": "2026-10-18T23:53:07.816Z",
+      "updatedAt": "2026-10-18T23:53:07.816Z",
+      "status": "queued",
+      "revision": 2,
+      "reviewState": "pending",
+      "progress": 0,
+      "events": [
+        {
+          "id": "d7d8d45e-23a0-40e7-93b4-a8eaa723611b",
+          "at": "2026-10-18T23:53:07.816Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        }
+      ],
+      "artifacts": [],
+      "ownerId": "69e1c751-01c3-43a2-bff9-bae12eb58b46",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:53:07.817Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      }
+    }
+  }
+}

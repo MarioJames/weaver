@@ -1,0 +1,24 @@
+› 只读回答：fixture 中README提到Weaver和agents-cooperation，这里的调度顺序与随…
+    修复importer.mjs的importRows(existing,rows)，返回{items,errors}，items保留e…
+    + 4 lines (^t to expand)
+
+• 根据 fixture/README.md (fixture/README.md)，Weaver 按保存的同层优先权重和顺序
+  确定性调度，不是随机抽签：
+
+  • 权重表示优先级，不表示抽中概率。
+  • 权重为 0 的 Worker 被排除。
+  • only_engine 是硬约束，不会跨引擎回退。
+  • agents-cooperation 在这里仅是历史来源名称，不是另一套调度入口。
+
+  因此，不能把权重 250 理解成比 100 多出 2.5 倍的抽中概率；它用于确定同层候选的
+  优先次序。
+
+↳ Hook · OpenViking · 2 sources · 1 past event · 1 work memory
+
+  Worked for 22s • 8:58 PM
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol high · /tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261…
+  ? for shortcuts                                     ⚠ 3 warnings · f2 to view

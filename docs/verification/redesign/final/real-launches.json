@@ -1,0 +1,34 @@
+{
+  "opencode": {
+    "taskId": "ed51853c-3a5f-4a8f-8662-9acd91d4882c",
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-opencode",
+    "requested": [
+      "opencode/glm-5.3-flash-free",
+      "max"
+    ]
+  },
+  "pi": {
+    "taskId": "a9d0bafc-7f20-47f3-a60a-9a393143449a",
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi",
+    "requested": [
+      "cc-switch-agentplan/glm-5.3-flash",
+      "high"
+    ]
+  },
+  "grok": {
+    "taskId": "1c3b37ed-35f4-4748-a54c-e53c90e66b9f",
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-grok",
+    "requested": [
+      "grok-4.7",
+      "high"
+    ]
+  },
+  "codex": {
+    "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+    "requested": [
+      "gpt-6.1-sol",
+      "xhigh"
+    ]
+  }
+}

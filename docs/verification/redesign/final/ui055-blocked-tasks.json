@@ -1,0 +1,140 @@
+[
+  {
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/ui055-blocked",
+    "acceptanceCriteria": [
+      "Generated deterministic demo output only"
+    ],
+    "title": "ui055 policy blocked holder",
+    "instruction": "Synthetic deterministic demo only, no project changes.",
+    "id": "853160b7-9f7e-433b-bb65-7b36f90ed91e",
+    "createdAt": "2026-10-19T01:01:08.686Z",
+    "updatedAt": "2026-10-19T01:01:09.100Z",
+    "status": "running",
+    "revision": 6,
+    "reviewState": "pending",
+    "progress": 0,
+    "events": [
+      {
+        "id": "b7047611-bb2c-442d-bec9-58a3b8315f65",
+        "at": "2026-10-19T01:01:08.686Z",
+        "kind": "lifecycle",
+        "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+      },
+      {
+        "id": "e009ce26-037b-4a60-a9d3-1784076354e0",
+        "at": "2026-10-19T01:01:08.892Z",
+        "kind": "lifecycle",
+        "message": "Frozen work package created"
+      },
+      {
+        "id": "0c1f90db-a9d1-44d4-982f-1b0bb20b0523",
+        "at": "2026-10-19T01:01:09.096Z",
+        "kind": "lifecycle",
+        "message": "Policy selected qa_b_worker; explicit mock-jsonl provider"
+      },
+      {
+        "id": "24c2e342-529e-45d1-a8be-7ab343396dfe",
+        "at": "2026-10-19T01:01:09.100Z",
+        "kind": "lifecycle",
+        "message": "Launching explicit mock-jsonl provider"
+      }
+    ],
+    "artifacts": [],
+    "ownerId": "68506e25-46b3-4eda-a213-19ad69059966",
+    "ownerEpoch": 0,
+    "ownerLastActivityAt": "2026-10-19T01:01:08.686Z",
+    "continuationPolicy": {
+      "idleRotationMinutes": 60
+    },
+    "packageId": "49159289-973c-4281-a52e-17247dd51342",
+    "dispatch": {
+      "owner": "codex_owner",
+      "worker": "qa_b_worker",
+      "engine": "pi",
+      "model": "cc-switch-agentplan/glm-5.3-flash",
+      "effort": "high",
+      "execution": "mock",
+      "maxParallel": 1,
+      "maxWaitMinutes": 1,
+      "adapter": "mock-jsonl"
+    },
+    "scheduled": false,
+    "run": {
+      "id": "48befcbe-4210-4856-97b3-2156e76cc7ff",
+      "adapter": "mock-jsonl",
+      "execution": "mock",
+      "status": "running",
+      "startedAt": "2026-10-19T01:01:09.100Z",
+      "timeoutMs": 60000,
+      "engine": "pi",
+      "model": "cc-switch-agentplan/glm-5.3-flash",
+      "effort": "high",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/ui055-blocked"
+    }
+  },
+  {
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/ui055-blocked",
+    "acceptanceCriteria": [
+      "Generated deterministic demo output only"
+    ],
+    "title": "ui055 policy blocked queue",
+    "instruction": "Synthetic deterministic demo only, no project changes.",
+    "id": "9881d6d7-8fe1-4997-8e58-9175906a6b4a",
+    "createdAt": "2026-10-19T01:01:09.386Z",
+    "updatedAt": "2026-10-19T01:01:09.826Z",
+    "status": "queued",
+    "revision": 4,
+    "reviewState": "pending",
+    "progress": 0,
+    "events": [
+      {
+        "id": "3d5ee409-6b37-4d44-9e04-f5ef7d7c30a7",
+        "at": "2026-10-19T01:01:09.386Z",
+        "kind": "lifecycle",
+        "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+      },
+      {
+        "id": "6b44c1de-baba-4023-b693-47cf38432b0a",
+        "at": "2026-10-19T01:01:09.587Z",
+        "kind": "lifecycle",
+        "message": "Frozen work package created"
+      },
+      {
+        "id": "638a432c-8227-4bc2-b27d-9103cae54412",
+        "at": "2026-10-19T01:01:09.826Z",
+        "kind": "lifecycle",
+        "message": "Policy selected qa_b_worker; explicit mock-jsonl provider"
+      },
+      {
+        "id": "f36b1880-3c27-406a-a1fa-5f93ce5dd0e9",
+        "at": "2026-10-19T01:01:09.826Z",
+        "kind": "lifecycle",
+        "message": "Dispatch admitted to queue; waiting for an execution slot"
+      }
+    ],
+    "artifacts": [],
+    "ownerId": "98cdd75d-673e-45ac-b085-977d8c6feabe",
+    "ownerEpoch": 0,
+    "ownerLastActivityAt": "2026-10-19T01:01:09.386Z",
+    "continuationPolicy": {
+      "idleRotationMinutes": 60
+    },
+    "packageId": "c2d5f57a-f38e-433f-96c1-18670a4685a8",
+    "dispatch": {
+      "owner": "codex_owner",
+      "worker": "qa_b_worker",
+      "engine": "pi",
+      "model": "cc-switch-agentplan/glm-5.3-flash",
+      "effort": "high",
+      "execution": "mock",
+      "maxParallel": 1,
+      "maxWaitMinutes": 1,
+      "adapter": "mock-jsonl"
+    },
+    "scheduled": true,
+    "queueReason": {
+      "code": "waiting_for_capacity",
+      "message": "Owner codex_owner is at its current concurrency limit (1)."
+    }
+  }
+]

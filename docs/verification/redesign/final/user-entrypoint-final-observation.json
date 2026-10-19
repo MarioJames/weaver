@@ -1,0 +1,11 @@
+{
+  "source": "QA independent read-only after owner final observation",
+  "pane": "w2M:p52",
+  "paneResult": "pane_not_found",
+  "port": 4737,
+  "portListening": false,
+  "installedCapabilitiesError": "APP_NOT_RUNNING",
+  "defaultDataMutation": false,
+  "userServiceWasNotStoppedByQA": true,
+  "caveat": "At resume QA once sent launch text to already-running user pane stdin, discovered takeover, reported it, and never repeated input, closed pane or signalled service. No launch/model occurred from that mistaken delivery. Subsequent user pane disappearance cause unknown."
+}

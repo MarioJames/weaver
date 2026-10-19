@@ -1,0 +1,32 @@
+[
+  {
+    "path": "dist/cli/main.mjs",
+    "expected": "6a831a0e563c9a9b30342683b9494410dfdd094eb9b25cb87548834ccfdfe489",
+    "actual": "6a831a0e563c9a9b30342683b9494410dfdd094eb9b25cb87548834ccfdfe489",
+    "unchanged": true
+  },
+  {
+    "path": "dist/renderer/assets/index-CE-Vrkfs.js",
+    "expected": "dc66c9d77ff7837e9d8e89c4839af5df9ca2cdc74a1ef54d670063415a362ae0",
+    "actual": "dc66c9d77ff7837e9d8e89c4839af5df9ca2cdc74a1ef54d670063415a362ae0",
+    "unchanged": true
+  },
+  {
+    "path": "dist/renderer/assets/index-iulDnCg6.css",
+    "expected": "23b582d0ab0e243d4bb327f171f6e3ca9c67ed8629270c1f9656d6cd090144f5",
+    "actual": "23b582d0ab0e243d4bb327f171f6e3ca9c67ed8629270c1f9656d6cd090144f5",
+    "unchanged": true
+  },
+  {
+    "path": "dist/renderer/index.html",
+    "expected": "e4c70791df2ba54ddf1dcd4bad936fe604077fed856d901821aca052f74dc610",
+    "actual": "e4c70791df2ba54ddf1dcd4bad936fe604077fed856d901821aca052f74dc610",
+    "unchanged": true
+  },
+  {
+    "path": "dist/workers/mock-worker.mjs",
+    "expected": "849f305b7e2e84417d7d3c05a06e25951dbc90f0e30aa9d1756a01b003cc659d",
+    "actual": "849f305b7e2e84417d7d3c05a06e25951dbc90f0e30aa9d1756a01b003cc659d",
+    "unchanged": true
+  }
+]

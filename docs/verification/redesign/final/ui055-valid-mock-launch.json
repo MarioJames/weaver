@@ -1,0 +1,73 @@
+{
+  "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/ui055-demo-valid",
+  "acceptanceCriteria": [
+    "Generated artifact explicitly identifies deterministic mock output."
+  ],
+  "title": "ui055 valid demo artifact",
+  "instruction": "Produce deterministic mock demo artifact only. No project changes expected.",
+  "id": "bbfe9d71-187c-4682-ae3c-7044fc02cec2",
+  "createdAt": "2026-10-19T00:56:21.685Z",
+  "updatedAt": "2026-10-19T00:56:22.064Z",
+  "status": "running",
+  "revision": 6,
+  "reviewState": "pending",
+  "progress": 0,
+  "events": [
+    {
+      "id": "9ab00d00-8f2c-4aa6-9295-ecd6536073c9",
+      "at": "2026-10-19T00:56:21.685Z",
+      "kind": "lifecycle",
+      "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+    },
+    {
+      "id": "a6b0eab6-9dc4-45d4-8268-e75d1b52cb19",
+      "at": "2026-10-19T00:56:21.873Z",
+      "kind": "lifecycle",
+      "message": "Frozen work package created"
+    },
+    {
+      "id": "3ee5f494-cceb-4932-ba5d-35ce90fa9d42",
+      "at": "2026-10-19T00:56:22.061Z",
+      "kind": "lifecycle",
+      "message": "Policy selected qa_b_worker; explicit mock-jsonl provider"
+    },
+    {
+      "id": "be07dd6e-2453-4edc-b3bc-112702ad624a",
+      "at": "2026-10-19T00:56:22.064Z",
+      "kind": "lifecycle",
+      "message": "Launching explicit mock-jsonl provider"
+    }
+  ],
+  "artifacts": [],
+  "ownerId": "4882f2cd-d873-4351-8b50-427f5409d6f1",
+  "ownerEpoch": 0,
+  "ownerLastActivityAt": "2026-10-19T00:56:21.685Z",
+  "continuationPolicy": {
+    "idleRotationMinutes": 60
+  },
+  "packageId": "adf9470a-3bcc-47e5-a240-90c914c002d2",
+  "dispatch": {
+    "owner": "codex_owner",
+    "worker": "qa_b_worker",
+    "engine": "pi",
+    "model": "cc-switch-agentplan/glm-5.3-flash",
+    "effort": "high",
+    "execution": "mock",
+    "maxParallel": 1,
+    "maxWaitMinutes": 1,
+    "adapter": "mock-jsonl"
+  },
+  "scheduled": false,
+  "run": {
+    "id": "08d4bc47-afab-4f0e-bdda-77d3305e5c1c",
+    "adapter": "mock-jsonl",
+    "execution": "mock",
+    "status": "running",
+    "startedAt": "2026-10-19T00:56:22.064Z",
+    "timeoutMs": 60000,
+    "engine": "pi",
+    "model": "cc-switch-agentplan/glm-5.3-flash",
+    "effort": "high",
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/ui055-demo-valid"
+  }
+}

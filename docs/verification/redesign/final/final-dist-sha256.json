@@ -1,0 +1,7 @@
+{
+  "dist/cli/main.mjs": "42be2d9bc166a73edc252b4473b5332eaeb8b154d1b7d9f07748c56ccf0dd807",
+  "dist/renderer/assets/index-DFiKHKRh.js": "38a59a96978d35c87bbf1e093c42c28fcec73b2becc5cfb29869722d2c173f46",
+  "dist/renderer/assets/index-iulDnCg6.css": "23b582d0ab0e243d4bb327f171f6e3ca9c67ed8629270c1f9656d6cd090144f5",
+  "dist/renderer/index.html": "f5bcd3a691e9e0098935dbf2ddf60daf1d5ff92ea18cb121ab4827dbc5a82241",
+  "dist/workers/mock-worker.mjs": "849f305b7e2e84417d7d3c05a06e25951dbc90f0e30aa9d1756a01b003cc659d"
+}

@@ -1,0 +1,59 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 3294896620169087710
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:34033/",
+  "refs": {
+    "e1": {
+      "name": "",
+      "role": "generic"
+    },
+    "e10": {
+      "name": "验收标准",
+      "role": "textbox"
+    },
+    "e2": {
+      "name": "创建任务",
+      "role": "heading"
+    },
+    "e3": {
+      "name": "Close",
+      "role": "button"
+    },
+    "e4": {
+      "name": "导入 JSON",
+      "role": "button"
+    },
+    "e5": {
+      "name": "任务标题",
+      "role": "textbox"
+    },
+    "e6": {
+      "name": "目标项目目录",
+      "role": "textbox"
+    },
+    "e7": {
+      "name": "Owner profile",
+      "role": "combobox"
+    },
+    "e8": {
+      "name": "创建任务",
+      "role": "button"
+    },
+    "e9": {
+      "name": "目标与约束",
+      "role": "textbox"
+    }
+  },
+  "snapshot": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - dialog \"创建任务\"\n      - generic\n        - heading \"创建任务\" [level=2, ref=e2]\n        - button \"Close\" [ref=e3]\n        - form\n          - StaticText \"新建任务\"\n          - button \"导入 JSON\" [ref=e4]\n          - group\n            - LabelText\n              - StaticText \"任务标题\"\n            - textbox \"任务标题\" [required, ref=e5]\n            - LabelText\n              - StaticText \"目标与约束\"\n            - textbox \"目标与约束\" [required, ref=e9]\n            - LabelText\n              - generic\n                - StaticText \"目标项目目录\"\n                - StaticText \"绝对路径。留空或 . 不会提交，草稿保留。服务端仍会检查目录是否存在。\"\n            - textbox \"目标项目目录\" [required, ref=e6]\n            - LabelText\n              - StaticText \"Owner profile\"\n            - combobox \"Owner profile\" [expanded=false, ref=e7]: codex_owner\n              - StaticText \"codex_owner\"\n            - LabelText\n              - generic\n                - StaticText \"验收标准\"\n                - StaticText \"每行一项，1–30 项，每项最多 1000 字。\"\n            - textbox \"验收标准\" [required, ref=e10]\n            - StaticText \"创建时登记外部 Owner 的逻辑引用，宿主引用未经验证，不会启动新的 AI。默认空闲 60 分钟后提醒手动接续；真实 CLI 自行读取接续包和切换上下文。\"\n            - button \"创建任务\" [disabled, ref=e8]"
+}

@@ -1,0 +1,70 @@
+[
+  {
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-210003-8da82d/fixture/recovery",
+    "acceptanceCriteria": [
+      "原有测试原封不动保留并通过；node --test test.mjs全部通过。",
+      "有效行保留，坏行逐条带正确index和明确reason；existing和批内重复ID不覆盖已有数据。",
+      "覆盖无效行/字段类型/空白、重复及后续有效行、空输入和原输入不变等边界。",
+      "文件修改仅限importer.mjs和test.mjs；不提交Git，不修改数据样例。"
+    ],
+    "constraints": [
+      "仅可修改该workspace内importer.mjs与test.mjs；禁止修改README、其他项目文件、数据样例、原测试断言或期望。",
+      "禁止委派、运行调度器、提交或推送Git；禁止mock provider；禁止修改工具配置或认证。",
+      "你是单包Worker，无需执行Owner/herdr命名及调度流程；不要同用户沟通。",
+      "任务临时根为/tmp/recovery-import-owner-jbZfbe，临时产物只放其worker子目录；不创建报告或额外项目文件。无需独立报告。"
+    ],
+    "title": "修复任务导入并补齐边界测试",
+    "instruction": "修复 importer.mjs 的 importRows(existing,rows)。Owner 已运行 node --test test.mjs，1/1失败，r.items为undefined。先阅读README及原测试；保留原测试全部断言和数据样例，只追加回归测试。返回{items,errors}；items保留existing顺序，按输入顺序追加有效行；拒绝null、数组、非对象行，id/title必须是非空字符串（包含纯空白应拒绝）。重复ID包括existing和本批已接收行，拒绝而不覆盖，每个坏行返回{index,reason}，index为rows零基下标，reason非空且明确表明原因；坏行不能阻断后续有效行，不占用未接收ID。保持所有原输入不变，不规范化或丢失有效行字段。按项目现有node:test补针对行为的边界测试，执行node --test test.mjs。报告实际变更及测试结果。",
+    "id": "5f813e19-5466-4eac-8e41-da4a2e6e5f56",
+    "createdAt": "2026-10-19T01:01:36.098Z",
+    "updatedAt": "2026-10-19T01:03:28.562Z",
+    "status": "running",
+    "revision": 28,
+    "reviewState": "pending",
+    "progress": 20,
+    "ownerId": "66f96a8c-c49a-461b-9a72-9163b2165cb5",
+    "ownerEpoch": 0,
+    "ownerLastActivityAt": "2026-10-19T01:01:36.098Z",
+    "continuationPolicy": {
+      "idleRotationMinutes": 60
+    },
+    "packageId": "55824a17-2091-478d-8f36-70ee50a9e8f3",
+    "dispatch": {
+      "owner": "codex_owner",
+      "worker": "qa_b_worker",
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "execution": "real",
+      "maxParallel": 2,
+      "maxWaitMinutes": 10,
+      "adapter": "codex",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-210003-8da82d/fixture/recovery",
+      "workspaceIdentity": "38:1735553",
+      "engineKind": "codex"
+    },
+    "scheduled": false,
+    "run": {
+      "id": "361e2d6a-1bba-4179-b30a-d3cae3501735",
+      "adapter": "codex",
+      "execution": "real",
+      "status": "running",
+      "startedAt": "2026-10-19T01:01:51.334Z",
+      "timeoutMs": 600000,
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-210003-8da82d/fixture/recovery",
+      "scopeUnit": "weaver-cli-codex-9b3e4b21",
+      "evidence": {
+        "engine": "codex",
+        "requestedModel": "gpt-6.1-sol",
+        "requestedEffort": "xhigh",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-210003-8da82d/fixture/recovery",
+        "terminal": "pending",
+        "role": "worker"
+      }
+    },
+    "artifactCount": 0
+  }
+]

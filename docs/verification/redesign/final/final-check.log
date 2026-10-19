@@ -1,0 +1,406 @@
+npm notice run weaver@0.1.0 check
+npm notice run npm run typecheck && npm test && npm run build
+npm notice run weaver@0.1.0 typecheck
+npm notice run tsc --noEmit
+npm notice run weaver@0.1.0 test
+npm notice run node --import tsx --test tests/*.test.ts
+✔ catalog covers every handler command, nested continuation, and output flags (1.926684ms)
+✔ tasks create stamps the caller cwd and keeps an explicit absolute path (0.16042ms)
+✔ text and jsonl errors stay in the requested format (337.933611ms)
+✔ explicit invalid workspace is rejected instead of becoming caller cwd (0.963763ms)
+✔ CLI parse errors respect a valid output format in any flag order (475.625634ms)
+✔ command help and root catalog are machine-readable and expose digest and revision fields (240.295698ms)
+✔ CLI runs through an actual symlink entrypoint (347.597436ms)
+✔ importing the CLI does not run it, including a host with non-file argv (182.128958ms)
+✖ watch drains all retained event pages before returning terminal snapshot in jsonl and text (22.656461ms)
+✖ watch reports cursor expiry instead of silently skipping retained events (5.576103ms)
+✖ bounded wait uses its remaining deadline for an unresponsive transport (1.884187ms)
+✔ owned scope kills a detached grandchild and does not signal an unrelated process (1628.454218ms)
+✔ owned scope returns command stdout and a zero exit (1587.62043ms)
+✔ immediate cancellation waits for a delayed owned scope and leaves no live descendants (2018.757351ms)
+ℹ {"unit":"weaver-cli-start-2e74e47869e8","launcherPid":3418771,"elapsed":1997,"closed":true,"closeCode":null,"closeSignal":"SIGTERM","errors":[],"active":"ControlGroup=\nActiveState=inactive\nInvocationID=\n","parentAlive":false,"grandAlive":false,"parentInScope":false,"grandInScope":false}
+ℹ {"phase":"cleanup","unit":"weaver-cli-start-2e74e47869e8","launcherPid":3418771,"closed":true,"elapsed":2019,"active":"ControlGroup=\nActiveState=inactive\nInvocationID=\n","launcherAlive":false,"parentAlive":false,"grandAlive":false}
+✔ cancelled failed launcher and fast command exit both close without a live scope (988.62233ms)
+ℹ {"mode":"failed-launcher","unit":"weaver-cli-end-a20c12044c35","launcherPid":3418837,"closed":true,"code":17,"elapsed":466,"errors":[],"active":"ControlGroup=\nActiveState=inactive\nInvocationID=\n"}
+ℹ {"phase":"cleanup","mode":"failed-launcher","unit":"weaver-cli-end-a20c12044c35","launcherPid":3418837,"closed":true,"active":"ControlGroup=\nActiveState=inactive\nInvocationID=\n","launcherAlive":false}
+ℹ {"mode":"fast-exit","unit":"weaver-cli-end-34c69f2d1693","launcherPid":3418866,"closed":true,"code":0,"elapsed":496,"errors":[],"active":"ControlGroup=\nActiveState=inactive\nInvocationID=\n"}
+ℹ {"phase":"cleanup","mode":"fast-exit","unit":"weaver-cli-end-34c69f2d1693","launcherPid":3418866,"closed":true,"active":"ControlGroup=\nActiveState=inactive\nInvocationID=\n","launcherAlive":false}
+✔ SIGKILL upgrades a pending cancellation after SIGTERM was ignored (140.608983ms)
+ℹ {"unit":"weaver-cli-kill-2cf05e2858aa","pid":3418907,"closed":true,"signal":"SIGKILL","elapsed":127,"errors":[],"active":"ControlGroup=\nActiveState=inactive\nInvocationID=\n","pidAlive":false}
+ℹ {"phase":"cleanup","unit":"weaver-cli-kill-2cf05e2858aa","launcherPid":3418907,"closed":true,"active":"ControlGroup=\nActiveState=inactive\nInvocationID=\n","launcherAlive":false}
+✔ missing launcher executable reports an error and closes without waiting for a scope (51.787914ms)
+ℹ {"unit":"weaver-cli-miss-562aa1499869","launcherPid":null,"closed":true,"code":-2,"elapsed":39,"errors":["Error: spawn systemd-run ENOENT"],"active":"ControlGroup=\nActiveState=inactive\nInvocationID=\n"}
+ℹ {"phase":"cleanup","unit":"weaver-cli-miss-562aa1499869","launcherPid":null,"closed":true,"active":"ControlGroup=\nActiveState=inactive\nInvocationID=\n"}
+✔ oversized complete frames split across chunks never reach the parser (0.700442ms)
+ℹ {"case":"split-complete","pushedBytes":[6],"overflows":[{"phase":"complete","limitBytes":131072,"observedBytes":184320}]}
+✔ frame byte limit also applies to unterminated (0.280091ms)
+ℹ {"case":"unterminated","pushedBytes":[],"overflows":[{"phase":"unterminated","limitBytes":131072,"observedBytes":131073}]}
+✔ frame byte limit also applies to end-flush (0.462132ms)
+ℹ {"case":"end-flush","pushedBytes":[],"overflows":[{"phase":"unterminated","limitBytes":131072,"observedBytes":131073}]}
+✔ exact byte-limit UTF-8 frames are accepted when split inside a multibyte character (1.420025ms)
+ℹ {"case":"exact-utf8","terminated":true,"pushedBytes":[131072],"overflows":[]}
+ℹ {"case":"exact-utf8","terminated":false,"pushedBytes":[131072],"overflows":[]}
+✔ normal bounded Pi updates can exceed the old total transport byte cap (107.502617ms)
+ℹ {"transportBytes":1936000,"maxFrameBytes":2419,"unit":"weaver-cli-pi-626a0b27","childPid":3418167,"childExecutable":false,"code":0,"signal":null,"evidence":{"engine":"pi","requestedModel":"fixture/pi","requestedEffort":"high","workspace":"/tmp/weaver-redesign-3QuXVe/final-check-tmp/weaver-provider-stream-ihz9Lp","terminal":"success","vendorModel":"fixture/pi"},"errors":[],"stderr":"","records":[{"type":"log","message":"Launching pi with requested model fixture/pi"},{"type":"log","message":"pi --approve trusts project files for this run; it is not OS isolation"},{"type":"progress","percent":10,"message":"owned scope started"},{"type":"artifact","name":"result.md","mediaType":"text/markdown","content":"PONG"},{"type":"result","summary":"PONG"}],"active":"ActiveState=inactive\n"}
+✔ retained Pi evidence is clipped without rejecting a valid vendor completion (83.798304ms)
+ℹ {"unit":"weaver-cli-pi-41935522","childPid":3418285,"childExecutable":false,"code":0,"signal":null,"evidence":{"engine":"pi","requestedModel":"fixture/pi","requestedEffort":"high","workspace":"/tmp/weaver-redesign-3QuXVe/final-check-tmp/weaver-provider-stream-kFXgXz","terminal":"success"},"errors":[],"stderr":"","records":[{"type":"log","message":"Launching pi with requested model fixture/pi"},{"type":"log","message":"pi --approve trusts project files for this run; it is not OS isolation"},{"type":"progress","percent":10,"message":"owned scope started"},{"type":"log","message":"retained evidence clipped: field=assistant_text limitCharacters=30000 observedCharactersAtLeast=30001; assistant policy=last 30000 characters of completed text; oversized identifiers omitted"},{"type":"artifact","name":"result.md","mediaType":"text/markdown","content":"[30000 characters]"},{"type":"result","summary":"[4000 characters]"}],"active":"ActiveState=inactive\n"}
+✔ an oversized unterminated vendor frame reports its exact budget and closes its owned scope (1595.599656ms)
+ℹ {"unit":"weaver-cli-pi-70d7fe62","childPid":3418407,"childExecutable":false,"code":1,"signal":"SIGTERM","evidence":{"engine":"pi","requestedModel":"fixture/pi","requestedEffort":"high","workspace":"/tmp/weaver-redesign-3QuXVe/final-check-tmp/weaver-provider-stream-5gzCJC","terminal":"truncated"},"errors":[],"stderr":"","records":[{"type":"log","message":"Launching pi with requested model fixture/pi"},{"type":"log","message":"pi --approve trusts project files for this run; it is not OS isolation"},{"type":"progress","percent":10,"message":"owned scope started"},{"type":"log","message":"vendor protocol frame exceeded limit: phase=unterminated limitBytes=131072 observedBytes=146176 observedVendorBytes=146176 parsedFrames=0"},{"type":"log","message":"local protocol terminal truncated"}],"active":"ActiveState=inactive\n"}
+✔ zero/nonzero exit and final records keep their failure meaning after stream changes (185.338423ms)
+ℹ {"mode":"error","unit":"weaver-cli-pi-dc0b5e00","childPid":3418655,"childExecutable":false,"code":1,"signal":null,"evidence":{"engine":"pi","requestedModel":"fixture/pi","requestedEffort":"high","workspace":"/tmp/weaver-redesign-3QuXVe/final-check-tmp/weaver-provider-stream-T9HZR2","terminal":"error"},"errors":[],"stderr":"","records":[{"type":"log","message":"Launching pi with requested model fixture/pi"},{"type":"log","message":"pi --approve trusts project files for this run; it is not OS isolation"},{"type":"progress","percent":10,"message":"owned scope started"},{"type":"log","message":"fixture vendor failure"},{"type":"log","message":"vendor terminal error exit 0: fixture vendor failure"}],"active":"ActiveState=inactive\n"}
+ℹ {"mode":"nonzero","unit":"weaver-cli-pi-dd634493","childPid":3418665,"childExecutable":false,"code":7,"signal":null,"evidence":{"engine":"pi","requestedModel":"fixture/pi","requestedEffort":"high","workspace":"/tmp/weaver-redesign-3QuXVe/final-check-tmp/weaver-provider-stream-MuyeTb","terminal":"error"},"errors":[],"stderr":"","records":[{"type":"log","message":"Launching pi with requested model fixture/pi"},{"type":"log","message":"pi --approve trusts project files for this run; it is not OS isolation"},{"type":"progress","percent":10,"message":"owned scope started"},{"type":"log","message":"vendor terminal error exit 7"}],"active":"ActiveState=inactive\n"}
+ℹ {"mode":"missing-final","unit":"weaver-cli-pi-0d0688ff","childPid":3418676,"childExecutable":false,"code":1,"signal":null,"evidence":{"engine":"pi","requestedModel":"fixture/pi","requestedEffort":"high","workspace":"/tmp/weaver-redesign-3QuXVe/final-check-tmp/weaver-provider-stream-mG8zha","terminal":"missing"},"errors":[],"stderr":"","records":[{"type":"log","message":"Launching pi with requested model fixture/pi"},{"type":"log","message":"pi --approve trusts project files for this run; it is not OS isolation"},{"type":"progress","percent":10,"message":"owned scope started"},{"type":"log","message":"vendor terminal missing exit 0"}],"active":"ActiveState=inactive\n"}
+✔ rejects a missing workspace before any process is started (1.130535ms)
+✔ prepared argv is fixed, keeps the prompt off the command line, and refuses credential directories (3.750453ms)
+✔ normalization requires a real vendor terminal, assistant text, and a zero exit (1.873792ms)
+✔ tool steps stay recoverable until a real terminal stop (0.621378ms)
+✔ workspace must be absolute before a prompt file is written (1.437507ms)
+✔ short instructions that match a cli name stay off argv (0.938177ms)
+✔ stderr redaction waits for a secret split across chunks (0.492468ms)
+✔ overlong stderr drops the line instead of splitting a secret (0.350401ms)
+✔ pi thinking level is rejected before launch (0.694058ms)
+✔ completed assistant streams retain bounded final evidence without changing vendor success (7.413318ms)
+✔ oversized identifiers stay unknown and oversized error evidence is bounded and redacted (0.2968ms)
+✔ retained text windows redact a whole credential before clipping through its boundary (0.444557ms)
+✔ CLI parsing supports args/envelopes and explicit retry IDs (3.032962ms)
+✔ missing app returns APP_NOT_RUNNING (25.460801ms)
+✔ actual authenticated socket supports request and clean restart (12.546364ms)
+✔ rejects bad authentication and oversized requests without invoking handler (7.600938ms)
+✔ unsafe token permissions fail closed and cleanup preserves replacement discovery (2.281864ms)
+✔ endpoint discovery rejects unsafe files and path substitution without sockets (1.060841ms)
+✔ CLI subprocess prints a single JSON response when app is not running (107.21536ms)
+✔ manual attach keeps caller labels unverified and does not register a session on spawn (14.886799ms)
+✔ logical mock owner, frozen package, dispatch, delivery, ack, review and restart (1859.814732ms)
+✔ durable idempotency, conflicts, bounded events and unknown execution fail closed (1.98037ms)
+✔ policy governs actual admission and scheduler runs waiting work after slot release (3680.211618ms)
+✔ cancel is domain operation, terminal cancellation idempotent and review revision protected (22.338817ms)
+✔ one create command owns mock owner creation and preserves task context (1839.608856ms)
+✔ pending receipt is never replayed after restart and transaction rollback preserves state (3.444257ms)
+✔ continuation commands validate revision, survive restart and idle rotation does not churn (9.057721ms)
+✔ sync snapshots have monotonic persisted revision and catch missed invalidation (0.883228ms)
+✔ trace export redacts quoted JSON credentials and hashes artifact content bytes (0.816833ms)
+✔ default external owner pulls, acknowledges and reviews results; idle due never auto-rotates it (1843.931406ms)
+✔ idle policy has exact boundary, disabled TTL and no timer-created owners (2.908115ms)
+✔ worker activity cannot reset idle policy and backwards clock does not expire (0.355062ms)
+✔ manual same-profile and changed-profile transfers preserve immutable old history (2.356985ms)
+✔ active and scheduled workers prevent replacement creation (0.836394ms)
+✔ ack failure preserves binding and cleans up only the new mock (0.72198ms)
+✔ worker or stale epoch introduced during handshake blocks commit and cleans replacement (1.060466ms)
+✔ persistence failure rolls back new owner, binding and history (0.6785ms)
+✔ pack is bounded, redacted, references accepted artifacts and never invents decisions (20.079083ms)
+✔ persisted continuation roundtrips and rejects malformed policy, history and packs (1.725224ms)
+✔ server create does not invent a workspace and real dispatch never falls back (12.144447ms)
+✔ real dispatch freezes an existing absolute workspace and does not launch when it is missing (19.316632ms)
+✔ a queued route stays frozen when the saved model changes (5.428413ms)
+✔ a lower max_parallel blocks the next start and does not stop work already running (14.798095ms)
+✔ explicit mock provider still runs the mock worker from the real runtime adapter (1836.795493ms)
+✔ oversized complete instructions fail before package admission or launch (1.088937ms)
+✔ requested and observed provider facts survive completion and reload, bounded and separate (3.450557ms)
+✔ queue reasons expose policy and frozen-route blocks without repeated writes or rerouting (2.072657ms)
+✔ queued engine kind and replaced workspace cannot change frozen execution authority (1.847181ms)
+✔ pump never makes an attempted worker runnable again after PID persistence fails (0.780125ms)
+✔ pi is a fixed catalog engine and only claude and codex advertise native subagents (1.471305ms)
+✔ path discovery reports installed, missing, nonzero and timeout without a shell (224.390448ms)
+✔ overlapping scans share one version probe per command (5.063937ms)
+✔ enabling an installed engine does not create or enable roles and preserves them on disable (5.918815ms)
+✔ failed probe, stale revision and enabled roles block enablement without writing (2.09602ms)
+✔ an enabled role requires its engine to be enabled (0.509941ms)
+✔ version probe stops descendants that keep the pipes open (3.946085ms)
+✔ version text drops controls and rejects an empty success (5.054433ms)
+✔ policy save cannot enable an engine, and a mismatched kind is not probed or converted (2.656279ms)
+✔ mock owner lifecycle exposes truthful identity and acknowledgment ownership (1.591941ms)
+✔ manual owner attachment cannot claim transport or control of external host (0.157562ms)
+✔ owner state is isolated and validation fails before mutation (0.197472ms)
+✔ registry rejects unknown, unavailable, duplicate and incapable adapters (0.27954ms)
+✔ worker bridge forwards the exact task to the existing launcher once (0.141133ms)
+✔ restored host and inbox preserve acknowledgment and have no aliases (0.38022ms)
+✔ restore rejects forged ownership, malformed messages and oversized state atomically (0.464657ms)
+✔ bundled mock worker completes a task and persists artifact (1854.468064ms)
+✔ queued cancellation never launches; running cancellation waits for child exit (18.038869ms)
+✔ malformed JSON, missing result, nonzero exit, and trailing record fail (132.35067ms)
+✔ spawn failure yields failed task rather than stuck running (18.183635ms)
+✔ configured owner concurrency replaces the old global cap of two (111.835574ms)
+✔ real timeout uses configured minutes and ignores a 60s fallback (0.281575ms)
+✔ shutdown terminates active workers and persists cancelled states (3.031657ms)
+✔ automatic Herdr transport stays unavailable (0.218473ms)
+✔ result without exit is still running, then timeout fails it (2012.531807ms)
+✔ truncated JSON and oversized stderr fail safely (66.492895ms)
+✔ repeated artifact records are bounded (33.034982ms)
+✔ migrated defaults validate, clone, and default review stays true (1.970346ms)
+✔ schema rejects unsupported keywords and returns exact nested paths (0.584606ms)
+✔ schema uses own keys and rejects prototype reference attacks (3.346203ms)
+✔ effort, worker references, parallel limits and unique enabled owners validated (5.013847ms)
+✔ mutually exclusive class tags and disabled engine owners rejected (0.681379ms)
+✔ class ordering preserved: mechanical then routine then paid (0.504783ms)
+✔ judgment domain tag prefers heterogeneous provider, then own engine (1.10588ms)
+✔ paid judgment default preserves declared order rather than inventing native priority (0.17827ms)
+✔ peer suggestion remains advisory and contains no launch instructions (1.13481ms)
+✔ explicit worker selection warns outside pool and rejects invalid combinations (0.884205ms)
+✔ engine/model quota precedence, expiration and indefinite blocks (1.329177ms)
+✔ no available worker errors include candidate diagnostics (0.367019ms)
+✔ release times accept timezone/relative forms and reject invalid or overflow (0.652917ms)
+✔ app settings roundtrip without reading upstream/home, stale writes fail (3.954572ms)
+✔ block edits persist, expired blocks are ignored at preview time, deletion unblocks (1.852879ms)
+✔ invalid quota edits preserve disk and in-memory state (4.8943ms)
+✔ duplicate blocks and unknown IPC fields rejected (0.477303ms)
+✔ capacity is hypothetical preview only, never execution permission (0.492463ms)
+✔ corrupt policy file is rejected and retained (0.260236ms)
+✔ disabled pi template validates without native subagents and stays out of claude routing (3.398798ms)
+✔ weight reorders inside a tier, keeps ties in list order, and does not cross class (0.267169ms)
+✔ weight 0 and a fixed engine are hard exclusions with no cross-engine fallback (0.545631ms)
+✔ invalid weights and unknown pins are rejected; all-zero and unavailable pins still save (4.675755ms)
+✔ saved preview uses the same weight and pin resolver (2.275974ms)
+✔ JSONL survives fragmented UTF-8, CRLF, blank lines, and final unterminated record (1.176299ms)
+✔ rejects malformed, unknown, invalid, and oversized records (2.335094ms)
+✔ rejects traversal and unsupported artifact types; preserves text as text (0.411218ms)
+✔ validates inputs and task IDs at boundary (0.262561ms)
+✔ rpc posts the exact method and arity and returns result once (28.241092ms)
+✔ non-2xx, network, and missing result fail once without a retry (1.642186ms)
+✔ command helper keeps ok:false and commandId on the real client (1.375187ms)
+✔ file import sends one createTask and cancel or invalid files do not (14.15094ms)
+✔ task watch polls sync.status once, notifies on change or error, and stops on unsubscribe (4.814897ms)
+✔ an in-flight status poll is aborted and ignored after the last unsubscribe (0.938653ms)
+✔ status listeners share one poll and a listener can unsubscribe itself (1.041156ms)
+✔ stalled rpc and response body fail once at the transport deadline (1.900267ms)
+✔ late status after unsubscribe is ignored and the next subscription still reports its first revision (2.45371ms)
+✔ renderer sends versioned command and UUID only for mutations (2.029889ms)
+✔ renderer surfaces explicit control plane errors (0.306245ms)
+✔ renderer reports unavailable command bridge without mutation (0.143414ms)
+✔ role native inputs have visible label links, including config id and freeform effort (79.020377ms)
+✔ task native input and textareas have visible label links even with workspace validation shown (20.39719ms)
+✔ log redaction removes common credential formats (0.672511ms)
+✔ private key bodies are excluded from export (0.127233ms)
+✔ kind and text filters operate on redacted display (0.126817ms)
+✔ role id editor follows the visible record (0.743248ms)
+✔ tag choices do not repeat class tags (0.274786ms)
+✔ deleting a worker names the owners that reference it (0.288302ms)
+✔ advanced policy json keeps the current draft unless config and every block are safe (1.224321ms)
+✔ engine readiness follows the newest saved snapshot (0.44685ms)
+✔ adding a worker ignores a candidate that is stale or already listed (0.106199ms)
+✔ renaming or removing a worker or engine keeps weight and pin keys saveable (0.47666ms)
+✔ changed preview conditions discard both a failed pin preview and successful result (1.135749ms)
+✔ late preview cannot overwrite a newer request, even with the same selection (0.108456ms)
+✔ returning to previous conditions does not revive an old preview and offline preview can be retried (0.10083ms)
+✔ burst invalidations coalesce and suppress stale in-flight snapshot (0.858825ms)
+✔ failed snapshot can recover on next invalidation (0.318433ms)
+✔ unmounted subscriptions cannot publish pending snapshots (0.15849ms)
+✔ execution completion is distinct from acceptance (0.536683ms)
+✔ filters preserve pending review and support Chinese and owner search (0.133128ms)
+✔ board has distinct loading and empty states (63.263412ms)
+✔ task view separates execution and review, escapes instruction (22.037252ms)
+✔ task workspace must be an absolute directory (0.100764ms)
+✔ task tabs move by arrow, home and end (0.098565ms)
+✔ artifact preview renders hostile markup as text only (8.297023ms)
+✔ cancelling task disables repeat cancellation (12.638787ms)
+✔ installed Lobe controls associate names with the actual input and buttons (14.892142ms)
+✔ visible Form labels link to the named select trigger and number input once (14.39961ms)
+✔ queued task shows the current queue reason without inventing capacity wait (48.786513ms)
+✖ HTTP guards reject unsafe requests before any task state exists (8.237091ms)
+✖ second web invocation does not open or recover live task state (8.246572ms)
+✖ failed HTTP bind releases only this attempt (8.256225ms)
+✖ weaver web reports bind and damaged-store failures (96.28898ms)
+✖ headless CLI can create, dispatch, review, and leaving does not cancel work (1.571583ms)
+✖ shutdown and restart keep task history (87.868616ms)
+✖ engine scan and enable do not create roles (1.876864ms)
+✖ a rejected engine enable leaves the server and policy usable (1.164137ms)
+✖ production upgrades and idle sockets cannot hold shutdown (0.92354ms)
+✖ a static read failure does not kill the server (1.818496ms)
+✖ dev mode serves the renderer on the owned origin (1.140061ms)
+✔ persists, returns isolated copies, and recovers interrupted task without PID reuse (2.015413ms)
+✔ corrupted and future-schema stores are retained unchanged (0.362563ms)
+✔ bounds event retention to 500 (1.675401ms)
+✔ nested persisted records are validated before renderer exposure (0.701834ms)
+ℹ tests 185
+ℹ suites 0
+ℹ pass 171
+ℹ fail 14
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9570.688464
+
+✖ failing tests:
+
+test at tests/cli-polling.test.ts:1:537
+✖ watch drains all retained event pages before returning terminal snapshot in jsonl and text (22.656461ms)
+  Error [LocalIPCError]: Application data path is too long for a Unix socket
+      at startLocalIPC (/home/mocha/opensource/weaver/src/main/local-ipc.ts:117:52)
+      at async TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/cli-polling.test.ts:18:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    code: 'ENDPOINT_PATH_TOO_LONG'
+  }
+
+test at tests/cli-polling.test.ts:1:2022
+✖ watch reports cursor expiry instead of silently skipping retained events (5.576103ms)
+  Error [LocalIPCError]: Application data path is too long for a Unix socket
+      at startLocalIPC (/home/mocha/opensource/weaver/src/main/local-ipc.ts:117:52)
+      at async TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/cli-polling.test.ts:38:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'ENDPOINT_PATH_TOO_LONG'
+  }
+
+test at tests/cli-polling.test.ts:1:2802
+✖ bounded wait uses its remaining deadline for an unresponsive transport (1.884187ms)
+  Error [LocalIPCError]: Application data path is too long for a Unix socket
+      at startLocalIPC (/home/mocha/opensource/weaver/src/main/local-ipc.ts:117:52)
+      at async TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/cli-polling.test.ts:49:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'ENDPOINT_PATH_TOO_LONG'
+  }
+
+test at tests/runtime-http.test.ts:3:652
+✖ HTTP guards reject unsafe requests before any task state exists (8.237091ms)
+  Error [LocalIPCError]: Application data path is too long for a Unix socket
+      at startLocalIPC (/home/mocha/opensource/weaver/src/main/local-ipc.ts:117:52)
+      at async startRuntime (/home/mocha/opensource/weaver/src/main/runtime.ts:174:15)
+      at async boot (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:60:16)
+      at async TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:116:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    code: 'ENDPOINT_PATH_TOO_LONG'
+  }
+
+test at tests/runtime-http.test.ts:3:5006
+✖ second web invocation does not open or recover live task state (8.246572ms)
+  Error [LocalIPCError]: Application data path is too long for a Unix socket
+      at startLocalIPC (/home/mocha/opensource/weaver/src/main/local-ipc.ts:117:52)
+      at async TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:202:18)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'ENDPOINT_PATH_TOO_LONG'
+  }
+
+test at tests/runtime-http.test.ts:3:5726
+✖ failed HTTP bind releases only this attempt (8.256225ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'ENDPOINT_PATH_TOO_LONG'
+  - 'EADDRINUSE'
+  
+      at Object.<anonymous> (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:217:14)
+      at expectedException (node:assert:578:17)
+      at expectsError (node:assert:703:21)
+      at strict.rejects (node:assert:769:3)
+      at async TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:215:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'ENDPOINT_PATH_TOO_LONG',
+    expected: 'EADDRINUSE',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/runtime-http.test.ts:3:6389
+✖ weaver web reports bind and damaged-store failures (96.28898ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'ENDPOINT_PATH_TOO_LONG'
+  - 'EADDRINUSE'
+  
+      at TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:235:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'ENDPOINT_PATH_TOO_LONG',
+    expected: 'EADDRINUSE',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/runtime-http.test.ts:3:7807
+✖ headless CLI can create, dispatch, review, and leaving does not cancel work (1.571583ms)
+  Error [LocalIPCError]: Application data path is too long for a Unix socket
+      at startLocalIPC (/home/mocha/opensource/weaver/src/main/local-ipc.ts:117:52)
+      at async startRuntime (/home/mocha/opensource/weaver/src/main/runtime.ts:174:15)
+      at async boot (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:60:16)
+      at async TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:254:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'ENDPOINT_PATH_TOO_LONG'
+  }
+
+test at tests/runtime-http.test.ts:3:10360
+✖ shutdown and restart keep task history (87.868616ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^http:\/\/127\.0\.0\.1:\d+$/. Input:
+  
+  '{"apiVersion":"weaver.v1","commandId":null,"ok":false,"error":{"code":"ENDPOINT_PATH_TOO_LONG","message":"Application data path is too long for a Unix socket","retryable":false}}'
+  
+      at TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:316:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{"apiVersion":"weaver.v1","commandId":null,"ok":false,"error":{"code":"ENDPOINT_PATH_TOO_LONG","message":"Application data path is too long for a Unix socket","retryable":false}}',
+    expected: /^http:\/\/127\.0\.0\.1:\d+$/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/runtime-http.test.ts:6:1455
+✖ engine scan and enable do not create roles (1.876864ms)
+  Error [LocalIPCError]: Application data path is too long for a Unix socket
+      at startLocalIPC (/home/mocha/opensource/weaver/src/main/local-ipc.ts:117:52)
+      at async startRuntime (/home/mocha/opensource/weaver/src/main/runtime.ts:174:15)
+      at async boot (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:60:16)
+      at async TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:339:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'ENDPOINT_PATH_TOO_LONG'
+  }
+
+test at tests/runtime-http.test.ts:6:3172
+✖ a rejected engine enable leaves the server and policy usable (1.164137ms)
+  Error [LocalIPCError]: Application data path is too long for a Unix socket
+      at startLocalIPC (/home/mocha/opensource/weaver/src/main/local-ipc.ts:117:52)
+      at async startRuntime (/home/mocha/opensource/weaver/src/main/runtime.ts:174:15)
+      at async boot (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:60:16)
+      at async TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:363:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'ENDPOINT_PATH_TOO_LONG'
+  }
+
+test at tests/runtime-http.test.ts:6:5069
+✖ production upgrades and idle sockets cannot hold shutdown (0.92354ms)
+  Error [LocalIPCError]: Application data path is too long for a Unix socket
+      at startLocalIPC (/home/mocha/opensource/weaver/src/main/local-ipc.ts:117:52)
+      at async startRuntime (/home/mocha/opensource/weaver/src/main/runtime.ts:174:15)
+      at async boot (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:60:16)
+      at async TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:396:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'ENDPOINT_PATH_TOO_LONG'
+  }
+
+test at tests/runtime-http.test.ts:6:5950
+✖ a static read failure does not kill the server (1.818496ms)
+  Error [LocalIPCError]: Application data path is too long for a Unix socket
+      at startLocalIPC (/home/mocha/opensource/weaver/src/main/local-ipc.ts:117:52)
+      at async startRuntime (/home/mocha/opensource/weaver/src/main/runtime.ts:174:15)
+      at async boot (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:60:16)
+      at async TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:426:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'ENDPOINT_PATH_TOO_LONG'
+  }
+
+test at tests/runtime-http.test.ts:6:7199
+✖ dev mode serves the renderer on the owned origin (1.140061ms)
+  Error [LocalIPCError]: Application data path is too long for a Unix socket
+      at startLocalIPC (/home/mocha/opensource/weaver/src/main/local-ipc.ts:117:52)
+      at async startRuntime (/home/mocha/opensource/weaver/src/main/runtime.ts:174:15)
+      at async TestContext.<anonymous> (/home/mocha/opensource/weaver/tests/runtime-http.test.ts:452:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'ENDPOINT_PATH_TOO_LONG'
+  }

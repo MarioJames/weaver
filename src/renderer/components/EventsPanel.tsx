@@ -1,14 +1,51 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { NamedSelect } from './NamedControls';
+import { useEffect, useRef, useState } from 'react';
+import { Button, Input, Text } from '@lobehub/ui/base-ui';
 import type { TaskEvent } from '../../shared/types';
-import { redactLog, selectEvents, exportEvents } from '../log-view';
 import { command } from '../commands';
-interface EventPage { events: TaskEvent[]; nextCursor: string|null; hasMore: boolean }
+import { exportEvents, redactLog, selectEvents } from '../log-view';
+import { styles } from '../style';
+
+interface EventPage { events: TaskEvent[]; nextCursor: string | null; hasMore: boolean }
+const kinds = ['all', 'lifecycle', 'log', 'progress', 'artifact', 'result', 'error'];
+
 export function EventsPanel({ events, taskId }: { events: TaskEvent[]; taskId: string }) {
- const [kind,setKind]=useState('all'); const [query,setQuery]=useState('');
- const [page,setPage]=useState<EventPage>({events,nextCursor:null,hasMore:false}); const [busy,setBusy]=useState(false); const [error,setError]=useState(''); const [attempt,setAttempt]=useState(0); const generation=useRef(0); const lock=useRef(false);
- useEffect(()=>{const id=++generation.current;setBusy(true);setError('');void command<EventPage>('tasks.events',{taskId,limit:100}).then(result=>{if(id===generation.current)setPage(result);}).catch(error=>{if(id===generation.current)setError(String(error));}).finally(()=>{if(id===generation.current)setBusy(false);});return()=>{generation.current++;};},[taskId,events.length,attempt]);
- async function more(){if(lock.current||busy||!page.nextCursor)return;lock.current=true;setBusy(true);const id=generation.current;try{const result=await command<EventPage>('tasks.events',{taskId,after:page.nextCursor,limit:100});if(id===generation.current)setPage(current=>({...result,events:[...current.events,...result.events]}));}catch(error){if(id===generation.current)setError(String(error));}finally{lock.current=false;if(id===generation.current)setBusy(false);}}
- const visible=selectEvents(page.events,kind,query);
- function download(){const url=URL.createObjectURL(new Blob([exportEvents(taskId,visible)],{type:'application/json'}));const anchor=document.createElement('a');anchor.href=url;anchor.download=`weaver-events-${taskId}.json`;document.body.appendChild(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
- return <div className="events" role="tabpanel" id="events-panel" aria-labelledby="events-tab" aria-busy={busy}><div className="log-controls"><label>事件类型<select value={kind} onChange={event=>setKind(event.target.value)}>{['all','lifecycle','log','progress','artifact','result','error'].map(value=><option key={value} value={value}>{value==='all'?'全部':value}</option>)}</select></label><label>搜索已加载事件<input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="按消息内容筛选"/></label><button disabled={!visible.length} onClick={download}>导出已筛选日志</button></div><p className="muted">显示与导出会遮盖常见凭据格式；不保证识别所有敏感信息，分享前请检查。已加载 {page.events.length} 条，筛选后 {visible.length} 条。</p>{error&&<div role="alert" className="muted"><p>{error}</p><button disabled={busy} onClick={()=>setAttempt(value=>value+1)}>重新读取时间线</button></div>}{!visible.length?<p className="muted empty">{busy?'正在加载事件…':'暂无事件。任务状态与 worker 输出会记录在这里。'}</p>:visible.map(event=><div className="event" key={event.id}><time dateTime={event.at} title={new Date(event.at).toLocaleString()}>{new Date(event.at).toLocaleTimeString()}</time><span className={`event-kind ${event.kind}`}>{event.kind}</span><p>{redactLog(event.message)}</p></div>)}{page.hasMore&&<button className="load-more" disabled={busy} onClick={()=>void more()}>{busy?'加载中…':'加载更多事件'}</button>}</div>;
+  const [kind, setKind] = useState('all');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState<EventPage>({ events, nextCursor: null, hasMore: false });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  const generation = useRef(0);
+  const lock = useRef(false);
+  useEffect(() => {
+    const id = ++generation.current;
+    setBusy(true); setError('');
+    void command<EventPage>('tasks.events', { taskId, limit: 100 }).then(result => { if (id === generation.current) setPage(result); }).catch(cause => { if (id === generation.current) setError(String(cause)); }).finally(() => { if (id === generation.current) setBusy(false); });
+    return () => { generation.current += 1; };
+  }, [taskId, events.length, attempt]);
+  async function more() {
+    if (lock.current || busy || !page.nextCursor) return;
+    lock.current = true; setBusy(true); const id = generation.current;
+    try { const result = await command<EventPage>('tasks.events', { taskId, after: page.nextCursor, limit: 100 }); if (id === generation.current) setPage(current => ({ ...result, events: [...current.events, ...result.events] })); }
+    catch (cause) { if (id === generation.current) setError(String(cause)); }
+    finally { lock.current = false; if (id === generation.current) setBusy(false); }
+  }
+  const visible = selectEvents(page.events, kind, query);
+  function download() {
+    const url = URL.createObjectURL(new Blob([exportEvents(taskId, visible)], { type: 'application/json' }));
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `weaver-events-${taskId}.json`; document.body.appendChild(anchor); anchor.click(); anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  return <div aria-busy={busy} className={styles.stack}>
+    <div className={styles.row}>
+      <NamedSelect aria-label="事件类型" value={kind} options={kinds.map(value => ({ value, label: value === 'all' ? '全部' : value }))} onChange={value => { if (typeof value === 'string') setKind(value); }} />
+      <div className={styles.grow}><Input aria-label="搜索已加载事件" placeholder="按消息内容筛选" value={query} onChange={event => setQuery(event.target.value)} /></div>
+      <Button disabled={!visible.length} onClick={download}>导出已筛选日志</Button>
+    </div>
+    <Text type="secondary">显示和导出会遮盖常见凭据格式，分享前仍需检查。已加载 {page.events.length} 条，筛选后 {visible.length} 条。</Text>
+    {error && <div role="alert" className={styles.stack}><Text type="danger">{error}</Text><Button disabled={busy} onClick={() => setAttempt(value => value + 1)}>重新读取时间线</Button></div>}
+    {!visible.length ? <Text type="secondary">{busy ? '正在加载事件…' : '暂无事件。任务状态和 worker 输出会记在这里。'}</Text> : visible.map(event => <div key={event.id} className={styles.row}><time dateTime={event.at}>{new Date(event.at).toLocaleTimeString()}</time><Text type={event.kind === 'error' ? 'danger' : 'secondary'}>{event.kind}</Text><Text className={styles.wrap}>{redactLog(event.message)}</Text></div>)}
+    {page.hasMore && <Button disabled={busy} onClick={() => void more()}>{busy ? '加载中…' : '加载更多事件'}</Button>}
+  </div>;
 }

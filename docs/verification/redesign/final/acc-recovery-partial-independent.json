@@ -1,0 +1,12 @@
+{
+  "exit": 0,
+  "stdout": "✔ preserves existing and reports invalid rows (1.001273ms)\n✔ empty rows preserves existing, empty existing supports import (0.163965ms)\n✔ existing and new rows keep input order, other fields preserved (0.807974ms)\n✔ null, non-object and array rows rejected with located errors (0.140346ms)\n✔ missing/empty/non-string id and title rejected, whitespace strings rejected, no trimming (0.159949ms)\n✔ duplicate ids vs existing and within batch rejected without overriding (0.104842ms)\n✔ invalid row does not reserve its id for later valid rows; processing continues after failures (0.072311ms)\n✔ inputs are not mutated (frozen) and originals untouched (0.11576ms)\n✔ whitespace-only id and title rejected with located errors; valid rows continue (0.234702ms)\n✔ empty existing and empty rows return empty items and errors (0.162238ms)\nℹ tests 10\nℹ suites 0\nℹ pass 10\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 40.190643\n",
+  "stderr": "",
+  "originalTestPreserved": true,
+  "files": {
+    "importer.mjs": "724ef63b56de6605e71ed659350f2e4c929041b38858f2c2bd80f73a0ab97d0c",
+    "test.mjs": "a758c99850e7c32319d5c555ff3cdf16ba067a97d55dd2691a6ee3e811a3a2b2",
+    "README.md": "1539e4710be21f2397adde438ea4128f32c225c1696e7fa734c90468ca4b3840"
+  },
+  "notAccepted": "Both attempts lacked provider terminal success; passing partial files alone do not make task success."
+}

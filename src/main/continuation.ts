@@ -22,7 +22,7 @@ export interface ContextPack {
 }
 export interface HandoffRecord {
  id: string; at: string; reason: 'manual' | 'idle'; fromOwnerId: string; toOwnerId: string;
- fromProfileId: string; toProfileId: string; epoch: number; packId: string; acknowledgementId: string;
+ fromProfileId: string; toProfileId: string; epoch: number; packId: string; acknowledgementId: string | null;
 }
 export type ContinuationTask = Task & {
  ownerEpoch?: number; ownerLastActivityAt?: string; continuationPolicy?: ContinuationPolicy;
@@ -54,7 +54,7 @@ function assertQuiescent(task: Task): void {
   fail('ROTATION_BLOCKED', 'Owner transfer requires all workers and queued dispatch to finish or be cancelled');
  }
 }
-/** Synchronous mock handshake; the old binding remains authoritative until the atomic commit.
+/** Mock handshake or manual metadata handoff; the old binding remains authoritative until atomic commit.
  * No timer, process, network call, AI invocation, or vendor cache operation is performed here.
  * CommandHandler owns durable command receipts; all mutations must enter via that handler.
  */
@@ -87,25 +87,31 @@ export class ContinuationService {
   if ((original.continuationHistory?.length ?? 0) >= MAX_HANDOFFS) fail('RESOURCE_LIMIT', 'Owner handoff history limit reached; no replacement created');
   const owner = this.store.getMetadata().owners.find(o => o.id === original.ownerId);
   if (!owner) return fail('NOT_FOUND', 'Task has no logical owner');
-  if (owner.mode !== 'mock') fail('CAPABILITY_UNAVAILABLE', 'Only mock owner continuation is enabled');
   const targetProfile = profileId ?? owner.profileId;
   if (!targetProfile.trim() || targetProfile.length > 120) fail('INVALID_REQUEST', 'Invalid owner profile');
   const at = new Date(this.now()).toISOString();
   const pack = this.assemble(original, targetProfile, epoch + 1, at);
-  const replacement: LogicalOwner = {id: randomUUID(), name: owner.name, profileId: targetProfile, mode: 'mock', state: 'ready', createdAt: at};
+  const replacement: LogicalOwner = {id: randomUUID(), name: owner.name, profileId: targetProfile, mode: owner.mode, state: owner.mode === 'mock' ? 'ready' : 'attached', createdAt: at};
   let spawned = false;
   try {
-   // Mark ownership before spawn so partial mock creation is also eligible for cleanup.
+   // Register cleanup before creating a mock host or a manual local attachment.
    spawned = true;
-   replacement.host = this.host.spawn({ownerId: replacement.id, name: replacement.name, profileId: targetProfile});
-   const ready = this.host.inspect(replacement.id).host;
-   if (ready.state !== 'ready' || ready.mode !== 'mock' || !ready.ownsHost) fail('OWNER_NOT_READY', 'Replacement owner is not ready');
-   const message = this.host.send(replacement.id, JSON.stringify(pack));
-   const ack = this.host.acknowledge(replacement.id, message.id);
-   if (ack.status !== 'acknowledged' || ack.ownerId !== replacement.id || ack.id !== message.id) fail('OWNER_NOT_READY', 'Replacement did not acknowledge its context pack');
-   replacement.messages = [ack];
+   let acknowledgementId: string | null = null;
+   if (owner.mode === 'mock') {
+    replacement.host = this.host.spawn({ownerId: replacement.id, name: replacement.name, profileId: targetProfile});
+    const ready = this.host.inspect(replacement.id).host;
+    if (ready.state !== 'ready' || ready.mode !== 'mock' || !ready.ownsHost) fail('OWNER_NOT_READY', 'Replacement owner is not ready');
+    const message = this.host.send(replacement.id, JSON.stringify(pack));
+    const ack = this.host.acknowledge(replacement.id, message.id);
+    if (ack.status !== 'acknowledged' || ack.ownerId !== replacement.id || ack.id !== message.id) fail('OWNER_NOT_READY', 'Replacement did not acknowledge its context pack');
+    replacement.messages = [ack]; acknowledgementId = ack.id;
+   } else {
+    replacement.host = this.host.attach({ownerId: replacement.id, name: replacement.name, profileId: targetProfile, session: 'external-cli', pane: 'unverified'});
+    pack.limitations.push('External owner must read this context pack itself', 'The real CLI host performs any context switch; Weaver did not start a new AI or reset a vendor cache', 'No automatic delivery to, or acknowledgement from, the external host');
+    if (Buffer.byteLength(JSON.stringify(pack)) > MAX_CONTEXT_PACK_BYTES) fail('CONTEXT_LIMIT', 'Context pack exceeds bounded size');
+   }
    const handoff: HandoffRecord = {id: randomUUID(), at, reason, fromOwnerId: owner.id, toOwnerId: replacement.id,
-    fromProfileId: owner.profileId, toProfileId: targetProfile, epoch: epoch + 1, packId: pack.id, acknowledgementId: ack.id};
+    fromProfileId: owner.profileId, toProfileId: targetProfile, epoch: epoch + 1, packId: pack.id, acknowledgementId};
    this.store.transaction(() => {
     const current = this.read(taskId);
     if ((current.ownerEpoch ?? 0) !== epoch || current.ownerId !== owner.id) fail('OWNER_EPOCH_CONFLICT', 'Owner changed while preparing continuation');
@@ -145,7 +151,7 @@ export class ContinuationService {
    pendingApprovals: task.status === 'completed' && (!task.reviewState || task.reviewState === 'pending') ? ['Completed result awaits owner acceptance review'] : [],
    recentMessages: task.events.filter(e => e.kind !== 'log' && e.kind !== 'progress').slice(-8).map(e => ({kind: e.kind, at: e.at, message: redactContext(e.message, 500)})),
    baseReferences: {taskId: task.id, packageId: pkg?.id ?? null, previousPackId: task.contextPack?.id ?? null},
-   limitations: ['Bounded snapshot; artifact bodies and full transcripts omitted', 'Plan contains recorded work-package scope only; no inferred decisions', 'Redaction is best-effort; mock-only local transport', 'Idle interval is user policy, not vendor cache retention']
+   limitations: ['Bounded snapshot; artifact bodies and full transcripts omitted', 'Plan contains recorded work-package scope only; no inferred decisions', 'Redaction is best-effort; host transport is not established by this pack', 'Idle interval is user policy, not vendor cache retention']
   };
   if (Buffer.byteLength(JSON.stringify(pack)) > MAX_CONTEXT_PACK_BYTES) fail('CONTEXT_LIMIT', 'Context pack exceeds bounded size');
   return pack;
@@ -178,7 +184,7 @@ export function validateContinuationFields(raw: Record<string, unknown>): Partia
    const h = record(value); const epoch = integer(h.epoch);
    if (epoch <= previousEpoch || epoch > (output.ownerEpoch ?? 0) || (h.reason !== 'manual' && h.reason !== 'idle')) bad();
    previousEpoch = epoch;
-   return {id: str(h.id), at: date(h.at), reason: h.reason as 'manual' | 'idle', fromOwnerId: str(h.fromOwnerId), toOwnerId: str(h.toOwnerId), fromProfileId: str(h.fromProfileId, 120), toProfileId: str(h.toProfileId, 120), epoch, packId: str(h.packId), acknowledgementId: str(h.acknowledgementId)};
+   return {id: str(h.id), at: date(h.at), reason: h.reason as 'manual' | 'idle', fromOwnerId: str(h.fromOwnerId), toOwnerId: str(h.toOwnerId), fromProfileId: str(h.fromProfileId, 120), toProfileId: str(h.toProfileId, 120), epoch, packId: str(h.packId), acknowledgementId: h.acknowledgementId === null ? null : str(h.acknowledgementId)};
   });
  }
  if (raw.contextPack !== undefined) {

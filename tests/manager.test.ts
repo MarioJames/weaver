@@ -5,8 +5,8 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
 import { TaskStore } from '../src/main/store';
-import { TaskManager } from '../src/main/manager';
-import { MockWorkerAdapter, WorkerCliAdapter, type WorkerAdapter } from '../src/main/adapters/worker';
+import { executionTimeoutMs, TaskManager } from '../src/main/manager';
+import { MockWorkerAdapter, type WorkerAdapter } from '../src/main/adapters/worker';
 import { HerdrOwnerAdapter } from '../src/main/adapters/owner-herdr';
 import type { TaskInput } from '../src/shared/types';
 const input: TaskInput={title:'Demo',instruction:'Safe local fixture only',owner:{name:'owner',transport:'herdr-visible',session:'main',pane:'1'}};
@@ -37,17 +37,25 @@ test('malformed JSON, missing result, nonzero exit, and trailing record fail',as
 test('spawn failure yields failed task rather than stuck running',async () => {
  await harness(new MockWorkerAdapter('/nonexistent-weaver-executable','unused'),async(manager,store)=>{const task=manager.create(input);manager.start(task.id);assert.equal((await terminal(store,task.id)).status,'failed');});
 });
-test('enforces concurrency and execution timeout',async () => {
+test('configured owner concurrency replaces the old global cap of two',async () => {
  await harness(fixture('setInterval(()=>{},1000)'),async(manager,store)=>{
-  const tasks=[manager.create(input),manager.create(input),manager.create(input)];manager.start(tasks[0].id);manager.start(tasks[1].id);assert.throws(()=>manager.start(tasks[2].id),/Two workers/);assert.equal(store.get(tasks[2].id).status,'queued');
+  const tasks=[manager.create(input),manager.create(input),manager.create(input)];
+  for (const task of tasks) { task.dispatch={owner:'owner',worker:'worker',engine:'codex',model:'m',effort:'high',execution:'mock',maxParallel:2}; manager.update(task); }
+  manager.start(tasks[0].id);manager.start(tasks[1].id);assert.throws(()=>manager.start(tasks[2].id),/configured concurrency limit \(2\)/);assert.equal(store.get(tasks[2].id).status,'queued');
   const done=await terminal(store,tasks[0].id);assert.equal(done.status,'failed');assert.match(done.events.at(-1)!.message,/timeout/);
+  assert.equal(done.run?.timeoutMs,100);
  },100);
+});
+test('real timeout uses configured minutes and ignores a 60s fallback',() => {
+ const real={dispatch:{owner:'o',worker:'w',engine:'codex',model:'m',effort:'high',execution:'real' as const,maxParallel:1,maxWaitMinutes:15}};
+ assert.equal(executionTimeoutMs(real,60_000),15*60_000);
+ assert.equal(executionTimeoutMs({dispatch:{owner:'o',worker:'w',engine:'codex',model:'m',effort:'high',execution:'mock',maxParallel:1}},100),100);
+ assert.throws(()=>executionTimeoutMs({dispatch:{owner:'o',worker:'w',engine:'codex',model:'m',effort:'high',execution:'real',maxParallel:1}}),/max_wait_minutes/);
 });
 test('shutdown terminates active workers and persists cancelled states',async () => {
  await harness(fixture('setInterval(()=>{},1000)'),async(manager,store)=>{const task=manager.create(input);manager.start(task.id);await manager.shutdown();assert.equal(store.get(task.id).status,'cancelled');});
 });
-test('real CLI and automatic Herdr adapters fail closed',async () => {
- const cli=new WorkerCliAdapter();assert.equal(cli.available,false);assert.throws(()=>cli.start(),/not implemented/);
+test('automatic Herdr transport stays unavailable',async () => {
  const owner=new HerdrOwnerAdapter();assert.equal(owner.available,false);await assert.rejects(owner.send(input.owner,'hello'),/not implemented/);
 });
 test('result without exit is still running, then timeout fails it',async () => {

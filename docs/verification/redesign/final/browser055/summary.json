@@ -1,0 +1,21 @@
+{
+  "target": "http://127.0.0.1:34033",
+  "mode": "task",
+  "session": "weaver-web-acceptance",
+  "reuse_page": true,
+  "profile_dir": "/tmp/weaver-redesign-3QuXVe/final-browser",
+  "timestamp": "20261018T210203",
+  "evidence_dir": "/tmp/weaver-redesign-3QuXVe/acceptance/.browser-harness/evidence/20261018T210203",
+  "artifacts": {
+    "screenshot": "screenshot.png",
+    "dom": "dom.json",
+    "console": "console.json",
+    "network_xhr": "network-xhr.json",
+    "network_errors": "network-errors.json"
+  },
+  "counts": {
+    "network_xhr": 997,
+    "network_errors": 2
+  },
+  "artifact_errors": []
+}

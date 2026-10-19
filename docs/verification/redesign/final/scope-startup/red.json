@@ -1,0 +1,17 @@
+[
+  {
+    "unit": "weaver-cli-start-054397405ba5",
+    "elapsed": 5025,
+    "closed": false,
+    "errors": [],
+    "pids": {
+      "parent": 3405545,
+      "grand": 3405571
+    },
+    "active": "ControlGroup=/user.slice/user-1000.slice/user@1000.service/app.slice/weaver-cli-start-054397405ba5.scope\nActiveState=active\nInvocationID=4a032028fabd456b98fd8135e7ae0198\n",
+    "parentAlive": true,
+    "grandAlive": true,
+    "parentInScope": true,
+    "grandInScope": true
+  }
+]

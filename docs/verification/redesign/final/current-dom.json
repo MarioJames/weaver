@@ -1,0 +1,127 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 9599166362864130260
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:44583/",
+  "refs": {
+    "e1": {
+      "name": "",
+      "role": "generic"
+    },
+    "e10": {
+      "name": "工作代理",
+      "role": "link"
+    },
+    "e11": {
+      "name": "路由与配额",
+      "role": "link"
+    },
+    "e12": {
+      "name": "新建任务",
+      "role": "button"
+    },
+    "e13": {
+      "name": "任务列表",
+      "role": "region"
+    },
+    "e14": {
+      "name": "搜索任务",
+      "role": "textbox"
+    },
+    "e15": {
+      "name": "全部",
+      "role": "button"
+    },
+    "e16": {
+      "name": "进行中",
+      "role": "button"
+    },
+    "e17": {
+      "name": "待验收",
+      "role": "button"
+    },
+    "e18": {
+      "name": "已结束",
+      "role": "button"
+    },
+    "e19": {
+      "name": "执行完成 100% 修复任务导入并补齐边界测试 Task owner · 已通过",
+      "role": "button"
+    },
+    "e2": {
+      "name": "跳到内容",
+      "role": "link"
+    },
+    "e20": {
+      "name": "执行失败 20% 补强 recovery 导入回归测试 Task owner · 10/18/2026, 8:52:02 PM",
+      "role": "button"
+    },
+    "e21": {
+      "name": "执行完成 100% 修复 recovery 任务批量导入 Task owner · 需修改",
+      "role": "button"
+    },
+    "e22": {
+      "name": "执行失败 20% 修复任务导入：保留有效行并报告逐行错误 recovery importer Owner · 10/18/2026, 8:30:35 PM",
+      "role": "button"
+    },
+    "e23": {
+      "name": "执行失败 20% 修复任务导入：保留有效行并报告逐行错误 recovery importer Owner · 10/18/2026, 8:26:44 PM",
+      "role": "button"
+    },
+    "e24": {
+      "name": "执行完成 100% 离线任务看板：唯一索引、批量导入与跨模块验证 complex store Owner · 已通过",
+      "role": "button"
+    },
+    "e25": {
+      "name": "执行完成 100% 离线任务看板：筛选、分页与状态统计 complex view Owner · 已通过",
+      "role": "button"
+    },
+    "e26": {
+      "name": "执行完成 100% 实现本地任务索引与 Node 测试 representative index Owner · 已通过",
+      "role": "button"
+    },
+    "e27": {
+      "name": "执行完成 100% 创建 smoke health.txt smoke health Owner · 已通过",
+      "role": "button"
+    },
+    "e3": {
+      "name": "Weaver",
+      "role": "button"
+    },
+    "e4": {
+      "name": "主导航",
+      "role": "navigation"
+    },
+    "e5": {
+      "name": "收起导航",
+      "role": "button"
+    },
+    "e6": {
+      "name": "切换到浅色",
+      "role": "button"
+    },
+    "e7": {
+      "name": "任务",
+      "role": "link"
+    },
+    "e8": {
+      "name": "引擎",
+      "role": "link"
+    },
+    "e9": {
+      "name": "负责人",
+      "role": "link"
+    }
+  },
+  "snapshot": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - link \"跳到内容\" [ref=e2]\n    - complementary\n      - button \"Weaver\" [ref=e3]\n        - StaticText \"Weaver\"\n      - navigation \"主导航\" [ref=e4]\n        - link \"任务\" [ref=e7]\n          - image\n          - StaticText \"任务\"\n        - link \"引擎\" [ref=e8]\n          - image\n          - StaticText \"引擎\"\n        - link \"负责人\" [ref=e9]\n          - image\n          - StaticText \"负责人\"\n        - link \"工作代理\" [ref=e10]\n          - image\n          - StaticText \"工作代理\"\n        - link \"路由与配额\" [ref=e11]\n          - image\n          - StaticText \"路由与配额\"\n      - button \"收起导航\" [ref=e5]\n        - image\n      - button \"切换到浅色\" [ref=e6]\n        - image\n      - status\n        - StaticText \"2 个并行槽位 · 已同步\"\n    - main\n      - generic\n        - button \"新建任务\" [ref=e12]\n        - region \"任务列表\" [ref=e13]\n          - textbox \"搜索任务\" [ref=e14]\n          - group\n            - button \"全部\" [ref=e15]\n              - StaticText \"全部\"\n            - button \"进行中\" [ref=e16]\n              - StaticText \"进行中\"\n            - button \"待验收\" [ref=e17]\n              - StaticText \"待验收\"\n            - button \"已结束\" [ref=e18]\n              - StaticText \"已结束\"\n          - generic\n            - button \"执行完成 100% 修复任务导入并补齐边界测试 Task owner · 已通过\" [ref=e19]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"修复任务导入并补齐边界测试\"\n              - generic\n                - StaticText \"Task owner · 已通过\"\n            - button \"执行失败 20% 补强 recovery 导入回归测试 Task owner · 10/18/2026, 8:52:02 PM\" [ref=e20]\n              - StaticText \"执行失败\"\n              - generic\n                - StaticText \"20%\"\n              - strong\n                - StaticText \"补强 recovery 导入回归测试\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 8:52:02 PM\"\n            - button \"执行完成 100% 修复 recovery 任务批量导入 Task owner · 需修改\" [ref=e21]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"修复 recovery 任务批量导入\"\n              - generic\n                - StaticText \"Task owner · 需修改\"\n            - button \"执行失败 20% 修复任务导入：保留有效行并报告逐行错误 recovery importer Owner · 10/18/2026, 8:30:35 PM\" [ref=e22]\n              - StaticText \"执行失败\"\n              - generic\n                - StaticText \"20%\"\n              - strong\n                - StaticText \"修复任务导入：保留有效行并报告逐行错误\"\n              - generic\n                - StaticText \"recovery importer Owner · 10/18/2026, 8:30:35 PM\"\n            - button \"执行失败 20% 修复任务导入：保留有效行并报告逐行错误 recovery importer Owner · 10/18/2026, 8:26:44 PM\" [ref=e23]\n              - StaticText \"执行失败\"\n              - generic\n                - StaticText \"20%\"\n              - strong\n                - StaticText \"修复任务导入：保留有效行并报告逐行错误\"\n              - generic\n                - StaticText \"recovery importer Owner · 10/18/2026, 8:26:44 PM\"\n            - button \"执行完成 100% 离线任务看板：唯一索引、批量导入与跨模块验证 complex store Owner · 已通过\" [ref=e24]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"离线任务看板：唯一索引、批量导入与跨模块验证\"\n              - generic\n                - StaticText \"complex store Owner · 已通过\"\n            - button \"执行完成 100% 离线任务看板：筛选、分页与状态统计 complex view Owner · 已通过\" [ref=e25]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"离线任务看板：筛选、分页与状态统计\"\n              - generic\n                - StaticText \"complex view Owner · 已通过\"\n            - button \"执行完成 100% 实现本地任务索引与 Node 测试 representative index Owner · 已通过\" [ref=e26]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"实现本地任务索引与 Node 测试\"\n              - generic\n                - StaticText \"representative index Owner · 已通过\"\n            - button \"执行完成 100% 创建 smoke health.txt smoke health Owner · 已通过\" [ref=e27]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"创建 smoke health.txt\"\n              - generic\n                - StaticText \"smoke health Owner · 已通过\"\n      - StaticText \"选择一项任务\"\n      - StaticText \"创建或导入后，执行、交接和验收都留在同一条记录里。\""
+}

@@ -1,0 +1,10 @@
+{
+  "exit": 0,
+  "stdout": "✔ an empty index lists no tasks and returns null for an unknown id (0.715294ms)\n✔ adding a task makes its unchanged id and title available (0.152486ms)\n✔ list repeatedly preserves insertion order instead of sorting ids (0.153667ms)\n✔ a duplicate id throws Error without replacing a task or changing order (0.288569ms)\n✔ empty, whitespace, missing, and non-string ids throw Error without adding tasks (0.195677ms)\n✔ valid ids retain surrounding whitespace and remain distinct (0.092051ms)\n✔ title is stored without additional validation or coercion (0.077433ms)\n✔ separate indexes have independent records and duplicate detection (0.095989ms)\nℹ tests 8\nℹ suites 0\nℹ pass 8\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 40.089265\n",
+  "stderr": "",
+  "files": [
+    "README.md",
+    "src/index.mjs",
+    "tests/index.test.mjs"
+  ]
+}

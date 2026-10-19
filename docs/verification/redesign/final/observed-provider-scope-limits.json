@@ -1,0 +1,12 @@
+[
+  {
+    "taskId": "1bbac1ec-3132-458e-94f1-bef0605421c6",
+    "scope": "weaver-cli-codex-4fe6bd80.scope",
+    "show": "ControlGroup=/user.slice/user-1000.slice/user@1000.service/app.slice/weaver-cli-codex-4fe6bd80.scope\nMemoryHigh=8589934592\nMemoryMax=10737418240\nActiveState=active\n"
+  },
+  {
+    "taskId": "8bc8d2b0-2572-40bf-8fc2-d6d49186ce1e",
+    "scope": "weaver-cli-codex-b86a98ab.scope",
+    "show": "ControlGroup=/user.slice/user-1000.slice/user@1000.service/app.slice/weaver-cli-codex-b86a98ab.scope\nMemoryHigh=8589934592\nMemoryMax=10737418240\nActiveState=active\n"
+  }
+]

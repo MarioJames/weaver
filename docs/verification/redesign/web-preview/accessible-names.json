@@ -1,0 +1,101 @@
+[
+  {
+    "ariaLabel": null,
+    "ariaLabelledby": null,
+    "id": "base-ui-_r_ua_",
+    "label": [],
+    "parentLabel": null,
+    "role": "combobox",
+    "tag": "BUTTON",
+    "text": "claude_owner",
+    "value": ""
+  },
+  {
+    "ariaLabel": null,
+    "ariaLabelledby": null,
+    "id": "base-ui-_r_ue_",
+    "label": [],
+    "parentLabel": null,
+    "role": "combobox",
+    "tag": "BUTTON",
+    "text": "判断",
+    "value": ""
+  },
+  {
+    "ariaLabel": null,
+    "ariaLabelledby": null,
+    "id": "base-ui-_r_uk_",
+    "label": [],
+    "parentLabel": "假设正在运行的工作代理数",
+    "role": null,
+    "tag": "INPUT",
+    "text": "",
+    "value": "0"
+  },
+  {
+    "ariaLabel": null,
+    "ariaLabelledby": null,
+    "id": "base-ui-_r_um_",
+    "label": [],
+    "parentLabel": "等待上限（分钟）",
+    "role": null,
+    "tag": "INPUT",
+    "text": "",
+    "value": "15"
+  },
+  {
+    "ariaLabel": null,
+    "ariaLabelledby": null,
+    "id": "base-ui-_r_uo_",
+    "label": [],
+    "parentLabel": null,
+    "role": "combobox",
+    "tag": "BUTTON",
+    "text": "不固定",
+    "value": ""
+  },
+  {
+    "ariaLabel": null,
+    "ariaLabelledby": null,
+    "id": "base-ui-_r_us_",
+    "label": [],
+    "parentLabel": "qa_b_worker 的优先权重",
+    "role": null,
+    "tag": "INPUT",
+    "text": "",
+    "value": "100"
+  },
+  {
+    "ariaLabel": null,
+    "ariaLabelledby": null,
+    "id": "base-ui-_r_ut_",
+    "label": [],
+    "parentLabel": "qa_renamed_worker 的优先权重",
+    "role": null,
+    "tag": "INPUT",
+    "text": "",
+    "value": "100"
+  },
+  {
+    "ariaLabel": null,
+    "ariaLabelledby": null,
+    "id": "base-ui-_r_uu_",
+    "label": [],
+    "parentLabel": null,
+    "role": "combobox",
+    "tag": "BUTTON",
+    "text": "选择工作代理",
+    "value": ""
+  },
+  {
+    "ariaLabel": null,
+    "ariaLabelledby": null,
+    "id": "base-ui-_r_v2_",
+    "label": [],
+    "parentLabel": null,
+    "role": "switch",
+    "tag": "BUTTON",
+    "text": "",
+    "value": ""
+  }
+]

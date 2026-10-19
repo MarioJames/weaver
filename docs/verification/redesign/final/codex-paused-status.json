@@ -1,0 +1,158 @@
+{
+  "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+  "acceptanceCriteria": [
+    "proof.txt contains exactly weaver-real-codex and a newline"
+  ],
+  "constraints": [
+    "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+  ],
+  "title": "weaver-real-codex",
+  "instruction": "Create proof.txt containing exactly weaver-real-codex and newline. Read it back. Do not touch any other file.",
+  "id": "35988b40-faee-44b3-9301-fb24cadcbce2",
+  "createdAt": "2026-10-18T23:45:04.713Z",
+  "updatedAt": "2026-10-18T23:45:52.383Z",
+  "status": "completed",
+  "revision": 15,
+  "reviewState": "pending",
+  "progress": 100,
+  "events": [
+    {
+      "id": "967c51ea-40e2-44f5-949f-4ab46bb9df89",
+      "at": "2026-10-18T23:45:04.713Z",
+      "kind": "lifecycle",
+      "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+    },
+    {
+      "id": "c0ff459c-4cda-41c9-bac0-b6b5b0113639",
+      "at": "2026-10-18T23:45:04.756Z",
+      "kind": "lifecycle",
+      "message": "Frozen work package created"
+    },
+    {
+      "id": "bf019747-9c0c-4be5-9218-326f1a35bbfd",
+      "at": "2026-10-18T23:45:04.844Z",
+      "kind": "lifecycle",
+      "message": "Policy selected codex_worker; launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex"
+    },
+    {
+      "id": "c6582c0b-7b53-4c7e-b23a-0abf4f878472",
+      "at": "2026-10-18T23:45:04.844Z",
+      "kind": "lifecycle",
+      "message": "Launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex"
+    },
+    {
+      "id": "562a3e07-584e-4cdf-bce3-4b69c8ab3af6",
+      "at": "2026-10-18T23:45:04.848Z",
+      "kind": "log",
+      "message": "Launching codex with requested model gpt-6.1-sol"
+    },
+    {
+      "id": "3d37c57d-7b2b-436c-b1fa-e49a4348b3f2",
+      "at": "2026-10-18T23:45:04.848Z",
+      "kind": "log",
+      "message": "codex sandbox workspace-write is the vendor profile, not a separate OS claim"
+    },
+    {
+      "id": "2dacdd07-a033-4609-843b-60c8c92135e1",
+      "at": "2026-10-18T23:45:04.848Z",
+      "kind": "progress",
+      "message": "owned scope started"
+    },
+    {
+      "id": "714b8b74-f2bd-4c3d-a26c-fa3e7b3b7558",
+      "at": "2026-10-18T23:45:05.095Z",
+      "kind": "progress",
+      "message": "codex thread started"
+    },
+    {
+      "id": "3f1cb43d-0c50-437f-9071-d054225f5ffb",
+      "at": "2026-10-18T23:45:39.208Z",
+      "kind": "log",
+      "message": "tool started command_execution"
+    },
+    {
+      "id": "fcd21782-34ef-498d-b62f-8c90b9cf6812",
+      "at": "2026-10-18T23:45:39.208Z",
+      "kind": "log",
+      "message": "tool finished command_execution"
+    },
+    {
+      "id": "0737b943-6fd8-4124-b9f5-2710fa6c3983",
+      "at": "2026-10-18T23:45:52.381Z",
+      "kind": "artifact",
+      "message": "Received result.md"
+    },
+    {
+      "id": "db22f845-6d18-456c-8615-4c27d7538a82",
+      "at": "2026-10-18T23:45:52.382Z",
+      "kind": "result",
+      "message": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。"
+    },
+    {
+      "id": "0f99d827-4a34-44a2-9626-11aaa1f690f3",
+      "at": "2026-10-18T23:45:52.383Z",
+      "kind": "lifecycle",
+      "message": "Worker exited successfully; output is ready for owner review"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "b14c639a-1f71-4c76-83be-76f4b65cd77d",
+      "name": "result.md",
+      "mediaType": "text/markdown",
+      "content": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。",
+      "createdAt": "2026-10-18T23:45:52.381Z"
+    }
+  ],
+  "ownerId": "e10d7179-11a7-43f7-867c-a6030dedaf0d",
+  "ownerEpoch": 0,
+  "ownerLastActivityAt": "2026-10-18T23:45:04.713Z",
+  "continuationPolicy": {
+    "idleRotationMinutes": 60
+  },
+  "packageId": "e51eaf60-f729-4d35-b469-f7dc88de6221",
+  "dispatch": {
+    "owner": "codex_owner",
+    "worker": "codex_worker",
+    "engine": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "xhigh",
+    "execution": "real",
+    "maxParallel": 4,
+    "maxWaitMinutes": 15,
+    "adapter": "codex",
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+    "workspaceIdentity": "38:1725517",
+    "engineKind": "codex"
+  },
+  "scheduled": false,
+  "summary": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。",
+  "run": {
+    "id": "b8fea0ce-7260-4958-ad74-6b3b2e953e3e",
+    "adapter": "codex",
+    "execution": "real",
+    "status": "stopped",
+    "startedAt": "2026-10-18T23:45:04.844Z",
+    "timeoutMs": 900000,
+    "engine": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "xhigh",
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+    "scopeUnit": "weaver-cli-codex-4e181c67",
+    "evidence": {
+      "engine": "codex",
+      "requestedModel": "gpt-6.1-sol",
+      "requestedEffort": "xhigh",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+      "terminal": "success",
+      "role": "worker",
+      "vendorSessionId": "01a15167-93c8-7d91-b1a2-eaaf1f5963a2",
+      "usage": {
+        "inputTokens": 45597,
+        "outputTokens": 328
+      }
+    },
+    "endedAt": "2026-10-18T23:45:52.383Z",
+    "exitCode": 0
+  }
+}

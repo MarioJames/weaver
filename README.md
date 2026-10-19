@@ -1,66 +1,155 @@
 # Weaver
 
-An Electron + TypeScript + React control plane for owner-led work. The unified interface is implemented and exercised with deterministic mock owners/workers. **No real agent, provider API, or project edit is performed.** Vendor-specific owner/worker adapters remain disabled.
+Weaver is a local Node control plane for owner-led agent work. It ships as one public skill (`skills/weaver`, skill name `weaver`), one `weaver` CLI, and one foreground web process. The browser UI and the CLI call the same `CommandHandler`: the web serves loopback HTTP on `127.0.0.1`, the CLI connects through an authenticated Unix-socket transport, and both speak `weaver.v1`. There is no second daemon, no separate owner-model process, no MCP service, no remote API, and no database: state is a versioned JSON store owned by the running process.
 
-## Run and verify
+The owner is the real agent that hosts the skill. It registers logical ownership in Weaver through the CLI and dispatches workers from there; Weaver never spawns an owner model itself. Saved routes launch real OpenCode, Pi, Grok, and Codex launchers through fixed argument adapters. `mock-jsonl` runs only when explicitly requested. A failed or unloaded real engine fails the dispatch; it never falls back to mock, Claude Code, or another engine. Claude Code real execution is deferred. Engine scan checks `PATH` and `--version` only.
 
-Requires Node.js 22.12+ and a supported Electron desktop.
+## Install and build
+
+Requires Node.js 22.12+ (`engines` in `package.json`). No system toolchain is installed.
 
 ```sh
 npm ci
-npm run dev
-npm run check
+npm run build
+npm start            # node dist/cli/main.mjs web
+npm run check        # typecheck, tests, production build
 ```
 
-`dev` builds then launches Electron; `start` uses an existing build. Do not disable Chromium's sandbox to bypass a restricted environment. Installers and signing are not included.
+Without a global install you can run the built CLI directly: `node dist/cli/main.mjs --help`. `package.json` exposes the `weaver` bin, but where `npm link` places it depends on your npm `globalPrefix`: check `npm prefix -g` first and never assume it is `~/.local`; only proceed when it is already a user-owned prefix (the install worker's verified setup used `globalPrefix=/home/mocha/.local`, then `npm link --offline --ignore-scripts` with no args; current npm rejects `npm link --global` with `ELINKGLOBAL`). After linking, verify `realpath ~/.local/bin/weaver` resolves into this repository's `dist/cli/main.mjs` and that `weaver --help` works. Do not overwrite an existing `weaver` bin or skill of the same name; keep both and stop. Installation and invocation acceptance records live in [VERIFICATION.md](VERIFICATION.md).
 
-## Implemented flow
+The public skill lives at `skills/weaver` in this repository. A user-level skill entry links or copies that directory to `~/.agents/skills/weaver`; it coexists with any preinstalled global `agents-cooperation` skill, which stays untouched. Never point the skill at the old Herdr scheduler.
 
-1. Enter task goal, workspace, owner profile and acceptance criteria. One command creates a logical mock owner and task atomically; no session/pane input is needed.
-2. Dispatch a mock worker. Weaver freezes a package, applies configured routing/availability/quota rules and actual concurrency limits, then runs or queues the bundled subprocess. A selected provider/model is policy metadata; actual execution is always mock.
-3. Inspect synchronized task status, bounded events, artifacts, correlation IDs and best-effort-redacted logs. Tokens/cost/context usage are unknown when not reported.
-4. Completion requires a valid final result and successful process exit. Result delivery, acknowledgment and acceptance/rejection are distinct states. Reviews bind a result digest and current task revision.
-5. Cancel queued/running work; running cancellation waits for exit. Retry creates a new task linked to immutable prior history.
-6. Switch a mock owner manually, or configure idle continuation (default 60 minutes, null disables). Expiry is checked on the next valid worker dispatch, not by a background timer. A bounded context pack, readiness/acknowledgment and atomic epoch handoff preserve context. Active/scheduled work blocks rotation. This is user policy, not a vendor cache promise.
-
-Settings save into app-owned `policy.v1.json`. Route preview is non-executing; dispatch separately applies current policy. The global mock cap is two, additionally bounded by the selected owner's configured cap. Blocked queued work remains queued; it never silently falls back to a real provider.
-
-## CLI and shared command contract
-
-The app is the sole writer and process supervisor. The CLI never opens the task database or creates a fallback daemon.
+## Run one local control plane
 
 ```sh
-npm run build
-node dist/cli/main.mjs capabilities --json
-node dist/cli/main.mjs tasks create --input request.json --command-id unique-retry-key --json --no-input
-node dist/cli/main.mjs tasks get --task-id UUID --json
+weaver web --no-open
 ```
 
-`package.json` exposes the `weaver` bin for normal package installation/linking. Inputs can be argument objects or full `{apiVersion:"weaver.v1",commandId,command,args}` envelopes; `--input -` reads stdin. Keep the same command ID when retrying an uncertain mutation. stdout contains one JSON response; exit 0 means the command was handled successfully, exit 1 means failure. Successful submission is not successful execution. See [logical command examples](skills/agents-cooperation/references/handoff.md).
+`weaver web` is a foreground process and the only writer and supervisor. It binds `127.0.0.1` only (default port 4737; `--port` selects another, `0` picks a free port), prints the URL after the stores and endpoints are ready, and keeps running after the browser closes. `--dev` serves the UI with Vite on the same loopback origin. `--data-dir` overrides the state directory; the default is `$XDG_DATA_HOME/weaver` or `~/.local/share/weaver`, which is also the discoverable endpoint root (`control.v1.json`). A busy port reports `EADDRINUSE` and names `--port`. Weaver does not read, migrate, or delete `~/.config/weaver-desktop`.
 
-Implemented commands include capabilities, owners spawn/attach/get/list/switch/continuation settings, tasks create/get/list/cancel/retry/events/results, packages create/get, workers spawn, artifacts read, result delivery/ack, reviews, command receipts, observability and synchronization snapshots. The command envelope is also exposed through the narrow renderer preload bridge.
+Stop with Ctrl+C or SIGTERM: the process drains, stops the workers it started, and exits. Task and policy files are kept. Closing the browser tab does not stop tasks, and there is no second background daemon; if a client reports `APP_NOT_RUNNING`, start `weaver web --no-open` first.
 
-### Transport and authorization boundary
+## Skill entry and preflight
 
-Unix-domain IPC uses a random per-app-instance credential in an owned private directory; token/discovery/socket files are restricted. No token is put in argv or output. The credential grants **local trusted-user demo authority**, not per-owner isolation. Unknown providers fail closed. Do not connect untrusted external agents to this demo authority.
+The skill instructs the owner to use Weaver CLI for capability inspection, routing, bounded packages, dispatch, and result verification; workers never delegate. Before any dispatch the owner checks existing state with the CLI:
 
-App absent returns `APP_NOT_RUNNING`. IPC requests/clients/timeouts are bounded. CLI disconnect never cancels app work. Windows transport is intentionally unavailable until current-user pipe ACLs are implemented; the desktop UI can still run. A stale discovery file fails closed: verify no app instance is running before manually removing stale `control.v1.json` from app userData. No automatic overwrite or unsafe endpoint takeover is performed.
+```sh
+weaver capabilities           # command catalog, limits, realExecution
+weaver engines scan           # PATH + --version probe of the fixed engine catalog
+weaver policy get             # saved owners, workers, weights, pins, blocks, revision
+```
 
-## Architecture and persistence
+`capabilities.realExecution` means the real launcher module is loaded, not that a model ran or a login was proven. Engine scan proves an installed executable and version only; enabling an engine (`engines set-enabled`) still requires the probe and never creates a worker or owner role. Worker, model, and effort configuration is separate policy work, and real dispatch additionally requires an existing absolute workspace.
 
-Renderer / CLI → shared `CommandHandler` → `TaskStore`, policy, scheduler and adapters. Generic `OwnerHostAdapter`, `WorkerProviderAdapter` and a capability-checked registry are implemented. The mock owner supports delivery, acknowledgment, restoration and context handoff; the mock worker uses the existing bounded JSONL subprocess supervisor. No second control plane lives in the CLI.
+## One real task from the CLI
 
-The versioned JSON store retains tasks, owners, frozen packages, receipts, continuation history and a monotonic snapshot revision. In-process transactions atomically replace one file. Mutation intent is persisted before effects; an interrupted command returns `COMMAND_INDETERMINATE` rather than blindly repeating a spawn. This is not exactly-once external execution or a transactional outbox. The single writer uses fsync + rename, but no directory fsync. Caps include 200 tasks, 200 retained owners, 1,000 packages, 5,000 receipts, 32 MiB store and 500 events/task. There is no retention UI yet.
+The values below are local examples from this machine's verified install, not a universal availability guarantee: OpenCode `opencode/glm-5.3-flash-free` effort `max`, Pi `cc-switch-agentplan/glm-5.3-flash` effort `high`, Grok `grok-4.7` effort `high`, Codex `gpt-6.1-sol` effort `xhigh`. Native provider authentication is reused from each engine's own configuration; Weaver never copies or prints credentials.
 
-Renderer notifications invalidate snapshots; subscribe before loading and reload after missed notifications/reconnect. `sync.status` detects changed revision and `sync.snapshot` returns bounded summaries. Event queries use retained event IDs; expired cursors return `CURSOR_EXPIRED`, not silent loss. This is not a durable global push stream.
+```sh
+# 1. Register a logical owner and task together (one row in owners + tasks).
+#    An omitted workspace becomes this CLI process's working directory;
+#    an explicit relative path is resolved against the caller directory.
+#    The server never substitutes its own repository path.
+weaver tasks create --input task.json --command-id create-0731
 
-## Remaining integration and hardening
+# 2. Freeze the bounded work package (scope + acceptance criteria).
+weaver packages create --task-id <taskId> --input package.json --command-id package-0731
 
-- Real owner host/provider adapters, installed-version verification, authorization and native protocol normalization
-- Scoped external-agent credentials/object-level permissions, approval policy, real resource budgets and workspace isolation
-- Real process-tree containment and side-effect reconciliation beyond the bundled single-process mock
-- SQLite/indexed storage, durable outbox/recovery, retention/archival and production scale
-- Windows secured named pipe, MCP facade, installers/signing
-- Actual desktop GUI/preload/IPC and authenticated socket acceptance on an unrestricted supported machine
+# 3. Dispatch on the current saved route: the judgment class resolves
+#    worker/engine/model/effort by eligibility, weights and tier order.
+#    Without an explicit `only_engine` pin saved in policy this may not land
+#    on Codex (Pi/Grok are eligible too); a Codex pin must be configured
+#    explicitly in policy, not assumed here. An explicit `worker` is accepted.
+weaver workers spawn --task-id <taskId> --input dispatch.json --command-id dispatch-0731
 
-See [VERIFICATION.md](VERIFICATION.md), [architecture](docs/architecture.md), [agent-interface design](docs/agent-interface.md) and [migration inventory](docs/script-migration.md). Design documents describe a broader target, not proof every production feature exists. The public skill is host-independent. Apache-2.0; see LICENSE and NOTICE.
+# 4. Bounded wait (1-600 seconds, default 30). Exiting wait or watch never cancels the task.
+weaver tasks wait --task-id <taskId> --for 120
+```
+
+```json
+task.json
+{
+  "title": "Fix flaky CLI test",
+  "instruction": "Reproduce the flake on main and fix the timing assumption.",
+  "ownerProfileId": "codex_owner",
+  "workspace": "/home/you/your-repo",
+  "acceptanceCriteria": ["targeted test passes three consecutive runs"]
+}
+
+package.json
+{
+  "scope": ["tests/cli-timeout.test.ts"],
+  "acceptanceCriteria": ["test suite stable locally", "minimal diff"]
+}
+
+dispatch.json
+{ "class": "judgment" }
+```
+
+`workers spawn` returns the frozen dispatch (owner, worker, engine, model, effort, execution, max_parallel bounds, max wait, workspace) and either starts the worker or queues it when the owner is at its `max_parallel`. Queued work freezes the chosen route: it is never silently reselected or moved to another engine. `--input -` reads JSON from stdin; a full `{apiVersion:"weaver.v1",commandId,command,args}` envelope is accepted the same way.
+
+If a mutation reply is lost, do not retry with a new ID: `weaver operations get --command-id <id>` reads the durable receipt for the same command ID. Unknown commands are rejected before any dispatch; a command executed but not acknowledged returns `COMMAND_INDETERMINATE` and requires inspecting state, not blind replay.
+
+## Configure: order, weights, pin
+
+Policy is one validated document saved atomically with a revision check. It holds enabled engines, owners (ordered `workers` list, `worker_weights`, optional `only_engine`, `max_parallel`), workers (engine, model, effort, tags), and quota `blocks`.
+
+- Weights are integers 0..1000, default 100; they are priority, not probability. Larger first within a tier; ties follow the owner's `workers` order. Weight `0` excludes the worker, and an explicitly named worker cannot bypass weight 0 or the pin.
+- Class/tag eligibility is resolved first (mechanical/routine/judgment tiers, then tags), weights only reorder inside a tier.
+- `only_engine` is a hard pin: every dispatch for that owner (automatic, explicit worker, or queued pump) is constrained to that engine. There is no fallback across engines. A pin whose selection set is empty or unavailable can be saved but every dispatch fails until it is fixed.
+- Concurrency is per owner: `max_parallel`. The reported total is the sum of enabled owners, not a separate global limit. Lowering `max_parallel` leaves running tasks alone.
+- Timeout is `herdr.max_wait_minutes` (1-1440); there is no 60-second default.
+
+```sh
+weaver policy validate --input config.json   # config.json is the config document itself
+weaver policy preview  --input preview.json  # preview.json is a {owner, worker/class, runningCount} object
+weaver policy save     --input save.json     # save.json is {revision, config, blocks}; validate and save take different shapes
+weaver engines set-enabled --input toggle.json
+```
+
+Route preview is non-executing; dispatch separately applies current policy. Editing a weight or model later does not rewrite an already-queued route; blocked work stays queued with a bounded `queueReason` (capacity, policy, frozen route, workspace, launch).
+
+```json
+{ "owner": "codex_owner", "worker": "codex_worker", "runningCount": 2 }
+```
+
+## Result acceptance
+
+Execution completion, delivery, acknowledgment, and acceptance are distinct states and never inferred from a green progress bar. Completion requires a valid final result and a zero-exit process; truncated or missing finals fail. The manual owner pulls and verifies independently:
+
+```sh
+weaver tasks results --task-id <taskId>        # manifest with artifact sha256 and manifestDigest
+weaver artifacts read --task-id <taskId> --input read.json
+# verify files/diffs/tests in your own tooling, outside Weaver
+weaver results ack --task-id <taskId> --input ack.json --command-id ack-0731      # received, not accepted
+weaver reviews submit --task-id <taskId> --input review.json --command-id review-0731
+```
+
+`results.ack` and `reviews.submit` must reference the current `manifestDigest` and expected task revision; stale digests are rejected. For manual owners `results.deliver` is unavailable by design: there is no push channel, the owner pulls. A rejected review does not rerun silently: `tasks retry` creates a new task linked to the previous one via `retryOf`, reusing owner binding.
+
+```text
+ack:    { "expectedRevision": <read the current revision from tasks results / tasks get>,
+          "manifestDigest": "<digest from tasks results>" }
+review: { "expectedRevision": <read the current revision again after ack; ack itself bumps it>,
+          "manifestDigest": "<digest>", "decision": "accepted", "comment": "diff reproduced locally" }
+```
+
+A revision copied from the pre-ack step is already stale for the review and returns `REVISION_CONFLICT`; read it fresh before each submission.
+
+## Data and process boundary
+
+State is one versioned JSON store (`tasks.v1.json`) plus one policy store (`policy.v1.json`) written by the single running process with fsync + rename atomic replacement (intentionally no directory fsync). Caps: 200 tasks, 200 retained owners, 1,000 packages, 5,000 command receipts, 500 events per task, 20 artifacts per task, 32,000-character artifact content, 256 KiB policy document, 32 MiB store, 100 events per page. There is no retention UI yet.
+
+The Unix CLI transport uses a random per-instance token in an owned private directory (`control-<instanceId>/`), 1 MiB frames, and a 15-second per-request timeout; token and discovery files are user-restricted and no token is ever placed in argv or output. The credential is **local trusted-user authority**, not per-owner isolation: do not connect untrusted external agents. A stale discovery file must not exist while another instance runs; verify no running instance before removing it manually. The local control plane targets Linux/Unix. `weaver web` starts its Unix CLI transport before the loopback HTTP layer and refuses to start on native Windows (`UNSUPPORTED_PLATFORM`, `src/main/local-ipc.ts`); supervised real workers additionally rely on Linux systemd user scopes.
+
+Repository honesty: real runs record the frozen route, requested engine/model/effort, adapter, workspace identity, and the launcher's scope unit and observed evidence; vendor-only fields stay unknown when unreported, and observability metrics are `null` with an explicit source note unless a provider emits evidence. Testing or build counts are not acceptance; current verification evidence lives in [VERIFICATION.md](VERIFICATION.md).
+
+## Layout and provenance
+
+- [architecture](docs/architecture.md): components, single-writer authority, scheduling, lifecycle, storage, local boundaries
+- [agent-interface](docs/agent-interface.md): command catalog, envelope, outputs, and a full real lifecycle example
+- [local engine operation guide](docs/local-integration-plan.md): discovery, enablement, roles, models, timeout, cancellation, and failure diagnosis for OpenCode/Pi/Grok/Codex
+- [script-migration](docs/script-migration.md): the real Apache-2.0 upstream provenance and migration mapping
+- Skill: [skills/weaver/SKILL.md](skills/weaver/SKILL.md) with [references](skills/weaver/references/handoff.md)
+
+Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).

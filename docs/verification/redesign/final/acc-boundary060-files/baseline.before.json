@@ -1,0 +1,221 @@
+{
+  "capturedAt": "2026-10-19T01:15:41.423713+00:00",
+  "paths": {
+    "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/fixture": {
+      "kind": "directory",
+      "entries": {
+        "ACCESS.md": {
+          "kind": "file",
+          "size": 438,
+          "sha256": "f5329216d1a24272684bb78cb86709780621f92eb0e74d361a4f52d40fa6dd83",
+          "mode": "0o664"
+        },
+        "README.md": {
+          "kind": "file",
+          "size": 190,
+          "sha256": "a0780b707d62d223884008eab1e08b6c375b22dc77d71bbc910f384d71a78a6b",
+          "mode": "0o664"
+        },
+        "bin/weaver": {
+          "kind": "file",
+          "size": 91,
+          "sha256": "a116607efb9e871699a348ccda8ec1d7bd366593d891b3f0148f06a5a5c3791e",
+          "mode": "0o700"
+        },
+        "complex/README.md": {
+          "kind": "file",
+          "size": 406,
+          "sha256": "80abb2557a9cb70c87ce2db138dc29783de9eaa39901d738f7a5bb9ed998493d",
+          "mode": "0o664"
+        },
+        "recovery/README.md": {
+          "kind": "file",
+          "size": 310,
+          "sha256": "1539e4710be21f2397adde438ea4128f32c225c1696e7fa734c90468ca4b3840",
+          "mode": "0o664"
+        },
+        "recovery/importer.mjs": {
+          "kind": "file",
+          "size": 73,
+          "sha256": "aefd8532db093123c31bf940d7dbc7d5a14e4f8e6fa2f86a0401a0dd12acc2be",
+          "mode": "0o664"
+        },
+        "recovery/test.mjs": {
+          "kind": "file",
+          "size": 352,
+          "sha256": "b307fbaaaa74dfd74978222a9afe5d4bb97f7a27ee3f8de38ec662f63ade9e1e",
+          "mode": "0o664"
+        },
+        "representative/README.md": {
+          "kind": "file",
+          "size": 210,
+          "sha256": "e16fa0d1ddf8928db1cc5c1b5595e541cf1674ab04f47ff564c17580a0f0922b",
+          "mode": "0o664"
+        }
+      }
+    },
+    "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.agents": {
+      "kind": "directory",
+      "entries": {
+        "skills/weaver/LICENSE": {
+          "kind": "file",
+          "size": 11357,
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "mode": "0o644"
+        },
+        "skills/weaver/SKILL.md": {
+          "kind": "file",
+          "size": 5368,
+          "sha256": "e8659a8196db8032890718acd8972c118108b2dacacd85e99c7640cdf430414f",
+          "mode": "0o644"
+        },
+        "skills/weaver/references/handoff.md": {
+          "kind": "file",
+          "size": 7887,
+          "sha256": "252baf8ed0e7164f12e8af0addd84b22ea4d9d1914a0060fbf3d6c6696e33433",
+          "mode": "0o644"
+        },
+        "skills/weaver/references/provenance.md": {
+          "kind": "file",
+          "size": 1798,
+          "sha256": "20b2fbb949c30466ee9481175920a21e1b518f8fd45fd075212ed5ac78400d24",
+          "mode": "0o644"
+        }
+      }
+    },
+    "/tmp/weaver-redesign-3QuXVe/a": {
+      "kind": "directory",
+      "entries": {
+        "agent-state/00d508a5-3c84-46a9-b5aa-b0781a90b898/prompt-2fffbae0.txt": {
+          "kind": "file",
+          "size": 2906,
+          "sha256": "70b4b750e4eba63bd5316d9e3a986a8e67440dab2d977b32e16fca4727119c1b",
+          "mode": "0o600"
+        },
+        "agent-state/0a68044f-8d5c-43b3-93e7-2f6088dafb1b/prompt-eb6d1c47.txt": {
+          "kind": "file",
+          "size": 4203,
+          "sha256": "81dc7521cd06c3410f5ec71166faaf5bb0b11195f78bebbc3b8309abb6df15f6",
+          "mode": "0o600"
+        },
+        "agent-state/1bbac1ec-3132-458e-94f1-bef0605421c6/prompt-4fe6bd80.txt": {
+          "kind": "file",
+          "size": 5332,
+          "sha256": "945060fcfe0b68995f97e806fac874702ce877e5f8fd97b78da5e38205922903",
+          "mode": "0o600"
+        },
+        "agent-state/5f813e19-5466-4eac-8e41-da4a2e6e5f56/prompt-9b3e4b21.txt": {
+          "kind": "file",
+          "size": 2995,
+          "sha256": "5d1933700105712f94060db78f1092c3711724e1f9cf550d3cc75e6ab496f5e6",
+          "mode": "0o600"
+        },
+        "agent-state/8bc8d2b0-2572-40bf-8fc2-d6d49186ce1e/prompt-b86a98ab.txt": {
+          "kind": "file",
+          "size": 3849,
+          "sha256": "35338f1787e276a283c5ebd3ffc00d7c82f1b51c5ef0f798118cb547e2fca5fe",
+          "mode": "0o600"
+        },
+        "agent-state/9159779a-bcb1-406b-9a62-ebf2b31fd49b/prompt-b022fdf4.txt": {
+          "kind": "file",
+          "size": 2924,
+          "sha256": "55a26e668db73073628429822382ae3e5f465b8a1f73685eaa467a82ed29cb2c",
+          "mode": "0o600"
+        },
+        "agent-state/9f23564d-f284-483c-8b08-e03814e76c73/prompt-4cdd35da.txt": {
+          "kind": "file",
+          "size": 2109,
+          "sha256": "110120a3bb9bcbbfb934840606e39992f3ba13182aa70159cbb30647e5eede21",
+          "mode": "0o600"
+        },
+        "agent-state/a146d348-8ab2-4b81-b4d1-295b39725d6a/prompt-1e06b552.txt": {
+          "kind": "file",
+          "size": 4832,
+          "sha256": "0e252efba6de30d1caf3a12a31f8163497394fe0ed5b400e7a24ae7adc904c73",
+          "mode": "0o600"
+        },
+        "agent-state/b9e7b26e-025d-4f54-b800-337e58e039ba/prompt-41c27736.txt": {
+          "kind": "file",
+          "size": 5857,
+          "sha256": "51be50f743c7268e9d8ee986461cc4da958d7d0c4547990a197a63d33b36ec34",
+          "mode": "0o600"
+        },
+        "control-a08589017ed588d5154d0023c7042a3b/ipc.sock": {
+          "kind": "special"
+        },
+        "control-a08589017ed588d5154d0023c7042a3b/token": {
+          "kind": "file",
+          "size": 64,
+          "sha256": "e28e3907a84715c3d5da5da6ad16ae08aea233143d74571823e350d46e17d843",
+          "mode": "0o600"
+        },
+        "control.v1.json": {
+          "kind": "file",
+          "size": 247,
+          "sha256": "d77aa1b49e198b0a4862f108a065e0f876d97fba33621cbc98f8e17fb912f417",
+          "mode": "0o600"
+        },
+        "policy.v1.json": {
+          "kind": "file",
+          "size": 4507,
+          "sha256": "896709acabea7734a4b382973491e9a9f5f14c3f423b1cea6662a663eb5209fe",
+          "mode": "0o600"
+        },
+        "tasks.v1.json": {
+          "kind": "file",
+          "size": 323220,
+          "sha256": "436b436091945272a91515c929287e1180ff8147cf48092db0d19bb8ddfcec00",
+          "mode": "0o600"
+        }
+      }
+    },
+    "/home/mocha/.codex/auth.json": {
+      "kind": "file",
+      "size": 4165,
+      "sha256": "01724ffe7ddecee9cad71017f8c3ad5970d909acf7629a94f7af5e6651d13c58",
+      "mode": "0o600"
+    },
+    "/home/mocha/.codex/config.toml": {
+      "kind": "file",
+      "size": 13663,
+      "sha256": "289f4520ef8b0945d02e36cb8f4f1d457e9e99d6c5a72255bfdab7814e9483fc",
+      "mode": "0o600"
+    },
+    "/home/mocha/.claude.json": {
+      "kind": "file",
+      "size": 591883,
+      "sha256": "1ff55b3b9653302ac64c07c45dff373cd95281e4f91fdcee88332ebd539e2cbb",
+      "mode": "0o600"
+    },
+    "/home/mocha/.claude/settings.json": {
+      "kind": "file",
+      "size": 2617,
+      "sha256": "d4b7e32cdc7db55add9f80f727888ebcfb591504227718148811403d90ba9423",
+      "mode": "0o600"
+    },
+    "/home/mocha/.config/agents-cooperation/config.json": {
+      "kind": "file",
+      "size": 3140,
+      "sha256": "ab2db5fe0baa71890b8b19da83cdea2a82c1d73be982972737d08559e37ea8fb",
+      "mode": "0o600"
+    },
+    "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.aut-acceptance": {
+      "kind": "directory",
+      "entries": {
+        "plugin-install.json": {
+          "kind": "file",
+          "size": 578,
+          "sha256": "8de1d06a432c767f705768b4459ffddae2399ca7a7e6a8a8ab37be592729fb32",
+          "mode": "0o664"
+        }
+      }
+    },
+    "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.iso/claude-settings.json": {
+      "kind": "file",
+      "size": 939,
+      "sha256": "fb97d7dd4e32a30df88984da19c8c2cca65cdc6e8948ca43725d883c22a467af",
+      "mode": "0o664"
+    }
+  },
+  "coverage": "SHA256/content size/mode; no credential values copied. Includes full fixture, .agents, isolated Weaver data and explicitly located auth/config paths. Excludes unknown provider config locations and concurrent changes outside capture interval."
+}

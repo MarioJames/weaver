@@ -13,10 +13,11 @@ async function startOrSkip(t: TestContext, directory: string, handler: (input: a
 const response = (request: any) => ({ apiVersion: 'weaver.v1', commandId: request.commandId, ok: true, data: request });
 
 test('CLI parsing supports args/envelopes and explicit retry IDs', () => {
-  const options = parseCLI(['tasks', 'get', '--task-id', 'task-1', '--command-id', 'retry-id', '--json', '--no-input']);
+  const options = parseCLI(['tasks', 'get', '--task-id', 'task-1', '--command-id', 'retry-id', '--json']);
   assert.deepEqual(makeRequest(options), { apiVersion: 'weaver.v1', command: 'tasks.get', commandId: 'retry-id', args: { taskId: 'task-1' } });
   assert.equal(makeRequest(parseCLI(['capabilities'])).command, 'capabilities.get');
   assert.throws(() => parseCLI(['tasks', 'list', '--bogus']));
+  assert.throws(() => parseCLI(['tasks', 'get', '--no-input']), /Unknown option/);
   assert.throws(() => makeRequest(options, { apiVersion: 'weaver.v1', command: 'tasks.cancel', args: {} }));
   assert.throws(() => makeRequest(options, { taskId: 'different' }));
 });
@@ -94,7 +95,8 @@ test('endpoint discovery rejects unsafe files and path substitution without sock
 
 test('CLI subprocess prints a single JSON response when app is not running', async () => {
  const {spawnSync}=await import('node:child_process');
- const result=spawnSync(process.execPath,['--import','tsx','src/cli/main.ts','capabilities','--user-data','/tmp/weaver-does-not-exist-'+Date.now()],{encoding:'utf8'});
+ const result=spawnSync(process.execPath,['--import','tsx','src/cli/main.ts','capabilities','--data-dir','/tmp/weaver-does-not-exist-'+Date.now()],{encoding:'utf8'});
  assert.equal(result.status,1);assert.equal(result.stdout.trim().split('\n').length,1);
  const response=JSON.parse(result.stdout);assert.equal(response.apiVersion,'weaver.v1');assert.equal(response.error.code,'APP_NOT_RUNNING');
+ assert.match(response.error.message,/weaver web --no-open/);
 });

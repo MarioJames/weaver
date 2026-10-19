@@ -1,0 +1,311 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 3294896620169087710
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:34033/",
+  "refs": {
+    "e1": {
+      "name": "",
+      "role": "generic"
+    },
+    "e10": {
+      "name": "工作代理",
+      "role": "link"
+    },
+    "e11": {
+      "name": "路由与配额",
+      "role": "link"
+    },
+    "e12": {
+      "name": "新建任务",
+      "role": "button"
+    },
+    "e13": {
+      "name": "任务列表",
+      "role": "region"
+    },
+    "e14": {
+      "name": "任务详情",
+      "role": "region"
+    },
+    "e15": {
+      "name": "搜索任务",
+      "role": "textbox"
+    },
+    "e16": {
+      "name": "开始执行",
+      "role": "button"
+    },
+    "e17": {
+      "name": "取消任务",
+      "role": "button"
+    },
+    "e18": {
+      "name": "全部",
+      "role": "button"
+    },
+    "e19": {
+      "name": "进行中",
+      "role": "button"
+    },
+    "e2": {
+      "name": "跳到内容",
+      "role": "link"
+    },
+    "e20": {
+      "name": "待验收",
+      "role": "button"
+    },
+    "e21": {
+      "name": "已结束",
+      "role": "button"
+    },
+    "e22": {
+      "name": "待执行 0% UI055 create only, no model Task owner · 10/18/2026, 8:55:28 PM",
+      "role": "button"
+    },
+    "e23": {
+      "name": "已取消 10% Real Pi immediate cancel 055 Task owner · 10/18/2026, 8:51:11 PM",
+      "role": "button"
+    },
+    "e24": {
+      "name": "执行完成 100% downcap queue Task owner · 待验收",
+      "role": "button"
+    },
+    "e25": {
+      "name": "已取消 15% downcap second Task owner · 10/18/2026, 8:27:30 PM",
+      "role": "button"
+    },
+    "e26": {
+      "name": "已取消 15% downcap first Task owner · 10/18/2026, 8:27:30 PM",
+      "role": "button"
+    },
+    "e27": {
+      "name": "待执行 0% uncertain receipt fixture Task owner · 10/18/2026, 8:27:04 PM",
+      "role": "button"
+    },
+    "e28": {
+      "name": "执行完成 100% priority freeze queued Task owner · 待验收",
+      "role": "button"
+    },
+    "e29": {
+      "name": "执行完成 100% priority freeze active Task owner · 待验收",
+      "role": "button"
+    },
+    "e3": {
+      "name": "Weaver",
+      "role": "button"
+    },
+    "e30": {
+      "name": "已取消 0% bounded wait queued fixture Task owner · 10/18/2026, 8:19:45 PM",
+      "role": "button"
+    },
+    "e31": {
+      "name": "已取消 0% kind freeze guard Task owner · 10/18/2026, 8:18:54 PM",
+      "role": "button"
+    },
+    "e32": {
+      "name": "执行完成 100% kind slot Task owner · 待验收",
+      "role": "button"
+    },
+    "e33": {
+      "name": "已取消 0% admission all-zero Task owner · 10/18/2026, 8:18:53 PM",
+      "role": "button"
+    },
+    "e34": {
+      "name": "已取消 0% admission pin Task owner · 10/18/2026, 8:18:52 PM",
+      "role": "button"
+    },
+    "e35": {
+      "name": "已取消 0% admission zero Task owner · 10/18/2026, 8:18:52 PM",
+      "role": "button"
+    },
+    "e36": {
+      "name": "已取消 0% SIGTERM active mock Task owner · 10/18/2026, 8:18:16 PM",
+      "role": "button"
+    },
+    "e37": {
+      "name": "待执行 0% missing workspace Task owner · 10/18/2026, 7:56:54 PM",
+      "role": "button"
+    },
+    "e38": {
+      "name": "已取消 0% qa_owner capacity 1 Task owner · 10/18/2026, 7:56:53 PM",
+      "role": "button"
+    },
+    "e39": {
+      "name": "已取消 0% qa_owner capacity 0 Task owner · 10/18/2026, 7:56:53 PM",
+      "role": "button"
+    },
+    "e4": {
+      "name": "主导航",
+      "role": "navigation"
+    },
+    "e40": {
+      "name": "已取消 0% codex_owner capacity 1 Task owner · 10/18/2026, 7:56:53 PM",
+      "role": "button"
+    },
+    "e41": {
+      "name": "已取消 15% codex_owner capacity 0 Task owner · 10/18/2026, 7:56:52 PM",
+      "role": "button"
+    },
+    "e42": {
+      "name": "已取消 0% workspace guard no launch Task owner · 10/18/2026, 7:56:50 PM",
+      "role": "button"
+    },
+    "e43": {
+      "name": "执行完成 100% occupy workspace slot Task owner · 待验收",
+      "role": "button"
+    },
+    "e44": {
+      "name": "已取消 0% workspace guard no launch Task owner · 10/18/2026, 7:56:34 PM",
+      "role": "button"
+    },
+    "e45": {
+      "name": "执行完成 100% occupy workspace slot Task owner · 待验收",
+      "role": "button"
+    },
+    "e46": {
+      "name": "执行完成 100% capacity queued Task owner · 待验收",
+      "role": "button"
+    },
+    "e47": {
+      "name": "执行完成 100% capacity first Task owner · 待验收",
+      "role": "button"
+    },
+    "e48": {
+      "name": "执行失败 20% Actual Pi timeout Task owner · 10/18/2026, 7:53:37 PM",
+      "role": "button"
+    },
+    "e49": {
+      "name": "已取消 20% Actual Pi cancel Task owner · 10/18/2026, 7:53:37 PM",
+      "role": "button"
+    },
+    "e5": {
+      "name": "收起导航",
+      "role": "button"
+    },
+    "e50": {
+      "name": "待执行 0% stdin idempotency Task owner · 10/18/2026, 7:53:07 PM",
+      "role": "button"
+    },
+    "e51": {
+      "name": "已取消 0% Catalog text Catalog text · 10/18/2026, 7:52:24 PM",
+      "role": "button"
+    },
+    "e52": {
+      "name": "执行完成 100% Catalog text Catalog text · 已通过",
+      "role": "button"
+    },
+    "e53": {
+      "name": "已取消 0% Catalog jsonl Catalog jsonl · 10/18/2026, 7:52:20 PM",
+      "role": "button"
+    },
+    "e54": {
+      "name": "执行完成 100% Catalog jsonl Catalog jsonl · 已通过",
+      "role": "button"
+    },
+    "e55": {
+      "name": "已取消 0% Catalog json Catalog json · 10/18/2026, 7:52:15 PM",
+      "role": "button"
+    },
+    "e56": {
+      "name": "执行完成 100% Catalog json Catalog json · 需修改",
+      "role": "button"
+    },
+    "e57": {
+      "name": "执行完成 100% weaver-real-codex Task owner · 已通过",
+      "role": "button"
+    },
+    "e58": {
+      "name": "执行失败 20% weaver-real-grok Task owner · 10/18/2026, 7:45:04 PM",
+      "role": "button"
+    },
+    "e59": {
+      "name": "执行完成 100% weaver-real-pi Task owner · 已通过",
+      "role": "button"
+    },
+    "e6": {
+      "name": "切换到浅色",
+      "role": "button"
+    },
+    "e60": {
+      "name": "执行完成 100% weaver-real-opencode Task owner · 已通过",
+      "role": "button"
+    },
+    "e61": {
+      "name": "时间线 1",
+      "role": "tab"
+    },
+    "e62": {
+      "name": "产物 0",
+      "role": "tab"
+    },
+    "e63": {
+      "name": "验收",
+      "role": "tab"
+    },
+    "e64": {
+      "name": "",
+      "role": "LabelText"
+    },
+    "e65": {
+      "name": "空闲阈值（分钟）",
+      "role": "textbox"
+    },
+    "e66": {
+      "name": "Increase",
+      "role": "button"
+    },
+    "e67": {
+      "name": "Decrease",
+      "role": "button"
+    },
+    "e68": {
+      "name": "保存空闲策略",
+      "role": "button"
+    },
+    "e69": {
+      "name": "登记手动接续",
+      "role": "button"
+    },
+    "e7": {
+      "name": "任务",
+      "role": "link"
+    },
+    "e70": {
+      "name": "事件类型",
+      "role": "combobox"
+    },
+    "e71": {
+      "name": "导出已筛选日志",
+      "role": "button"
+    },
+    "e72": {
+      "name": "启用空闲接续提醒",
+      "role": "checkbox"
+    },
+    "e73": {
+      "name": "搜索已加载事件",
+      "role": "textbox"
+    },
+    "e8": {
+      "name": "引擎",
+      "role": "link"
+    },
+    "e9": {
+      "name": "负责人",
+      "role": "link"
+    }
+  },
+  "snapshot": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - link \"跳到内容\" [ref=e2]\n    - complementary\n      - button \"Weaver\" [ref=e3]\n        - StaticText \"Weaver\"\n      - navigation \"主导航\" [ref=e4]\n        - link \"任务\" [ref=e7]\n          - image\n          - StaticText \"任务\"\n        - link \"引擎\" [ref=e8]\n          - image\n          - StaticText \"引擎\"\n        - link \"负责人\" [ref=e9]\n          - image\n          - StaticText \"负责人\"\n        - link \"工作代理\" [ref=e10]\n          - image\n          - StaticText \"工作代理\"\n        - link \"路由与配额\" [ref=e11]\n          - image\n          - StaticText \"路由与配额\"\n      - button \"收起导航\" [ref=e5]\n        - image\n      - button \"切换到浅色\" [ref=e6]\n        - image\n      - status\n        - StaticText \"2 个并行槽位 · 已同步\"\n    - main\n      - generic\n        - button \"新建任务\" [ref=e12]\n        - region \"任务列表\" [ref=e13]\n          - textbox \"搜索任务\" [ref=e15]\n          - group\n            - button \"全部\" [ref=e18]\n              - StaticText \"全部\"\n            - button \"进行中\" [ref=e19]\n              - StaticText \"进行中\"\n            - button \"待验收\" [ref=e20]\n              - StaticText \"待验收\"\n            - button \"已结束\" [ref=e21]\n              - StaticText \"已结束\"\n          - generic\n            - button \"待执行 0% UI055 create only, no model Task owner · 10/18/2026, 8:55:28 PM\" [ref=e22]\n              - StaticText \"待执行\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"UI055 create only, no model\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 8:55:28 PM\"\n            - button \"已取消 10% Real Pi immediate cancel 055 Task owner · 10/18/2026, 8:51:11 PM\" [ref=e23]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"10%\"\n              - strong\n                - StaticText \"Real Pi immediate cancel 055\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 8:51:11 PM\"\n            - button \"执行完成 100% downcap queue Task owner · 待验收\" [ref=e24]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"downcap queue\"\n              - generic\n                - StaticText \"Task owner · 待验收\"\n            - button \"已取消 15% downcap second Task owner · 10/18/2026, 8:27:30 PM\" [ref=e25]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"15%\"\n              - strong\n                - StaticText \"downcap second\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 8:27:30 PM\"\n            - button \"已取消 15% downcap first Task owner · 10/18/2026, 8:27:30 PM\" [ref=e26]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"15%\"\n              - strong\n                - StaticText \"downcap first\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 8:27:30 PM\"\n            - button \"待执行 0% uncertain receipt fixture Task owner · 10/18/2026, 8:27:04 PM\" [ref=e27]\n              - StaticText \"待执行\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"uncertain receipt fixture\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 8:27:04 PM\"\n            - button \"执行完成 100% priority freeze queued Task owner · 待验收\" [ref=e28]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"priority freeze queued\"\n              - generic\n                - StaticText \"Task owner · 待验收\"\n            - button \"执行完成 100% priority freeze active Task owner · 待验收\" [ref=e29]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"priority freeze active\"\n              - generic\n                - StaticText \"Task owner · 待验收\"\n            - button \"已取消 0% bounded wait queued fixture Task owner · 10/18/2026, 8:19:45 PM\" [ref=e30]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"bounded wait queued fixture\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 8:19:45 PM\"\n            - button \"已取消 0% kind freeze guard Task owner · 10/18/2026, 8:18:54 PM\" [ref=e31]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"kind freeze guard\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 8:18:54 PM\"\n            - button \"执行完成 100% kind slot Task owner · 待验收\" [ref=e32]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"kind slot\"\n              - generic\n                - StaticText \"Task owner · 待验收\"\n            - button \"已取消 0% admission all-zero Task owner · 10/18/2026, 8:18:53 PM\" [ref=e33]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"admission all-zero\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 8:18:53 PM\"\n            - button \"已取消 0% admission pin Task owner · 10/18/2026, 8:18:52 PM\" [ref=e34]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"admission pin\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 8:18:52 PM\"\n            - button \"已取消 0% admission zero Task owner · 10/18/2026, 8:18:52 PM\" [ref=e35]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"admission zero\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 8:18:52 PM\"\n            - button \"已取消 0% SIGTERM active mock Task owner · 10/18/2026, 8:18:16 PM\" [ref=e36]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"SIGTERM active mock\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 8:18:16 PM\"\n            - button \"待执行 0% missing workspace Task owner · 10/18/2026, 7:56:54 PM\" [ref=e37]\n              - StaticText \"待执行\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"missing workspace\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 7:56:54 PM\"\n            - button \"已取消 0% qa_owner capacity 1 Task owner · 10/18/2026, 7:56:53 PM\" [ref=e38]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"qa_owner capacity 1\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 7:56:53 PM\"\n            - button \"已取消 0% qa_owner capacity 0 Task owner · 10/18/2026, 7:56:53 PM\" [ref=e39]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"qa_owner capacity 0\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 7:56:53 PM\"\n            - button \"已取消 0% codex_owner capacity 1 Task owner · 10/18/2026, 7:56:53 PM\" [ref=e40]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"codex_owner capacity 1\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 7:56:53 PM\"\n            - button \"已取消 15% codex_owner capacity 0 Task owner · 10/18/2026, 7:56:52 PM\" [ref=e41]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"15%\"\n              - strong\n                - StaticText \"codex_owner capacity 0\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 7:56:52 PM\"\n            - button \"已取消 0% workspace guard no launch Task owner · 10/18/2026, 7:56:50 PM\" [ref=e42]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"workspace guard no launch\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 7:56:50 PM\"\n            - button \"执行完成 100% occupy workspace slot Task owner · 待验收\" [ref=e43]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"occupy workspace slot\"\n              - generic\n                - StaticText \"Task owner · 待验收\"\n            - button \"已取消 0% workspace guard no launch Task owner · 10/18/2026, 7:56:34 PM\" [ref=e44]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"workspace guard no launch\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 7:56:34 PM\"\n            - button \"执行完成 100% occupy workspace slot Task owner · 待验收\" [ref=e45]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"occupy workspace slot\"\n              - generic\n                - StaticText \"Task owner · 待验收\"\n            - button \"执行完成 100% capacity queued Task owner · 待验收\" [ref=e46]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"capacity queued\"\n              - generic\n                - StaticText \"Task owner · 待验收\"\n            - button \"执行完成 100% capacity first Task owner · 待验收\" [ref=e47]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"capacity first\"\n              - generic\n                - StaticText \"Task owner · 待验收\"\n            - button \"执行失败 20% Actual Pi timeout Task owner · 10/18/2026, 7:53:37 PM\" [ref=e48]\n              - StaticText \"执行失败\"\n              - generic\n                - StaticText \"20%\"\n              - strong\n                - StaticText \"Actual Pi timeout\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 7:53:37 PM\"\n            - button \"已取消 20% Actual Pi cancel Task owner · 10/18/2026, 7:53:37 PM\" [ref=e49]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"20%\"\n              - strong\n                - StaticText \"Actual Pi cancel\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 7:53:37 PM\"\n            - button \"待执行 0% stdin idempotency Task owner · 10/18/2026, 7:53:07 PM\" [ref=e50]\n              - StaticText \"待执行\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"stdin idempotency\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 7:53:07 PM\"\n            - button \"已取消 0% Catalog text Catalog text · 10/18/2026, 7:52:24 PM\" [ref=e51]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"Catalog text\"\n              - generic\n                - StaticText \"Catalog text · 10/18/2026, 7:52:24 PM\"\n            - button \"执行完成 100% Catalog text Catalog text · 已通过\" [ref=e52]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"Catalog text\"\n              - generic\n                - StaticText \"Catalog text · 已通过\"\n            - button \"已取消 0% Catalog jsonl Catalog jsonl · 10/18/2026, 7:52:20 PM\" [ref=e53]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"Catalog jsonl\"\n              - generic\n                - StaticText \"Catalog jsonl · 10/18/2026, 7:52:20 PM\"\n            - button \"执行完成 100% Catalog jsonl Catalog jsonl · 已通过\" [ref=e54]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"Catalog jsonl\"\n              - generic\n                - StaticText \"Catalog jsonl · 已通过\"\n            - button \"已取消 0% Catalog json Catalog json · 10/18/2026, 7:52:15 PM\" [ref=e55]\n              - StaticText \"已取消\"\n              - generic\n                - StaticText \"0%\"\n              - strong\n                - StaticText \"Catalog json\"\n              - generic\n                - StaticText \"Catalog json · 10/18/2026, 7:52:15 PM\"\n            - button \"执行完成 100% Catalog json Catalog json · 需修改\" [ref=e56]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"Catalog json\"\n              - generic\n                - StaticText \"Catalog json · 需修改\"\n            - button \"执行完成 100% weaver-real-codex Task owner · 已通过\" [ref=e57]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"weaver-real-codex\"\n              - generic\n                - StaticText \"Task owner · 已通过\"\n            - button \"执行失败 20% weaver-real-grok Task owner · 10/18/2026, 7:45:04 PM\" [ref=e58]\n              - StaticText \"执行失败\"\n              - generic\n                - StaticText \"20%\"\n              - strong\n                - StaticText \"weaver-real-grok\"\n              - generic\n                - StaticText \"Task owner · 10/18/2026, 7:45:04 PM\"\n            - button \"执行完成 100% weaver-real-pi Task owner · 已通过\" [ref=e59]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"weaver-real-pi\"\n              - generic\n                - StaticText \"Task owner · 已通过\"\n            - button \"执行完成 100% weaver-real-opencode Task owner · 已通过\" [ref=e60]\n              - StaticText \"执行完成\"\n              - generic\n                - StaticText \"100%\"\n              - strong\n                - StaticText \"weaver-real-opencode\"\n              - generic\n                - StaticText \"Task owner · 已通过\"\n      - region \"任务详情\" [ref=e14]\n        - StaticText \"UI055 create only, no model\"\n        - StaticText \"待执行\"\n        - StaticText \"尚未进入验收\"\n        - generic\n          - StaticText \"更新于 8:55:28 PM\"\n        - button \"开始执行\" [ref=e16]\n        - button \"取消任务\" [ref=e17]\n        - generic\n          - StaticText \"已创建 · 未执行 · 执行未完成 · 未确认收到结果 · 未验收\"\n        - StaticText \"执行进度\"\n        - generic\n          - StaticText \"0%\"\n        - progressbar \"执行进度\": 0\n        - StaticText \"目标与约束\"\n        - StaticText \"Fixture. No real dispatch.\"\n        - list\n          - listitem [level=1]\n            - ListMarker \"1. \"\n            - StaticText \"Record created, no provider\"\n        - StaticText \"尚未记录调度结果。\"\n        - generic\n          - StaticText \"最近活动 · 8:55:28 PM · Task queued. Owner reference is metadata only; no Herdr session was contacted.\"\n        - tablist \"任务记录\"\n          - tab \"时间线 1\" [selected, ref=e61]\n          - tab \"产物 0\" [ref=e62]\n          - tab \"验收\" [ref=e63]\n        - tabpanel \"时间线 1\"\n          - generic\n            - LabelText\n              - StaticText \"事件类型\"\n            - combobox \"事件类型\" [expanded=false, ref=e70]: 全部\n              - StaticText \"全部\"\n            - textbox \"搜索已加载事件\" [ref=e73]\n            - button \"导出已筛选日志\" [ref=e71]\n            - generic\n              - StaticText \"显示和导出会遮盖常见凭据格式，分享前仍需检查。已加载 1 条，筛选后 1 条。\"\n            - time\n              - StaticText \"8:55:28 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Task queued. Owner reference is metadata only; no Herdr session was contacted.\"\n        - complementary \"执行上下文\"\n          - StaticText \"执行上下文\"\n          - generic\n            - StaticText \"Owner Task owner\"\n          - generic\n            - StaticText \"Worker 尚未分配\"\n          - generic\n            - StaticText \"Worker 执行记录 尚未记录 · 适配器 尚未记录\"\n          - StaticText \"Owner 是逻辑登记。外部 CLI 宿主引用未经验证，登记不代表已启动新的 AI。\"\n          - generic\n            - StaticText \"工作目录 /tmp/weaver-redesign-3QuXVe/acceptance/final/ui055-manual\"\n          - StaticText \"Token 和费用未知。worker 未报告实际计量。\"\n          - StaticText \"Owner 手动接续\"\n          - StaticText \"空闲到期仅提醒外部 Owner 手动接续。真实 CLI 负责切换上下文并自行读取接续包；Weaver 不会自动替换外部 AI、投递接续包或确认宿主收到。\"\n          - generic\n            - StaticText \"Epoch 0 · 未达到空闲阈值\"\n          - LabelText [ref=e64] clickable [cursor:pointer]\n            - checkbox \"启用空闲接续提醒\" [checked=true, ref=e72]\n            - StaticText \"启用空闲接续提醒\"\n          - LabelText\n            - StaticText \"空闲阈值（分钟）\"\n          - textbox \"空闲阈值（分钟）\" [ref=e65]: 60\n            - StaticText \"60\"\n          - button \"Increase\" [ref=e66]\n            - image\n          - button \"Decrease\" [ref=e67]\n            - image\n          - button \"保存空闲策略\" [ref=e68]\n          - button \"登记手动接续\" [ref=e69]\n          - generic\n            - StaticText \"Task efdee112-169c-4e25-900f-b9e9fde79682\"\n          - generic\n            - StaticText \"Owner handle 828f4b72-a3cb-4ae1-a2e9-ada866722590 · Attempt 尚未开始\"\n          - generic\n            - StaticText \"Package 尚未冻结 · Revision 2\""
+}

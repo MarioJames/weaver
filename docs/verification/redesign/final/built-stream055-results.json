@@ -1,0 +1,505 @@
+{
+  "build": "055",
+  "kind": "Public built CLI to actual isolated HTTP/runtime and real systemd; private PATH synthetic Pi, NO MODEL CALLS",
+  "cases": [
+    {
+      "case": "normal",
+      "task": {
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/normal",
+        "acceptanceCriteria": [
+          "proof.txt contains exactly built-normal and a newline"
+        ],
+        "constraints": [
+          "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+        ],
+        "title": "built-normal",
+        "instruction": "Synthetic stream fixture; no model call.",
+        "id": "1515ae02-a55c-49cf-b4b5-f534c9c74c2f",
+        "createdAt": "2026-10-19T00:50:00.913Z",
+        "updatedAt": "2026-10-19T00:50:01.102Z",
+        "status": "completed",
+        "revision": 12,
+        "reviewState": "pending",
+        "progress": 100,
+        "events": [
+          {
+            "id": "359b8c73-4a2e-402f-89e5-367871c1444b",
+            "at": "2026-10-19T00:50:00.913Z",
+            "kind": "lifecycle",
+            "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+          },
+          {
+            "id": "1b78ae5e-2bb7-4820-9538-575902c377f8",
+            "at": "2026-10-19T00:50:00.957Z",
+            "kind": "lifecycle",
+            "message": "Frozen work package created"
+          },
+          {
+            "id": "a21d3093-6901-4cec-ab3c-2318d176a1e9",
+            "at": "2026-10-19T00:50:01.042Z",
+            "kind": "lifecycle",
+            "message": "Policy selected pi_worker; launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/built-stream/normal"
+          },
+          {
+            "id": "3ff01d3c-eb2b-4ec5-a457-4d0dc8b3042a",
+            "at": "2026-10-19T00:50:01.043Z",
+            "kind": "lifecycle",
+            "message": "Launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/built-stream/normal"
+          },
+          {
+            "id": "5fde7ff2-ebc4-4c8a-9d39-f87b45b10f9d",
+            "at": "2026-10-19T00:50:01.046Z",
+            "kind": "log",
+            "message": "Launching pi with requested model fixture/pi"
+          },
+          {
+            "id": "e58020b4-b431-4537-ab16-074ea4d0e0fc",
+            "at": "2026-10-19T00:50:01.046Z",
+            "kind": "log",
+            "message": "pi --approve trusts project files for this run; it is not OS isolation"
+          },
+          {
+            "id": "156cd989-8796-4ebe-a130-1a5431b84d71",
+            "at": "2026-10-19T00:50:01.046Z",
+            "kind": "progress",
+            "message": "owned scope started"
+          },
+          {
+            "id": "39e27515-0480-4d15-a4d9-a48bcfa0d0d9",
+            "at": "2026-10-19T00:50:01.102Z",
+            "kind": "artifact",
+            "message": "Received result.md"
+          },
+          {
+            "id": "a8b2f685-5887-46e1-b12c-d1c4263d9d64",
+            "at": "2026-10-19T00:50:01.102Z",
+            "kind": "result",
+            "message": "PONG"
+          },
+          {
+            "id": "d91864b0-dc85-4f1b-9c67-d5a4c8f599fa",
+            "at": "2026-10-19T00:50:01.102Z",
+            "kind": "lifecycle",
+            "message": "Worker exited successfully; output is ready for owner review"
+          }
+        ],
+        "artifacts": [
+          {
+            "id": "2dff86c3-40f4-4d88-bbf2-7bcce1f861d5",
+            "name": "result.md",
+            "mediaType": "text/markdown",
+            "content": "PONG",
+            "createdAt": "2026-10-19T00:50:01.102Z"
+          }
+        ],
+        "ownerId": "976f8db3-817d-4634-99f1-29c4ea236881",
+        "ownerEpoch": 0,
+        "ownerLastActivityAt": "2026-10-19T00:50:00.913Z",
+        "continuationPolicy": {
+          "idleRotationMinutes": 60
+        },
+        "packageId": "55688a7b-2570-4732-99a5-11f3c36e2ff8",
+        "dispatch": {
+          "owner": "codex_owner",
+          "worker": "pi_worker",
+          "engine": "pi",
+          "model": "fixture/pi",
+          "effort": "high",
+          "execution": "real",
+          "maxParallel": 4,
+          "maxWaitMinutes": 15,
+          "adapter": "pi",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/normal",
+          "workspaceIdentity": "38:1734722",
+          "engineKind": "pi"
+        },
+        "scheduled": false,
+        "summary": "PONG",
+        "run": {
+          "id": "16d44cc9-4ac0-46fe-ae7c-fc17698f333f",
+          "adapter": "pi",
+          "execution": "real",
+          "status": "stopped",
+          "startedAt": "2026-10-19T00:50:01.043Z",
+          "timeoutMs": 900000,
+          "engine": "pi",
+          "model": "fixture/pi",
+          "effort": "high",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/normal",
+          "scopeUnit": "weaver-cli-pi-a2294809",
+          "evidence": {
+            "engine": "pi",
+            "requestedModel": "fixture/pi",
+            "requestedEffort": "high",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/normal",
+            "terminal": "success",
+            "role": "worker",
+            "vendorModel": "fixture/pi"
+          },
+          "endedAt": "2026-10-19T00:50:01.102Z",
+          "exitCode": 0
+        }
+      },
+      "result": {
+        "exit": 0,
+        "response": {
+          "apiVersion": "weaver.v1",
+          "commandId": "946468a5-2f06-467c-9bae-aaa81268cee0",
+          "ok": true,
+          "data": {
+            "taskId": "1515ae02-a55c-49cf-b4b5-f534c9c74c2f",
+            "attemptId": "16d44cc9-4ac0-46fe-ae7c-fc17698f333f",
+            "packageId": "55688a7b-2570-4732-99a5-11f3c36e2ff8",
+            "execution": "completed",
+            "summary": "PONG",
+            "artifacts": [
+              {
+                "id": "2dff86c3-40f4-4d88-bbf2-7bcce1f861d5",
+                "name": "result.md",
+                "mediaType": "text/markdown",
+                "sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87"
+              }
+            ],
+            "exitCode": 0,
+            "manifestDigest": "c2e5e76e1c9e77b912709c4cc6626b11bbb35f3609dad6f4076fe5f35406d4e4",
+            "delivery": "pending",
+            "acceptance": "pending"
+          }
+        },
+        "stderr": ""
+      },
+      "childPid": 3429663,
+      "pidGone": true,
+      "scopeState": "ControlGroup=\nActiveState=inactive\n"
+    },
+    {
+      "case": "retained",
+      "task": {
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/retained",
+        "acceptanceCriteria": [
+          "proof.txt contains exactly built-retained and a newline"
+        ],
+        "constraints": [
+          "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+        ],
+        "title": "built-retained",
+        "instruction": "Synthetic stream fixture; no model call.",
+        "id": "56d368ce-30fe-435c-b230-27f032392791",
+        "createdAt": "2026-10-19T00:50:01.318Z",
+        "updatedAt": "2026-10-19T00:50:01.496Z",
+        "status": "completed",
+        "revision": 13,
+        "reviewState": "pending",
+        "progress": 100,
+        "events": [
+          {
+            "id": "0b62e4fa-2590-4a78-81ac-b726f0d63846",
+            "at": "2026-10-19T00:50:01.318Z",
+            "kind": "lifecycle",
+            "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+          },
+          {
+            "id": "da33eda6-cfa5-4866-8ac0-f96722b68f09",
+            "at": "2026-10-19T00:50:01.360Z",
+            "kind": "lifecycle",
+            "message": "Frozen work package created"
+          },
+          {
+            "id": "b76375dd-6aa5-4d96-b193-173022d7cd48",
+            "at": "2026-10-19T00:50:01.446Z",
+            "kind": "lifecycle",
+            "message": "Policy selected pi_worker; launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/built-stream/retained"
+          },
+          {
+            "id": "0818c48b-e02b-4d15-b308-d4c16b3da619",
+            "at": "2026-10-19T00:50:01.446Z",
+            "kind": "lifecycle",
+            "message": "Launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/built-stream/retained"
+          },
+          {
+            "id": "4143aa0d-f9c3-43c4-a2a9-f4b124e93ede",
+            "at": "2026-10-19T00:50:01.448Z",
+            "kind": "log",
+            "message": "Launching pi with requested model fixture/pi"
+          },
+          {
+            "id": "736ea2e6-de73-49d1-9bf1-d93f2460774b",
+            "at": "2026-10-19T00:50:01.449Z",
+            "kind": "log",
+            "message": "pi --approve trusts project files for this run; it is not OS isolation"
+          },
+          {
+            "id": "3f269afa-8dde-4fa3-9a14-962d1f742206",
+            "at": "2026-10-19T00:50:01.449Z",
+            "kind": "progress",
+            "message": "owned scope started"
+          },
+          {
+            "id": "16273229-a17b-4f97-a277-03c38442f844",
+            "at": "2026-10-19T00:50:01.495Z",
+            "kind": "log",
+            "message": "retained evidence clipped: field=assistant_text limitCharacters=30000 observedCharactersAtLeast=30001; assistant policy=last 30000 characters of completed text; oversized identifiers omitted"
+          },
+          {
+            "id": "9bd02eac-7cdf-4607-8748-2044aac5f816",
+            "at": "2026-10-19T00:50:01.496Z",
+            "kind": "artifact",
+            "message": "Received result.md"
+          },
+          {
+            "id": "568e65ce-bbc6-48dc-860a-2ca7b4466bfb",
+            "at": "2026-10-19T00:50:01.496Z",
+            "kind": "result",
+            "message": "[Earlier assistant text omitted; retained bounded final text]\nfinal:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:fi"
+          },
+          {
+            "id": "5c0e675d-6e4e-4eea-bc02-760184ad33d7",
+            "at": "2026-10-19T00:50:01.496Z",
+            "kind": "lifecycle",
+            "message": "Worker exited successfully; output is ready for owner review"
+          }
+        ],
+        "artifacts": [
+          {
+            "id": "24d424f9-27a4-4f6d-902b-a152ea920e7a",
+            "name": "result.md",
+            "mediaType": "text/markdown",
+            "content": "[Earlier assistant text omitted; retained bounded final text]\nfinal:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:FINAL_TAIL",
+            "createdAt": "2026-10-19T00:50:01.496Z"
+          }
+        ],
+        "ownerId": "9c7aa778-7232-4490-91e0-855c5690b942",
+        "ownerEpoch": 0,
+        "ownerLastActivityAt": "2026-10-19T00:50:01.318Z",
+        "continuationPolicy": {
+          "idleRotationMinutes": 60
+        },
+        "packageId": "db582b43-cea2-4b14-9104-8105e0051563",
+        "dispatch": {
+          "owner": "codex_owner",
+          "worker": "pi_worker",
+          "engine": "pi",
+          "model": "fixture/pi",
+          "effort": "high",
+          "execution": "real",
+          "maxParallel": 4,
+          "maxWaitMinutes": 15,
+          "adapter": "pi",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/retained",
+          "workspaceIdentity": "38:1734723",
+          "engineKind": "pi"
+        },
+        "scheduled": false,
+        "summary": "[Earlier assistant text omitted; retained bounded final text]\nfinal:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:fi",
+        "run": {
+          "id": "159205f7-e468-44d8-9729-0098d2678b92",
+          "adapter": "pi",
+          "execution": "real",
+          "status": "stopped",
+          "startedAt": "2026-10-19T00:50:01.446Z",
+          "timeoutMs": 900000,
+          "engine": "pi",
+          "model": "fixture/pi",
+          "effort": "high",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/retained",
+          "scopeUnit": "weaver-cli-pi-d364dd74",
+          "evidence": {
+            "engine": "pi",
+            "requestedModel": "fixture/pi",
+            "requestedEffort": "high",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/retained",
+            "terminal": "success",
+            "role": "worker",
+            "vendorModel": "fixture/pi"
+          },
+          "endedAt": "2026-10-19T00:50:01.496Z",
+          "exitCode": 0
+        }
+      },
+      "result": {
+        "exit": 0,
+        "response": {
+          "apiVersion": "weaver.v1",
+          "commandId": "cf9303ba-d770-4ccd-add9-9bfc8ee77596",
+          "ok": true,
+          "data": {
+            "taskId": "56d368ce-30fe-435c-b230-27f032392791",
+            "attemptId": "159205f7-e468-44d8-9729-0098d2678b92",
+            "packageId": "db582b43-cea2-4b14-9104-8105e0051563",
+            "execution": "completed",
+            "summary": "[Earlier assistant text omitted; retained bounded final text]\nfinal:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:final:fi",
+            "artifacts": [
+              {
+                "id": "24d424f9-27a4-4f6d-902b-a152ea920e7a",
+                "name": "result.md",
+                "mediaType": "text/markdown",
+                "sha256": "44c9bd117b6ad260bfea64c2742f419e4be6faff9e0c65371f11915bf3343636"
+              }
+            ],
+            "exitCode": 0,
+            "manifestDigest": "b5171a64cb4a190cee5961de03b127884761eec77dee716f15d40bce59e98b72",
+            "delivery": "pending",
+            "acceptance": "pending"
+          }
+        },
+        "stderr": ""
+      },
+      "childPid": 3429759,
+      "pidGone": true,
+      "scopeState": "ControlGroup=\nActiveState=inactive\n"
+    },
+    {
+      "case": "overflow",
+      "task": {
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/overflow",
+        "acceptanceCriteria": [
+          "proof.txt contains exactly built-overflow and a newline"
+        ],
+        "constraints": [
+          "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+        ],
+        "title": "built-overflow",
+        "instruction": "Synthetic stream fixture; no model call.",
+        "id": "8d989380-9d01-42b7-a397-e93aa3d86ee4",
+        "createdAt": "2026-10-19T00:50:01.724Z",
+        "updatedAt": "2026-10-19T00:50:03.435Z",
+        "status": "failed",
+        "revision": 12,
+        "reviewState": "pending",
+        "progress": 10,
+        "events": [
+          {
+            "id": "772dcf3b-5e86-4608-b14b-f453bcb5943d",
+            "at": "2026-10-19T00:50:01.724Z",
+            "kind": "lifecycle",
+            "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+          },
+          {
+            "id": "38662c94-c8a2-4b3a-9679-c1cc0f7875fa",
+            "at": "2026-10-19T00:50:01.766Z",
+            "kind": "lifecycle",
+            "message": "Frozen work package created"
+          },
+          {
+            "id": "34d636c7-fa0b-45db-9571-ccad1733fac1",
+            "at": "2026-10-19T00:50:01.847Z",
+            "kind": "lifecycle",
+            "message": "Policy selected pi_worker; launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/built-stream/overflow"
+          },
+          {
+            "id": "d9a684ed-56f6-43cc-868b-760c8e36a9f4",
+            "at": "2026-10-19T00:50:01.847Z",
+            "kind": "lifecycle",
+            "message": "Launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/built-stream/overflow"
+          },
+          {
+            "id": "34543a7f-e49e-4d59-89e6-6c1504e0e42e",
+            "at": "2026-10-19T00:50:01.851Z",
+            "kind": "log",
+            "message": "Launching pi with requested model fixture/pi"
+          },
+          {
+            "id": "dbeaa35a-1662-476c-ae1a-9b2e36bad4b9",
+            "at": "2026-10-19T00:50:01.851Z",
+            "kind": "log",
+            "message": "pi --approve trusts project files for this run; it is not OS isolation"
+          },
+          {
+            "id": "bbf3bbc7-db77-4bad-b3d2-a93e518d76f4",
+            "at": "2026-10-19T00:50:01.851Z",
+            "kind": "progress",
+            "message": "owned scope started"
+          },
+          {
+            "id": "b2cae9a4-967b-4113-ac5b-f067a0665081",
+            "at": "2026-10-19T00:50:01.897Z",
+            "kind": "log",
+            "message": "vendor protocol frame exceeded limit: phase=unterminated limitBytes=131072 observedBytes=182720 observedVendorBytes=182720 parsedFrames=0"
+          },
+          {
+            "id": "04d683d9-269f-43de-99cc-493c01587212",
+            "at": "2026-10-19T00:50:03.435Z",
+            "kind": "log",
+            "message": "local protocol terminal truncated"
+          },
+          {
+            "id": "f9f48156-309a-4c19-a25a-7f2a83fc7a36",
+            "at": "2026-10-19T00:50:03.435Z",
+            "kind": "error",
+            "message": "Worker exited without successful result (code 1, signal SIGTERM)"
+          }
+        ],
+        "artifacts": [],
+        "ownerId": "ae7459fc-1813-4dc0-8d3a-623f05740e91",
+        "ownerEpoch": 0,
+        "ownerLastActivityAt": "2026-10-19T00:50:01.724Z",
+        "continuationPolicy": {
+          "idleRotationMinutes": 60
+        },
+        "packageId": "68caeb1d-f73a-4926-ae5a-745e24baad7c",
+        "dispatch": {
+          "owner": "codex_owner",
+          "worker": "pi_worker",
+          "engine": "pi",
+          "model": "fixture/pi",
+          "effort": "high",
+          "execution": "real",
+          "maxParallel": 4,
+          "maxWaitMinutes": 15,
+          "adapter": "pi",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/overflow",
+          "workspaceIdentity": "38:1734724",
+          "engineKind": "pi"
+        },
+        "scheduled": false,
+        "run": {
+          "id": "8dfcc0e4-70d4-469c-bd0f-f5194cecb161",
+          "adapter": "pi",
+          "execution": "real",
+          "status": "stopped",
+          "startedAt": "2026-10-19T00:50:01.847Z",
+          "timeoutMs": 900000,
+          "engine": "pi",
+          "model": "fixture/pi",
+          "effort": "high",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/overflow",
+          "scopeUnit": "weaver-cli-pi-fa1f98fd",
+          "evidence": {
+            "engine": "pi",
+            "requestedModel": "fixture/pi",
+            "requestedEffort": "high",
+            "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/built-stream/overflow",
+            "terminal": "truncated",
+            "role": "worker"
+          },
+          "endedAt": "2026-10-19T00:50:03.435Z",
+          "exitCode": 1
+        }
+      },
+      "result": {
+        "exit": 0,
+        "response": {
+          "apiVersion": "weaver.v1",
+          "commandId": "c2102eec-3f66-4768-8a48-6d791c13e1ec",
+          "ok": true,
+          "data": {
+            "taskId": "8d989380-9d01-42b7-a397-e93aa3d86ee4",
+            "attemptId": "8dfcc0e4-70d4-469c-bd0f-f5194cecb161",
+            "packageId": "68caeb1d-f73a-4926-ae5a-745e24baad7c",
+            "execution": "failed",
+            "summary": null,
+            "artifacts": [],
+            "exitCode": 1,
+            "manifestDigest": "05c5ebb4f8fab54cc8ce748f0d49f253ff9b59654448c44e642e62a0722b7129",
+            "delivery": "pending",
+            "acceptance": "pending"
+          }
+        },
+        "stderr": ""
+      },
+      "childPid": 3429853,
+      "pidGone": true,
+      "scopeState": "ControlGroup=\nActiveState=inactive\n"
+    }
+  ]
+}

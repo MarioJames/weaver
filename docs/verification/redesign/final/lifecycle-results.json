@@ -1,0 +1,354 @@
+{
+  "cancel": {
+    "task": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-cancel",
+      "acceptanceCriteria": [
+        "hold.mjs executed as given"
+      ],
+      "constraints": [
+        "Only operate inside this fixture. No delegation/commit/push. The wait is intentional and must be run exactly."
+      ],
+      "title": "Actual Pi cancel",
+      "instruction": "Run `node hold.mjs` in this fixture and wait for it to finish. This is an authorized cancellation/timeout lifecycle check. Do not edit or replace the script, do not bypass or shorten its wait, and do not spawn other work. After command completion read proof.txt and report.",
+      "id": "44fa7e7e-80e4-4717-9ed2-19cc6b079de4",
+      "createdAt": "2026-10-18T23:53:37.264Z",
+      "updatedAt": "2026-10-18T23:53:51.929Z",
+      "status": "cancelled",
+      "revision": 17,
+      "reviewState": "pending",
+      "progress": 20,
+      "events": [
+        {
+          "id": "3e6f04a8-42a4-45ed-bddd-57d61af0443c",
+          "at": "2026-10-18T23:53:37.264Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "00316d41-d0c4-4577-bbf0-ab4de58c5588",
+          "at": "2026-10-18T23:53:37.337Z",
+          "kind": "lifecycle",
+          "message": "Frozen work package created"
+        },
+        {
+          "id": "7100056f-a634-4385-b762-7af1f6f324aa",
+          "at": "2026-10-18T23:53:37.449Z",
+          "kind": "lifecycle",
+          "message": "Policy selected pi_worker; launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-cancel"
+        },
+        {
+          "id": "6082e358-7fed-41af-bf42-2c9846fafb01",
+          "at": "2026-10-18T23:53:37.451Z",
+          "kind": "lifecycle",
+          "message": "Launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-cancel"
+        },
+        {
+          "id": "632fb080-55e2-4074-b0d6-98bb8543560d",
+          "at": "2026-10-18T23:53:37.493Z",
+          "kind": "log",
+          "message": "Launching pi with requested model cc-switch-agentplan/glm-5.3-flash"
+        },
+        {
+          "id": "f3a9700b-cea6-42b2-a698-9f771eead13b",
+          "at": "2026-10-18T23:53:37.495Z",
+          "kind": "log",
+          "message": "pi --approve trusts project files for this run; it is not OS isolation"
+        },
+        {
+          "id": "06773ed4-3093-4316-aa5e-7711c5f4549b",
+          "at": "2026-10-18T23:53:37.497Z",
+          "kind": "progress",
+          "message": "owned scope started"
+        },
+        {
+          "id": "0517c189-8724-424e-8a25-870069c30ec4",
+          "at": "2026-10-18T23:53:37.667Z",
+          "kind": "progress",
+          "message": "pi agent started"
+        },
+        {
+          "id": "d2eb094a-fd3c-4c30-ab6a-037f7b9b0233",
+          "at": "2026-10-18T23:53:43.657Z",
+          "kind": "log",
+          "message": "tool started read"
+        },
+        {
+          "id": "ab2231eb-0518-4b45-903c-43804d72a065",
+          "at": "2026-10-18T23:53:43.666Z",
+          "kind": "log",
+          "message": "tool started bash"
+        },
+        {
+          "id": "cd41d295-c074-430d-876d-87dd5c08b23c",
+          "at": "2026-10-18T23:53:43.668Z",
+          "kind": "log",
+          "message": "tool finished bash"
+        },
+        {
+          "id": "26b12a2c-3d6d-42a6-a15e-4e1f2c58b677",
+          "at": "2026-10-18T23:53:43.670Z",
+          "kind": "log",
+          "message": "tool finished read"
+        },
+        {
+          "id": "ddec2dc5-2cca-499d-9d4c-e7cca7e22b6f",
+          "at": "2026-10-18T23:53:48.371Z",
+          "kind": "log",
+          "message": "tool started bash"
+        },
+        {
+          "id": "7f37aa93-cb98-4536-902d-ac5b6d394a54",
+          "at": "2026-10-18T23:53:50.384Z",
+          "kind": "lifecycle",
+          "message": "Cancellation requested; waiting for worker exit"
+        },
+        {
+          "id": "000a5fce-e014-4919-877d-2ae0240eeb20",
+          "at": "2026-10-18T23:53:51.929Z",
+          "kind": "lifecycle",
+          "message": "Worker stopped after cancellation"
+        }
+      ],
+      "artifacts": [],
+      "ownerId": "bbc5ea0f-7506-4001-aea2-1031dc3e8ef7",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:53:37.264Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "packageId": "5d3a018c-f2a3-41b8-840c-96ad2e78c1ca",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "pi_worker",
+        "engine": "pi",
+        "model": "cc-switch-agentplan/glm-5.3-flash",
+        "effort": "high",
+        "execution": "real",
+        "maxParallel": 4,
+        "maxWaitMinutes": 1,
+        "adapter": "pi",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-cancel",
+        "workspaceIdentity": "38:1728210",
+        "engineKind": "pi"
+      },
+      "scheduled": false,
+      "run": {
+        "id": "3d521fae-477b-483e-b73a-8c777346ea27",
+        "adapter": "pi",
+        "execution": "real",
+        "status": "stopped",
+        "startedAt": "2026-10-18T23:53:37.451Z",
+        "timeoutMs": 60000,
+        "engine": "pi",
+        "model": "cc-switch-agentplan/glm-5.3-flash",
+        "effort": "high",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-cancel",
+        "scopeUnit": "weaver-cli-pi-b8f01198",
+        "evidence": {
+          "engine": "pi",
+          "requestedModel": "cc-switch-agentplan/glm-5.3-flash",
+          "requestedEffort": "high",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-cancel",
+          "terminal": "cancelled",
+          "role": "worker",
+          "vendorModel": "cc-switch-agentplan/glm-5.3-flash",
+          "vendorSessionId": "01a1516f-6661-71a3-9a26-eeffc35d1fab",
+          "usage": {
+            "inputTokens": 272,
+            "outputTokens": 127
+          }
+        },
+        "endedAt": "2026-10-18T23:53:51.929Z",
+        "exitCode": 143
+      }
+    },
+    "pids": {
+      "parent": 3372737,
+      "detached": 3372744
+    },
+    "processStates": {
+      "parent": "absent",
+      "detached": "absent"
+    },
+    "scope": "inactive"
+  },
+  "timeout": {
+    "task": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-timeout",
+      "acceptanceCriteria": [
+        "hold.mjs executed as given"
+      ],
+      "constraints": [
+        "Only operate inside this fixture. No delegation/commit/push. The wait is intentional and must be run exactly."
+      ],
+      "title": "Actual Pi timeout",
+      "instruction": "Run `node hold.mjs` in this fixture and wait for it to finish. This is an authorized cancellation/timeout lifecycle check. Do not edit or replace the script, do not bypass or shorten its wait, and do not spawn other work. After command completion read proof.txt and report.",
+      "id": "ffaff7b9-bfc0-4baf-b174-43a23c8ddc5d",
+      "createdAt": "2026-10-18T23:53:37.540Z",
+      "updatedAt": "2026-10-18T23:54:39.260Z",
+      "status": "failed",
+      "revision": 18,
+      "reviewState": "pending",
+      "progress": 20,
+      "events": [
+        {
+          "id": "ac51ed82-cfab-4314-a7c9-bc16d15696e3",
+          "at": "2026-10-18T23:53:37.540Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "60b10937-a7f8-44c7-9cd2-a28d2870ae94",
+          "at": "2026-10-18T23:53:37.615Z",
+          "kind": "lifecycle",
+          "message": "Frozen work package created"
+        },
+        {
+          "id": "514209c8-cea7-4ecd-938b-c3c2d7b89233",
+          "at": "2026-10-18T23:53:37.723Z",
+          "kind": "lifecycle",
+          "message": "Policy selected pi_worker; launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-timeout"
+        },
+        {
+          "id": "ab295e11-6f5d-47ab-8960-6e65004e0b55",
+          "at": "2026-10-18T23:53:37.725Z",
+          "kind": "lifecycle",
+          "message": "Launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-timeout"
+        },
+        {
+          "id": "b499cf5b-b0b2-4f3f-96f3-bc331d1ba9d4",
+          "at": "2026-10-18T23:53:37.767Z",
+          "kind": "log",
+          "message": "Launching pi with requested model cc-switch-agentplan/glm-5.3-flash"
+        },
+        {
+          "id": "d1bf8350-063d-4fc3-9abc-511885e2a3ad",
+          "at": "2026-10-18T23:53:37.769Z",
+          "kind": "log",
+          "message": "pi --approve trusts project files for this run; it is not OS isolation"
+        },
+        {
+          "id": "d96ba2ab-411a-400c-ae0f-b56b67a76488",
+          "at": "2026-10-18T23:53:37.771Z",
+          "kind": "progress",
+          "message": "owned scope started"
+        },
+        {
+          "id": "aae467ff-9d7f-4757-bcc3-df8d5ef81737",
+          "at": "2026-10-18T23:53:37.929Z",
+          "kind": "progress",
+          "message": "pi agent started"
+        },
+        {
+          "id": "86c3c43e-ed67-4106-b8b1-14a9c9c0bdc2",
+          "at": "2026-10-18T23:53:41.341Z",
+          "kind": "log",
+          "message": "tool started read"
+        },
+        {
+          "id": "538a0976-74ec-4ba8-8d31-53284dc01bff",
+          "at": "2026-10-18T23:53:41.351Z",
+          "kind": "log",
+          "message": "tool started bash"
+        },
+        {
+          "id": "9b58a1c8-d4a8-486c-a2f4-d7e7cc089410",
+          "at": "2026-10-18T23:53:41.352Z",
+          "kind": "log",
+          "message": "tool finished bash"
+        },
+        {
+          "id": "dfca3743-9326-47d6-814f-efffc7ecd4e6",
+          "at": "2026-10-18T23:53:41.354Z",
+          "kind": "log",
+          "message": "tool finished read"
+        },
+        {
+          "id": "b3219c95-78f7-4697-bd1a-1a1d81a18d9c",
+          "at": "2026-10-18T23:53:42.883Z",
+          "kind": "log",
+          "message": "Connection error."
+        },
+        {
+          "id": "b8c0d868-2b30-4387-8833-2bc2a93e7a9b",
+          "at": "2026-10-18T23:53:44.888Z",
+          "kind": "progress",
+          "message": "pi agent started"
+        },
+        {
+          "id": "f46ce11b-918c-4298-8e8a-8ff06b768a0f",
+          "at": "2026-10-18T23:53:47.759Z",
+          "kind": "log",
+          "message": "tool started bash"
+        },
+        {
+          "id": "7ea5f691-7c8e-47aa-bf75-b7a28f60eb37",
+          "at": "2026-10-18T23:54:39.260Z",
+          "kind": "error",
+          "message": "Worker exceeded its execution timeout"
+        }
+      ],
+      "artifacts": [],
+      "ownerId": "5ef3545a-81c1-4b26-850b-c0e044c0c1a6",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:53:37.540Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "packageId": "6a168ff1-9350-45d1-bc76-fb8f77382546",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "pi_worker",
+        "engine": "pi",
+        "model": "cc-switch-agentplan/glm-5.3-flash",
+        "effort": "high",
+        "execution": "real",
+        "maxParallel": 4,
+        "maxWaitMinutes": 1,
+        "adapter": "pi",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-timeout",
+        "workspaceIdentity": "38:1728231",
+        "engineKind": "pi"
+      },
+      "scheduled": false,
+      "run": {
+        "id": "de8403ea-b71f-4092-92cb-3a40b7b340be",
+        "adapter": "pi",
+        "execution": "real",
+        "status": "stopped",
+        "startedAt": "2026-10-18T23:53:37.725Z",
+        "timeoutMs": 60000,
+        "engine": "pi",
+        "model": "cc-switch-agentplan/glm-5.3-flash",
+        "effort": "high",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-timeout",
+        "scopeUnit": "weaver-cli-pi-0a289da8",
+        "evidence": {
+          "engine": "pi",
+          "requestedModel": "cc-switch-agentplan/glm-5.3-flash",
+          "requestedEffort": "high",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-timeout",
+          "terminal": "cancelled",
+          "role": "worker",
+          "vendorModel": "cc-switch-agentplan/glm-5.3-flash",
+          "vendorSessionId": "01a1516f-6768-7640-995c-77328157c104",
+          "usage": {
+            "inputTokens": 272,
+            "outputTokens": 101
+          }
+        },
+        "endedAt": "2026-10-18T23:54:39.260Z",
+        "exitCode": 143
+      }
+    },
+    "pids": {
+      "parent": 3372719,
+      "detached": 3372726
+    },
+    "processStates": {
+      "parent": "absent",
+      "detached": "absent"
+    },
+    "scope": "inactive"
+  }
+}

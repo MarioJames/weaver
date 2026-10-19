@@ -1,0 +1,66 @@
+{
+  "operation": {
+    "commandId": "qa-uncertain-response",
+    "state": "settled",
+    "response": {
+      "apiVersion": "weaver.v1",
+      "commandId": "qa-uncertain-response",
+      "ok": true,
+      "data": {
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+        "title": "uncertain receipt fixture",
+        "instruction": "not executed",
+        "id": "27dbe36b-efc7-41be-9575-e1f612ced625",
+        "createdAt": "2026-10-19T00:27:04.715Z",
+        "updatedAt": "2026-10-19T00:27:04.715Z",
+        "status": "queued",
+        "revision": 2,
+        "reviewState": "pending",
+        "progress": 0,
+        "events": [
+          {
+            "id": "3ad4c226-a4ad-4b7b-a0bb-021c07d9656c",
+            "at": "2026-10-19T00:27:04.715Z",
+            "kind": "lifecycle",
+            "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+          }
+        ],
+        "artifacts": [],
+        "ownerId": "98d438d7-02c1-4783-9150-3f2fd2770b81",
+        "ownerEpoch": 0,
+        "ownerLastActivityAt": "2026-10-19T00:27:04.715Z",
+        "continuationPolicy": {
+          "idleRotationMinutes": 60
+        }
+      }
+    }
+  },
+  "replaySameTaskId": true,
+  "replay": {
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+    "title": "uncertain receipt fixture",
+    "instruction": "not executed",
+    "id": "27dbe36b-efc7-41be-9575-e1f612ced625",
+    "createdAt": "2026-10-19T00:27:04.715Z",
+    "updatedAt": "2026-10-19T00:27:04.715Z",
+    "status": "queued",
+    "revision": 2,
+    "reviewState": "pending",
+    "progress": 0,
+    "events": [
+      {
+        "id": "3ad4c226-a4ad-4b7b-a0bb-021c07d9656c",
+        "at": "2026-10-19T00:27:04.715Z",
+        "kind": "lifecycle",
+        "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+      }
+    ],
+    "artifacts": [],
+    "ownerId": "98d438d7-02c1-4783-9150-3f2fd2770b81",
+    "ownerEpoch": 0,
+    "ownerLastActivityAt": "2026-10-19T00:27:04.715Z",
+    "continuationPolicy": {
+      "idleRotationMinutes": 60
+    }
+  }
+}

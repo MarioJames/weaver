@@ -1,0 +1,86 @@
+[
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:34033/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"155\", \"Chromium\";v=\"155\", \"Not(A:Brand\";v=\"24\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\":\"savePolicy\",\"args\":[{\"revision\":56,\"config\":{\"$schema\":\"./config.schema.json\",\"version\":1,\"chatgpt_review\":false,\"engines\":{\"claude\":{\"enabled\":false,\"kind\":\"claude\",\"native_subagents\":true},\"codex\":{\"enabled\":true,\"kind\":\"codex\",\"native_subagents\":true},\"grok\":{\"enabled\":true,\"kind\":\"grok\",\"native_subagents\":false},\"opencode\":{\"enabled\":true,\"kind\":\"opencode\",\"native_subagents\":false},\"pi\":{\"enabled\":true,\"kind\":\"pi\",\"native_subagents\":false},\"qoder\":{\"enabled\":false,\"kind\":\"qodercli\",\"native_subagents\":false}},\"owners\":{\"claude_owner\":{\"enabled\":false,\"engine\":\"claude\",\"model\":\"claude-opus-5-5\",\"effort\":\"high\",\"workers\":[\"claude_worker\",\"qoder_worker\",\"opencode_worker\",\"grok_worker\"],\"max_parallel\":4},\"codex_owner\":{\"enabled\":true,\"engine\":\"codex\",\"model\":\"gpt-6.1-sol\",\"effort\":\"xhigh\",\"workers\":[\"qa_a_worker\",\"qa_b_worker\"],\"max_parallel\":1,\"worker_weights\":{},\"only_engine\":\"qoder\"},\"pi_owner\":{\"enabled\":false,\"engine\":\"pi\",\"model\":\"glm-5.3-flash\",\"effort\":\"high\",\"workers\":[\"pi_worker\"],\"max_parallel\":1},\"qa_owner\":{\"enabled\":true,\"engine\":\"pi\",\"model\":\"cc-switch-agentplan/glm-5.3-flash\",\"effort\":\"high\",\"workers\":[\"qa_a_worker\"],\"max_parallel\":1,\"worker_weights\":{}}},\"workers\":{\"claude_worker\":{\"enabled\":false,\"engine\":\"claude\",\"model\":\"sonnet\",\"effort\":\"high\",\"tags\":[\"frontend\",\"ui\",\"browser\",\"docs\"],\"description\":\"Default worker for Claude Code (Sonnet); strong at frontend, UI, browser acceptance and docs.\"},\"codex_worker\":{\"enabled\":true,\"engine\":\"codex\",\"model\":\"gpt-6.1-sol\",\"effort\":\"xhigh\",\"tags\":[\"backend\",\"algorithm\",\"refactor\",\"long-test\"],\"description\":\"Default worker for Codex (gpt-6.1-sol); strong at backend logic, algorithms, refactors and long-running test loops.\"},\"grok_worker\":{\"enabled\":true,\"engine\":\"grok\",\"model\":\"grok-4.7\",\"effort\":\"high\",\"tags\":[\"research\"],\"description\":\"Example worker for Grok (grok-4.7); strong at research.\"},\"qoder_worker\":{\"enabled\":false,\"engine\":\"qoder\",\"model\":\"Qwen3.8-Flash\",\"effort\":\"xhigh\",\"tags\":[\"routine\"],\"description\":\"Free routine worker (Qwen3.8-Flash via qodercli); resolve --class mechanical|routine picks it for routine implementation whose plan is frozen and write scope is explicit.\"},\"opencode_worker\":{\"enabled\":true,\"engine\":\"opencode\",\"model\":\"opencode/glm-5.3-flash-free\",\"effort\":\"max\",\"tags\":[\"mechanical\"],\"description\":\"Free mechanical worker (glm-5.3-flash-free via opencode); resolve --class mechanical picks it for rule-bound edits, test runs, lint fixes and read-only sweeps. Its TUI uses the variant remembered in ~/.local/state/opencode/model.json, which must match effort.\"},\"pi_worker\":{\"enabled\":true,\"engine\":\"pi\",\"model\":\"cc-switch-agentplan/glm-5.3-flash\",\"effort\":\"high\",\"description\":\"Disabled Pi template (glm-5.3-flash). Not proof the CLI is installed, authenticated, or callable. Enable the engine and this role separately before dispatch. Real Claude calls stay deferred.\",\"tags\":[\"backend\",\"docs\",\"test\"]},\"qa_a_worker\":{\"enabled\":true,\"engine\":\"codex\",\"model\":\"gpt-6.1-sol\",\"effort\":\"xhigh\",\"tags\":[],\"description\":\"Default worker for Codex (gpt-6.1-sol); strong at backend logic, algorithms, refactors and long-running test loops.\"},\"qa_b_worker\":{\"enabled\":true,\"engine\":\"pi\",\"model\":\"cc-switch-agentplan/glm-5.3-flash\",\"effort\":\"high\",\"description\":\"Disabled Pi template (glm-5.3-flash). Not proof the CLI is installed, authenticated, or callable. Enable the engine and this role separately before dispatch. Real Claude calls stay deferred.\",\"tags\":[]}},\"herdr\":{\"max_wait_minutes\":1}},\"blocks\":[]}]}",
+    "requestId": "3427407.1085",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Mon, 19 Oct 2026 01:03:05 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "4023",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 200,
+    "timestamp": 1792371785480,
+    "url": "http://127.0.0.1:34033/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:34033/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"155\", \"Chromium\";v=\"155\", \"Not(A:Brand\";v=\"24\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\":\"previewRoute\",\"args\":[{\"owner\":\"codex_owner\",\"class\":\"judgment\",\"runningCount\":0}]}",
+    "requestId": "3427407.328",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Mon, 19 Oct 2026 00:53:09 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "319",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 200,
+    "timestamp": 1792371189258,
+    "url": "http://127.0.0.1:34033/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:34033/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Google Chrome\";v=\"155\", \"Chromium\";v=\"155\", \"Not(A:Brand\";v=\"24\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\":\"command\",\"args\":[{\"apiVersion\":\"weaver.v1\",\"command\":\"sync.status\",\"args\":{\"after\":1367}}]}",
+    "requestId": "3427407.1129",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Mon, 19 Oct 2026 01:03:43 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "172",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 200,
+    "timestamp": 1792371823608,
+    "url": "http://127.0.0.1:34033/api/rpc"
+  }
+]

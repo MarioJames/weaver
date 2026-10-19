@@ -1,0 +1,13 @@
+{
+  "main-data-f": {
+    "qa_a_worker": "Codex gpt-6.1-sol/xhigh",
+    "qa_b_worker": "Pi cc-switch-agentplan/glm-5.3-flash/high",
+    "purpose": "deterministic scheduling/CLI/browser fixtures"
+  },
+  "acc-data-a": {
+    "qa_a_worker": "Pi cc-switch-agentplan/glm-5.3-flash/high",
+    "qa_b_worker": "Codex gpt-6.1-sol/xhigh",
+    "purpose": "external Owner real behavior ladder"
+  },
+  "real-engine-tasks": "canonical opencode_worker/pi_worker/codex_worker/grok_worker using formal029 models/efforts"
+}

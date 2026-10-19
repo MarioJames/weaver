@@ -1,0 +1,402 @@
+[
+  {
+    "unit": "weaver-cli-start-e2fb88b373e9",
+    "launcherPid": 3414890,
+    "elapsed": 1985,
+    "closed": true,
+    "closeCode": null,
+    "closeSignal": "SIGTERM",
+    "errors": [],
+    "pids": {
+      "parent": 3414890,
+      "grand": 3414915
+    },
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n",
+    "parentAlive": false,
+    "grandAlive": false,
+    "parentInScope": false,
+    "grandInScope": false
+  },
+  {
+    "phase": "cleanup",
+    "unit": "weaver-cli-start-e2fb88b373e9",
+    "launcherPid": 3414890,
+    "closed": true,
+    "elapsed": 2008,
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n",
+    "launcherAlive": false,
+    "parentAlive": false,
+    "grandAlive": false
+  },
+  {
+    "mode": "failed-launcher",
+    "unit": "weaver-cli-end-39865aa9cf1c",
+    "launcherPid": 3415022,
+    "closed": true,
+    "code": 17,
+    "elapsed": 465,
+    "errors": [],
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+  },
+  {
+    "phase": "cleanup",
+    "mode": "failed-launcher",
+    "unit": "weaver-cli-end-39865aa9cf1c",
+    "launcherPid": 3415022,
+    "closed": true,
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n",
+    "launcherAlive": false
+  },
+  {
+    "mode": "fast-exit",
+    "unit": "weaver-cli-end-f840c1d8dabc",
+    "launcherPid": 3415073,
+    "closed": true,
+    "code": 0,
+    "elapsed": 462,
+    "errors": [],
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+  },
+  {
+    "phase": "cleanup",
+    "mode": "fast-exit",
+    "unit": "weaver-cli-end-f840c1d8dabc",
+    "launcherPid": 3415073,
+    "closed": true,
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n",
+    "launcherAlive": false
+  },
+  {
+    "unit": "weaver-cli-kill-d05cca1ac321",
+    "pid": 3415098,
+    "closed": true,
+    "signal": "SIGKILL",
+    "elapsed": 129,
+    "errors": [],
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n",
+    "pidAlive": false
+  },
+  {
+    "phase": "cleanup",
+    "unit": "weaver-cli-kill-d05cca1ac321",
+    "launcherPid": 3415098,
+    "closed": true,
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n",
+    "launcherAlive": false
+  },
+  {
+    "unit": "weaver-cli-miss-b217e1da3cb5",
+    "launcherPid": null,
+    "closed": true,
+    "code": -2,
+    "elapsed": 37,
+    "errors": [
+      "Error: spawn systemd-run ENOENT"
+    ],
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+  },
+  {
+    "phase": "cleanup",
+    "unit": "weaver-cli-miss-b217e1da3cb5",
+    "launcherPid": null,
+    "closed": true,
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+  },
+  {
+    "case": "split-complete",
+    "pushedBytes": [
+      6
+    ],
+    "overflows": [
+      {
+        "phase": "complete",
+        "limitBytes": 131072,
+        "observedBytes": 184320
+      }
+    ]
+  },
+  {
+    "case": "unterminated",
+    "pushedBytes": [],
+    "overflows": [
+      {
+        "phase": "unterminated",
+        "limitBytes": 131072,
+        "observedBytes": 131073
+      }
+    ]
+  },
+  {
+    "case": "end-flush",
+    "pushedBytes": [],
+    "overflows": [
+      {
+        "phase": "unterminated",
+        "limitBytes": 131072,
+        "observedBytes": 131073
+      }
+    ]
+  },
+  {
+    "case": "exact-utf8",
+    "terminated": true,
+    "pushedBytes": [
+      131072
+    ],
+    "overflows": []
+  },
+  {
+    "case": "exact-utf8",
+    "terminated": false,
+    "pushedBytes": [
+      131072
+    ],
+    "overflows": []
+  },
+  {
+    "transportBytes": 1936000,
+    "maxFrameBytes": 2419,
+    "unit": "weaver-cli-pi-f30fe5c2",
+    "childPid": 3414690,
+    "childExecutable": false,
+    "code": 0,
+    "signal": null,
+    "evidence": {
+      "engine": "pi",
+      "requestedModel": "fixture/pi",
+      "requestedEffort": "high",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/provider-stream/stream-oIJZV5",
+      "terminal": "success",
+      "vendorModel": "fixture/pi"
+    },
+    "errors": [],
+    "stderr": "",
+    "records": [
+      {
+        "type": "log",
+        "message": "Launching pi with requested model fixture/pi"
+      },
+      {
+        "type": "log",
+        "message": "pi --approve trusts project files for this run; it is not OS isolation"
+      },
+      {
+        "type": "progress",
+        "percent": 10,
+        "message": "owned scope started"
+      },
+      {
+        "type": "artifact",
+        "name": "result.md",
+        "mediaType": "text/markdown",
+        "content": "PONG"
+      },
+      {
+        "type": "result",
+        "summary": "PONG"
+      }
+    ],
+    "active": "ActiveState=inactive\n"
+  },
+  {
+    "unit": "weaver-cli-pi-c89726e1",
+    "childPid": 3414716,
+    "childExecutable": false,
+    "code": 0,
+    "signal": null,
+    "evidence": {
+      "engine": "pi",
+      "requestedModel": "fixture/pi",
+      "requestedEffort": "high",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/provider-stream/stream-ZPxuIF",
+      "terminal": "success"
+    },
+    "errors": [],
+    "stderr": "",
+    "records": [
+      {
+        "type": "log",
+        "message": "Launching pi with requested model fixture/pi"
+      },
+      {
+        "type": "log",
+        "message": "pi --approve trusts project files for this run; it is not OS isolation"
+      },
+      {
+        "type": "progress",
+        "percent": 10,
+        "message": "owned scope started"
+      },
+      {
+        "type": "log",
+        "message": "retained evidence clipped: field=assistant_text limitCharacters=30000 observedCharactersAtLeast=30001; assistant policy=last 30000 characters of completed text; oversized identifiers omitted"
+      },
+      {
+        "type": "artifact",
+        "name": "result.md",
+        "mediaType": "text/markdown",
+        "content": "[30000 characters]"
+      },
+      {
+        "type": "result",
+        "summary": "[4000 characters]"
+      }
+    ],
+    "active": "ActiveState=inactive\n"
+  },
+  {
+    "unit": "weaver-cli-pi-b8dae99c",
+    "childPid": 3414780,
+    "childExecutable": false,
+    "code": 1,
+    "signal": "SIGTERM",
+    "evidence": {
+      "engine": "pi",
+      "requestedModel": "fixture/pi",
+      "requestedEffort": "high",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/provider-stream/stream-R2aCoQ",
+      "terminal": "truncated"
+    },
+    "errors": [],
+    "stderr": "",
+    "records": [
+      {
+        "type": "log",
+        "message": "Launching pi with requested model fixture/pi"
+      },
+      {
+        "type": "log",
+        "message": "pi --approve trusts project files for this run; it is not OS isolation"
+      },
+      {
+        "type": "progress",
+        "percent": 10,
+        "message": "owned scope started"
+      },
+      {
+        "type": "log",
+        "message": "vendor protocol frame exceeded limit: phase=unterminated limitBytes=131072 observedBytes=146176 observedVendorBytes=146176 parsedFrames=0"
+      },
+      {
+        "type": "log",
+        "message": "local protocol terminal truncated"
+      }
+    ],
+    "active": "ActiveState=inactive\n"
+  },
+  {
+    "mode": "error",
+    "unit": "weaver-cli-pi-fc79c857",
+    "childPid": 3414833,
+    "childExecutable": false,
+    "code": 1,
+    "signal": null,
+    "evidence": {
+      "engine": "pi",
+      "requestedModel": "fixture/pi",
+      "requestedEffort": "high",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/provider-stream/stream-CB8rOe",
+      "terminal": "error"
+    },
+    "errors": [],
+    "stderr": "",
+    "records": [
+      {
+        "type": "log",
+        "message": "Launching pi with requested model fixture/pi"
+      },
+      {
+        "type": "log",
+        "message": "pi --approve trusts project files for this run; it is not OS isolation"
+      },
+      {
+        "type": "progress",
+        "percent": 10,
+        "message": "owned scope started"
+      },
+      {
+        "type": "log",
+        "message": "fixture vendor failure"
+      },
+      {
+        "type": "log",
+        "message": "vendor terminal error exit 0: fixture vendor failure"
+      }
+    ],
+    "active": "ActiveState=inactive\n"
+  },
+  {
+    "mode": "nonzero",
+    "unit": "weaver-cli-pi-a998ad4f",
+    "childPid": 3414844,
+    "childExecutable": false,
+    "code": 7,
+    "signal": null,
+    "evidence": {
+      "engine": "pi",
+      "requestedModel": "fixture/pi",
+      "requestedEffort": "high",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/provider-stream/stream-El691Z",
+      "terminal": "error"
+    },
+    "errors": [],
+    "stderr": "",
+    "records": [
+      {
+        "type": "log",
+        "message": "Launching pi with requested model fixture/pi"
+      },
+      {
+        "type": "log",
+        "message": "pi --approve trusts project files for this run; it is not OS isolation"
+      },
+      {
+        "type": "progress",
+        "percent": 10,
+        "message": "owned scope started"
+      },
+      {
+        "type": "log",
+        "message": "vendor terminal error exit 7"
+      }
+    ],
+    "active": "ActiveState=inactive\n"
+  },
+  {
+    "mode": "missing-final",
+    "unit": "weaver-cli-pi-0cff7614",
+    "childPid": 3414854,
+    "childExecutable": false,
+    "code": 1,
+    "signal": null,
+    "evidence": {
+      "engine": "pi",
+      "requestedModel": "fixture/pi",
+      "requestedEffort": "high",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/provider-stream/stream-KuEeBU",
+      "terminal": "missing"
+    },
+    "errors": [],
+    "stderr": "",
+    "records": [
+      {
+        "type": "log",
+        "message": "Launching pi with requested model fixture/pi"
+      },
+      {
+        "type": "log",
+        "message": "pi --approve trusts project files for this run; it is not OS isolation"
+      },
+      {
+        "type": "progress",
+        "percent": 10,
+        "message": "owned scope started"
+      },
+      {
+        "type": "log",
+        "message": "vendor terminal missing exit 0"
+      }
+    ],
+    "active": "ActiveState=inactive\n"
+  }
+]

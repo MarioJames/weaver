@@ -10,9 +10,11 @@ export const EFFORTS: Record<string, string[]> = {
   claude: ["low", "medium", "high", "xhigh", "max"],
   codex: ["low", "medium", "high", "xhigh", "max"],
   grok: ["none", "minimal", "low", "medium", "high", "xhigh", "max"],
+  pi: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
   qodercli: ["auto", "none", "low", "medium", "high", "xhigh", "max", "ultracode"],
 };
-const SUPPORTED_POLICY_KINDS = ["claude", "codex", "opencode", "qodercli", "grok"];
+const SUPPORTED_POLICY_KINDS = ["claude", "codex", "opencode", "qodercli", "grok", "pi"];
+export const ENGINE_KINDS: string[] = CONFIG_SCHEMA.$defs?.engine?.properties?.kind?.enum ?? [];
 
 /** Reserved class tags: a worker carrying one is a free worker picked by resolve --class; every other tag is a domain tag. */
 export const CLASS_TAGS = ["mechanical", "routine"];
@@ -23,7 +25,13 @@ export class PolicyError extends Error {
   constructor(message: string, public issues: Issue[] = []) { super(message); }
 }
 export interface Engine { enabled: boolean; kind: string; native_subagents?: boolean }
-export interface Owner { enabled: boolean; engine: string; model: string; effort: string; workers: string[]; max_parallel: number }
+export interface Owner { enabled: boolean; engine: string; model: string; effort: string; workers: string[]; max_parallel: number; worker_weights?: Record<string, number>; only_engine?: string }
+/** Omitted weights are 100. This is priority within one tier, not a probability. */
+export function effectiveWeight(owner: Owner, workerId: string): number {
+  const weights = owner.worker_weights;
+  if (!weights || !Object.hasOwn(weights, workerId)) return 100;
+  return weights[workerId]!;
+}
 export interface Worker { enabled: boolean; engine: string; model: string; effort: string; description?: string; tags?: string[] }
 export interface Herdr { max_wait_minutes: number }
 export interface Config { version: 1; chatgpt_review?: boolean; engines: Record<string, Engine>; owners: Record<string, Owner>; workers: Record<string, Worker>; herdr: Herdr }
@@ -53,13 +61,20 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
     if (!engine) bad(`${at}.engine`, `unknown engine ${owner.engine}`);
     else checkEffort(at, owner.engine, owner.effort);
     owner.workers.forEach((worker, i) => { if (!Object.hasOwn(c.workers, worker)) bad(`${at}.workers[${i}]`, `unknown worker ${worker}`); });
-    if (engine && !engine.native_subagents) bad(`${at}.engine`, `engine ${owner.engine} must set native_subagents: true to host an owner`);
+    if (owner.worker_weights) {
+      for (const [workerId, weight] of Object.entries(owner.worker_weights)) {
+        const atWeight = `${at}.worker_weights[${JSON.stringify(workerId)}]`;
+        if (!owner.workers.includes(workerId)) bad(atWeight, `weight key ${workerId} is not in this owner's workers`);
+        if (!Number.isInteger(weight) || weight < 0 || weight > 1000) bad(atWeight, "weight must be an integer from 0 to 1000");
+      }
+    }
+    if (owner.only_engine !== undefined && !Object.hasOwn(c.engines, owner.only_engine)) bad(`${at}.only_engine`, `unknown engine ${owner.only_engine}`);
     if (!owner.enabled) continue;
     if (engine && !engine.enabled) bad(`${at}.engine`, `engine ${owner.engine} is disabled`);
     const other = owned.get(owner.engine);
     if (other) bad(at, `engine ${owner.engine} already has enabled owner ${other}`);
     else owned.set(owner.engine, id);
-    const hasWorker = owner.workers.some(w => { const a = c.workers[w]; return a?.enabled && c.engines[a.engine]?.enabled; });
+    const hasWorker = owner.workers.some(workerId => { const worker = c.workers[workerId]; return worker?.enabled && c.engines[worker.engine]?.enabled; });
     if (!hasWorker) bad(`${at}.workers`, "enabled owner needs at least one enabled worker on an enabled engine");
   }
   // Kinds that can host native sub-agents come from the schema (engine.then), not from a second table here.
@@ -69,6 +84,7 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
     const kind = Object.hasOwn(c.engines, worker.engine) ? c.engines[worker.engine]?.kind : undefined;
     if (!kind) { bad(`${at}.engine`, `unknown engine ${worker.engine}`); continue; }
     checkEffort(at, worker.engine, worker.effort);
+    if (worker.enabled && !c.engines[worker.engine]?.enabled) bad(`${at}.engine`, `engine ${worker.engine} is disabled`);
     if (CLASS_TAGS.every(t => worker.tags?.includes(t))) bad(`${at}.tags`, `a worker cannot carry both ${CLASS_TAGS.join(" and ")}`);
     if (!SUPPORTED_POLICY_KINDS.includes(kind) && !nativeKinds.includes(kind)) bad(`${at}.engine`, `kind ${kind} has no migrated routing policy`);
   }
@@ -109,11 +125,22 @@ export interface Dispatch {
  execution: 'disabled'; dispatch: 'preview'; warnings: string[];
  selected_by?: string; class?: string; skipped?: {worker:string; reason:string}[];
  peer_suggestion?: {owner:string; reason:string};
+ /** Effective priority of the selected worker. Omitted config means 100. */
+ weight?: number;
+ /** Owner pin in force for this selection. Absent when the owner is not pinned. */
+ only_engine?: string;
 }
 function previewSelection(config: Config, ownerId: string, workerId: string, warnings: string[]): Dispatch {
+ const owner = config.owners[ownerId]!;
  const worker = config.workers[workerId]!;
  return {owner:ownerId,worker:workerId,engine:worker.engine,model:worker.model,effort:worker.effort,
-  execution:'disabled',dispatch:'preview',warnings};
+  execution:'disabled',dispatch:'preview',warnings,weight:effectiveWeight(owner,workerId),
+  ...(owner.only_engine ? { only_engine: owner.only_engine } : {})};
+}
+function exclusionReason(owner: Owner, workerId: string, worker: Worker): string | undefined {
+  if (effectiveWeight(owner, workerId) === 0) return "priority weight 0";
+  if (owner.only_engine && worker.engine !== owner.only_engine) return `fixed engine ${owner.only_engine}`;
+  return undefined;
 }
 function requireOwner(config: Config, blocks: Block[], id: string, what = "owner"): Owner {
   const owner = Object.hasOwn(config.owners,id) ? config.owners[id] : undefined;
@@ -142,6 +169,8 @@ export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOpti
     if (!worker) throw new PolicyError(`unknown worker ${opts.worker}`);
     const a = availabilityOf(config, blocks, worker);
     if (a.status !== "available") throw new PolicyError(`worker ${opts.worker} unavailable: ${describeUnavailable(a)}`);
+    const excluded = exclusionReason(owner, opts.worker, worker);
+    if (excluded) throw new PolicyError(`worker ${opts.worker} unavailable: ${excluded}`);
     const warnings = owner.workers.includes(opts.worker) ? [] : [`worker ${opts.worker} 不在 owner ${opts.owner} 的 workers 列表中`];
     return { ...previewSelection(config, opts.owner, opts.worker, warnings), selected_by: "worker" };
   }
@@ -152,12 +181,17 @@ export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOpti
     if (CLASS_TAGS.includes(opts.tag)) throw new PolicyError(`--tag ${opts.tag} is a class tag; use --class ${opts.tag}`);
   }
   const all = owner.workers.map(id => ({ id, worker: config.workers[id]!, availability: availabilityOf(config, blocks, config.workers[id]!) }));
-  const usable = (c: { availability: Availability }) => c.availability.status === "available";
   const paid = all.filter(c => !isFree(c.worker));
-  // Attempt order: free class workers first (mechanical, then routine), then the judgment pool.
-  // A domain tag matches heterogeneous workers first, then own-engine workers; without a tag, preserve paid pool order.
+  const skipReason = (c: (typeof all)[number]) => c.availability.status !== "available" ? describeUnavailable(c.availability) : (exclusionReason(owner, c.id, c.worker) ?? describeUnavailable(c.availability));
+  const eligible = (c: (typeof all)[number]) => c.availability.status === "available" && !exclusionReason(owner, c.id, c.worker);
+  // Attempt order stays class, then tag, then native, then declared order.
+  // Weight reorders only inside the list being added. A higher weight cannot cross into an earlier tier.
   const sequence: { c: (typeof all)[number]; by: "class" | "tag" | "native" | "order" }[] = [];
-  const add = (list: typeof all, by: "class" | "tag" | "native" | "order") => list.forEach(c => { if (!sequence.some(s => s.c === c)) sequence.push({ c, by }); });
+  const ordered = (list: typeof all) => list
+    .map((c, index) => ({ c, index }))
+    .sort((a, b) => effectiveWeight(owner, b.c.id) - effectiveWeight(owner, a.c.id) || owner.workers.indexOf(a.c.id) - owner.workers.indexOf(b.c.id) || a.index - b.index)
+    .map(item => item.c);
+  const add = (list: typeof all, by: "class" | "tag" | "native" | "order") => ordered(list).forEach(c => { if (!sequence.some(s => s.c === c)) sequence.push({ c, by }); });
   if (cls === "mechanical") add(all.filter(c => c.worker.tags?.includes("mechanical")), "class");
   if (cls !== "judgment") add(all.filter(c => c.worker.tags?.includes("routine")), "class");
   if (opts.tag !== undefined) {
@@ -165,10 +199,11 @@ export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOpti
     add(paid.filter(c => c.worker.engine === owner.engine), "native");
   }
   add(paid, "order");
-  const hit = sequence.find(s => usable(s.c));
+  const hit = sequence.find(s => eligible(s.c));
   if (!hit) {
     const considered = sequence.map(s => s.c);
-    throw new PolicyError(`no available worker for owner ${opts.owner} (class ${cls})`, considered.map(c => ({ path: `$.owners.${opts.owner}.workers`, message: `${c.id}: ${describeUnavailable(c.availability)}` })));
+    const detail = considered.map(c => `${c.id}: ${skipReason(c)}`).join("; ");
+    throw new PolicyError(`no available worker for owner ${opts.owner} (class ${cls})${detail ? `: ${detail}` : ""}`, considered.map(c => ({ path: `$.owners.${opts.owner}.workers`, message: `${c.id}: ${skipReason(c)}` })));
   }
   const warnings: string[] = [];
   if (hit.by === "native" && sequence.some(s => s.by === "tag")) warnings.push(`带 ${opts.tag} 标签的异构候选不可用，已回落到本引擎原生 worker`);
@@ -176,7 +211,7 @@ export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOpti
     if (cls !== "judgment") warnings.push("无可用免费 worker，已按 judgment 回退");
     else if (opts.tag !== undefined) warnings.push(`无可用的 ${opts.tag} 标签候选，已按顺序回退`);
   }
-  const skipped = sequence.slice(0, sequence.indexOf(hit)).filter(s => !usable(s.c)).map(s => ({ worker: s.c.id, reason: describeUnavailable(s.c.availability) }));
+  const skipped = sequence.slice(0, sequence.indexOf(hit)).filter(s => !eligible(s.c)).map(s => ({ worker: s.c.id, reason: skipReason(s.c) }));
   const suggestion = hit.by === "native" && opts.tag !== undefined ? peerSuggestion(config, blocks, owner, paid.map(c => c.worker), opts.tag) : undefined;
   return { ...previewSelection(config, opts.owner, hit.c.id, warnings), class: cls, selected_by: hit.by, skipped, ...(suggestion ? { peer_suggestion: suggestion } : {}) };
 }

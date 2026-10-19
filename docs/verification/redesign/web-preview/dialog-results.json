@@ -1,0 +1,228 @@
+{
+  "invalidWorkspaceDisabled": true,
+  "focusAfterEscape": {
+    "tag": "BUTTON",
+    "text": "新建任务"
+  },
+  "draft": [
+    {
+      "name": "搜索任务",
+      "value": ""
+    },
+    {
+      "name": "验收说明",
+      "value": ""
+    },
+    {
+      "name": null,
+      "value": "on"
+    },
+    {
+      "name": null,
+      "value": "60"
+    },
+    {
+      "name": null,
+      "value": "60"
+    },
+    {
+      "name": "任务标题",
+      "value": "网页创建但不派发"
+    },
+    {
+      "name": "目标与约束",
+      "value": "只检查新建任务与弹窗草稿，不执行任何模型"
+    },
+    {
+      "name": "目标项目目录",
+      "value": "."
+    },
+    {
+      "name": null,
+      "value": "claude_owner"
+    },
+    {
+      "name": "验收标准",
+      "value": "任务已创建\n未自动执行"
+    }
+  ],
+  "tasks": {
+    "tasks": [
+      {
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance",
+        "acceptanceCriteria": [
+          "任务已创建",
+          "未自动执行"
+        ],
+        "title": "网页创建但不派发",
+        "instruction": "只检查新建任务与弹窗草稿，不执行任何模型",
+        "id": "17844bfa-5f16-497e-8378-9da559b51206",
+        "createdAt": "2026-10-18T15:46:22.088Z",
+        "updatedAt": "2026-10-18T15:46:22.088Z",
+        "status": "queued",
+        "revision": 2,
+        "reviewState": "pending",
+        "progress": 0,
+        "ownerId": "30d0233a-94c3-4bd6-8e5e-ead698800caa",
+        "ownerEpoch": 0,
+        "ownerLastActivityAt": "2026-10-18T15:46:22.088Z",
+        "continuationPolicy": {
+          "idleRotationMinutes": 60
+        },
+        "artifactCount": 0
+      },
+      {
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance",
+        "acceptanceCriteria": [
+          "结果可查看",
+          "收到确认与验收独立"
+        ],
+        "title": "预验收显式 mock 结果",
+        "instruction": "仅生成内置 mock 演示产物，不启动模型。",
+        "id": "d028a7ac-6386-4b81-bff0-bf669c9c32fa",
+        "createdAt": "2026-10-18T15:45:21.962Z",
+        "updatedAt": "2026-10-18T15:45:58.401Z",
+        "status": "completed",
+        "revision": 17,
+        "reviewState": "accepted",
+        "progress": 100,
+        "ownerId": "a5a54e6e-27d3-47f5-9665-e50a24ea0628",
+        "ownerEpoch": 1,
+        "ownerLastActivityAt": "2026-10-18T15:45:58.401Z",
+        "continuationPolicy": {
+          "idleRotationMinutes": 60
+        },
+        "packageId": "d3d6e066-2aaa-4790-96af-349e04f45c92",
+        "dispatch": {
+          "owner": "codex_owner",
+          "worker": "codex_worker",
+          "engine": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "execution": "mock",
+          "maxParallel": 4,
+          "maxWaitMinutes": 15,
+          "adapter": "mock-jsonl"
+        },
+        "scheduled": false,
+        "summary": "Mock task completed. Review the generated demo artifact.",
+        "acknowledged": true,
+        "reviewComment": "预验收仅检查显式 mock 产物与独立验收状态。",
+        "contextPack": {
+          "version": 1,
+          "id": "01b14aae-2e1d-41d4-b242-b077ed114f40",
+          "createdAt": "2026-10-18T15:45:58.401Z",
+          "taskId": "d028a7ac-6386-4b81-bff0-bf669c9c32fa",
+          "ownerEpoch": 1,
+          "goal": "仅生成内置 mock 演示产物，不启动模型。",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance",
+          "profile": "codex_owner",
+          "constraints": [],
+          "plan": [
+            "/tmp/weaver-redesign-3QuXVe/acceptance"
+          ],
+          "decisions": [
+            "Result review: accepted: 预验收仅检查显式 mock 产物与独立验收状态。"
+          ],
+          "taskProgress": {
+            "status": "completed",
+            "percent": 100,
+            "summary": "Mock task completed. Review the generated demo artifact."
+          },
+          "acceptedArtifacts": [
+            {
+              "id": "c7d6e736-0647-4762-aa0a-0c4d99bbe84d",
+              "name": "mock-result.md",
+              "mediaType": "text/markdown",
+              "sha256": "53caeb7773d3ae97369f3c670c174e2e5980e422935f4d57ab15463fe6530cb4"
+            }
+          ],
+          "pendingApprovals": [],
+          "recentMessages": [
+            {
+              "kind": "lifecycle",
+              "at": "2026-10-18T15:45:21.962Z",
+              "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+            },
+            {
+              "kind": "lifecycle",
+              "at": "2026-10-18T15:45:22.042Z",
+              "message": "Policy selected codex_worker; explicit mock-jsonl provider"
+            },
+            {
+              "kind": "lifecycle",
+              "at": "2026-10-18T15:45:22.042Z",
+              "message": "Launching explicit mock-jsonl provider"
+            },
+            {
+              "kind": "artifact",
+              "at": "2026-10-18T15:45:23.869Z",
+              "message": "Received mock-result.md"
+            },
+            {
+              "kind": "result",
+              "at": "2026-10-18T15:45:23.869Z",
+              "message": "Mock task completed. Review the generated demo artifact."
+            },
+            {
+              "kind": "lifecycle",
+              "at": "2026-10-18T15:45:23.872Z",
+              "message": "Worker exited successfully; output is ready for owner review"
+            },
+            {
+              "kind": "lifecycle",
+              "at": "2026-10-18T15:45:56.603Z",
+              "message": "Result receipt acknowledged; acceptance unchanged"
+            },
+            {
+              "kind": "lifecycle",
+              "at": "2026-10-18T15:45:57.101Z",
+              "message": "Owner review: accepted"
+            }
+          ],
+          "baseReferences": {
+            "taskId": "d028a7ac-6386-4b81-bff0-bf669c9c32fa",
+            "packageId": "d3d6e066-2aaa-4790-96af-349e04f45c92",
+            "previousPackId": null
+          },
+          "limitations": [
+            "Bounded snapshot; artifact bodies and full transcripts omitted",
+            "Plan contains recorded work-package scope only; no inferred decisions",
+            "Redaction is best-effort; mock-only local transport",
+            "Idle interval is user policy, not vendor cache retention"
+          ]
+        },
+        "continuationHistory": [
+          {
+            "id": "fa58ea90-a5f0-4285-95ce-be0dfb629795",
+            "at": "2026-10-18T15:45:58.401Z",
+            "reason": "manual",
+            "fromOwnerId": "ec9da2e6-418c-4d6c-963b-1027b0700508",
+            "toOwnerId": "a5a54e6e-27d3-47f5-9665-e50a24ea0628",
+            "fromProfileId": "codex_owner",
+            "toProfileId": "codex_owner",
+            "epoch": 1,
+            "packId": "01b14aae-2e1d-41d4-b242-b077ed114f40",
+            "acknowledgementId": "5a251a37-d3c3-44d0-b290-01e8c4287cde"
+          }
+        ],
+        "run": {
+          "id": "11815c20-92b0-4ca1-99fe-a3dc55f00c7c",
+          "adapter": "mock-jsonl",
+          "execution": "mock",
+          "status": "stopped",
+          "startedAt": "2026-10-18T15:45:22.042Z",
+          "timeoutMs": 900000,
+          "engine": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance",
+          "endedAt": "2026-10-18T15:45:23.872Z",
+          "exitCode": 0
+        },
+        "artifactCount": 1
+      }
+    ],
+    "nextOffset": null
+  }
+}

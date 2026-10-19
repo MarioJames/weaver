@@ -1,0 +1,191 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 3294896620169087710
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:34033/",
+  "refs": {
+    "e1": {
+      "name": "",
+      "role": "generic"
+    },
+    "e10": {
+      "name": "引擎",
+      "role": "link"
+    },
+    "e11": {
+      "name": "负责人",
+      "role": "link"
+    },
+    "e12": {
+      "name": "工作代理",
+      "role": "link"
+    },
+    "e13": {
+      "name": "路由与配额",
+      "role": "link"
+    },
+    "e14": {
+      "name": "重试连接",
+      "role": "button"
+    },
+    "e15": {
+      "name": "Close alert",
+      "role": "button"
+    },
+    "e16": {
+      "name": "预览已保存路由",
+      "role": "button"
+    },
+    "e17": {
+      "name": "自动审查偏好",
+      "role": "switch"
+    },
+    "e18": {
+      "name": "添加限制",
+      "role": "button"
+    },
+    "e19": {
+      "name": "负责人",
+      "role": "combobox"
+    },
+    "e2": {
+      "name": "跳到内容",
+      "role": "link"
+    },
+    "e20": {
+      "name": "类别",
+      "role": "combobox"
+    },
+    "e21": {
+      "name": "领域标签",
+      "role": "textbox"
+    },
+    "e22": {
+      "name": "假设正在运行的工作代理数",
+      "role": "textbox"
+    },
+    "e23": {
+      "name": "Increase",
+      "role": "button"
+    },
+    "e24": {
+      "name": "Decrease",
+      "role": "button"
+    },
+    "e25": {
+      "name": "等待上限（分钟）",
+      "role": "textbox"
+    },
+    "e26": {
+      "name": "Increase",
+      "role": "button"
+    },
+    "e27": {
+      "name": "Decrease",
+      "role": "button"
+    },
+    "e28": {
+      "name": "固定单一引擎",
+      "role": "combobox"
+    },
+    "e29": {
+      "name": "清除固定",
+      "role": "button"
+    },
+    "e3": {
+      "name": "Weaver",
+      "role": "button"
+    },
+    "e30": {
+      "name": "qa_b_worker 的优先权重",
+      "role": "textbox"
+    },
+    "e31": {
+      "name": "Increase",
+      "role": "button"
+    },
+    "e32": {
+      "name": "Decrease",
+      "role": "button"
+    },
+    "e33": {
+      "name": "上移 qa_b_worker",
+      "role": "button"
+    },
+    "e34": {
+      "name": "下移 qa_b_worker",
+      "role": "button"
+    },
+    "e35": {
+      "name": "移除引用 qa_b_worker",
+      "role": "button"
+    },
+    "e36": {
+      "name": "qa_a_worker 的优先权重",
+      "role": "textbox"
+    },
+    "e37": {
+      "name": "Increase",
+      "role": "button"
+    },
+    "e38": {
+      "name": "Decrease",
+      "role": "button"
+    },
+    "e39": {
+      "name": "上移 qa_a_worker",
+      "role": "button"
+    },
+    "e4": {
+      "name": "主导航",
+      "role": "navigation"
+    },
+    "e40": {
+      "name": "下移 qa_a_worker",
+      "role": "button"
+    },
+    "e41": {
+      "name": "移除引用 qa_a_worker",
+      "role": "button"
+    },
+    "e42": {
+      "name": "加入顺序的工作代理",
+      "role": "combobox"
+    },
+    "e43": {
+      "name": "添加引用",
+      "role": "button"
+    },
+    "e5": {
+      "name": "收起导航",
+      "role": "button"
+    },
+    "e6": {
+      "name": "切换到浅色",
+      "role": "button"
+    },
+    "e7": {
+      "name": "保存配置",
+      "role": "button"
+    },
+    "e8": {
+      "name": "放弃草稿并重新加载",
+      "role": "button"
+    },
+    "e9": {
+      "name": "任务",
+      "role": "link"
+    }
+  },
+  "snapshot": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - link \"跳到内容\" [ref=e2]\n    - complementary\n      - button \"Weaver\" [ref=e3]\n        - StaticText \"Weaver\"\n      - navigation \"主导航\" [ref=e4]\n        - link \"任务\" [ref=e9]\n          - image\n          - StaticText \"任务\"\n        - link \"引擎\" [ref=e10]\n          - image\n          - StaticText \"引擎\"\n        - link \"负责人\" [ref=e11]\n          - image\n          - StaticText \"负责人\"\n        - link \"工作代理\" [ref=e12]\n          - image\n          - StaticText \"工作代理\"\n        - link \"路由与配额\" [ref=e13]\n          - image\n          - StaticText \"路由与配额\"\n      - button \"收起导航\" [ref=e5]\n        - image\n      - button \"切换到浅色\" [ref=e6]\n        - image\n      - status\n        - StaticText \"2 个并行槽位 · 同步中断\"\n    - main\n      - alert\n        - StaticText \"Error: NETWORK: Failed to fetch\"\n        - button \"重试连接\" [ref=e14]\n        - button \"Close alert\" [ref=e15]\n      - button \"保存配置\" [disabled, ref=e7]\n      - button \"放弃草稿并重新加载\" [ref=e8]\n      - StaticText \"已保存版本 48\"\n      - status\n        - StaticText \"已重新加载已保存配置。\"\n      - generic\n        - StaticText \"预览只看已保存版本，不含未保存草稿，也不会启动代理。权重和固定引擎写入草稿，用上方保存后才参与预览。假设运行数只用于容量判断。\"\n        - form\n          - LabelText\n            - StaticText \"负责人\"\n          - combobox \"负责人\" [expanded=false, ref=e19]: codex_owner\n            - StaticText \"codex_owner\"\n          - LabelText\n            - StaticText \"类别\"\n          - combobox \"类别\" [expanded=false, ref=e20]: 判断\n            - StaticText \"判断\"\n          - LabelText\n            - generic\n              - StaticText \"领域标签\"\n              - StaticText \"只在判断类时参与选择。\"\n          - textbox \"领域标签\" [ref=e21]: after-success\n            - StaticText \"after-success\"\n          - LabelText\n            - StaticText \"假设正在运行的工作代理数\"\n          - textbox \"假设正在运行的工作代理数\" [ref=e22]: 0\n            - StaticText \"0\"\n          - button \"Increase\" [ref=e23]\n            - image\n          - button \"Decrease\" [disabled, ref=e24]\n            - image\n          - LabelText\n            - StaticText \"等待上限（分钟）\"\n          - textbox \"等待上限（分钟）\" [ref=e25]: 1\n            - StaticText \"1\"\n          - button \"Increase\" [ref=e26]\n            - image\n          - button \"Decrease\" [disabled, ref=e27]\n            - image\n          - LabelText\n            - generic\n              - StaticText \"固定单一引擎\"\n              - StaticText \"选定后，自动派发、指定工作代理和排队重试都只能用这台引擎。它不可用时不会改派到别的引擎。\"\n          - LabelText\n            - StaticText \"固定单一引擎\"\n          - combobox \"固定单一引擎\" [expanded=false, ref=e28]: 不固定\n            - StaticText \"不固定\"\n          - button \"清除固定\" [disabled, ref=e29]\n          - LabelText\n            - generic\n              - StaticText \"工作代理与同类优先权重\"\n              - StaticText \"类别和标签仍先决定候选。同一层级内，优先权重更大的先尝试，相同权重才按上面的顺序。0 表示这个负责人不派给该工作代理。这是优先级，不是随机概率。\"\n          - generic\n            - StaticText \"1. qa_b_worker\"\n          - LabelText\n            - StaticText \"qa_b_worker 的优先权重\"\n          - textbox \"qa_b_worker 的优先权重\" [ref=e30]: 100\n            - StaticText \"100\"\n          - button \"Increase\" [ref=e31]\n            - image\n          - button \"Decrease\" [ref=e32]\n            - image\n          - button \"上移 qa_b_worker\" [disabled, ref=e33]\n            - StaticText \"上移\"\n          - button \"下移 qa_b_worker\" [ref=e34]\n            - StaticText \"下移\"\n          - button \"移除引用 qa_b_worker\" [ref=e35]\n            - StaticText \"移除\"\n          - generic\n            - StaticText \"2. qa_a_worker\"\n          - LabelText\n            - StaticText \"qa_a_worker 的优先权重\"\n          - textbox \"qa_a_worker 的优先权重\" [ref=e36]: 100\n            - StaticText \"100\"\n          - button \"Increase\" [ref=e37]\n            - image\n          - button \"Decrease\" [ref=e38]\n            - image\n          - button \"上移 qa_a_worker\" [ref=e39]\n            - StaticText \"上移\"\n          - button \"下移 qa_a_worker\" [disabled, ref=e40]\n            - StaticText \"下移\"\n          - button \"移除引用 qa_a_worker\" [ref=e41]\n            - StaticText \"移除\"\n          - LabelText\n            - StaticText \"加入顺序的工作代理\"\n          - combobox \"加入顺序的工作代理\" [expanded=false, ref=e42]: 选择工作代理\n            - StaticText \"选择工作代理\"\n          - button \"添加引用\" [disabled, ref=e43]\n        - button \"预览已保存路由\" [ref=e16]\n        - generic\n          - StaticText \"已保存版本 48 · 生效限制 0 项\"\n        - LabelText\n          - StaticText \"自动审查偏好\"\n        - switch \"自动审查偏好\" [checked=false, ref=e17]\n        - StaticText \"自动审查偏好。关闭后本应用不会外接审查。\"\n        - StaticText \"配额限制\"\n        - StaticText \"每项需要引擎、原因和开始时间。恢复时间留空表示手动解除。过期项不参与路由。移除后再保存才会生效。\"\n        - button \"添加限制\" [ref=e18]\n        - group\n          - DisclosureTriangle \"控制面状态与高级 JSON\" [expanded=false]\n            - StaticText \"控制面状态与高级 JSON\""
+}

@@ -1,0 +1,16 @@
+{
+  "createdTask": "d028a7ac-6386-4b81-bff0-bf669c9c32fa",
+  "execution": {
+    "owner": "codex_owner",
+    "worker": "codex_worker",
+    "engine": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "high",
+    "execution": "mock",
+    "maxParallel": 4,
+    "maxWaitMinutes": 15,
+    "adapter": "mock-jsonl"
+  },
+  "status": "completed",
+  "ownerId": "ec9da2e6-418c-4d6c-963b-1027b0700508"
+}

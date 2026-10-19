@@ -1,0 +1,26 @@
+{
+  "sourceMessage": "050/051",
+  "kind": "No-model real systemd scope/JSONL fixture; worker executed and owner independently reviewed. Not actual Pi model recovery or QA final-build PASS.",
+  "files": [
+    {
+      "file": "red.log",
+      "sha256": "bf543666eee2de8f90ea52b584cb345d347223bc36fc80a169d666272bd24cf7",
+      "source": "/tmp/weaver-redesign-3QuXVe/provider-stream/red.log"
+    },
+    {
+      "file": "observed.json",
+      "sha256": "48e5e2134f26b4d6612b2ff1f2eb80f9b062c9925711974359649c9c1cfb2a3f",
+      "source": "/tmp/weaver-redesign-3QuXVe/provider-stream/observed.json"
+    },
+    {
+      "file": "dist-045-check.json",
+      "sha256": "826d4a4701e5e11d86c3c54cc549bc458ae0346957e02f9c74aea1109dbfc565",
+      "source": "/tmp/weaver-redesign-3QuXVe/provider-stream/dist-045-check.json"
+    },
+    {
+      "file": "all-providers.log",
+      "sha256": "08116dc0c94607014c9adc29dc190565e1cbce6b3f9f6bbcb6c0a72b7dbf024c",
+      "source": "/tmp/weaver-redesign-3QuXVe/provider-stream/all-providers.log"
+    }
+  ]
+}

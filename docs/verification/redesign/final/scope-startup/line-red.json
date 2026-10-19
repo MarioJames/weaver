@@ -1,0 +1,45 @@
+[
+  {
+    "case": "split-complete",
+    "pushedBytes": [
+      6,
+      184320,
+      5,
+      7
+    ],
+    "overflows": []
+  },
+  {
+    "case": "unterminated",
+    "pushedBytes": [
+      7
+    ],
+    "overflows": [
+      null
+    ]
+  },
+  {
+    "case": "end-flush",
+    "pushedBytes": [
+      131073,
+      7
+    ],
+    "overflows": []
+  },
+  {
+    "case": "exact-utf8",
+    "terminated": true,
+    "pushedBytes": [
+      131072
+    ],
+    "overflows": []
+  },
+  {
+    "case": "exact-utf8",
+    "terminated": false,
+    "pushedBytes": [
+      131072
+    ],
+    "overflows": []
+  }
+]

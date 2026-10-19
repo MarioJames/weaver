@@ -1,0 +1,64 @@
+{
+  "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final",
+  "title": "SIGTERM active mock",
+  "instruction": "explicit mock shutdown fixture",
+  "id": "c7ba6803-43b7-4874-95cd-c310a6834e4c",
+  "createdAt": "2026-10-19T00:18:16.869Z",
+  "updatedAt": "2026-10-19T00:18:17.001Z",
+  "status": "running",
+  "revision": 6,
+  "reviewState": "pending",
+  "progress": 0,
+  "events": [
+    {
+      "id": "74a1cceb-bb19-4ffb-bc94-9e90999271f9",
+      "at": "2026-10-19T00:18:16.869Z",
+      "kind": "lifecycle",
+      "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+    },
+    {
+      "id": "f139b702-243b-4de8-9686-2d277a035fec",
+      "at": "2026-10-19T00:18:16.998Z",
+      "kind": "lifecycle",
+      "message": "Policy selected qa_a_worker; explicit mock-jsonl provider"
+    },
+    {
+      "id": "a4126355-ddc6-4221-840b-9c4c08f64392",
+      "at": "2026-10-19T00:18:17.001Z",
+      "kind": "lifecycle",
+      "message": "Launching explicit mock-jsonl provider"
+    }
+  ],
+  "artifacts": [],
+  "ownerId": "a9e2cfb6-5cc5-43d4-8cd9-93bbf669ec27",
+  "ownerEpoch": 0,
+  "ownerLastActivityAt": "2026-10-19T00:18:16.869Z",
+  "continuationPolicy": {
+    "idleRotationMinutes": 60
+  },
+  "packageId": "a47328b3-a1b8-4f5d-bb88-748e57816c19",
+  "dispatch": {
+    "owner": "codex_owner",
+    "worker": "qa_a_worker",
+    "engine": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "xhigh",
+    "execution": "mock",
+    "maxParallel": 1,
+    "maxWaitMinutes": 1,
+    "adapter": "mock-jsonl"
+  },
+  "scheduled": false,
+  "run": {
+    "id": "b0e8205e-246f-41ab-8772-3b7e57d6c193",
+    "adapter": "mock-jsonl",
+    "execution": "mock",
+    "status": "running",
+    "startedAt": "2026-10-19T00:18:17.000Z",
+    "timeoutMs": 60000,
+    "engine": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "xhigh",
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final"
+  }
+}

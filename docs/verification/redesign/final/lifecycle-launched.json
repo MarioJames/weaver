@@ -1,0 +1,14 @@
+{
+  "cancel": {
+    "id": "44fa7e7e-80e4-4717-9ed2-19cc6b079de4",
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-cancel",
+    "scope": "weaver-cli-pi-b8f01198",
+    "startedAt": "2026-10-18T23:53:37.451Z"
+  },
+  "timeout": {
+    "id": "ffaff7b9-bfc0-4baf-b174-43a23c8ddc5d",
+    "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/lifecycle-timeout",
+    "scope": "weaver-cli-pi-0a289da8",
+    "startedAt": "2026-10-18T23:53:37.725Z"
+  }
+}

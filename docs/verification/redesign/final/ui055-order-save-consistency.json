@@ -1,0 +1,31 @@
+{
+  "saved": {
+    "enabled": true,
+    "engine": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "xhigh",
+    "workers": [
+      "qa_a_worker",
+      "qa_b_worker"
+    ],
+    "max_parallel": 1,
+    "worker_weights": {}
+  },
+  "preview": {
+    "owner": "codex_owner",
+    "worker": "qa_a_worker",
+    "engine": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "xhigh",
+    "execution": "disabled",
+    "dispatch": "preview",
+    "warnings": [],
+    "weight": 100,
+    "class": "judgment",
+    "selected_by": "order",
+    "skipped": [],
+    "maxParallel": 1,
+    "capacityAvailable": true,
+    "chatgptReview": false
+  }
+}

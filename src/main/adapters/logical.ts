@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { Task } from '../../shared/types';
-import type { WorkerAdapter } from './worker';
+import type { ManagedProcess, WorkerAdapter } from './worker';
 
 export interface LogicalAdapter {
  readonly id: string;
@@ -172,7 +171,7 @@ export class MockOwnerHostAdapter implements OwnerHostAdapter {
 }
 
 export interface WorkerProviderAdapter extends LogicalAdapter {
- start(task: Task): ChildProcessWithoutNullStreams;
+ start(task: Task): ManagedProcess;
 }
 /** Reuses the bounded JSONL process adapter; does not implement a second process launcher. */
 export class MockWorkerProviderAdapter implements WorkerProviderAdapter, WorkerAdapter {
@@ -182,5 +181,5 @@ export class MockWorkerProviderAdapter implements WorkerProviderAdapter, WorkerA
  constructor(private readonly worker: WorkerAdapter) {
   if (worker.id !== 'mock-jsonl') throw new Error('Only the mock-jsonl worker can be bridged');
  }
- start(task: Task): ChildProcessWithoutNullStreams { return this.worker.start(task); }
+ start(task: Task): ManagedProcess { return this.worker.start(task); }
 }

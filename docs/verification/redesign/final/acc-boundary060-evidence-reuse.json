@@ -1,0 +1,44 @@
+{
+  "newRound": "round_cc3314b9a6",
+  "newTask": "owner-scratch-boundary",
+  "sourceFreeze": "060",
+  "changedFiles": [
+    "skills/weaver/SKILL.md",
+    "skills/weaver/references/handoff.md"
+  ],
+  "boundary": "Add explicit supplied temporary-parent containment only; workflow/routing/commands/business criteria/runtime/build unchanged. Fresh actual Owner read-only audit independently proved new boundary.",
+  "retained": [
+    {
+      "round": "round_85a961ee70",
+      "originalVerdict": "FAIL",
+      "independentPassedTaskKeys": [
+        "owner-smoke",
+        "owner-representative",
+        "owner-complex"
+      ],
+      "packages": 4,
+      "proof": "actual AB/BA/B250 dispatches, success/file checks/ack/accepted; whole round failed recovery and stays FAIL"
+    },
+    {
+      "round": "round_d724e4a216",
+      "originalVerdict": "FAIL",
+      "independentPassedTaskKeys": [
+        "owner-negative"
+      ],
+      "proof": "read-only rg/cat, exact fixture/API snapshots unchanged; Pi recovery not passed"
+    },
+    {
+      "round": "round_9008d64020",
+      "originalVerdict": "CONDITIONAL",
+      "independentPassedTaskKeys": [
+        "owner-recovery"
+      ],
+      "proof": "explicit Codex pin business recovery success/QA10/10/original bytes/ack/accepted; temporary scratch boundary failed and stays CONDITIONAL"
+    }
+  ],
+  "unresolvedSupplierLimits": [
+    "Pi recovery Connection error attempts not relabelled success",
+    "Grok single402 balance failure, no restore time, no fallback"
+  ],
+  "authorization": "Parent058/060 scoped boundary revalidation, original8round budget unchanged; no fourth business recovery or worker model calls."
+}

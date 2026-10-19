@@ -7,14 +7,21 @@ import { event } from './store';
 import { ContinuationService, ContinuationError, redactContext } from './continuation';
 import { MockOwnerHostAdapter, type OwnerHostEvidence, type OwnerMessage } from './adapters/logical';
 import { PolicyStore } from './policy/store';
-const writes=new Set(['owners.attach','owners.spawn','owners.switch','owners.continuation.configure','tasks.create','tasks.retry','tasks.cancel','packages.create','workers.spawn','results.deliver','results.ack','reviews.submit']);
+import { absoluteExistingWorkspace, assertFrozenWorkspace, workspaceIdentity, isRealEngineKind } from './workspace';
+import { workerInstruction } from './adapters/instruction';
+export const WRITE_COMMANDS = ['owners.attach','owners.spawn','owners.switch','owners.continuation.configure','tasks.create','tasks.retry','tasks.cancel','packages.create','workers.spawn','results.deliver','results.ack','reviews.submit'] as const;
+export const READ_COMMANDS = ['capabilities.get','sync.snapshot','sync.status','owners.list','owners.get','owners.continuation.get','tasks.get','tasks.list','tasks.events','tasks.results','artifacts.read','packages.get','operations.get','observability.get','observability.export'] as const;
+const writes=new Set<string>(WRITE_COMMANDS);
+export function configuredParallel(policy: PolicyStore): number {
+ return Object.values(policy.snapshot().config.owners).filter(owner => owner.enabled).reduce((sum, owner) => sum + owner.max_parallel, 0);
+}
 class CommandError extends Error {constructor(readonly code:string,message:string){super(message);}}
 const fail=(code:string,message:string):never=>{throw new CommandError(code,message);};
 function canonical(value:unknown):string {if(Array.isArray(value))return `[${value.map(canonical).join(',')}]`;if(value&&typeof value==='object')return `{${Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`;return JSON.stringify(value);}
 const digest=(value:unknown)=>createHash('sha256').update(canonical(value)).digest('hex');
 const terminal=(t:Task)=>['completed','failed','cancelled'].includes(t.status);
-/** A single app-owned handler shared by Electron and CLI. The local principal is deliberately
- * trusted-user demo scope, not an impersonation-resistant owner credential or real-agent grant. */
+/** A single app-owned handler shared by the loopback UI and CLI. The local principal is deliberately
+ * trusted-local-machine scope, not an OS-user login or a real-agent grant. */
 export class CommandHandler {
  draining=false;
  transportStatus:'ready'|'unavailable'|'not-started'='not-started';
@@ -72,34 +79,71 @@ export class CommandHandler {
   if(args.expectedRevision!==undefined)args.expectedRevision=this.manager.store.get(task.id).revision;
  }
 
+ private queueBlocked(task:Task, code:NonNullable<Task['queueReason']>['code'], message:string):void {
+  const bounded=redactContext(message,700);
+  if(task.queueReason?.code===code&&task.queueReason.message===bounded)return;
+  task.queueReason={code,message:bounded};this.put(task);
+ }
  pump():void {
   if(this.pumping||this.draining)return;this.pumping=true;
-  try{for(const task of this.manager.store.list().reverse()){if(terminal(task)&&task.ownerId){try{this.execute('results.deliver',{taskId:task.id});}catch{/* Manual attachments have no delivery transport. */}}if(task.status!=='queued'||!task.scheduled||!task.dispatch)continue;
-   try{const running=this.manager.store.list().filter(t=>(t.status==='running'||t.status==='cancelling')&&t.dispatch?.owner===task.dispatch!.owner).length;const route=this.policy.preview({owner:task.dispatch.owner,worker:task.dispatch.worker,runningCount:running});if(!route.capacityAvailable||this.manager.runningCount>=this.manager.maxParallel)continue;task.scheduled=false;this.put(task);this.manager.start(task.id);}catch{/* A changed policy keeps the persisted request queued; no unauthorized fallback. */}
+  try{for(const task of this.manager.store.list().reverse()){
+   if(terminal(task)&&task.ownerId){try{this.execute('results.deliver',{taskId:task.id});}catch{/* Manual owners pull results. */}}
+   if(task.status!=='queued'||!task.scheduled||!task.dispatch)continue;
+   let phase:NonNullable<Task['queueReason']>['code']='policy_blocked';
+   try{
+    const frozen=task.dispatch;
+    const running=this.manager.store.list().filter(t=>(t.status==='running'||t.status==='cancelling')&&t.dispatch?.owner===frozen.owner).length;
+    const route=this.policy.preview({owner:frozen.owner,worker:frozen.worker,runningCount:running});
+    const kind=this.policy.snapshot().config.engines[route.engine]?.kind;
+    if(route.worker!==frozen.worker||route.engine!==frozen.engine||route.model!==frozen.model||route.effort!==frozen.effort||(frozen.engineKind!==undefined&&kind!==frozen.engineKind)){
+     this.queueBlocked(task,'frozen_route_changed','Current worker engine, kind, model or effort no longer matches the frozen dispatch; restore the route or cancel and create a new task.');continue;
+    }
+    if(!route.capacityAvailable){this.queueBlocked(task,'waiting_for_capacity',`Owner ${frozen.owner} is at its current concurrency limit (${route.maxParallel}).`);continue;}
+    phase='workspace_changed';if(frozen.execution==='real')assertFrozenWorkspace(frozen);
+    phase='launch_blocked';this.manager.start(task.id,route.maxParallel);
+   }catch(error){
+    // start may have created/stopped a process before a persistence error. Never overwrite
+    // its current state with the stale queued snapshot or make that attempt runnable again.
+    const current=this.manager.store.get(task.id);
+    if(current.status==='queued'&&current.scheduled)this.queueBlocked(current,phase,error instanceof Error?error.message:'Queued dispatch blocked');
+   }
   }}finally{this.pumping=false;}
  }
- private publicTask(task:Task){const {owner,run,...rest}=task;return {...rest,...(run?{run:{id:run.id,adapter:run.adapter,status:run.status,startedAt:run.startedAt,endedAt:run.endedAt,exitCode:run.exitCode}}:{})};}
+ private publicTask(task:Task){const {owner,run,...rest}=task;if(!run)return rest;const visible={...run};delete visible.pid;return {...rest,run:visible};}
  private manifest(task:Task){if(!terminal(task))fail('RESULT_NOT_READY','Execution has not reached a terminal state');const manifest={taskId:task.id,attemptId:task.run?.id??null,packageId:task.packageId??null,execution:task.status,summary:task.summary??null,artifacts:task.artifacts.map(a=>({id:a.id,name:a.name,mediaType:a.mediaType,sha256:createHash('sha256').update(a.content).digest('hex')})),exitCode:task.run?.exitCode??null};return {...manifest,manifestDigest:digest(manifest),delivery:task.acknowledged?'acknowledged':'pending',acceptance:task.reviewState??'pending'};}
+ private decideExecution(engine:string,provider:unknown,task:Task):{execution:'real'|'mock';adapter:string;maxWaitMinutes:number;workspace?:string;engineKind?:string} {
+  const minutes=this.policy.snapshot().config.herdr.max_wait_minutes;
+  if(!Number.isSafeInteger(minutes)||minutes<1||minutes>1440)fail('INVALID_REQUEST','Configured max_wait_minutes is invalid');
+  if(provider==='mock-jsonl'||this.manager.adapterId==='mock-jsonl') return {execution:'mock',adapter:'mock-jsonl',maxWaitMinutes:minutes};
+  const kind=this.policy.snapshot().config.engines[engine]?.kind??'';
+  if(kind==='claude')fail('CAPABILITY_UNAVAILABLE','Claude Code real execution is deferred. No mock provider was substituted.');
+  if(!isRealEngineKind(kind))fail('CAPABILITY_UNAVAILABLE',`Engine ${engine} (${kind||'unknown kind'}) cannot be launched. No mock provider was substituted.`);
+  if(!this.manager.canLaunchReal)fail('CAPABILITY_UNAVAILABLE',`Real launcher for ${kind} is not loaded. No mock provider was substituted.`);
+  return {execution:'real',adapter:kind,engineKind:kind,workspace:absoluteExistingWorkspace(task.workspace),maxWaitMinutes:minutes};
+ }
  private execute(command:string,a:Record<string,unknown>):unknown {
   switch(command){
    case 'sync.snapshot':return {revision:this.manager.store.revision,tasks:this.manager.store.list().map(t=>({id:t.id,title:t.title,status:t.status,revision:t.revision??0,ownerId:t.ownerId,updatedAt:t.updatedAt,reviewState:t.reviewState??'pending'})),owners:this.manager.store.getMetadata().owners.map(o=>({id:o.id,name:o.name,profileId:o.profileId,mode:o.mode,state:o.state}))};
    case 'sync.status':return {revision:this.manager.store.revision,changed:a.after!==this.manager.store.revision,recovery:'refresh sync.snapshot; push invalidation is not a durable event stream'};
-   case 'capabilities.get':return {apiVersion:API_VERSION,cliTransport:this.transportStatus,authentication:'ephemeral-local-trusted-user-demo',ownerScopedAuthorization:false,ownerSpawn:'mock-only',manualAttach:'metadata-only',workerProviders:['mock-jsonl'],realExecution:false,mcp:false,maxParallel:this.manager.maxParallel,policyAdmission:true,commands:['capabilities.get','sync.snapshot','sync.status','owners.list','owners.get','owners.continuation.get',...writes,'tasks.get','tasks.list','tasks.events','tasks.results','artifacts.read','packages.get','operations.get','observability.get','observability.export'],limits:{tasks:200,owners:200,packages:1000,receipts:5000,eventsPerPage:100},durability:'durable intent before effect; interrupted commands require reconciliation, not automatic replay'};
+   case 'capabilities.get':return {apiVersion:API_VERSION,cliTransport:this.transportStatus,authentication:'ephemeral-local-trusted-user-demo',ownerScopedAuthorization:false,ownerSpawn:'logical-registration',manualAttach:'metadata-only',ownerModelSpawned:false,attachmentVerified:false,authenticated:false,modelUsable:false,workerProviders:this.manager.canLaunchReal?['mock-jsonl','opencode','pi','grok','codex']:['mock-jsonl'],realExecution:this.manager.canLaunchReal,mcp:false,maxParallel:configuredParallel(this.policy),policyAdmission:true,commands:[...READ_COMMANDS,...WRITE_COMMANDS],limits:{tasks:200,owners:200,packages:1000,receipts:5000,eventsPerPage:100},durability:'durable intent before effect; interrupted commands require reconciliation, not automatic replay'};
    case 'owners.continuation.get':return this.continuation.get(parseId(a.taskId));
    case 'owners.continuation.configure':{if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');return this.continuation.configure(parseId(a.taskId),a.expectedRevision as number,a.idleRotationMinutes as number|null);}
    case 'owners.switch':{if(!Number.isSafeInteger(a.expectedRevision)||(a.expectedEpoch!==undefined&&!Number.isSafeInteger(a.expectedEpoch)))fail('INVALID_REQUEST','Revision and epoch must be integers');if(a.reason!==undefined&&a.reason!=='manual'&&a.reason!=='idle')fail('INVALID_REQUEST','Invalid switch reason');const task=this.task(a);const owner=this.owner(task.ownerId);const profile=text(a.profileId??owner.profileId,'profileId',120);if(this.policy.snapshot().owners[profile]?.status!=='available')fail('POLICY_DENIED','Target owner profile unavailable');return this.continuation.rotate(task.id,Number(a.expectedRevision),a.reason==='idle'?'idle':'manual',a.expectedEpoch===undefined?undefined:Number(a.expectedEpoch),profile);}
    case 'owners.list':return {owners:this.manager.store.getMetadata().owners};
    case 'owners.get':return this.owner(a.ownerId);
    case 'owners.attach':case 'owners.spawn':{
-    const mode=command==='owners.spawn'?'mock':'manual';if(a.provider!==undefined&&a.provider!=='mock')fail('CAPABILITY_UNAVAILABLE','Only the in-process mock owner host is enabled');
+    const mode=command==='owners.spawn'&&a.provider==='mock'?'mock':'manual';if(a.provider!==undefined&&a.provider!=='mock')fail('CAPABILITY_UNAVAILABLE','This process does not spawn an owner model');
     const profileId=text(a.profileId,'profileId',120);const snapshot=this.policy.snapshot();if(snapshot.owners[profileId]?.status!=='available')fail('POLICY_DENIED','Owner profile is unavailable');
     const meta=this.manager.store.getMetadata();if(meta.owners.length>=200)fail('RESOURCE_LIMIT','Owner limit reached');
-    const owner:LogicalOwner={id:randomUUID(),name:text(a.name,'name',120),profileId,mode,state:mode==='mock'?'ready':'attached',createdAt:new Date().toISOString()};owner.host=mode==='mock'?this.ownerHost.spawn({ownerId:owner.id,name:owner.name,profileId}):this.ownerHost.attach({ownerId:owner.id,name:owner.name,profileId,session:'manual-reference',pane:'unverified'});meta.owners.push(owner);this.manager.store.setMetadata(meta);return owner;
+    const owner:LogicalOwner={id:randomUUID(),name:text(a.name,'name',120),profileId,mode,state:mode==='mock'?'ready':'attached',createdAt:new Date().toISOString()};
+    if(mode==='mock'){if(a.session!==undefined||a.pane!==undefined)fail('INVALID_REQUEST','Logical registration has no session or pane');owner.host=this.ownerHost.spawn({ownerId:owner.id,name:owner.name,profileId});}
+    else owner.host=this.ownerHost.attach({ownerId:owner.id,name:owner.name,profileId,session:a.session===undefined?'external-cli':text(a.session,'session',120),pane:a.pane===undefined?'unverified':text(a.pane,'pane',120)});
+    meta.owners.push(owner);this.manager.store.setMetadata(meta);return owner;
    }
    case 'tasks.create':return this.manager.store.transaction(()=>{
     let owner:LogicalOwner|undefined;let input;
-    if(a.ownerProfileId!==undefined){parseTaskInput({...a,instruction:a.instruction??a.goal,owner:{name:'validation',transport:'herdr-visible',session:'logical',pane:'logical'}});if(this.manager.store.list().length>=200)fail('RESOURCE_LIMIT','Task limit reached');if(a.ownerId!==undefined)fail('INVALID_REQUEST','Choose ownerId or ownerProfileId');owner=this.execute('owners.spawn',{profileId:a.ownerProfileId,name:a.ownerName??'Task owner',provider:a.ownerProvider??'mock'}) as LogicalOwner;}
-    if(a.ownerId!==undefined||owner){owner??=this.owner(a.ownerId);input=parseTaskInput({...a,title:a.title,instruction:a.instruction??a.goal,owner:{name:owner.name,transport:'herdr-visible',session:'logical-owner',pane:'manual-or-mock'}});}else input=parseTaskInput(a);
+    if(a.ownerProfileId!==undefined){parseTaskInput({...a,instruction:a.instruction??a.goal,owner:{name:'validation',transport:'herdr-visible',session:'unverified',pane:'unverified'}});if(this.manager.store.list().length>=200)fail('RESOURCE_LIMIT','Task limit reached');if(a.ownerId!==undefined)fail('INVALID_REQUEST','Choose ownerId or ownerProfileId');owner=this.execute('owners.spawn',{profileId:a.ownerProfileId,name:a.ownerName??'Task owner',provider:a.ownerProvider}) as LogicalOwner;}
+    if(a.ownerId!==undefined||owner){owner??=this.owner(a.ownerId);input=parseTaskInput({...a,title:a.title,instruction:a.instruction??a.goal,owner:{name:owner.name,transport:'herdr-visible',session:'unverified',pane:'unverified'}});}else input=parseTaskInput(a);
     const task=this.manager.create(input);if(owner){task.ownerId=owner.id;task.ownerEpoch=0;task.ownerLastActivityAt=new Date().toISOString();task.continuationPolicy={idleRotationMinutes:60};this.put(task);}return this.publicTask(task);
    });
    case 'tasks.retry':{const previous=this.task(a);if(!terminal(previous))fail('INVALID_STATE','Retry requires terminal execution');const task=this.manager.create({title:previous.title,instruction:previous.instruction,owner:previous.owner,workspace:previous.workspace,acceptanceCriteria:previous.acceptanceCriteria,constraints:previous.constraints});task.ownerId=previous.ownerId;task.retryOf=previous.id;this.put(task);return this.publicTask(task);}
@@ -117,17 +161,24 @@ export class CommandHandler {
    case 'packages.get':{const pkg=this.manager.store.getMetadata().packages.find(p=>p.id===parseId(a.packageId));if(!pkg)fail('NOT_FOUND','Package not found');return pkg;}
    case 'workers.spawn':{
     let task=this.task(a);this.revise(task,a);if(task.status!=='queued')fail('INVALID_STATE','Only queued tasks may dispatch');
-    if(a.provider!==undefined&&a.provider!=='mock-jsonl')fail('CAPABILITY_UNAVAILABLE','Real worker providers are not enabled');
+    if(a.provider!==undefined&&a.provider!=='mock-jsonl')fail('CAPABILITY_UNAVAILABLE',`Provider ${String(a.provider)} is not available`);
     if(a.packageId!==undefined&&a.packageId!==task.packageId)fail('REVISION_CONFLICT','Package does not belong to task');
+    if(task.scheduled)fail('INVALID_STATE','Task already scheduled');
     const logical=task.ownerId?this.owner(task.ownerId):undefined;
     const owner=text(a.owner??logical?.profileId??Object.keys(this.policy.snapshot().config.owners)[0],'owner profile',120);
     if(logical&&owner!==logical.profileId)fail('POLICY_DENIED','Task owner profile cannot be changed at dispatch');
     const running=this.manager.store.list().filter(t=>(t.status==='running'||t.status==='cancelling')&&t.dispatch?.owner===owner).length;
     const route=this.policy.preview({owner,...(a.worker!==undefined?{worker:a.worker}:{class:a.class??'routine'}),...(a.tag!==undefined?{tag:a.tag}:{}),runningCount:running});
-    if(task.scheduled)fail('INVALID_STATE','Task already scheduled');
+    const decision=this.decideExecution(route.engine,a.provider,task);
+    const pendingPackage:WorkPackage=task.packageId?this.manager.store.getMetadata().packages.find(p=>p.id===task.packageId&&p.taskId===task.id)!:{id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:[decision.workspace??task.workspace??'Explicit mock fixture'],acceptanceCriteria:task.acceptanceCriteria?.length?task.acceptanceCriteria:[decision.execution==='mock'?'Mock output returned for owner review':'Provider result returned for owner review'],createdAt:new Date().toISOString()};
+    if(!pendingPackage)fail('INVALID_REQUEST','Frozen work package is missing');
+    if(decision.execution==='real')workerInstruction({...task,workspace:decision.workspace},pendingPackage);
     this.prepareOwnerActivity(command,a);task=this.task(a);
-    if(!task.packageId){const pkg:WorkPackage={id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:[task.workspace??'Bundled mock fixture only'],acceptanceCriteria:task.acceptanceCriteria?.length?task.acceptanceCriteria:['Mock output returned for owner review'],createdAt:new Date().toISOString()};const meta=this.manager.store.getMetadata();if(meta.packages.length>=1000)fail('RESOURCE_LIMIT','Package limit reached');meta.packages.push(pkg);this.manager.store.transaction(()=>{this.manager.store.setMetadata(meta);task.packageId=pkg.id;this.put(task);});}
-    task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,execution:'mock',maxParallel:route.maxParallel};event(task,'lifecycle',`Policy selected ${route.worker}; executing bundled mock only (no provider connection)`);if(!route.capacityAvailable||this.manager.runningCount>=this.manager.maxParallel){task.scheduled=true;event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.put(task);return this.publicTask(task);}this.put(task);return this.publicTask(this.manager.start(task.id));
+    if(decision.workspace)task.workspace=decision.workspace;
+    if(!task.packageId){const meta=this.manager.store.getMetadata();if(meta.packages.length>=1000)fail('RESOURCE_LIMIT','Package limit reached');meta.packages.push(pendingPackage);this.manager.store.transaction(()=>{this.manager.store.setMetadata(meta);task.packageId=pendingPackage.id;this.put(task);});}
+    task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,workspaceIdentity:workspaceIdentity(decision.workspace)}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
+    event(task,'lifecycle',decision.execution==='real'?`Policy selected ${route.worker}; launching ${decision.engineKind} in ${decision.workspace}`:`Policy selected ${route.worker}; explicit mock-jsonl provider`);
+    if(!route.capacityAvailable){task.scheduled=true;task.queueReason={code:'waiting_for_capacity',message:`Owner ${route.owner} is at its current concurrency limit (${route.maxParallel}).`};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.put(task);return this.publicTask(task);}this.put(task);return this.publicTask(this.manager.start(task.id,route.maxParallel));
    }
    case 'tasks.cancel':{const task=this.task(a);this.revise(task,a);if(terminal(task))return {task:this.publicTask(task),alreadyTerminal:true};return this.publicTask(this.manager.cancel(task.id));}
    case 'tasks.events':{
@@ -137,7 +188,7 @@ export class CommandHandler {
    }
    case 'observability.get':case 'observability.export':{
     const task=this.task(a);const redact=(value:string)=>redactContext(value,40000);
-    const trace={taskId:task.id,ownerId:task.ownerId??null,packageId:task.packageId??null,attemptId:task.run?.id??null,revision:task.revision??0,execution:task.status,stage:task.scheduled?'waiting_for_capacity':task.status==='completed'?(task.reviewState==='accepted'?'accepted':'awaiting_review'):task.status,lastActivityAt:task.updatedAt,retryOf:task.retryOf??null,route:task.dispatch??null,artifacts:task.artifacts.map(v=>({id:v.id,name:redact(v.name)})),events:task.events.filter(e=>a.kind===undefined||e.kind===a.kind).map(e=>({...e,message:redact(e.message)})),metrics:{tokens:null,cost:null,contextUsage:null,source:'not reported by mock provider'},redaction:'best-effort pattern redaction; inspect before sharing'};return command==='observability.export'?{mediaType:'application/json',name:`weaver-trace-${task.id}.json`,content:JSON.stringify(trace,null,2)}:trace;
+    const trace={taskId:task.id,ownerId:task.ownerId??null,packageId:task.packageId??null,attemptId:task.run?.id??null,revision:task.revision??0,execution:task.status,stage:task.scheduled?(task.queueReason?.code??'waiting_for_capacity'):task.status==='completed'?(task.reviewState==='accepted'?'accepted':'awaiting_review'):task.status,lastActivityAt:task.updatedAt,retryOf:task.retryOf??null,route:task.dispatch??null,queueReason:task.queueReason??null,run:task.run?{scopeUnit:task.run.scopeUnit??null,evidence:task.run.evidence??null}:null,artifacts:task.artifacts.map(v=>({id:v.id,name:redact(v.name)})),events:task.events.filter(e=>a.kind===undefined||e.kind===a.kind).map(e=>({...e,message:redact(e.message)})),metrics:{tokens:null,cost:null,contextUsage:null,source:task.dispatch?.execution==='real'?'not reported unless the provider emits evidence':'not reported by mock provider'},redaction:'best-effort pattern redaction; inspect before sharing'};return command==='observability.export'?{mediaType:'application/json',name:`weaver-trace-${task.id}.json`,content:JSON.stringify(trace,null,2)}:trace;
    }
    case 'tasks.results':return this.manifest(this.task(a));
    case 'artifacts.read':{const task=this.task(a);const artifact=task.artifacts.find(v=>v.id===parseId(a.artifactId));if(!artifact)fail('NOT_FOUND','Artifact not found');return artifact;}

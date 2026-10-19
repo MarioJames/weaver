@@ -1,0 +1,171 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 3294896620169087710
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:34033/",
+  "refs": {
+    "e1": {
+      "name": "",
+      "role": "generic"
+    },
+    "e10": {
+      "name": "引擎",
+      "role": "link"
+    },
+    "e11": {
+      "name": "负责人",
+      "role": "link"
+    },
+    "e12": {
+      "name": "工作代理",
+      "role": "link"
+    },
+    "e13": {
+      "name": "路由与配额",
+      "role": "link"
+    },
+    "e14": {
+      "name": "新建工作代理",
+      "role": "button"
+    },
+    "e15": {
+      "name": "claude_worker 草稿停用 claude · sonnet · 已保存 disabled",
+      "role": "button"
+    },
+    "e16": {
+      "name": "codex_worker 草稿启用 codex · gpt-6.1-sol · 已保存 available",
+      "role": "button"
+    },
+    "e17": {
+      "name": "grok_worker 草稿启用 grok · grok-4.7 · 已保存 available",
+      "role": "button"
+    },
+    "e18": {
+      "name": "qoder_worker 草稿停用 qoder · Qwen3.8-Flash · 已保存 disabled",
+      "role": "button"
+    },
+    "e19": {
+      "name": "opencode_worker 草稿启用 opencode · opencode/glm-5.3-flash-free · 已保存 available",
+      "role": "button"
+    },
+    "e2": {
+      "name": "跳到内容",
+      "role": "link"
+    },
+    "e20": {
+      "name": "pi_worker 草稿启用 pi · cc-switch-agentplan/glm-5.3-flash · 已保存 available",
+      "role": "button"
+    },
+    "e21": {
+      "name": "qa_a_worker 草稿启用 codex · gpt-6.1-sol · 已保存 available",
+      "role": "button"
+    },
+    "e22": {
+      "name": "qa_b_worker 草稿启用 pi · cc-switch-agentplan/glm-5.3-flash · 已保存 available",
+      "role": "button"
+    },
+    "e23": {
+      "name": "配置 ID",
+      "role": "textbox"
+    },
+    "e24": {
+      "name": "启用此角色",
+      "role": "switch"
+    },
+    "e25": {
+      "name": "所属引擎",
+      "role": "combobox"
+    },
+    "e26": {
+      "name": "模型",
+      "role": "textbox"
+    },
+    "e27": {
+      "name": "推理强度 该引擎允许：low、medium、high、xhigh、max",
+      "role": "combobox"
+    },
+    "e28": {
+      "name": "用途说明",
+      "role": "textbox"
+    },
+    "e29": {
+      "name": "删除此配置",
+      "role": "button"
+    },
+    "e3": {
+      "name": "Weaver",
+      "role": "button"
+    },
+    "e30": {
+      "name": "",
+      "role": "generic"
+    },
+    "e31": {
+      "name": "能力标签",
+      "role": "combobox"
+    },
+    "e32": {
+      "name": "Remove frontend",
+      "role": "button"
+    },
+    "e33": {
+      "name": "Remove ui",
+      "role": "button"
+    },
+    "e34": {
+      "name": "Remove browser",
+      "role": "button"
+    },
+    "e35": {
+      "name": "Remove docs",
+      "role": "button"
+    },
+    "e36": {
+      "name": "Remove qa055_two",
+      "role": "button"
+    },
+    "e37": {
+      "name": "Remove qa055_three",
+      "role": "button"
+    },
+    "e38": {
+      "name": "能力标签 frontend Remove frontend ui Remove ui browser Remove browser docs Remove docs qa055_two Remove qa055_two qa055_three Remove qa055_three",
+      "role": "textbox"
+    },
+    "e4": {
+      "name": "主导航",
+      "role": "navigation"
+    },
+    "e5": {
+      "name": "收起导航",
+      "role": "button"
+    },
+    "e6": {
+      "name": "切换到浅色",
+      "role": "button"
+    },
+    "e7": {
+      "name": "保存配置",
+      "role": "button"
+    },
+    "e8": {
+      "name": "放弃草稿并重新加载",
+      "role": "button"
+    },
+    "e9": {
+      "name": "任务",
+      "role": "link"
+    }
+  },
+  "snapshot": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - link \"跳到内容\" [ref=e2]\n    - complementary\n      - button \"Weaver\" [ref=e3]\n        - StaticText \"Weaver\"\n      - navigation \"主导航\" [ref=e4]\n        - link \"任务\" [ref=e9]\n          - image\n          - StaticText \"任务\"\n        - link \"引擎\" [ref=e10]\n          - image\n          - StaticText \"引擎\"\n        - link \"负责人\" [ref=e11]\n          - image\n          - StaticText \"负责人\"\n        - link \"工作代理\" [ref=e12]\n          - image\n          - StaticText \"工作代理\"\n        - link \"路由与配额\" [ref=e13]\n          - image\n          - StaticText \"路由与配额\"\n      - button \"收起导航\" [ref=e5]\n        - image\n      - button \"切换到浅色\" [ref=e6]\n        - image\n      - status\n        - StaticText \"2 个并行槽位 · 已同步\"\n    - main\n      - button \"保存配置\" [ref=e7]\n      - button \"放弃草稿并重新加载\" [ref=e8]\n      - StaticText \"有未保存修改\"\n      - generic\n        - button \"新建工作代理\" [ref=e14]\n          - StaticText \"新建工作代理\"\n        - button \"claude_worker 草稿停用 claude · sonnet · 已保存 disabled\" [ref=e15]\n          - strong\n            - StaticText \"claude_worker\"\n          - StaticText \"草稿停用\"\n          - generic\n            - StaticText \"claude · sonnet · 已保存 disabled\"\n        - button \"codex_worker 草稿启用 codex · gpt-6.1-sol · 已保存 available\" [ref=e16]\n          - strong\n            - StaticText \"codex_worker\"\n          - StaticText \"草稿启用\"\n          - generic\n            - StaticText \"codex · gpt-6.1-sol · 已保存 available\"\n        - button \"grok_worker 草稿启用 grok · grok-4.7 · 已保存 available\" [ref=e17]\n          - strong\n            - StaticText \"grok_worker\"\n          - StaticText \"草稿启用\"\n          - generic\n            - StaticText \"grok · grok-4.7 · 已保存 available\"\n        - button \"qoder_worker 草稿停用 qoder · Qwen3.8-Flash · 已保存 disabled\" [ref=e18]\n          - strong\n            - StaticText \"qoder_worker\"\n          - StaticText \"草稿停用\"\n          - generic\n            - StaticText \"qoder · Qwen3.8-Flash · 已保存 disabled\"\n        - button \"opencode_worker 草稿启用 opencode · opencode/glm-5.3-flash-free · 已保存 available\" [ref=e19]\n          - strong\n            - StaticText \"opencode_worker\"\n          - StaticText \"草稿启用\"\n          - generic\n            - StaticText \"opencode · opencode/glm-5.3-flash-free · 已保存 available\"\n        - button \"pi_worker 草稿启用 pi · cc-switch-agentplan/glm-5.3-flash · 已保存 available\" [ref=e20]\n          - strong\n            - StaticText \"pi_worker\"\n          - StaticText \"草稿启用\"\n          - generic\n            - StaticText \"pi · cc-switch-agentplan/glm-5.3-flash · 已保存 available\"\n        - button \"qa_a_worker 草稿启用 codex · gpt-6.1-sol · 已保存 available\" [ref=e21]\n          - strong\n            - StaticText \"qa_a_worker\"\n          - StaticText \"草稿启用\"\n          - generic\n            - StaticText \"codex · gpt-6.1-sol · 已保存 available\"\n        - button \"qa_b_worker 草稿启用 pi · cc-switch-agentplan/glm-5.3-flash · 已保存 available\" [ref=e22]\n          - strong\n            - StaticText \"qa_b_worker\"\n          - StaticText \"草稿启用\"\n          - generic\n            - StaticText \"pi · cc-switch-agentplan/glm-5.3-flash · 已保存 available\"\n      - form\n        - LabelText\n          - generic\n            - StaticText \"配置 ID\"\n            - StaticText \"离开输入框或按 Enter 后同步引用。\"\n        - textbox \"配置 ID\" [ref=e23]: claude_worker\n          - StaticText \"claude_worker\"\n        - LabelText\n          - StaticText \"启用此角色\"\n        - switch \"启用此角色\" [checked=false, disabled, ref=e24]\n        - StaticText \"引擎 claude 未启用。先在引擎页启用它，再启用角色。\"\n        - LabelText\n          - StaticText \"所属引擎\"\n        - combobox \"所属引擎\" [expanded=false, ref=e25]: claude · 未启用\n          - StaticText \"claude · 未启用\"\n        - LabelText\n          - StaticText \"模型\"\n        - textbox \"模型\" [ref=e26]: sonnet\n          - StaticText \"sonnet\"\n        - LabelText\n          - generic\n            - StaticText \"推理强度\"\n            - StaticText \"该引擎允许：low、medium、high、xhigh、max\"\n        - combobox \"推理强度 该引擎允许：low、medium、high、xhigh、max\" [expanded=false, ref=e27]: high\n          - StaticText \"high\"\n        - LabelText\n          - StaticText \"用途说明\"\n        - textbox \"用途说明\" [ref=e28]: Default worker for Claude Code (Sonnet); strong at frontend, UI, browser acceptance and docs.\n          - StaticText \"Default worker for Claude Code (Sonnet); strong at frontend, UI, browser acceptance and docs.\"\n        - LabelText\n          - generic\n            - StaticText \"能力标签\"\n            - StaticText \"mechanical 与 routine 是类别标签，同一代理只能有其中一个。\"\n        - generic\n          - generic [ref=e30] clickable [onclick]\n            - StaticText \"能力标签\"\n          - LabelText\n            - StaticText \"能力标签\"\n            - combobox \"能力标签\" [expanded=false, ref=e31]: frontend Remove frontend ui Remove ui browser Remove browser docs Remove docs qa055_two Remove qa055_two qa055_three Remove qa055_three 能力标签\n              - StaticText \"frontend\"\n              - button \"Remove frontend\" [ref=e32]\n              - StaticText \"ui\"\n              - button \"Remove ui\" [ref=e33]\n              - StaticText \"browser\"\n              - button \"Remove browser\" [ref=e34]\n              - StaticText \"docs\"\n              - button \"Remove docs\" [ref=e35]\n              - StaticText \"qa055_two\"\n              - button \"Remove qa055_two\" [ref=e36]\n              - StaticText \"qa055_three\"\n              - button \"Remove qa055_three\" [ref=e37]\n              - textbox \"能力标签 frontend Remove frontend ui Remove ui browser Remove browser docs Remove docs qa055_two Remove qa055_two qa055_three Remove qa055_three\" [ref=e38]\n        - button \"删除此配置\" [ref=e29]\n        - StaticText \"删除前会说明影响。取消不改草稿，保存前仍会做完整校验。\""
+}

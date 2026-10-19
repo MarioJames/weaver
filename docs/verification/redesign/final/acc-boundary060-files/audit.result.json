@@ -1,0 +1,87 @@
+{
+  "auditRoot": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.tmp/weaver-readonly-audit-2w53xlfz",
+  "providedTemporaryParent": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.tmp",
+  "entrypoint": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/fixture/bin/weaver",
+  "readOnly": true,
+  "policyRevision": 6,
+  "ownerProfile": "codex_owner",
+  "ownerStatus": {
+    "status": "available"
+  },
+  "savedOwnerPolicy": {
+    "enabled": true,
+    "engine": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "xhigh",
+    "workers": [
+      "qa_a_worker",
+      "qa_b_worker"
+    ],
+    "max_parallel": 2,
+    "worker_weights": {
+      "qa_b_worker": 250
+    },
+    "only_engine": "codex"
+  },
+  "quotaBlocks": [],
+  "activeQuotaBlocks": [],
+  "previewInput": {
+    "owner": "codex_owner",
+    "class": "routine"
+  },
+  "preview": {
+    "owner": "codex_owner",
+    "worker": "qa_b_worker",
+    "engine": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "xhigh",
+    "execution": "disabled",
+    "dispatch": "preview",
+    "warnings": [],
+    "weight": 250,
+    "only_engine": "codex",
+    "class": "routine",
+    "selected_by": "class",
+    "skipped": [],
+    "maxParallel": 2,
+    "capacityAvailable": true,
+    "chatgptReview": false
+  },
+  "invariancePassed": true,
+  "evidence": {
+    "request": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.tmp/weaver-readonly-audit-2w53xlfz/preview.input.json",
+    "rawPreview": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.tmp/weaver-readonly-audit-2w53xlfz/preview.stdout.json",
+    "rawPolicy": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.tmp/weaver-readonly-audit-2w53xlfz/policy.before.stdout.json",
+    "baselineBefore": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.tmp/weaver-readonly-audit-2w53xlfz/baseline.before.json",
+    "baselineAfter": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.tmp/weaver-readonly-audit-2w53xlfz/baseline.after.json",
+    "comparison": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.tmp/weaver-readonly-audit-2w53xlfz/invariance.result.json",
+    "replayArgv": [
+      "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/fixture/bin/weaver",
+      "policy",
+      "preview",
+      "--input",
+      "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.tmp/weaver-readonly-audit-2w53xlfz/preview.input.json",
+      "--output",
+      "json"
+    ]
+  },
+  "uncertainties": [
+    "capabilities reports realExecution=true but authenticated=false and modelUsable=false; no real model call was attempted, so provider authentication, model availability, actual capacity admission and real execution remain unverified.",
+    "Policy and preview report execution=disabled; this audit does not establish whether any future dispatch would be admitted.",
+    "Owner profile availability is policy status, not verified native-host attachment or a new logical owner registration.",
+    "Preview returned skipped=[]; the only_engine constraint is explicit, but no per-candidate exclusion trace was returned.",
+    "Invariance is limited to enumerated paths and before/after API snapshots; see invariance.result.json."
+  ],
+  "resourceDisposition": {
+    "newWorkerOrTaskOrOwner": false,
+    "policyOrTaskMutation": false,
+    "sourceOrAuthOrGlobalConfigMutation": false,
+    "processesStarted": false,
+    "sharedAcceptanceService": "Left running unchanged as ACCESS.md requires.",
+    "evidenceRetention": "Retained at user request under supplied temporary root; no other temporary root created."
+  },
+  "sessionNaming": {
+    "changed": false,
+    "reason": "Herdr resolver returned unverified_caller; no verified ownership or createdAt available."
+  }
+}

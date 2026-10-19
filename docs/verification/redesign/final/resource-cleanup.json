@@ -1,0 +1,195 @@
+{
+  "scopeStates": [
+    {
+      "unit": "dev-weaver-final.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nSubState=dead\n"
+    },
+    {
+      "unit": "dev-weaver-owner-acc.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nSubState=dead\n"
+    },
+    {
+      "unit": "dev-weaver-stream-built.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nSubState=dead\n"
+    },
+    {
+      "unit": "dev-weaver-acc-round1.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nSubState=dead\n"
+    },
+    {
+      "unit": "dev-weaver-acc-round2.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nSubState=dead\n"
+    },
+    {
+      "unit": "dev-weaver-acc-round3.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nSubState=dead\n"
+    },
+    {
+      "unit": "dev-weaver-boundary-http.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nSubState=dead\n"
+    },
+    {
+      "unit": "dev-weaver-acc-boundary.scope",
+      "state": "ControlGroup=\nActiveState=inactive\nSubState=dead\n"
+    }
+  ],
+  "ownServicePorts": [
+    {
+      "port": 34033,
+      "listening": false
+    },
+    {
+      "port": 40149,
+      "listening": false
+    },
+    {
+      "port": 34699,
+      "listening": false
+    },
+    {
+      "port": 44583,
+      "listening": false
+    }
+  ],
+  "herdrPanesClosed": [
+    "w2M:p4Y",
+    "w2M:p51",
+    "w2M:p53",
+    "w2M:p54",
+    "w2M:p56",
+    "w2M:p57"
+  ],
+  "unrelatedControlProcess": {
+    "pid": 3432812,
+    "existsAfterTestFinally": false
+  },
+  "accCleanup": [
+    {
+      "round": "round_d724e4a216",
+      "verdict": "FAIL",
+      "cleanup": {
+        "removed": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-204635-c7f806",
+        "existed": true,
+        "tmpdir": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-204635-c7f806/.tmp",
+        "tmpdir_existed": true,
+        "tmpdir_removed": true,
+        "nested_sandboxes": [],
+        "session": "acc-1-20261018-204635-c7f806",
+        "session_killed": true,
+        "plugin_cleanup": {
+          "name": "weaver",
+          "removed_plugin_dir": true,
+          "plugin_dir": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-204635-c7f806/.agents/skills/weaver",
+          "skills": [
+            "weaver"
+          ],
+          "agents": []
+        }
+      },
+      "cleanup_skipped": null
+    },
+    {
+      "round": "round_9008d64020",
+      "verdict": "CONDITIONAL",
+      "cleanup": {
+        "removed": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-210003-8da82d",
+        "existed": true,
+        "tmpdir": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-210003-8da82d/.tmp",
+        "tmpdir_existed": true,
+        "tmpdir_removed": true,
+        "nested_sandboxes": [],
+        "session": "acc-1-20261018-210003-8da82d",
+        "session_killed": true,
+        "plugin_cleanup": {
+          "name": "weaver",
+          "removed_plugin_dir": true,
+          "plugin_dir": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-210003-8da82d/.agents/skills/weaver",
+          "skills": [
+            "weaver"
+          ],
+          "agents": []
+        }
+      },
+      "cleanup_skipped": null
+    },
+    {
+      "round": "round_cc3314b9a6",
+      "verdict": "PASS",
+      "cleanup": {
+        "removed": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65",
+        "existed": true,
+        "tmpdir": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.tmp",
+        "tmpdir_existed": true,
+        "tmpdir_removed": true,
+        "nested_sandboxes": [],
+        "session": "acc-1-20261018-211414-300c65",
+        "session_killed": true,
+        "plugin_cleanup": {
+          "name": "weaver",
+          "removed_plugin_dir": true,
+          "plugin_dir": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.agents/skills/weaver",
+          "skills": [
+            "weaver"
+          ],
+          "agents": []
+        }
+      },
+      "cleanup_skipped": null
+    }
+  ],
+  "profile": "/tmp/weaver-redesign-3QuXVe/final-browser",
+  "profileStatus": "browser closed and bh task-profile remove succeeded; profile absent",
+  "isolatedDataDirs": [
+    "/tmp/weaver-redesign-3QuXVe/f",
+    "/tmp/weaver-redesign-3QuXVe/a",
+    "/tmp/weaver-redesign-3QuXVe/s"
+  ],
+  "isolatedDataDisposition": "Services stopped. Owner explicitly owns unified task-root reclaim after final archive review. No default data touched.",
+  "profileExists": false,
+  "reportBoundaryFollowup": "Completed: fresh060 read-only boundary PASS/cleanup; new p56/p57, HTTP44583 and both new scopes inactive/closed, final report Chrome/profile removed. Original historical verdicts retained.",
+  "userResourceFinalObservation": "p52 pane_not_found,4737 no listener,default capabilities APP_NOT_RUNNING. Not stopped/restarted by QA; see user-entrypoint-final-observation.json.",
+  "globalSkill": "Installed by authorized separate worker only after clean boundary PASS; repo skills/weaver symlink retained.",
+  "newReportProfile": "/tmp/weaver-redesign-3QuXVe/final-report",
+  "newReportProfileStatus": "browser closed; bh task-profile remove succeeded; directory absent",
+  "newReportProfileExists": false,
+  "remainingTaskChromePids": [],
+  "taskRootDisposition": "RECLAIMED by Owner after independent proc/mount/identity preflight; root absent; no QA consumer remains.",
+  "userResourcesNotTargeted": [
+    "w2M:p52",
+    "user HTTP4737",
+    "root w2M:p4R/tabw2M:t1P",
+    "formal bin/defaultdata/auth/old desktop"
+  ],
+  "persistentResourcesRetained": [
+    "formal weaver CLI bin",
+    "~/.agents/skills/weaver symlink",
+    "~/.local/share/weaver development data",
+    "native provider auth/global config",
+    "old desktop persistent data"
+  ],
+  "ownerReclaim": {
+    "at": "2026-10-19T01:25:42.513506+00:00",
+    "action": "reclaimed exact task-owned disposable temporary root",
+    "removedRoot": "/tmp/weaver-redesign-3QuXVe",
+    "rootAbsent": true,
+    "preflight": "064-owner-cleanup-preflight.json",
+    "consumersBeforeRemoval": [],
+    "mountsWithinRoot": [],
+    "ownedScopesInactive": 28,
+    "removedFiles": 1359,
+    "removedRegularFileBytes": 76467404,
+    "symlinkFileEntriesUnlinkedWithoutFollowing": 3,
+    "persistentPathsPreserved": [
+      "/home/mocha/.local/bin/weaver",
+      "/home/mocha/.local/lib/node_modules/weaver",
+      "/home/mocha/.agents/skills/weaver",
+      "/home/mocha/.local/share/weaver",
+      "/home/mocha/.config/weaver-desktop",
+      "/home/mocha/opensource/weaver/dist",
+      "/home/mocha/opensource/weaver/node_modules"
+    ],
+    "sourceAndEvidence": "repository source, frozen build and final evidence preserved; no project files modified",
+    "userService": "not started/stopped; last observation offline; p52 absent; no broad prefix cleanup",
+    "messages": "persistent coordination evidence retained"
+  }
+}

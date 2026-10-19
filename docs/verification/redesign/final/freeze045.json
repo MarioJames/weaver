@@ -1,0 +1,6 @@
+{
+  "source": "13f1854608ecd801bbbd7d0d139024a84f6147740beba02b0f9cf45f1054e63c",
+  "build": "f35370f650f5774ebbe7be8c338166f962d0466b84b3055538c142945fb1e78f",
+  "mismatches": [],
+  "reuse040": "Only CLI entrypoint guard and new symlink test changed; runtime/providers/scheduler/UI/skill identical. Reuse real runs; ack/review and restart on045."
+}

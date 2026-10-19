@@ -1,0 +1,238 @@
+{
+  "at": "2026-10-19T01:25:18.132496+00:00",
+  "root": "/tmp/weaver-redesign-3QuXVe",
+  "uid": 1000,
+  "dev": 38,
+  "ino": 1698540,
+  "mountsWithinRoot": [],
+  "taskRootConsumers": [],
+  "ownedScopeStates": [
+    {
+      "unit": "dev-weaver-acc-boundary.scope",
+      "ControlGroup": "",
+      "Id": "dev-weaver-acc-boundary.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "dev-weaver-acc-round1.scope",
+      "ControlGroup": "",
+      "Id": "dev-weaver-acc-round1.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "dev-weaver-acc-round2.scope",
+      "ControlGroup": "",
+      "Id": "dev-weaver-acc-round2.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "dev-weaver-acc-round3.scope",
+      "ControlGroup": "",
+      "Id": "dev-weaver-acc-round3.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "dev-weaver-boundary-http.scope",
+      "ControlGroup": "",
+      "Id": "dev-weaver-boundary-http.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "dev-weaver-final.scope",
+      "ControlGroup": "",
+      "Id": "dev-weaver-final.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "dev-weaver-owner-acc.scope",
+      "ControlGroup": "",
+      "Id": "dev-weaver-owner-acc.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "dev-weaver-stream-built.scope",
+      "ControlGroup": "",
+      "Id": "dev-weaver-stream-built.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-codex-4e181c67.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-codex-4e181c67.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-codex-4fe6bd80.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-codex-4fe6bd80.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-codex-9b3e4b21.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-codex-9b3e4b21.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-codex-b86a98ab.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-codex-b86a98ab.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-codex-eb6d1c47.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-codex-eb6d1c47.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-grok-5a6568fa.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-grok-5a6568fa.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-opencode-b7d49b78.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-opencode-b7d49b78.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-pi-0a289da8.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-pi-0a289da8.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-pi-1e06b552.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-pi-1e06b552.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-pi-2fffbae0.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-pi-2fffbae0.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-pi-41c27736.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-pi-41c27736.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-pi-4cdd35da.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-pi-4cdd35da.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-pi-7d14f290.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-pi-7d14f290.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-pi-a2294809.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-pi-a2294809.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-pi-b022fdf4.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-pi-b022fdf4.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-pi-b8ce55e9.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-pi-b8ce55e9.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-pi-b8f01198.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-pi-b8f01198.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-pi-c9ce85d5.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-pi-c9ce85d5.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-pi-d364dd74.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-pi-d364dd74.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    },
+    {
+      "unit": "weaver-cli-pi-fa1f98fd.scope",
+      "ControlGroup": "",
+      "Id": "weaver-cli-pi-fa1f98fd.scope",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "InvocationID": ""
+    }
+  ],
+  "scopeCount": 28,
+  "scopeCheck": "all recorded units inactive/failed with no ControlGroup",
+  "rootReclaim": "preflight only; await explicit QA archive/dependency handoff; no data removed"
+}

@@ -1,0 +1,18 @@
+{
+  "round": "round_85a961ee70",
+  "verdict": "FAIL: intermediate, not final asset verdict",
+  "passedTasks": [
+    "owner-smoke",
+    "owner-representative",
+    "owner-complex"
+  ],
+  "acceptedRealPackages": 4,
+  "failedTask": "owner-recovery",
+  "causes": [
+    "First Pi truncated with SIGTERM before deadline; exact raw cap branch/bytes not persisted and unknown. Separate controlled red confirms old cumulative cap design defect.",
+    "Second Pi native Connection error, correctly failed despite native exit0."
+  ],
+  "stagedSkillRead": true,
+  "directOwnerImplementationCallsObserved": false,
+  "reuseScope": "Parent authorized preserve positive tasks; future transport/scope boundary fixes require affected recovery/lifecycle revalidation; no criterion reduced."
+}

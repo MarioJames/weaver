@@ -1,0 +1,11 @@
+{
+  "round": "round_9008d64020",
+  "finding": "Owner scratch escaped configured ACCEPTANCE_TMPDIR/task root",
+  "path": "/tmp/recovery-import-owner-jbZfbe",
+  "createdByObservedOwner": true,
+  "observedCleanup": "Owner shutil.rmtree at 2026-10-19T01:04:53.716Z",
+  "currentlyExists": false,
+  "businessResult": "completed + acknowledged + accepted + QA original-byte check and 10/10; this does not prove strict scratch isolation",
+  "noFourthRound": "Parent057 bounded budget decision",
+  "evidence": "acc-round3-observed-calls.json"
+}

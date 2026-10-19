@@ -1,0 +1,231 @@
+import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { dirname, join, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { API_VERSION } from '../shared/commands';
+import { EXECUTION_BOUNDARY, ENGINE_CATALOG, readinessFor, type EngineProbeRecord } from '../shared/engines';
+import { parseId, parseTaskInput } from '../shared/validation';
+import { startCliAgent } from './adapters/cli/index';
+import { RoutingWorkerAdapter } from './adapters/routing';
+import { MockWorkerAdapter } from './adapters/worker';
+import { CommandHandler, configuredParallel } from './commands';
+import { applyEngineEnabled, parseEngineToggle } from './engines/control';
+import { EngineProber } from './engines/probe';
+import { SECURITY_HEADERS, startHttpServer, type HttpRuntime } from './http';
+import { failure, startLocalIPC } from './local-ipc';
+import { TaskManager } from './manager';
+import { validateConfig } from './policy/routing';
+import { PolicyStore } from './policy/store';
+import { RpcError, parseRpcBody } from './rpc';
+import { TaskStore } from './store';
+
+export interface RuntimeOptions {
+  dataDir: string;
+  port?: number;
+  open?: boolean;
+  dev?: boolean;
+  rendererRoot?: string;
+  repoRoot?: string;
+  workerScript?: string;
+}
+
+export interface WeaverRuntime {
+  url: string;
+  port: number;
+  done: Promise<void>;
+  close(): Promise<void>;
+}
+
+export function modulePaths(moduleUrl = import.meta.url) {
+  const here = dirname(fileURLToPath(moduleUrl));
+  if (here.endsWith(`${sep}src${sep}main`)) {
+    const repo = resolve(here, '../..');
+    return { repo, workerScript: join(repo, 'scripts/mock-worker.mjs'), rendererRoot: join(repo, 'dist/renderer') };
+  }
+  const dist = resolve(here, '..');
+  return { repo: resolve(dist, '..'), workerScript: join(dist, 'workers/mock-worker.mjs'), rendererRoot: join(dist, 'renderer') };
+}
+
+function publicError(error: unknown): { code: string; message: string } {
+  if (error instanceof RpcError) return { code: error.code, message: error.message };
+  if (error instanceof Error) return { code: 'INVALID_REQUEST', message: error.message };
+  return { code: 'INTERNAL_ERROR', message: 'Request failed' };
+}
+
+function openBrowser(url: string): void {
+  const command = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
+  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
+  const child = spawn(command, args, { stdio: 'ignore', detached: true, shell: false });
+  child.on('error', () => {});
+  child.unref();
+}
+
+export async function startRuntime(options: RuntimeOptions): Promise<WeaverRuntime> {
+  const paths = modulePaths();
+  const dataDir = resolve(options.dataDir);
+  const repo = options.repoRoot ?? paths.repo;
+  const rendererRoot = options.rendererRoot ?? paths.rendererRoot;
+  const workerScript = options.workerScript ?? paths.workerScript;
+  let ready = false;
+  let draining = false;
+  let commands: CommandHandler | undefined;
+  let manager: TaskManager | undefined;
+  let store: TaskStore | undefined;
+  let policy: PolicyStore | undefined;
+  let http: HttpRuntime | undefined;
+  let vite: { middlewares: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next: (error?: unknown) => void) => void; close(): Promise<void> } | undefined;
+  const inflight = new Set<Promise<unknown>>();
+  const prober = new EngineProber();
+  let probes: EngineProbeRecord[] | null = null;
+  const remember = (probe: EngineProbeRecord | null) => {
+    if (!probe) return probes;
+    const next = [...(probes ?? []).filter(item => item.id !== probe.id), probe];
+    probes = ENGINE_CATALOG.map(entry => next.find(item => item.id === entry.id)).filter((item): item is EngineProbeRecord => Boolean(item));
+    return probes;
+  };
+  const track = <T>(job: Promise<T>): Promise<T> => {
+    inflight.add(job);
+    job.then(() => { inflight.delete(job); }, () => { inflight.delete(job); });
+    return job;
+  };
+  const requireReady = () => {
+    if (draining) throw new RpcError('APP_DRAINING', 'Weaver is shutting down');
+    if (!ready || !commands || !manager || !store || !policy) throw new RpcError('APP_STARTING', 'Weaver is still starting');
+    return { commands, manager, store, policy };
+  };
+  async function dispatch(method: string, args: unknown[]): Promise<unknown> {
+    const active = requireReady();
+    switch (method) {
+      case 'command': return active.commands.handle(args[0]);
+      case 'getPolicy': return active.policy.snapshot();
+      case 'validatePolicy': {
+        let encoded = '';
+        try { encoded = JSON.stringify(args[0]); } catch { throw new RpcError('INVALID_REQUEST', 'Policy must be JSON'); }
+        if (Buffer.byteLength(encoded) > 256 * 1024) throw new RpcError('INVALID_REQUEST', 'Policy exceeds 256 KiB');
+        return validateConfig(args[0]);
+      }
+      case 'savePolicy': {
+        const snapshot = active.policy.save(args[0]);
+        active.commands.pump();
+        return snapshot;
+      }
+      case 'previewRoute': return active.policy.preview(args[0]);
+      case 'scanEngines': {
+        const found = await track(prober.scan());
+        probes = found;
+        const snapshot = active.policy.snapshot();
+        return { probedAt: new Date().toISOString(), probes: found, readiness: readinessFor(found, snapshot.config), boundary: EXECUTION_BOUNDARY };
+      }
+      case 'setEngineEnabled': {
+        const result = await track(applyEngineEnabled(active.policy, prober, parseEngineToggle(args[0])));
+        active.commands.pump();
+        const known = remember(result.probe) ?? [];
+        return { snapshot: result.snapshot, probe: result.probe, readiness: readinessFor(known, result.snapshot.config) };
+      }
+      case 'listTasks': return active.store.list();
+      case 'createTask': {
+        const input = parseTaskInput(args[0]);
+        const response = active.commands.handle({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'tasks.create', args: input as unknown as Record<string, unknown> });
+        if (!response.ok) throw new RpcError(response.error?.code ?? 'COMMAND_FAILED', response.error?.message ?? 'Command failed');
+        return active.store.get((response.data as { id: string }).id);
+      }
+      case 'startTask': {
+        const id = parseId(args[0]);
+        const response = active.commands.handle({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'workers.spawn', args: { taskId: id } });
+        if (!response.ok) throw new RpcError(response.error?.code ?? 'COMMAND_FAILED', response.error?.message ?? 'Command failed');
+        return active.store.get(id);
+      }
+      case 'cancelTask': {
+        const id = parseId(args[0]);
+        const response = active.commands.handle({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'tasks.cancel', args: { taskId: id } });
+        if (!response.ok) throw new RpcError(response.error?.code ?? 'COMMAND_FAILED', response.error?.message ?? 'Command failed');
+        return active.store.get(id);
+      }
+      case 'capabilities': return {
+        worker: active.manager.canLaunchReal
+          ? 'Saved opencode, pi, grok, and codex routes launch that engine. mock-jsonl runs only when requested. Failures do not fall back.'
+          : 'mock-jsonl is the explicit test provider. A real route fails until the engine launcher is loaded and does not fall back to mock.',
+        owner: 'Logical registration only. The owner is the agent in the skill host and calls this CLI. This process does not spawn an owner model.',
+        maxParallel: configuredParallel(active.policy),
+        storePath: active.store.path,
+      };
+      default: throw new RpcError('INVALID_REQUEST', 'Unknown method');
+    }
+  }
+  async function call(method: string, args: unknown[]): Promise<unknown> {
+    try { return await dispatch(method, args); }
+    catch (error) { const mapped = publicError(error); throw new RpcError(mapped.code, mapped.message); }
+  }
+  async function handleIpc(request: unknown): Promise<unknown> {
+    if (draining) return failure('APP_DRAINING', 'Weaver is shutting down');
+    if (!ready) return failure('APP_STARTING', 'Weaver is still starting');
+    if (!request || typeof request !== 'object' || Array.isArray(request)) return failure('INVALID_REQUEST', 'Invalid request');
+    const record = request as Record<string, unknown>;
+    if (Object.hasOwn(record, 'apiVersion') || Object.hasOwn(record, 'command')) return commands!.handle(request);
+    try {
+      const parsed = parseRpcBody(request);
+      return { apiVersion: API_VERSION, commandId: null, ok: true, data: await dispatch(parsed.method, parsed.args) };
+    } catch (error) {
+      const mapped = publicError(error);
+      return failure(mapped.code, mapped.message);
+    }
+  }
+
+  const ipc = await startLocalIPC(dataDir, request => handleIpc(request));
+  let resolveDone: () => void = () => {};
+  const done = new Promise<void>(resolve => { resolveDone = resolve; });
+  let closed = false;
+  const runtime: WeaverRuntime = { url: '', port: 0, done, close };
+  try {
+    http = await startHttpServer({
+      port: options.port ?? 0,
+      staticRoot: options.dev ? undefined : rendererRoot,
+      allowUpgrade: options.dev === true,
+      prepare: options.dev ? async (server, port) => {
+        const { createServer } = await import('vite');
+        vite = await createServer({
+          configFile: join(repo, 'vite.config.ts'),
+          appType: 'spa',
+          server: { middlewareMode: true, cors: false, port, headers: SECURITY_HEADERS, ws: { server } },
+        });
+      } : undefined,
+      delegate: options.dev ? (req, res, next) => { vite!.middlewares(req, res, next); } : undefined,
+      call,
+    });
+    store = new TaskStore(join(dataDir, 'tasks.v1.json'));
+    store.recover();
+    policy = new PolicyStore(join(dataDir, 'policy.v1.json'));
+    const workers = new RoutingWorkerAdapter(new MockWorkerAdapter(process.execPath, workerScript), startCliAgent, join(dataDir, 'agent-state'), id => store!.getMetadata().packages.find(pkg => pkg.id === id));
+    manager = new TaskManager(store, workers, () => {}, undefined, error => {
+      console.error(error instanceof Error ? error.message : 'Task history could not be saved');
+    });
+    commands = new CommandHandler(manager, policy);
+    commands.transportStatus = 'ready';
+    ready = true;
+    runtime.port = http.port;
+    runtime.url = `http://127.0.0.1:${http.port}`;
+    if (options.open) openBrowser(runtime.url);
+    return runtime;
+  } catch (error) {
+    ready = false;
+    await vite?.close().catch(() => {});
+    await http?.close().catch(() => {});
+    await ipc.close().catch(() => {});
+    resolveDone();
+    throw error;
+  }
+
+  async function close(): Promise<void> {
+    if (closed) return;
+    closed = true;
+    draining = true;
+    ready = false;
+    if (commands) commands.draining = true;
+    await Promise.allSettled([...inflight]);
+    try { await manager?.shutdown(); } catch (error) { console.error(error instanceof Error ? error.message : 'shutdown failed'); }
+    await vite?.close().catch(() => {});
+    await http?.close().catch(() => {});
+    await ipc.close().catch(() => {});
+    resolveDone();
+  }
+}

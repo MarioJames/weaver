@@ -1,0 +1,81 @@
+{
+  "round": "round_cc3314b9a6",
+  "task": "owner-scratch-boundary",
+  "sourceFreeze": "060",
+  "runtimeBuild": "055 unchanged",
+  "observerIndependentChecks": {
+    "policy": true,
+    "tasks": true,
+    "fixtureHashes": true,
+    "hostConfigFingerprints": true
+  },
+  "observedAuditRoot": "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.tmp/weaver-readonly-audit-2w53xlfz",
+  "rootInsideProvidedParent": true,
+  "materialFiles": [
+    {
+      "name": "snapshot.py",
+      "sha256": "b6d97dd7cda458640f71d5b147551cfe767a943d8c2c48feda809c0b9fd9e828"
+    },
+    {
+      "name": "baseline.before.json",
+      "sha256": "7197c569655da08244e4b9d01768dfd2aafa24fc0bfe60ee880d631356bf109c"
+    },
+    {
+      "name": "preview.input.json",
+      "sha256": "7bba730180666254803b79656ed0911c544afb7eb718230daf3a19f7b01b0909"
+    },
+    {
+      "name": "policy.before.stdout.json",
+      "sha256": "bc53c11648b95bce49f5343461972f163257781bc4877de8932fd3f45ec0c315"
+    },
+    {
+      "name": "audit.result.json",
+      "sha256": "0ab296562714cc2b86e2a7a1f0c24fe8479d51994fd2510d4fc3c9f1b1148eb5"
+    },
+    {
+      "name": "policy.after.stdout.json",
+      "sha256": "bc53c11648b95bce49f5343461972f163257781bc4877de8932fd3f45ec0c315"
+    },
+    {
+      "name": "preview.stdout.json",
+      "sha256": "dc240ca2971eb03c1d59ea023041ba1fcae296175426649e322df757cf861dac"
+    },
+    {
+      "name": "baseline.after.json",
+      "sha256": "e9d5da225a70c16db8e57563ddaf88b333ec76c236d268d4587628fdc3499a98"
+    },
+    {
+      "name": "root.json",
+      "sha256": "147246ca73d1ea1ca4bc456c8a2dc1b5d1534a61359a305474c787193dd628e4"
+    },
+    {
+      "name": "invariance.result.json",
+      "sha256": "bcdf88fc3d1ad71e7fdd3e4950ab860c816ab23d6c32d0cffbe1454ab5e31495"
+    }
+  ],
+  "rawPreview": {
+    "apiVersion": "weaver.v1",
+    "commandId": null,
+    "ok": true,
+    "data": {
+      "owner": "codex_owner",
+      "worker": "qa_b_worker",
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "execution": "disabled",
+      "dispatch": "preview",
+      "warnings": [],
+      "weight": 250,
+      "only_engine": "codex",
+      "class": "routine",
+      "selected_by": "class",
+      "skipped": [],
+      "maxParallel": 2,
+      "capacityAvailable": true,
+      "chatgptReview": false
+    }
+  },
+  "noNewTaskOrWorker": true,
+  "limits": "Observed commands/created task scratch only; point-in-time fingerprints cannot rule out transient restored writes or unenumerated host paths. Native host logs outside sandbox remain documented host boundary."
+}

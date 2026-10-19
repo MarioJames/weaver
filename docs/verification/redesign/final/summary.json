@@ -1,0 +1,99 @@
+{
+  "verdict": "PASS_WITH_PROVIDER_AVAILABILITY_LIMITS",
+  "sourceFreeze": "060",
+  "sourceSHA256": "0f0390e30f4b36658deaa1255838b4b1f7f43e53ecfdd540057a358f3a8419d4",
+  "runtimeBuildFreeze": "055",
+  "buildSHA256": "be6c1323859308d144e73847615ef5e1b1b5e0b1394832db8ba54841f219e8e1",
+  "fullCheck": {
+    "pass": 185,
+    "fail": 0,
+    "skip": 0,
+    "longTmpdirFailurePreserved": true
+  },
+  "CLI": {
+    "commands": 35,
+    "formats": [
+      "json",
+      "jsonl",
+      "text"
+    ],
+    "rows": 113,
+    "missing": [],
+    "evidence": "045 source-identical CLI/domain mapping"
+  },
+  "schedulingScenarios": 20,
+  "runtimeEdges": 6,
+  "admissionEdges": 5,
+  "realFormalEngines": {
+    "opencode": "max,file verified,ack,accepted",
+    "pi": "high,file verified,ack,accepted; recovery vendor connection failed",
+    "codex": "xhigh,file verified,ack,accepted; fresh recovery10/10 accepted",
+    "grok": "single high402,no file,no fallback,restore unknown",
+    "claude": "no model calls"
+  },
+  "ACC": {
+    "acceptanceId": "acc_8e5b2f46d8",
+    "finalRound": "round_cc3314b9a6",
+    "finalVerdict": "PASS",
+    "scopedReuse": "acc-boundary060-evidence-reuse.json",
+    "originalRoundsPreserved": [
+      "round_85a961ee70 FAIL",
+      "round_d724e4a216 FAIL",
+      "round_9008d64020 CONDITIONAL"
+    ],
+    "newBoundary": "actual staged real Codex CLI gpt-6.1-sol/high,provided root containment,API/file snapshots unchanged,no worker dispatch",
+    "cleanup": true
+  },
+  "browser": {
+    "pages": 5,
+    "viewportThemeCombinations": 30,
+    "sizes": [
+      "1440x1000",
+      "960x800",
+      "900x650"
+    ],
+    "fullViewportNoHeaderNoHorizontalOverflow": true,
+    "consoleErrors": 0,
+    "uncaughtErrors": 0,
+    "CSPViolationObserved": false,
+    "expectedHttpFailures": "favicon404 and intentional invalid route400; offline injected and explicit main retry clears error",
+    "sixDimensionReview": 9.65
+  },
+  "report": {
+    "path": "REPORT.html",
+    "actuallyOpened": true,
+    "links": 63,
+    "brokenOrExternalLinks": 0,
+    "width900And390NoOverflow": true,
+    "actualChromePrintPages": 6
+  },
+  "installation": {
+    "bin": "retained",
+    "globalSkill": "installed after final clean PASS",
+    "defaultData": "retained,not modified by QA",
+    "defaultServiceFinal": "offline APP_NOT_RUNNING,expected; user runs weaver web"
+  },
+  "resources": {
+    "ownScopesInactive": true,
+    "panesClosed": [
+      "w2M:p4Y",
+      "w2M:p51",
+      "w2M:p53",
+      "w2M:p54",
+      "w2M:p56",
+      "w2M:p57"
+    ],
+    "allACCSandboxStagingSessionsRemoved": true,
+    "taskChromePids": [],
+    "profilesRemoved": true,
+    "userP52Port4737": "not stopped by QA; final not found/no listener,cause unknown",
+    "taskRoot": "reclaimed by Owner; absent; 28 exact scopes inactive and no proc/mount consumers before removal"
+  },
+  "proReview": "user waived; no Pro pass claimed",
+  "remainingRisks": [
+    "Grok402 balance exhausted,restore unknown",
+    "Pi recovery Connection error supplier instability",
+    "Old actual truncated attempt exact cap branch/bytes unknown",
+    "Observation only covers recorded calls and enumerated paths,not transient restored/unobserved writes"
+  ]
+}

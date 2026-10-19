@@ -1,0 +1,24 @@
+{
+  "build": "055",
+  "round": "round_d724e4a216",
+  "nodeTestExit": 0,
+  "stdout": "✔ preserves existing and reports invalid rows (0.855ms)\n✔ rejects empty/whitespace id and title (0.120073ms)\n✔ duplicate ids in batch are rejected and bad rows do not occupy ids (0.640458ms)\n✔ preserves original values without trimming (0.101289ms)\n✔ does not mutate inputs (0.13101ms)\n✔ existing order is preserved when appending (0.086013ms)\n✔ rejects non-object rows and non-string/missing id/title per-row, keeps later valid rows (0.162241ms)\n✔ rejects tab/newline and pure-whitespace id and title (0.09437ms)\n✔ bad row does not occupy id; later same-id valid row accepted, third rejected with explicit index and reason (0.144552ms)\n✔ empty rows and all-bad rows preserve existing without losing original data (0.199155ms)\nℹ tests 10\nℹ suites 0\nℹ pass 10\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 38.076313\n",
+  "stderr": "",
+  "originalTestBytesPreserved": true,
+  "readmeUnchanged": true,
+  "files": [
+    {
+      "path": "importer.mjs",
+      "sha256": "17f68349a3d53832a5c238d6abe8a1c3599de1a2a48c16805341b3d94a966e8d"
+    },
+    {
+      "path": "test.mjs",
+      "sha256": "4f8b237f242077bd3793acbc6b3a1d4dea83c3b43e7bd26fb119e11a16d21263"
+    },
+    {
+      "path": "README.md",
+      "sha256": "1539e4710be21f2397adde438ea4128f32c225c1696e7fa734c90468ca4b3840"
+    }
+  ],
+  "interpretation": "Independent tests do not replace provider successful terminal or accepted review. First successful run reviewed rejected, follow-up connection error not accepted."
+}

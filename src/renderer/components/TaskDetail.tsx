@@ -1,23 +1,64 @@
-import React, { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
+import { Empty } from '@lobehub/ui';
+import { Button, Progress, Tag, Text } from '@lobehub/ui/base-ui';
 import type { Task } from '../../shared/types';
 import { redactLog } from '../log-view';
-import { statusLabels, reviewLabel, isActive } from '../task-view';
-import { EventsPanel } from './EventsPanel';
-import { ReviewPanel } from './ReviewPanel';
+import { isActive, nextTab, reviewLabel, statusLabels } from '../task-view';
+import { styles } from '../style';
 import { ArtifactsPanel } from './ArtifactsPanel';
+import { EventsPanel } from './EventsPanel';
 import { OwnerInspector } from './OwnerInspector';
-export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry }: { task?: Task; busy: boolean; onStart: (id:string)=>void; onCancel: (id:string)=>void; action: (fn:()=>Promise<unknown>)=>Promise<boolean>; onRetry?: (id:string)=>void }) {
- const [tab,setTab]=useState<'events'|'artifacts'|'review'>('events');
- if(!task)return <section className="detail"><div className="welcome"><div className="weave">W</div><span className="eyebrow">YOUR LOCAL WORKSPACE</span><h2>把任务交出去，把进展看清楚</h2><p>从一个明确的目标开始。<br/>Weaver 将执行、交接与验收放在同一条记录里。</p><div className="steps"><span>01 · 描述目标</span><span>02 · 跟踪执行</span><span>03 · 检查交付</span></div><p className="welcome-note">选择左侧任务，或创建你的第一个 mock 任务</p></div></section>;
- const latest=task.events.at(-1);const failure=[...task.events].reverse().find(event=>event.kind==='error');
- return <section className="detail task-workspace" aria-label="任务详情"><div className="detail-heading"><div><div className="task-breadcrumb">任务工作台 <span>/</span> {task.id.slice(0,8)}</div><h2>{task.title}</h2><div className="heading-meta"><span className={`status ${task.status}`}>{statusLabels[task.status]}</span><span>{reviewLabel(task)}</span><span>更新于 {new Date(task.updatedAt).toLocaleTimeString()}</span></div></div><div className="actions">{task.status==='queued'&&!task.scheduled&&<button className="primary" disabled={busy} onClick={()=>onStart(task.id)}>开始 mock 执行</button>}{isActive(task)&&<button disabled={busy||task.status==='cancelling'} onClick={()=>onCancel(task.id)}>{task.status==='cancelling'?'正在停止…':'取消任务'}</button>}{!isActive(task)&&onRetry&&<button disabled={busy} onClick={()=>onRetry(task.id)}>新建重试任务</button>}</div></div>
- <div className="task-layout"><div className="task-content"><div className="stage-track" aria-label="任务阶段"><span className="done">已创建</span><i/><span className={task.run?'done':''}>执行{task.scheduled?' · 等待槽位':''}</span><i/><span className={task.status==='completed'?'done':''}>交付</span><i/><span className={task.reviewState==='accepted'?'done':''}>验收</span></div>
- <div className="progress-heading"><strong>执行进度</strong><span>{task.progress}%</span></div><progress aria-label="执行进度" max={100} value={task.progress}/>
- {(task.scheduled||task.status==='failed'||task.status==='cancelled')&&<div className={`task-blocker ${task.status==='failed'?'failure':''}`} role="status"><strong>{task.scheduled?'等待执行槽位':task.status==='failed'?'执行失败':'执行已取消'}</strong><p>{redactLog(task.scheduled?'调度请求已保存。有可用槽位且策略允许时自动开始。':failure?.message??latest?.message??'查看事件时间线了解详情。')}</p></div>}
- {task.retryOf&&<p className="retry-source">重试来源：{task.retryOf}</p>}<div className="goal-section"><span className="eyebrow">TASK BRIEF</span><h3>目标与约束</h3><p>{task.instruction}</p>{task.acceptanceCriteria?.length?<div className="acceptance-list"><h4>验收标准</h4><ol>{task.acceptanceCriteria.map((criterion,index)=><li key={index}>{criterion}</li>)}</ol></div>:<p className="muted">此旧任务未记录结构化验收标准。</p>}</div>
- {task.dispatch&&<p className="dispatch-note">策略：{task.dispatch.worker} · {task.dispatch.engine} / {task.dispatch.model} · {task.dispatch.effort}<br/>实际执行：{task.dispatch.execution}，真实 provider 未连接</p>}
- {task.summary&&<div className="result"><strong>执行结果</strong><p>{task.summary}</p><small>执行完成与验收通过分别记录。</small></div>}
- <div className="activity-peek"><span className="activity-dot"/><div><small>最近活动{latest?` · ${new Date(latest.at).toLocaleTimeString()}`:''}</small><p>{redactLog(latest?.message??'等待首次调度')}</p></div></div>
- <div className="tabs" role="tablist" aria-label="任务记录">{(['events','artifacts','review'] as const).map(value=><button key={value} id={`${value}-tab`} aria-controls={`${value}-panel`} role="tab" aria-selected={tab===value} tabIndex={tab===value?0:-1} onKeyDown={event=>{const tabs=['events','artifacts','review'] as const;const index=tabs.indexOf(value);const next=event.key==='ArrowRight'?tabs[(index+1)%3]:event.key==='ArrowLeft'?tabs[(index+2)%3]:event.key==='Home'?'events':event.key==='End'?'review':undefined;if(next){event.preventDefault();setTab(next);document.getElementById(`${next}-tab`)?.focus();}}} className={tab===value?'active':''} onClick={()=>setTab(value)}>{value==='events'?'时间线':value==='artifacts'?'交付产物':'验收'} <span>{value==='review'?reviewLabel(task):task[value].length}</span></button>)}</div>
- {tab==='events'?<EventsPanel events={task.events} taskId={task.id}/>:tab==='artifacts'?<ArtifactsPanel artifacts={task.artifacts}/>:<div id="review-panel" role="tabpanel" aria-labelledby="review-tab">{task.status==='completed'?<ReviewPanel task={task} busy={busy} action={action}/>:<div className="panel-empty"><h3>执行成功后进入验收</h3><p>执行结果、收到确认与验收结论各自独立。当前可先查看时间线与已有产物。</p></div>}</div>}</div><OwnerInspector task={task} busy={busy} action={action}/></div></section>;
+import { ReviewPanel } from './ReviewPanel';
+
+const queueLabels = { waiting_for_capacity: '等待执行槽位', policy_blocked: '当前策略阻止派发', frozen_route_changed: '已冻结路由发生变化', workspace_changed: '工作目录发生变化', launch_blocked: '执行启动受阻' };
+
+export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry }: { task?: Task; busy: boolean; onStart: (id: string) => void; onCancel: (id: string) => void; action: (fn: () => Promise<unknown>) => Promise<boolean>; onRetry?: (id: string) => void }) {
+  const [tab, setTab] = useState('events');
+  if (!task) return <Empty title="选择一项任务" description="创建或导入后，执行、交接和验收都留在同一条记录里。" />;
+  const latest = task.events.at(-1);
+  const failure = [...task.events].reverse().find(event => event.kind === 'error');
+  return <section aria-label="任务详情" className={styles.stack}>
+    <div className={styles.spread}>
+      <div className={styles.stack}>
+        <Text className={styles.wrap} style={{ fontSize: 18, fontWeight: 600 }}>{task.title}</Text>
+        <div className={styles.row}><Tag>{statusLabels[task.status]}</Tag><Tag>{reviewLabel(task)}</Tag><Text type="secondary">更新于 {new Date(task.updatedAt).toLocaleTimeString()}</Text></div>
+      </div>
+      <div className={styles.row}>
+        {task.status === 'queued' && !task.scheduled && <Button type="primary" disabled={busy} onClick={() => onStart(task.id)}>开始执行</Button>}
+        {isActive(task) && <Button disabled={busy || task.status === 'cancelling'} onClick={() => onCancel(task.id)}>{task.status === 'cancelling' ? '正在停止…' : '取消任务'}</Button>}
+        {!isActive(task) && onRetry && <Button disabled={busy} onClick={() => onRetry(task.id)}>新建重试任务</Button>}
+      </div>
+    </div>
+    <div className={styles.detail}>
+      <div className={styles.stack}>
+        <Text type="secondary">已创建 · {task.run ? '有执行记录' : '未执行'}{task.scheduled ? ' · 已排队' : ''} · {task.status === 'completed' ? '执行完成' : '执行未完成'} · {task.acknowledged ? '已确认收到结果' : '未确认收到结果'} · {task.reviewState === 'accepted' ? '已验收' : '未验收'}</Text>
+        <div className={styles.spread}><Text>执行进度</Text><Text>{task.progress}%</Text></div>
+        <Progress aria-label="执行进度" percent={task.progress} showInfo={false} />
+        {(task.scheduled || task.status === 'failed' || task.status === 'cancelled') && <Text role="status">{task.scheduled ? `调度请求已排队。${task.queueReason ? `${queueLabels[task.queueReason.code]}：${redactLog(task.queueReason.message)}` : '等待调度检查。'}` : task.status === 'failed' ? `执行失败。${redactLog(failure?.message ?? latest?.message ?? '查看时间线。')}` : `执行已取消。${redactLog(failure?.message ?? latest?.message ?? '查看时间线。')}`}</Text>}
+        {task.retryOf && <Text type="secondary" className={styles.wrap}>重试来源：{task.retryOf}</Text>}
+        <div className={styles.stack}><Text style={{ fontWeight: 600 }}>目标与约束</Text><Text className={styles.wrap}>{task.instruction}</Text>
+          {task.acceptanceCriteria?.length ? <ol>{task.acceptanceCriteria.map((criterion, index) => <li key={index} className={styles.wrap}>{criterion}</li>)}</ol> : <Text type="secondary">此旧任务未记录结构化验收标准。</Text>}
+        </div>
+        <Text type="secondary" className={styles.wrap}>{task.dispatch ? `策略：${task.dispatch.worker} · ${task.dispatch.engine} / ${task.dispatch.model} · ${task.dispatch.effort}。实际执行：${task.dispatch.execution}。` : '尚未记录调度结果。'}</Text>
+        {task.summary && <div className={styles.stack}><Text style={{ fontWeight: 600 }}>执行结果</Text><Text className={styles.wrap}>{task.summary}</Text><Text type="secondary">执行完成与验收通过分别记录。</Text></div>}
+        <Text type="secondary" className={styles.wrap}>最近活动{latest ? ` · ${new Date(latest.at).toLocaleTimeString()}` : ''} · {redactLog(latest?.message ?? '等待首次调度')}</Text>
+        <div role="tablist" aria-label="任务记录" className={styles.row} onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+          const keys = ['events', 'artifacts', 'review'];
+          const next = nextTab(keys, tab, event.key);
+          if (!next) return;
+          event.preventDefault();
+          setTab(next);
+          document.getElementById(`task-tab-${next}`)?.focus();
+        }}>
+          {([['events', `时间线 ${task.events.length}`], ['artifacts', `产物 ${task.artifacts.length}`], ['review', '验收']] as const).map(([key, label]) => <button key={key} type="button" className={styles.tab} id={`task-tab-${key}`} role="tab" aria-selected={tab === key} aria-controls={`task-panel-${key}`} tabIndex={tab === key ? 0 : -1} onClick={() => setTab(key)}>{label}</button>)}
+        </div>
+        <div role="tabpanel" id={`task-panel-${tab}`} aria-labelledby={`task-tab-${tab}`}>
+          {tab === 'events' && <EventsPanel events={task.events} taskId={task.id} />}
+          {tab === 'artifacts' && <ArtifactsPanel artifacts={task.artifacts} />}
+          {tab === 'review' && (task.status === 'completed' ? <ReviewPanel task={task} busy={busy} action={action} /> : <Empty title="执行成功后进入验收" description="执行结果、收到确认和验收结论各自独立。" />)}
+        </div>
+      </div>
+      <OwnerInspector task={task} busy={busy} action={action} />
+    </div>
+  </section>;
 }

@@ -1,0 +1,17 @@
+{
+  "source": "ACC registered immutable strategy fixture, copied at each start. Original files preserved outside round.",
+  "files": {
+    "README.md": {
+      "sha256": "1539e4710be21f2397adde438ea4128f32c225c1696e7fa734c90468ca4b3840",
+      "text": "修复importer.mjs的importRows(existing,rows)，返回{items,errors}，items保留existing顺序，追加有效新行；每行必须对象且id/title非空string，重复id（含existing）拒绝并逐条记录errors，原输入不变。执行node --test test.mjs并补边界测试，不删改已有断言。\n"
+    },
+    "importer.mjs": {
+      "sha256": "aefd8532db093123c31bf940d7dbc7d5a14e4f8e6fa2f86a0401a0dd12acc2be",
+      "text": "export function importRows(existing,rows){return rows.map(x=>({...x}));}\n"
+    },
+    "test.mjs": {
+      "sha256": "b307fbaaaa74dfd74978222a9afe5d4bb97f7a27ee3f8de38ec662f63ade9e1e",
+      "text": "import{test}from'node:test';import{strict as a}from'node:assert';import{importRows}from'./importer.mjs';test('preserves existing and reports invalid rows',()=>{const r=importRows([{id:'a',title:'old'}],[{id:'b',title:'new'},null,{id:'a',title:'override'}]);a.deepEqual(r.items,[{id:'a',title:'old'},{id:'b',title:'new'}]);a.equal(r.errors.length,2)});\n"
+    }
+  }
+}

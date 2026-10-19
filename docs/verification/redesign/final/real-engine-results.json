@@ -1,0 +1,896 @@
+{
+  "opencode": {
+    "task": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-opencode",
+      "acceptanceCriteria": [
+        "proof.txt contains exactly weaver-real-opencode and a newline"
+      ],
+      "constraints": [
+        "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+      ],
+      "title": "weaver-real-opencode",
+      "instruction": "Create proof.txt containing exactly weaver-real-opencode and newline. Read it back. Do not touch any other file.",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:45:04.181Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "revision": 19,
+      "scheduled": false,
+      "ownerId": "45fceddc-f69e-421b-be93-658ebf05e7b6",
+      "packageId": "9d9b9ed7-4445-4b7f-8d34-2792497b04f1",
+      "reviewState": "pending",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "opencode_worker",
+        "engine": "opencode",
+        "model": "opencode/glm-5.3-flash-free",
+        "effort": "max",
+        "execution": "real",
+        "maxParallel": 4,
+        "maxWaitMinutes": 15,
+        "adapter": "opencode",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-opencode",
+        "engineKind": "opencode",
+        "workspaceIdentity": "38:1725453"
+      },
+      "id": "ed51853c-3a5f-4a8f-8662-9acd91d4882c",
+      "createdAt": "2026-10-18T23:45:04.181Z",
+      "updatedAt": "2026-10-18T23:45:20.755Z",
+      "status": "completed",
+      "progress": 100,
+      "events": [
+        {
+          "id": "802e26ef-f2cd-4cdd-8537-6b26927c55be",
+          "at": "2026-10-18T23:45:04.181Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "97f26929-fe44-4283-bdc1-3cfa788381f1",
+          "at": "2026-10-18T23:45:04.226Z",
+          "kind": "lifecycle",
+          "message": "Frozen work package created"
+        },
+        {
+          "id": "04e1aeef-0d1c-4974-b071-40f90f9b4faf",
+          "at": "2026-10-18T23:45:04.312Z",
+          "kind": "lifecycle",
+          "message": "Policy selected opencode_worker; launching opencode in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-opencode"
+        },
+        {
+          "id": "70cd5a46-4dfb-49f2-a30b-0e4c019f994d",
+          "at": "2026-10-18T23:45:04.312Z",
+          "kind": "lifecycle",
+          "message": "Launching opencode in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-opencode"
+        },
+        {
+          "id": "201ef8cd-4057-4d73-b3dd-973c32ce8f34",
+          "at": "2026-10-18T23:45:04.316Z",
+          "kind": "log",
+          "message": "Launching opencode with requested model opencode/glm-5.3-flash-free"
+        },
+        {
+          "id": "cb7d8084-2c9f-4234-9b57-874602b6c515",
+          "at": "2026-10-18T23:45:04.316Z",
+          "kind": "log",
+          "message": "opencode --auto approves permissions inside the CLI; it is not OS isolation"
+        },
+        {
+          "id": "aa1c6212-6d24-43cb-ab27-6cf1b6847c5a",
+          "at": "2026-10-18T23:45:04.316Z",
+          "kind": "progress",
+          "message": "owned scope started"
+        },
+        {
+          "id": "17367ee8-5b0a-46df-ae4b-4dd634caca1b",
+          "at": "2026-10-18T23:45:08.092Z",
+          "kind": "progress",
+          "message": "opencode step started"
+        },
+        {
+          "id": "28924bd1-07d7-4967-a4cd-7294032ab328",
+          "at": "2026-10-18T23:45:10.713Z",
+          "kind": "log",
+          "message": "tool finished write"
+        },
+        {
+          "id": "28c9708e-8725-46a7-a5f8-c2106b3dd304",
+          "at": "2026-10-18T23:45:14.210Z",
+          "kind": "progress",
+          "message": "opencode step started"
+        },
+        {
+          "id": "ac239b6e-76bd-468c-9ccd-48fa684b5d13",
+          "at": "2026-10-18T23:45:14.517Z",
+          "kind": "log",
+          "message": "tool finished read"
+        },
+        {
+          "id": "666ed527-7bf7-4e7e-84a2-2da3f849203d",
+          "at": "2026-10-18T23:45:15.859Z",
+          "kind": "progress",
+          "message": "opencode step started"
+        },
+        {
+          "id": "caecffdf-f463-4d57-8eed-74f5e52cff4e",
+          "at": "2026-10-18T23:45:17.728Z",
+          "kind": "log",
+          "message": "tool finished bash"
+        },
+        {
+          "id": "7b7fa922-b637-41e0-94fe-f70f82b4070b",
+          "at": "2026-10-18T23:45:19.810Z",
+          "kind": "progress",
+          "message": "opencode step started"
+        },
+        {
+          "id": "6dacacdf-af1e-4e9a-86d2-f87b2f9c0eb3",
+          "at": "2026-10-18T23:45:20.754Z",
+          "kind": "artifact",
+          "message": "Received result.md"
+        },
+        {
+          "id": "38503a8b-5212-4382-9e3b-026497486b8a",
+          "at": "2026-10-18T23:45:20.754Z",
+          "kind": "result",
+          "message": "完成：proof.txt 已写入并读回验证。字节数 21 = 19 字符（weaver-real-opencode）+ 换行，od 确认内容恰为 `weaver-real-opencode\\n`，无多余字节。未触碰其他文件，无未决风险。"
+        },
+        {
+          "id": "03df8f34-83bb-46c0-b5ff-21e2285b1efa",
+          "at": "2026-10-18T23:45:20.755Z",
+          "kind": "lifecycle",
+          "message": "Worker exited successfully; output is ready for owner review"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "59acbe43-94da-4afb-b960-c016f2d13d2f",
+          "createdAt": "2026-10-18T23:45:20.754Z",
+          "name": "result.md",
+          "mediaType": "text/markdown",
+          "content": "完成：proof.txt 已写入并读回验证。字节数 21 = 19 字符（weaver-real-opencode）+ 换行，od 确认内容恰为 `weaver-real-opencode\\n`，无多余字节。未触碰其他文件，无未决风险。"
+        }
+      ],
+      "summary": "完成：proof.txt 已写入并读回验证。字节数 21 = 19 字符（weaver-real-opencode）+ 换行，od 确认内容恰为 `weaver-real-opencode\\n`，无多余字节。未触碰其他文件，无未决风险。",
+      "run": {
+        "id": "3a7dacb5-89f7-4189-b591-c349837a3696",
+        "adapter": "opencode",
+        "execution": "real",
+        "status": "stopped",
+        "scopeUnit": "weaver-cli-opencode-b7d49b78",
+        "evidence": {
+          "engine": "opencode",
+          "requestedModel": "opencode/glm-5.3-flash-free",
+          "requestedEffort": "max",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-opencode",
+          "terminal": "success",
+          "role": "worker",
+          "vendorSessionId": "ses_eae986b95ffeQydJqO1o8RnxTY",
+          "usage": {
+            "inputTokens": 235,
+            "outputTokens": 67
+          }
+        },
+        "engine": "opencode",
+        "model": "opencode/glm-5.3-flash-free",
+        "effort": "max",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-opencode",
+        "timeoutMs": 900000,
+        "startedAt": "2026-10-18T23:45:04.312Z",
+        "endedAt": "2026-10-18T23:45:20.755Z",
+        "exitCode": 0
+      }
+    },
+    "fileExists": true,
+    "content": "weaver-real-opencode\n",
+    "fileMatches": true,
+    "sourceRun": "040",
+    "reviewBuild": "045",
+    "scopeAfter": "inactive",
+    "reviewFlow": {
+      "manifest": {
+        "taskId": "ed51853c-3a5f-4a8f-8662-9acd91d4882c",
+        "attemptId": "3a7dacb5-89f7-4189-b591-c349837a3696",
+        "packageId": "9d9b9ed7-4445-4b7f-8d34-2792497b04f1",
+        "execution": "completed",
+        "summary": "完成：proof.txt 已写入并读回验证。字节数 21 = 19 字符（weaver-real-opencode）+ 换行，od 确认内容恰为 `weaver-real-opencode\\n`，无多余字节。未触碰其他文件，无未决风险。",
+        "artifacts": [
+          {
+            "id": "59acbe43-94da-4afb-b960-c016f2d13d2f",
+            "name": "result.md",
+            "mediaType": "text/markdown",
+            "sha256": "f5725e6dd3c3d71c9f1f581b54c6398a553c872c3a4c2d891c4053329b85e1f0"
+          }
+        ],
+        "exitCode": 0,
+        "manifestDigest": "6a5bcf9916b4955f2292d356e16dd8eee56a7f4bea58195e424b48942933364a",
+        "delivery": "pending",
+        "acceptance": "pending"
+      },
+      "ack": {
+        "taskId": "ed51853c-3a5f-4a8f-8662-9acd91d4882c",
+        "attemptId": "3a7dacb5-89f7-4189-b591-c349837a3696",
+        "packageId": "9d9b9ed7-4445-4b7f-8d34-2792497b04f1",
+        "execution": "completed",
+        "summary": "完成：proof.txt 已写入并读回验证。字节数 21 = 19 字符（weaver-real-opencode）+ 换行，od 确认内容恰为 `weaver-real-opencode\\n`，无多余字节。未触碰其他文件，无未决风险。",
+        "artifacts": [
+          {
+            "id": "59acbe43-94da-4afb-b960-c016f2d13d2f",
+            "name": "result.md",
+            "mediaType": "text/markdown",
+            "sha256": "f5725e6dd3c3d71c9f1f581b54c6398a553c872c3a4c2d891c4053329b85e1f0"
+          }
+        ],
+        "exitCode": 0,
+        "manifestDigest": "6a5bcf9916b4955f2292d356e16dd8eee56a7f4bea58195e424b48942933364a",
+        "delivery": "acknowledged",
+        "acceptance": "pending"
+      },
+      "review": {
+        "taskId": "ed51853c-3a5f-4a8f-8662-9acd91d4882c",
+        "attemptId": "3a7dacb5-89f7-4189-b591-c349837a3696",
+        "packageId": "9d9b9ed7-4445-4b7f-8d34-2792497b04f1",
+        "execution": "completed",
+        "summary": "完成：proof.txt 已写入并读回验证。字节数 21 = 19 字符（weaver-real-opencode）+ 换行，od 确认内容恰为 `weaver-real-opencode\\n`，无多余字节。未触碰其他文件，无未决风险。",
+        "artifacts": [
+          {
+            "id": "59acbe43-94da-4afb-b960-c016f2d13d2f",
+            "name": "result.md",
+            "mediaType": "text/markdown",
+            "sha256": "f5725e6dd3c3d71c9f1f581b54c6398a553c872c3a4c2d891c4053329b85e1f0"
+          }
+        ],
+        "exitCode": 0,
+        "manifestDigest": "6a5bcf9916b4955f2292d356e16dd8eee56a7f4bea58195e424b48942933364a",
+        "delivery": "acknowledged",
+        "acceptance": "accepted"
+      }
+    }
+  },
+  "pi": {
+    "task": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi",
+      "acceptanceCriteria": [
+        "proof.txt contains exactly weaver-real-pi and a newline"
+      ],
+      "constraints": [
+        "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+      ],
+      "title": "weaver-real-pi",
+      "instruction": "Create proof.txt containing exactly weaver-real-pi and newline. Read it back. Do not touch any other file.",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:45:04.356Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "revision": 19,
+      "scheduled": false,
+      "ownerId": "2841b0e3-5117-446c-9847-9dd10a11b4d3",
+      "packageId": "874870f1-f447-4e94-9827-028c6326bdad",
+      "reviewState": "pending",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "pi_worker",
+        "engine": "pi",
+        "model": "cc-switch-agentplan/glm-5.3-flash",
+        "effort": "high",
+        "execution": "real",
+        "maxParallel": 4,
+        "maxWaitMinutes": 15,
+        "adapter": "pi",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi",
+        "engineKind": "pi",
+        "workspaceIdentity": "38:1725475"
+      },
+      "id": "a9d0bafc-7f20-47f3-a60a-9a393143449a",
+      "createdAt": "2026-10-18T23:45:04.356Z",
+      "updatedAt": "2026-10-18T23:45:16.342Z",
+      "status": "completed",
+      "progress": 100,
+      "events": [
+        {
+          "id": "fcf8488d-f631-4960-8733-0e22853bfe3c",
+          "at": "2026-10-18T23:45:04.356Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "8990b324-2012-4775-b743-0ca7936edcaf",
+          "at": "2026-10-18T23:45:04.402Z",
+          "kind": "lifecycle",
+          "message": "Frozen work package created"
+        },
+        {
+          "id": "be3e9ee1-0281-4da3-8015-9de4d8436378",
+          "at": "2026-10-18T23:45:04.491Z",
+          "kind": "lifecycle",
+          "message": "Policy selected pi_worker; launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi"
+        },
+        {
+          "id": "3f9e0423-5ce0-4e60-9046-d65082328421",
+          "at": "2026-10-18T23:45:04.491Z",
+          "kind": "lifecycle",
+          "message": "Launching pi in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi"
+        },
+        {
+          "id": "8c537af8-22ba-499b-9711-58c12fe62eb0",
+          "at": "2026-10-18T23:45:04.493Z",
+          "kind": "log",
+          "message": "Launching pi with requested model cc-switch-agentplan/glm-5.3-flash"
+        },
+        {
+          "id": "58c2d417-5ca8-47c3-a21f-b20d3b222575",
+          "at": "2026-10-18T23:45:04.493Z",
+          "kind": "log",
+          "message": "pi --approve trusts project files for this run; it is not OS isolation"
+        },
+        {
+          "id": "a67b8b24-d71e-4f6c-96de-7f3a99fb8dcb",
+          "at": "2026-10-18T23:45:04.493Z",
+          "kind": "progress",
+          "message": "owned scope started"
+        },
+        {
+          "id": "bc527543-9c5d-4466-9efa-fc6d136e1878",
+          "at": "2026-10-18T23:45:04.705Z",
+          "kind": "progress",
+          "message": "pi agent started"
+        },
+        {
+          "id": "4bbff9ac-49e6-4767-adb6-41a24109fc4e",
+          "at": "2026-10-18T23:45:07.271Z",
+          "kind": "log",
+          "message": "tool started write"
+        },
+        {
+          "id": "11fb1efa-37af-4a6b-9f8a-3fa7bd656362",
+          "at": "2026-10-18T23:45:07.274Z",
+          "kind": "log",
+          "message": "tool finished write"
+        },
+        {
+          "id": "a80b6039-5553-4e65-ab07-039c3fb58e81",
+          "at": "2026-10-18T23:45:10.887Z",
+          "kind": "log",
+          "message": "tool started read"
+        },
+        {
+          "id": "952b769c-4b5c-466d-9049-2c9ca7aff066",
+          "at": "2026-10-18T23:45:10.887Z",
+          "kind": "log",
+          "message": "tool started bash"
+        },
+        {
+          "id": "a19cf96e-9e35-4268-bdc2-2d14d38cb91a",
+          "at": "2026-10-18T23:45:10.895Z",
+          "kind": "log",
+          "message": "tool finished bash"
+        },
+        {
+          "id": "37f4b75c-7053-4625-802f-ea1ae0f1799b",
+          "at": "2026-10-18T23:45:10.896Z",
+          "kind": "log",
+          "message": "tool finished read"
+        },
+        {
+          "id": "4202b398-4a69-45a6-b179-853e16bb640a",
+          "at": "2026-10-18T23:45:16.341Z",
+          "kind": "artifact",
+          "message": "Received result.md"
+        },
+        {
+          "id": "c2f64afb-c6ca-43e6-90a5-3934c67d0e87",
+          "at": "2026-10-18T23:45:16.342Z",
+          "kind": "result",
+          "message": "Task complete.\n\n**Report:**\n\n- **Changes:** Created `/tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi/proof.txt` — the only file written. No other files touched.\n- **Content:** `weaver-real-pi` followed by a single newline.\n- **Verification:**\n  - Read back the file via `read`: output is `weaver-real-pi`.\n  - Byte-level check via `od -c`: confirms exactly `weaver-real-pi\\n` (14 bytes), no extra characters.\n- **Acceptance criteria:** ✅ `proof.txt` contains exactly `weaver-real-pi` and a newline.\n- **Risks:** None."
+        },
+        {
+          "id": "54adb1b7-2714-4aa5-9ca9-ca41e5a834cf",
+          "at": "2026-10-18T23:45:16.342Z",
+          "kind": "lifecycle",
+          "message": "Worker exited successfully; output is ready for owner review"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "1b6be895-1977-4bee-ba18-84c6f22c62ae",
+          "createdAt": "2026-10-18T23:45:16.341Z",
+          "name": "result.md",
+          "mediaType": "text/markdown",
+          "content": "Task complete.\n\n**Report:**\n\n- **Changes:** Created `/tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi/proof.txt` — the only file written. No other files touched.\n- **Content:** `weaver-real-pi` followed by a single newline.\n- **Verification:**\n  - Read back the file via `read`: output is `weaver-real-pi`.\n  - Byte-level check via `od -c`: confirms exactly `weaver-real-pi\\n` (14 bytes), no extra characters.\n- **Acceptance criteria:** ✅ `proof.txt` contains exactly `weaver-real-pi` and a newline.\n- **Risks:** None."
+        }
+      ],
+      "summary": "Task complete.\n\n**Report:**\n\n- **Changes:** Created `/tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi/proof.txt` — the only file written. No other files touched.\n- **Content:** `weaver-real-pi` followed by a single newline.\n- **Verification:**\n  - Read back the file via `read`: output is `weaver-real-pi`.\n  - Byte-level check via `od -c`: confirms exactly `weaver-real-pi\\n` (14 bytes), no extra characters.\n- **Acceptance criteria:** ✅ `proof.txt` contains exactly `weaver-real-pi` and a newline.\n- **Risks:** None.",
+      "run": {
+        "id": "f709cbf5-e09d-4590-b3f5-f4858c649fa0",
+        "adapter": "pi",
+        "execution": "real",
+        "status": "stopped",
+        "scopeUnit": "weaver-cli-pi-7d14f290",
+        "evidence": {
+          "engine": "pi",
+          "requestedModel": "cc-switch-agentplan/glm-5.3-flash",
+          "requestedEffort": "high",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi",
+          "terminal": "success",
+          "role": "worker",
+          "vendorSessionId": "01a15167-929e-700b-a81f-d65830a4be4e",
+          "vendorModel": "cc-switch-agentplan/glm-5.3-flash",
+          "usage": {
+            "inputTokens": 117,
+            "outputTokens": 151
+          }
+        },
+        "engine": "pi",
+        "model": "cc-switch-agentplan/glm-5.3-flash",
+        "effort": "high",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi",
+        "timeoutMs": 900000,
+        "startedAt": "2026-10-18T23:45:04.491Z",
+        "endedAt": "2026-10-18T23:45:16.342Z",
+        "exitCode": 0
+      }
+    },
+    "fileExists": true,
+    "content": "weaver-real-pi\n",
+    "fileMatches": true,
+    "sourceRun": "040",
+    "reviewBuild": "045",
+    "scopeAfter": "inactive",
+    "reviewFlow": {
+      "manifest": {
+        "taskId": "a9d0bafc-7f20-47f3-a60a-9a393143449a",
+        "attemptId": "f709cbf5-e09d-4590-b3f5-f4858c649fa0",
+        "packageId": "874870f1-f447-4e94-9827-028c6326bdad",
+        "execution": "completed",
+        "summary": "Task complete.\n\n**Report:**\n\n- **Changes:** Created `/tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi/proof.txt` — the only file written. No other files touched.\n- **Content:** `weaver-real-pi` followed by a single newline.\n- **Verification:**\n  - Read back the file via `read`: output is `weaver-real-pi`.\n  - Byte-level check via `od -c`: confirms exactly `weaver-real-pi\\n` (14 bytes), no extra characters.\n- **Acceptance criteria:** ✅ `proof.txt` contains exactly `weaver-real-pi` and a newline.\n- **Risks:** None.",
+        "artifacts": [
+          {
+            "id": "1b6be895-1977-4bee-ba18-84c6f22c62ae",
+            "name": "result.md",
+            "mediaType": "text/markdown",
+            "sha256": "361d7860bafc60fa81140549e61e553485ae9e76b61a3598e7876694d7bc22e3"
+          }
+        ],
+        "exitCode": 0,
+        "manifestDigest": "78a4f00fcbf82e995c8e335d0b3431aa1e263b54b656c23aed97e9684d9ac06d",
+        "delivery": "pending",
+        "acceptance": "pending"
+      },
+      "ack": {
+        "taskId": "a9d0bafc-7f20-47f3-a60a-9a393143449a",
+        "attemptId": "f709cbf5-e09d-4590-b3f5-f4858c649fa0",
+        "packageId": "874870f1-f447-4e94-9827-028c6326bdad",
+        "execution": "completed",
+        "summary": "Task complete.\n\n**Report:**\n\n- **Changes:** Created `/tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi/proof.txt` — the only file written. No other files touched.\n- **Content:** `weaver-real-pi` followed by a single newline.\n- **Verification:**\n  - Read back the file via `read`: output is `weaver-real-pi`.\n  - Byte-level check via `od -c`: confirms exactly `weaver-real-pi\\n` (14 bytes), no extra characters.\n- **Acceptance criteria:** ✅ `proof.txt` contains exactly `weaver-real-pi` and a newline.\n- **Risks:** None.",
+        "artifacts": [
+          {
+            "id": "1b6be895-1977-4bee-ba18-84c6f22c62ae",
+            "name": "result.md",
+            "mediaType": "text/markdown",
+            "sha256": "361d7860bafc60fa81140549e61e553485ae9e76b61a3598e7876694d7bc22e3"
+          }
+        ],
+        "exitCode": 0,
+        "manifestDigest": "78a4f00fcbf82e995c8e335d0b3431aa1e263b54b656c23aed97e9684d9ac06d",
+        "delivery": "acknowledged",
+        "acceptance": "pending"
+      },
+      "review": {
+        "taskId": "a9d0bafc-7f20-47f3-a60a-9a393143449a",
+        "attemptId": "f709cbf5-e09d-4590-b3f5-f4858c649fa0",
+        "packageId": "874870f1-f447-4e94-9827-028c6326bdad",
+        "execution": "completed",
+        "summary": "Task complete.\n\n**Report:**\n\n- **Changes:** Created `/tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi/proof.txt` — the only file written. No other files touched.\n- **Content:** `weaver-real-pi` followed by a single newline.\n- **Verification:**\n  - Read back the file via `read`: output is `weaver-real-pi`.\n  - Byte-level check via `od -c`: confirms exactly `weaver-real-pi\\n` (14 bytes), no extra characters.\n- **Acceptance criteria:** ✅ `proof.txt` contains exactly `weaver-real-pi` and a newline.\n- **Risks:** None.",
+        "artifacts": [
+          {
+            "id": "1b6be895-1977-4bee-ba18-84c6f22c62ae",
+            "name": "result.md",
+            "mediaType": "text/markdown",
+            "sha256": "361d7860bafc60fa81140549e61e553485ae9e76b61a3598e7876694d7bc22e3"
+          }
+        ],
+        "exitCode": 0,
+        "manifestDigest": "78a4f00fcbf82e995c8e335d0b3431aa1e263b54b656c23aed97e9684d9ac06d",
+        "delivery": "acknowledged",
+        "acceptance": "accepted"
+      }
+    }
+  },
+  "grok": {
+    "task": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-grok",
+      "acceptanceCriteria": [
+        "proof.txt contains exactly weaver-real-grok and a newline"
+      ],
+      "constraints": [
+        "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+      ],
+      "title": "weaver-real-grok",
+      "instruction": "Create proof.txt containing exactly weaver-real-grok and newline. Read it back. Do not touch any other file.",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:45:04.539Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "revision": 17,
+      "scheduled": false,
+      "ownerId": "f4073e3e-701f-4fb1-908c-2389b8e18240",
+      "packageId": "01459abc-7568-4d21-9548-9a627e32e267",
+      "reviewState": "pending",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "grok_worker",
+        "engine": "grok",
+        "model": "grok-4.7",
+        "effort": "high",
+        "execution": "real",
+        "maxParallel": 4,
+        "maxWaitMinutes": 15,
+        "adapter": "grok",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-grok",
+        "engineKind": "grok",
+        "workspaceIdentity": "38:1725496"
+      },
+      "id": "1c3b37ed-35f4-4748-a54c-e53c90e66b9f",
+      "createdAt": "2026-10-18T23:45:04.539Z",
+      "updatedAt": "2026-10-18T23:45:13.069Z",
+      "status": "failed",
+      "progress": 20,
+      "events": [
+        {
+          "id": "1043343e-0c4c-465e-bf26-d04fbeeb7aa6",
+          "at": "2026-10-18T23:45:04.539Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "4af5dd78-3fbf-4d7b-aa42-b25bc6c09c64",
+          "at": "2026-10-18T23:45:04.584Z",
+          "kind": "lifecycle",
+          "message": "Frozen work package created"
+        },
+        {
+          "id": "d6d656e1-34d4-4f77-832e-f05a98cc534c",
+          "at": "2026-10-18T23:45:04.666Z",
+          "kind": "lifecycle",
+          "message": "Policy selected grok_worker; launching grok in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-grok"
+        },
+        {
+          "id": "1917380f-e3bc-4fc9-82ee-9b3a898f1511",
+          "at": "2026-10-18T23:45:04.667Z",
+          "kind": "lifecycle",
+          "message": "Launching grok in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-grok"
+        },
+        {
+          "id": "1e992de2-a5a6-4cf7-8c5e-37b41c3e1237",
+          "at": "2026-10-18T23:45:04.670Z",
+          "kind": "log",
+          "message": "Launching grok with requested model grok-4.7"
+        },
+        {
+          "id": "5c1abfc5-ba6c-41ff-9f94-e41424e5732e",
+          "at": "2026-10-18T23:45:04.670Z",
+          "kind": "log",
+          "message": "grok permission mode bypassPermissions is a CLI policy, not OS filesystem isolation"
+        },
+        {
+          "id": "cec824ec-1bab-47bb-b565-e04678334c5a",
+          "at": "2026-10-18T23:45:04.670Z",
+          "kind": "progress",
+          "message": "owned scope started"
+        },
+        {
+          "id": "ab16e482-eb8f-4f14-bda0-c05d08d115fd",
+          "at": "2026-10-18T23:45:11.315Z",
+          "kind": "progress",
+          "message": "grok session started"
+        },
+        {
+          "id": "1ac335e9-4c0d-4142-b9b2-c67dcf55cb09",
+          "at": "2026-10-18T23:45:11.315Z",
+          "kind": "log",
+          "message": "Internal error: {\n  \"message\": \"API error (status 402 Payment Required): Grok Build usage balance exhausted\",\n  \"http_status\": 402\n}"
+        },
+        {
+          "id": "0b7830f1-c8ef-4663-80f2-7a05bba10b24",
+          "at": "2026-10-18T23:45:13.057Z",
+          "kind": "log",
+          "message": "stderr: Error: Internal error: {\n"
+        },
+        {
+          "id": "4482213a-53e6-4d71-a2f7-3685ae022978",
+          "at": "2026-10-18T23:45:13.057Z",
+          "kind": "log",
+          "message": "stderr:   \"message\": \"API error (status 402 Payment Required): Grok Build usage balance exhausted\",\n"
+        },
+        {
+          "id": "4f5658e9-0818-4828-9cac-90634aa8b74c",
+          "at": "2026-10-18T23:45:13.058Z",
+          "kind": "log",
+          "message": "stderr:   \"http_status\": 402\n"
+        },
+        {
+          "id": "8b205ad9-896f-42d1-9953-fb2682ce09f3",
+          "at": "2026-10-18T23:45:13.058Z",
+          "kind": "log",
+          "message": "stderr: }\n"
+        },
+        {
+          "id": "99fec31c-0f6a-44be-9285-4820296e6442",
+          "at": "2026-10-18T23:45:13.069Z",
+          "kind": "log",
+          "message": "vendor terminal error exit 1: Internal error: {\n  \"message\": \"API error (status 402 Payment Required): Grok Build usage balance exhausted\",\n  \"http_status\": 402\n}"
+        },
+        {
+          "id": "ab4772e2-a3a6-4d75-a0da-425df8a25105",
+          "at": "2026-10-18T23:45:13.069Z",
+          "kind": "error",
+          "message": "Worker exited without successful result (code 1, signal none)"
+        }
+      ],
+      "artifacts": [],
+      "run": {
+        "id": "9fbf3f12-829a-4399-b099-8b289668ee94",
+        "adapter": "grok",
+        "execution": "real",
+        "status": "stopped",
+        "scopeUnit": "weaver-cli-grok-5a6568fa",
+        "evidence": {
+          "engine": "grok",
+          "requestedModel": "grok-4.7",
+          "requestedEffort": "high",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-grok",
+          "terminal": "error",
+          "role": "worker",
+          "vendorSessionId": "01a15167-995d-7513-ad46-4a4374f005c0",
+          "vendorModel": "grok-4.7",
+          "usage": {
+            "inputTokens": 0,
+            "outputTokens": 0
+          }
+        },
+        "engine": "grok",
+        "model": "grok-4.7",
+        "effort": "high",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-grok",
+        "timeoutMs": 900000,
+        "startedAt": "2026-10-18T23:45:04.667Z",
+        "endedAt": "2026-10-18T23:45:13.069Z",
+        "exitCode": 1
+      }
+    },
+    "fileExists": false,
+    "content": null,
+    "fileMatches": false,
+    "sourceRun": "040",
+    "reviewBuild": "045",
+    "scopeAfter": "inactive"
+  },
+  "codex": {
+    "task": {
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+      "acceptanceCriteria": [
+        "proof.txt contains exactly weaver-real-codex and a newline"
+      ],
+      "constraints": [
+        "Only edit the explicitly scoped fixture files. No delegation, commit, push, external messages or unrelated writes."
+      ],
+      "title": "weaver-real-codex",
+      "instruction": "Create proof.txt containing exactly weaver-real-codex and newline. Read it back. Do not touch any other file.",
+      "ownerEpoch": 0,
+      "ownerLastActivityAt": "2026-10-18T23:45:04.713Z",
+      "continuationPolicy": {
+        "idleRotationMinutes": 60
+      },
+      "revision": 15,
+      "scheduled": false,
+      "ownerId": "e10d7179-11a7-43f7-867c-a6030dedaf0d",
+      "packageId": "e51eaf60-f729-4d35-b469-f7dc88de6221",
+      "reviewState": "pending",
+      "dispatch": {
+        "owner": "codex_owner",
+        "worker": "codex_worker",
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "execution": "real",
+        "maxParallel": 4,
+        "maxWaitMinutes": 15,
+        "adapter": "codex",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+        "engineKind": "codex",
+        "workspaceIdentity": "38:1725517"
+      },
+      "id": "35988b40-faee-44b3-9301-fb24cadcbce2",
+      "createdAt": "2026-10-18T23:45:04.713Z",
+      "updatedAt": "2026-10-18T23:45:52.383Z",
+      "status": "completed",
+      "progress": 100,
+      "events": [
+        {
+          "id": "967c51ea-40e2-44f5-949f-4ab46bb9df89",
+          "at": "2026-10-18T23:45:04.713Z",
+          "kind": "lifecycle",
+          "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+        },
+        {
+          "id": "c0ff459c-4cda-41c9-bac0-b6b5b0113639",
+          "at": "2026-10-18T23:45:04.756Z",
+          "kind": "lifecycle",
+          "message": "Frozen work package created"
+        },
+        {
+          "id": "bf019747-9c0c-4be5-9218-326f1a35bbfd",
+          "at": "2026-10-18T23:45:04.844Z",
+          "kind": "lifecycle",
+          "message": "Policy selected codex_worker; launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex"
+        },
+        {
+          "id": "c6582c0b-7b53-4c7e-b23a-0abf4f878472",
+          "at": "2026-10-18T23:45:04.844Z",
+          "kind": "lifecycle",
+          "message": "Launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex"
+        },
+        {
+          "id": "562a3e07-584e-4cdf-bce3-4b69c8ab3af6",
+          "at": "2026-10-18T23:45:04.848Z",
+          "kind": "log",
+          "message": "Launching codex with requested model gpt-6.1-sol"
+        },
+        {
+          "id": "3d37c57d-7b2b-436c-b1fa-e49a4348b3f2",
+          "at": "2026-10-18T23:45:04.848Z",
+          "kind": "log",
+          "message": "codex sandbox workspace-write is the vendor profile, not a separate OS claim"
+        },
+        {
+          "id": "2dacdd07-a033-4609-843b-60c8c92135e1",
+          "at": "2026-10-18T23:45:04.848Z",
+          "kind": "progress",
+          "message": "owned scope started"
+        },
+        {
+          "id": "714b8b74-f2bd-4c3d-a26c-fa3e7b3b7558",
+          "at": "2026-10-18T23:45:05.095Z",
+          "kind": "progress",
+          "message": "codex thread started"
+        },
+        {
+          "id": "3f1cb43d-0c50-437f-9071-d054225f5ffb",
+          "at": "2026-10-18T23:45:39.208Z",
+          "kind": "log",
+          "message": "tool started command_execution"
+        },
+        {
+          "id": "fcd21782-34ef-498d-b62f-8c90b9cf6812",
+          "at": "2026-10-18T23:45:39.208Z",
+          "kind": "log",
+          "message": "tool finished command_execution"
+        },
+        {
+          "id": "0737b943-6fd8-4124-b9f5-2710fa6c3983",
+          "at": "2026-10-18T23:45:52.381Z",
+          "kind": "artifact",
+          "message": "Received result.md"
+        },
+        {
+          "id": "db22f845-6d18-456c-8615-4c27d7538a82",
+          "at": "2026-10-18T23:45:52.382Z",
+          "kind": "result",
+          "message": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。"
+        },
+        {
+          "id": "0f99d827-4a34-44a2-9626-11aaa1f690f3",
+          "at": "2026-10-18T23:45:52.383Z",
+          "kind": "lifecycle",
+          "message": "Worker exited successfully; output is ready for owner review"
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "b14c639a-1f71-4c76-83be-76f4b65cd77d",
+          "createdAt": "2026-10-18T23:45:52.381Z",
+          "name": "result.md",
+          "mediaType": "text/markdown",
+          "content": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。"
+        }
+      ],
+      "summary": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。",
+      "run": {
+        "id": "b8fea0ce-7260-4958-ad74-6b3b2e953e3e",
+        "adapter": "codex",
+        "execution": "real",
+        "status": "stopped",
+        "scopeUnit": "weaver-cli-codex-4e181c67",
+        "evidence": {
+          "engine": "codex",
+          "requestedModel": "gpt-6.1-sol",
+          "requestedEffort": "xhigh",
+          "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+          "terminal": "success",
+          "role": "worker",
+          "vendorSessionId": "01a15167-93c8-7d91-b1a2-eaaf1f5963a2",
+          "usage": {
+            "inputTokens": 45597,
+            "outputTokens": 328
+          }
+        },
+        "engine": "codex",
+        "model": "gpt-6.1-sol",
+        "effort": "xhigh",
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+        "timeoutMs": 900000,
+        "startedAt": "2026-10-18T23:45:04.844Z",
+        "endedAt": "2026-10-18T23:45:52.383Z",
+        "exitCode": 0
+      }
+    },
+    "fileExists": true,
+    "content": "weaver-real-codex\n",
+    "fileMatches": true,
+    "sourceRun": "040",
+    "reviewBuild": "045",
+    "scopeAfter": "inactive",
+    "reviewFlow": {
+      "manifest": {
+        "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+        "attemptId": "b8fea0ce-7260-4958-ad74-6b3b2e953e3e",
+        "packageId": "e51eaf60-f729-4d35-b469-f7dc88de6221",
+        "execution": "completed",
+        "summary": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。",
+        "artifacts": [
+          {
+            "id": "b14c639a-1f71-4c76-83be-76f4b65cd77d",
+            "name": "result.md",
+            "mediaType": "text/markdown",
+            "sha256": "8596544fd5571d01a21435cb1ac5321d4e428803327dac666fd0c534a8128043"
+          }
+        ],
+        "exitCode": 0,
+        "manifestDigest": "bc3c2cca0f6580b6f0aec115df9121df0e0cc6e6d30548e30cd6cface5b31606",
+        "delivery": "pending",
+        "acceptance": "pending"
+      },
+      "ack": {
+        "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+        "attemptId": "b8fea0ce-7260-4958-ad74-6b3b2e953e3e",
+        "packageId": "e51eaf60-f729-4d35-b469-f7dc88de6221",
+        "execution": "completed",
+        "summary": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。",
+        "artifacts": [
+          {
+            "id": "b14c639a-1f71-4c76-83be-76f4b65cd77d",
+            "name": "result.md",
+            "mediaType": "text/markdown",
+            "sha256": "8596544fd5571d01a21435cb1ac5321d4e428803327dac666fd0c534a8128043"
+          }
+        ],
+        "exitCode": 0,
+        "manifestDigest": "bc3c2cca0f6580b6f0aec115df9121df0e0cc6e6d30548e30cd6cface5b31606",
+        "delivery": "acknowledged",
+        "acceptance": "pending"
+      },
+      "review": {
+        "taskId": "35988b40-faee-44b3-9301-fb24cadcbce2",
+        "attemptId": "b8fea0ce-7260-4958-ad74-6b3b2e953e3e",
+        "packageId": "e51eaf60-f729-4d35-b469-f7dc88de6221",
+        "execution": "completed",
+        "summary": "将仅写入指定的 proof.txt，并读回核对完整内容。\n\n已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\n`，验收通过。\n\n仅写入该文件；未委派、提交或推送。无未解决风险。",
+        "artifacts": [
+          {
+            "id": "b14c639a-1f71-4c76-83be-76f4b65cd77d",
+            "name": "result.md",
+            "mediaType": "text/markdown",
+            "sha256": "8596544fd5571d01a21435cb1ac5321d4e428803327dac666fd0c534a8128043"
+          }
+        ],
+        "exitCode": 0,
+        "manifestDigest": "bc3c2cca0f6580b6f0aec115df9121df0e0cc6e6d30548e30cd6cface5b31606",
+        "delivery": "acknowledged",
+        "acceptance": "accepted"
+      }
+    }
+  }
+}

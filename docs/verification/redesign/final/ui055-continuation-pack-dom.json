@@ -1,0 +1,163 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 3294896620169087710
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:34033/",
+  "refs": {
+    "e1": {
+      "name": "",
+      "role": "generic"
+    },
+    "e10": {
+      "name": "引擎",
+      "role": "link"
+    },
+    "e11": {
+      "name": "负责人",
+      "role": "link"
+    },
+    "e12": {
+      "name": "工作代理",
+      "role": "link"
+    },
+    "e13": {
+      "name": "路由与配额",
+      "role": "link"
+    },
+    "e14": {
+      "name": "搜索任务",
+      "role": "textbox"
+    },
+    "e15": {
+      "name": "任务详情",
+      "role": "region"
+    },
+    "e16": {
+      "name": "全部",
+      "role": "button"
+    },
+    "e17": {
+      "name": "进行中",
+      "role": "button"
+    },
+    "e18": {
+      "name": "待验收",
+      "role": "button"
+    },
+    "e19": {
+      "name": "已结束",
+      "role": "button"
+    },
+    "e2": {
+      "name": "跳到内容",
+      "role": "link"
+    },
+    "e20": {
+      "name": "执行完成 100% ui055 valid demo artifact Task owner · 已通过",
+      "role": "button"
+    },
+    "e21": {
+      "name": "新建重试任务",
+      "role": "button"
+    },
+    "e22": {
+      "name": "时间线 14",
+      "role": "tab"
+    },
+    "e23": {
+      "name": "产物 1",
+      "role": "tab"
+    },
+    "e24": {
+      "name": "验收",
+      "role": "tab"
+    },
+    "e25": {
+      "name": "交付验收",
+      "role": "region"
+    },
+    "e26": {
+      "name": "",
+      "role": "LabelText"
+    },
+    "e27": {
+      "name": "空闲阈值（分钟）",
+      "role": "textbox"
+    },
+    "e28": {
+      "name": "Increase",
+      "role": "button"
+    },
+    "e29": {
+      "name": "Decrease",
+      "role": "button"
+    },
+    "e3": {
+      "name": "Weaver",
+      "role": "button"
+    },
+    "e30": {
+      "name": "保存空闲策略",
+      "role": "button"
+    },
+    "e31": {
+      "name": "登记手动接续",
+      "role": "button"
+    },
+    "e32": {
+      "name": "已确认收到",
+      "role": "button"
+    },
+    "e33": {
+      "name": "验收通过",
+      "role": "button"
+    },
+    "e34": {
+      "name": "要求修改",
+      "role": "button"
+    },
+    "e35": {
+      "name": "启用空闲接续提醒",
+      "role": "checkbox"
+    },
+    "e36": {
+      "name": "验收说明",
+      "role": "textbox"
+    },
+    "e4": {
+      "name": "主导航",
+      "role": "navigation"
+    },
+    "e5": {
+      "name": "收起导航",
+      "role": "button"
+    },
+    "e6": {
+      "name": "切换到浅色",
+      "role": "button"
+    },
+    "e7": {
+      "name": "新建任务",
+      "role": "button"
+    },
+    "e8": {
+      "name": "任务列表",
+      "role": "region"
+    },
+    "e9": {
+      "name": "任务",
+      "role": "link"
+    }
+  },
+  "snapshot": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - link \"跳到内容\" [ref=e2]\n    - complementary\n      - button \"Weaver\" [ref=e3]\n        - StaticText \"Weaver\"\n      - navigation \"主导航\" [ref=e4]\n        - link \"任务\" [ref=e9]\n          - image\n          - StaticText \"任务\"\n        - link \"引擎\" [ref=e10]\n          - image\n          - StaticText \"引擎\"\n        - link \"负责人\" [ref=e11]\n          - image\n          - StaticText \"负责人\"\n        - link \"工作代理\" [ref=e12]\n          - image\n          - StaticText \"工作代理\"\n        - link \"路由与配额\" [ref=e13]\n          - image\n          - StaticText \"路由与配额\"\n      - button \"收起导航\" [ref=e5]\n        - image\n      - button \"切换到浅色\" [ref=e6]\n        - image\n      - status\n        - StaticText \"2 个并行槽位 · 已同步\"\n    - main\n      - button \"新建任务\" [ref=e7]\n      - region \"任务列表\" [ref=e8]\n        - textbox \"搜索任务\" [ref=e14]: ui055 valid demo artifact\n          - StaticText \"ui055 valid demo artifact\"\n        - group\n          - button \"全部\" [ref=e16]\n            - StaticText \"全部\"\n          - button \"进行中\" [ref=e17]\n            - StaticText \"进行中\"\n          - button \"待验收\" [ref=e18]\n            - StaticText \"待验收\"\n          - button \"已结束\" [ref=e19]\n            - StaticText \"已结束\"\n        - button \"执行完成 100% ui055 valid demo artifact Task owner · 已通过\" [ref=e20]\n          - StaticText \"执行完成\"\n          - generic\n            - StaticText \"100%\"\n          - strong\n            - StaticText \"ui055 valid demo artifact\"\n          - generic\n            - StaticText \"Task owner · 已通过\"\n      - region \"任务详情\" [ref=e15]\n        - StaticText \"ui055 valid demo artifact\"\n        - StaticText \"执行完成\"\n        - StaticText \"已通过\"\n        - generic\n          - StaticText \"更新于 8:56:58 PM\"\n        - button \"新建重试任务\" [ref=e21]\n        - generic\n          - StaticText \"已创建 · 有执行记录 · 执行完成 · 已确认收到结果 · 已验收\"\n        - StaticText \"执行进度\"\n        - generic\n          - StaticText \"100%\"\n        - progressbar \"执行进度\": 100\n        - StaticText \"目标与约束\"\n        - StaticText \"Produce deterministic mock demo artifact only. No project changes expected.\"\n        - list\n          - listitem [level=1]\n            - ListMarker \"1. \"\n            - StaticText \"Generated artifact explicitly identifies deterministic mock output.\"\n        - StaticText \"策略：qa_b_worker · pi / cc-switch-agentplan/glm-5.3-flash · high。实际执行：mock。\"\n        - StaticText \"执行结果\"\n        - StaticText \"Mock task completed. Review the generated demo artifact.\"\n        - StaticText \"执行完成与验收通过分别记录。\"\n        - generic\n          - StaticText \"最近活动 · 8:56:47 PM · Result receipt acknowledged; acceptance unchanged\"\n        - tablist \"任务记录\"\n          - tab \"时间线 14\" [ref=e22]\n          - tab \"产物 1\" [ref=e23]\n          - tab \"验收\" [selected, ref=e24]\n        - tabpanel \"验收\"\n          - region \"交付验收\" [ref=e25]\n            - StaticText \"交付与验收\"\n            - StaticText \"执行完成、确认收到结果和验收通过分别记录。此处确认是当前操作者的结果确认，不代表外部 Owner 宿主自动收到。先读取并检查产物，再提交结论。\"\n            - generic\n              - StaticText \"交付：已确认收到 · 验收：已通过 · 执行：completed\"\n            - generic\n              - StaticText \"已保存的验收说明：Inspected deterministic demo artifact; fixture criterion is explicit mock output only, no file changes or AI completion claimed.\"\n            - textbox \"验收说明\" [ref=e36]\n            - button \"已确认收到\" [disabled, ref=e32]\n            - button \"验收通过\" [disabled, ref=e33]\n            - button \"要求修改\" [ref=e34]\n            - generic\n              - StaticText \"结果清单指纹 ab89423dee407db501d22038487fea6dc65554577f2e0dc40c32a133821ea067\"\n        - complementary \"执行上下文\"\n          - StaticText \"执行上下文\"\n          - generic\n            - StaticText \"Owner Task owner\"\n          - generic\n            - StaticText \"Worker qa_b_worker\"\n          - generic\n            - StaticText \"Worker 执行记录 mock · 适配器 mock-jsonl\"\n          - StaticText \"Owner 是逻辑登记。外部 CLI 宿主引用未经验证，登记不代表已启动新的 AI。\"\n          - generic\n            - StaticText \"工作目录 /tmp/weaver-redesign-3QuXVe/acceptance/final/ui055-demo-valid\"\n          - StaticText \"Token 和费用未知。worker 未报告实际计量。\"\n          - StaticText \"Owner 手动接续\"\n          - StaticText \"空闲到期仅提醒外部 Owner 手动接续。真实 CLI 负责切换上下文并自行读取接续包；Weaver 不会自动替换外部 AI、投递接续包或确认宿主收到。\"\n          - generic\n            - StaticText \"Epoch 1 · 未达到空闲阈值\"\n          - LabelText [ref=e26] clickable [cursor:pointer]\n            - checkbox \"启用空闲接续提醒\" [checked=true, ref=e35]\n            - StaticText \"启用空闲接续提醒\"\n          - LabelText\n            - StaticText \"空闲阈值（分钟）\"\n          - textbox \"空闲阈值（分钟）\" [ref=e27]: 60\n            - StaticText \"60\"\n          - button \"Increase\" [ref=e28]\n            - image\n          - button \"Decrease\" [ref=e29]\n            - image\n          - button \"保存空闲策略\" [ref=e30]\n          - button \"登记手动接续\" [ref=e31]\n          - group\n            - DisclosureTriangle \"已生成的接续包 · 需外部 CLI 自行读取\" [expanded=false]\n              - StaticText \"已生成的接续包 · 需外部 CLI 自行读取\"\n          - generic\n            - StaticText \"历史交接 · 1\"\n          - list\n            - listitem [level=1]\n              - ListMarker \"1. \"\n              - StaticText \"Epoch 1 · 手动交接 · 仅逻辑登记，无外部宿主确认 · 10/18/2026, 8:56:58 PM\"\n          - generic\n            - StaticText \"Task bbfe9d71-187c-4682-ae3c-7044fc02cec2\"\n          - generic\n            - StaticText \"Owner handle 412da262-0953-40b2-af2c-e922428e5187 · Attempt 08d4bc47-afab-4f0e-bdda-77d3305e5c1c\"\n          - generic\n            - StaticText \"Package adf9470a-3bcc-47e5-a240-90c914c002d2 · Revision 17\""
+}

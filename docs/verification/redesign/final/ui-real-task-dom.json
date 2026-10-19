@@ -1,0 +1,155 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 3294896620169087710
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:41949/",
+  "refs": {
+    "e1": {
+      "name": "",
+      "role": "generic"
+    },
+    "e10": {
+      "name": "引擎",
+      "role": "link"
+    },
+    "e11": {
+      "name": "负责人",
+      "role": "link"
+    },
+    "e12": {
+      "name": "工作代理",
+      "role": "link"
+    },
+    "e13": {
+      "name": "路由与配额",
+      "role": "link"
+    },
+    "e14": {
+      "name": "搜索任务",
+      "role": "textbox"
+    },
+    "e15": {
+      "name": "任务详情",
+      "role": "region"
+    },
+    "e16": {
+      "name": "全部",
+      "role": "button"
+    },
+    "e17": {
+      "name": "进行中",
+      "role": "button"
+    },
+    "e18": {
+      "name": "待验收",
+      "role": "button"
+    },
+    "e19": {
+      "name": "已结束",
+      "role": "button"
+    },
+    "e2": {
+      "name": "跳到内容",
+      "role": "link"
+    },
+    "e20": {
+      "name": "执行完成 100% weaver-real-codex Task owner · 已通过",
+      "role": "button"
+    },
+    "e21": {
+      "name": "新建重试任务",
+      "role": "button"
+    },
+    "e22": {
+      "name": "时间线 15",
+      "role": "tab"
+    },
+    "e23": {
+      "name": "产物 1",
+      "role": "tab"
+    },
+    "e24": {
+      "name": "验收",
+      "role": "tab"
+    },
+    "e25": {
+      "name": "",
+      "role": "LabelText"
+    },
+    "e26": {
+      "name": "空闲阈值（分钟）",
+      "role": "textbox"
+    },
+    "e27": {
+      "name": "Increase",
+      "role": "button"
+    },
+    "e28": {
+      "name": "Decrease",
+      "role": "button"
+    },
+    "e29": {
+      "name": "保存空闲策略",
+      "role": "button"
+    },
+    "e3": {
+      "name": "Weaver",
+      "role": "button"
+    },
+    "e30": {
+      "name": "登记手动接续",
+      "role": "button"
+    },
+    "e31": {
+      "name": "事件类型",
+      "role": "combobox"
+    },
+    "e32": {
+      "name": "导出已筛选日志",
+      "role": "button"
+    },
+    "e33": {
+      "name": "启用空闲接续提醒",
+      "role": "checkbox"
+    },
+    "e34": {
+      "name": "搜索已加载事件",
+      "role": "textbox"
+    },
+    "e4": {
+      "name": "主导航",
+      "role": "navigation"
+    },
+    "e5": {
+      "name": "收起导航",
+      "role": "button"
+    },
+    "e6": {
+      "name": "切换到浅色",
+      "role": "button"
+    },
+    "e7": {
+      "name": "新建任务",
+      "role": "button"
+    },
+    "e8": {
+      "name": "任务列表",
+      "role": "region"
+    },
+    "e9": {
+      "name": "任务",
+      "role": "link"
+    }
+  },
+  "snapshot": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - link \"跳到内容\" [ref=e2]\n    - complementary\n      - button \"Weaver\" [ref=e3]\n        - StaticText \"Weaver\"\n      - navigation \"主导航\" [ref=e4]\n        - link \"任务\" [ref=e9]\n          - image\n          - StaticText \"任务\"\n        - link \"引擎\" [ref=e10]\n          - image\n          - StaticText \"引擎\"\n        - link \"负责人\" [ref=e11]\n          - image\n          - StaticText \"负责人\"\n        - link \"工作代理\" [ref=e12]\n          - image\n          - StaticText \"工作代理\"\n        - link \"路由与配额\" [ref=e13]\n          - image\n          - StaticText \"路由与配额\"\n      - button \"收起导航\" [ref=e5]\n        - image\n      - button \"切换到浅色\" [ref=e6]\n        - image\n      - status\n        - StaticText \"2 个并行槽位 · 已同步\"\n    - main\n      - button \"新建任务\" [ref=e7]\n      - region \"任务列表\" [ref=e8]\n        - textbox \"搜索任务\" [ref=e14]: weaver-real-codex\n          - StaticText \"weaver-real-codex\"\n        - group\n          - button \"全部\" [ref=e16]\n            - StaticText \"全部\"\n          - button \"进行中\" [ref=e17]\n            - StaticText \"进行中\"\n          - button \"待验收\" [ref=e18]\n            - StaticText \"待验收\"\n          - button \"已结束\" [ref=e19]\n            - StaticText \"已结束\"\n        - button \"执行完成 100% weaver-real-codex Task owner · 已通过\" [ref=e20]\n          - StaticText \"执行完成\"\n          - generic\n            - StaticText \"100%\"\n          - strong\n            - StaticText \"weaver-real-codex\"\n          - generic\n            - StaticText \"Task owner · 已通过\"\n      - region \"任务详情\" [ref=e15]\n        - StaticText \"weaver-real-codex\"\n        - StaticText \"执行完成\"\n        - StaticText \"已通过\"\n        - generic\n          - StaticText \"更新于 7:50:06 PM\"\n        - button \"新建重试任务\" [ref=e21]\n        - generic\n          - StaticText \"已创建 · 有执行记录 · 执行完成 · 已确认收到结果 · 已验收\"\n        - StaticText \"执行进度\"\n        - generic\n          - StaticText \"100%\"\n        - progressbar \"执行进度\": 100\n        - StaticText \"目标与约束\"\n        - StaticText \"Create proof.txt containing exactly weaver-real-codex and newline. Read it back. Do not touch any other file.\"\n        - list\n          - listitem [level=1]\n            - ListMarker \"1. \"\n            - StaticText \"proof.txt contains exactly weaver-real-codex and a newline\"\n        - StaticText \"策略：codex_worker · codex / gpt-6.1-sol · xhigh。实际执行：real。\"\n        - StaticText \"执行结果\"\n        - StaticText \"将仅写入指定的 proof.txt，并读回核对完整内容。 已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\\\n`，验收通过。 仅写入该文件；未委派、提交或推送。无未解决风险。\"\n        - StaticText \"执行完成与验收通过分别记录。\"\n        - generic\n          - StaticText \"最近活动 · 7:50:06 PM · Owner review: accepted\"\n        - tablist \"任务记录\"\n          - tab \"时间线 15\" [selected, ref=e22]\n          - tab \"产物 1\" [ref=e23]\n          - tab \"验收\" [ref=e24]\n        - tabpanel \"时间线 15\"\n          - generic\n            - LabelText\n              - StaticText \"事件类型\"\n            - combobox \"事件类型\" [expanded=false, ref=e31]: 全部\n              - StaticText \"全部\"\n            - textbox \"搜索已加载事件\" [ref=e34]\n            - button \"导出已筛选日志\" [ref=e32]\n            - generic\n              - StaticText \"显示和导出会遮盖常见凭据格式，分享前仍需检查。已加载 15 条，筛选后 15 条。\"\n            - time\n              - StaticText \"7:45:04 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Task queued. Owner reference is metadata only; no Herdr session was contacted.\"\n            - time\n              - StaticText \"7:45:04 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Frozen work package created\"\n            - time\n              - StaticText \"7:45:04 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Policy selected codex_worker; launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex\"\n            - time\n              - StaticText \"7:45:04 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Launching codex in /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex\"\n            - time\n              - StaticText \"7:45:04 PM\"\n            - StaticText \"log\"\n            - StaticText \"Launching codex with requested model gpt-6.1-sol\"\n            - time\n              - StaticText \"7:45:04 PM\"\n            - StaticText \"log\"\n            - StaticText \"codex sandbox workspace-write is the vendor profile, not a separate OS claim\"\n            - time\n              - StaticText \"7:45:04 PM\"\n            - StaticText \"progress\"\n            - StaticText \"owned scope started\"\n            - time\n              - StaticText \"7:45:05 PM\"\n            - StaticText \"progress\"\n            - StaticText \"codex thread started\"\n            - time\n              - StaticText \"7:45:39 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool started command_execution\"\n            - time\n              - StaticText \"7:45:39 PM\"\n            - StaticText \"log\"\n            - StaticText \"tool finished command_execution\"\n            - time\n              - StaticText \"7:45:52 PM\"\n            - StaticText \"artifact\"\n            - StaticText \"Received result.md\"\n            - time\n              - StaticText \"7:45:52 PM\"\n            - StaticText \"result\"\n            - StaticText \"将仅写入指定的 proof.txt，并读回核对完整内容。 已创建 [proof.txt](/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex/proof.txt)，读回确认字节内容严格为 `weaver-real-codex\\\\n`，验收通过。 仅写入该文件；未委派、提交或推送。无未解决风险。\"\n            - time\n              - StaticText \"7:45:52 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Worker exited successfully; output is ready for owner review\"\n            - time\n              - StaticText \"7:50:06 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Result receipt acknowledged; acceptance unchanged\"\n            - time\n              - StaticText \"7:50:06 PM\"\n            - StaticText \"lifecycle\"\n            - StaticText \"Owner review: accepted\"\n        - complementary \"执行上下文\"\n          - StaticText \"执行上下文\"\n          - generic\n            - StaticText \"Owner Task owner\"\n          - generic\n            - StaticText \"Worker codex_worker\"\n          - generic\n            - StaticText \"Worker 执行记录 real · 适配器 codex\"\n          - StaticText \"Owner 是逻辑登记。外部 CLI 宿主引用未经验证，登记不代表已启动新的 AI。\"\n          - generic\n            - StaticText \"工作目录 /tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex\"\n          - StaticText \"Token 和费用未知。worker 未报告实际计量。\"\n          - StaticText \"Owner 手动接续\"\n          - StaticText \"空闲到期仅提醒外部 Owner 手动接续。真实 CLI 负责切换上下文并自行读取接续包；Weaver 不会自动替换外部 AI、投递接续包或确认宿主收到。\"\n          - generic\n            - StaticText \"Epoch 0 · 未达到空闲阈值\"\n          - LabelText [ref=e25] clickable [cursor:pointer]\n            - checkbox \"启用空闲接续提醒\" [checked=true, ref=e33]\n            - StaticText \"启用空闲接续提醒\"\n          - LabelText\n            - StaticText \"空闲阈值（分钟）\"\n          - textbox \"空闲阈值（分钟）\" [ref=e26]: 60\n            - StaticText \"60\"\n          - button \"Increase\" [ref=e27]\n            - image\n          - button \"Decrease\" [ref=e28]\n            - image\n          - button \"保存空闲策略\" [ref=e29]\n          - button \"登记手动接续\" [ref=e30]\n          - generic\n            - StaticText \"Task 35988b40-faee-44b3-9301-fb24cadcbce2\"\n          - generic\n            - StaticText \"Owner handle e10d7179-11a7-43f7-867c-a6030dedaf0d · Attempt b8fea0ce-7260-4958-ad74-6b3b2e953e3e\"\n          - generic\n            - StaticText \"Package e51eaf60-f729-4d35-b469-f7dc88de6221 · Revision 17\""
+}

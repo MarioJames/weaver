@@ -1,0 +1,80 @@
+{
+  "ok": true,
+  "fileChecks": {
+    "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/fixture": {
+      "unchanged": true,
+      "existsBefore": true,
+      "existsAfter": true
+    },
+    "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.agents": {
+      "unchanged": true,
+      "existsBefore": true,
+      "existsAfter": true
+    },
+    "/tmp/weaver-redesign-3QuXVe/a": {
+      "unchanged": true,
+      "existsBefore": true,
+      "existsAfter": true
+    },
+    "/home/mocha/.codex/auth.json": {
+      "unchanged": true,
+      "existsBefore": true,
+      "existsAfter": true
+    },
+    "/home/mocha/.codex/config.toml": {
+      "unchanged": true,
+      "existsBefore": true,
+      "existsAfter": true
+    },
+    "/home/mocha/.claude.json": {
+      "unchanged": true,
+      "existsBefore": true,
+      "existsAfter": true
+    },
+    "/home/mocha/.claude/settings.json": {
+      "unchanged": true,
+      "existsBefore": true,
+      "existsAfter": true
+    },
+    "/home/mocha/.config/agents-cooperation/config.json": {
+      "unchanged": true,
+      "existsBefore": true,
+      "existsAfter": true
+    },
+    "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.aut-acceptance": {
+      "unchanged": true,
+      "existsBefore": true,
+      "existsAfter": true
+    },
+    "/tmp/weaver-redesign-3QuXVe/acceptance/acc-tmp/acc-1-20261018-211414-300c65/.iso/claude-settings.json": {
+      "unchanged": true,
+      "existsBefore": true,
+      "existsAfter": true
+    }
+  },
+  "apiChecks": {
+    "policy": {
+      "unchanged": true
+    },
+    "owners": {
+      "unchanged": true
+    },
+    "tasks": {
+      "unchanged": true,
+      "allPagesCaptured": true
+    },
+    "sync": {
+      "unchanged": true,
+      "revisionBefore": 452,
+      "revisionAfter": 452,
+      "tasks": 9,
+      "owners": 7
+    }
+  },
+  "method": "Compare raw API data fields excluding response commandId; compare file path/type/content SHA256/size/mode manifests. Credential values never included.",
+  "limits": [
+    "Point-in-time comparison cannot rule out a transient write restored between captures.",
+    "Only enumerated config/auth paths are covered; absent paths are recorded as absent.",
+    "Directory inode/mtime and external provider state are outside this baseline."
+  ]
+}

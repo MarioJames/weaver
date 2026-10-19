@@ -1,0 +1,243 @@
+{
+  "grokEnabled": true,
+  "ownersUnchanged": true,
+  "workersUnchanged": true,
+  "scan": {
+    "probedAt": "2026-10-18T15:49:22.510Z",
+    "probes": [
+      {
+        "id": "claude",
+        "kind": "claude",
+        "command": "claude",
+        "status": "installed",
+        "probedAt": "2026-10-18T15:49:22.134Z",
+        "authenticated": false,
+        "modelUsable": false,
+        "path": "/home/mocha/.local/share/claude/versions/2.1.302",
+        "version": "2.1.302 (Claude Code)"
+      },
+      {
+        "id": "codex",
+        "kind": "codex",
+        "command": "codex",
+        "status": "installed",
+        "probedAt": "2026-10-18T15:49:22.134Z",
+        "authenticated": false,
+        "modelUsable": false,
+        "path": "/home/mocha/.codex/packages/standalone/releases/0.163.0-x86_64-unknown-linux-musl/bin/codex",
+        "version": "codex-cli 0.163.0"
+      },
+      {
+        "id": "grok",
+        "kind": "grok",
+        "command": "grok",
+        "status": "installed",
+        "probedAt": "2026-10-18T15:49:22.134Z",
+        "authenticated": false,
+        "modelUsable": false,
+        "path": "/home/mocha/.grok/downloads/grok-linux-x86_64",
+        "version": "grok 1.0.62 (1474f9cbdd91)"
+      },
+      {
+        "id": "opencode",
+        "kind": "opencode",
+        "command": "opencode",
+        "status": "installed",
+        "probedAt": "2026-10-18T15:49:22.134Z",
+        "authenticated": false,
+        "modelUsable": false,
+        "path": "/home/mocha/.opencode/bin/opencode",
+        "version": "1.19.3"
+      },
+      {
+        "id": "pi",
+        "kind": "pi",
+        "command": "pi",
+        "status": "installed",
+        "probedAt": "2026-10-18T15:49:22.134Z",
+        "authenticated": false,
+        "modelUsable": false,
+        "path": "/home/mocha/.local/lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js",
+        "version": "1.3.0"
+      },
+      {
+        "id": "qoder",
+        "kind": "qodercli",
+        "command": "qodercli",
+        "status": "installed",
+        "probedAt": "2026-10-18T15:49:22.134Z",
+        "authenticated": false,
+        "modelUsable": false,
+        "path": "/home/mocha/.qoder/bin/qodercli/qodercli-1.1.73",
+        "version": "1.1.73"
+      },
+      {
+        "id": "gemini",
+        "kind": "gemini",
+        "command": "gemini",
+        "status": "missing",
+        "probedAt": "2026-10-18T15:49:22.134Z",
+        "authenticated": false,
+        "modelUsable": false
+      }
+    ],
+    "readiness": [
+      {
+        "id": "claude",
+        "kind": "claude",
+        "installed": true,
+        "enabled": true,
+        "ownerConfigured": true,
+        "workerConfigured": true,
+        "adapterStatus": "deferred",
+        "realExecution": false,
+        "probe": {
+          "id": "claude",
+          "kind": "claude",
+          "command": "claude",
+          "status": "installed",
+          "probedAt": "2026-10-18T15:49:22.134Z",
+          "authenticated": false,
+          "modelUsable": false,
+          "path": "/home/mocha/.local/share/claude/versions/2.1.302",
+          "version": "2.1.302 (Claude Code)"
+        }
+      },
+      {
+        "id": "codex",
+        "kind": "codex",
+        "installed": true,
+        "enabled": true,
+        "ownerConfigured": true,
+        "workerConfigured": true,
+        "adapterStatus": "real",
+        "realExecution": true,
+        "probe": {
+          "id": "codex",
+          "kind": "codex",
+          "command": "codex",
+          "status": "installed",
+          "probedAt": "2026-10-18T15:49:22.134Z",
+          "authenticated": false,
+          "modelUsable": false,
+          "path": "/home/mocha/.codex/packages/standalone/releases/0.163.0-x86_64-unknown-linux-musl/bin/codex",
+          "version": "codex-cli 0.163.0"
+        }
+      },
+      {
+        "id": "grok",
+        "kind": "grok",
+        "installed": true,
+        "enabled": true,
+        "ownerConfigured": false,
+        "workerConfigured": true,
+        "adapterStatus": "real",
+        "realExecution": false,
+        "probe": {
+          "id": "grok",
+          "kind": "grok",
+          "command": "grok",
+          "status": "installed",
+          "probedAt": "2026-10-18T15:49:22.134Z",
+          "authenticated": false,
+          "modelUsable": false,
+          "path": "/home/mocha/.grok/downloads/grok-linux-x86_64",
+          "version": "grok 1.0.62 (1474f9cbdd91)"
+        }
+      },
+      {
+        "id": "opencode",
+        "kind": "opencode",
+        "installed": true,
+        "enabled": false,
+        "ownerConfigured": false,
+        "workerConfigured": true,
+        "adapterStatus": "real",
+        "realExecution": false,
+        "probe": {
+          "id": "opencode",
+          "kind": "opencode",
+          "command": "opencode",
+          "status": "installed",
+          "probedAt": "2026-10-18T15:49:22.134Z",
+          "authenticated": false,
+          "modelUsable": false,
+          "path": "/home/mocha/.opencode/bin/opencode",
+          "version": "1.19.3"
+        }
+      },
+      {
+        "id": "pi",
+        "kind": "pi",
+        "installed": true,
+        "enabled": false,
+        "ownerConfigured": true,
+        "workerConfigured": true,
+        "adapterStatus": "real",
+        "realExecution": false,
+        "probe": {
+          "id": "pi",
+          "kind": "pi",
+          "command": "pi",
+          "status": "installed",
+          "probedAt": "2026-10-18T15:49:22.134Z",
+          "authenticated": false,
+          "modelUsable": false,
+          "path": "/home/mocha/.local/lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js",
+          "version": "1.3.0"
+        }
+      },
+      {
+        "id": "qoder",
+        "kind": "qodercli",
+        "installed": true,
+        "enabled": false,
+        "ownerConfigured": false,
+        "workerConfigured": true,
+        "adapterStatus": "not_implemented",
+        "realExecution": false,
+        "probe": {
+          "id": "qoder",
+          "kind": "qodercli",
+          "command": "qodercli",
+          "status": "installed",
+          "probedAt": "2026-10-18T15:49:22.134Z",
+          "authenticated": false,
+          "modelUsable": false,
+          "path": "/home/mocha/.qoder/bin/qodercli/qodercli-1.1.73",
+          "version": "1.1.73"
+        }
+      },
+      {
+        "id": "gemini",
+        "kind": "gemini",
+        "installed": false,
+        "enabled": false,
+        "ownerConfigured": false,
+        "workerConfigured": false,
+        "adapterStatus": "not_implemented",
+        "realExecution": false,
+        "probe": {
+          "id": "gemini",
+          "kind": "gemini",
+          "command": "gemini",
+          "status": "missing",
+          "probedAt": "2026-10-18T15:49:22.134Z",
+          "authenticated": false,
+          "modelUsable": false
+        }
+      }
+    ],
+    "boundary": {
+      "discovery": "path-and-readonly-version",
+      "enablementAuthority": "policy.engines.enabled",
+      "probeIsNotAuthority": true,
+      "roleAutoCreate": false,
+      "realAdapter": "opencode|pi|grok|codex",
+      "deferredAdapter": "claude",
+      "mockExecution": "explicit-in-task-detail",
+      "authenticated": false,
+      "modelUsable": false
+    }
+  }
+}

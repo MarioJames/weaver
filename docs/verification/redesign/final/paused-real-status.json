@@ -1,0 +1,151 @@
+{
+  "opencode": {
+    "status": "completed",
+    "scope": "weaver-cli-opencode-b7d49b78",
+    "evidence": {
+      "engine": "opencode",
+      "requestedModel": "opencode/glm-5.3-flash-free",
+      "requestedEffort": "max",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-opencode",
+      "terminal": "success",
+      "role": "worker",
+      "vendorSessionId": "ses_eae986b95ffeQydJqO1o8RnxTY",
+      "usage": {
+        "inputTokens": 235,
+        "outputTokens": 67
+      }
+    },
+    "events": [
+      {
+        "id": "6dacacdf-af1e-4e9a-86d2-f87b2f9c0eb3",
+        "at": "2026-10-18T23:45:20.754Z",
+        "kind": "artifact",
+        "message": "Received result.md"
+      },
+      {
+        "id": "38503a8b-5212-4382-9e3b-026497486b8a",
+        "at": "2026-10-18T23:45:20.754Z",
+        "kind": "result",
+        "message": "完成：proof.txt 已写入并读回验证。字节数 21 = 19 字符（weaver-real-opencode）+ 换行，od 确认内容恰为 `weaver-real-opencode\\n`，无多余字节。未触碰其他文件，无未决风险。"
+      },
+      {
+        "id": "03df8f34-83bb-46c0-b5ff-21e2285b1efa",
+        "at": "2026-10-18T23:45:20.755Z",
+        "kind": "lifecycle",
+        "message": "Worker exited successfully; output is ready for owner review"
+      }
+    ],
+    "workspaceFileExists": true
+  },
+  "pi": {
+    "status": "completed",
+    "scope": "weaver-cli-pi-7d14f290",
+    "evidence": {
+      "engine": "pi",
+      "requestedModel": "cc-switch-agentplan/glm-5.3-flash",
+      "requestedEffort": "high",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi",
+      "terminal": "success",
+      "role": "worker",
+      "vendorModel": "cc-switch-agentplan/glm-5.3-flash",
+      "vendorSessionId": "01a15167-929e-700b-a81f-d65830a4be4e",
+      "usage": {
+        "inputTokens": 117,
+        "outputTokens": 151
+      }
+    },
+    "events": [
+      {
+        "id": "4202b398-4a69-45a6-b179-853e16bb640a",
+        "at": "2026-10-18T23:45:16.341Z",
+        "kind": "artifact",
+        "message": "Received result.md"
+      },
+      {
+        "id": "c2f64afb-c6ca-43e6-90a5-3934c67d0e87",
+        "at": "2026-10-18T23:45:16.342Z",
+        "kind": "result",
+        "message": "Task complete.\n\n**Report:**\n\n- **Changes:** Created `/tmp/weaver-redesign-3QuXVe/acceptance/final/real-pi/proof.txt` — the only file written. No other files touched.\n- **Content:** `weaver-real-pi` followed by a single newline.\n- **Verification:**\n  - Read back the file via `read`: output is `weaver-real-pi`.\n  - Byte-level check via `od -c`: confirms exactly `weaver-real-pi\\n` (14 bytes), no extra characters.\n- **Acceptance criteria:** ✅ `proof.txt` contains exactly `weaver-real-pi` and a newline.\n- **Risks:** None."
+      },
+      {
+        "id": "54adb1b7-2714-4aa5-9ca9-ca41e5a834cf",
+        "at": "2026-10-18T23:45:16.342Z",
+        "kind": "lifecycle",
+        "message": "Worker exited successfully; output is ready for owner review"
+      }
+    ],
+    "workspaceFileExists": true
+  },
+  "grok": {
+    "status": "failed",
+    "scope": "weaver-cli-grok-5a6568fa",
+    "evidence": {
+      "engine": "grok",
+      "requestedModel": "grok-4.7",
+      "requestedEffort": "high",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-grok",
+      "terminal": "error",
+      "role": "worker",
+      "vendorModel": "grok-4.7",
+      "vendorSessionId": "01a15167-995d-7513-ad46-4a4374f005c0",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0
+      }
+    },
+    "events": [
+      {
+        "id": "8b205ad9-896f-42d1-9953-fb2682ce09f3",
+        "at": "2026-10-18T23:45:13.058Z",
+        "kind": "log",
+        "message": "stderr: }\n"
+      },
+      {
+        "id": "99fec31c-0f6a-44be-9285-4820296e6442",
+        "at": "2026-10-18T23:45:13.069Z",
+        "kind": "log",
+        "message": "vendor terminal error exit 1: Internal error: {\n  \"message\": \"API error (status 402 Payment Required): Grok Build usage balance exhausted\",\n  \"http_status\": 402\n}"
+      },
+      {
+        "id": "ab4772e2-a3a6-4d75-a0da-425df8a25105",
+        "at": "2026-10-18T23:45:13.069Z",
+        "kind": "error",
+        "message": "Worker exited without successful result (code 1, signal none)"
+      }
+    ],
+    "workspaceFileExists": false
+  },
+  "codex": {
+    "status": "running",
+    "scope": "weaver-cli-codex-4e181c67",
+    "evidence": {
+      "engine": "codex",
+      "requestedModel": "gpt-6.1-sol",
+      "requestedEffort": "xhigh",
+      "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/real-codex",
+      "terminal": "pending",
+      "role": "worker"
+    },
+    "events": [
+      {
+        "id": "3d37c57d-7b2b-436c-b1fa-e49a4348b3f2",
+        "at": "2026-10-18T23:45:04.848Z",
+        "kind": "log",
+        "message": "codex sandbox workspace-write is the vendor profile, not a separate OS claim"
+      },
+      {
+        "id": "2dacdd07-a033-4609-843b-60c8c92135e1",
+        "at": "2026-10-18T23:45:04.848Z",
+        "kind": "progress",
+        "message": "owned scope started"
+      },
+      {
+        "id": "714b8b74-f2bd-4c3d-a26c-fa3e7b3b7558",
+        "at": "2026-10-18T23:45:05.095Z",
+        "kind": "progress",
+        "message": "codex thread started"
+      }
+    ],
+    "workspaceFileExists": false
+  }
+}

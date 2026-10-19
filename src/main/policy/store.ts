@@ -47,10 +47,15 @@ export class PolicyStore {
    owners:Object.fromEntries(Object.entries(this.config.owners).map(([id,e])=>[id,availabilityOf(this.config,blocks,e)])),
    workers:Object.fromEntries(Object.entries(this.config.workers).map(([id,e])=>[id,availabilityOf(this.config,blocks,e)])),execution:'disabled'});
  }
- save(value: unknown): PolicySnapshot {
+ save(value: unknown, options?: { allowEngineEnable?: boolean }): PolicySnapshot {
   const input=object(value); exact(input,['revision','config','blocks']);
   if(input.revision!==this.revision) throw new Error('Settings changed; reload before saving');
   const parsed=this.parse(input.config,input.blocks);
+  if (!options?.allowEngineEnable) {
+   for (const [id, engine] of Object.entries(parsed.config.engines)) {
+    if (engine.enabled && this.config.engines[id]?.enabled !== true) throw new Error(`Engine ${id} cannot be enabled by policy save; use the probe toggle`);
+   }
+  }
   const data=JSON.stringify({version:1,revision:this.revision+1,...parsed},null,2); bounded(JSON.parse(data));
   mkdirSync(dirname(this.path),{recursive:true}); const temp=`${this.path}.${randomUUID()}.tmp`;
   try {

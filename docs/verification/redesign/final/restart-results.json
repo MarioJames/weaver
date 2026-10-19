@@ -1,0 +1,453 @@
+{
+  "sameTaskRunIds": true,
+  "receiptUnchanged": true,
+  "tasks": 24,
+  "snapshotAfter": {
+    "revision": 1081,
+    "tasks": [
+      {
+        "id": "4f7faacd-e87a-4bd0-92da-8198a3043105",
+        "title": "missing workspace",
+        "status": "queued",
+        "revision": 2,
+        "ownerId": "fc0759cf-dfba-4f00-9b1b-4f768875fd39",
+        "updatedAt": "2026-10-18T23:56:54.297Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "6f5c429b-0820-4943-ade9-e4d127a75844",
+        "title": "qa_owner capacity 1",
+        "status": "cancelled",
+        "revision": 9,
+        "ownerId": "726fedef-7eb9-458a-b731-8374003f3f03",
+        "updatedAt": "2026-10-18T23:56:54.264Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "13a217bc-1698-4f1c-8fae-a28a0466fee2",
+        "title": "qa_owner capacity 0",
+        "status": "cancelled",
+        "revision": 9,
+        "ownerId": "bd406125-b0a7-4c1f-947e-b1cfec8f9e50",
+        "updatedAt": "2026-10-18T23:56:54.121Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "6506e3f2-d396-42b0-a216-24c006b21fe7",
+        "title": "codex_owner capacity 1",
+        "status": "cancelled",
+        "revision": 9,
+        "ownerId": "3773946d-453f-4224-be6f-a7cad1e76061",
+        "updatedAt": "2026-10-18T23:56:54.031Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "8969b940-e114-4295-bdbe-6198233d7375",
+        "title": "codex_owner capacity 0",
+        "status": "cancelled",
+        "revision": 10,
+        "ownerId": "ffbbbeb3-96fa-4837-b97d-b6f58e7c1269",
+        "updatedAt": "2026-10-18T23:56:53.898Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "2534056e-dc37-45fc-b730-0e02f92a1191",
+        "title": "workspace guard no launch",
+        "status": "cancelled",
+        "revision": 6,
+        "ownerId": "efe29d5b-00e3-4202-b2ff-ce2182e9a378",
+        "updatedAt": "2026-10-18T23:56:52.738Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "52b05b52-68f1-4a0f-a51b-10e2a9eaff8a",
+        "title": "occupy workspace slot",
+        "status": "completed",
+        "revision": 14,
+        "ownerId": "99fb8198-07c8-4e61-8f37-0e9c45ed7723",
+        "updatedAt": "2026-10-18T23:56:51.869Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "724b51d6-138f-41c4-98e8-b7415d84b833",
+        "title": "workspace guard no launch",
+        "status": "cancelled",
+        "revision": 6,
+        "ownerId": "cf43b107-db8f-423d-bd7a-ab2c1e3a1659",
+        "updatedAt": "2026-10-18T23:56:36.917Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "d94d568c-45ee-4a73-86be-8f50bdd46e37",
+        "title": "occupy workspace slot",
+        "status": "completed",
+        "revision": 14,
+        "ownerId": "c7fc9cc5-51d4-4fbb-8a33-40c01fcac2be",
+        "updatedAt": "2026-10-18T23:56:36.048Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "c7773548-e8f2-4309-84db-7f8e4241bc7c",
+        "title": "capacity queued",
+        "status": "completed",
+        "revision": 16,
+        "ownerId": "da178ae7-3467-4d8e-8c4c-06c899993cdc",
+        "updatedAt": "2026-10-18T23:56:02.400Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "414a902f-714b-411f-986f-293e16de2b7e",
+        "title": "capacity first",
+        "status": "completed",
+        "revision": 14,
+        "ownerId": "1a07c476-d2ca-4ce3-81b7-e69a6bf18ddf",
+        "updatedAt": "2026-10-18T23:56:01.807Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "ffaff7b9-bfc0-4baf-b174-43a23c8ddc5d",
+        "title": "Actual Pi timeout",
+        "status": "failed",
+        "revision": 18,
+        "ownerId": "5ef3545a-81c1-4b26-850b-c0e044c0c1a6",
+        "updatedAt": "2026-10-18T23:54:39.260Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "44fa7e7e-80e4-4717-9ed2-19cc6b079de4",
+        "title": "Actual Pi cancel",
+        "status": "cancelled",
+        "revision": 17,
+        "ownerId": "bbc5ea0f-7506-4001-aea2-1031dc3e8ef7",
+        "updatedAt": "2026-10-18T23:53:51.929Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "8b8b0cfc-e284-4228-ad1e-7a8281cab66d",
+        "title": "stdin idempotency",
+        "status": "queued",
+        "revision": 2,
+        "ownerId": "69e1c751-01c3-43a2-bff9-bae12eb58b46",
+        "updatedAt": "2026-10-18T23:53:07.816Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "88531d7f-6971-49a4-be76-b2725a6a033b",
+        "title": "Catalog text",
+        "status": "cancelled",
+        "revision": 3,
+        "ownerId": "e2d7b4e4-a7a6-4c82-96b6-d2064dd3be2f",
+        "updatedAt": "2026-10-18T23:52:24.428Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "4e2efc9d-a994-41bd-a839-aa35a9f72bf2",
+        "title": "Catalog text",
+        "status": "completed",
+        "revision": 18,
+        "ownerId": "e2d7b4e4-a7a6-4c82-96b6-d2064dd3be2f",
+        "updatedAt": "2026-10-18T23:52:24.283Z",
+        "reviewState": "accepted"
+      },
+      {
+        "id": "8b545e0c-6281-4381-9d17-c951bfed43d2",
+        "title": "Catalog jsonl",
+        "status": "cancelled",
+        "revision": 3,
+        "ownerId": "060262c3-b849-45f9-8cad-18a795cb0316",
+        "updatedAt": "2026-10-18T23:52:20.135Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "8f43fc4d-8c94-4858-8557-500f8c7db53c",
+        "title": "Catalog jsonl",
+        "status": "completed",
+        "revision": 18,
+        "ownerId": "060262c3-b849-45f9-8cad-18a795cb0316",
+        "updatedAt": "2026-10-18T23:52:19.994Z",
+        "reviewState": "accepted"
+      },
+      {
+        "id": "2ed5c3bc-38a1-4591-a319-65d3c4e8256b",
+        "title": "Catalog json",
+        "status": "cancelled",
+        "revision": 3,
+        "ownerId": "9bda5036-e2f6-4d04-8eb1-93ac20a719e4",
+        "updatedAt": "2026-10-18T23:52:15.864Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "babd096f-e21a-40e7-b693-a10e6960fc29",
+        "title": "Catalog json",
+        "status": "completed",
+        "revision": 223,
+        "ownerId": "9bda5036-e2f6-4d04-8eb1-93ac20a719e4",
+        "updatedAt": "2026-10-18T23:53:28.365Z",
+        "reviewState": "rejected"
+      },
+      {
+        "id": "35988b40-faee-44b3-9301-fb24cadcbce2",
+        "title": "weaver-real-codex",
+        "status": "completed",
+        "revision": 17,
+        "ownerId": "e10d7179-11a7-43f7-867c-a6030dedaf0d",
+        "updatedAt": "2026-10-18T23:50:06.480Z",
+        "reviewState": "accepted"
+      },
+      {
+        "id": "1c3b37ed-35f4-4748-a54c-e53c90e66b9f",
+        "title": "weaver-real-grok",
+        "status": "failed",
+        "revision": 17,
+        "ownerId": "f4073e3e-701f-4fb1-908c-2389b8e18240",
+        "updatedAt": "2026-10-18T23:45:13.069Z",
+        "reviewState": "pending"
+      },
+      {
+        "id": "a9d0bafc-7f20-47f3-a60a-9a393143449a",
+        "title": "weaver-real-pi",
+        "status": "completed",
+        "revision": 21,
+        "ownerId": "2841b0e3-5117-446c-9847-9dd10a11b4d3",
+        "updatedAt": "2026-10-18T23:50:06.219Z",
+        "reviewState": "accepted"
+      },
+      {
+        "id": "ed51853c-3a5f-4a8f-8662-9acd91d4882c",
+        "title": "weaver-real-opencode",
+        "status": "completed",
+        "revision": 21,
+        "ownerId": "45fceddc-f69e-421b-be93-658ebf05e7b6",
+        "updatedAt": "2026-10-18T23:50:06.000Z",
+        "reviewState": "accepted"
+      }
+    ],
+    "owners": [
+      {
+        "id": "45fceddc-f69e-421b-be93-658ebf05e7b6",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "2841b0e3-5117-446c-9847-9dd10a11b4d3",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "f4073e3e-701f-4fb1-908c-2389b8e18240",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "e10d7179-11a7-43f7-867c-a6030dedaf0d",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "7e96171e-bc8d-4758-9702-d7c5a3862bec",
+        "name": "Catalog json",
+        "profileId": "codex_owner",
+        "mode": "mock",
+        "state": "ready"
+      },
+      {
+        "id": "f2ca2f48-e0f6-49d8-9569-65c36b25ab74",
+        "name": "Manual json",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "9bda5036-e2f6-4d04-8eb1-93ac20a719e4",
+        "name": "Catalog json",
+        "profileId": "codex_owner",
+        "mode": "mock",
+        "state": "ready"
+      },
+      {
+        "id": "8a63ef8b-10ba-42d4-933e-d32535959002",
+        "name": "Catalog jsonl",
+        "profileId": "codex_owner",
+        "mode": "mock",
+        "state": "ready"
+      },
+      {
+        "id": "52dbacb1-8fcf-40ea-89fe-93d455a51c84",
+        "name": "Manual jsonl",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "060262c3-b849-45f9-8cad-18a795cb0316",
+        "name": "Catalog jsonl",
+        "profileId": "codex_owner",
+        "mode": "mock",
+        "state": "ready"
+      },
+      {
+        "id": "eb62d595-36ee-474c-ad65-a03a62b7417a",
+        "name": "Catalog text",
+        "profileId": "codex_owner",
+        "mode": "mock",
+        "state": "ready"
+      },
+      {
+        "id": "37b7c34f-1a03-4d83-88a1-c59f1c2c1597",
+        "name": "Manual text",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "e2d7b4e4-a7a6-4c82-96b6-d2064dd3be2f",
+        "name": "Catalog text",
+        "profileId": "codex_owner",
+        "mode": "mock",
+        "state": "ready"
+      },
+      {
+        "id": "69e1c751-01c3-43a2-bff9-bae12eb58b46",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "bbc5ea0f-7506-4001-aea2-1031dc3e8ef7",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "5ef3545a-81c1-4b26-850b-c0e044c0c1a6",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "1a07c476-d2ca-4ce3-81b7-e69a6bf18ddf",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "da178ae7-3467-4d8e-8c4c-06c899993cdc",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "c7fc9cc5-51d4-4fbb-8a33-40c01fcac2be",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "cf43b107-db8f-423d-bd7a-ab2c1e3a1659",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "99fb8198-07c8-4e61-8f37-0e9c45ed7723",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "efe29d5b-00e3-4202-b2ff-ce2182e9a378",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "ffbbbeb3-96fa-4837-b97d-b6f58e7c1269",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "3773946d-453f-4224-be6f-a7cad1e76061",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "bd406125-b0a7-4c1f-947e-b1cfec8f9e50",
+        "name": "Task owner",
+        "profileId": "qa_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "726fedef-7eb9-458a-b731-8374003f3f03",
+        "name": "Task owner",
+        "profileId": "qa_owner",
+        "mode": "manual",
+        "state": "attached"
+      },
+      {
+        "id": "fc0759cf-dfba-4f00-9b1b-4f768875fd39",
+        "name": "Task owner",
+        "profileId": "codex_owner",
+        "mode": "manual",
+        "state": "attached"
+      }
+    ]
+  },
+  "receipt": {
+    "commandId": "qa-fixed-idempotency",
+    "state": "settled",
+    "response": {
+      "apiVersion": "weaver.v1",
+      "commandId": "qa-fixed-idempotency",
+      "ok": true,
+      "data": {
+        "workspace": "/tmp/weaver-redesign-3QuXVe/acceptance/final/caller-cwd",
+        "title": "stdin idempotency",
+        "instruction": "not executed",
+        "id": "8b8b0cfc-e284-4228-ad1e-7a8281cab66d",
+        "createdAt": "2026-10-18T23:53:07.816Z",
+        "updatedAt": "2026-10-18T23:53:07.816Z",
+        "status": "queued",
+        "revision": 2,
+        "reviewState": "pending",
+        "progress": 0,
+        "events": [
+          {
+            "id": "d7d8d45e-23a0-40e7-93b4-a8eaa723611b",
+            "at": "2026-10-18T23:53:07.816Z",
+            "kind": "lifecycle",
+            "message": "Task queued. Owner reference is metadata only; no Herdr session was contacted."
+          }
+        ],
+        "artifacts": [],
+        "ownerId": "69e1c751-01c3-43a2-bff9-bae12eb58b46",
+        "ownerEpoch": 0,
+        "ownerLastActivityAt": "2026-10-18T23:53:07.817Z",
+        "continuationPolicy": {
+          "idleRotationMinutes": 60
+        }
+      }
+    }
+  }
+}

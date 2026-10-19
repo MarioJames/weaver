@@ -1,0 +1,156 @@
+[
+  {
+    "unit": "weaver-cli-start-51f489e9d83d",
+    "launcherPid": 3411478,
+    "elapsed": 2027,
+    "closed": true,
+    "closeCode": null,
+    "closeSignal": "SIGTERM",
+    "errors": [],
+    "pids": {
+      "parent": 3411478,
+      "grand": 3411522
+    },
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n",
+    "parentAlive": false,
+    "grandAlive": false,
+    "parentInScope": false,
+    "grandInScope": false
+  },
+  {
+    "phase": "cleanup",
+    "unit": "weaver-cli-start-51f489e9d83d",
+    "launcherPid": 3411478,
+    "closed": true,
+    "elapsed": 2050,
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n",
+    "launcherAlive": false,
+    "parentAlive": false,
+    "grandAlive": false
+  },
+  {
+    "mode": "failed-launcher",
+    "unit": "weaver-cli-end-ccd17bcba01b",
+    "launcherPid": 3411562,
+    "closed": true,
+    "code": 17,
+    "elapsed": 442,
+    "errors": [],
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+  },
+  {
+    "phase": "cleanup",
+    "mode": "failed-launcher",
+    "unit": "weaver-cli-end-ccd17bcba01b",
+    "launcherPid": 3411562,
+    "closed": true,
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n",
+    "launcherAlive": false
+  },
+  {
+    "mode": "fast-exit",
+    "unit": "weaver-cli-end-0769af193948",
+    "launcherPid": 3411584,
+    "closed": true,
+    "code": 0,
+    "elapsed": 1988,
+    "errors": [],
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+  },
+  {
+    "phase": "cleanup",
+    "mode": "fast-exit",
+    "unit": "weaver-cli-end-0769af193948",
+    "launcherPid": 3411584,
+    "closed": true,
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n",
+    "launcherAlive": false
+  },
+  {
+    "unit": "weaver-cli-kill-13c77e96da59",
+    "pid": 3411643,
+    "closed": true,
+    "signal": "SIGKILL",
+    "elapsed": 130,
+    "errors": [],
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n",
+    "pidAlive": false
+  },
+  {
+    "phase": "cleanup",
+    "unit": "weaver-cli-kill-13c77e96da59",
+    "launcherPid": 3411643,
+    "closed": true,
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n",
+    "launcherAlive": false
+  },
+  {
+    "unit": "weaver-cli-miss-b8905f608221",
+    "launcherPid": null,
+    "closed": true,
+    "code": -2,
+    "elapsed": 35,
+    "errors": [
+      "Error: spawn systemd-run ENOENT"
+    ],
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+  },
+  {
+    "phase": "cleanup",
+    "unit": "weaver-cli-miss-b8905f608221",
+    "launcherPid": null,
+    "closed": true,
+    "active": "ControlGroup=\nActiveState=inactive\nInvocationID=\n"
+  },
+  {
+    "case": "split-complete",
+    "pushedBytes": [
+      6
+    ],
+    "overflows": [
+      {
+        "phase": "complete",
+        "limitBytes": 131072,
+        "observedBytes": 184320
+      }
+    ]
+  },
+  {
+    "case": "unterminated",
+    "pushedBytes": [],
+    "overflows": [
+      {
+        "phase": "unterminated",
+        "limitBytes": 131072,
+        "observedBytes": 131073
+      }
+    ]
+  },
+  {
+    "case": "end-flush",
+    "pushedBytes": [],
+    "overflows": [
+      {
+        "phase": "unterminated",
+        "limitBytes": 131072,
+        "observedBytes": 131073
+      }
+    ]
+  },
+  {
+    "case": "exact-utf8",
+    "terminated": true,
+    "pushedBytes": [
+      131072
+    ],
+    "overflows": []
+  },
+  {
+    "case": "exact-utf8",
+    "terminated": false,
+    "pushedBytes": [
+      131072
+    ],
+    "overflows": []
+  }
+]
