@@ -4,7 +4,7 @@ import { PageHeader } from '@lobehub/ui/dashboard';
 import { Alert, Button, Drawer } from '@lobehub/ui/base-ui';
 import { command } from '../commands';
 import type { OwnerInstance } from '../../shared/commands';
-import { archivedTasks, withOwnerProfiles } from '../task-view';
+import { archivedTasks, readTaskFilters, withOwnerProfiles } from '../task-view';
 import { ArchiveDrawer } from '../components/ArchiveDrawer';
 import { NewTaskDialog } from '../components/NewTaskDialog';
 import { TaskBoard } from '../components/TaskBoard';
@@ -12,6 +12,7 @@ import { TaskDetail } from '../components/TaskDetail';
 import type { useWorkbench } from '../hooks/useWorkbench';
 
 export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWorkbench>; ownerKind?: (ownerId?: string) => string | undefined }) {
+  const [filters, setFilters] = useState(readTaskFilters);
   const [creating, setCreating] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [selected, setSelected] = useState<string>();
@@ -28,15 +29,16 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
   }, [work.tasks, ownersAttempt]);
   const tasks = withOwnerProfiles(work.tasks, owners);
   const task = tasks.find(item => item.id === selected);
-  const archived = archivedTasks(tasks, Date.now()).length;
+  const now = Date.now();
+  const archived = archivedTasks(tasks, now).length;
   return <>
     <PageHeader title="任务" description="创建、执行和验收都记录在同一条任务里。" action={<>
       <Button ref={newTaskRef} type="primary" icon={Plus} disabled={work.busy || !work.caps || work.loading} onClick={() => setCreating(true)}>新建任务</Button>
       <Button icon={Archive} disabled={!work.caps || work.loading} onClick={() => setArchiving(true)}>归档 {archived}</Button>
     </>} />
     {ownersError && <Alert type="warning" title="负责人资料读取失败" description={ownersError} action={<Button onClick={() => setOwnersAttempt(value => value + 1)}>重试</Button>} />}
-    <TaskBoard tasks={tasks} selected={selected} loading={work.loading} onSelect={setSelected} ownerKind={ownerKind} />
-    <ArchiveDrawer tasks={tasks} selected={selected} open={archiving} onClose={() => setArchiving(false)} onSelect={setSelected} ownerKind={ownerKind} />
+    <TaskBoard filters={filters} onFiltersChange={setFilters} now={now} tasks={tasks} selected={selected} loading={work.loading} onSelect={setSelected} ownerKind={ownerKind} />
+    <ArchiveDrawer now={now} tasks={tasks} selected={selected} open={archiving} onClose={() => setArchiving(false)} onSelect={setSelected} ownerKind={ownerKind} />
     <Drawer open={!!task} title="任务详情" placement="right" width="min(960px, 92vw)" onClose={() => setSelected(undefined)}>
       {task && <TaskDetail key={task.id} task={task} busy={work.busy || !work.caps} action={work.action} ownerKind={ownerKind}
         onStart={id => void work.action(() => window.weaver.startTask(id))}

@@ -64,7 +64,7 @@ export function ArchiveList({ tasks, selected, onSelect, ownerKind, now = Date.n
     </div>
     {rows.length ? <Table<Task> columns={archiveColumns(ownerKind)} dataSource={rows} rowKey="id" pagination={false} size="small" scroll={{ x: true }}
       onRow={task => archiveRowProps(task, selected, onSelect)} /> :
-      <Empty title="还没有归档任务" description="任务结束满一天后会出现在这里。" />}
+      <Empty title={archivedTasks(tasks, now).length ? "没有匹配的归档任务" : "还没有归档任务"} description={archivedTasks(tasks, now).length ? "调整负责人或搜索条件。" : "任务结束满一天后会出现在这里。"} />}
   </div>;
 }
 

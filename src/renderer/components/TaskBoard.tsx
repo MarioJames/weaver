@@ -6,7 +6,7 @@ import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import type { Task } from '../../shared/types';
 import { redactLog } from '../log-view';
 import type { FilterDimension, FilterOption, TaskSelection } from '../task-view';
-import { FILTER_DIMENSIONS, TASK_COLUMNS, applyTaskFilters, columnize, emptySelection, filterButtonLabel, filterOptions, filterTasks, hasFilters, nonArchived, readEndedExpanded, readTaskFilters, resolveSelection, reviewLabel, statusLabels, toggleOption, writeEndedExpanded, writeTaskFilters } from '../task-view';
+import { FILTER_DIMENSIONS, TIME_RANGES, TASK_COLUMNS, applyTaskFilters, columnize, emptySelection, filterButtonLabel, filterOptions, filterTasks, hasFilters, isOpenTask, nonArchived, readEndedExpanded, readTaskFilters, resolveSelection, reviewLabel, statusLabels, toggleOption, writeEndedExpanded, writeTaskFilters } from '../task-view';
 import { styles } from '../style';
 import { AgentFacts } from './AgentFacts';
 import { EngineIcon } from './EngineIcon';
@@ -58,20 +58,22 @@ export function filterReveal(options: FilterOption[], chosen: string[], onReveal
   return <Button size="small" type="text" block onClick={onReveal}>显示全部 {quiet.length}</Button>;
 }
 
-export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, now = Date.now() }: { tasks: Task[]; selected?: string; loading: boolean; onSelect: (id: string) => void; ownerKind?: (ownerId?: string) => string | undefined; now?: number }) {
+export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filters, onFiltersChange, now = Date.now() }: { filters?: TaskSelection; onFiltersChange?: (selection: TaskSelection) => void; tasks: Task[]; selected?: string; loading: boolean; onSelect: (id: string) => void; ownerKind?: (ownerId?: string) => string | undefined; now?: number }) {
   const [query, setQuery] = useState('');
   const [stored, setStored] = useState(readTaskFilters);
   const [ended, setEnded] = useState(readEndedExpanded);
   const [revealed, setRevealed] = useState<Record<FilterDimension, boolean>>({ owner: false, engine: false, worker: false });
   if (loading && !tasks.length) return <div role="status" className={styles.stack}><Skeleton animated /><Text type="secondary">正在加载本地任务…</Text></div>;
   if (!tasks.length) return <Empty title="还没有任务" description="从右上角新建第一个任务。" />;
-  const selection = resolveSelection(stored, tasks, now);
+  const selection = resolveSelection(filters ?? stored, tasks, now);
   const board = nonArchived(tasks, now);
-  const visible = filterTasks(applyTaskFilters(board, selection), 'all', query);
+  const visible = filterTasks(applyTaskFilters(board, selection, undefined, now), 'all', query);
   const columns = columnize(visible);
-  const choose = (dimension: FilterDimension, values: string[]) => {
-    const next: TaskSelection = { ...selection, [dimension]: values };
+  const olderOpenWork = !visible.length && selection.time === 'today' &&
+    filterTasks(applyTaskFilters(board, { ...selection, time: 'all' }, undefined, now), 'all', query).some(isOpenTask);
+  const update = (next: TaskSelection) => {
     setStored(next);
+    onFiltersChange?.(next);
     writeTaskFilters(next);
   };
   /** 已结束 starts folded: its count is the whole story until someone asks for more. */
@@ -100,14 +102,26 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, now =
         const options = filterOptions(board, dimension, selection, now);
         const chosen = selection[dimension];
         return <DropdownMenu key={dimension} trigger="click" placement="bottomLeft"
-          items={filterItems(dimension, options, chosen, value => choose(dimension, toggleOption(chosen, value)), ownerKind, revealed[dimension])}
+          items={filterItems(dimension, options, chosen, value => update({ ...selection, [dimension]: toggleOption(chosen, value) }), ownerKind, revealed[dimension])}
           footer={revealed[dimension] ? undefined : filterReveal(options, chosen, () => setRevealed({ ...revealed, [dimension]: true }))}>
           <Button size="small" type={chosen.length ? 'fill' : 'default'} icon={ChevronDown} iconPosition="end">{filterButtonLabel(dimension, options, chosen)}</Button>
         </DropdownMenu>;
       })}
-      {hasFilters(selection) && <Button size="small" type="text" onClick={() => { setStored(emptySelection()); writeTaskFilters(emptySelection()); }}>清除</Button>}
+      <DropdownMenu trigger="click" placement="bottomLeft" items={TIME_RANGES.map(range => ({
+        type: 'checkbox' as const,
+        key: range.value,
+        label: range.label,
+        checked: selection.time === range.value,
+        onCheckedChange: () => update({ ...selection, time: range.value }),
+      }))}>
+        <Button size="small" type={selection.time === 'all' ? 'default' : 'fill'} icon={ChevronDown} iconPosition="end">{`时间：${TIME_RANGES.find(range => range.value === selection.time)?.label}`}</Button>
+      </DropdownMenu>
+      {hasFilters(selection) && <Button size="small" type="text" onClick={() => update(emptySelection())}>清除</Button>}
     </div>
-    {!visible.length ? <Text type="secondary" className={styles.meta} style={{ padding: 8 }}>没有匹配的任务</Text> :
+    {!visible.length ? olderOpenWork ? <div className={styles.row}>
+      <Text type="secondary">今天没有任务，还有更早的未结束任务。</Text>
+      <Button size="small" onClick={() => update({ ...selection, time: 'all' })}>查看全部</Button>
+    </div> : <Text type="secondary" className={styles.meta} style={{ padding: 8 }}>没有匹配的任务</Text> :
       <div className={styles.columns} aria-busy={loading}>
         {TASK_COLUMNS.map((column, index) => {
           const items = columns[index];

@@ -17,7 +17,7 @@ export function withOwnerProfiles(tasks: Task[], owners: Pick<OwnerInstance, 'id
     return instance ? { ...task, owner: { ...task.owner, name: instance.name, profileId: instance.profileId } } : task;
   });
 }
-/** Named registrations retain their instance identity; throwaways share the profile. */
+/** Named registrations carry a display name distinct from their policy profile. */
 function namedOwnerInstance(task: Task): boolean {
   return !!task.ownerId && !!logicalOwnerName(task) && task.ownerId !== taskOwnerId(task);
 }
@@ -66,8 +66,29 @@ export type FilterDimension = 'owner' | 'engine' | 'worker';
 export const FILTER_DIMENSIONS: readonly FilterDimension[] = ['owner', 'engine', 'worker'];
 export const filterLabels: Record<FilterDimension, string> = { owner: '负责人', engine: '引擎', worker: '工作代理' };
 /** The chosen values per dimension. */
-export type TaskSelection = Record<FilterDimension, string[]>;
-export function emptySelection(): TaskSelection { return { owner: [], engine: [], worker: [] }; }
+export const TIME_RANGES = [
+  { value: 'all', label: '全部' },
+  { value: '1h', label: '近 1 小时' },
+  { value: 'today', label: '今天' },
+  { value: '24h', label: '近 24 小时' },
+  { value: '7d', label: '近 7 天' },
+  { value: '30d', label: '近 30 天' },
+] as const;
+export type TaskTimeRange = typeof TIME_RANGES[number]['value'];
+export type TaskSelection = Record<FilterDimension, string[]> & { time: TaskTimeRange };
+/** Last activity since a local-day or elapsed-time boundary; the caller supplies the clock. */
+export function filterByTime(tasks: Task[], range: TaskTimeRange, now: number): Task[] {
+  if (range === 'all') return tasks;
+  const midnight = new Date(now);
+  midnight.setHours(0, 0, 0, 0);
+  const hours = { '1h': 1, '24h': 24, '7d': 168, '30d': 720 };
+  const since = range === 'today' ? midnight.getTime() : now - hours[range] * 3600000;
+  return tasks.filter(task => {
+    const updated = Date.parse(task.updatedAt);
+    return updated >= since && updated <= now;
+  });
+}
+export function emptySelection(): TaskSelection { return { owner: [], engine: [], worker: [], time: 'today' }; }
 /** localStorage key holding the board's filter selection. */
 export const TASK_FILTERS_KEY = 'weaver-task-filters';
 /** One dropdown entry: what it is called, how much live work hides behind it, and the brand to draw. */
@@ -75,8 +96,9 @@ export interface FilterOption { value: string; label: string; kind?: string; ope
 /** The value a task answers for in one dimension; undefined when the task has no value to group by. */
 export function taskOption(task: Task, dimension: FilterDimension): { value: string; label: string } | undefined {
   if (dimension === 'owner') {
-    const value = namedOwnerInstance(task) ? task.ownerId! : taskOwnerId(task) ?? ownerLabel(task);
-    return { value, label: namedOwnerInstance(task) ? task.owner.name : logicalOwnerName(task) ?? ownerLabel(task) };
+    const named = !!task.ownerId && !!logicalOwnerName(task);
+    const value = named ? task.owner.name : taskOwnerId(task) ?? ownerLabel(task);
+    return { value, label: named ? task.owner.name : logicalOwnerName(task) ?? ownerLabel(task) };
   }
   const kind = dispatchKind(task);
   if (dimension === 'engine') return kind ? { value: kind, label: kind } : undefined;
@@ -87,8 +109,8 @@ export function taskOption(task: Task, dimension: FilterDimension): { value: str
  * Same dimension ORs its choices, dimensions AND each other.
  * `skip` leaves one dimension unfiltered, which is how a dropdown counts what adding a choice would show.
  */
-export function applyTaskFilters(tasks: Task[], selection: TaskSelection, skip?: FilterDimension): Task[] {
-  return tasks.filter(task => FILTER_DIMENSIONS.every(dimension => {
+export function applyTaskFilters(tasks: Task[], selection: TaskSelection, skip?: FilterDimension, now: number = Date.now()): Task[] {
+  return filterByTime(tasks, selection.time, now).filter(task => FILTER_DIMENSIONS.every(dimension => {
     if (dimension === skip) return true;
     const chosen = selection[dimension];
     if (!chosen.length) return true;
@@ -99,7 +121,7 @@ export function applyTaskFilters(tasks: Task[], selection: TaskSelection, skip?:
 /** Every value the board holds for one dimension, busiest first. Archived work is not on the board, so it never counts. */
 export function filterOptions(tasks: Task[], dimension: FilterDimension, selection: TaskSelection, now: number = Date.now()): FilterOption[] {
   const board = nonArchived(tasks, now);
-  const narrowed = new Set(applyTaskFilters(board, selection, dimension).map(task => task.id));
+  const narrowed = new Set(applyTaskFilters(board, selection, dimension, now).map(task => task.id));
   const seen = new Map<string, FilterOption>();
   for (const task of board) {
     const option = taskOption(task, dimension);
@@ -113,17 +135,11 @@ export function filterOptions(tasks: Task[], dimension: FilterDimension, selecti
     seen.set(option.value, { value: option.value, label: option.label, kind: dimension === 'owner' ? undefined : dispatchKind(task), ...(dimension === 'owner' ? { ownerProfile: taskOwnerId(task) } : {}), open: live ? 1 : 0 });
   }
   const options = [...seen.values()];
-  // Separate durable registrations may share a name (for example across sessions).
-  if (dimension === 'owner') {
-    const labels = new Map<string, number>();
-    for (const option of options) labels.set(option.label, (labels.get(option.label) ?? 0) + 1);
-    for (const option of options) if (labels.get(option.label)! > 1) option.label = `${option.label} · ${option.value}`;
-  }
   return options.sort((a, b) => b.open - a.open || a.label.localeCompare(b.label));
 }
-/** Is anything narrowed at all? Only then does 清除 have a job. */
+/** 清除 is available only when the selection differs from the default today view. */
 export function hasFilters(selection: TaskSelection): boolean {
-  return FILTER_DIMENSIONS.some(dimension => selection[dimension].length > 0);
+  return selection.time !== 'today' || FILTER_DIMENSIONS.some(dimension => selection[dimension].length > 0);
 }
 /** The checklist toggles: choosing a value that is already chosen drops it. */
 export function toggleOption(values: string[], value: string): string[] {
@@ -143,11 +159,13 @@ function parseSelection(raw: string | null): TaskSelection {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return emptySelection();
     const stored = parsed as Record<string, unknown>;
+    const initial = emptySelection();
+    initial.time = TIME_RANGES.find(range => range.value === stored.time)?.value ?? initial.time;
     return FILTER_DIMENSIONS.reduce((selection, dimension) => {
       const values = stored[dimension];
       selection[dimension] = Array.isArray(values) ? values.filter(value => typeof value === 'string') : [];
       return selection;
-    }, emptySelection());
+    }, initial);
   } catch { return emptySelection(); }
 }
 /** The saved selection; unreadable storage is the same as none. */
@@ -162,9 +180,13 @@ export function writeTaskFilters(selection: TaskSelection): void {
 export function resolveSelection(selection: TaskSelection, tasks: Task[], now: number = Date.now()): TaskSelection {
   return FILTER_DIMENSIONS.reduce((next, dimension) => {
     const known = new Set(filterOptions(tasks, dimension, emptySelection(), now).map(option => option.value));
-    next[dimension] = selection[dimension].filter(value => known.has(value));
+    next[dimension] = [...new Set(selection[dimension].map(value => {
+      if (dimension !== 'owner' || known.has(value)) return value;
+      const task = tasks.find(task => task.ownerId === value);
+      return task ? taskOption(task, 'owner')?.value ?? value : value;
+    }).filter(value => known.has(value)))];
     return next;
-  }, emptySelection());
+  }, { ...emptySelection(), time: selection.time });
 }
 /** localStorage key recording whether the board's 已结束 column is open. */
 export const ENDED_EXPANDED_KEY = 'weaver-task-ended-expanded';
