@@ -122,7 +122,28 @@ test('new logical commands are catalogued, parseable in both forms and in help',
  }
  assert.match(CLI_HELP,/\[--engine <id>\] \[--cancel\]/);
  assert.match(CLI_HELP,/engine <id> is the engine argument of engines penalty and engines unblock/);
- assert.match(CLI_HELP,/the server decides what a retry or an unblock does/);
+ assert.match(CLI_HELP,/tasks retry returns the linked task already dispatched/);
+ // The help says what an owner gets, not which component decides it.
+ assert.doesNotMatch(CLI_HELP,/the server decides|the CLI never/);
+});
+
+test('text output carries the next step a dispatch or retry handed back',()=>{
+ const waited={id:'t-1',status:'running',title:'Held',dispatch:{engine:'claude'},next:{action:'wait',command:'weaver tasks wait --task-id t-1'},excludedEngines:['codex']};
+ const text=renderEnvelope('text',{apiVersion:'weaver.v1',ok:true,data:waited});
+ assert.equal(text.split('\n')[0],'t-1 running Held');
+ assert.match(text,/^next: weaver tasks wait --task-id t-1$/m);
+ assert.match(text,/^excluded engines: codex$/m);
+ const native={id:'t-2',status:'running',title:'Native',next:{action:'run_subagent',model:'sonnet',effort:'high',prompt:'FULL INSTRUCTION\nsecond line',then:'weaver workers complete --task-id t-2 --input report.json'}};
+ const handoff=renderEnvelope('text',{apiVersion:'weaver.v1',ok:true,data:native});
+ assert.match(handoff,/^t-2 running Native$/m);
+ assert.match(handoff,/^next: run a subagent on model sonnet, effort high$/m);
+ assert.ok(handoff.includes('FULL INSTRUCTION\nsecond line'),'the whole native prompt is handed over, not shortened');
+ assert.match(handoff,/^then: weaver workers complete --task-id t-2 --input report\.json$/m);
+ // The machine formats keep every field the text format reshapes.
+ for(const format of ['json','jsonl'] as const){
+  assert.deepEqual(JSON.parse(renderEnvelope(format,{apiVersion:'weaver.v1',ok:true,data:waited})).data,waited,'wait command and exclusions survive');
+  assert.deepEqual(JSON.parse(renderEnvelope(format,{apiVersion:'weaver.v1',ok:true,data:native})).data,native,'the full prompt survives');
+ }
 });
 
 test('flags become the frozen logical args and a mutation keeps the shared command ID rule',()=>{

@@ -54,7 +54,8 @@ export const EXECUTION_BOUNDARY = {
   enablementAuthority: 'policy.engines.enabled',
   probeIsNotAuthority: true,
   roleAutoCreate: false,
-  realAdapter: 'opencode|pi|grok|codex',
+  /** The same list adapterStatusFor answers 'real' with, so the published fact cannot drift from it. */
+  realAdapter: [...REAL_ADAPTER_KINDS].join('|'),
   deferredAdapter: 'claude',
   mockExecution: 'explicit-in-task-detail',
   authenticated: false,

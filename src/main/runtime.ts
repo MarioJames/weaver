@@ -221,7 +221,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
         worker: active.manager.canLaunchReal
           ? 'Saved opencode, pi, grok, codex, and qodercli routes launch that engine. mock-jsonl runs only when requested. Failures do not fall back.'
           : 'mock-jsonl is the explicit test provider. A real route fails until the engine launcher is loaded and does not fall back to mock.',
-        owner: 'Logical registration only. The owner is the agent in the skill host and calls this CLI. This process does not spawn an owner model.',
+        owner: 'Attachment is metadata only. owners.switch with launch and owners.launch start a visible Herdr owner on a claude or codex profile; a Herdr executable on PATH is neither a model run nor a login proof.',
         maxParallel: configuredParallel(active.policy),
         storePath: active.store.path,
         quota: QUOTA_CAPABILITIES,
@@ -289,7 +289,8 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     manager = new TaskManager(store, workers, () => {}, undefined, error => {
       console.error(error instanceof Error ? error.message : 'Task history could not be saved');
     });
-    commands = new CommandHandler(manager, policy);
+    // Health and penalties are this monitor's own answers, so the command face reads them from it rather than inventing them.
+    commands = new CommandHandler(manager, policy, undefined, undefined, stall);
     commands.transportStatus = 'ready';
     ready = true;
     scheduler.start();

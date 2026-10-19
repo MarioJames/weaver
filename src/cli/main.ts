@@ -91,7 +91,7 @@ tasks create: an omitted workspace becomes this CLI process's working directory 
 
 tasks wait and tasks watch poll tasks get and tasks events. --for is 1 through 600 seconds; omitted, it defaults to min(600, herdr.max_wait_minutes × 60) from the policy, or 30 seconds when the policy cannot be read. They do not start a second scheduler.
 
---engine <id> is the engine argument of engines penalty and engines unblock. --cancel is a valueless flag that sets cancel on tasks retry. Both are rejected on any other command, repeated, missing their value, or when the --input body already carries a different one. The CLI only maps them into the request args; the server decides what a retry or an unblock does, and the CLI never cancels, copies or dispatches by itself.
+--engine <id> is the engine argument of engines penalty and engines unblock. --cancel is a valueless flag that sets cancel on tasks retry. Both are rejected on any other command, repeated, missing their value, or when the --input body already carries a different one. tasks retry returns the linked task already dispatched, together with the one thing to do next.
 
 Mutations need --command-id, except policy save, engines set-enabled, and quota refresh, which send the JSON body shown in their usage. quota refresh defaults to {} and synchronizes Weaver-owned policy blocks without inference; it does not accept command or task IDs. operations get reads that same --command-id. owners attach stores a name and profile plus optional caller labels. It does not contact a host. owners spawn does not start an owner model. capabilities.realExecution means the worker launcher is loaded, not that a model ran or a login was proven. mock-jsonl is an explicit provider. A real route does not fall back to mock.
 
@@ -297,10 +297,22 @@ export function applyCallerWorkspace(request: Record<string, unknown>, cwd: stri
   else if (typeof workspace !== 'string' || workspace.trim() === '') throw new LocalIPCError('INVALID_ARGUMENT', 'Explicit workspace must be a nonempty path string');
   else if (!isAbsolute(workspace)) record.workspace = resolve(cwd, workspace);
 }
+/** Text carries the same handoff the json next field does: the wait command, or the exact subagent run. */
+function renderNext(next: Record<string, unknown>): string[] {
+  if (next.action === 'run_subagent') {
+    return [`next: run a subagent on model ${next.model}, effort ${next.effort}`, String(next.prompt ?? ''), `then: ${next.then ?? ''}`].filter(Boolean);
+  }
+  return [`next: ${next.command ?? next.action ?? ''}`];
+}
 function renderData(data: unknown): string {
   if (!data || typeof data !== 'object') return data === undefined ? '' : String(data);
   const record = data as Record<string, unknown>;
-  if (typeof record.status === 'string' && typeof record.title === 'string') return `${record.id ?? ''} ${record.status} ${record.title}`.trim();
+  if (typeof record.status === 'string' && typeof record.title === 'string') {
+    const lines = [`${record.id ?? ''} ${record.status} ${record.title}`.trim()];
+    if (record.next && typeof record.next === 'object') lines.push(...renderNext(record.next as Record<string, unknown>));
+    if (Array.isArray(record.excludedEngines) && record.excludedEngines.length) lines.push(`excluded engines: ${record.excludedEngines.join(', ')}`);
+    return lines.join('\n');
+  }
   if (Array.isArray(record.tasks)) return record.tasks.map(item => renderData(item)).join('\n') || 'No tasks';
   if (Array.isArray(record.owners)) return record.owners.map(item => { const owner = item as Record<string, unknown>; return `${owner.id ?? ''} ${owner.name ?? ''} ${owner.state ?? ''}`.trim(); }).join('\n') || 'No owners';
   if (Array.isArray(record.events)) return record.events.map(item => { const event = item as Record<string, unknown>; return `${event.kind ?? 'event'}: ${event.message ?? ''}`; }).join('\n') || 'No events';
