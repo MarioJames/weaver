@@ -3,11 +3,11 @@ import { redact } from './redact';
 
 const LIMITS = [
  {kind:'quota', pattern:/FreeUsageLimitError|GoUsageLimitError|insufficient[_ ](?:balance|quota)|\b402\b|(?:usage|spending|credit|quota)[_ ]limit|quota.{0,30}(?:exceeded|exhausted)|(?:out of|insufficient|zero|no) (?:credits|balance)|balance.{0,20}(?:exhausted|insufficient)/i},
- {kind:'rate_limit', pattern:/rate[_ -]?limit|too many requests|\b429\b|AI_APICallError/i},
+ {kind:'rate_limit', pattern:/rate[_ -]?limit|too many requests|\b429\b/i},
  {kind:'auth', pattern:/authentication[_ ](?:failed|error)|invalid[_ ]api[_ ]key|unauthorized|\b401\b/i},
 ] as const;
 const ENGINE_PATTERNS:Record<string,RegExp> = {
- opencode:/AI_APICallError|FreeUsageLimitError|GoUsageLimitError/i,
+ opencode:/FreeUsageLimitError|GoUsageLimitError|usage limit/i,
  qodercli:/usage limit|quota|credits/i, pi:/usage limit|quota|credits/i,
  grok:/balance|\b402\b/i, codex:/usage limit|you.?ve hit your limit|limit reached/i,
  claude:/usage limit|you.?ve hit your limit|limit reached/i,

@@ -28,7 +28,7 @@ export function buildLaunchSpec(input: {
     case 'opencode':
       return {
         stdin: input.instruction,
-        argv: ['opencode', 'run', '--format', 'json', '--model', input.model, '--variant', input.effort, '--pure', '--auto', '--dir', input.workspace],
+        argv: ['opencode', 'run', '--format', 'json', '--model', input.model, '--variant', input.effort, '--pure', '--auto', '--print-logs', '--log-level', 'ERROR', '--dir', input.workspace],
       };
     case 'grok':
       return {

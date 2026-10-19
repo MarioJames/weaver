@@ -48,7 +48,7 @@ test('prepared argv is fixed, keeps the prompt off the command line, and refuses
         assert.equal(prepared.argv.includes('--dangerously-bypass-approvals-and-sandbox'), false);
       }
       if (engine === 'pi') assert.ok(prepared.argv.includes('--no-session') && prepared.argv.includes('--mode') && prepared.argv.includes('json'));
-      if (engine === 'opencode') assert.ok(prepared.argv.includes('--pure') && prepared.argv.includes('--auto') && prepared.argv.includes('--dir'));
+      if (engine === 'opencode') assert.ok(prepared.argv.includes('--pure') && prepared.argv.includes('--auto') && prepared.argv.includes('--dir') && prepared.argv.join(' ').includes('--print-logs --log-level ERROR'));
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
