@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { TaskManager } from '../src/main/manager';
 import { TaskStore } from '../src/main/store';
@@ -14,7 +15,7 @@ import { classifyVendorError } from '../src/main/adapters/cli/vendor-errors';
 
 const RAW = 'timestamp=2026-10-19T14:24:00Z level=ERROR run=123 error.error="AI_RetryError: AI_APICallError: Rate limit exceeded. Please try again later."';
 function fixture(onStart = () => {}) {
- const dir=mkdtempSync('/tmp/weaver-tasks/server-4VDE/blk/test-');
+ const dir=mkdtempSync(join(tmpdir(),'weaver-test-'));
  const children: ReturnType<typeof child>[]=[];
  function child() { return Object.assign(new EventEmitter(), {stdout:new PassThrough(),stderr:new PassThrough(),kill:()=>true}); }
  let store=new TaskStore(join(dir,'tasks.json'));

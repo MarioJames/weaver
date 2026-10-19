@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { TaskStore, event } from '../src/main/store';
 import { TaskManager } from '../src/main/manager';
@@ -12,7 +13,7 @@ import { PolicyStore } from '../src/main/policy/store';
 import { API_VERSION } from '../src/shared/commands';
 import type { Task } from '../src/shared/types';
 
-const root = '/tmp/weaver-tasks/server-4VDE/storeP';
+const root = join(tmpdir(), 'weaver-store-stream');
 const input = { title: 'Stream fixture', instruction: 'Local test', owner: { name: 'owner', transport: 'herdr-visible' as const, session: 'main', pane: '1' } };
 function fixture(): Task {
   const at = new Date().toISOString();

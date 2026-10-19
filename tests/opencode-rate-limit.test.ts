@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { TaskManager } from '../src/main/manager';
 import { TaskStore } from '../src/main/store';
 import { classifyVendorError } from '../src/main/adapters/cli/vendor-errors';
@@ -13,7 +14,7 @@ const API_ERROR = 'timestamp=2026-10-19T14:09:10.177Z level=ERROR run=9f54ce89 m
 async function run(stderr: string, sleepMs = 60000) {
   const { CommandHandler } = await import('../src/main/commands');
   const { PolicyStore } = await import('../src/main/policy/store');
-  const dir = mkdtempSync('/tmp/weaver-tasks/server-4VDE/ocdiag/rl-');
+  const dir = mkdtempSync(join(tmpdir(),'weaver-rl-'));
   const previous = process.env.PATH;
   writeFileSync(join(dir, 'systemd-run'), '#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n', { mode: 0o700 });
   writeFileSync(join(dir, 'systemctl'), '#!/bin/sh\necho ActiveState=inactive\n', { mode: 0o700 });

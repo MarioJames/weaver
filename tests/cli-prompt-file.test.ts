@@ -2,11 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { startOwnedScope } from '../src/main/adapters/cli/scope';
 import { startCliAgent } from '../src/main/adapters/cli';
 
 test('read-only prompt descriptor delivers full unicode stdin to a child',async()=>{
- const dir=mkdtempSync('/tmp/weaver-tasks/server-4VDE/launch/prompt-');const previous=process.env.PATH;
+ const dir=mkdtempSync(join(tmpdir(),'weaver-prompt-'));const previous=process.env.PATH;
  writeFileSync(join(dir,'systemd-run'),'#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n',{mode:0o700});
  writeFileSync(join(dir,'systemctl'),'#!/bin/sh\necho ActiveState=inactive\n',{mode:0o700});
  process.env.PATH=dir+':'+previous;
@@ -21,7 +22,7 @@ test('read-only prompt descriptor delivers full unicode stdin to a child',async(
 });
 
 test('qoder fake emits first-output only after a normalized vendor event',async()=>{
- const dir=mkdtempSync('/tmp/weaver-tasks/server-4VDE/launch/qoder-');const previous=process.env.PATH;
+ const dir=mkdtempSync(join(tmpdir(),'weaver-qoder-'));const previous=process.env.PATH;
  writeFileSync(join(dir,'systemd-run'),'#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n',{mode:0o700});
  writeFileSync(join(dir,'systemctl'),'#!/bin/sh\necho ActiveState=inactive\n',{mode:0o700});
  writeFileSync(join(dir,'qodercli'),`#!${process.execPath}\nconst fs=require('fs');fs.writeFileSync(${JSON.stringify(join(dir,'received'))},fs.readFileSync(0));fs.writeFileSync(1,JSON.stringify({type:'error',message:'fixture vendor error'})+'\\n');process.exitCode=42;`,{mode:0o700});
@@ -34,7 +35,7 @@ test('qoder fake emits first-output only after a normalized vendor event',async(
 });
 
 test('unterminated stderr limit is detected before child exit and secrets are redacted',async()=>{
- const dir=mkdtempSync('/tmp/weaver-tasks/server-4VDE/launch/stderr-');const previous=process.env.PATH;
+ const dir=mkdtempSync(join(tmpdir(),'weaver-stderr-'));const previous=process.env.PATH;
  writeFileSync(join(dir,'systemd-run'),'#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n',{mode:0o700});
  writeFileSync(join(dir,'systemctl'),'#!/bin/sh\necho ActiveState=inactive\n',{mode:0o700});
  writeFileSync(join(dir,'qodercli'),`#!${process.execPath}\nconst fs=require('fs');fs.readFileSync(0);fs.writeFileSync(2,'Rate limit exceeded api_key=fixture-secret-value');setTimeout(()=>process.exit(42),80);`,{mode:0o700});

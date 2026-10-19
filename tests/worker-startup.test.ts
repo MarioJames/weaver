@@ -4,12 +4,13 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { TaskManager } from '../src/main/manager';
 import { TaskStore } from '../src/main/store';
 import { classifyVendorError } from '../src/main/adapters/cli/vendor-errors';
 
 function harness() {
- const dir=mkdtempSync('/tmp/weaver-tasks/server-4VDE/launch/test-');
+ const dir=mkdtempSync(join(tmpdir(),'weaver-test-'));
  const child=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill:()=>true});
  const store=new TaskStore(join(dir,'tasks.json'));
  const manager=new TaskManager(store,{id:'pi',start:()=>child});

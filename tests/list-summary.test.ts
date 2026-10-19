@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { TaskStore } from '../src/main/store';
 import type { Task } from '../src/shared/types';
 
@@ -12,7 +13,7 @@ function fixture(i:number):Task {
   artifacts:[{id:'artifact',name:'result.md',mediaType:'text/markdown',createdAt:at,content:'x'.repeat(4096)}]};
 }
 test('300-task list stays below 300 KB while single-task reads retain full history and artifact bodies',()=>{
- const root=mkdtempSync('/tmp/weaver-tasks/server-4VDE/b5/list-summary-');
+ const root=mkdtempSync(join(tmpdir(),'weaver-list-summary-'));
  const store=new TaskStore(join(root,'store.json'));
  try {
   store.transaction(()=>{for(let i=0;i<300;i++)store.put(fixture(i));});
