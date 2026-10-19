@@ -28,6 +28,8 @@ export function event(task: Task, kind: TaskEvent['kind'], message: string): voi
 export class TaskStore {
  private inTransaction=false;
  private sequence=0;
+ private dirty=false;
+ private flushTimer?: NodeJS.Timeout;
  get revision():number{return this.sequence;}
  transaction<T>(fn:()=>T):T {
   if(this.inTransaction)return fn();
@@ -36,7 +38,7 @@ export class TaskStore {
  }
  private tasks = new Map<string, Task>();
  private metadata: {owners:LogicalOwner[];packages:WorkPackage[];receipts:Record<string,CommandReceipt>}={owners:[],packages:[],receipts:{}};
- constructor(readonly path: string) {
+ constructor(readonly path: string, private write: (path: string, content: string) => void = (path, content) => writeFileSync(path, content, {mode:0o600})) {
   mkdirSync(dirname(path), {recursive:true});
   if (existsSync(path)) {
    if (statSync(path).size > 32 * 1024 * 1024) throw new Error('Store exceeds 32 MiB limit; original file retained');
@@ -73,17 +75,36 @@ export class TaskStore {
  setMetadata(value: typeof this.metadata): void { const previous=this.metadata; this.metadata=structuredClone(value); try {this.save();} catch(error) {this.metadata=previous;throw error;} }
  list(): Task[] { return structuredClone([...this.tasks.values()].reverse()); }
  get(id: string): Task { const task = this.tasks.get(id); if (!task) throw new Error('Task not found'); return structuredClone(task); }
- put(task: Task): void {
+ put(task: Task, durability: 'sync' | 'stream' = 'sync', onError: (error: unknown) => void = console.error): void {
   const previous = this.tasks.get(task.id); this.tasks.set(task.id, structuredClone(task));
+  if (durability === 'stream' && !this.inTransaction) {
+   // Readers and sync.status observe stream activity before its next disk checkpoint.
+   this.sequence++; this.dirty=true; this.scheduleFlush(onError); return;
+  }
   try { this.save(); } catch (error) { if (previous) this.tasks.set(task.id, previous); else this.tasks.delete(task.id); throw error; }
+ }
+ /** Flush only pending stream changes; ordinary writes also checkpoint them atomically. */
+ flush(): void { if (this.dirty) this.save(); }
+ close(): void { this.flush(); }
+ private scheduleFlush(onError: (error: unknown) => void): void {
+  if (this.flushTimer) return;
+  this.flushTimer=setTimeout(() => {
+   this.flushTimer=undefined;
+   try { this.flush(); } catch (error) {
+    // Keep the in-memory events and retry; a failed command must not discard them either.
+    this.scheduleFlush(onError); onError(error);
+   }
+  },500);
+  this.flushTimer.unref();
  }
  private save(): void {
   if(this.inTransaction)return;
   const temp = `${this.path}.tmp`;
-  const content = JSON.stringify({version:1,sequence:this.sequence+1,tasks:[...this.tasks.values()],metadata:this.metadata},null,2);
+  const content = JSON.stringify({version:1,sequence:this.sequence+1,tasks:[...this.tasks.values()],metadata:this.metadata});
   if (Buffer.byteLength(content) > 32 * 1024 * 1024) throw new Error('Store exceeds 32 MiB limit');
-  writeFileSync(temp, content, {mode:0o600});
+  this.write(temp, content);
   const fd = openSync(temp,'r'); try { fsyncSync(fd); } finally { closeSync(fd); }
   renameSync(temp,this.path);this.sequence++;
+  this.dirty=false; clearTimeout(this.flushTimer); this.flushTimer=undefined;
  }
 }

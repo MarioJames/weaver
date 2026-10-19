@@ -80,7 +80,7 @@ export class TaskManager {
       if (run.error || run.cancelled) return;
       run.stderrBytes += chunk.length;
       if (run.stderrBytes > 32768) { this.stop(id, 'Worker stderr exceeds 32 KiB limit'); return; }
-      try { const current = this.store.get(id); event(current, 'log', `stderr: ${chunk.toString('utf8')}`); this.persist(current); } catch (error) { this.stop(id, 'Unable to persist stderr'); this.fatal(error); }
+      try { const current = this.store.get(id); event(current, 'log', `stderr: ${chunk.toString('utf8')}`); this.persist(current, 'stream'); } catch (error) { this.stop(id, 'Unable to persist stderr'); this.fatal(error); }
     });
     child.on('error', (error: Error) => { run.error = error.message; });
     child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
@@ -134,6 +134,7 @@ export class TaskManager {
       try { this.cancel(id); } catch (error) { const run = this.running.get(id); if (run) { run.cancelled = true; this.terminate(run); } this.fatal(error); }
     }
     await Promise.all(exits);
+    this.store.flush();
   }
   private stop(id: string, message: string): void {
     const run = this.running.get(id); if (!run) return;
@@ -157,7 +158,7 @@ export class TaskManager {
         event(task, 'artifact', `Received ${record.name}`); break;
       case 'result': run.result = record.summary; event(task, 'result', record.summary); break;
     }
-    this.persist(task);
+    this.persist(task, 'stream');
   }
   private observe(task: Task, child: ManagedProcess): void {
     if (!task.run) return;
@@ -168,5 +169,5 @@ export class TaskManager {
       if(source.usage){task.run.evidence.usage={};for(const key of ['inputTokens','outputTokens'] as const){const value=source.usage[key];if(Number.isSafeInteger(value)&&typeof value==='number'&&value>=0)task.run.evidence.usage[key]=value;}}
     }
   }
-  private persist(task: Task): void { task.revision = (task.revision ?? 0) + 1; this.store.put(task); this.notify(); }
+  private persist(task: Task, durability: 'sync' | 'stream' = 'sync'): void { task.revision = (task.revision ?? 0) + 1; this.store.put(task, durability, this.fatal); this.notify(); }
 }

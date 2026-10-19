@@ -322,6 +322,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     await ownerDrain;
     await Promise.allSettled([...inflight]);
     try { await manager?.shutdown(); } catch (error) { console.error(error instanceof Error ? error.message : 'shutdown failed'); }
+    try { store?.close(); } catch (error) { console.error(error instanceof Error ? error.message : 'Task history could not be flushed'); }
     await vite?.close().catch(() => {});
     await http?.close().catch(() => {});
     await ipc.close().catch(() => {});
