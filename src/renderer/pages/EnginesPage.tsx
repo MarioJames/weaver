@@ -3,7 +3,7 @@ import { NamedSwitch } from '../components/NamedControls';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, RefreshCw, ScanSearch } from 'lucide-react';
 import { PageHeader, Surface } from '@lobehub/ui/dashboard';
-import { ActionIcon, Alert, Button, Progress, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
+import { ActionIcon, Button, Progress, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
 import { ENGINE_CATALOG, catalogEntry, engineDisableConflict, type EngineProbeRecord } from '../../shared/engines';
 import type { EngineQuotaRecord, QuotaEngine, QuotaWindow } from '../../shared/quota';
 import { QUOTA_KINDS, quotaRefreshEnabled, type Block, type Engine } from '../../main/policy/routing';
@@ -11,6 +11,13 @@ import { acceptQuotaPolicy, dateText, quotaPercentText, quotaProgressPercent, qu
 import type { PolicyDraft, PolicyUpdate } from '../usePolicyDraft';
 import type { RendererAPI, StallEngineState, StallHistoryEntry, StallSnapshot } from '../client';
 import { styles } from '../style';
+import { createStaticStyles } from 'antd-style';
+import type { StatusTone } from '../status-colors';
+
+const blockStyles = createStaticStyles(({ css, cssVar }) => ({
+  row: css`display: flex; align-items: center; gap: 8px; min-width: 0; color: ${cssVar.colorTextSecondary}; font-size: ${cssVar.fontSizeSM}; > :not([data-block-reason]) { flex-shrink: 0; }`,
+  reason: css`flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`,
+}));
 
 const PROBE: Record<string, { label: string; color?: string }> = {
   installed: { label: '已安装', color: 'success' },
@@ -28,6 +35,7 @@ function mergeProbes(current: EngineProbeRecord[], probe: EngineProbeRecord | nu
 const isQuotaKind = (kind: string): kind is QuotaEngine => (QUOTA_KINDS as readonly string[]).includes(kind);
 
 /** Penalty blocks are ordinary policy blocks; this `by` value is what tells them apart from a quota or manual pause. */
+type EngineBlockState = StallEngineState & { blockedUntil?: string | null };
 const STALL_BY = 'weaver-stall';
 const STALL_HISTORY = 5;
 const STALL_TASK_ID = 8;
@@ -102,16 +110,6 @@ function stallTasks(tasks: string[]): string {
 }
 
 /** A penalty line belongs to the engine only while its penalty block is still in force. */
-function activeStallBlock(blocks: Block[], now: number): Block | undefined {
-  return blocks.find(block => block.by === STALL_BY && (!block.release_at || Date.parse(block.release_at) > now));
-}
-
-function stallReleaseText(block: Block, now: number): string {
-  const release = block.release_at ? Date.parse(block.release_at) : NaN;
-  if (!Number.isFinite(release) || release <= now) return '待探测解封';
-  return `${new Date(release).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 自动解除`;
-}
-
 function stallHistoryText(entry: StallHistoryEntry): string {
   const parts = [dateText(entry.at), `第 ${entry.level} 级`];
   if (entry.tasks.length) parts.push(`任务 ${stallTasks(entry.tasks)}`);
@@ -127,18 +125,14 @@ function stallAttentionText(state: StallEngineState): string {
   return `${dateText(last.at)} 第 ${last.level} 级${tasks}${minutes}。查看后点「恢复派发」解除。`;
 }
 
-export function StallNotice({ state, block, now }: { state?: StallEngineState; block?: Block; now: number }) {
+export function StallNotice({ state }: { state?: StallEngineState; block?: Block; now: number }) {
   if (!state) return null;
   const history = state.history.slice(-STALL_HISTORY);
-  if (!block && !state.needsAttention && !history.length) return null;
+  if (!state.needsAttention && !history.length) return null;
   return <section aria-label="惩罚暂停" className={styles.tight}>
-    {state.needsAttention && <Alert type="warning" title="多个工作代理卡住，已停止自动恢复" description={stallAttentionText(state)} />}
-    {state.level >= 1 && block && <div className={styles.row} style={{ gap: 6 }}>
-      <Tag size="small" color="warning">{`惩罚暂停 · 第 ${state.level} 级`}</Tag>
-      <Text type="secondary" className={styles.meta}>{stallReleaseText(block, now)}</Text>
-    </div>}
-    {history.length > 0 && <details className={styles.stallHistory}>
+    {(history.length > 0 || state.needsAttention) && <details className={styles.stallHistory}>
       <summary>记录</summary>
+      {state.needsAttention && <Text type="secondary" className={styles.meta}>{stallAttentionText(state)}</Text>}
       {history.map((entry, index) => <Text key={`${entry.at}:${entry.level}:${index}`} type="secondary" className={styles.meta}>{stallHistoryText(entry)}</Text>)}
     </details>}
   </section>;
@@ -195,14 +189,13 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
         const reason = enabled && conflict ? conflict : !enabled && probe?.status !== 'installed' ? '未在本机找到这个命令' : kindMismatch ? '已保存的类型与目录不一致' : '';
         const kind = record?.kind ?? entry.kind;
         const engineBlocks = savedBlocks.filter(block => block.engine === entry.id);
-        const penaltyBlock = activeStallBlock(engineBlocks, stall.now);
         return <Surface key={entry.id} aria-label={entry.id} className={styles.card} title={entry.id} description={<span className={styles.row} style={{ gap: 6 }}><Tag size="small" color={PROBE[status]?.color}>{PROBE[status]?.label ?? status}</Tag><Text type="secondary" className={styles.wrap}>{probe?.version || entry.command}</Text></span>}
           extra={<Tooltip title={blocked && reason ? reason : enabled ? '停用' : '启用'}><span><NamedSwitch aria-label={`启用 ${entry.id}`} checked={enabled} loading={busyId === entry.id} disabled={blocked} onChange={checked => void toggle(entry.id, checked)} /></span></Tooltip>}>
           <div className={styles.cardBody}>
-            <StallNotice state={stall.snapshot?.engines[entry.id]} block={penaltyBlock} now={stall.now} />
+            <StallNotice state={stall.snapshot?.engines[entry.id]} now={stall.now} />
             {isQuotaKind(kind) ? <QuotaSummary engine={kind} record={quota.records.find(item => item.engine === kind)} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === kind ? quota.feedback : undefined} onRefresh={() => void quota.refresh(kind)} />
               : <Text type="secondary" className={styles.meta}>免费模型，不探测额度。</Text>}
-            <BlockList blocks={engineBlocks} disabled={busyId !== '' || !record} onRemove={block => void change(entry.id, doc => ({ ...doc, blocks: doc.blocks.filter(item => !(item.engine === block.engine && item.model === block.model)) }))} />
+            <BlockList blocks={engineBlocks} state={stall.snapshot?.engines[entry.id]} now={stall.now} disabled={busyId !== '' || !record} onRemove={block => void change(entry.id, doc => ({ ...doc, blocks: doc.blocks.filter(item => !(item.engine === block.engine && item.model === block.model)) }))} />
             <div className={styles.cardFoot}>
               <div className={styles.spread}>
                 <Text>主动刷新额度</Text>
@@ -222,18 +215,42 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
   </>;
 }
 
-function BlockList({ blocks, disabled, onRemove }: { blocks: Block[]; disabled: boolean; onRemove: (block: Block) => void }) {
-  const now = Date.now();
-  const active = blocks.filter(block => !block.release_at || Date.parse(block.release_at) > now);
+/** One category, one bounded reason and one explicit recovery condition for every pause. */
+export function engineBlockText(block: Block, now: number, state?: EngineBlockState) {
+  const stall = block.by === STALL_BY;
+  const category = stall ? `卡住惩罚${state?.level ? ` 第 ${state.level} 级` : ''}`
+    : block.by?.startsWith('weaver-quota:') ? '额度耗尽'
+    : block.by === 'weaver-vendor-limit' ? /^(?:额度耗尽|quota)|FreeUsageLimitError|GoUsageLimitError/i.test(block.reason) ? '额度耗尽' : '限流'
+    : '手动暂停';
+  const fullReason = block.reason.replace(/\s+/g, ' ').trim();
+  const plain = fullReason.replace(/^(?:限流|额度耗尽)：\s*/, '');
+  const reason = plain.length > 120 ? `${plain.slice(0,119)}…` : plain;
+  const deadline = block.release_at ?? (stall && state?.level && state.level <= 2 ? state.blockedUntil : undefined);
+  const time = deadline ? Date.parse(deadline) : NaN;
+  let release = '需手动恢复';
+  if (Number.isFinite(time) && time > now) {
+    const date = new Date(time), today = new Date(now);
+    const hhmm = `${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+    const day = date.toDateString() === today.toDateString() ? '' : `${date.getFullYear() === today.getFullYear() ? '' : `${date.getFullYear()}/`}${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')} `;
+    release = `${day}${hhmm} 自动解除`;
+  } else if (stall && state && state.level >= 1 && state.level <= 2) release = '探测通过后解除';
+  const tone: StatusTone = category === '手动暂停' ? 'default' : 'warning';
+  return { category, reason, fullReason, release, tone };
+}
+
+export function BlockList({ blocks, disabled, onRemove, now = Date.now(), state }: { blocks: Block[]; disabled: boolean; onRemove: (block: Block) => void; now?: number; state?: EngineBlockState }) {
+  const active = blocks.filter(block => block.by === STALL_BY || !block.release_at || Date.parse(block.release_at) > now);
   if (!active.length) return null;
   return <section aria-label="派发限制" className={styles.tight}>
-    {active.map(block => <div key={`${block.engine}:${block.model ?? ''}`} className={styles.spread} style={{ flexWrap: 'nowrap' }}>
-      <span className={styles.tight}>
-        <span className={styles.row} style={{ gap: 6 }}><Tag size="small" color="warning">{block.by?.startsWith('weaver-quota:') ? '额度耗尽' : '已暂停'}</Tag><Text className={styles.wrap}>{block.model ? `模型 ${block.model}` : '整台引擎'}</Text></span>
-        <Text type="secondary" className={styles.meta}>{block.by?.startsWith('weaver-quota:') ? '额度恢复后自动解除' : block.reason}{block.release_at ? ` · ${dateText(block.release_at)} 恢复` : ' · 需手动恢复'}</Text>
-      </span>
-      <Tooltip title="恢复派发"><ActionIcon size="small" icon={Play} aria-label="恢复派发" disabled={disabled} onClick={() => onRemove(block)} /></Tooltip>
-    </div>)}
+    {active.map(block => {
+      const text = engineBlockText(block, now, state);
+      return <div key={`${block.engine}:${block.model ?? ''}`} data-engine-block={block.engine} className={blockStyles.row}>
+        <Tag size="small" color={text.tone}>{text.category}</Tag>
+        <Tooltip title={text.fullReason}><span data-block-reason className={blockStyles.reason}>{block.model ? `${block.model} · ` : ''}{text.reason}</span></Tooltip>
+        <span>{text.release}</span>
+        <Tooltip title="恢复派发"><ActionIcon size="small" icon={Play} aria-label="恢复派发" disabled={disabled} onClick={() => onRemove(block)} /></Tooltip>
+      </div>;
+    })}
   </section>;
 }
 

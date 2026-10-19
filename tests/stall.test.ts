@@ -254,8 +254,8 @@ test('a penalty block has no release time, and nothing stacks while one waits fo
   assert.equal(first.block.engine, 'claude');
   assert.equal(first.block.by, STALL_BLOCK_BY);
   assert.equal(first.block.release_at, undefined, 'only a passing probe or the user lifts this');
-  assert.match(first.block.reason, /^2 个工作代理超过 5 分钟无响应（task /);
-  assert.match(first.block.reason, /第 1 次惩罚性暂停，5 分钟后探测确认恢复$/);
+  assert.equal(first.block.reason, '2 个子 Agent 超过 5 分钟无响应');
+  assert.ok(first.block.reason.length <= 120);
 
   state.engines.claude = armed(1, START);
   assert.equal(nextPenalty(state, 'claude', START + 4 * MINUTE, stalled), null, 'no stacking while the penalty waits for its probe');
@@ -266,13 +266,13 @@ test('a penalty block has no release time, and nothing stacks while one waits fo
   state.engines.claude = { ...emptyPenalty(), level: 1, lastTriggerAt: START };
   const second = nextPenalty(state, 'claude', START + 6 * MINUTE, stalled)!;
   assert.equal(second.level, 2);
-  assert.match(second.block.reason, /第 2 次惩罚性暂停，10 分钟后探测确认恢复$/);
+  assert.ok(second.block.reason.length <= 120);
 
   state.engines.claude = { ...emptyPenalty(), level: 2, lastTriggerAt: START + 6 * MINUTE };
   const third = nextPenalty(state, 'claude', START + 16 * MINUTE, stalled)!;
   assert.equal(third.level, 3);
   assert.equal(third.block.release_at, undefined);
-  assert.match(third.block.reason, /连续第 3 次出现，每 10 分钟探测一次，连续 3 次通过才自动恢复$/);
+  assert.ok(third.block.reason.length <= 120);
 
   state.engines.claude = armed(3, START + 16 * MINUTE);
   assert.equal(nextPenalty(state, 'claude', START + 60 * MINUTE, stalled), null, 'level 3 waits for its streak or the user');
@@ -480,7 +480,7 @@ test('a passing probe is the only thing that lifts level 1, and it keeps the lad
     await h.advance(1);
     assert.equal(h.engine().level, 2);
     assert.equal(p.calls.length, 1, 'the new penalty waits its own ten minutes');
-    assert.match(h.stallBlocks()[0]!.reason, /第 2 次惩罚性暂停，10 分钟后探测确认恢复$/);
+    assert.equal(h.stallBlocks()[0]!.reason, '2 个子 Agent 超过 5 分钟无响应');
     assert.equal(h.stallBlocks()[0]!.release_at, undefined);
   } finally { await h.monitor.stop(); await h.cleanup(); }
 });
@@ -510,7 +510,7 @@ test('a failed probe escalates on the spot: 1 to 2 waits ten minutes, 2 to 3 nee
     const blocks = h.stallBlocks();
     assert.equal(blocks.length, 1, 'still one penalty block for the engine');
     assert.equal(blocks[0]!.release_at, undefined);
-    assert.match(blocks[0]!.reason, /第 2 次惩罚性暂停，10 分钟后探测确认恢复$/);
+    assert.equal(blocks[0]!.reason, '2 个子 Agent 超过 5 分钟无响应');
     assert.equal(h.pumps(), 1, 'the engine never left routing, so nothing re-routes');
 
     await h.advance(10);
@@ -1182,7 +1182,7 @@ test('taskHealth reports what the monitor itself saw', async () => {
     assert.deepEqual(penalized(blind.status()), []);
 
     const unknown = blind.monitor.taskHealth(makeTask({ execution: 'mock', status: 'completed' }));
-    assert.equal(unknown.state, 'working');
+    assert.equal(unknown.state, 'ended');
     assert.equal(unknown.silenceMs, null);
     assert.equal(unknown.cpuActive, null);
     assert.equal(unknown.cpuIdleMs, null);

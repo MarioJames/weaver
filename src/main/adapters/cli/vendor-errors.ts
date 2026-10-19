@@ -12,6 +12,20 @@ const ENGINE_PATTERNS:Record<string,RegExp> = {
  grok:/balance|\b402\b/i, codex:/usage limit|you.?ve hit your limit|limit reached/i,
  claude:/usage limit|you.?ve hit your limit|limit reached/i,
 };
+/** Extract OpenCode's quoted error field before showing it to people. Raw evidence stays in vendorError. */
+export function vendorMessage(message:string):string {
+ const quoted=message.match(/\berror\.error=("(?:\\.|[^"\\])*")/);
+ let value=message;
+ if(quoted)try{value=JSON.parse(quoted[1]);}catch{ /* Malformed logs still have a bounded readable fallback. */ }
+ return redact(value).replace(/^(?:(?:AI_APICallError|AI_RetryError):\s*)+/i,'').replace(/\s+/g,' ').trim();
+}
+
+export function vendorBlockReason(failure:Pick<TaskFailure,'kind'|'message'>):string {
+ const prefix=failure.kind==='quota'?'额度耗尽':'限流';
+ const reason=`${prefix}：${vendorMessage(failure.message)}`;
+ return reason.length>120?`${reason.slice(0,119)}…`:reason;
+}
+
 export function classifyVendorError(engine:string,message:string,now=Date.now()):TaskFailure|undefined {
  let kind:TaskFailure['kind']|undefined=LIMITS.find(rule=>rule.pattern.test(message))?.kind;
  if(!kind&&ENGINE_PATTERNS[engine]?.test(message))kind='quota';
@@ -22,5 +36,5 @@ export function classifyVendorError(engine:string,message:string,now=Date.now())
  const delayTime=delay?now+Number(delay[1])*(/^ms|millisecond/i.test(delay[2]??'')?1:/^m/i.test(delay[2]??'')?60000:1000):NaN;
  const target=Number.isFinite(absoluteTime)&&absoluteTime>now?absoluteTime:delayTime;
  const retryAt=Number.isFinite(new Date(target).getTime())?new Date(target).toISOString():undefined;
- return {kind,message:redact(message).slice(0,1900),...(retryAt?{retryAt}:{} )};
+ return {kind,message:vendorMessage(message).slice(0,1900),...(retryAt?{retryAt}:{} )};
 }

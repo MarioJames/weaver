@@ -14,6 +14,7 @@ import type { RoutePreview } from '../shared/policy';
 import { QUOTA_CAPABILITIES } from './policy/quota';
 import { EXCLUDED_ENGINE_REASON } from './policy/routing';
 import { absoluteExistingWorkspace, assertFrozenWorkspace, workspaceIdentity, isRealEngineKind, REAL_ENGINE_KINDS } from './workspace';
+import { vendorBlockReason } from './adapters/cli/vendor-errors';
 import { workerInstruction } from './adapters/instruction';
 export const WRITE_COMMANDS = ['owners.attach','owners.spawn','owners.switch','owners.launch','owners.continuation.configure','tasks.create','tasks.retry','tasks.cancel','packages.create','workers.spawn','workers.complete','results.deliver','results.ack','reviews.submit','engines.unblock'] as const;
 export const READ_COMMANDS = ['capabilities.get','sync.snapshot','sync.status','owners.list','owners.get','owners.continuation.get','tasks.get','tasks.list','tasks.events','tasks.results','tasks.health','artifacts.read','packages.get','operations.get','observability.get','observability.export','engines.health','engines.penalty'] as const;
@@ -82,12 +83,13 @@ export class CommandHandler {
   job.then(settled,settled);return job;
  }
  private async driveAsync(flow:CommandFlow<CommandResponse>,signal:AbortSignal):Promise<CommandResponse>{
+  const deadline=Date.now()+8000;
   let step=flow.next();
   while(!step.done){
    let host:OwnerLaunchResult|undefined;
    try {
     const effect=step.value;
-    if(effect.kind==='first-output')await this.manager.waitForFirstOutput(effect.taskId);
+    if(effect.kind==='first-output')await this.manager.waitForFirstOutput(effect.taskId,Math.max(0,deadline-Date.now()));
     else if(effect.kind==='close')await (this.asyncHost.closer??closeOwnerHostAsync)(effect.host);
     else host=await (this.asyncHost.launcher??(this.hostLauncher===launchOwner?launchOwnerAsync:async input=>this.hostLauncher(input)))({...effect.input,signal});
    }catch(error){step=flow.throw(error);continue;}
@@ -116,7 +118,7 @@ export class CommandHandler {
     meta.receipts[receiptKey]={hash};this.manager.store.setMetadata(meta);
    }
    let data=command==='owners.launch'||command==='owners.switch'?yield* this.executeOwner(command,args):this.execute(command,args);
-   if(command==='workers.spawn' && data && typeof data==='object' && 'id' in data){
+   if((command==='workers.spawn'||command==='tasks.retry') && data && typeof data==='object' && 'id' in data){
     const snapshot=data as Task; if(snapshot.dispatch?.execution==='real'&&snapshot.status==='running'){
      yield {kind:'first-output',taskId:snapshot.id};
      data={...data,...this.publicTask(this.manager.store.get(snapshot.id)),started:!!this.manager.store.get(snapshot.id).run?.firstOutputAt};
@@ -192,8 +194,21 @@ export class CommandHandler {
    const snapshot=this.policy.snapshot();
    const existing=snapshot.blocks.find(block=>block.engine===engine&&block.model===undefined);
    if(existing&&existing.by!=='weaver-vendor-limit'){this.vendorBlockedAttempts.add(key);continue;}
-   const release_at=f.retryAt??(f.kind==='rate_limit'?new Date(Date.now()+600000).toISOString():undefined);
-   const block={engine,reason:f.message.slice(-2000),since:new Date().toISOString(),by:'weaver-vendor-limit',...(release_at?{release_at}:{})};
+   const now=Date.now();
+   // Keep the ladder in the existing durable task metadata, including after explicit block removal.
+   const meta=this.manager.store.getMetadata() as ReturnType<TaskManager['store']['getMetadata']> & {vendorRateLimits?:Record<string,{level:number;lastTriggerAt:number}>};
+   let minutes=10;
+   if(f.kind==='rate_limit'){
+    const previous=meta.vendorRateLimits?.[engine];
+    const level=previous&&now-previous.lastTriggerAt<2*60*60_000?Math.min(previous.level+1,3):1;
+    minutes=[10,30,60][level-1];
+    meta.vendorRateLimits={...meta.vendorRateLimits,[engine]:{level,lastTriggerAt:now}};
+    this.manager.store.setMetadata(meta);
+   }
+   const retryAt=f.retryAt?Date.parse(f.retryAt):NaN;
+   const release=f.kind==='rate_limit'?Math.max(now+minutes*60_000,Number.isFinite(retryAt)?retryAt:0):retryAt;
+   const release_at=Number.isFinite(release)&&release>now?new Date(release).toISOString():undefined;
+   const block={engine,reason:vendorBlockReason(f),since:new Date(now).toISOString(),by:'weaver-vendor-limit',...(release_at?{release_at}:{})};
    this.policy.save({revision:snapshot.revision,config:snapshot.config,blocks:[...snapshot.blocks.filter(item=>item!==existing),block]});
    this.vendorBlockedAttempts.add(key);
   }

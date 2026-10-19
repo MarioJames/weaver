@@ -96,7 +96,7 @@ export interface StallStatus {
 /** What a running worker looks like from the outside: the monitor's own samples, no second classifier. */
 export interface TaskHealth {
   taskId: string;
-  state: 'starting' | 'working' | 'waiting_model' | 'stalled';
+  state: 'ended' | 'starting' | 'working' | 'waiting_model' | 'stalled';
   taskStatus: Task['status'];
   engine: string | null;
   lastEventAt: string | null;
@@ -126,11 +126,9 @@ function arm(level: number, now: number): Pick<EnginePenalty, 'blockedUntil' | '
   return { blockedUntil: at, nextProbeAt: at };
 }
 
-function reasonFor(head: string, level: number): string {
-  const minutes = STALL_LADDER[level - 1];
-  return minutes === null
-    ? `${head}，连续第 ${level} 次出现，每 ${PROBE_MS / 60_000} 分钟探测一次，连续 ${PROBE_SUCCESSES} 次通过才自动恢复`
-    : `${head}，第 ${level} 次惩罚性暂停，${minutes} 分钟后探测确认恢复`;
+function reasonFor(head: string): string {
+  // Recovery timing and task evidence have their own status fields and history.
+  return head.replace(/（task .*$/, '').replace(/工作代理/g, '子 Agent ').slice(0, 120);
 }
 
 /** A vendor message is evidence, not a log file: credentials are stripped, then one bounded line, never the argv. */
@@ -201,7 +199,7 @@ export function nextPenalty(state: StallState, engine: string, now: number, stal
   const ids = stalled.slice(0, 4).map(task => task.id.slice(0, 8));
   const head = `${stalled.length} 个工作代理超过 ${STALL_MS / 60_000} 分钟无响应（task ${ids.join('、')}）`;
   // No release_at: only a passing probe or the user lifts this block.
-  return { level, head, block: { engine, reason: reasonFor(head, level), since: new Date(now).toISOString(), by: STALL_BLOCK_BY } };
+  return { level, head, block: { engine, reason: reasonFor(head), since: new Date(now).toISOString(), by: STALL_BLOCK_BY } };
 }
 
 /** The probe reuses one enabled worker's configured route, so it proves the same account path a dispatch would take. */
@@ -395,7 +393,7 @@ export class StallMonitor {
     const stalled = isStalled(task, now, Object.fromEntries(this.samples));
     return {
       taskId: task.id,
-      state: task.status==='running'&&task.dispatch?.execution==='real'&&!task.run?.firstOutputAt ? 'starting' : stalled ? 'stalled' : silence !== null && silence >= STALL_MS && active !== true ? 'waiting_model' : 'working',
+      state: ['completed','failed','cancelled'].includes(task.status) ? 'ended' : task.status==='running'&&task.dispatch?.execution==='real'&&!task.run?.firstOutputAt ? 'starting' : stalled ? 'stalled' : silence !== null && silence >= STALL_MS && active !== true ? 'waiting_model' : 'working',
       taskStatus: task.status,
       engine: task.dispatch?.engine ?? null,
       lastEventAt: task.events.at(-1)?.at ?? task.run?.startedAt ?? null,
@@ -623,7 +621,7 @@ export class StallMonitor {
     const level = Math.min(penalty.level + 1, STALL_LADDER.length);
     this.state.engines[engine] = { level, lastTriggerAt: penalty.lastTriggerAt, needsAttention: level >= STALL_LADDER.length, probeSuccesses: 0, head: penalty.head, ...arm(level, now) };
     // The block is still what keeps the engine out of routing, so no pump: only its reason has to stay honest.
-    this.writeBlock(policy, { engine, reason: reasonFor(penalty.head || NO_HEAD, level), since: new Date(now).toISOString(), by: STALL_BLOCK_BY });
+    this.writeBlock(policy, { engine, reason: reasonFor(penalty.head || NO_HEAD), since: new Date(now).toISOString(), by: STALL_BLOCK_BY });
     this.dirty = true;
   }
 

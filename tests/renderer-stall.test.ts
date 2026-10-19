@@ -4,7 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
-import { EnginesPage, StallNotice } from '../src/renderer/pages/EnginesPage';
+import { BlockList, EnginesPage, StallNotice } from '../src/renderer/pages/EnginesPage';
 import { defaultConfig, type Block } from '../src/main/policy/routing';
 import type { StallEngineState, StallHistoryEntry } from '../src/renderer/client';
 import type { PolicyDraft } from '../src/renderer/usePolicyDraft';
@@ -26,17 +26,17 @@ function state(overrides: Partial<StallEngineState> = {}): StallEngineState {
   return { level: 1, lastTriggerAt: at(-60_000), needsAttention: false, history: [entry()], ...overrides };
 }
 
-test('a penalized engine names its level and the deadline it releases at', () => {
-  const html = markup(React.createElement(StallNotice, { state: state({ level: 2 }), block: penalty(), now: NOW }));
-  assert.match(html, /惩罚暂停 · 第 2 级/);
+test('the block row names the penalty level and recovery deadline once', () => {
+  const html = markup(React.createElement(BlockList, { blocks: [penalty()], state: state({ level: 2 }), now: NOW, disabled: false, onRemove: () => {} }));
+  assert.match(html, /卡住惩罚 第 2 级/);
   assert.match(html, /自动解除/);
-  assert.doesNotMatch(html, /待探测解封/);
-  assert.doesNotMatch(html, /多个工作代理卡住/);
+  assert.equal((html.match(/aria-label="恢复派发"/g) ?? []).length, 1);
 });
 
-test('a penalty with no usable deadline waits for the probe or a human', () => {
-  for (const block of [penalty({ release_at: at(-1) }), penalty({ release_at: undefined }), penalty({ release_at: 'not a date' })]) {
-    assert.match(markup(React.createElement(StallNotice, { state: state({ level: 3 }), block, now: NOW })), /待探测解封/);
+test('overdue early penalties wait for a probe, level three requires manual recovery', () => {
+  for (const release_at of [at(-1), undefined, 'not a date']) {
+    const html = markup(React.createElement(BlockList, { blocks: [penalty({ release_at })], state: state({ level: 3 }), now: NOW, disabled: false, onRemove: () => {} }));
+    assert.match(html, /需手动恢复/);
   }
 });
 
@@ -46,12 +46,11 @@ test('an engine without a penalty block in force shows no level line', () => {
   assert.match(html, /记录/, 'the history stays readable while the monitor catches up');
 });
 
-test('the attention alert reports the last trigger and how to lift it', () => {
+test('the attention history reports the last trigger and how to lift it', () => {
   const html = markup(React.createElement(StallNotice, {
     state: state({ level: 3, needsAttention: true, history: [entry(), entry({ level: 5, tasks: ['9f2c0a11-dead-beef-0000-000000000001'], stalledMinutes: 41, at: at(-1) })] }),
     block: penalty({ release_at: undefined }), now: NOW,
   }));
-  assert.match(html, /多个工作代理卡住，已停止自动恢复/);
   assert.match(html, /第 5 级/);
   assert.match(html, /9f2c0a11/);
   assert.match(html, /已卡住 41 分钟/);
