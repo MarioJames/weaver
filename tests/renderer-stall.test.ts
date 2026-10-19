@@ -17,7 +17,7 @@ function markup(node: React.ReactNode) {
 const NOW = Date.parse('2026-10-19T06:00:00.000Z');
 const at = (offset: number) => new Date(NOW + offset).toISOString();
 function penalty(overrides: Partial<Block> = {}): Block {
-  return { engine: 'codex', reason: '2 个工作代理超过 5 分钟无响应，第 1 次惩罚性暂停 5 分钟', since: at(-60_000), release_at: at(240_000), by: 'weaver-stall', ...overrides };
+  return { engine: 'codex', reason: '2 个子 Agent 超过 5 分钟无响应，第 1 次惩罚性暂停 5 分钟', since: at(-60_000), release_at: at(240_000), by: 'weaver-stall', ...overrides };
 }
 function entry(overrides: Partial<StallHistoryEntry> = {}): StallHistoryEntry {
   return { at: at(-60_000), level: 1, tasks: ['1ebbfc8f-afc6-4b93-8916-06ec488fbd8a'], stalledMinutes: 7, ...overrides };
@@ -81,7 +81,7 @@ test('the record disclosure lists the five most recent penalties with their prob
 test('an engine with nothing to look up gets no disclosure and no notice at all', () => {
   assert.doesNotMatch(markup(React.createElement(StallNotice, { state: state({ history: [] }), block: penalty(), now: NOW })), /记录/);
   for (const props of [{}, { state: state({ level: 0, needsAttention: false, history: [] }) }]) {
-    assert.doesNotMatch(markup(React.createElement(StallNotice, { ...props, now: NOW })), /惩罚暂停|多个工作代理卡住|记录|<details/);
+    assert.doesNotMatch(markup(React.createElement(StallNotice, { ...props, now: NOW })), /惩罚暂停|多个子 Agent 卡住|记录|<details/);
   }
 });
 
@@ -95,6 +95,6 @@ test('the engine page stays silent while the stall RPC is pending, missing or fa
     setConfig: () => {}, setBlocks: () => {}, load: async () => true, save: async () => true, commit: async () => {}, rebase: () => {}, applyServerSnapshot: () => true,
   } as unknown as PolicyDraft;
   const html = markup(React.createElement(EnginesPage, { policy }));
-  assert.doesNotMatch(html, /惩罚暂停|多个工作代理卡住|stall/i);
+  assert.doesNotMatch(html, /惩罚暂停|多个子 Agent 卡住|stall/i);
   assert.equal((html.match(/aria-label="恢复派发"/g) ?? []).length, 1, 'the penalty block stays liftable from the block list');
 });

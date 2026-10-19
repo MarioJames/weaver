@@ -79,3 +79,6 @@ export function quotaRecoveryText(record: EngineQuotaRecord): string {
   if (record.status === 'unknown') return '尚不能确认账户额度，未知值不会按 0 处理。';
   return '';
 }
+
+/** Windows shown under the quota state on engine cards. */
+export function quotaVisibleWindows(record: EngineQuotaRecord): QuotaWindow[] { return record.status === 'unknown' ? [] : record.windows; }

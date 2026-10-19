@@ -7,7 +7,7 @@ import { ActionIcon, Button, Progress, Skeleton, Tag, Text, Tooltip } from '@lob
 import { ENGINE_CATALOG, catalogEntry, engineDisableConflict, type EngineProbeRecord } from '../../shared/engines';
 import type { EngineQuotaRecord, QuotaEngine, QuotaWindow } from '../../shared/quota';
 import { QUOTA_KINDS, quotaRefreshEnabled, type Block, type Engine } from '../../main/policy/routing';
-import { acceptQuotaPolicy, dateText, quotaPercentText, quotaProgressPercent, quotaRecordStale, quotaRecoveryText, quotaRetryMs, quotaStatusText, quotaNextUpdateMs, quotaCountText } from '../quota-view';
+import { acceptQuotaPolicy, dateText, quotaPercentText, quotaProgressPercent, quotaRecordStale, quotaRecoveryText, quotaRetryMs, quotaStatusText, quotaNextUpdateMs, quotaCountText, quotaVisibleWindows } from '../quota-view';
 import type { PolicyDraft, PolicyUpdate } from '../usePolicyDraft';
 import type { RendererAPI, StallEngineState, StallHistoryEntry, StallSnapshot } from '../client';
 import { styles } from '../style';
@@ -17,6 +17,16 @@ import type { StatusTone } from '../status-colors';
 const blockStyles = createStaticStyles(({ css, cssVar }) => ({
   row: css`display: flex; align-items: center; gap: 8px; min-width: 0; color: ${cssVar.colorTextSecondary}; font-size: ${cssVar.fontSizeSM}; > :not([data-block-reason]) { flex-shrink: 0; }`,
   reason: css`flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`,
+}));
+
+export function engineVersionText(version: string): string {
+  return version.trim().replace(/\s+\([a-f\d]{7,40}\)$/i, '');
+}
+
+const engineStyles = createStaticStyles(({ css, cssVar }) => ({
+  cards: css`display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); align-items: start; gap: 16px; min-inline-size: 0;`,
+  enable: css`display: flex; align-items: center; justify-content: flex-end; gap: 8px;`,
+  reason: css`max-inline-size: 180px; color: ${cssVar.colorTextSecondary}; font-size: ${cssVar.fontSizeSM}; overflow-wrap: anywhere;`,
 }));
 
 const PROBE: Record<string, { label: string; color?: string }> = {
@@ -177,7 +187,7 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
   return <>
     <PageHeader title="引擎" description="本机已安装的 Agent CLI。这里的开关立即生效；是否派发还看额度是否自动暂停了这台引擎。" action={<Button icon={ScanSearch} loading={scanning} onClick={() => void scan()}>重新探测</Button>} />
     {!saved && policy.loading && <Skeleton.Text animated rows={6} />}
-    {saved && <div className={styles.cards}>
+    {saved && <div className={engineStyles.cards}>
       {ENGINE_CATALOG.map(entry => {
         const probe = probes.find(item => item.id === entry.id);
         const record = saved.engines[entry.id];
@@ -186,11 +196,12 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
         const enabled = record?.enabled === true;
         const conflict = engineDisableConflict(saved, entry.id);
         const blocked = busyId !== '' || (enabled ? Boolean(conflict) : probe?.status !== 'installed' || kindMismatch);
-        const reason = enabled && conflict ? conflict : !enabled && probe?.status !== 'installed' ? '未在本机找到这个命令' : kindMismatch ? '已保存的类型与目录不一致' : '';
+        const roles = [Object.values(saved.owners).some(owner => owner.enabled && owner.engine === entry.id) ? '父 Agent' : '', Object.values(saved.workers).some(worker => worker.enabled && worker.engine === entry.id) ? '子 Agent' : ''].filter(Boolean);
+        const reason = enabled && conflict ? `仍启用的${roles.join(' / ')}，请先停用。` : !enabled && probe?.status !== 'installed' ? '未在本机找到这个命令' : kindMismatch ? '已保存的类型与目录不一致' : '';
         const kind = record?.kind ?? entry.kind;
         const engineBlocks = savedBlocks.filter(block => block.engine === entry.id);
-        return <Surface key={entry.id} aria-label={entry.id} className={styles.card} title={entry.id} description={<span className={styles.row} style={{ gap: 6 }}><Tag size="small" color={PROBE[status]?.color}>{PROBE[status]?.label ?? status}</Tag><Text type="secondary" className={styles.wrap}>{probe?.version || entry.command}</Text></span>}
-          extra={<Tooltip title={blocked && reason ? reason : enabled ? '停用' : '启用'}><span><NamedSwitch aria-label={`启用 ${entry.id}`} checked={enabled} loading={busyId === entry.id} disabled={blocked} onChange={checked => void toggle(entry.id, checked)} /></span></Tooltip>}>
+        return <Surface key={entry.id} aria-label={entry.id} title={entry.id} description={<span className={styles.row} style={{ gap: 6 }}><Tag size="small" color={PROBE[status]?.color}>{PROBE[status]?.label ?? status}</Tag><Tooltip title={probe?.version || entry.command}><Text type="secondary" className={styles.wrap}>{engineVersionText(probe?.version || entry.command)}</Text></Tooltip></span>}
+          extra={<div className={engineStyles.enable}>{blocked && reason && <Text type="secondary" className={engineStyles.reason}>{reason}</Text>}<NamedSwitch aria-label={`启用 ${entry.id}`} size="small" checked={enabled} loading={busyId === entry.id} disabled={blocked} onChange={checked => void toggle(entry.id, checked)} /></div>}>
           <div className={styles.cardBody}>
             <StallNotice state={stall.snapshot?.engines[entry.id]} now={stall.now} />
             {isQuotaKind(kind) ? <QuotaSummary engine={kind} record={quota.records.find(item => item.engine === kind)} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === kind ? quota.feedback : undefined} onRefresh={() => void quota.refresh(kind)} />
@@ -208,7 +219,7 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
           </div>
         </Surface>;
       })}
-      {unsupported.map(([id, record]) => <Surface key={id} aria-label={id} className={styles.card} title={id} description={<Tag size="small">暂不支持探测</Tag>}>
+      {unsupported.map(([id, record]) => <Surface key={id} aria-label={id} title={id} description={<Tag size="small">暂不支持探测</Tag>}>
         <Text type="secondary" className={styles.wrap}>类型 {record.kind}。这条记录原样保留，不能在这里启用。{record.enabled ? '当前为启用状态。' : ''}</Text>
       </Surface>)}
     </div>}
@@ -266,7 +277,7 @@ function QuotaSummary({ engine, record, now, busy, policyBusy, feedback, onRefre
       </Tooltip>
     </div>
     {!record ? <Skeleton.Text rows={1} /> : <>
-      {record.windows.map(window => <QuotaWindowRow key={window.id} window={window} />)}
+      {quotaVisibleWindows(record).map(window => <QuotaWindowRow key={window.id} window={window} />)}
       {!record.windows.length && record.status !== 'unknown' && <Text type="secondary" className={styles.meta}>{record.detail}</Text>}
       {quotaRecoveryText(record) && record.status !== 'unknown' && <Text type="secondary" className={styles.meta}>{quotaRecoveryText(record)}</Text>}
       <Text type="secondary" className={styles.meta}>{record.observedAt ? `${stale ? '已过期 · ' : ''}${dateText(record.observedAt)} 观测` : record.checkedAt ? `${dateText(record.checkedAt)} 检查` : '尚未刷新'}</Text>
