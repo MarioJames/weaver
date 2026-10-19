@@ -38,12 +38,12 @@ function rpcHeaders(port: number, extra: Record<string, string> = {}) {
 }
 
 const exec = promisify(execFile);
-async function cli(dataDir: string, args: string[]) {
+async function cli(dataDir: string, args: string[], env?: NodeJS.ProcessEnv) {
   let status = 0;
   let stdout = '';
   let stderr = '';
   try {
-    const result = await exec(process.execPath, ['--import', 'tsx', 'src/cli/main.ts', ...args, '--data-dir', dataDir], { cwd: REPO, encoding: 'utf8', timeout: 20_000 });
+    const result = await exec(process.execPath, ['--import', 'tsx', 'src/cli/main.ts', ...args, '--data-dir', dataDir], { cwd: REPO, encoding: 'utf8', timeout: 20_000, env: { ...process.env, ...env } });
     stdout = result.stdout;
     stderr = result.stderr;
   } catch (error) {
@@ -255,11 +255,26 @@ test('headless CLI can create, dispatch, review, and leaving does not cancel wor
   const runtime = await boot(t, dataDir);
   if (!runtime) { await rm(dataDir, { recursive: true, force: true }); return; }
   try {
-    const caps = await cli(dataDir, ['capabilities']);
-    assert.equal(caps.status, 0);
-    assert.equal(caps.json.ok, true);
-    assert.equal(caps.json.data.ownerSpawn, 'logical-registration');
-    assert.equal(caps.json.data.realExecution, typeof startCliAgent === 'function');
+    const herdrBin = await mkdtemp(join(tmpdir(), 'wv-owner-path-'));
+    const originalPath = process.env.PATH ?? '';
+    try {
+      const fakeHerdr = join(herdrBin, 'herdr');
+      await writeFile(fakeHerdr, '#!/bin/sh\nexit 0\n');
+      await chmod(fakeHerdr, 0o755);
+      // The running app owns the Herdr availability decision, so only its PATH changes between the two reads.
+      process.env.PATH = herdrBin;
+      const withHerdr = await cli(dataDir, ['capabilities'], { PATH: originalPath });
+      assert.equal(withHerdr.status, 0, withHerdr.stdout + withHerdr.stderr);
+      assert.equal(withHerdr.json.ok, true);
+      assert.equal(withHerdr.json.data.ownerSpawn, 'herdr');
+      assert.equal(withHerdr.json.data.realExecution, typeof startCliAgent === 'function');
+      process.env.PATH = join(herdrBin, 'no-herdr');
+      const withoutHerdr = await cli(dataDir, ['capabilities'], { PATH: originalPath });
+      assert.equal(withoutHerdr.status, 0, withoutHerdr.stdout + withoutHerdr.stderr);
+      assert.equal(withoutHerdr.json.ok, true);
+      assert.equal(withoutHerdr.json.data.ownerSpawn, 'logical-registration');
+      assert.equal(withoutHerdr.json.data.realExecution, typeof startCliAgent === 'function');
+    } finally { process.env.PATH = originalPath; await rm(herdrBin, { recursive: true, force: true }); }
     const input = join(dataDir, 'create.json');
     await writeFile(input, JSON.stringify({ title: 'Headless', instruction: 'Mock demonstration only.', owner: { name: 'demo', transport: 'herdr-visible', session: 'reference', pane: 'reference' } }));
     const created = await cli(dataDir, ['tasks', 'create', '--input', input, '--command-id', 'create-1']);

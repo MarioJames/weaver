@@ -11,6 +11,7 @@ export interface OwnerRef { name: string; transport: 'herdr-visible'; session: s
 export interface TaskInput { workspace?: string; acceptanceCriteria?: string[]; constraints?: string[]; title: string; instruction: string; owner: OwnerRef }
 export interface Artifact { id: string; name: string; mediaType: 'text/plain' | 'text/markdown' | 'application/json'; content: string; createdAt: string }
 export interface TaskEvent { id: string; at: string; kind: 'lifecycle' | 'log' | 'progress' | 'artifact' | 'result' | 'error'; message: string }
+export interface TaskOwnerHost { kind: 'herdr'; session: string; workspaceId: string; paneId: string; agentName: string; launchedAt: string }
 export interface TaskDispatch {
   owner: string; worker: string; engine: string; model: string; effort: string;
   /** native: the owner runs this same-engine worker with its built-in subagent tool; no process is launched. */
@@ -23,7 +24,7 @@ export interface AgentRun {
   scopeUnit?: string; evidence?: import('../main/adapters/cli/types').CliAgentEvidence;
   pid?: number; startedAt?: string; endedAt?: string; exitCode?: number | null;
 }
-export interface Task extends TaskInput { ownerEpoch?: number; ownerLastActivityAt?: string; continuationPolicy?: import('../main/continuation').ContinuationPolicy; continuationHistory?: import('../main/continuation').HandoffRecord[]; contextPack?: import('../main/continuation').ContextPack; revision?: number; scheduled?: boolean; queueReason?: { code: 'waiting_for_capacity' | 'policy_blocked' | 'frozen_route_changed' | 'workspace_changed' | 'launch_blocked'; message: string }; retryOf?: string; ownerId?: string; packageId?: string; acknowledged?: boolean; reviewState?: 'pending' | 'accepted' | 'rejected'; reviewComment?: string; dispatch?: TaskDispatch; id: string; createdAt: string; updatedAt: string; status: TaskStatus; progress: number; events: TaskEvent[]; artifacts: Artifact[]; run?: AgentRun; summary?: string }
+export interface Task extends TaskInput { ownerEpoch?: number; ownerLastActivityAt?: string; continuationPolicy?: import('../main/continuation').ContinuationPolicy; continuationHistory?: import('../main/continuation').HandoffRecord[]; contextPack?: import('../main/continuation').ContextPack; ownerHost?: TaskOwnerHost; revision?: number; scheduled?: boolean; queueReason?: { code: 'waiting_for_capacity' | 'policy_blocked' | 'frozen_route_changed' | 'workspace_changed' | 'launch_blocked'; message: string }; retryOf?: string; ownerId?: string; packageId?: string; acknowledged?: boolean; reviewState?: 'pending' | 'accepted' | 'rejected'; reviewComment?: string; dispatch?: TaskDispatch; id: string; createdAt: string; updatedAt: string; status: TaskStatus; progress: number; events: TaskEvent[]; artifacts: Artifact[]; run?: AgentRun; summary?: string }
 export type WorkerRecord =
  | { type: 'log'; message: string }
  | { type: 'progress'; percent: number; message: string }

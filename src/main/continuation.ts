@@ -8,7 +8,12 @@ import type { TaskStore } from './store';
 export const DEFAULT_IDLE_TTL_MINUTES = 60;
 export const MAX_CONTEXT_PACK_BYTES = 32 * 1024;
 export const MAX_HANDOFFS = 100;
+export const MAX_HANDOFF_PROMPT_CHARS = 6000;
 export interface ContinuationPolicy { idleRotationMinutes: number | null }
+export interface ContinuationStatus {
+ taskId: string; ownerId: string; ownerEpoch: number; policy: ContinuationPolicy; lastActivityAt: string; due: boolean;
+ history: HandoffRecord[]; contextPack: ContextPack | null; prompt?: string;
+}
 export interface ContextPack {
  version: 1; id: string; createdAt: string; taskId: string; ownerEpoch: number;
  goal: string; workspace: string | null; profile: string; constraints: string[];
@@ -42,6 +47,39 @@ export function redactContext(value: string, limit = 700): string {
   .replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/gi, '$1[REDACTED]@')
   .slice(0, limit);
 }
+const promptChars = (value: string): number => Array.from(value).length;
+const promptTruncate = (value: string, max: number): string => {
+ const chars = Array.from(value);
+ return chars.length > max ? `${chars.slice(0, max).join('')}…` : value;
+};
+/** Plain-text briefing for the incoming owner host; every free-text value is redacted here or in the pack. */
+export function handoffPrompt(task: ContinuationTask, pack: ContextPack): string {
+ const head = `你将作为负责人接手 Weaver 任务「${redactContext(task.title, 160)}」（${pack.taskId}）。先读取 agents-weaver 技能（没有安装时运行 \`weaver --skill\`），按其中的流程继续。`;
+ const nextStep = `先运行 \`weaver owners continuation get --task-id ${pack.taskId}\` 和 \`weaver tasks get --task-id ${pack.taskId}\` / \`weaver tasks results --task-id ${pack.taskId}\` 核对现状，然后继续派发、等待、审查并验收；不要重复已完成的工作。`;
+ const build = (scale: number): string => {
+  const limit = (base: number) => Math.max(16, Math.floor(base * scale));
+  const sections: string[] = [head];
+  if (pack.workspace) sections.push(`工作目录：${pack.workspace}`);
+  if (pack.goal) sections.push(`目标：${promptTruncate(pack.goal, limit(1600))}`);
+  if (pack.constraints.length) sections.push(`约束：\n${pack.constraints.map(value => `- ${promptTruncate(value, limit(400))}`).join('\n')}`);
+  if (task.acceptanceCriteria?.length) sections.push(`验收标准：\n${task.acceptanceCriteria.map(value => `- ${promptTruncate(redactContext(value, limit(400)), limit(400))}`).join('\n')}`);
+  const statusLines = [`状态：${pack.taskProgress.status}`];
+  if (pack.taskProgress.summary) statusLines.push(`最新摘要：${promptTruncate(pack.taskProgress.summary, limit(1000))}`);
+  sections.push(`当前状态：\n${statusLines.join('\n')}`);
+  if (pack.acceptedArtifacts.length) sections.push(`已有产物：\n${pack.acceptedArtifacts.map(artifact => `- ${promptTruncate(artifact.name, limit(150))}`).join('\n')}`);
+  const recent = task.events.filter(e => ['lifecycle', 'result', 'artifact', 'error'].includes(e.kind)).slice(-6);
+  if (recent.length) sections.push(`最近进展：\n${recent.map(e => `- [${e.at}] (${e.kind}) ${promptTruncate(redactContext(e.message, limit(500)), limit(500))}`).join('\n')}`);
+  if (pack.pendingApprovals.length) sections.push(`待批准：\n${pack.pendingApprovals.map(value => `- ${promptTruncate(value, limit(500))}`).join('\n')}`);
+  sections.push(`下一步：\n${nextStep}`);
+  return sections.join('\n\n');
+ };
+ let prompt = build(1);
+ for (const scale of [1 / 2, 1 / 4, 1 / 8, 1 / 16]) {
+  if (promptChars(prompt) <= MAX_HANDOFF_PROMPT_CHARS) return prompt;
+  prompt = build(scale);
+ }
+ return promptChars(prompt) <= MAX_HANDOFF_PROMPT_CHARS ? prompt : Array.from(prompt).slice(0, MAX_HANDOFF_PROMPT_CHARS).join('');
+}
 export function idleContinuationDue(task: ContinuationTask, now = Date.now()): boolean {
  const minutes = task.continuationPolicy?.idleRotationMinutes === undefined ? DEFAULT_IDLE_TTL_MINUTES : task.continuationPolicy.idleRotationMinutes;
  if (minutes === null) return false;
@@ -60,12 +98,14 @@ function assertQuiescent(task: Task): void {
  */
 export class ContinuationService {
  constructor(private readonly store: TaskStore, private readonly host: OwnerHostAdapter, private readonly now: () => number = Date.now) {}
- get(taskId: string) {
+ get(taskId: string): ContinuationStatus {
   const task = this.read(taskId);
-  return structuredClone({taskId, ownerId: task.ownerId, ownerEpoch: task.ownerEpoch ?? 0,
+  const result = structuredClone({taskId, ownerId: task.ownerId, ownerEpoch: task.ownerEpoch ?? 0,
    policy: task.continuationPolicy ?? {idleRotationMinutes: DEFAULT_IDLE_TTL_MINUTES},
    lastActivityAt: task.ownerLastActivityAt ?? task.createdAt, due: idleContinuationDue(task, this.now()),
-   history: task.continuationHistory ?? [], contextPack: task.contextPack ?? null});
+   history: task.continuationHistory ?? [], contextPack: task.contextPack ?? null}) as ContinuationStatus;
+  if (result.contextPack) result.prompt = handoffPrompt(task, result.contextPack);
+  return result;
  }
  due(taskId: string): boolean { return idleContinuationDue(this.read(taskId), this.now()); }
  configure(taskId: string, expectedRevision: number, idleRotationMinutes: number | null) {
@@ -77,7 +117,7 @@ export class ContinuationService {
   task.updatedAt = task.ownerLastActivityAt;
   this.store.put(task); return this.get(taskId);
  }
- rotate(taskId: string, expectedRevision: number, reason: 'manual' | 'idle', expectedEpoch?: number, profileId?: string) {
+  rotate(taskId: string, expectedRevision: number, reason: 'manual' | 'idle', expectedEpoch?: number, profileId?: string): ContinuationStatus {
   const original = this.read(taskId); this.revision(original, expectedRevision);
   if (reason !== 'manual' && reason !== 'idle') fail('INVALID_REQUEST', 'Invalid continuation reason');
   const epoch = original.ownerEpoch ?? 0;

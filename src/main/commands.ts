@@ -4,15 +4,17 @@ import type { Task } from '../shared/types';
 import { object, parseId, parseTaskInput, parseWorkerRecord, text } from '../shared/validation';
 import { TaskManager } from './manager';
 import { event } from './store';
-import { ContinuationService, ContinuationError, redactContext } from './continuation';
+import { ContinuationService, ContinuationError, handoffPrompt, redactContext } from './continuation';
 import { MockOwnerHostAdapter, type OwnerHostEvidence, type OwnerMessage } from './adapters/logical';
+import { launchOwner, herdrOnPath, OwnerLaunchError } from './owner-host';
+import type { TaskOwnerHost } from '../shared/types';
 import { PolicyStore } from './policy/store';
 import { EXCLUDED_ENGINE_REASON } from './policy/routing';
 import type { RoutePreview } from '../shared/policy';
 import { QUOTA_CAPABILITIES } from './policy/quota';
 import { absoluteExistingWorkspace, assertFrozenWorkspace, workspaceIdentity, isRealEngineKind, REAL_ENGINE_KINDS } from './workspace';
 import { workerInstruction } from './adapters/instruction';
-export const WRITE_COMMANDS = ['owners.attach','owners.spawn','owners.switch','owners.continuation.configure','tasks.create','tasks.retry','tasks.cancel','packages.create','workers.spawn','workers.complete','results.deliver','results.ack','reviews.submit'] as const;
+export const WRITE_COMMANDS = ['owners.attach','owners.spawn','owners.switch','owners.launch','owners.continuation.configure','tasks.create','tasks.retry','tasks.cancel','packages.create','workers.spawn','workers.complete','results.deliver','results.ack','reviews.submit'] as const;
 export const READ_COMMANDS = ['capabilities.get','sync.snapshot','sync.status','owners.list','owners.get','owners.continuation.get','tasks.get','tasks.list','tasks.events','tasks.results','artifacts.read','packages.get','operations.get','observability.get','observability.export'] as const;
 const writes=new Set<string>(WRITE_COMMANDS);
 /** Running tasks per worker across every owner: the load that weighted dispatch balances. */
@@ -36,8 +38,9 @@ export class CommandHandler {
  transportStatus:'ready'|'unavailable'|'not-started'='not-started';
  private ownerHost=new MockOwnerHostAdapter();
  private continuation:ContinuationService;
- constructor(readonly manager:TaskManager,readonly policy:PolicyStore){
-  this.continuation=new ContinuationService(manager.store,this.ownerHost);
+  constructor(readonly manager:TaskManager,readonly policy:PolicyStore,
+   private readonly hostLauncher: typeof launchOwner = launchOwner, private readonly herdrPresent: () => boolean = () => herdrOnPath()){
+   this.continuation=new ContinuationService(manager.store,this.ownerHost);
   manager.listeners.add(()=>queueMicrotask(()=>this.pump()));
   for(const owner of manager.store.getMetadata().owners) if(owner.host)this.ownerHost.restore(owner.host as OwnerHostEvidence,(owner.messages??[]) as OwnerMessage[]);
   queueMicrotask(()=>this.pump());
@@ -76,6 +79,24 @@ export class CommandHandler {
  private task(a:Record<string,unknown>):Task {try{return this.manager.store.get(parseId(a.taskId));}catch{ return fail('NOT_FOUND','Task not found');}}
  private revise(task:Task,a:Record<string,unknown>){if(a.expectedRevision!==undefined && a.expectedRevision!==(task.revision??0))fail('REVISION_CONFLICT',`Current revision is ${task.revision??0}`);}
  private put(task:Task){this.manager.update(task);}
+  private startOwnerHost(task:Task,profile:string,prompt:string):{ownerHost?:TaskOwnerHost;failure?:{code:string;message:string}} {
+   try {
+    const workspace=task.dispatch?.workspace??task.workspace;
+    if(!workspace)throw new OwnerLaunchError('OWNER_LAUNCH_FAILED','Task has no workspace to launch the owner in');
+    const config=this.policy.snapshot().config;
+    const ownerConfig=config.owners[profile];
+    if(!ownerConfig)throw new OwnerLaunchError('OWNER_LAUNCH_FAILED',`Owner profile ${profile} is missing from the policy`);
+    const launched=this.hostLauncher({taskId:task.id,epoch:task.ownerEpoch??0,title:task.title,workspace,engineKind:config.engines[ownerConfig.engine]?.kind??'',model:ownerConfig.model,effort:ownerConfig.effort,prompt});
+    const ownerHost:TaskOwnerHost={kind:'herdr',session:launched.session,workspaceId:launched.workspaceId,paneId:launched.paneId,agentName:launched.agentName,launchedAt:new Date().toISOString()};
+    task.ownerHost=ownerHost;event(task,'lifecycle',`Started ${profile} in Herdr (${ownerHost.agentName})`);this.put(task);
+    return {ownerHost};
+   }catch(error){
+    const code=error instanceof OwnerLaunchError?error.code:'OWNER_LAUNCH_FAILED';
+    const message=error instanceof Error?error.message:String(error);
+    event(task,'error',`Owner launch failed (${code}): ${message}`);this.put(task);
+    return {failure:{code,message}};
+   }
+  }
  private pumping=false;
  checkIdleOwners():string[] {return this.manager.store.list().filter(task=>task.ownerId&&this.continuation.due(task.id)).map(task=>task.id);}
  private prepareOwnerActivity(command:string,args:Record<string,unknown>):void {
@@ -166,10 +187,11 @@ export class CommandHandler {
   switch(command){
    case 'sync.snapshot':return {revision:this.manager.store.revision,tasks:this.manager.store.list().map(t=>({id:t.id,title:t.title,status:t.status,revision:t.revision??0,ownerId:t.ownerId,updatedAt:t.updatedAt,reviewState:t.reviewState??'pending'})),owners:this.manager.store.getMetadata().owners.map(o=>({id:o.id,name:o.name,profileId:o.profileId,mode:o.mode,state:o.state}))};
    case 'sync.status':return {revision:this.manager.store.revision,changed:a.after!==this.manager.store.revision,recovery:'refresh sync.snapshot; push invalidation is not a durable event stream'};
-   case 'capabilities.get':return {apiVersion:API_VERSION,cliTransport:this.transportStatus,authentication:'ephemeral-local-trusted-user-demo',ownerScopedAuthorization:false,ownerSpawn:'logical-registration',manualAttach:'metadata-only',ownerModelSpawned:false,attachmentVerified:false,authenticated:false,modelUsable:false,workerProviders:this.manager.canLaunchReal?['mock-jsonl',...REAL_ENGINE_KINDS]:['mock-jsonl'],realExecution:this.manager.canLaunchReal,mcp:false,maxParallel:configuredParallel(this.policy),policyAdmission:true,quota:QUOTA_CAPABILITIES,commands:[...READ_COMMANDS,...WRITE_COMMANDS],limits:{tasks:200,owners:200,packages:1000,receipts:5000,eventsPerPage:100},durability:'durable intent before effect; interrupted commands require reconciliation, not automatic replay'};
+   case 'capabilities.get':return {apiVersion:API_VERSION,cliTransport:this.transportStatus,authentication:'ephemeral-local-trusted-user-demo',ownerScopedAuthorization:false,ownerSpawn:this.herdrPresent()?'herdr':'logical-registration',manualAttach:'metadata-only',ownerModelSpawned:false,attachmentVerified:false,authenticated:false,modelUsable:false,workerProviders:this.manager.canLaunchReal?['mock-jsonl',...REAL_ENGINE_KINDS]:['mock-jsonl'],realExecution:this.manager.canLaunchReal,mcp:false,maxParallel:configuredParallel(this.policy),policyAdmission:true,quota:QUOTA_CAPABILITIES,commands:[...READ_COMMANDS,...WRITE_COMMANDS],limits:{tasks:200,owners:200,packages:1000,receipts:5000,eventsPerPage:100},durability:'durable intent before effect; interrupted commands require reconciliation, not automatic replay'};
    case 'owners.continuation.get':return this.continuation.get(parseId(a.taskId));
    case 'owners.continuation.configure':{if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');return this.continuation.configure(parseId(a.taskId),a.expectedRevision as number,a.idleRotationMinutes as number|null);}
-   case 'owners.switch':{if(!Number.isSafeInteger(a.expectedRevision)||(a.expectedEpoch!==undefined&&!Number.isSafeInteger(a.expectedEpoch)))fail('INVALID_REQUEST','Revision and epoch must be integers');if(a.reason!==undefined&&a.reason!=='manual'&&a.reason!=='idle')fail('INVALID_REQUEST','Invalid switch reason');const task=this.task(a);const owner=this.owner(task.ownerId);const profile=text(a.profileId??owner.profileId,'profileId',120);if(this.policy.snapshot().owners[profile]?.status!=='available')fail('POLICY_DENIED','Target owner profile unavailable');return this.continuation.rotate(task.id,Number(a.expectedRevision),a.reason==='idle'?'idle':'manual',a.expectedEpoch===undefined?undefined:Number(a.expectedEpoch),profile);}
+   case 'owners.switch':{if(!Number.isSafeInteger(a.expectedRevision)||(a.expectedEpoch!==undefined&&!Number.isSafeInteger(a.expectedEpoch)))fail('INVALID_REQUEST','Revision and epoch must be integers');if(a.reason!==undefined&&a.reason!=='manual'&&a.reason!=='idle')fail('INVALID_REQUEST','Invalid switch reason');if(a.launch!==undefined&&typeof a.launch!=='boolean')fail('INVALID_REQUEST','launch must be a boolean');const task=this.task(a);const owner=this.owner(task.ownerId);const profile=text(a.profileId??owner.profileId,'profileId',120);if(this.policy.snapshot().owners[profile]?.status!=='available')fail('POLICY_DENIED','Target owner profile unavailable');const result=this.continuation.rotate(task.id,Number(a.expectedRevision),a.reason==='idle'?'idle':'manual',a.expectedEpoch===undefined?undefined:Number(a.expectedEpoch),profile);if(a.launch!==true)return result;const launched=this.startOwnerHost(this.manager.store.get(task.id),profile,typeof result.prompt==='string'?result.prompt:'');(result as {launch?:unknown}).launch=launched.ownerHost?{ok:true,ownerHost:launched.ownerHost}:{ok:false,code:launched.failure!.code,message:launched.failure!.message};return result;}
+   case 'owners.launch':{if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');const task=this.task(a);this.revise(task,a);if(!task.contextPack)return fail('INVALID_STATE','No context pack to launch the owner from');const owner=task.ownerId?this.owner(task.ownerId):undefined;if(!owner)return fail('INVALID_STATE','Task has no logical owner');const profile=owner.profileId;if(this.policy.snapshot().owners[profile]?.status!=='available')fail('POLICY_DENIED','Owner profile is unavailable');const prompt=handoffPrompt(task,task.contextPack);const launched=this.startOwnerHost(this.manager.store.get(task.id),profile,prompt);return {taskId:task.id,prompt,...launched.ownerHost?{launch:{ok:true,ownerHost:launched.ownerHost}}:{launch:{ok:false,code:launched.failure!.code,message:launched.failure!.message}},task:this.publicTask(this.manager.store.get(task.id))};}
    case 'owners.list':return {owners:this.manager.store.getMetadata().owners};
    case 'owners.get':return this.owner(a.ownerId);
    case 'owners.attach':case 'owners.spawn':{

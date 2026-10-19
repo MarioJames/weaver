@@ -52,6 +52,13 @@ export function parseStoredTask(value: unknown): Task {
  if(raw.queueReason!==undefined){const q=object(raw.queueReason);if(!['waiting_for_capacity','policy_blocked','frozen_route_changed','workspace_changed','launch_blocked'].includes(String(q.code)))throw new Error('Invalid queue reason');extra.queueReason={code:q.code as NonNullable<Task['queueReason']>['code'],message:text(q.message,'queue reason',700)};}
  if(raw.scheduled!==undefined) {if(typeof raw.scheduled!=='boolean')throw new Error('Invalid scheduled flag');extra.scheduled=raw.scheduled;}
  for(const key of ['ownerId','packageId','retryOf'] as const) if(raw[key]!==undefined) extra[key]=parseId(raw[key]);
+ if(raw.ownerHost!==undefined) {
+  const host=object(raw.ownerHost);
+  if(host.kind!=='herdr')throw new Error('Invalid stored owner host');
+  const agentName=text(host.agentName,'ownerHost agentName',40);
+  if(!/^[a-z][a-z0-9_-]{0,31}$/.test(agentName))throw new Error('Invalid stored owner host');
+  extra.ownerHost={kind:'herdr',session:text(host.session,'ownerHost session',120),workspaceId:text(host.workspaceId,'ownerHost workspaceId',80),paneId:text(host.paneId,'ownerHost paneId',80),agentName,launchedAt:date(host.launchedAt)};
+ }
  if(raw.acknowledged!==undefined) {if(typeof raw.acknowledged!=='boolean')throw new Error('Invalid acknowledgment');extra.acknowledged=raw.acknowledged;}
  if(raw.reviewState!==undefined) {if(!['pending','accepted','rejected'].includes(String(raw.reviewState)))throw new Error('Invalid review');extra.reviewState=raw.reviewState as Task['reviewState'];}
  if(raw.reviewComment!==undefined)extra.reviewComment=text(raw.reviewComment,'review comment',4000,true);
