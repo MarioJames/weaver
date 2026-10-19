@@ -6,7 +6,7 @@ import type { DisplayStatus } from './status-colors';
 export type TaskFilter = 'all' | 'active' | 'review' | 'closed';
 export const statusLabels: Record<TaskStatus, string> = { queued: '待执行', running: '执行中', cancelling: '停止中', completed: '执行完成', failed: '执行失败', cancelled: '已取消' };
 export function isActive(task: Task): boolean { return ['queued', 'running', 'cancelling'].includes(task.status); }
-export const UNASSIGNED_OWNER = '未指定负责人';
+export const UNASSIGNED_OWNER = '未指定父 Agent';
 /** Placeholder assigned to per-task throwaway instances. */
 const PLACEHOLDER_OWNER = 'Task owner';
 type ProfiledTask = Task & { owner: Task['owner'] & { profileId?: string } };
@@ -54,6 +54,15 @@ export function projectLabel(task: Task): string {
   const path = (task.dispatch?.workspace || task.workspace || '').replace(/\/+$/, '');
   if (!path) return '';
   return path.slice(path.lastIndexOf('/') + 1);
+}
+/** Compact local display; the original timestamp remains available on the time element. */
+export function compactTaskTime(value: string, now: number = Date.now()): string {
+  const date = new Date(value);
+  const today = new Date(now);
+  const pad = (part: number) => String(part).padStart(2, '0');
+  const clock = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const sameDay = date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+  return sameDay ? clock : `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${clock}`;
 }
 export function filterTasks(tasks: Task[], filter: TaskFilter): Task[] {
   return tasks.filter(task => filter === 'all' || (filter === 'active' && isActive(task)) || (filter === 'review' && task.status === 'completed' && reviewStatus(task) === 'pending') || (filter === 'closed' && !isActive(task)));

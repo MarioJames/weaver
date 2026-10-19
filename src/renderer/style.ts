@@ -255,6 +255,8 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
 
     &[data-tone='processing'] { background: ${cssVar.colorPrimary}; }
     &[data-tone='warning'] { background: ${cssVar.colorWarning}; }
+    &[data-tone='orange'] { background: ${cssVar.orange}; }
+    &[data-tone='volcano'] { background: ${cssVar.volcano}; }
     &[data-tone='success'] { background: ${cssVar.colorSuccess}; }
     &[data-tone='error'] { background: ${cssVar.colorError}; }
   `,
@@ -264,9 +266,19 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     gap: ${cssVar.marginXS};
     align-items: center;
     min-inline-size: 0;
-    min-block-size: ${cssVar.controlHeightSM};
+    block-size: ${cssVar.controlHeight};
     color: ${cssVar.colorTextSecondary};
     font-size: ${cssVar.fontSizeSM};
+  `,
+  facetSelectedDetails: css`
+    display: flex;
+    flex: 1 1 0;
+    gap: ${cssVar.marginXS};
+    align-items: center;
+    min-inline-size: 0;
+    white-space: nowrap;
+
+    &[data-active='false'] { visibility: hidden; }
   `,
   facetSelectedList: css`
     display: flex;
@@ -294,23 +306,16 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
 
     > * { flex: 1 1 0; min-inline-size: 0; }
   `,
-  /** The four status lanes side by side, stacked on small screens, each full height. */
+  /** Keep cards readable; narrower viewports scroll only the lane container. */
   columns: css`
     display: grid;
     flex: 1 1 auto;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(240px, 1fr));
     gap: ${cssVar.marginSM};
-    align-items: stretch;
-    min-block-size: 320px;
+    align-items: start;
+    inline-size: 100%;
     min-inline-size: 0;
-
-    ${responsive.laptop} {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    ${responsive.mobile} {
-      grid-template-columns: minmax(0, 1fr);
-    }
+    overflow-x: auto;
   `,
   column: css`
     --column-bg: ${cssVar.colorFillTertiary};
@@ -391,7 +396,7 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     text-overflow: ellipsis;
     white-space: nowrap;
   `,
-  /** One text flow: the sub agent tag is inline at the start and the title wraps beneath it. */
+  /** The full title line is reserved for readable text. */
   cardTitle: css`
     display: -webkit-box;
     min-inline-size: 0;
@@ -402,25 +407,26 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     line-clamp: 2;
   `,
   cardTag: css`
-    max-inline-size: 60%;
-    margin-inline-end: 6px;
+    min-inline-size: 0;
+    max-inline-size: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
-    vertical-align: middle;
+    white-space: nowrap;
   `,
   cardTitleText: css`
     overflow-wrap: anywhere;
   `,
   cardStatus: css`
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 4px;
     min-inline-size: 0;
     > :first-child { flex: none; }
   `,
   cardActivity: css`
-    flex: 1 1 0;
-    min-inline-size: 0;
+    flex: 1 1 100%;
+    min-inline-size: min(100%, 12ch);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -592,6 +598,12 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     flex-direction: column;
     gap: 12px;
     min-inline-size: 0;
+  `,
+  archiveDirectory: css`
+    display: block;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
   `,
   /** An archived row opens the full record: whole-row click, so it reads and looks clickable. */
   archiveRow: css`

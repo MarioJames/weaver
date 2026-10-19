@@ -38,31 +38,32 @@ function card(task: Task) {
   return result[0];
 }
 
-test('card title starts with the dispatched worker tag and compact facts only identify the parent', () => {
+test('card title stays separate from the dispatched sub agent and compact facts identify the parent', () => {
   const html = card(base);
-  assert.match(html, /<title>Claude Code<\/title>[\s\S]*WORKER[\s\S]*<strong[^>]*>CARD_ONE<\/strong>/);
+  assert.match(html, /<strong[^>]*>CARD_ONE<\/strong>[\s\S]*<title>Claude Code<\/title>[\s\S]*WORKER/);
   /** One text flow: tag and title live in the same title block, with no separate title column. */
   const block = html.match(new RegExp(`<span class="${styles.cardTitle}">([\\s\\S]*?)</span></button>|<span class="${styles.cardTitle}">([\\s\\S]*?</strong>)</span>`));
   assert.ok(block);
   const inner = block[1] ?? block[2];
-  assert.ok(inner.includes('WORKER') && inner.includes('CARD_ONE') && inner.indexOf('WORKER') < inner.indexOf('CARD_ONE'));
-  assert.equal((html.match(/WORKER/g) ?? []).length, 1);
+  assert.ok(inner.includes('CARD_ONE'));
+  assert.doesNotMatch(inner, /WORKER/);
+  assert.equal((html.match(/>WORKER</g) ?? []).length, 1);
   assert.equal((html.match(/<dt/g) ?? []).length, 1);
   assert.match(html, /父 Agent/);
   assert.doesNotMatch(html, /目录|\/projects|\/frozen/);
   assert.doesNotMatch(card({ ...base, dispatch: undefined }), /WORKER|<title>Claude Code/);
 });
 
-test('running, cancelling and scheduled cards share status, redacted activity and time on the second line', () => {
-  for (const task of [base, { ...base, status: 'cancelling' as const }, { ...base, status: 'queued' as const, scheduled: true }]) {
+test('running and cancelling cards show redacted activity after status and compact time', () => {
+  for (const task of [base, { ...base, status: 'cancelling' as const }]) {
     const html = card(task);
-    const row = html.match(new RegExp(`<span class="${styles.cardStatus}">([\\s\\S]*?)</time></span>`))?.[1];
+    const row = html.slice(html.indexOf(`class="${styles.cardStatus}"`), html.indexOf('<dl'));
     assert.ok(row, 'status, activity and time must share one row');
     assert.match(row, /ACTIVITY/);
     assert.doesNotMatch(row, /secret-value/);
     assert.match(row, /<time[^>]*dateTime="2026-10-18T12:00:00.000Z"/i);
     assert.equal((row.match(/lucide-loader-2/g) ?? []).length, 1);
-    assert.ok(row.indexOf('ACTIVITY') < row.indexOf('<time'));
+    assert.ok(row.indexOf('ACTIVITY') > row.indexOf('<time'));
   }
   assert.match(card({ ...base, events: [] }), /等待首次调度/);
 });
@@ -70,7 +71,7 @@ test('running, cancelling and scheduled cards share status, redacted activity an
 test('completed, failed, cancelled and unscheduled queued cards keep status and time without activity', () => {
   for (const [status, label] of [['completed', '待验收'], ['failed', '失败'], ['cancelled', '已取消'], ['queued', '待执行']] as const) {
     const html = card({ ...base, status });
-    const row = html.match(new RegExp(`<span class="${styles.cardStatus}">([\\s\\S]*?)</time></span>`))?.[1];
+    const row = html.slice(html.indexOf(`class="${styles.cardStatus}"`), html.indexOf('<dl'));
     assert.ok(row, 'status and time must share one row');
     assert.match(row, new RegExp(label));
     assert.doesNotMatch(html, /ACTIVITY|secret-value|等待首次调度|lucide-loader-2/);

@@ -4,7 +4,7 @@ import type { Task } from '../shared/types';
  * One color scheme for every place that shows where a task is: board lanes, card and detail tags,
  * timeline outcomes and filter dots. Values are Tag color presets; lanes map them to cssVar tokens.
  */
-export type StatusTone = 'default' | 'processing' | 'warning' | 'success' | 'error';
+export type StatusTone = 'default' | 'processing' | 'warning' | 'success' | 'error' | 'orange' | 'volcano';
 
 /** The state a person reads at a glance, review outcome included once execution has finished. */
 export type DisplayStatus = 'queued' | 'scheduled' | 'running' | 'cancelling' | 'review' | 'accepted' | 'rejected' | 'failed' | 'cancelled';
@@ -17,8 +17,8 @@ export const DISPLAY_LABELS: Record<DisplayStatus, string> = {
 };
 
 export const DISPLAY_TONES: Record<DisplayStatus, StatusTone> = {
-  queued: 'default', scheduled: 'default', running: 'processing', cancelling: 'warning',
-  review: 'warning', accepted: 'success', rejected: 'warning', failed: 'error', cancelled: 'default',
+  queued: 'default', scheduled: 'default', running: 'processing', cancelling: 'orange',
+  review: 'warning', accepted: 'success', rejected: 'volcano', failed: 'error', cancelled: 'default',
 };
 
 export function displayStatus(task: Task): DisplayStatus {

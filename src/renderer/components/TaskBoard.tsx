@@ -2,11 +2,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Empty, Icon } from '@lobehub/ui';
 import { Button, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
-import { ChevronDown, ChevronRight, ChevronUp, Folder, Loader2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, Clock, Folder, Loader2, X } from 'lucide-react';
 import type { Task } from '../../shared/types';
 import { redactLog } from '../log-view';
 import type { FilterDimension, FilterOption, TaskSelection, TaskTimeRange } from '../task-view';
-import { FILTER_DIMENSIONS, TASK_COLUMNS, TIME_RANGES, applyTaskFilters, columnize, dispatchKind, emptySelection, filterLabels, filterOptions, filterSummary, hasFilters, isOpenTask, nonArchived, readEndedExpanded, readFiltersCollapsed, readTaskFilters, resolveSelection, selectedEntries, toggleOption, workspaceGroups, writeEndedExpanded, writeFiltersCollapsed, writeTaskFilters } from '../task-view';
+import { FILTER_DIMENSIONS, TASK_COLUMNS, TIME_RANGES, applyTaskFilters, columnize, compactTaskTime, dispatchKind, emptySelection, filterLabels, filterOptions, filterSummary, hasFilters, isOpenTask, nonArchived, readEndedExpanded, readFiltersCollapsed, readTaskFilters, resolveSelection, selectedEntries, toggleOption, workspaceGroups, writeEndedExpanded, writeFiltersCollapsed, writeTaskFilters } from '../task-view';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../status-colors';
 import type { DisplayStatus } from '../status-colors';
 import { styles } from '../style';
@@ -17,7 +17,7 @@ import { EngineIcon } from './EngineIcon';
 function cardStatus(task: Task): { label: string; color?: string; spin: boolean } {
   const status = displayStatus(task);
   const tone = DISPLAY_TONES[status];
-  return { label: DISPLAY_LABELS[status], color: tone === 'default' ? undefined : tone, spin: status === 'running' || status === 'cancelling' || status === 'scheduled' };
+  return { label: DISPLAY_LABELS[status], color: tone === 'default' ? undefined : tone, spin: status === 'running' || status === 'cancelling' };
 }
 
 const spinner = <Icon icon={Loader2} spin size="small" />;
@@ -95,18 +95,19 @@ export function TaskFacets({ board, selection, collapsed, now, ownerKind, onChan
         onClick={() => onChange({ ...selection, [dimension]: toggleOption(selection[dimension], option.value) })} />)}
     </FacetRow>)}
     <div className={styles.facetSelected}>
-      <span>已选：</span>
-      <span className={styles.facetSelectedList}>
-        {selection.time !== 'today' && <button type="button" className={styles.facetChip} aria-label={`移除 ${TIME_RANGES.find(range => range.value === selection.time)?.label}`} onClick={() => onChange({ ...selection, time: 'today' })}>
-          {TIME_RANGES.find(range => range.value === selection.time)?.label}<Icon icon={X} size="small" />
-        </button>}
-        {entries.map(entry => <button key={`${entry.dimension}:${entry.value}`} type="button" className={styles.facetChip} aria-label={`移除 ${entry.label}`}
-          onClick={() => onChange({ ...selection, [entry.dimension]: selection[entry.dimension].filter(value => value !== entry.value) })}>
-          {entry.label}<Icon icon={X} size="small" />
-        </button>)}
-        {!entries.length && selection.time === 'today' && <Text type="secondary" className={styles.meta}>未选择</Text>}
-      </span>
-      <Button size="small" type="text" disabled={!hasFilters(selection)} onClick={() => onChange(emptySelection())}>清除全部</Button>
+      <div className={styles.facetSelectedDetails} data-active={hasFilters(selection)} aria-hidden={!hasFilters(selection)} inert={!hasFilters(selection)}>
+        <span>已选：</span>
+        <span className={styles.facetSelectedList}>
+          {selection.time !== 'today' && <button type="button" className={styles.facetChip} aria-label={`移除 ${TIME_RANGES.find(range => range.value === selection.time)?.label}`} onClick={() => onChange({ ...selection, time: 'today' })}>
+            时间：{TIME_RANGES.find(range => range.value === selection.time)?.label}<Icon icon={X} size="small" />
+          </button>}
+          {entries.map(entry => <button key={`${entry.dimension}:${entry.value}`} type="button" className={styles.facetChip} aria-label={`移除 ${entry.label}`}
+            onClick={() => onChange({ ...selection, [entry.dimension]: selection[entry.dimension].filter(value => value !== entry.value) })}>
+            {entry.label}<Icon icon={X} size="small" />
+          </button>)}
+        </span>
+        <Button size="small" type="text" disabled={!hasFilters(selection)} onClick={() => onChange(emptySelection())}>清除全部</Button>
+      </div>
       <Button size="small" type="text" icon={ChevronUp} aria-expanded onClick={() => onCollapse(true)}>收起</Button>
     </div>
   </div>;
@@ -116,6 +117,7 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
   const [stored, setStored] = useState(readTaskFilters);
   const [ended, setEnded] = useState(readEndedExpanded);
   const [collapsed, setCollapsed] = useState(readFiltersCollapsed);
+  const [expandedLanes, setExpandedLanes] = useState<string[]>([]);
   if (loading && !tasks.length) return <div role="status" className={styles.stack}><Skeleton animated /><Text type="secondary">正在加载本地任务…</Text></div>;
   if (!tasks.length) return <Empty title="还没有任务" description="从右上角新建第一个任务。" />;
   const selection = resolveSelection(filters ?? stored, tasks, now);
@@ -144,54 +146,58 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
     const latest = task.events.at(-1);
     return <button key={task.id} type="button" className={styles.taskCard} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
       <span className={styles.cardTitle}>
-        {task.dispatch?.worker && <Tag className={styles.cardTag} size="small" icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
         <strong className={styles.cardTitleText}>{task.title}</strong>
       </span>
       <span className={styles.cardStatus}>
-        <Tag size="small" color={tag.color} icon={tag.spin ? spinner : undefined}>{tag.label}</Tag>
+        <Tag size="small" color={tag.color} icon={tag.spin ? spinner : displayStatus(task) === 'scheduled' ? <Icon icon={Clock} size="small" /> : undefined}>{tag.label}</Tag>
+        {task.dispatch?.worker && <Tag className={styles.cardTag} title={task.dispatch.worker} size="small" icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
+        <time className={styles.cardTime} dateTime={task.updatedAt} title={new Date(task.updatedAt).toLocaleString('zh-CN')}>{compactTaskTime(task.updatedAt, now)}</time>
         {tag.spin && <Text type="secondary" className={styles.cardActivity} title={redactLog(latest?.message ?? '等待首次调度')}>{redactLog(latest?.message ?? '等待首次调度')}</Text>}
-        <time className={styles.cardTime} dateTime={task.updatedAt}>{new Date(task.updatedAt).toLocaleString()}</time>
       </span>
       <AgentFacts compact task={task} ownerKind={ownerKind} />
     </button>;
   };
   return <section aria-label="任务看板" className={styles.board}>
     <TaskFacets board={board} selection={selection} collapsed={collapsed} now={now} ownerKind={ownerKind} onChange={update} onCollapse={collapse} />
-    {!visible.length ? olderOpenWork ? <div className={styles.row}>
-      <Text type="secondary">今天没有任务，还有更早的未结束任务。</Text>
-      <Button size="small" onClick={() => update({ ...selection, time: 'all' })}>查看全部</Button>
-    </div> : <Text type="secondary" className={styles.meta} style={{ padding: 8 }}>没有匹配的任务</Text> :
-      <div className={styles.columns} aria-busy={loading}>
-        {TASK_COLUMNS.map((column, index) => {
-          const items = columns[index];
-          const groups = workspaceGroups(items);
-          /** Only 已结束 folds; the columns with live work are always in view. */
-          const foldable = column.key === 'closed';
-          const shown = !foldable || ended;
-          const count = <>
-            <strong>{column.label}</strong>
-            <span className={`${styles.numbers} ${styles.columnCount}`}>{items.length}</span>
-          </>;
-          return <div key={column.key} id={shown && foldable ? ENDED_BODY_ID : undefined} className={styles.column} data-status-column={column.key} data-collapsed={!shown}>
-            <header className={styles.columnHead}>
-              {foldable ? <button type="button" className={styles.fold} aria-expanded={shown} aria-controls={shown ? ENDED_BODY_ID : undefined} onClick={toggleEnded}>
-                <Icon icon={shown ? ChevronDown : ChevronRight} size="small" />
-                {count}
-              </button> : count}
-            </header>
-            {shown && <>
-              {groups.map(group => <div key={group.workspace} className={styles.workspaceGroup}>
-                {groups.length > 1 && <h3 className={styles.workspaceHeading} title={group.workspace || group.label}>
-                  <Icon icon={Folder} size="small" />
-                  <span className={styles.workspaceName}>{group.label}</span>
-                  <span className={styles.numbers}>{group.tasks.length}</span>
-                </h3>}
-                {group.tasks.map(task => card(task))}
-              </div>)}
-              {!items.length && <Text type="secondary" className={styles.meta} aria-hidden="true">—</Text>}
-            </>}
-          </div>;
-        })}
-      </div>}
+    {!visible.length && <Empty title="没有匹配的任务" description={olderOpenWork ? '今天没有任务，还有更早的未结束任务。' : undefined} action={<div className={styles.row}>
+      <Button size="small" onClick={() => update(emptySelection())}>清除筛选</Button>
+      {olderOpenWork && <Button size="small" onClick={() => update({ ...selection, time: 'all' })}>查看全部</Button>}
+    </div>} />}
+    <div className={styles.columns} aria-busy={loading}>
+      {TASK_COLUMNS.map((column, index) => {
+        const items = columns[index];
+        const expanded = expandedLanes.includes(column.key);
+        const groups = workspaceGroups(expanded ? items : items.slice(0, 20));
+        /** Only 已结束 folds; the columns with live work are always in view. */
+        const foldable = column.key === 'closed';
+        const shown = !foldable || ended || !items.length;
+        const count = <>
+          <strong>{column.label}</strong>
+          <span className={`${styles.numbers} ${styles.columnCount}`}>{items.length}</span>
+        </>;
+        return <div key={column.key} id={shown && foldable ? ENDED_BODY_ID : undefined} className={styles.column} data-status-column={column.key} data-collapsed={!shown}>
+          <header className={styles.columnHead}>
+            {foldable && items.length > 0 ? <button type="button" className={styles.fold} aria-expanded={shown} aria-controls={shown ? ENDED_BODY_ID : undefined} onClick={toggleEnded}>
+              <Icon icon={shown ? ChevronDown : ChevronRight} size="small" />
+              {count}
+            </button> : count}
+          </header>
+          {shown && <>
+            {groups.map(group => <div key={group.workspace} className={styles.workspaceGroup}>
+              {groups.length > 1 && <h3 className={styles.workspaceHeading} title={group.workspace || group.label}>
+                <Icon icon={Folder} size="small" />
+                <span className={styles.workspaceName}>{group.label}</span>
+                <span className={styles.numbers}>{group.tasks.length}</span>
+              </h3>}
+              {group.tasks.map(task => card(task))}
+            </div>)}
+            {!items.length && <Text type="secondary" className={styles.meta}>暂无任务</Text>}
+            {items.length > 20 && <Button size="small" type="text" aria-expanded={expanded} onClick={() => setExpandedLanes(current => expanded ? current.filter(key => key !== column.key) : [...current, column.key])}>
+              {expanded ? '收起' : `查看全部 ${items.length}`}
+            </Button>}
+          </>}
+        </div>;
+      })}
+    </div>
   </section>;
 }

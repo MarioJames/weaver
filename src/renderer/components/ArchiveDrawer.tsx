@@ -6,14 +6,14 @@ import { Drawer, Table, Tag, Text } from '@lobehub/ui/base-ui';
 import type { TableColumnsType } from '@lobehub/ui/base-ui';
 import type { Task } from '../../shared/types';
 import type { FilterDimension, TaskSelection } from '../task-view';
-import { TIME_RANGES, archiveRows, archivedTasks, dispatchKind, facetOptions, filterLabels, ownerLabel, projectLabel, taskOwnerId } from '../task-view';
+import { TIME_RANGES, archiveRows, archivedTasks, compactTaskTime, dispatchKind, facetOptions, filterLabels, ownerLabel, projectLabel, taskOwnerId } from '../task-view';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../status-colors';
 import { styles } from '../style';
 import { AgentLabel } from './EngineIcon';
 import { NamedSelect } from './NamedControls';
 
 /** What the archive table shows per owner: who ran the work and which agent did it. */
-export function archiveColumns(ownerKind?: (ownerId?: string) => string | undefined): TableColumnsType<Task> {
+export function archiveColumns(ownerKind?: (ownerId?: string) => string | undefined, now: number = Date.now()): TableColumnsType<Task> {
   return [
     { title: '任务', dataIndex: 'title', key: 'title', render: (_, task) => <Text strong className={styles.wrap}>{task.title}</Text> },
     {
@@ -25,13 +25,13 @@ export function archiveColumns(ownerKind?: (ownerId?: string) => string | undefi
         <AgentLabel kind={dispatchKind(task)} name={task.dispatch?.worker ?? '未记录子 Agent'} />
       </span>,
     },
-    { title: '项目', key: 'project', render: (_, task) => <span className={styles.wrap}>{projectLabel(task) || '未记录项目'}</span> },
+    { title: '工作目录', key: 'project', render: (_, task) => <span className={styles.archiveDirectory} title={task.dispatch?.workspace || task.workspace}>{projectLabel(task) || '未记录工作目录'}</span> },
     {
       title: '结果',
       key: 'outcome',
       render: (_, task) => { const status = displayStatus(task); const tone = DISPLAY_TONES[status]; return <Tag size="small" color={tone === 'default' ? undefined : tone}>{DISPLAY_LABELS[status]}</Tag>; },
     },
-    { title: '结束于', key: 'ended', render: (_, task) => <Text type="secondary" className={styles.meta}>{new Date(task.updatedAt).toLocaleString()}</Text> },
+    { title: '结束于', key: 'ended', render: (_, task) => <time className={styles.cardTime} dateTime={task.updatedAt} title={new Date(task.updatedAt).toLocaleString('zh-CN')}>{compactTaskTime(task.updatedAt, now)}</time> },
   ];
 }
 
@@ -70,7 +70,7 @@ export function ArchiveList({ tasks, selected, onSelect, ownerKind, now = Date.n
       {multi('worker')}
       {multi('status')}
     </div>
-    {rows.length ? <Table<Task> columns={archiveColumns(ownerKind)} dataSource={rows} rowKey="id" pagination={false} size="small" scroll={{ x: true }}
+    {rows.length ? <Table<Task> columns={archiveColumns(ownerKind, now)} dataSource={rows} rowKey="id" pagination={false} size="small" scroll={{ x: true }}
       onRow={task => archiveRowProps(task, selected, onSelect)} /> :
       <Empty title={archived.length ? "没有匹配的归档任务" : "还没有归档任务"} description={archived.length ? "调整时间、父 Agent、子 Agent 或状态。" : "任务结束满一天后会出现在这里。"} />}
   </div>;

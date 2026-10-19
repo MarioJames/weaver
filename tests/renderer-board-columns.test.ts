@@ -13,7 +13,7 @@ test('lane styles use theme tokens rather than literal colors and carry no accen
   for (const token of ['colorFillTertiary', 'colorTextSecondary', 'colorPrimaryBg', 'colorPrimary', 'colorWarningBg', 'colorWarning', 'colorFillQuaternary', 'colorTextTertiary']) {
     assert.ok(lanes.includes(`cssVar.${token}`), `Missing semantic lane token: ${token}`);
   }
-  assert.match(block('columns', 'column'), /align-items: stretch/);
+  assert.match(block('columns', 'column'), /align-items: start/);
   assert.match(block('columnHead', 'columnCount'), /color: var\(--column-text\)/);
   assert.doesNotMatch(block('columnHead', 'columnCount'), /border|background/);
   assert.ok(block('taskCard', 'taskCard').length >= 0);

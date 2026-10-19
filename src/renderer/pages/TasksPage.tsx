@@ -33,7 +33,7 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
   return <>
     <PageHeader title="任务" description="创建、执行和验收都记录在同一条任务里。" action={<>
       <Button ref={newTaskRef} type="primary" icon={Plus} disabled={work.busy || !work.caps || work.loading} onClick={() => setCreating(true)}>新建任务</Button>
-      <Button icon={Archive} disabled={!work.caps || work.loading} onClick={() => setArchiving(true)}>归档 {archived}</Button>
+      <Button icon={Archive} disabled={!work.caps || work.loading} onClick={() => setArchiving(true)}>归档 {work.loading ? <span role="status" aria-label="正在加载归档数量">…</span> : archived}</Button>
     </>} />
     <TaskBoard filters={filters} onFiltersChange={setFilters} now={now} tasks={tasks} selected={selected} loading={work.loading} onSelect={setSelected} ownerKind={ownerKind} />
     <ArchiveDrawer now={now} tasks={tasks} selected={selected} open={archiving} onClose={() => setArchiving(false)} onSelect={setSelected} ownerKind={ownerKind} />

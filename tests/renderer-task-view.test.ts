@@ -78,7 +78,7 @@ test('agent labels pair the brand icon with the name in one inline row', () => {
 test('owner attribution prefers the frozen dispatch over the placeholder owner name', () => {
   assert.equal(ownerLabel(claude), 'claude_owner');
   assert.equal(ownerLabel(codex), 'codex_owner');
-  assert.equal(ownerLabel(unassigned), '未指定负责人');
+  assert.equal(ownerLabel(unassigned), '未指定父 Agent');
   assert.equal(ownerLabel({ ...unassigned, owner: { ...owner, name: 'Mario' } }), 'Mario');
   assert.equal(ownerLabel({ ...unassigned, owner: { ...owner, name: 'Mario' }, dispatch }), 'claude_owner');
 });
@@ -260,11 +260,11 @@ test('the columns hold the live board work, newest first, with archived work kep
   assert.match(html, /data-status-column="closed"[\s\S]*<strong[^>]*>看板丁<\/strong>/);
 });
 
-test('a card shows its worker before the title and only the parent in compact facts', () => {
+test('a card reserves its title line and shows the sub agent afterwards, with only the parent in compact facts', () => {
   const html = markup(React.createElement(TaskBoard, { tasks: [claude], loading: false, onSelect: () => {}, ownerKind, now }));
   assert.match(html, /接入新引擎/);
   assert.match(html, /<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?claude_owner<\/span>/);
-  assert.match(html, /claude_worker[\s\S]*<strong[^>]*>接入新引擎<\/strong>/);
+  assert.match(html, /<strong[^>]*>接入新引擎<\/strong>[\s\S]*claude_worker/);
   assert.equal((html.match(/<dt/g) ?? []).length, 1);
   assert.doesNotMatch(html, /<dt[^>]*>Worker|<dt[^>]*>目录|复制工作目录/);
   assert.match(html, /Reading TaskBoard\.tsx/);
@@ -298,7 +298,7 @@ test('archive rows are the aged-out work, newest first, narrowed by the drawer s
 
 test('the archive table names, pairs and tags each archived row, newest first', () => {
   const columns = archiveColumns(ownerKind);
-  assert.deepEqual(columns.map(column => column.title), ['任务', '父 Agent → 子 Agent', '项目', '结果', '结束于']);
+  assert.deepEqual(columns.map(column => column.title), ['任务', '父 Agent → 子 Agent', '工作目录', '结果', '结束于']);
   const rows = archiveRows([...archived, onTheDay], { ...emptySelection(), time: 'all' }, now);
   assert.deepEqual(rows.map(task => task.title), ['归档取消案', '归档失败案', '归档通过案']);
   const cell = (key: string, task: Task) => {
@@ -340,15 +340,15 @@ test('the archive list is quiet when nothing has aged out yet', () => {
   assert.doesNotMatch(html, /重排任务面板/);
 });
 
-test('running and queued cards spin, finished cards do not, and a running card carries exactly one loader', () => {
+test('only active execution cards spin and scheduled cards use a static clock', () => {
   const spinning = markup(React.createElement(TaskBoard, { tasks: [claude], loading: false, onSelect: () => {}, now }));
   assert.match(spinning, /lucide-loader-2/);
   assert.match(spinning, /Reading TaskBoard\.tsx/);
   assert.equal((spinning.match(/lucide-loader-2/g) ?? []).length, 1);
   const waiting = markup(React.createElement(TaskBoard, { tasks: [{ ...claude, status: 'queued', scheduled: true }], loading: false, onSelect: () => {}, now }));
-  assert.match(waiting, /lucide-loader-2/);
+  assert.match(waiting, /lucide-clock/);
   assert.match(waiting, /排队中/);
-  assert.equal((waiting.match(/lucide-loader-2/g) ?? []).length, 1);
+  assert.equal((waiting.match(/lucide-loader-2/g) ?? []).length, 0);
   const stopped = markup(React.createElement(TaskBoard, { tasks: [unassigned], loading: false, onSelect: () => {}, now }));
   assert.doesNotMatch(stopped, /lucide-loader-2/);
 });
@@ -421,7 +421,7 @@ test('the inspector row is the owner, its status and one action', () => {
   assert.match(routed, /接续给…/);
   assert.doesNotMatch(routed, /工作目录|尚未记录调度结果|当前进度/);
   const legacy = markup(React.createElement(OwnerInspector, { task: unassigned, busy: false, action: async () => true }));
-  assert.match(legacy, /未指定负责人/);
+  assert.match(legacy, /未指定父 Agent/);
   assert.doesNotMatch(legacy, /工作目录 旧任务未记录|Epoch|Revision/);
 });
 
@@ -562,7 +562,7 @@ test('an empty today board offers all time only when matching older open work ca
 test('detail default overview excludes prompt and requirements and keeps all facts below the tabs', () => {
   const html = markup(React.createElement(TaskDetail, { task: { ...claude, instruction: 'PRIVATE_PROMPT', constraints: ['ONLY_REQUIREMENT'], acceptanceCriteria: ['CRITERION_ONE'], summary: 'RESULT_TEXT' }, ...detailProps }));
   const labels = [...html.matchAll(/role="tab"[^>]*>([^<]+)<\/button>/g)].map(match => match[1]);
-  assert.deepEqual(labels, ['概览', 'Prompt', '要求 1', '时间线 1', '产物 0', '验收', '接续']);
+  assert.deepEqual(labels, ['概览', 'Prompt', '要求 2', '时间线 1', '产物 0', '验收', '接续']);
   assert.doesNotMatch(html, /PRIVATE_PROMPT|ONLY_REQUIREMENT|CRITERION_ONE|此旧任务未记录/);
   assert.match(html, /RESULT_TEXT/);
   const beforeTabs = html.slice(0, html.indexOf('aria-label="任务记录"'));
