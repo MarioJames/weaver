@@ -61,10 +61,10 @@ export function filterTasks(tasks: Task[], filter: TaskFilter, query: string): T
 export function filterByOwner(tasks: Task[], owner: string): Task[] {
   return !owner || owner === ALL_OWNERS ? tasks : tasks.filter(task => ownerLabel(task) === owner);
 }
-/** The board narrows work along these three dimensions, in toolbar order. */
-export type FilterDimension = 'owner' | 'engine' | 'worker';
-export const FILTER_DIMENSIONS: readonly FilterDimension[] = ['owner', 'engine', 'worker'];
-export const filterLabels: Record<FilterDimension, string> = { owner: '负责人', engine: '引擎', worker: '工作代理' };
+/** The board's filter dimensions, in toolbar order. */
+export type FilterDimension = 'owner' | 'worker' | 'workspace';
+export const FILTER_DIMENSIONS: readonly FilterDimension[] = ['owner', 'worker', 'workspace'];
+export const filterLabels: Record<FilterDimension, string> = { owner: '父 Agent', worker: '工作代理', workspace: '工作目录' };
 /** The chosen values per dimension. */
 export const TIME_RANGES = [
   { value: 'all', label: '全部' },
@@ -88,7 +88,7 @@ export function filterByTime(tasks: Task[], range: TaskTimeRange, now: number): 
     return updated >= since && updated <= now;
   });
 }
-export function emptySelection(): TaskSelection { return { owner: [], engine: [], worker: [], time: 'today' }; }
+export function emptySelection(): TaskSelection { return { owner: [], worker: [], workspace: [], time: 'today' }; }
 /** localStorage key holding the board's filter selection. */
 export const TASK_FILTERS_KEY = 'weaver-task-filters';
 /** One dropdown entry: what it is called, how much live work hides behind it, and the brand to draw. */
@@ -100,8 +100,10 @@ export function taskOption(task: Task, dimension: FilterDimension): { value: str
     const value = named ? task.owner.name : taskOwnerId(task) ?? ownerLabel(task);
     return { value, label: named ? task.owner.name : logicalOwnerName(task) ?? ownerLabel(task) };
   }
-  const kind = dispatchKind(task);
-  if (dimension === 'engine') return kind ? { value: kind, label: kind } : undefined;
+  if (dimension === 'workspace') {
+    const workspace = task.workspace;
+    return workspace ? { value: workspace, label: workspaceLabel(workspace) } : undefined;
+  }
   const worker = task.dispatch?.worker;
   return worker ? { value: worker, label: worker } : undefined;
 }
@@ -132,7 +134,7 @@ export function filterOptions(tasks: Task[], dimension: FilterDimension, selecti
       if (live) known.open += 1;
       continue;
     }
-    seen.set(option.value, { value: option.value, label: option.label, kind: dimension === 'owner' ? undefined : dispatchKind(task), ...(dimension === 'owner' ? { ownerProfile: taskOwnerId(task) } : {}), open: live ? 1 : 0 });
+    seen.set(option.value, { value: option.value, label: option.label, kind: dimension === 'worker' ? dispatchKind(task) : undefined, ...(dimension === 'owner' ? { ownerProfile: taskOwnerId(task) } : {}), open: live ? 1 : 0 });
   }
   const options = [...seen.values()];
   return options.sort((a, b) => b.open - a.open || a.label.localeCompare(b.label));
@@ -215,6 +217,22 @@ export function columnize(tasks: Task[]): Task[][] {
   for (const task of tasks) columns[TASK_COLUMNS.findIndex(column => column.key === taskColumn(task))].push(task);
   for (const column of columns) column.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return columns;
+}
+/** Directory labels retain full paths as identity, including roots and missing workspaces. */
+function workspaceLabel(workspace: string): string {
+  const path = workspace.replace(/\/+$/, '');
+  return path.slice(path.lastIndexOf('/') + 1) || workspace || '未指定工作目录';
+}
+/** Workspace groups and their cards both follow the newest task's update time. */
+export function workspaceGroups(tasks: Task[]): { workspace: string; label: string; tasks: Task[] }[] {
+  const groups = new Map<string, Task[]>();
+  for (const task of [...tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))) {
+    const workspace = task.workspace ?? '';
+    const group = groups.get(workspace);
+    if (group) group.push(task);
+    else groups.set(workspace, [task]);
+  }
+  return [...groups].map(([workspace, tasks]) => ({ workspace, label: workspaceLabel(workspace), tasks }));
 }
 /** How long finished work stays on the board before it moves to the archive. */
 export const ARCHIVE_AFTER_MS = 24 * 60 * 60 * 1000;

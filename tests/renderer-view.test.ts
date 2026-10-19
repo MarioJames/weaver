@@ -8,6 +8,7 @@ import type { Task } from '../src/shared/types';
 import { TASK_COLUMNS, filterTasks, isActive, reviewLabel, reviewStatus, taskColumn } from '../src/renderer/task-view';
 import { TaskBoard } from '../src/renderer/components/TaskBoard';
 import { TaskDetail } from '../src/renderer/components/TaskDetail';
+import { TaskTextBlock } from '../src/renderer/components/TaskTextBlock';
 import { workspacePathError } from '../src/renderer/components/TaskComposer';
 import { ArtifactsPanel } from '../src/renderer/components/ArtifactsPanel';
 import { NamedInputNumber, NamedSelect, NamedSwitch } from '../src/renderer/components/NamedControls';
@@ -35,7 +36,7 @@ test('every task lands in exactly one kanban column by where it is in its lifecy
 });
 test('board lays tasks out in columns with counts',()=>{const html=markup(React.createElement(TaskBoard,{tasks:[task,{...task,id:'q',title:'排队任务',status:'queued' as const}],now:Date.parse('2026-10-18T02:00:00Z'),loading:false,onSelect:()=>{}}));assert.match(html,/待执行/);assert.match(html,/待验收/);assert.match(html,/排队任务/);assert.match(html,/中文任务/);});
 test('board has distinct loading and empty states',()=>{const props={tasks:[],onSelect:()=>{}};assert.match(markup(React.createElement(TaskBoard,{...props,loading:true})),/正在加载/);assert.match(markup(React.createElement(TaskBoard,{...props,loading:false})),/还没有任务/);});
-test('task view separates execution and review, escapes instruction',()=>{const html=markup(React.createElement(TaskDetail,{task:{...task,instruction:'<script>bad()</script>'},busy:false,onStart:()=>{},onCancel:()=>{},action:async()=>true}));assert.match(html,/执行完成/);assert.match(html,/待验收/);assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>bad\(\)<\/script>/);assert.doesNotMatch(html,/开始 mock 执行/);assert.doesNotMatch(html,/真实 provider 未连接/);assert.doesNotMatch(html,/本地 mock/);assert.match(html,/<dt[^>]*>Owner<\/dt><dd[^>]*>[\s\S]*?>Owner<\/span><\/dd>/);assert.match(html,/更新于/);assert.doesNotMatch(html,/执行进度/);assert.doesNotMatch(html,/role="progressbar"/);assert.match(html,/role="tablist"/);assert.match(html,/role="tabpanel"/);assert.match(html,/aria-selected="true"/);});
+test('task view separates execution and review with prompt in its own tab',()=>{const html=markup(React.createElement(TaskDetail,{task:{...task,instruction:'<script>bad()</script>'},busy:false,onStart:()=>{},onCancel:()=>{},action:async()=>true}));assert.match(html,/执行完成/);assert.match(html,/待验收/);assert.match(html,/role="tab"[^>]*>Prompt/);assert.doesNotMatch(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>bad\(\)<\/script>/);assert.doesNotMatch(html,/开始 mock 执行/);assert.doesNotMatch(html,/真实 provider 未连接/);assert.doesNotMatch(html,/本地 mock/);assert.match(html,/<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?>Owner<\/span><\/dd>/);assert.match(html,/更新于/);assert.doesNotMatch(html,/执行进度/);assert.doesNotMatch(html,/role="progressbar"/);assert.match(html,/role="tablist"/);assert.match(html,/role="tabpanel"/);assert.match(html,/aria-selected="true"/);});
 test('task workspace must be an absolute directory',()=>{assert.equal(workspacePathError(''), '填写目标项目的绝对路径。');assert.match(workspacePathError('.'),/绝对路径/);assert.match(workspacePathError('docs'),/绝对路径/);assert.equal(workspacePathError('/home/user/project'),'');});
 test('artifact preview renders hostile markup as text only',()=>{const html=markup(React.createElement(ArtifactsPanel,{artifacts:[{id:'a',name:'test.html',mediaType:'text/plain',createdAt:task.createdAt,content:'<img src=x onerror=alert(1)>'}]}));assert.match(html,/&lt;img/);assert.doesNotMatch(html,/<img/);});
 test('cancelling task disables repeat cancellation',()=>{const html=markup(React.createElement(TaskDetail,{task:{...task,status:'cancelling'},busy:false,onStart:()=>{},onCancel:()=>{},action:async()=>true}));assert.match(html,/<button[^>]*disabled=""[^>]*>[\s\S]*正在停止/);});
@@ -89,4 +90,14 @@ test('queued task shows the current queue reason without inventing capacity wait
     assert.match(html, /specific reason/);
     assert.doesNotMatch(html, /等待执行槽位/);
   }
+});
+
+
+test('full prompt retains escaped text and its copy action', () => {
+  const instruction = '<script>bad()</script>\n' + 'A long instruction. '.repeat(100);
+  const html = markup(React.createElement(TaskTextBlock, { title: 'Prompt', content: instruction }));
+  assert.match(html, /&lt;script&gt;bad\(\)&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script>|aria-expanded/);
+  assert.match(html, /复制Prompt/);
+  assert.match(html, /A long instruction\. A long instruction\./);
 });

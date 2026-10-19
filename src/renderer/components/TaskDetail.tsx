@@ -22,6 +22,8 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
   const failure = [...task.events].reverse().find(event => event.kind === 'error');
   const dispatch = task.dispatch;
   const rest = [dispatch && `${dispatch.engine} / ${dispatch.model}`, dispatch?.effort, `更新于 ${new Date(task.updatedAt).toLocaleString()}`].filter(Boolean).join(' · ');
+  const summary = task.summary?.trim();
+  const artifacts = task.summary ? task.artifacts.filter(artifact => artifact.content.trim() !== summary) : task.artifacts;
   const queueNotice = task.scheduled || (task.status === 'queued' && task.queueReason);
   return <section aria-label="任务详情" className={styles.stack}>
     <div className={styles.spread}>
@@ -38,24 +40,25 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
         {!isActive(task) && onRetry && <Button disabled={busy} onClick={() => onRetry(task.id)}>新建重试任务</Button>}
       </div>
     </div>
-    <AgentFacts task={task} ownerKind={ownerKind} />
-    <Text type="secondary" className={styles.wrap}>{rest}</Text>
-    {queueNotice ? <Alert type="info" title="调度请求已排队" description={task.queueReason ? `${queueLabels[task.queueReason.code]}：${redactLog(task.queueReason.message)}` : '等待调度检查。'} />
-      : task.status === 'failed' ? <Alert type="error" title="执行失败" description={redactLog(failure?.message ?? latest?.message ?? '查看时间线。')} />
-        : task.status === 'cancelled' ? <Alert type="secondary" title="执行已取消" description={redactLog(failure?.message ?? latest?.message ?? '查看时间线。')} /> : undefined}
-    {task.retryOf && <Text type="secondary" className={styles.wrap}>重试来源：{task.retryOf}</Text>}
     <div role="group" aria-label="任务记录" className={detailStyles.tabs}>
       <Tabs activeKey={tab} onChange={setTab} variant="square" size="small" classNames={{ list: detailStyles.tabList, panel: detailStyles.panel }} items={[
         { key: 'overview', label: '概览', children: <div className={detailStyles.overview}>
-          <TaskTextBlock title="Prompt" content={task.instruction} />
+          {queueNotice ? <Alert type="info" title="调度请求已排队" description={task.queueReason ? `${queueLabels[task.queueReason.code]}：${redactLog(task.queueReason.message)}` : '等待调度检查。'} />
+            : task.status === 'failed' ? <Alert type="error" title="执行失败" description={redactLog(failure?.message ?? latest?.message ?? '查看时间线。')} />
+              : task.status === 'cancelled' ? <Alert type="secondary" title="执行已取消" description={redactLog(failure?.message ?? latest?.message ?? '查看时间线。')} /> : task.status === 'running' ? <Text type="secondary" className={detailStyles.activity}>{redactLog(latest?.message ?? '等待首次调度').replace(/\s+/g, ' ').trim()}</Text> : undefined}
+          {task.summary && <TaskTextBlock key={`${task.id}:summary`} title="执行结果" content={task.summary} clamp={6} />}
+          <AgentFacts task={task} ownerKind={ownerKind} />
+          <Text type="secondary" className={styles.wrap}>{rest}{task.retryOf && ` · 重试来源：${task.retryOf}`}</Text>
+        </div> },
+        { key: 'prompt', label: 'Prompt', children: <TaskTextBlock key={`${task.id}:prompt`} title="Prompt" content={task.instruction} /> },
+        { key: 'requirements', label: '要求' + (task.acceptanceCriteria?.length ? ` ${task.acceptanceCriteria.length}` : ''), children: <div className={detailStyles.overview}>
           {task.constraints?.length ? <div className={styles.stack}><Text style={{ fontWeight: 600 }}>执行约束</Text><ul className={detailStyles.list}>{task.constraints.map((constraint, index) => <li key={index}>{constraint}</li>)}</ul></div> : undefined}
           <div className={styles.stack}><Text style={{ fontWeight: 600 }}>验收标准</Text>
             {task.acceptanceCriteria?.length ? <ol className={detailStyles.list}>{task.acceptanceCriteria.map((criterion, index) => <li key={index}>{criterion}</li>)}</ol> : <Text type="secondary">此旧任务未记录结构化验收标准。</Text>}
           </div>
-          {task.summary && <TaskTextBlock title="执行结果" content={task.summary} />}
         </div> },
         { key: 'events', label: '时间线 ' + task.events.length, children: <EventsPanel events={task.events} taskId={task.id} active={timelineActive(task.status)} /> },
-        { key: 'artifacts', label: '产物 ' + task.artifacts.length, children: <ArtifactsPanel artifacts={task.artifacts} /> },
+        { key: 'artifacts', label: '产物 ' + artifacts.length, children: <ArtifactsPanel artifacts={artifacts} /> },
         { key: 'review', label: '验收', children: task.status === 'completed' ? <ReviewPanel task={task} busy={busy} action={action} /> : <Empty title="执行成功后进入验收" description="执行结果、收到确认和验收结论各自独立。" /> },
         { key: 'continuation', label: '接续', children: <OwnerInspector task={task} busy={busy} action={action} /> },
       ]} />

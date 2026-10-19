@@ -172,14 +172,49 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
   board: css`
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: ${cssVar.marginSM};
     min-inline-size: 0;
+  `,
+  filterBar: css`
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: ${cssVar.marginSM};
+    min-inline-size: 0;
+
+    @media (max-width: 600px) {
+      > :first-child { flex-basis: 100%; }
+    }
+  `,
+  filterSearch: css`
+    flex: 1;
+    min-inline-size: min(220px, 100%);
+  `,
+  filterButton: css`
+    min-inline-size: min(140px, 100%);
+    max-inline-size: 100%;
+    block-size: auto;
+    min-block-size: ${cssVar.controlHeightSM};
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: start;
+    flex-shrink: 0;
+  `,
+  filterMenu: css`
+    min-inline-size: min(260px, calc(100vw - 24px));
+    inline-size: max-content;
+    max-inline-size: min(360px, calc(100vw - 24px));
+  `,
+  filterOptionLabel: css`
+    display: block;
+    white-space: normal;
+    overflow-wrap: anywhere;
   `,
   /** The four status columns side by side, stacked on small screens. */
   columns: css`
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
+    gap: ${cssVar.marginSM};
     align-items: start;
     min-inline-size: 0;
 
@@ -192,17 +227,50 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     }
   `,
   column: css`
+    --column-bg: ${cssVar.colorFillTertiary};
+    --column-accent: ${cssVar.colorTextTertiary};
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: ${cssVar.marginXS};
     min-inline-size: 0;
+    padding: ${cssVar.paddingSM};
+    border-block-start: 3px solid var(--column-accent);
+    border-radius: ${cssVar.borderRadiusLG};
+    background: var(--column-bg);
+
+    &[data-status-column='running'] {
+      --column-bg: ${cssVar.colorPrimaryBg};
+      --column-accent: ${cssVar.colorPrimary};
+    }
+    &[data-status-column='review'] {
+      --column-bg: ${cssVar.colorWarningBg};
+      --column-accent: ${cssVar.colorWarning};
+    }
+    &[data-status-column='closed'] {
+      --column-bg: ${cssVar.colorFillQuaternary};
+      --column-accent: ${cssVar.colorTextQuaternary};
+    }
+    &[data-collapsed='true'] { gap: 0; }
   `,
   columnHead: css`
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
     display: flex;
-    gap: 8px;
-    align-items: baseline;
+    gap: ${cssVar.marginXS};
+    align-items: center;
     justify-content: space-between;
-    padding-block-end: 2px;
+    padding-block: ${cssVar.paddingXXS};
+    background: var(--column-bg);
+    color: var(--column-accent);
+  `,
+  columnCount: css`
+    padding: 0 ${cssVar.paddingXS};
+    border-radius: ${cssVar.borderRadiusSM};
+    background: ${cssVar.colorBgContainer};
+    color: var(--column-accent);
+    font-size: ${cssVar.fontSizeSM};
+    line-height: 1.7;
   `,
   /** The 已结束 count is also its fold: label, number and chevron in one clickable row. */
   fold: css`
@@ -223,6 +291,66 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
       outline-offset: 1px;
     }
   `,
+  workspaceGroup: css`
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+    gap: 8px;
+  `,
+  workspaceHeading: css`
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-inline-size: 0;
+    margin: 4px 0;
+    color: ${cssVar.colorTextSecondary};
+    font-size: ${cssVar.fontSizeSM};
+    font-weight: normal;
+    > svg { flex: none; }
+  `,
+  workspaceName: css`
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  `,
+  cardTitle: css`
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-inline-size: 0;
+    > :first-child:not(strong) {
+      flex: none;
+      max-inline-size: 45%;
+      overflow: hidden;
+    }
+  `,
+  cardTitleText: css`
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  `,
+  cardStatus: css`
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-inline-size: 0;
+    > :first-child { flex: none; }
+  `,
+  cardActivity: css`
+    flex: 1 1 0;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: ${cssVar.fontSizeSM};
+  `,
+  cardTime: css`
+    flex: none;
+    margin-inline-start: auto;
+    color: ${cssVar.colorTextSecondary};
+    font-size: ${cssVar.fontSizeSM};
+    white-space: nowrap;
+  `,
   taskCard: css`
     display: flex;
     flex-direction: column;
@@ -233,7 +361,7 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     border: 1px solid ${cssVar.colorBorderSecondary};
     border-radius: ${cssVar.borderRadius};
     background: ${cssVar.colorBgContainer};
-    color: inherit;
+    color: ${cssVar.colorText};
     font: inherit;
     text-align: start;
     cursor: pointer;

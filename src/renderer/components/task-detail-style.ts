@@ -51,6 +51,22 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
   description: css`
     font-size: ${cssVar.fontSizeSM};
   `,
+  activity: css`
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    min-inline-size: 0;
+  `,
+  clamped: css`
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  `,
+  textFooter: css`
+    padding: ${cssVar.paddingXXS} ${cssVar.paddingSM};
+    border-block-start: 1px solid ${cssVar.colorBorderSecondary};
+  `,
   textContent: css`
     margin: 0;
     padding: ${cssVar.padding};

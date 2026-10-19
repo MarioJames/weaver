@@ -2,24 +2,24 @@ import { useState } from 'react';
 import { Empty, Icon } from '@lobehub/ui';
 import type { DropdownMenuCheckboxItem } from '@lobehub/ui/base-ui';
 import { Button, DropdownMenu, Input, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
-import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Folder, Loader2 } from 'lucide-react';
 import type { Task } from '../../shared/types';
 import { redactLog } from '../log-view';
 import type { FilterDimension, FilterOption, TaskSelection } from '../task-view';
-import { FILTER_DIMENSIONS, TIME_RANGES, TASK_COLUMNS, applyTaskFilters, columnize, emptySelection, filterButtonLabel, filterOptions, filterTasks, hasFilters, isOpenTask, nonArchived, readEndedExpanded, readTaskFilters, resolveSelection, reviewLabel, statusLabels, toggleOption, writeEndedExpanded, writeTaskFilters } from '../task-view';
+import { FILTER_DIMENSIONS, TIME_RANGES, TASK_COLUMNS, applyTaskFilters, columnize, dispatchKind, emptySelection, filterButtonLabel, filterOptions, filterTasks, hasFilters, isOpenTask, nonArchived, readEndedExpanded, readTaskFilters, resolveSelection, reviewLabel, statusLabels, toggleOption, workspaceGroups, writeEndedExpanded, writeTaskFilters } from '../task-view';
 import { styles } from '../style';
 import { AgentFacts } from './AgentFacts';
 import { EngineIcon } from './EngineIcon';
 
-/** Closed tasks say how they ended; open ones are already described by their column. */
-function outcome(task: Task): { label: string; color?: string; spin?: boolean } | undefined {
+/** Every card has a status; active dispatch also carries a spinner and activity. */
+function outcome(task: Task): { label: string; color?: string; spin?: boolean } {
   if (task.status === 'failed') return { label: statusLabels.failed, color: 'error' };
   if (task.status === 'cancelled') return { label: statusLabels.cancelled };
   if (task.status === 'cancelling') return { label: statusLabels.cancelling, color: 'warning', spin: true };
-  if (task.status === 'completed' && task.reviewState) return { label: reviewLabel(task), color: task.reviewState === 'accepted' ? 'success' : 'warning' };
+  if (task.status === 'completed') return { label: reviewLabel(task), color: task.reviewState === 'accepted' ? 'success' : 'warning' };
   if (task.status === 'running') return { label: statusLabels.running, color: 'processing', spin: true };
   if (task.scheduled) return { label: '排队中', color: 'processing', spin: true };
-  return undefined;
+  return { label: statusLabels[task.status] };
 }
 
 const spinner = <Icon icon={Loader2} spin size="small" />;
@@ -28,8 +28,9 @@ const ENDED_BODY_ID = 'board-ended';
 /** A choice only the curious should have to look for: nothing live behind it and not already picked. */
 const isQuiet = (option: FilterOption, chosen: string[]) => option.open === 0 && !chosen.includes(option.value);
 
-/** The brand behind a choice: owners by their policy engine, engines by their kind, workers by their dispatch engine. */
+/** The brand behind a choice: owners by their policy engine, workers by their dispatch engine. */
 function optionIcon(dimension: FilterDimension, option: FilterOption, ownerKind?: (ownerId?: string) => string | undefined) {
+  if (dimension === 'workspace') return <Icon icon={Folder} size="small" />;
   return <EngineIcon kind={dimension === 'owner' ? ownerKind?.(option.ownerProfile ?? option.value) : option.kind} />;
 }
 
@@ -45,7 +46,7 @@ export function filterItems(dimension: FilterDimension, options: FilterOption[],
     /** Multi-select: a menu that closes on the first tick would make an OR across choices impossible. */
     closeOnClick: false,
     icon: optionIcon(dimension, option, ownerKind),
-    label: option.label,
+    label: <span className={styles.filterOptionLabel} title={dimension === 'workspace' ? option.value : undefined}>{option.label}</span>,
     extra: <Text type="secondary" className={styles.numbers}>{option.open}</Text>,
     onCheckedChange: () => onToggle(option.value),
   }));
@@ -62,7 +63,7 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
   const [query, setQuery] = useState('');
   const [stored, setStored] = useState(readTaskFilters);
   const [ended, setEnded] = useState(readEndedExpanded);
-  const [revealed, setRevealed] = useState<Record<FilterDimension, boolean>>({ owner: false, engine: false, worker: false });
+  const [revealed, setRevealed] = useState<Record<FilterDimension, boolean>>({ owner: false, worker: false, workspace: false });
   if (loading && !tasks.length) return <div role="status" className={styles.stack}><Skeleton animated /><Text type="secondary">正在加载本地任务…</Text></div>;
   if (!tasks.length) return <Empty title="还没有任务" description="从右上角新建第一个任务。" />;
   const selection = resolveSelection(filters ?? stored, tasks, now);
@@ -86,35 +87,38 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
     const tag = outcome(task);
     const latest = task.events.at(-1);
     return <button key={task.id} type="button" className={styles.taskCard} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
-      <span className={styles.spread} style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
-        <strong className={styles.wrap}>{task.title}</strong>
-        {tag && <Tag size="small" color={tag.color} icon={tag.spin ? spinner : undefined}>{tag.label}</Tag>}
+      <span className={styles.cardTitle}>
+        {task.dispatch?.worker && <Tag size="small" icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
+        <strong className={styles.cardTitleText}>{task.title}</strong>
       </span>
-      {task.status === 'running' && <Text type="secondary" className={styles.meta} ellipsis>{redactLog(latest?.message ?? '等待首次调度')}</Text>}
+      <span className={styles.cardStatus}>
+        <Tag size="small" color={tag.color} icon={tag.spin ? spinner : undefined}>{tag.label}</Tag>
+        {tag.spin && <Text type="secondary" className={styles.cardActivity} title={redactLog(latest?.message ?? '等待首次调度')}>{redactLog(latest?.message ?? '等待首次调度')}</Text>}
+        <time className={styles.cardTime} dateTime={task.updatedAt}>{new Date(task.updatedAt).toLocaleString()}</time>
+      </span>
       <AgentFacts compact task={task} ownerKind={ownerKind} />
-      <Text type="secondary" className={styles.meta}>{new Date(task.updatedAt).toLocaleString()}</Text>
     </button>;
   };
   return <section aria-label="任务看板" className={styles.board}>
-    <div className={styles.row}>
-      <Input aria-label="搜索任务" placeholder="搜索标题、负责人、项目或任务 ID" value={query} onChange={event => setQuery(event.target.value)} style={{ maxInlineSize: 360 }} />
+    <div className={styles.filterBar}>
+      <Input className={styles.filterSearch} aria-label="搜索任务" placeholder="搜索标题、负责人、项目或任务 ID" value={query} onChange={event => setQuery(event.target.value)} />
       {FILTER_DIMENSIONS.map(dimension => {
         const options = filterOptions(board, dimension, selection, now);
         const chosen = selection[dimension];
-        return <DropdownMenu key={dimension} trigger="click" placement="bottomLeft"
+        return <DropdownMenu key={dimension} trigger="click" placement="bottomLeft" popupProps={{ className: styles.filterMenu }}
           items={filterItems(dimension, options, chosen, value => update({ ...selection, [dimension]: toggleOption(chosen, value) }), ownerKind, revealed[dimension])}
           footer={revealed[dimension] ? undefined : filterReveal(options, chosen, () => setRevealed({ ...revealed, [dimension]: true }))}>
-          <Button size="small" type={chosen.length ? 'fill' : 'default'} icon={ChevronDown} iconPosition="end">{filterButtonLabel(dimension, options, chosen)}</Button>
+          <Button className={styles.filterButton} size="small" type={chosen.length ? 'fill' : 'default'} icon={ChevronDown} iconPosition="end">{filterButtonLabel(dimension, options, chosen)}</Button>
         </DropdownMenu>;
       })}
-      <DropdownMenu trigger="click" placement="bottomLeft" items={TIME_RANGES.map(range => ({
+      <DropdownMenu trigger="click" placement="bottomLeft" popupProps={{ className: styles.filterMenu }} items={TIME_RANGES.map(range => ({
         type: 'checkbox' as const,
         key: range.value,
         label: range.label,
         checked: selection.time === range.value,
         onCheckedChange: () => update({ ...selection, time: range.value }),
       }))}>
-        <Button size="small" type={selection.time === 'all' ? 'default' : 'fill'} icon={ChevronDown} iconPosition="end">{`时间：${TIME_RANGES.find(range => range.value === selection.time)?.label}`}</Button>
+        <Button className={styles.filterButton} size="small" type={selection.time === 'all' ? 'default' : 'fill'} icon={ChevronDown} iconPosition="end">{`时间：${TIME_RANGES.find(range => range.value === selection.time)?.label}`}</Button>
       </DropdownMenu>
       {hasFilters(selection) && <Button size="small" type="text" onClick={() => update(emptySelection())}>清除</Button>}
     </div>
@@ -125,14 +129,15 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
       <div className={styles.columns} aria-busy={loading}>
         {TASK_COLUMNS.map((column, index) => {
           const items = columns[index];
+          const groups = workspaceGroups(items);
           /** Only 已结束 folds; the columns with live work are always in view. */
           const foldable = column.key === 'closed';
           const shown = !foldable || ended;
           const count = <>
-            <Text strong>{column.label}</Text>
-            <Text type="secondary" className={styles.numbers}>{items.length}</Text>
+            <strong>{column.label}</strong>
+            <span className={`${styles.numbers} ${styles.columnCount}`}>{items.length}</span>
           </>;
-          return <div key={column.key} id={shown && foldable ? ENDED_BODY_ID : undefined} className={styles.column}>
+          return <div key={column.key} id={shown && foldable ? ENDED_BODY_ID : undefined} className={styles.column} data-status-column={column.key} data-collapsed={!shown}>
             <header className={styles.columnHead}>
               {foldable ? <button type="button" className={styles.fold} aria-expanded={shown} aria-controls={shown ? ENDED_BODY_ID : undefined} onClick={toggleEnded}>
                 <Icon icon={shown ? ChevronDown : ChevronRight} size="small" />
@@ -140,7 +145,14 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
               </button> : count}
             </header>
             {shown && <>
-              {items.map(task => card(task))}
+              {groups.map(group => <div key={group.workspace} className={styles.workspaceGroup}>
+                {groups.length > 1 && <h3 className={styles.workspaceHeading} title={group.workspace || group.label}>
+                  <Icon icon={Folder} size="small" />
+                  <span className={styles.workspaceName}>{group.label}</span>
+                  <span className={styles.numbers}>{group.tasks.length}</span>
+                </h3>}
+                {group.tasks.map(task => card(task))}
+              </div>)}
               {!items.length && <Text type="secondary" className={styles.meta} aria-hidden="true">—</Text>}
             </>}
           </div>;
