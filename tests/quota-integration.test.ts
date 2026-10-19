@@ -335,7 +335,7 @@ test('refresh blocks the existing queue without cancelling its explicit mock fix
       return result.json.result.data;
     };
     const first = await command('tasks.create', { title: 'Running fixture', instruction: 'Explicit mock only', ownerProfileId: 'codex_owner' });
-    const second = await command('tasks.create', { title: 'Queued fixture', instruction: 'Explicit mock only', ownerProfileId: 'codex_owner' });
+    const second = await command('tasks.create', { title: 'Queued fixture', instruction: 'Explicit mock only', ownerId: first.ownerId });
     await command('workers.spawn', { taskId: first.id, owner: 'codex_owner', worker: 'codex_worker', provider: 'mock-jsonl' });
     const queued = await command('workers.spawn', { taskId: second.id, owner: 'codex_owner', worker: 'codex_worker', provider: 'mock-jsonl' });
     assert.equal(queued.status, 'queued');
