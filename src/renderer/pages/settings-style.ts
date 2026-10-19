@@ -2,7 +2,7 @@ import { createStaticStyles } from 'antd-style';
 
 /**
  * One bordered panel with three columns per band: group context, field explanation, control.
- * The fills are the ordered `colorFill` ladder (strongest on the group, lightest on the control),
+ * The fills are the ordered `colorFill` ladder (one step lighter than the raw ladder: Tertiary on the group, Quaternary on the field, none on the control),
  * so the hierarchy reads the same in light and dark without any theme branch.
  * Borders take `colorBorder`, not the softer step: every separator here lands on a shaded fill.
  */
@@ -38,7 +38,7 @@ export const settingsStyles = createStaticStyles(({ css, cssVar }) => ({
   groupCell: css`
     justify-content: center;
     padding: 16px 20px;
-    background: ${cssVar.colorFillSecondary};
+    background: ${cssVar.colorFillTertiary};
     border-inline-end: 1px solid ${cssVar.colorBorder};
 
     @container (max-width: 860px) {
@@ -67,7 +67,7 @@ export const settingsStyles = createStaticStyles(({ css, cssVar }) => ({
   `,
   fieldCell: css`
     padding: 12px 20px;
-    background: ${cssVar.colorFillTertiary};
+    background: ${cssVar.colorFillQuaternary};
     justify-content: center;
   `,
   /** The control keeps its size at the column end; stacked, it starts the band instead. */
@@ -78,7 +78,6 @@ export const settingsStyles = createStaticStyles(({ css, cssVar }) => ({
     align-items: center;
     justify-content: flex-end;
     padding: 12px 20px;
-    background: ${cssVar.colorFillQuaternary};
     border-inline-start: 1px solid ${cssVar.colorBorder};
 
     @container (max-width: 860px) {

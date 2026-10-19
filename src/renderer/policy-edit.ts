@@ -1,4 +1,6 @@
-import type { Config, Owner, Worker } from '../main/policy/routing';
+import { DEFAULT_WEIGHT, WEIGHT_MAX, type Config, type Owner, type Worker } from '../main/policy/routing';
+
+export { DEFAULT_WEIGHT, WEIGHT_MAX };
 
 export type RoleSection = 'owners' | 'workers';
 
@@ -22,7 +24,7 @@ function renameKey<T>(record: Record<string, T>, from: string, to: string): Reco
 
 export function workerWeight(owner: Owner, workerId: string): number {
   const weights = owner.worker_weights;
-  if (!weights || !Object.hasOwn(weights, workerId)) return 100;
+  if (!weights || !Object.hasOwn(weights, workerId)) return DEFAULT_WEIGHT;
   return weights[workerId]!;
 }
 
@@ -43,10 +45,10 @@ function remapWeights(weights: Record<string, number> | undefined, map: (key: st
   return Object.keys(next).length ? next : undefined;
 }
 
-/** 100 and a cleared value omit the key. Other integers are stored, including values the schema still has to reject. */
+/** The default (5) and a cleared value omit the key. Other integers are stored, including values the schema still has to reject. */
 export function withWorkerWeight(owner: Owner, workerId: string, weight: number): Owner {
   const weights = { ...(owner.worker_weights ?? {}) };
-  if (!Number.isInteger(weight) || weight === 100) delete weights[workerId];
+  if (!Number.isInteger(weight) || weight === DEFAULT_WEIGHT) delete weights[workerId];
   else weights[workerId] = weight;
   return withWeights(owner, Object.keys(weights).length ? weights : undefined);
 }

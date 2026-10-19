@@ -36,8 +36,8 @@ test('renaming or removing a worker keeps weight keys saveable', () => {
   const removed = removeRole(config, 'workers', 'opencode_worker');
   assert.equal(removed.workers.opencode_worker, undefined);
   assert.equal(removed.owners.claude_owner.worker_weights, undefined);
-  assert.equal(workerWeight(removed.owners.claude_owner, 'claude_worker'), 100);
-  assert.equal(withWorkerWeight(config.owners.claude_owner, 'opencode_worker', 100).worker_weights, undefined);
+  assert.equal(workerWeight(removed.owners.claude_owner, 'claude_worker'), 5);
+  assert.equal(withWorkerWeight(config.owners.claude_owner, 'opencode_worker', 5).worker_weights, undefined);
 });
 
 test('a role list item only notes states its enable switch does not already show', async () => {

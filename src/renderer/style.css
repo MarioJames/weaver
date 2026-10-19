@@ -2,3 +2,6 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 /* Absolutely positioned helpers (visually hidden labels) must not grow the document behind the shell. */
 #root { position: relative; }
 fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+
+/* Reserve the scrollbar track on the content area so expanding or collapsing content never shifts the layout. */
+#root main { overflow-y: scroll; scrollbar-gutter: stable; }
