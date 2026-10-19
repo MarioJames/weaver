@@ -1,0 +1,25 @@
+{
+  "verificationUses": "existing shared development dependencies, no installation or lockfile mutation",
+  "versions": {
+    "@lobehub/ui": {
+      "installed": "5.64.4",
+      "npmLock": "5.58.0"
+    },
+    "typescript": {
+      "installed": "7.0.2",
+      "npmLock": "7.0.2"
+    },
+    "vite": {
+      "installed": "8.3.4",
+      "npmLock": "8.3.4"
+    },
+    "react": {
+      "installed": "19.3.1",
+      "npmLock": "19.3.1"
+    },
+    "antd": {
+      "installed": "6.6.6",
+      "npmLock": "6.6.6"
+    }
+  }
+}

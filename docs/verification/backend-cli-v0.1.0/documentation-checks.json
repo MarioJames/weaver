@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-10-19T10:59:08.762157+00:00",
+  "sourceCommit": "d5ea7e5b69a44fe394809dc542080ecb4e2a7fba",
+  "quota31BytesIdentical": true,
+  "quota31SHA256": "7d807a36e41967cc0dc4a8ac6d11bdfc3eca14e2c6339ff6b9737ef9657969cc",
+  "markdownLinksChecked": 15,
+  "htmlLinksAndImagesChecked": 50,
+  "reportSHA256": "6a11b6c5837065de1b40f9e3e74ac84bba72b05238805c533e810553533cccec",
+  "reportLanguage": "zh-CN",
+  "scripts": 0,
+  "externalDependencies": [],
+  "errors": [],
+  "files": {
+    "docs/architecture.md": "3dfb0542857e8da71a9753dfda2330a5efa62d0b7291f8602c559215cf781113",
+    "docs/agent-interface.md": "98c6d3b5b41e934a2e7f6c3755e8c09902d81e0eef65ecceaea92e7609780dfa",
+    "docs/verification/backend-cli-v0.1.0/REPORT.html": "6a11b6c5837065de1b40f9e3e74ac84bba72b05238805c533e810553533cccec"
+  }
+}

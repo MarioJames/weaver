@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-10-19T10:33:12.965025+00:00",
+  "commit": "c3511f70eb559d9a41214a282ddb4f4dd8407b8f",
+  "tree": "d014d71bc7428620bc32f9b9bd437dbfd7453ae8",
+  "typecheckExit": 0,
+  "relatedTests": {
+    "pass": 97,
+    "fail": 0,
+    "log": "S3-owner-final-check.txt"
+  },
+  "independentBoundaryEvidence": [
+    "S3-owner-boundary-current.json",
+    "S3-malformed-state-owner.json"
+  ],
+  "usesRealHerdrOrModel": false
+}

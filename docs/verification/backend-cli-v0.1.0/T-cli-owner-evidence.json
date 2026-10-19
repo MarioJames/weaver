@@ -1,0 +1,13 @@
+{
+  "checkedAt": "2026-10-19T10:34:35.045Z",
+  "fixture": "isolated actual source CLI + runtime, explicit mock and native only",
+  "checks": [
+    "retry dispatches once, preserves owner/scope/criteria, excludes cancelled engine, mock stays mock",
+    "actual CLI --cancel NO_ALTERNATIVE_ENGINE leaves original running and creates no child",
+    "actual diagnostics commands return shared monitor fields; health summary omits histories",
+    "actual text native dispatch includes model, effort, full frozen prompt and completion command; no model launched",
+    "exact engine unblock clears manual/model blocks, keeps other engine, replays receipt and rejects unknown before policy writes"
+  ],
+  "ok": true,
+  "resources": "inline runtime closed, fixture directory removed; shared service untouched"
+}

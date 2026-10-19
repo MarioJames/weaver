@@ -1,0 +1,90 @@
+[
+  {
+    "unit": "weaver-cli-qodercli-1e581b6e.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-101c3e68.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-71d2cca8.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-1a4ac168.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-6ec7017f.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-5f19d1c4.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-97e14a2f.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-3c9207f2.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-c35ab66d.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-d99f7268.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-0e8a82be.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-d2e91ef1.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-312e84aa.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-48a01121.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-43682540.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-7c694aab.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-6262d830.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-6a54ec36.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-c49c748e.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-qodercli-f8f3e4c9.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-opencode-d86a2f99.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  },
+  {
+    "unit": "weaver-cli-opencode-33f2f3a0.scope",
+    "state": "LoadState=not-found; ActiveState=inactive; SubState=dead"
+  }
+]

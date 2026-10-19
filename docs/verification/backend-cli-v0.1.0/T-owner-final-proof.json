@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-10-19T10:35:54.539447+00:00",
+  "tree": "170cbbc29b4541dd231e003a47dd1b3a8a163d42",
+  "baseHead": "c3511f70eb559d9a41214a282ddb4f4dd8407b8f",
+  "typecheckExit": 0,
+  "relatedTests": {
+    "pass": 99,
+    "fail": 0,
+    "log": "T-owner-final-check.txt"
+  },
+  "actualCliEvidence": "T-cli-owner-evidence.json",
+  "retryBoundaryEvidence": "T-owner-boundary-current.json",
+  "usesRealHerdrOrModel": false
+}

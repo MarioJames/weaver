@@ -1,0 +1,38 @@
+{
+  "completedAt": "2026-10-19T11:03:25.415148+00:00",
+  "allTaskPackagesTerminal": true,
+  "browserResources": {
+    "browserClosed": true,
+    "backgroundPid": 388832,
+    "backgroundPidExited": true,
+    "profileRemoved": true,
+    "profileProcessesRemaining": 0,
+    "serverStarted": false,
+    "scopeCreated": false,
+    "sharedServiceTouched": false,
+    "persistentDataTouched": false,
+    "scratchRoot": "/tmp/weaver-codex-resume-wo_10lhm/report-browser",
+    "scratchRemoved": true
+  },
+  "removedTemporaryRoot": "/tmp/weaver-codex-resume-wo_10lhm",
+  "temporaryRootAbsent": true,
+  "removedOwnedAliases": [
+    "/tmp/weaver-tasks/server-4VDE/codex-owner-njwhokcf",
+    "/tmp/wc-8e59792c"
+  ],
+  "aliasesAbsent": true,
+  "persistentDataPreserved": [
+    "~/.local/share/weaver",
+    ".weaver-dev",
+    "real credentials and all shared business/development data"
+  ],
+  "sharedService": [
+    "MainPID=1634",
+    "ExecMainStartTimestamp=Mon 2026-10-19 05:47:23 EDT",
+    "ActiveState=active",
+    "SubState=running"
+  ],
+  "sharedServiceStoppedOrRestarted": false,
+  "otherWorkerOrProjectResourcesTouched": false,
+  "retainedOnly": "Committed source and minimal delivered verification evidence; no disposable runtime/build/cache retained."
+}

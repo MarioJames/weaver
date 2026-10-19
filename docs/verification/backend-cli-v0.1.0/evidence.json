@@ -1,0 +1,339 @@
+{
+  "schemaVersion": 1,
+  "version": "v0.1.0",
+  "recordedAt": "2026-10-19T11:03:25.408832+00:00",
+  "responsibleOwner": "codex_owner / backend and CLI",
+  "sourceCommit": "d5ea7e5b69a44fe394809dc542080ecb4e2a7fba",
+  "sourceTree": "57465901fa9b25cd89045a3ba3ea415d63c840c3",
+  "implementationComplete": true,
+  "lineComplete": true,
+  "currentDelivery": "All logical implementation, documentation and report-browser packages completed and accepted. This evidence and final docs/report are delivered in one local handoff commit, identified by Git history and final owner answer.",
+  "verification": {
+    "checkedAt": "2026-10-19T10:47:37.120579+00:00",
+    "source": {
+      "committedAt": "2026-10-19T10:46:52.376444+00:00",
+      "commit": "d5ea7e5b69a44fe394809dc542080ecb4e2a7fba",
+      "tree": "57465901fa9b25cd89045a3ba3ea415d63c840c3",
+      "files": [
+        "src/cli/main.ts",
+        "src/main/commands.ts",
+        "src/main/http.ts",
+        "src/main/local-ipc.ts",
+        "src/main/owner-host.ts",
+        "src/main/runtime.ts",
+        "tests/cli-transport.test.ts",
+        "tests/owner-host-async.test.ts",
+        "tests/owner-launch-async.test.ts",
+        "tests/runtime-http.test.ts"
+      ],
+      "dependencySharing": "read dependency symlinks; .vite/.vite-temp and build outputs task-local",
+      "excludes": "Claude uncommitted renderer changes, pnpm lock/workspace files and in-flight docs"
+    },
+    "checks": [
+      {
+        "name": "typecheck",
+        "command": [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        "exitCode": 0,
+        "durationSeconds": 0.671,
+        "log": "final-typecheck.txt"
+      },
+      {
+        "name": "test",
+        "command": [
+          "npm",
+          "test"
+        ],
+        "exitCode": 0,
+        "durationSeconds": 16.817,
+        "log": "final-test.txt",
+        "counts": {
+          "tests": 526,
+          "suites": 0,
+          "pass": 526,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "name": "build",
+        "command": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "exitCode": 0,
+        "durationSeconds": 1.789,
+        "log": "final-build-summary.txt",
+        "warnings": "build-warnings.json"
+      }
+    ],
+    "complete": true
+  },
+  "packageProvenance": "package-provenance.json",
+  "groups": [
+    {
+      "group": "O",
+      "class": "routine (owner-defined design and scope)",
+      "commit": "cb588eb02ec94136f3bcb2826970a2fec0d47782",
+      "tasks": [
+        "0e853623-596f-456b-b181-77df59a285f2"
+      ],
+      "independentChecks": {
+        "historical": "Owner acceptance records: 61 related checks; original temporary raw logs removed externally. Final committed-tree suite covers this code.",
+        "finalRegression": "final-test.txt"
+      }
+    },
+    {
+      "group": "S1b",
+      "class": "routine (owner-defined design and scope)",
+      "commit": "848045208a22bef684b444b65c2ca844b13e9f04",
+      "tasks": [
+        "fd6c82d2-466f-46f4-bbc4-91f47ab692de"
+      ],
+      "independentChecks": {
+        "historical": "61 related checks including 25 stall cases, with typecheck; original temporary raw logs removed externally. Final committed-tree suite covers this code.",
+        "finalRegression": "final-test.txt"
+      }
+    },
+    {
+      "group": "T-CLI",
+      "class": "mechanical",
+      "commit": "b68c8ccf773ae10bf796d4a546cd9d826d443376",
+      "tasks": [
+        "c120e66f-0390-41c2-9e53-c7e93c32d37b"
+      ],
+      "independentChecks": {
+        "historical": "28 CLI checks with typecheck; final committed-tree suite covers this code.",
+        "finalRegression": "final-test.txt"
+      }
+    },
+    {
+      "group": "J1-core",
+      "class": "routine (owner-defined design and scope)",
+      "commit": "2a66809a9dffa988b8c3141a512265e506f5442d",
+      "tasks": [
+        "c17928f5-7316-4cb0-ae0f-9ee265e7b88d",
+        "aca870ce-c1bd-4c34-82fa-9b695a99319f",
+        "c50c6053-5ee7-4766-8388-f13de0463e74"
+      ],
+      "independentChecks": {
+        "historical": "75 related checks including 28 portable fake protocol cases and read-only real Herdr schema inspection; final suite covers this code.",
+        "finalRegression": "final-test.txt"
+      }
+    },
+    {
+      "group": "settings",
+      "class": "routine (owner-defined design and scope)",
+      "commit": "807a602ac4fcc1aad5308995b27434b2262e5646",
+      "tasks": [
+        "6abce86d-768b-4a4c-929b-93f6e255445c",
+        "aec22a4b-751e-4728-b09e-f6987abfd0dd",
+        "47b3c348-327b-4eec-b7da-c0b653ba3f64",
+        "98891bc3-72df-450b-a415-aeb1345ccbf2"
+      ],
+      "independentChecks": {
+        "historical": "15 targeted checks + typecheck; actual browser 1440px/390px, saved reload and light/dark component verification.",
+        "browserEvidence": "../settings-columns/evidence.json",
+        "screenshots": [
+          "../settings-columns/desktop.png",
+          "../settings-columns/mobile-top.png",
+          "../settings-columns/mobile-saved.png",
+          "../settings-columns/dark-component.png"
+        ],
+        "limitations": "Application is light-only; dark screenshot is a component fixture."
+      }
+    },
+    {
+      "group": "V1",
+      "class": "routine (owner-defined design and scope)",
+      "commit": "558070a2d0c3119a9150b89664eabfc434df7fdc",
+      "tasks": [
+        "edbccc71-7354-4680-a0a9-4574867cba0e"
+      ],
+      "independentChecks": {
+        "historical": "79 related checks + typecheck; isolated actual CLI verified distinct instances each have max_parallel slots and A queue does not block B.",
+        "finalRegression": "final-test.txt"
+      }
+    },
+    {
+      "group": "quota-queue-fixture",
+      "class": "mechanical",
+      "commit": "d6b76209937bb351f3389f19ae811688a3c5d382",
+      "tasks": [
+        "4427a5b2-86e6-4060-9008-2b84871bc306"
+      ],
+      "independentChecks": {
+        "targeted": 14,
+        "log": "QuotaFixture-commit-check.txt",
+        "scope": "Test fixture ownerId only; protected quota source and renewable-token case untouched."
+      }
+    },
+    {
+      "group": "S3",
+      "class": "routine (owner-defined design and scope)",
+      "commit": "c3511f70eb559d9a41214a282ddb4f4dd8407b8f",
+      "tasks": [
+        "eeb98bea-fde5-421e-8624-be3409ce40ad",
+        "b15147c7-6ad4-49e9-86f8-eacf2fee8c84",
+        "96aa13af-c388-4ce7-bd8e-f4647f681a40"
+      ],
+      "independentChecks": {
+        "targeted": 97,
+        "independentBoundaryCases": 8,
+        "proof": "S3-owner-final-proof.json",
+        "boundaries": [
+          "S3-owner-boundary-current.json",
+          "S3-malformed-state-owner.json"
+        ]
+      }
+    },
+    {
+      "group": "T",
+      "class": "routine (owner-defined design and scope)",
+      "commit": "a13896ae88a9729fa70d5d0531475229007aadd4",
+      "tasks": [
+        "8122b270-bb59-4e71-918b-ff39a21544e9",
+        "fe71219f-c217-454f-8911-b26998760fb7"
+      ],
+      "independentChecks": {
+        "targeted": 99,
+        "actualCliGroups": 5,
+        "independentBoundaryCases": 2,
+        "proof": "T-owner-final-proof.json",
+        "actualCli": "T-cli-owner-evidence.json",
+        "boundaries": "T-owner-boundary-current.json"
+      }
+    },
+    {
+      "group": "J1-async",
+      "class": "routine (owner-defined design and scope)",
+      "commit": "d5ea7e5b69a44fe394809dc542080ecb4e2a7fba",
+      "tasks": [
+        "3bc53bb8-9ac5-452c-bf98-2f44ff0baf1e"
+      ],
+      "independentChecks": {
+        "targeted": 96,
+        "proof": "J1-owner-final-proof.json",
+        "actualCliHttp": "one parallel 16-second fake executable window; CLI launch16182ms, window16183ms, concurrent CLI read93ms and HTTP read4ms; full suite independently reran long case"
+      }
+    },
+    {
+      "group": "docs",
+      "class": "mechanical",
+      "commit": null,
+      "tasks": [
+        "66ee2e11-212c-4b36-95d3-6339e02034cd",
+        "036ca8f9-549f-43e0-b0a1-41690a28b9e5"
+      ],
+      "independentChecks": {
+        "scope": [
+          "../../architecture.md",
+          "../../agent-interface.md",
+          "REPORT.html"
+        ],
+        "quota31SHA256": "7d807a36e41967cc0dc4a8ac6d11bdfc3eca14e2c6339ff6b9737ef9657969cc",
+        "review": "completed / accepted; quota3.1 bytes unchanged, 15 Markdown and 50 HTML references valid, source-contract and report browser evidence reviewed",
+        "proof": "documentation-checks.json"
+      }
+    },
+    {
+      "group": "report-qa",
+      "class": "mechanical verification",
+      "commit": null,
+      "commitReference": "included with this handoff evidence commit",
+      "tasks": [
+        "f957b775-b028-4662-9fbf-d17cfffbbea3"
+      ],
+      "independentChecks": {
+        "proof": "browser-qa.json",
+        "scope": "Actual Chrome report desktop/mobile/print, local references and precise resource closure; owner reviewed evidence/screenshots."
+      }
+    }
+  ],
+  "testCountPolicy": "526 is the final full-suite count. Targeted and owner boundary counts overlap; do not sum them.",
+  "limitations": [
+    "Product Herdr launch and automatic recovery probes were accepted with deterministic fake executables/probes and read-only Herdr schema, not paid live model calls. Weaver workers themselves used real Qoder or frozen Codex native routes as recorded.",
+    "Frozen native model/effort is requested routing, not independently observed vendor telemetry. Vendor-reported model values are explicitly labelled. Observed effort remains unknown.",
+    "Original early temporary logs were removed externally; durable acceptance receipts and current 526-test committed-tree regression cover those groups.",
+    "The shared running service uses its existing installed code and was never restarted. New source contracts were tested with isolated runtimes and actual source CLI subprocesses.",
+    "This verification excludes Claude-owned uncommitted renderer/test files and pnpm files; Claude owns the eventual merged release check.",
+    "Build succeeded with 2747 repeated dependency MODULE_LEVEL_DIRECTIVE warnings and a renderer chunk size warning. Compact log and raw log digest are retained.",
+    "验证复用现有开发依赖：@lobehub/ui 实装5.64.4，npm package-lock锁定5.58.0；typescript/vite/react/antd与锁一致。未执行npm ci锁定依赖环境复验，未安装依赖或改动任一锁文件；依赖与最终双线发行验证归Claude owner。"
+  ],
+  "policy": {
+    "latestObservedRevision": 37,
+    "workerWeightsOwnedByUser": true,
+    "ownerWeightMutations": [],
+    "ownerWeightRestorations": [],
+    "changeTime": null,
+    "restoreTime": null,
+    "explanation": "User adjusted current policy. This owner never changed any worker weight; latest correction prohibits restoration or further weight mutation.",
+    "finalReadAt": "2026-10-19T11:03:25.408820+00:00"
+  },
+  "resources": {
+    "sharedService": [
+      "MainPID=1634",
+      "ExecMainStartTimestamp=Mon 2026-10-19 05:47:23 EDT",
+      "ActiveState=active",
+      "SubState=running"
+    ],
+    "sharedServiceStoppedOrRestarted": false,
+    "persistentData": "~/.local/share/weaver, .weaver-dev and all real credentials retained; no persistent database or migration data removed.",
+    "isolatedAcceptanceProcesses": "Inline test runtimes and fake child processes closed/awaited; all recorded real worker scopes inactive/dead.",
+    "disposableValidationResources": "Isolated export trees, their local build/cache output and task-only test TMPDIR reclaimed; see resource-cleanup-events.json.",
+    "temporaryRoot": "Removed with the two verified task-owned aliases after all packages reached terminal states and evidence delivery completed; see resource-closure.json.",
+    "browserAcceptance": "Final hash accepted; report browser and daemon exited, marked profile and task browser scratch removed, no static service/scope started. Settings browser resources were already closed.",
+    "finalClosure": "resource-closure.json"
+  },
+  "release": {
+    "owner": "claude_owner",
+    "version": "v0.1.0",
+    "thisOwnerPushed": false,
+    "thisOwnerTagged": false,
+    "action": "Claude owner unifies both completed lines, pushes main and creates tag."
+  },
+  "protectedFiles": [
+    "src/main/quota/credentials.ts",
+    "src/main/quota/index.ts"
+  ],
+  "claudeIntegrationDeltas": [
+    "workers.spawn / tasks.get running-native / tasks.retry return canonical next; CLI text prints complete native model, effort, prompt and completion command.",
+    "owners.attach identity is durable profileId+name+session; owner list/get counts and capacity admission are per owner instance.",
+    "tasks.health and engines.health are monitor summaries; engines.penalty returns full retained history; engines.unblock clears all blocks only for the selected exact engine and replays receipt.",
+    "tasks.retry is one-call preflight/cancel/clone/freeze/dispatch; failed/cancelled/cancelling chain engines excluded, completed engine eligible, NO_ALTERNATIVE_ENGINE before mutation.",
+    "Stall penalties do not expire by time; L1/L2 need a passing probe, L3 needs three consecutive successes. State/history bounds and damaged-file fallback preserve existing block until probe.",
+    "owners.switch launch:true and owners.launch stay final responses; pending receipt dedup, same epoch exclusion, fresh-task finalization, stale-attempt cleanup and drain are asynchronous. Only complete validated launch requests receive210s; ordinary requests remain15s.",
+    "Settings page has closed borders, stepped column backgrounds and stacked narrow layout; existing browser evidence retained.",
+    "README/skills and remaining renderer changes belong to Claude owner. No edits to the protected credential or quota source by this owner."
+  ],
+  "verificationEnvironment": "dependency-versions.json",
+  "documentationChecks": "documentation-checks.json",
+  "completionStatement": "后端线已全部完成",
+  "documentationAcceptance": {
+    "originalTaskId": "66ee2e11-212c-4b36-95d3-6339e02034cd",
+    "finalTaskId": "036ca8f9-549f-43e0-b0a1-41690a28b9e5",
+    "status": "completed",
+    "review": "accepted",
+    "proof": "documentation-checks.json",
+    "commitReference": "This evidence is committed with the final documentation/report; self commit SHA is intentionally obtained from Git history and final owner answer."
+  },
+  "reportBrowserAcceptance": {
+    "taskId": "f957b775-b028-4662-9fbf-d17cfffbbea3",
+    "status": "completed",
+    "review": "accepted",
+    "proof": "browser-qa.json",
+    "targetSHA256": "6a11b6c5837065de1b40f9e3e74ac84bba72b05238805c533e810553533cccec"
+  },
+  "packageCounts": {
+    "records": 28,
+    "completedAndAccepted": 21,
+    "failedOrCancelledAttempts": 7,
+    "active": 0
+  }
+}

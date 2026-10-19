@@ -1,0 +1,20 @@
+{
+  "reviewedAt": "2026-10-19T11:02:48.118998+00:00",
+  "sourceCommit": "d5ea7e5b69a44fe394809dc542080ecb4e2a7fba",
+  "reportSHA256": "6a11b6c5837065de1b40f9e3e74ac84bba72b05238805c533e810553533cccec",
+  "ownerReviewed": [
+    "Final two-document diff against actual accepted source contracts",
+    "All report narrative and source/provenance/check/limitation consistency",
+    "Desktop and mobile delivered screenshots visually inspected",
+    "Final printed PDF text independently contains full source SHA,526/526,and both dependency versions",
+    "Quota3.1 exactbytes and50HTML/15Markdown links independently checked",
+    "Browser daemon PID388832/profile/scratch independently confirmed absent"
+  ],
+  "result": "accepted",
+  "browserErrors": 0,
+  "remainingRisks": [
+    "Live product Herdr/model/recovery probe was not exercised; deterministic fake/schema verification only",
+    "Existing dependency warnings and @lobehub/ui development-vs-npm-lock mismatch disclosed; no npmci reinstall validation",
+    "Shared service remains on its installed code, source validated with isolated runtimes; final merged release is Claude owner responsibility"
+  ]
+}

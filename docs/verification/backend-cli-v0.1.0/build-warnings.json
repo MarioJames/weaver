@@ -1,0 +1,12 @@
+{
+  "exitCode": 0,
+  "rawLogBytes": 2908749,
+  "rawLogSHA256": "b22e82168c578795a8524a609982fad8110ee244f8b1bc91f9ebffc6edc0b23f",
+  "moduleDirectiveWarnings": 2747,
+  "largeChunkWarning": true,
+  "result": "build completed successfully",
+  "warningKinds": [
+    "Dependency module-level use client directives may not be preserved by bundler",
+    "Renderer chunk exceeds 500 kB warning threshold"
+  ]
+}

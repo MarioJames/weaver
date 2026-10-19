@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-10-19T10:30:46.795Z",
+  "packageLimit": {
+    "ok": false,
+    "code": "RESOURCE_LIMIT",
+    "packages": 1000,
+    "tasks": 1,
+    "passed": true
+  },
+  "cancellingAncestor": {
+    "ok": true,
+    "code": null,
+    "engine": "codex",
+    "excludedEngines": [
+      "opencode",
+      "qoder"
+    ],
+    "passed": true
+  }
+}

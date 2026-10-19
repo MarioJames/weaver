@@ -1,0 +1,28 @@
+$ npm run build
+npm notice run weaver@0.1.0 build
+npm notice run tsc --noEmit && vite build && node scripts/build-main.mjs
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 11018 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/renderer/index.html                             0.78 kB │ gzip:   0.44 kB
+dist/renderer/assets/weaver-icon-Bvsmo56_.png       36.11 kB
+dist/renderer/assets/weaver-lockup-DEJ547Af.svg     49.57 kB │ gzip:  37.18 kB
+dist/renderer/assets/index-CJENdgaX.css              0.13 kB │ gzip:   0.12 kB
+dist/renderer/assets/index-BaDcbHIg.js           1,591.10 kB │ gzip: 508.28 kB
+✓ built in 795ms
+
+Repeated dependency warning summary:
+{
+  "exitCode": 0,
+  "rawLogBytes": 2908749,
+  "rawLogSHA256": "b22e82168c578795a8524a609982fad8110ee244f8b1bc91f9ebffc6edc0b23f",
+  "moduleDirectiveWarnings": 2747,
+  "largeChunkWarning": true,
+  "result": "build completed successfully",
+  "warningKinds": [
+    "Dependency module-level use client directives may not be preserved by bundler",
+    "Renderer chunk exceeds 500 kB warning threshold"
+  ]
+}

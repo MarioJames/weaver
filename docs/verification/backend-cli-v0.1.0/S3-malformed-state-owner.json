@@ -1,0 +1,60 @@
+{
+  "checkedAt": "2026-10-19T10:28:46.926Z",
+  "results": [
+    {
+      "case": "fractional level",
+      "status": {
+        "level": 1,
+        "lastTriggerAt": null,
+        "needsAttention": false,
+        "blocked": true,
+        "blockedUntil": "2026-10-19T10:33:46.922Z",
+        "nextProbeAt": "2026-10-19T10:33:46.922Z",
+        "probeSuccesses": 0,
+        "history": []
+      },
+      "passed": true,
+      "logs": [
+        "Stall state ignored: Invalid stall level",
+        "Adopted the stall penalty for claude that the state file did not account for"
+      ]
+    },
+    {
+      "case": "fractional streak",
+      "status": {
+        "level": 1,
+        "lastTriggerAt": null,
+        "needsAttention": false,
+        "blocked": true,
+        "blockedUntil": "2026-10-19T10:33:46.924Z",
+        "nextProbeAt": "2026-10-19T10:33:46.924Z",
+        "probeSuccesses": 0,
+        "history": []
+      },
+      "passed": true,
+      "logs": [
+        "Stall state ignored: Invalid stall probeSuccesses",
+        "Adopted the stall penalty for claude that the state file did not account for"
+      ]
+    },
+    {
+      "case": "invalid date",
+      "status": {
+        "level": 1,
+        "lastTriggerAt": null,
+        "needsAttention": false,
+        "blocked": true,
+        "blockedUntil": "2026-10-19T10:33:46.925Z",
+        "nextProbeAt": "2026-10-19T10:33:46.925Z",
+        "probeSuccesses": 0,
+        "history": []
+      },
+      "passed": true,
+      "logs": [
+        "Stall state ignored: Invalid stall lastTriggerAt",
+        "Adopted the stall penalty for claude that the state file did not account for"
+      ]
+    }
+  ],
+  "passed": true
+}

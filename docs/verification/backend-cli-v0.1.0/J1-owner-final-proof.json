@@ -1,0 +1,47 @@
+{
+  "checkedAt": "2026-10-19T10:46:22.102762+00:00",
+  "baseHead": "a13896ae88a9729fa70d5d0531475229007aadd4",
+  "tree": "57465901fa9b25cd89045a3ba3ea415d63c840c3",
+  "log": "J1-owner-final-check.txt",
+  "checks": [
+    {
+      "command": [
+        "npx",
+        "--no-install",
+        "tsc",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.77
+    },
+    {
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-reporter=tap",
+        "--test-timeout=45000",
+        "tests/owner-host.test.ts",
+        "tests/owner-host-async.test.ts",
+        "tests/owner-launch-async.test.ts",
+        "tests/commands.test.ts",
+        "tests/runtime-http.test.ts",
+        "tests/cli-transport.test.ts",
+        "tests/cli-catalog.test.ts"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 16.657
+    }
+  ],
+  "testCounts": {
+    "tests": 96,
+    "pass": 96,
+    "fail": 0
+  },
+  "slowWindow": [
+    "# CLI launch 16182ms; parallel window 16183ms; concurrent CLI read 93ms; HTTP read 4ms"
+  ],
+  "usesRealHerdrOrModel": false,
+  "testData": "task-owned temporary fixtures, each closed and removed in finally"
+}

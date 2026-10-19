@@ -1,0 +1,3 @@
+$ npm run typecheck
+npm notice run weaver@0.1.0 typecheck
+npm notice run tsc --noEmit

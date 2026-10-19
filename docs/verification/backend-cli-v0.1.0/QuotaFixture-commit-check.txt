@@ -1,0 +1,22 @@
+✔ quota merge preserves manual/model blocks and applies aliases without changing routing config (79.307951ms)
+✔ only selected fresh available data clears its own source; unknown and stale preserve blocks (12.187124ms)
+✔ release waits for latest exhausted account window, and any unknown reset removes the deadline (9.692462ms)
+✔ expired foreign engine blocks report an atomic conflict while active foreign blocks are preserved (8.698654ms)
+✔ refresh input rejects unknown fields, prototype names and non-enumerated engines (6.190445ms)
+✔ public CLI supports optional input and all output formats; HTTP shares strict quota validation (2738.979389ms)
+✔ a completed probe merges into latest saved config and preserves newly added manual blocks (32.142526ms)
+✔ shutdown aborts a pending native request and prevents late policy writes (11.048413ms)
+✔ persistence failure is explicit and leaves the in-memory policy unchanged (12.26124ms)
+✔ expired manual conflict reaches HTTP and CLI without overwriting the manual policy (213.325689ms)
+✔ live exhausted windows survive an older reset, then explicit Codex permission and Claude allowance clear old quota blocks (22.33938ms)
+✔ refresh blocks the existing queue without cancelling its explicit mock fixture run or changing its frozen route (69.601798ms)
+✔ fresh global restriction with expired included windows blocks without an invented release deadline (7.806637ms)
+✔ an expired but renewable native token keeps the last published reading instead of reporting a logout over HTTP (23.810155ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4221.46565

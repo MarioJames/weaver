@@ -1,0 +1,592 @@
+$ npx --no-install tsc --noEmit
+npm notice run weaver@0.1.0 npx
+npm notice run 'tsc' --noEmit
+$ node --import tsx --test --test-reporter=tap --test-timeout=45000 tests/owner-host.test.ts tests/owner-host-async.test.ts tests/owner-launch-async.test.ts tests/commands.test.ts tests/runtime-http.test.ts tests/cli-transport.test.ts tests/cli-catalog.test.ts
+TAP version 13
+# Subtest: catalog covers every handler command, nested continuation, and output flags
+ok 1 - catalog covers every handler command, nested continuation, and output flags
+  ---
+  duration_ms: 2.039642
+  type: 'test'
+  ...
+# Subtest: tasks create stamps the caller cwd and keeps an explicit absolute path
+ok 2 - tasks create stamps the caller cwd and keeps an explicit absolute path
+  ---
+  duration_ms: 0.159076
+  type: 'test'
+  ...
+# Subtest: text and jsonl errors stay in the requested format
+ok 3 - text and jsonl errors stay in the requested format
+  ---
+  duration_ms: 264.439935
+  type: 'test'
+  ...
+# Subtest: explicit invalid workspace is rejected instead of becoming caller cwd
+ok 4 - explicit invalid workspace is rejected instead of becoming caller cwd
+  ---
+  duration_ms: 0.470636
+  type: 'test'
+  ...
+# Subtest: CLI parse errors respect a valid output format in any flag order
+ok 5 - CLI parse errors respect a valid output format in any flag order
+  ---
+  duration_ms: 536.06059
+  type: 'test'
+  ...
+# Subtest: command help and root catalog are machine-readable and expose digest and revision fields
+ok 6 - command help and root catalog are machine-readable and expose digest and revision fields
+  ---
+  duration_ms: 264.754837
+  type: 'test'
+  ...
+# Subtest: new logical commands are catalogued, parseable in both forms and in help
+ok 7 - new logical commands are catalogued, parseable in both forms and in help
+  ---
+  duration_ms: 0.460533
+  type: 'test'
+  ...
+# Subtest: text output carries the next step a dispatch or retry handed back
+ok 8 - text output carries the next step a dispatch or retry handed back
+  ---
+  duration_ms: 0.673546
+  type: 'test'
+  ...
+# Subtest: flags become the frozen logical args and a mutation keeps the shared command ID rule
+ok 9 - flags become the frozen logical args and a mutation keeps the shared command ID rule
+  ---
+  duration_ms: 0.664882
+  type: 'test'
+  ...
+# Subtest: --engine and --cancel are refused on any other command, repeated or without a value
+ok 10 - --engine and --cancel are refused on any other command, repeated or without a value
+  ---
+  duration_ms: 0.440793
+  type: 'test'
+  ...
+# Subtest: a flag never overrides a different value already in the --input body or envelope
+ok 11 - a flag never overrides a different value already in the --input body or envelope
+  ---
+  duration_ms: 0.293039
+  type: 'test'
+  ...
+# Subtest: help parses the new flags and reports an invalid pairing in the requested format
+ok 12 - help parses the new flags and reports an invalid pairing in the requested format
+  ---
+  duration_ms: 452.371013
+  type: 'test'
+  ...
+# Subtest: the new commands reach the socket as logical envelopes, not method wrappers
+ok 13 - the new commands reach the socket as logical envelopes, not method wrappers
+  ---
+  duration_ms: 25.211931
+  type: 'test'
+  ...
+# Subtest: CLI parsing supports args/envelopes and explicit retry IDs
+ok 14 - CLI parsing supports args/envelopes and explicit retry IDs
+  ---
+  duration_ms: 1.485842
+  type: 'test'
+  ...
+# Subtest: missing app returns APP_NOT_RUNNING
+ok 15 - missing app returns APP_NOT_RUNNING
+  ---
+  duration_ms: 9.64491
+  type: 'test'
+  ...
+# Subtest: actual authenticated socket supports request and clean restart
+ok 16 - actual authenticated socket supports request and clean restart
+  ---
+  duration_ms: 12.269539
+  type: 'test'
+  ...
+# Subtest: rejects bad authentication and oversized requests without invoking handler
+ok 17 - rejects bad authentication and oversized requests without invoking handler
+  ---
+  duration_ms: 7.153224
+  type: 'test'
+  ...
+# Subtest: unsafe token permissions fail closed and cleanup preserves replacement discovery
+ok 18 - unsafe token permissions fail closed and cleanup preserves replacement discovery
+  ---
+  duration_ms: 5.034863
+  type: 'test'
+  ...
+# Subtest: endpoint discovery rejects unsafe files and path substitution without sockets
+ok 19 - endpoint discovery rejects unsafe files and path substitution without sockets
+  ---
+  duration_ms: 2.348015
+  type: 'test'
+  ...
+# Subtest: CLI subprocess prints a single JSON response when app is not running
+ok 20 - CLI subprocess prints a single JSON response when app is not running
+  ---
+  duration_ms: 89.912993
+  type: 'test'
+  ...
+# Subtest: only complete launch envelopes receive the fixed startup allowance
+ok 21 - only complete launch envelopes receive the fixed startup allowance
+  ---
+  duration_ms: 0.480453
+  type: 'test'
+  ...
+# Subtest: IPC extends wall and inactivity deadlines only after a complete authenticated launch frame
+ok 22 - IPC extends wall and inactivity deadlines only after a complete authenticated launch frame
+  ---
+  duration_ms: 5.753414
+  type: 'test'
+  ...
+# Subtest: explicit shorter client deadlines remain binding for launch and ordinary requests
+ok 23 - explicit shorter client deadlines remain binding for launch and ordinary requests
+  ---
+  duration_ms: 64.06138
+  type: 'test'
+  ...
+# Subtest: manual attach keeps caller labels unverified and does not register a session on spawn
+ok 24 - manual attach keeps caller labels unverified and does not register a session on spawn
+  ---
+  duration_ms: 10.483176
+  type: 'test'
+  ...
+# Subtest: owners.list reports every registered instance with its metadata and slot use, and a replayed attach registers nothing
+ok 25 - owners.list reports every registered instance with its metadata and slot use, and a replayed attach registers nothing
+  ---
+  duration_ms: 1845.378375
+  type: 'test'
+  ...
+# Subtest: logical mock owner, frozen package, dispatch, delivery, ack, review and restart
+ok 26 - logical mock owner, frozen package, dispatch, delivery, ack, review and restart
+  ---
+  duration_ms: 1851.975731
+  type: 'test'
+  ...
+# Subtest: durable idempotency, conflicts, bounded events and unknown execution fail closed
+ok 27 - durable idempotency, conflicts, bounded events and unknown execution fail closed
+  ---
+  duration_ms: 0.973456
+  type: 'test'
+  ...
+# Subtest: policy governs actual admission and scheduler runs waiting work after slot release
+ok 28 - policy governs actual admission and scheduler runs waiting work after slot release
+  ---
+  duration_ms: 5503.31791
+  type: 'test'
+  ...
+# Subtest: cancel is domain operation, terminal cancellation idempotent and review revision protected
+ok 29 - cancel is domain operation, terminal cancellation idempotent and review revision protected
+  ---
+  duration_ms: 18.297329
+  type: 'test'
+  ...
+# Subtest: one create command owns mock owner creation and preserves task context
+ok 30 - one create command owns mock owner creation and preserves task context
+  ---
+  duration_ms: 1834.377693
+  type: 'test'
+  ...
+# Subtest: pending receipt is never replayed after restart and transaction rollback preserves state
+ok 31 - pending receipt is never replayed after restart and transaction rollback preserves state
+  ---
+  duration_ms: 1.959664
+  type: 'test'
+  ...
+# Subtest: continuation commands validate revision, survive restart and idle rotation does not churn
+ok 32 - continuation commands validate revision, survive restart and idle rotation does not churn
+  ---
+  duration_ms: 7.025573
+  type: 'test'
+  ...
+# Subtest: sync snapshots have monotonic persisted revision and catch missed invalidation
+ok 33 - sync snapshots have monotonic persisted revision and catch missed invalidation
+  ---
+  duration_ms: 0.703514
+  type: 'test'
+  ...
+# Subtest: trace export redacts quoted JSON credentials and hashes artifact content bytes
+ok 34 - trace export redacts quoted JSON credentials and hashes artifact content bytes
+  ---
+  duration_ms: 0.838409
+  type: 'test'
+  ...
+# Subtest: default external owner pulls, acknowledges and reviews results; idle due never auto-rotates it
+ok 35 - default external owner pulls, acknowledges and reviews results; idle due never auto-rotates it
+  ---
+  duration_ms: 1845.692825
+  type: 'test'
+  ...
+# Subtest: owners.switch with launch starts the replacement owner in Herdr and records its host
+ok 36 - owners.switch with launch starts the replacement owner in Herdr and records its host
+  ---
+  duration_ms: 2.222019
+  type: 'test'
+  ...
+# Subtest: owners.switch keeps its rotation when the owner host cannot be launched and offers a retry
+ok 37 - owners.switch keeps its rotation when the owner host cannot be launched and offers a retry
+  ---
+  duration_ms: 2.228011
+  type: 'test'
+  ...
+# Subtest: owners.switch with a task that has no workspace never reaches Herdr
+ok 38 - owners.switch with a task that has no workspace never reaches Herdr
+  ---
+  duration_ms: 1.429665
+  type: 'test'
+  ...
+# Subtest: owners.launch relaunches the current owner from the existing pack without rotating again
+ok 39 - owners.launch relaunches the current owner from the existing pack without rotating again
+  ---
+  duration_ms: 4.207174
+  type: 'test'
+  ...
+# Subtest: stored ownerHost round-trips and malformed host records are rejected
+ok 40 - stored ownerHost round-trips and malformed host records are rejected
+  ---
+  duration_ms: 0.764994
+  type: 'test'
+  ...
+# Subtest: async codex launch preserves exact IDs, explicit argv, unicode labels and budgets
+ok 41 - async codex launch preserves exact IDs, explicit argv, unicode labels and budgets
+  ---
+  duration_ms: 1.398998
+  type: 'test'
+  ...
+# Subtest: async Claude help is best effort and controls only effort support
+ok 42 - async Claude help is best effort and controls only effort support
+  ---
+  duration_ms: 0.413725
+  type: 'test'
+  ...
+# Subtest: async protocol failures preserve step context and close only the documented workspace
+ok 43 - async protocol failures preserve step context and close only the documented workspace
+  ---
+  duration_ms: 0.840202
+  type: 'test'
+  ...
+# Subtest: async failed cleanup appends evidence without replacing original launch failure
+ok 44 - async failed cleanup appends evidence without replacing original launch failure
+  ---
+  duration_ms: 0.42958
+  type: 'test'
+  ...
+# Subtest: async missing pane cleans exact workspace, but missing workspace never guesses from pane
+ok 45 - async missing pane cleans exact workspace, but missing workspace never guesses from pane
+  ---
+  duration_ms: 0.266919
+  type: 'test'
+  ...
+# Subtest: preabort has no effects; abort during each owned step still allows fresh cleanup
+ok 46 - preabort has no effects; abort during each owned step still allows fresh cleanup
+  ---
+  duration_ms: 0.485087
+  type: 'test'
+  ...
+# Subtest: a terminated workspace create with an exact resource receipt is still cleaned up
+ok 47 - a terminated workspace create with an exact resource receipt is still cleaned up
+  ---
+  duration_ms: 0.187154
+  type: 'test'
+  ...
+# Subtest: explicit close validates exact identity and closes no other resource
+ok 48 - explicit close validates exact identity and closes no other resource
+  ---
+  duration_ms: 0.333109
+  type: 'test'
+  ...
+# Subtest: default async process runner stays nonblocking, bounds evidence and terminates on timeout or abort
+ok 49 - default async process runner stays nonblocking, bounds evidence and terminates on timeout or abort
+  ---
+  duration_ms: 1583.891216
+  type: 'test'
+  ...
+# Subtest: claude launch drives herdr through argv arrays, detects the effort flag and parses the workspace JSON
+ok 50 - claude launch drives herdr through argv arrays, detects the effort flag and parses the workspace JSON
+  ---
+  duration_ms: 3.131302
+  type: 'test'
+  ...
+# Subtest: codex launch skips the help probe and passes the effort config as one argv element
+ok 51 - codex launch skips the help probe and passes the effort config as one argv element
+  ---
+  duration_ms: 0.418417
+  type: 'test'
+  ...
+# Subtest: long task titles are truncated to 40 characters in the workspace label
+ok 52 - long task titles are truncated to 40 characters in the workspace label
+  ---
+  duration_ms: 0.488503
+  type: 'test'
+  ...
+# Subtest: claude help without an effort flag, or failing, keeps only --model
+ok 53 - claude help without an effort flag, or failing, keeps only --model
+  ---
+  duration_ms: 0.406375
+  type: 'test'
+  ...
+# Subtest: no claude on PATH means no probe at all
+ok 54 - no claude on PATH means no probe at all
+  ---
+  duration_ms: 0.235391
+  type: 'test'
+  ...
+# Subtest: unsupported engine kinds fail before any herdr call
+ok 55 - unsupported engine kinds fail before any herdr call
+  ---
+  duration_ms: 0.483317
+  type: 'test'
+  ...
+# Subtest: missing herdr on PATH fails as unavailable before any herdr call
+ok 56 - missing herdr on PATH fails as unavailable before any herdr call
+  ---
+  duration_ms: 0.326621
+  type: 'test'
+  ...
+# Subtest: step failures report the step with stderr capped at 500 characters and skip cleanup
+ok 57 - step failures report the step with stderr capped at 500 characters and skip cleanup
+  ---
+  duration_ms: 0.363324
+  type: 'test'
+  ...
+# Subtest: unparseable create JSON fails the launch without touching any other resource
+ok 58 - unparseable create JSON fails the launch without touching any other resource
+  ---
+  duration_ms: 0.371687
+  type: 'test'
+  ...
+# Subtest: a create response without a root pane still closes the workspace it created
+ok 59 - a create response without a root pane still closes the workspace it created
+  ---
+  duration_ms: 0.64752
+  type: 'test'
+  ...
+# Subtest: a failed cleanup of a paneless workspace is reported inside the launch failure
+ok 60 - a failed cleanup of a paneless workspace is reported inside the launch failure
+  ---
+  duration_ms: 0.308581
+  type: 'test'
+  ...
+# Subtest: a create response with no documented workspace id never launches, prompts or closes a guessed workspace
+ok 61 - a create response with no documented workspace id never launches, prompts or closes a guessed workspace
+  ---
+  duration_ms: 0.515932
+  type: 'test'
+  ...
+# Subtest: cleanup closes the documented workspace id, not a prefix of the pane id
+ok 62 - cleanup closes the documented workspace id, not a prefix of the pane id
+  ---
+  duration_ms: 0.364783
+  type: 'test'
+  ...
+# Subtest: a failing agent start closes only the workspace it created
+ok 63 - a failing agent start closes only the workspace it created
+  ---
+  duration_ms: 0.312536
+  type: 'test'
+  ...
+# Subtest: failed cleanup is reported inside the launch failure
+ok 64 - failed cleanup is reported inside the launch failure
+  ---
+  duration_ms: 0.315246
+  type: 'test'
+  ...
+# Subtest: a failing prompt submission also cleans up the created workspace
+ok 65 - a failing prompt submission also cleans up the created workspace
+  ---
+  duration_ms: 0.256629
+  type: 'test'
+  ...
+# Subtest: a runner that throws on workspace create reports the step and closes nothing
+ok 66 - a runner that throws on workspace create reports the step and closes nothing
+  ---
+  duration_ms: 0.288384
+  type: 'test'
+  ...
+# Subtest: a runner that throws after workspace create still closes exactly the created workspace
+ok 67 - a runner that throws after workspace create still closes exactly the created workspace
+  ---
+  duration_ms: 0.310908
+  type: 'test'
+  ...
+# Subtest: a failure envelope with exit code 0 fails agent start, skips the prompt and closes the workspace
+ok 68 - a failure envelope with exit code 0 fails agent start, skips the prompt and closes the workspace
+  ---
+  duration_ms: 0.325075
+  type: 'test'
+  ...
+# Subtest: a blocked agent prompt envelope with exit code 0 fails the launch and closes the workspace
+ok 69 - a blocked agent prompt envelope with exit code 0 fails the launch and closes the workspace
+  ---
+  duration_ms: 0.257172
+  type: 'test'
+  ...
+# Subtest: documented success envelopes are not mistaken for failures
+ok 70 - documented success envelopes are not mistaken for failures
+  ---
+  duration_ms: 0.921371
+  type: 'test'
+  ...
+# Subtest: a cleanup that throws is appended to the launch failure it recovers from
+ok 71 - a cleanup that throws is appended to the launch failure it recovers from
+  ---
+  duration_ms: 0.215653
+  type: 'test'
+  ...
+# Subtest: a cleanup reporting a failure envelope with exit code 0 is still reported as cleanup failure
+ok 72 - a cleanup reporting a failure envelope with exit code 0 is still reported as cleanup failure
+  ---
+  duration_ms: 0.184241
+  type: 'test'
+  ...
+# Subtest: invalid epochs and task ids are rejected deterministically
+ok 73 - invalid epochs and task ids are rejected deterministically
+  ---
+  duration_ms: 0.074088
+  type: 'test'
+  ...
+# Subtest: ownerAgentName derives the normalized bounded pattern
+ok 74 - ownerAgentName derives the normalized bounded pattern
+  ---
+  duration_ms: 0.041436
+  type: 'test'
+  ...
+# Subtest: executable discovery scans the injected PATH and honors the executable bit
+ok 75 - executable discovery scans the injected PATH and honors the executable bit
+  ---
+  duration_ms: 0.238791
+  type: 'test'
+  ...
+# Subtest: the launcher resolves herdr from the injected PATH instead of a fixed location
+ok 76 - the launcher resolves herdr from the injected PATH instead of a fixed location
+  ---
+  duration_ms: 0.219377
+  type: 'test'
+  ...
+# Subtest: defaultRunner captures stdout, stderr, exit codes and timeouts without a shell
+ok 77 - defaultRunner captures stdout, stderr, exit codes and timeouts without a shell
+  ---
+  duration_ms: 430.283805
+  type: 'test'
+  ...
+# Subtest: pending launch receipts, same epoch exclusion, fresh state and final restart replay
+ok 78 - pending launch receipts, same epoch exclusion, fresh state and final restart replay
+  ---
+  duration_ms: 14.001726
+  type: 'test'
+  ...
+# Subtest: post-launch persistence failure cleans only an uncommitted host and preserves the original error
+ok 79 - post-launch persistence failure cleans only an uncommitted host and preserves the original error
+  ---
+  duration_ms: 3.926845
+  type: 'test'
+  ...
+# Subtest: newer epochs stay launchable and older success/failure cannot overwrite their binding or context
+ok 80 - newer epochs stay launchable and older success/failure cannot overwrite their binding or context
+  ---
+  duration_ms: 3.571009
+  type: 'test'
+  ...
+# Subtest: drain aborts and joins owned pending work without late persistence, retaining finished hosts
+ok 81 - drain aborts and joins owned pending work without late persistence, retaining finished hosts
+  ---
+  duration_ms: 2.329416
+  type: 'test'
+  ...
+# Subtest: client socket disconnect leaves accepted launch receipt settling and replayable
+ok 82 - client socket disconnect leaves accepted launch receipt settling and replayable
+  ---
+  duration_ms: 21.311983
+  type: 'test'
+  ...
+# Subtest: real CLI and HTTP launch concurrently beyond 15s while ordinary reads remain responsive
+ok 83 - real CLI and HTTP launch concurrently beyond 15s while ordinary reads remain responsive
+  ---
+  duration_ms: 16259.634384
+  type: 'test'
+  ...
+# CLI launch 16182ms; parallel window 16183ms; concurrent CLI read 93ms; HTTP read 4ms
+# Subtest: HTTP guards reject unsafe requests before any task state exists
+ok 84 - HTTP guards reject unsafe requests before any task state exists
+  ---
+  duration_ms: 142.24912
+  type: 'test'
+  ...
+# Subtest: second web invocation does not open or recover live task state
+ok 85 - second web invocation does not open or recover live task state
+  ---
+  duration_ms: 4.929713
+  type: 'test'
+  ...
+# Subtest: failed HTTP bind releases only this attempt
+ok 86 - failed HTTP bind releases only this attempt
+  ---
+  duration_ms: 3.304581
+  type: 'test'
+  ...
+# Subtest: weaver web reports bind and damaged-store failures
+ok 87 - weaver web reports bind and damaged-store failures
+  ---
+  duration_ms: 189.848676
+  type: 'test'
+  ...
+# Subtest: headless CLI can create, dispatch, review, and leaving does not cancel work
+ok 88 - headless CLI can create, dispatch, review, and leaving does not cancel work
+  ---
+  duration_ms: 2507.609344
+  type: 'test'
+  ...
+# Subtest: shutdown and restart keep task history
+ok 89 - shutdown and restart keep task history
+  ---
+  duration_ms: 287.17864
+  type: 'test'
+  ...
+# Subtest: a repeated stop signal still drains and removes the endpoint
+ok 90 - a repeated stop signal still drains and removes the endpoint
+  ---
+  duration_ms: 1330.700187
+  type: 'test'
+  ...
+# Subtest: engine scan and enable do not create roles
+ok 91 - engine scan and enable do not create roles
+  ---
+  duration_ms: 828.512072
+  type: 'test'
+  ...
+# Subtest: a rejected engine enable leaves the server and policy usable
+ok 92 - a rejected engine enable leaves the server and policy usable
+  ---
+  duration_ms: 59.361231
+  type: 'test'
+  ...
+# Subtest: production upgrades and idle sockets cannot hold shutdown
+ok 93 - production upgrades and idle sockets cannot hold shutdown
+  ---
+  duration_ms: 6.217586
+  type: 'test'
+  ...
+# Subtest: a static read failure does not kill the server
+ok 94 - a static read failure does not kill the server
+  ---
+  duration_ms: 60.220204
+  type: 'test'
+  ...
+# Subtest: dev mode serves the renderer on the owned origin
+ok 95 - dev mode serves the renderer on the owned origin
+  ---
+  duration_ms: 811.186239
+  type: 'test'
+  ...
+# Subtest: HTTP startup timeout begins after origin and complete RPC validation and restores on response
+ok 96 - HTTP startup timeout begins after origin and complete RPC validation and restores on response
+  ---
+  duration_ms: 3.259545
+  type: 'test'
+  ...
+# 6:46:12 AM [vite] (client) [optimizer] bundling dependencies...
+1..96
+# tests 96
+# suites 0
+# pass 96
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 16598.571937

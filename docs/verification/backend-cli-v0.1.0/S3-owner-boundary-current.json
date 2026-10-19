@@ -1,0 +1,42 @@
+{
+  "errorRedaction": {
+    "error": "[REDACTED AUTH] api_key=[REDACTED] TOKEN] password=[REDACTED] https://[REDACTED]@example.test",
+    "passed": true
+  },
+  "exactEngineUnblock": {
+    "remaining": [
+      {
+        "engine": "codex"
+      }
+    ],
+    "passed": true
+  },
+  "stopWithoutReady": {
+    "level": 1,
+    "history": 0,
+    "passed": true
+  },
+  "orphanRecovery": {
+    "status": {
+      "level": 1,
+      "lastTriggerAt": null,
+      "needsAttention": false,
+      "blocked": true,
+      "blockedUntil": "2026-01-01T00:25:00.000Z",
+      "nextProbeAt": "2026-01-01T00:25:00.000Z",
+      "probeSuccesses": 0,
+      "history": []
+    },
+    "passed": true
+  },
+  "largeSquadReload": {
+    "beforeLevel": 1,
+    "beforeTasks": 50,
+    "taskCount": 200,
+    "afterLevel": 1,
+    "retainedRecords": 50,
+    "serializedBytes": 128378,
+    "logs": [],
+    "passed": true
+  }
+}

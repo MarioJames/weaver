@@ -1,0 +1,51 @@
+{
+  "scanExitCode": 0,
+  "scanVerdict": "needs-review",
+  "sourceDigest": "ed767a2f655012f297ead7c26c19ebf2849a7ada8e1caedb4b59752397e9151a",
+  "rulesDigest": "7b8ca4c2ea52cab9016ab2a8b43f24a88df41405cac37f5c307f06cb4f1deb1b",
+  "filesScanned": 145,
+  "findings": [
+    {
+      "rule": "seed-inline-theme",
+      "path": "docs/verification/quota/REPORT.html",
+      "line": 1,
+      "title": "局部颜色字面量线索",
+      "severity": "warning",
+      "status": "candidate",
+      "guidance": "检查是否绕过已存在主题token；品牌色和主题定义可能合法，不凭命中判错。",
+      "ownerReview": "Accepted: standalone report intentionally uses inline CSS and local color definitions; no application theme is bypassed"
+    },
+    {
+      "rule": "seed-inline-theme",
+      "path": "docs/verification/redesign/final/REPORT.html",
+      "line": 1,
+      "title": "局部颜色字面量线索",
+      "severity": "warning",
+      "status": "candidate",
+      "guidance": "检查是否绕过已存在主题token；品牌色和主题定义可能合法，不凭命中判错。",
+      "ownerReview": "Accepted: standalone report intentionally uses inline CSS and local color definitions; no application theme is bypassed"
+    },
+    {
+      "rule": "seed-deep-import",
+      "path": "src/main/adapters/cli/launch.ts",
+      "line": 7,
+      "title": "深相对路径线索",
+      "severity": "warning",
+      "status": "candidate",
+      "guidance": "检查项目是否已有alias或包公开入口，并核对运行时/测试/构建解析；深度本身不是硬性违规。",
+      "ownerReview": "Accepted: existing source-relative module imports match repository pattern; typecheck, runtime tests and production build resolve them"
+    },
+    {
+      "rule": "seed-deep-import",
+      "path": "src/main/adapters/cli/normalize.ts",
+      "line": 1,
+      "title": "深相对路径线索",
+      "severity": "warning",
+      "status": "candidate",
+      "guidance": "检查项目是否已有alias或包公开入口，并核对运行时/测试/构建解析；深度本身不是硬性违规。",
+      "ownerReview": "Accepted: existing source-relative module imports match repository pattern; typecheck, runtime tests and production build resolve them"
+    }
+  ],
+  "activeGateViolations": 0,
+  "reviewedAt": "2026-10-19T10:48:56.708960+00:00"
+}

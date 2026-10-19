@@ -1,0 +1,240 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-19T11:01:13.043150+00:00",
+  "result": "passed",
+  "scope": "Static report readability, print, fact consistency and relative-link QA only; does not replace product acceptance or verify real model authentication.",
+  "weaverTaskId": "f957b775-b028-4662-9fbf-d17cfffbbea3",
+  "target": "REPORT.html",
+  "targetSHA256": "6a11b6c5837065de1b40f9e3e74ac84bba72b05238805c533e810553533cccec",
+  "targetBytes": 33121,
+  "sourceCommit": "d5ea7e5b69a44fe394809dc542080ecb4e2a7fba",
+  "sourceTree": "57465901fa9b25cd89045a3ba3ea415d63c840c3",
+  "appURL": "file:///home/mocha/opensource/weaver/docs/verification/backend-cli-v0.1.0/REPORT.html",
+  "urlProvenance": "Successful browser-harness prepare of the exact absolute HTML target; file mode, no server.",
+  "browser": {
+    "tool": "agent-browser",
+    "version": "0.34.0",
+    "engine": "Google Chrome 155",
+    "mode": "task",
+    "session": "weaver-backend-report-qa",
+    "profile": "/tmp/weaver-codex-resume-wo_10lhm/report-browser/profile-root/browser-profile",
+    "profileCreatedBy": "bh task-profile create",
+    "profilePermissions": "0700 (bh-managed)"
+  },
+  "checks": {
+    "facts": {
+      "passed": true,
+      "tests": 526,
+      "pass": 526,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "typecheckExitCode": 0,
+      "buildExitCode": 0,
+      "warningsDisclosed": [
+        "2747 repeated module-level directives/use client warnings",
+        "renderer chunk exceeds 500 kB"
+      ],
+      "limitationsVisibleOutsideDetails": true,
+      "prematureReleaseOrAuthenticationClaims": false,
+      "userWeightsRestoredClaim": false,
+      "pendingOwnerUpdatedReceiptsTreatedAsPending": true,
+      "dependencyEnvironmentLimitationDisclosed": true
+    },
+    "desktop": {
+      "viewport": [
+        1440,
+        1000
+      ],
+      "documentScrollWidth": 1440,
+      "passed": true,
+      "visualReview": "Header, source/date, conclusion cards and verification table readable; critical text not clipped."
+    },
+    "mobile": {
+      "viewportSize": [
+        390,
+        844
+      ],
+      "viewport": 390,
+      "documentScrollWidth": 390,
+      "clippedCriticalElements": 0,
+      "passed": true,
+      "visualReview": "Refreshed header capture and actual new limitation paragraph inspected at 390px; no page overflow or clipping. Existing table behavior unchanged."
+    },
+    "links": {
+      "passed": true,
+      "hrefAndSrcOccurrences": 50,
+      "internalAnchors": 6,
+      "missingTargets": [],
+      "invalidAnchors": [],
+      "externalTargets": [],
+      "loadedSettingsImages": 4,
+      "details": "Final 50 href/src occurrences resolve locally and all six anchors match. New dependency JSON clicked and read. Prior representative JSON/TXT/settings clicks apply only to unchanged targets.",
+      "newAttachmentClick": {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/backend-cli-v0.1.0/dependency-versions.json",
+        "text": "{\n  \"verificationUses\": \"existing shared development dependencies, no installation or lockfile mutation\",\n  \"versions\": {\n    \"@lobehub/ui\": {\n      \"installed\": \"5.64.4\",\n      \"npmLock\": \"5.58.0\"\n    },\n    \"typescript\": {\n      \"installed\": \"7.0.2\",\n      \"npmLock\": \"7.0.2\"\n    },\n    \"vite\": {\n      \"installed\": \"8.3.4\",\n      \"npmLock\": \"8.3.4\"\n    },\n    \"react\": {\n      \"installed\": \"19.3.1\",\n      \"npmLock\": \"19.3.1\"\n    },\n    \"antd\": {\n      \"installed\": \"6.6.6\",\n      \"npmLock\": \"6.6.6\"\n    }\n  }\n}\n"
+      },
+      "unchangedAttachmentsClickedDuringInitialPass": [
+        "file:///home/mocha/opensource/weaver/docs/verification/backend-cli-v0.1.0/final-checks.json",
+        "file:///home/mocha/opensource/weaver/docs/verification/backend-cli-v0.1.0/final-typecheck.txt",
+        "file:///home/mocha/opensource/weaver/docs/verification/settings-columns/desktop.png"
+      ]
+    },
+    "staticDependencies": {
+      "passed": true,
+      "scripts": 0,
+      "externalStylesheets": 0,
+      "externalFontsOrCDNRequests": 0,
+      "inlineCSS": true,
+      "utf8": true
+    },
+    "print": {
+      "passed": true,
+      "method": "agent-browser pdf (actual Chrome print output), then Poppler pdfinfo/pdftotext/pdftoppm",
+      "file": "report-print.pdf",
+      "pages": 13,
+      "pageSize": "612 x 792 pt (Letter)",
+      "visualReview": "New 13-page Chrome PDF rendered and all pages reviewed as contact sheet; dependency paragraph and limitations detail inspected on page 11. Long IDs, conclusions and rows complete. Page 13 contains the continued footer.",
+      "missingLongIDs": [],
+      "limitationsPage": 11,
+      "dependencyLimitationPrinted": true
+    }
+  },
+  "steps": [
+    "Matched new owner SHA256 and created fresh bh task profile/session.",
+    "Opened exact bh-prepared file URL and refreshed 1440x1000 desktop capture.",
+    "Scrolled to new limitation, waited for lazy-image layout to settle, refreshed snapshot and clicked dependency JSON; verified both versions and returned.",
+    "Refreshed 390x844 header capture; inspected new limitation at 390px and checked page width/clipping.",
+    "Generated actual 13-page Chrome print PDF and reviewed Poppler renders plus complete text/IDs.",
+    "Rechecked all 50 href/src occurrences and six anchors; collected bh evidence with artifact_errors empty.",
+    "Closed browser, removed marked profile and externally verified daemon exit; reclaimed own scratch."
+  ],
+  "consoleMessages": [],
+  "pageErrors": [],
+  "network": {
+    "requestCount": 16,
+    "externalRequests": [],
+    "failedRequests": [],
+    "xhrFetchCount": 0,
+    "requests": [
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/backend-cli-v0.1.0/REPORT.html",
+        "status": 200,
+        "type": "Document"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/settings-columns/desktop.png",
+        "status": 200,
+        "type": "Image"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/settings-columns/mobile-saved.png",
+        "status": 200,
+        "type": "Image"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/settings-columns/mobile-top.png",
+        "status": 200,
+        "type": "Image"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/settings-columns/dark-component.png",
+        "status": 200,
+        "type": "Image"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/backend-cli-v0.1.0/REPORT.html",
+        "status": 200,
+        "type": "Document"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/settings-columns/desktop.png",
+        "status": 200,
+        "type": "Image"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/settings-columns/mobile-saved.png",
+        "status": 200,
+        "type": "Image"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/settings-columns/mobile-top.png",
+        "status": 200,
+        "type": "Image"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/settings-columns/dark-component.png",
+        "status": 200,
+        "type": "Image"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/backend-cli-v0.1.0/dependency-versions.json",
+        "status": 200,
+        "type": "Document"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/backend-cli-v0.1.0/REPORT.html",
+        "status": 200,
+        "type": "Document"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/settings-columns/desktop.png",
+        "status": 200,
+        "type": "Image"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/settings-columns/mobile-saved.png",
+        "status": 200,
+        "type": "Image"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/settings-columns/mobile-top.png",
+        "status": 200,
+        "type": "Image"
+      },
+      {
+        "url": "file:///home/mocha/opensource/weaver/docs/verification/settings-columns/dark-component.png",
+        "status": 200,
+        "type": "Image"
+      }
+    ]
+  },
+  "artifact_errors": [],
+  "evidence": [
+    "report-desktop.png",
+    "report-mobile.png",
+    "report-print.pdf"
+  ],
+  "cleanup": {
+    "browserClosed": true,
+    "backgroundPid": 388832,
+    "backgroundPidExited": true,
+    "profileRemoved": true,
+    "profileProcessesRemaining": 0,
+    "serverStarted": false,
+    "scopeCreated": false,
+    "sharedServiceTouched": false,
+    "persistentDataTouched": false,
+    "scratchRoot": "/tmp/weaver-codex-resume-wo_10lhm/report-browser",
+    "scratchRemoved": true
+  },
+  "issues": [],
+  "previousHash": "b228966a891acdc12e9fb7c2630d263afafadfe5b8370ffa53db625b0965d560",
+  "revalidation": {
+    "scope": "Only dependency limitation paragraph and new relative JSON link changed; final desktop/mobile captures and actual print PDF regenerated from new hash. Product checks not rerun.",
+    "limitation": "Existing @lobehub/ui 5.64.4 vs npm lock 5.58.0; no npm ci environment verification.",
+    "clickedNewAttachment": {
+      "url": "file:///home/mocha/opensource/weaver/docs/verification/backend-cli-v0.1.0/dependency-versions.json",
+      "text": "{\n  \"verificationUses\": \"existing shared development dependencies, no installation or lockfile mutation\",\n  \"versions\": {\n    \"@lobehub/ui\": {\n      \"installed\": \"5.64.4\",\n      \"npmLock\": \"5.58.0\"\n    },\n    \"typescript\": {\n      \"installed\": \"7.0.2\",\n      \"npmLock\": \"7.0.2\"\n    },\n    \"vite\": {\n      \"installed\": \"8.3.4\",\n      \"npmLock\": \"8.3.4\"\n    },\n    \"react\": {\n      \"installed\": \"19.3.1\",\n      \"npmLock\": \"19.3.1\"\n    },\n    \"antd\": {\n      \"installed\": \"6.6.6\",\n      \"npmLock\": \"6.6.6\"\n    }\n  }\n}\n"
+    },
+    "priorScopeReuse": "Initial actual JSON/TXT/settings screenshot clicks retained for unchanged attachments; every final HTML href/src and anchor rechecked on new hash."
+  },
+  "interactionDiagnostics": [
+    "Initial click was intercepted by a lazy-loaded image during layout movement; refreshed position/snapshot after settling and the real click passed. Navigation probe errors and temporary blank artifacts from that failed sequence were discarded; all named final PNG/PDF artifacts regenerated from verified report URL. No report issue reproduced."
+  ],
+  "evidenceSHA256": {
+    "report-desktop.png": "4c6e3d7913609d39c063f04fd55e4036691d2fcabcf00f95922c3963dacbc651",
+    "report-mobile.png": "953f31a94dbcf9aa87eac4ea7545982151ba06cee636e4e1fbca6698646bb427",
+    "report-print.pdf": "867e0afcc7e5bf14d59f0caac7acf87305349554e38e56a1700efc78bf5c6b36"
+  }
+}

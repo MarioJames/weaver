@@ -1,0 +1,64 @@
+[
+  {
+    "at": "2026-10-19T10:17:49.980995+00:00",
+    "removed": [
+      "/tmp/weaver-codex-resume-wo_10lhm/quota-fixture-tree",
+      "/tmp/weaver-codex-resume-wo_10lhm/quota-fixture.index",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/tbound-JeaqoF"
+    ],
+    "reason": "Quota fixture acceptance and commit complete; own failed boundary fixture was empty; shared dependencies/data/service preserved"
+  },
+  {
+    "at": "2026-10-19T10:33:12.964914+00:00",
+    "removed": [
+      "/tmp/weaver-codex-resume-wo_10lhm/s3-commit-tree",
+      "/tmp/weaver-codex-resume-wo_10lhm/s3-commit.index",
+      "/tmp/weaver-codex-resume-wo_10lhm/s3-commit.tar",
+      "/tmp/weaver-codex-resume-wo_10lhm/s3-commit-final-tree",
+      "/tmp/weaver-codex-resume-wo_10lhm/s3-commit-final.index",
+      "/tmp/weaver-codex-resume-wo_10lhm/s3-commit-final.tar",
+      "/tmp/weaver-codex-resume-wo_10lhm/j1-phase-a-check-tree",
+      "/tmp/weaver-codex-resume-wo_10lhm/j1-phase-a-check.index",
+      "/tmp/weaver-codex-resume-wo_10lhm/j1-phase-a-check.tar",
+      "/tmp/weaver-codex-resume-wo_10lhm/j1-phase-a-check2-tree",
+      "/tmp/weaver-codex-resume-wo_10lhm/j1-phase-a-check2.index",
+      "/tmp/weaver-codex-resume-wo_10lhm/j1-phase-a-check2.tar"
+    ],
+    "reason": "Independent validation completed; S3 accepted+committed, J1 phaseA proof recorded. Raw logs/JSON evidence retained for delivery. Shared dependency symlink targets and all persistent data preserved."
+  },
+  {
+    "at": "2026-10-19T10:48:56.768137+00:00",
+    "removed": [
+      "/tmp/weaver-codex-resume-wo_10lhm/t-commit-final-tree",
+      "/tmp/weaver-codex-resume-wo_10lhm/t-commit-final.index",
+      "/tmp/weaver-codex-resume-wo_10lhm/t-commit-final.tar",
+      "/tmp/weaver-codex-resume-wo_10lhm/j1-owner-final-tree",
+      "/tmp/weaver-codex-resume-wo_10lhm/j1-owner-final.index",
+      "/tmp/weaver-codex-resume-wo_10lhm/j1-owner-final.tar",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/wv-dev-JayKPn",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/wv-server-VJ02R5",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/wv-dev-0Ysxrd",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/wv-dev-HJnteF",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/wv-dev-kmFT8x",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/wv-dev-KY6HhN",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/wv-dev-moko4f",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/wv-dev-WQescR",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/wv-dev-YUcgZp",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/wv-dev-0Zj2nI",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/opencode",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/qodercli-natives-v1.1.73-mocha",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/node-compile-cache",
+      "/tmp/weaver-codex-resume-wo_10lhm/checks/tsx-1000"
+    ],
+    "reason": "All backend source accepted and committed; full 526-test suite, typecheck and production build completed. Exact disposable trees, local caches/build output and test TMPDIR reclaimed. Report artifacts retained until delivery; shared dependencies/service/persistent data untouched."
+  },
+  {
+    "at": "2026-10-19T11:03:25.415148+00:00",
+    "removed": [
+      "/tmp/weaver-codex-resume-wo_10lhm",
+      "/tmp/weaver-tasks/server-4VDE/codex-owner-njwhokcf",
+      "/tmp/wc-8e59792c"
+    ],
+    "reason": "All28 recorded tasks terminal (21completed/accepted,7unsuccessful attempts), evidence and report browser QA delivered; no remaining temp-root dependencies. Only this task root and verified owned aliases reclaimed; shared service/dependencies/persistent data and other projects untouched."
+  }
+]

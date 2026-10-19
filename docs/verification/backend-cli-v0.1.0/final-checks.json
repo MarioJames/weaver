@@ -1,0 +1,67 @@
+{
+  "checkedAt": "2026-10-19T10:47:37.120579+00:00",
+  "source": {
+    "committedAt": "2026-10-19T10:46:52.376444+00:00",
+    "commit": "d5ea7e5b69a44fe394809dc542080ecb4e2a7fba",
+    "tree": "57465901fa9b25cd89045a3ba3ea415d63c840c3",
+    "files": [
+      "src/cli/main.ts",
+      "src/main/commands.ts",
+      "src/main/http.ts",
+      "src/main/local-ipc.ts",
+      "src/main/owner-host.ts",
+      "src/main/runtime.ts",
+      "tests/cli-transport.test.ts",
+      "tests/owner-host-async.test.ts",
+      "tests/owner-launch-async.test.ts",
+      "tests/runtime-http.test.ts"
+    ],
+    "dependencySharing": "read dependency symlinks; .vite/.vite-temp and build outputs task-local",
+    "excludes": "Claude uncommitted renderer changes, pnpm lock/workspace files and in-flight docs"
+  },
+  "checks": [
+    {
+      "name": "typecheck",
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.671,
+      "log": "final-typecheck.txt"
+    },
+    {
+      "name": "test",
+      "command": [
+        "npm",
+        "test"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 16.817,
+      "log": "final-test.txt",
+      "counts": {
+        "tests": 526,
+        "suites": 0,
+        "pass": 526,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "name": "build",
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.789,
+      "log": "final-build-summary.txt",
+      "warnings": "build-warnings.json"
+    }
+  ],
+  "complete": true
+}
