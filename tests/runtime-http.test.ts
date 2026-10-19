@@ -334,6 +334,33 @@ test('shutdown and restart keep task history', { timeout: 20_000 }, async t => {
   } finally { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); await rm(dataDir, { recursive: true, force: true }); }
 });
 
+test('a repeated stop signal still drains and removes the endpoint', { timeout: 20_000 }, async t => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'wv-resignal-'));
+  const child: ChildProcess = spawn(process.execPath, ['--import', 'tsx', 'src/cli/main.ts', 'web', '--dev', '--no-open', '--port', '0', '--data-dir', dataDir], { cwd: REPO, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stderr = '';
+  child.stderr?.on('data', chunk => { stderr += chunk; });
+  const ready = await new Promise<boolean>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`no ready url\n${stderr}`)), 8000);
+    child.once('exit', code => { clearTimeout(timer); reject(new Error(`web exited ${code}\n${stderr}`)); });
+    child.stdout?.on('data', chunk => { if (String(chunk).includes('\n')) { clearTimeout(timer); resolve(true); } });
+  }).catch(error => {
+    child.kill('SIGKILL');
+    if (stderr.includes('EPERM') || String(error).includes('EPERM')) { t.skip('Sandbox denies Unix socket listen (EPERM); no bypass attempted'); return false; }
+    throw error;
+  });
+  try {
+    if (!ready) return;
+    child.removeAllListeners('exit');
+    const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(resolve => child.once('exit', (code, signal) => resolve({ code, signal })));
+    // A process group stop (Ctrl+C under tsx watch, systemd scope stop) delivers the signal twice.
+    child.kill('SIGINT');
+    await new Promise(resolve => setTimeout(resolve, 20));
+    child.kill('SIGINT');
+    assert.deepEqual(await exited, { code: 0, signal: null });
+    await assert.rejects(readFile(join(dataDir, 'control.v1.json'), 'utf8'));
+  } finally { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); await rm(dataDir, { recursive: true, force: true }); }
+});
+
 test('engine scan and enable do not create roles', { timeout: 30_000 }, async t => {
   const dataDir = await mkdtemp(join(tmpdir(), 'wv-engines-'));
   const runtime = await boot(t, dataDir);

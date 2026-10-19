@@ -381,8 +381,9 @@ export async function runCLI(argv: string[]): Promise<number> {
       catch (error) { throw startupFailure(error, web.port); }
       writeSync(process.stdout.fd, readyLine(runtime.url, runtime.port, web.output));
       const stop = () => { void runtime.close(); };
-      process.once('SIGINT', stop);
-      process.once('SIGTERM', stop);
+      // Repeated signals (process-group stops deliver one per process) join the same idempotent drain.
+      process.on('SIGINT', stop);
+      process.on('SIGTERM', stop);
       await runtime.done;
       return 0;
     }
