@@ -312,6 +312,42 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     font-size: 12px;
     color: ${cssVar.colorErrorText};
   `,
+  /** A form section set off from the fields above it. */
+  divided: css`
+    padding-block-start: 12px;
+    border-block-start: 1px solid ${cssVar.colorBorderSecondary};
+  `,
+  /** A model reply shown as a message card. */
+  replyCard: css`
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: ${cssVar.borderRadiusLG};
+    background: ${cssVar.colorFillQuaternary};
+
+    &[data-ok='true'] {
+      border-color: ${cssVar.colorSuccessBorder};
+      background: ${cssVar.colorSuccessBg};
+    }
+
+    &[data-ok='false'] {
+      border-color: ${cssVar.colorErrorBorder};
+      background: ${cssVar.colorErrorBg};
+    }
+  `,
+  replyText: css`
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  `,
+  replyError: css`
+    font-size: 13px;
+    color: ${cssVar.colorErrorText};
+  `,
   warn: css`
     color: ${cssVar.colorWarningText};
   `,

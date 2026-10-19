@@ -102,4 +102,7 @@ export function readinessFor(probes: EngineProbeRecord[], config: Config): Engin
 
 /** One worker route to greet: an engine id from the saved policy plus the model and effort to call. */
 export interface HelloInput { engine: string; model: string; effort: string }
-export interface HelloResult { ok: boolean; reply?: string; error?: string; durationMs: number; checkedAt: string }
+/** model is what the vendor reported answering, when it says; it can differ from the requested name. */
+export interface HelloResult { ok: boolean; reply?: string; model?: string; error?: string; durationMs: number; checkedAt: string }
+/** A greeting runs longer than one HTTP request may wait, so it is started and then polled. */
+export interface HelloJob { id: string; status: 'running' | 'done'; startedAt: string; result?: HelloResult }

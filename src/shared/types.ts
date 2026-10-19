@@ -40,7 +40,8 @@ export interface WeaverAPI {
  getQuota(): Promise<QuotaSnapshot>;
  refreshQuota(input: QuotaRefreshInput): Promise<QuotaRefreshResult>;
  setEngineEnabled(input: EngineToggleInput): Promise<EngineToggleResult>;
- sayHi(input: import('./engines').HelloInput): Promise<import('./engines').HelloResult>;
+ sayHi(input: import('./engines').HelloInput): Promise<import('./engines').HelloJob>;
+ sayHiResult(id: string): Promise<import('./engines').HelloJob>;
  listTasks(): Promise<Task[]>;
  createTask(input: TaskInput): Promise<Task>;
  importTask(): Promise<Task | null>;

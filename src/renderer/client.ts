@@ -236,6 +236,7 @@ export function createBrowserClient(): WeaverAPI {
     previewRoute: input => call('previewRoute', [input]) as ReturnType<WeaverAPI['previewRoute']>,
     scanEngines: () => call('scanEngines', []) as ReturnType<WeaverAPI['scanEngines']>,
     sayHi: input => call('sayHi', [input]) as ReturnType<WeaverAPI['sayHi']>,
+    sayHiResult: id => call('sayHiResult', [id]) as ReturnType<WeaverAPI['sayHiResult']>,
     setEngineEnabled: input => call('setEngineEnabled', [input]) as ReturnType<WeaverAPI['setEngineEnabled']>,
     listTasks: () => call('listTasks', []) as ReturnType<WeaverAPI['listTasks']>,
     createTask: input => call('createTask', [input]) as ReturnType<WeaverAPI['createTask']>,

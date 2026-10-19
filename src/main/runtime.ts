@@ -6,7 +6,7 @@ import { API_VERSION } from '../shared/commands';
 import { EXECUTION_BOUNDARY, ENGINE_CATALOG, readinessFor, type EngineProbeRecord } from '../shared/engines';
 import { parseId, parseTaskInput } from '../shared/validation';
 import { startCliAgent } from './adapters/cli/index';
-import { parseHelloInput, sayHi } from './engines/hello';
+import { HelloJobs, parseHelloInput, sayHi } from './engines/hello';
 import { RoutingWorkerAdapter } from './adapters/routing';
 import { MockWorkerAdapter } from './adapters/worker';
 import { CommandHandler, configuredParallel } from './commands';
@@ -83,7 +83,10 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   let vite: { middlewares: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next: (error?: unknown) => void) => void; close(): Promise<void> } | undefined;
   const inflight = new Set<Promise<unknown>>();
   const greetings = new AbortController();
-  let greeting = 0;
+  const hellos = new HelloJobs(route => {
+    const engine = policy?.snapshot().config.engines[route.engine];
+    return track(sayHi({ ...route, kind: engine?.kind ?? route.engine }, { root: join(dataDir, 'agent-state'), signal: greetings.signal }));
+  });
   const prober = new EngineProber();
   const quotaProber = options.quotaProber ?? new QuotaProber();
   let probes: EngineProbeRecord[] | null = null;
@@ -144,11 +147,15 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       }
       case 'sayHi': {
         const input = parseHelloInput(args[0]);
-        const engine = active.policy.snapshot().config.engines[input.engine];
-        if (!engine) throw new RpcError('INVALID_REQUEST', `Engine ${input.engine} is not configured`);
-        if (greeting >= 3) throw new RpcError('CAPACITY_EXCEEDED', 'Three probes are already running; wait for one to finish');
-        greeting += 1;
-        return track(sayHi({ ...input, kind: engine.kind }, { launch: startCliAgent, root: join(dataDir, 'agent-state'), signal: greetings.signal }).finally(() => { greeting -= 1; }));
+        if (!active.policy.snapshot().config.engines[input.engine]) throw new RpcError('INVALID_REQUEST', `Engine ${input.engine} is not configured`);
+        try { return hellos.start(input); } catch (error) { throw new RpcError('CAPACITY_EXCEEDED', error instanceof Error ? error.message : String(error)); }
+      }
+      case 'sayHiResult': {
+        const id = args[0];
+        if (typeof id !== 'string' || !/^[0-9a-f]{16}$/.test(id)) throw new RpcError('INVALID_REQUEST', 'Invalid probe id');
+        const job = hellos.get(id);
+        if (!job) throw new RpcError('NOT_FOUND', 'Probe not found or expired');
+        return job;
       }
       case 'previewRoute': return active.policy.preview(args[0]);
       case 'scanEngines': {

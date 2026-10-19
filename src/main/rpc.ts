@@ -10,6 +10,7 @@ Object.assign(ARITY, {
   getQuota: 0,
   refreshQuota: 1,
   sayHi: 1,
+  sayHiResult: 1,
   setEngineEnabled: 1,
   listTasks: 0,
   createTask: 1,

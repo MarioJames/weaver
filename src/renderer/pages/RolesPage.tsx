@@ -5,6 +5,7 @@ import { Empty } from '@lobehub/ui';
 import { Surface } from '@lobehub/ui/dashboard';
 import { Button, Input, Modal, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
 import type { HelloResult } from '../../shared/engines';
+import { startHello, useHelloRun } from '../hello-runs';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
 import { EFFORTS, type Availability, type Owner, type Worker } from '../../main/policy/routing';
 import { blankOwner, blankWorker, removeRole, renameRole, roleDeleteImpact, roleIdError, syncRoleEditor, type RoleSection } from '../policy-edit';
@@ -124,7 +125,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
             <Form.Field label="模型" required><Input id={`${fieldId}-model`} aria-label="模型" value={record.model} placeholder="例如：gpt-6.1-sol 或 provider/model" onChange={event => update({ ...record, model: event.target.value })} /></Form.Field>
             <Form.Field label="推理强度" required desc={efforts?.length ? undefined : '填写该模型接受的 variant。'}>{efforts?.length ? <NamedSelect id={`${fieldId}-effort`} aria-label="推理强度" value={record.effort} options={efforts.map(value => ({ value, label: value }))} onChange={value => { if (typeof value === 'string') update({ ...record, effort: value }); }} /> : <Input id={`${fieldId}-effort`} aria-label="推理强度" value={record.effort} placeholder="例如：max" onChange={event => update({ ...record, effort: event.target.value })} />}</Form.Field>
           </div>
-          {section === 'workers' ? <WorkerFields key={current} record={record as Worker} update={next => update(next)} /> : <OwnerFields key={current} config={config} blocks={policy.blocks} record={record as Owner} update={next => update(next)} />}
+          {section === 'workers' ? <WorkerFields key={current} id={current} record={record as Worker} update={next => update(next)} /> : <OwnerFields key={current} config={config} blocks={policy.blocks} record={record as Owner} update={next => update(next)} />}
           {impact && <Modal open={askDelete} title={impact.title} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onCancel={() => setAskDelete(false)} onOk={() => { policy.setConfig(removeRole(config, section, current)); setSelected(''); setPendingId(''); setAskDelete(false); }}>
             <Text>{impact.detail}</Text>
           </Modal>}
@@ -134,41 +135,52 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   </>;
 }
 
-function WorkerFields({ record, update }: { record: Worker; update: (next: Worker) => void }) {
+function WorkerFields({ id, record, update }: { id: string; record: Worker; update: (next: Worker) => void }) {
   const fieldId = useId();
   return <>
     <Form.Field label="用途说明"><Input id={`${fieldId}-description`} aria-label="用途说明" value={record.description ?? ''} placeholder="例如：负责前端界面与浏览器验收" onChange={event => update({ ...record, description: event.target.value })} /></Form.Field>
-    <HelloCheck record={record} />
+    <HelloCheck id={id} record={record} />
   </>;
 }
 
-/** Sends one real "say hi" through the route as currently filled in, saved or not. */
-function HelloCheck({ record }: { record: Worker }) {
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<HelloResult & { route: string }>();
-  const route = `${record.engine} · ${record.model} · ${record.effort}`;
+/** Sends one real "say hi" through the route as currently filled in, saved or not. The run outlives this form. */
+function HelloCheck({ id, record }: { id: string; record: Worker }) {
+  const run = useHelloRun(id);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!run?.running) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [run?.running]);
   const ready = Boolean(record.engine && record.model.trim() && record.effort.trim());
-  async function run() {
-    if (!window.weaver || !ready) return;
-    setRunning(true); setResult(undefined);
-    try { setResult({ ...await window.weaver.sayHi({ engine: record.engine, model: record.model.trim(), effort: record.effort.trim() }), route }); }
-    catch (error) { setResult({ ok: false, error: error instanceof Error ? error.message : String(error), durationMs: 0, checkedAt: new Date().toISOString(), route }); }
-    finally { setRunning(false); }
-  }
-  const seconds = result && result.durationMs ? `，用时 ${(result.durationMs / 1000).toFixed(1)} 秒` : '';
-  return <div className={styles.setting} style={{ paddingBlockEnd: 0 }}>
-    <div className={styles.tight}>
-      <Text strong>可用性</Text>
-      <Text type="secondary" className={styles.meta}>用当前填写的引擎、模型和推理强度真实调用一次，请它回一句 hi。会消耗少量额度。</Text>
-      {running && <Text type="secondary" className={styles.meta} role="status">正在等待回复…最长 2 分钟</Text>}
-      {result && <span role="status" className={styles.tight}>
-        <span className={styles.row}><Tag size="small" color={result.ok ? 'success' : 'error'}>{result.ok ? '可用' : '不可用'}</Tag><Text type="secondary" className={styles.meta}>{result.route}{seconds}</Text></span>
-        {result.reply && <Text className={styles.wrap}>“{result.reply}”</Text>}
-        {result.error && <Text type="danger" className={`${styles.wrap} ${styles.meta}`}>{result.error}</Text>}
-      </span>}
+  const elapsed = run?.running ? Math.max(0, Math.floor((now - run.startedAt) / 1000)) : 0;
+  return <div className={`${styles.stack} ${styles.divided}`}>
+    <div className={styles.spread} style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
+      <div className={styles.tight}>
+        <Text strong>可用性</Text>
+        <Text type="secondary" className={styles.meta}>用当前填写的引擎、模型和推理强度发一句 hi，走最轻的调用：不带工具、MCP 和插件，不保存会话。会消耗极少额度。</Text>
+      </div>
+      <Button icon={Zap} loading={run?.running} disabled={!ready} onClick={() => void startHello(id, { engine: record.engine, model: record.model.trim(), effort: record.effort.trim() }, `${record.engine} · ${record.model.trim()} · ${record.effort.trim()}`)}>发送 say hi</Button>
     </div>
-    <Button icon={Zap} loading={running} disabled={!ready} onClick={() => void run()}>发送 say hi</Button>
+    {run?.running && <Text type="secondary" className={styles.meta} role="status">正在等待 {run.route.split(' · ')[0]} 回复… {elapsed} 秒</Text>}
+    {run?.result && !run.running && <ReplyCard result={{ ...run.result, route: run.route }} />}
   </div>;
+}
+
+/** The model's answer as a message card: who answered, what it said, how long it took. */
+function ReplyCard({ result }: { result: HelloResult & { route: string } }) {
+  const seconds = result.durationMs ? `${(result.durationMs / 1000).toFixed(1)} 秒` : '';
+  return <article role="status" aria-label="say hi 结果" className={styles.replyCard} data-ok={result.ok ? 'true' : 'false'}>
+    <header className={styles.spread} style={{ flexWrap: 'nowrap' }}>
+      <span className={styles.row} style={{ flexWrap: 'nowrap', minInlineSize: 0 }}>
+        <Tag size="small" color={result.ok ? 'success' : 'error'}>{result.ok ? '可用' : '不可用'}</Tag>
+        <Text strong className={styles.wrap}>{result.route}</Text>
+      </span>
+      <Text type="secondary" className={`${styles.meta} ${styles.numbers}`} style={{ whiteSpace: 'nowrap' }}>{[seconds, new Date(result.checkedAt).toLocaleTimeString()].filter(Boolean).join(' · ')}</Text>
+    </header>
+    {result.ok ? <p className={styles.replyText}>{result.reply}</p> : <p className={`${styles.replyText} ${styles.replyError}`}>{result.error}</p>}
+    {result.model && <Text type="secondary" className={styles.meta}>实际应答模型：{result.model}</Text>}
+  </article>;
 }
 
 function OwnerFields({ config, blocks, record, update }: { config: NonNullable<PolicyDraft['config']>; blocks: PolicyDraft['blocks']; record: Owner; update: (next: Owner) => void }) {
