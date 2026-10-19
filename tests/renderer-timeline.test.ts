@@ -135,7 +135,7 @@ test('condensed timeline renders step summaries and keeps hidden raw chatter col
   assert.match(html, />Bash 1</);
   assert.match(html, /aria-expanded="false"/);
   assert.doesNotMatch(html, /tool started bash/);
-  assert.match(html, /Policy selected codex; launching/);
+  assert.match(html, /策略已选择子 Agent codex，正在启动/);
   assert.match(html, />执行中</);
   assert.match(html, /done summary/);
   assert.doesNotMatch(html, /已加载 \d+ 条/);
@@ -150,7 +150,7 @@ test('all-events mode keeps today view with export note and load control', () =>
     assert.match(html, /已加载 2 条 · 导出会遮盖常见凭据格式/);
     assert.match(html, /事件类型/);
     assert.doesNotMatch(html, /执行了 \d+ 个步骤/);
-    assert.match(html, /tool started bash/);
+    assert.match(html, /调用工具 bash/);
   } finally {
     (globalThis as Record<string, unknown>).localStorage = original;
   }

@@ -32,10 +32,10 @@ test('every lane limits the initial cards to the newest twenty', () => {
   }
 });
 
-test('no matching tasks keep all lane headers and offer a clear action', () => {
+test('no matching tasks show a single empty state and offer a clear action', () => {
   // Use a real but incompatible combination: both status values remain known to the board.
   const noMatch = board([task, { ...task, id: 'failed', status: 'failed', updatedAt: new Date(now - 7200000).toISOString() }], { ...emptySelection(), time: '1h', status: ['failed'] });
-  for (const lane of ['queued', 'running', 'review', 'closed']) assert.match(noMatch, new RegExp(`data-status-column="${lane}"`));
+  assert.doesNotMatch(noMatch, /data-status-column=|暂无任务/);
   assert.match(noMatch, /没有匹配的任务/);
   assert.match(noMatch, /清除筛选/);
 });

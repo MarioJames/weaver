@@ -14,7 +14,7 @@ test('block categories separate vendor rate limits, quotas, stall levels and man
 });
 test('release uses local 24h time, includes a date tomorrow and waits for a stall recovery probe',()=>{
  assert.equal(engineBlockText(block({release_at:new Date(2030,0,1,14,32).toISOString()}),NOW).release,'14:32 自动解除');
- assert.match(engineBlockText(block({release_at:new Date(2030,0,2,14,32).toISOString()}),NOW).release,/01\/02 14:32 自动解除/);
+ assert.match(engineBlockText(block({release_at:new Date(2030,0,2,14,32).toISOString()}),NOW).release,/^01-02 14:32 自动解除$/);
  assert.equal(engineBlockText(block(),NOW).release,'需手动恢复');
  assert.equal(engineBlockText(block({by:'weaver-stall'}),NOW,{level:1,blockedUntil:new Date(NOW-1).toISOString()} as any).release,'探测通过后解除');
  assert.equal(engineBlockText(block({by:'weaver-stall'}),NOW,{level:3,blockedUntil:null} as any).release,'需手动恢复');

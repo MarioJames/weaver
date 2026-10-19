@@ -121,8 +121,8 @@ export function roleDeleteImpact(config: Config, section: RoleSection, id: strin
     const owners = Object.entries(config.owners).filter(([, owner]) => owner.workers.includes(id)).map(([ownerId]) => ownerId);
     return {
       title: `删除子 Agent ${id}`,
-      detail: owners.length ? `保存后会从这些父 Agent的子 Agent列表中移除：${owners.join('、')}。取消不改草稿。` : '没有父 Agent引用这条子 Agent。取消不改草稿。',
+      detail: owners.length ? `保存后会从这些父 Agent 的子 Agent 列表中移除：${owners.join('、')}。取消不改草稿。` : '没有父 Agent 引用这条子 Agent。取消不改草稿。',
     };
   }
-  return { title: `删除父 Agent ${id}`, detail: '只从草稿移除这条父 Agent，子 Agent配置保留。取消不改草稿。' };
+  return { title: `删除父 Agent ${id}`, detail: '只从草稿移除这条父 Agent，子 Agent 配置保留。取消不改草稿。' };
 }

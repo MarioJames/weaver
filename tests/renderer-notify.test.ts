@@ -16,11 +16,12 @@ function markup(node: React.ReactNode) {
   return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode:'dark',enableCustomFonts:false,children:node }) }));
 }
 
-test('reconnect content provides status, attempt count and immediate retry, then success', () => {
-  const html=markup(React.createElement(ConnectionNotice,{state:{status:'reconnecting',attempt:3},retry:()=>{}}));
+test('reconnect content shows one status line and keeps attempt count in a tooltip, then success', () => {
+  const html=markup(React.createElement(ConnectionNotice,{state:{status:'reconnecting',attempt:3}}));
   assert.match(html,/正在重新连接…/);
-  assert.match(html,/正在重新连接/);assert.match(html,/重试次数：3/);assert.match(html,/立即重试/);
-  assert.match(markup(React.createElement(ConnectionNotice,{state:{status:'connected',attempt:0},retry:()=>{}})),/已重新连接/);
+  assert.match(html,/data-base-ui-tooltip-trigger/);
+  assert.doesNotMatch(html.slice(html.indexOf('<div role="status"')),/重试次数|立即重试|<button/);
+  assert.match(markup(React.createElement(ConnectionNotice,{state:{status:'connected',attempt:0}})),/已重新连接/);
 });
 
 test('failed policy loads and modal operations add no error content to page flow', () => {

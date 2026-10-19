@@ -67,3 +67,12 @@ test('queued tasks without a dispatch only show the rows they have', () => {
   const dts = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>/g)].map(match => match[1]);
   assert.deepEqual(dts, ['更新时间', '父 Agent']);
 });
+
+
+test('summary renders markdown and running dispatch metadata stays in the facts', () => {
+  const html = render({ ...task, status: 'completed', summary: '# 检查结果\n\n**通过**' });
+  assert.match(html, /<h1[^>]*>检查结果<\/h1>/);
+  assert.match(html, /<strong>通过<\/strong>/);
+  const running = render({ ...task, events: [{ id: 'dispatch', kind: 'lifecycle', at: task.updatedAt, message: 'Owner runs claude_worker natively; waiting for its report' }] });
+  assert.doesNotMatch(running, /父 Agent 派发给子 Agent/);
+});

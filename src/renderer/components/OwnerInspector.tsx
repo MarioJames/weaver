@@ -1,4 +1,4 @@
-import { formatDate } from '../log-view';
+import { dateText } from '../quota-view';
 import { isTransientError, useNotifyError } from '../notify';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Modal, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
@@ -75,9 +75,9 @@ export function OwnerInspector({ task, busy, action, owners, now = Date.now() }:
   const due = !blocked && interval !== null && idleMinutes >= interval;
   const owner = ownerLabel(task);
   const kind = profiles.find(item => item.id === currentProfile(task, profiles))?.kind;
-  const blockedReason = blocked ? '子 Agent执行中，完成或取消后再接续。'
+  const blockedReason = blocked ? '子 Agent 执行中，完成或取消后再接续。'
     : !task.ownerId ? '任务尚未登记父 Agent，无法接续。'
-      : profiles.length === 0 ? '父 Agent配置里还没有启用的父 Agent。' : '';
+      : profiles.length === 0 ? '父 Agent 配置里还没有启用的父 Agent。' : '';
 
   async function run(commandName: string, extra: Record<string, unknown>) {
     if (locked.current || busy || sending) return;
@@ -95,17 +95,17 @@ export function OwnerInspector({ task, busy, action, owners, now = Date.now() }:
       else if (applied) {
         setOpen(false);
         // Only a reported host is claimed as started; a rotation without one says just that.
-        setStarted(launch?.ok === true ? `已在 Herdr 中启动 ${launchedAgent(launch, profile ?? owner)}` : '父 Agent已轮换');
+        setStarted(launch?.ok === true ? `已在 Herdr 中启动 ${launchedAgent(launch, profile ?? owner)}` : '父 Agent 已轮换');
       }
     } finally { setSending(false); locked.current = false; }
   }
 
-  return <section aria-label="父 Agent接续" className={styles.stack}>
+  return <section aria-label="父 Agent 接续" className={styles.stack}>
     <div className={styles.row}>
       <span className={styles.lead}>
         <EngineIcon kind={kind} size={16} />
         <Text className={styles.owner}>{owner}</Text>
-        {blocked ? <Tag size="small">子 Agent执行中，暂不可接续</Tag>
+        {blocked ? <Tag size="small">子 Agent 执行中，暂不可接续</Tag>
           : due ? <Tag size="small" color="warning">{`已空闲 ${idleMinutes} 分钟，建议接续`}</Tag>
             : <Tag size="small" color="success">可接续</Tag>}
       </span>
@@ -115,7 +115,7 @@ export function OwnerInspector({ task, busy, action, owners, now = Date.now() }:
           : <Button type="primary" disabled={busy || sending} onClick={() => { setOpen(true); setFailure(''); setProfile(currentProfile(task, profiles)); }}>接续给…</Button>}
       </span>
     </div>
-    {task.ownerHost && <Text className={styles.host}>{`已在 Herdr 启动 ${task.ownerHost.agentName} · ${formatDate(task.ownerHost.launchedAt)}`}</Text>}
+    {task.ownerHost && <Text className={styles.host}>{`已在 Herdr 启动 ${task.ownerHost.agentName} · ${dateText(task.ownerHost.launchedAt)}`}</Text>}
     {started && <Text type="success" role="status">{started}</Text>}
     <Modal open={open} title="接续给新的父 Agent" okText="启动新的父 Agent" cancelText="取消"
       confirmLoading={sending} okButtonProps={{ disabled: !profile || sending }} maskClosable={!sending} keyboard={!sending}
@@ -146,7 +146,7 @@ export function ContinuationDialog({ profiles, value, sending, failure, onChange
     <NamedSelect aria-label="接手父 Agent" className={styles.pick} placeholder="选择接手父 Agent" disabled={sending} value={value}
       options={ownerOptions(profiles)}
       onChange={next => onChange(typeof next === 'string' ? next : undefined)} />
-    <Text type="secondary">Weaver 会生成接续说明，并在 Herdr 中启动新的父 Agent接手这个任务。</Text>
+    <Text type="secondary">Weaver 会生成接续说明，并在 Herdr 中启动新的父 Agent 接手这个任务。</Text>
 
   </div>;
 }

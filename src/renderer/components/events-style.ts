@@ -95,6 +95,13 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     border: 1px solid transparent;
     border-radius: ${cssVar.borderRadiusLG};
   `,
+  resultText: css`
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    > div { padding-inline: 0; }
+    > div:first-child { padding-block-start: 0; border-block-end: 0; }
+  `,
   cardSuccess: css`
     border-color: ${cssVar.colorSuccessBorder};
     background: ${cssVar.colorSuccessBg};

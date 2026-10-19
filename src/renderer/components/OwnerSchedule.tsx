@@ -1,4 +1,5 @@
 import { NamedInputNumber } from './NamedControls';
+import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { ActionIcon, Button, DropdownMenu, Tag, Text } from '@lobehub/ui/base-ui';
 import { Form } from '@lobehub/ui/base-ui/form';
@@ -21,10 +22,14 @@ export function workerStatusTag(config: Config, blocks: Block[], workerId: strin
 
 const PRESETS = [{ label: '不派发', value: 0 }, { label: '默认', value: DEFAULT_WEIGHT }, { label: '最高', value: WEIGHT_MAX }];
 
-export function OwnerScheduleFields({ config, blocks, record, update }: { config: Config; blocks: Block[]; record: Owner; update: (next: Owner) => void }) {
+export function OwnerScheduleFields({ config, blocks, record, savedRecord, update }: { config: Config; blocks: Block[]; record: Owner; savedRecord?: Owner; update: (next: Owner) => void }) {
   const available = Object.keys(config.workers).filter(id => !record.workers.includes(id));
-  // Shown in dispatch order: weight first, list order for ties.
-  const ordered = record.workers.map((id, index) => ({ id, index, weight: workerWeight(record, id) })).sort((a, b) => b.weight - a.weight || a.index - b.index);
+  const [initialRecord] = useState(record);
+  // Re-sort only when saved values change. Draft additions follow the existing rows.
+  const baseline = savedRecord ?? initialRecord;
+  const savedOrder = [...baseline.workers].sort((a, b) => workerWeight(baseline, b) - workerWeight(baseline, a));
+  const ids = [...savedOrder.filter(id => record.workers.includes(id)), ...record.workers.filter(id => !savedOrder.includes(id))];
+  const ordered = ids.map(id => ({ id, weight: workerWeight(record, id) }));
   // A titled section rather than a Form.Field: the add button sits beside the title, and a label element would forward clicks on the title to it.
   return <section aria-label="子 Agent" className={styles.tight}>
     <div className={styles.spread} style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
@@ -34,11 +39,12 @@ export function OwnerScheduleFields({ config, blocks, record, update }: { config
       </DropdownMenu>
     </div>
     <div className={styles.stack}>
-      <Text className={scheduleStyles.heading}>权重</Text>
-      <div className={styles.listRows}>{ordered.map(({ id, weight }) => {
+      <div className={`${styles.listRows} ${scheduleStyles.list}`}>
+        <div className={scheduleStyles.columns}><Text className={scheduleStyles.heading}>权重</Text></div>
+        {ordered.map(({ id, weight }) => {
         const status = workerStatusTag(config, blocks, id, weight);
         return <div key={id} className={`${styles.listRow} ${scheduleStyles.row}`}>
-          <span className={styles.row} style={{ minInlineSize: 0 }}><Text className={styles.wrap}>{id}</Text>{status && <Tag size="small" color={status.color}>{status.label}</Tag>}</span>
+          <span className={`${styles.row} ${scheduleStyles.name}`} style={{ minInlineSize: 0 }}><Text className={styles.wrap}>{id}</Text>{status && <Tag size="small" color={status.color}>{status.label}</Tag>}</span>
           <span className={scheduleStyles.controls}>
             <NamedInputNumber aria-label={`${id} 的权重`} size="small" min={0} max={WEIGHT_MAX} step={1} precision={0} value={weight} style={{ inlineSize: 72 }} onChange={value => update(withWorkerWeight(record, id, typeof value === 'number' ? value : DEFAULT_WEIGHT))} />
             <span role="group" aria-label={`${id} 权重预设`} className={scheduleStyles.presets}>{PRESETS.map(preset => <Button key={preset.value} size="small" type="text" aria-pressed={weight === preset.value} aria-label={`${id} ${preset.label}`} onClick={() => update(withWorkerWeight(record, id, preset.value))}>{preset.label}</Button>)}</span>

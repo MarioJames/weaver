@@ -39,7 +39,10 @@ export function useNotifyError(error: unknown, context?: string, action?: Notice
 }
 export const reconnect = new Reconnector(state => {
   if (state.status === 'idle') { toast.dismiss('control-reconnect'); return; }
-  if (state.status === 'connected') { toast.dismiss('control-reconnect'); toast.success({ id: 'reconnected', title: '已重新连接', duration: 2000, placement: 'bottom-right' }); return; }
-  toast({ id: 'control-reconnect', type: 'loading', duration: 0, closable: false, placement: 'bottom-right', title: createElement(ConnectionNotice, { state, retry: () => { void reconnect.retryNow(); } }) });
+  if (state.status === 'connected') { toast.dismiss('control-reconnect'); toast.success({ id: 'reconnected', title: '已重新连接', duration: 3000, placement: 'bottom-right' });
+    // The toast timer pauses while the window is unfocused or hovered; the confirmation must still go away.
+    setTimeout(() => toast.dismiss('reconnected'), 3000); return; }
+  toast.dismiss('reconnected');
+  toast({ id: 'control-reconnect', type: 'loading', duration: 0, closable: false, placement: 'bottom-right', title: createElement(ConnectionNotice, { state }) });
 });
 if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => reconnect.visibilityChanged());

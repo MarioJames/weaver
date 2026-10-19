@@ -70,7 +70,12 @@ export function acceptQuotaPolicy(policy: Pick<PolicyDraft, 'dirty' | 'snapshot'
   return result.policyChanged ? '额度已刷新，已按额度更新自动限制。' : '额度已刷新。';
 }
 export function dateText(value: string | null): string {
-  return value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : '未知';
+  if (!value || !Number.isFinite(Date.parse(value))) return '未知';
+  const parts = new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(item => item.type === type)?.value;
+  return `${part('year')}-${part('month')}-${part('day')} ${part('hour')}:${part('minute')}`;
 }
 export function quotaRecoveryText(record: EngineQuotaRecord): string {
   if (record.status === 'unauthenticated') return '请在原生 CLI 中确认登录后手动刷新。Weaver 不会登录、刷新凭据或切换账户。';

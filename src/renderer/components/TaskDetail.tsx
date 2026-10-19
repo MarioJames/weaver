@@ -20,10 +20,26 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
   const [tab, setTab] = useState('overview');
   const panel = useRef<HTMLElement>(null);
   useEffect(() => { const frame = requestAnimationFrame(() => panel.current?.closest('[role="dialog"]') && panel.current.focus({ preventScroll: true })); return () => cancelAnimationFrame(frame); }, []);
+  useEffect(() => {
+    const list = panel.current?.querySelector<HTMLElement>('[role="tablist"]');
+    if (!list) return;
+    const measure = () => {
+      const start = list.scrollLeft > 1;
+      const end = list.scrollWidth - list.clientWidth - list.scrollLeft > 1;
+      list.dataset.overflow = start && end ? 'both' : start ? 'start' : end ? 'end' : 'none';
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    list.addEventListener('scroll', measure, { passive: true });
+    return () => { observer.disconnect(); list.removeEventListener('scroll', measure); };
+  }, [task?.id]);
   if (!task) return <Empty title="选择一项任务" description="创建或导入后，执行、交接和验收都留在同一条记录里。" />;
   const latest = task.events.at(-1);
   const failure = [...task.events].reverse().find(event => event.kind === 'error');
   const status = displayStatus(task);
+  const activity = task.status === 'running' ? displayLog(latest?.message ?? '等待首次调度').replace(/\s+/g, ' ').trim() : '';
+  const showActivity = activity && !/^父 Agent.*子 Agent/.test(activity);
   const summary = task.summary?.trim();
   const artifacts = task.summary ? task.artifacts.filter(artifact => artifact.content.trim() !== summary) : task.artifacts;
   const queueNotice = task.scheduled || (task.status === 'queued' && task.queueReason);
@@ -46,8 +62,8 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
         { key: 'overview', label: '概览', children: <div className={detailStyles.overview}>
           {queueNotice ? <Alert type="info" title="调度请求已排队" description={task.queueReason ? `${queueLabels[task.queueReason.code]}：${redactLog(task.queueReason.message)}` : '等待调度检查。'} />
             : task.status === 'failed' ? <Alert type="error" title="执行失败" description={redactLog(failure?.message ?? latest?.message ?? '查看时间线。')} />
-              : task.status === 'cancelled' ? <Alert type="secondary" title="执行已取消" description={redactLog(failure?.message ?? latest?.message ?? '查看时间线。')} /> : task.status === 'running' ? <Text type="secondary" className={detailStyles.activity}>{displayLog(latest?.message ?? '等待首次调度').replace(/\s+/g, ' ').trim()}</Text> : undefined}
-          {task.summary && <TaskTextBlock key={`${task.id}:summary`} title="执行结果" content={task.summary} clamp={6} />}
+              : task.status === 'cancelled' ? <Alert type="secondary" title="执行已取消" description={redactLog(failure?.message ?? latest?.message ?? '查看时间线。')} /> : showActivity ? <Text type="secondary" className={detailStyles.activity}>{activity}</Text> : undefined}
+          {task.summary && <TaskTextBlock key={`${task.id}:summary`} title="执行结果" content={task.summary} markdown clamp={6} />}
           <AgentFacts task={task} ownerKind={ownerKind} />
           {task.retryOf && <Text type="secondary" className={styles.wrap}>重试来源：{task.retryOf}</Text>}
         </div> },

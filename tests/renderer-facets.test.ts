@@ -170,7 +170,7 @@ test('archive: one row of selects, no search box, shared status tags, 全部 tim
   /** The table itself needs the bundled module graph, so the selects render over an empty archive and the cells render directly. */
   const html = markup(React.createElement(ArchiveList, { tasks: [], onSelect: () => {}, now }));
   assert.doesNotMatch(html, /搜索|<input[^>]*placeholder/);
-  for (const label of ['时间', '父 Agent', '子 Agent', '状态']) assert.match(html, new RegExp(`按${label}筛选归档任务`));
+  for (const label of ['时间', '父 Agent', '子 Agent', '状态']) assert.match(html, new RegExp(`按${label}\\s*筛选归档任务`));
   assert.equal((html.match(new RegExp(`class="${styles.archiveFilters}`, 'g')) ?? []).length, 1);
   const outcome = archiveColumns().find(column => column.key === 'outcome')!;
   const cell = (task: Task) => markup(React.createElement(React.Fragment, null, outcome.render?.(task.title, task, 0) as React.ReactNode));

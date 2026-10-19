@@ -18,6 +18,7 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
   const [creating, setCreating] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [selected, setSelected] = useState<string>();
+  const detailTitleRef = useRef<HTMLSpanElement>(null);
   const newTaskRef = useRef<HTMLButtonElement | HTMLAnchorElement>(null);
   const [owners, setOwners] = useState<OwnerInstance[]>([]);
   useEffect(() => {
@@ -49,7 +50,7 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
     </>} />
     <TaskBoard filters={filters} onFiltersChange={setFilters} now={now} tasks={tasks} selected={selected} loading={work.loading} onSelect={setSelected} ownerKind={ownerKind} />
     <ArchiveDrawer now={now} tasks={tasks} selected={selected} open={archiving} onClose={() => setArchiving(false)} onSelect={setSelected} ownerKind={ownerKind} />
-    <Drawer open={!!task} title="任务详情" placement="right" width="min(960px, 92vw)" onClose={() => setSelected(undefined)}>
+    <Drawer open={!!task} title={<span ref={detailTitleRef} tabIndex={-1}>任务详情</span>} afterOpenChange={open => { if (open) detailTitleRef.current?.focus({ preventScroll: true }); }} placement="right" width="min(960px, 92vw)" onClose={() => setSelected(undefined)}>
       {task && !fullTask && <div role="status" aria-label="正在加载任务详情"><Skeleton animated /></div>}
       {task && fullTask && <TaskDetail key={task.id} task={{...fullTask, owner: task.owner}} busy={work.busy || !work.caps} action={work.action} ownerKind={ownerKind}
         onStart={id => void work.action(() => window.weaver.startTask(id))}

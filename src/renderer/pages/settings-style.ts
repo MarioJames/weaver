@@ -68,7 +68,7 @@ export const settingsStyles = createStaticStyles(({ css, cssVar }) => ({
   fieldCell: css`
     padding: 12px 20px;
     background: ${cssVar.colorFillQuaternary};
-    justify-content: center;
+    justify-content: flex-start;
   `,
   /** The control keeps its size at the column end; stacked, it starts the band instead. */
   controlCell: css`

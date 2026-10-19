@@ -1,10 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Children, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Empty, Icon } from '@lobehub/ui';
 import { Button, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
 import { ChevronDown, ChevronRight, ChevronUp, Clock, Folder, Loader2, X } from 'lucide-react';
 import type { Task } from '../../shared/types';
-import { redactLog } from '../log-view';
+import { displayLog } from '../log-view';
 import type { FilterDimension, FilterOption, TaskSelection, TaskTimeRange } from '../task-view';
 import { FILTER_DIMENSIONS, TASK_COLUMNS, TIME_RANGES, applyTaskFilters, columnize, compactTaskTime, dispatchKind, emptySelection, filterLabels, filterOptions, filterSummary, hasFilters, isOpenTask, nonArchived, readEndedExpanded, readFiltersCollapsed, readTaskFilters, resolveSelection, selectedEntries, toggleOption, workspaceGroups, writeEndedExpanded, writeFiltersCollapsed, writeTaskFilters } from '../task-view';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../status-colors';
@@ -22,8 +22,6 @@ function cardStatus(task: Task): { label: string; color?: string; spin: boolean 
 
 const spinner = <Icon icon={Loader2} spin size="small" />;
 const ENDED_BODY_ID = 'board-ended';
-/** Rows with more chips than this start with 更多 until the first measurement says otherwise. */
-const INLINE_CHIPS = 8;
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 /** One checkable chip: label, optional brand/dot, and how many tasks in scope carry it. */
@@ -38,26 +36,51 @@ export function FacetChip({ checked, label, count, icon, tone, title, onClick }:
 
 /** A single-line row of chips; whatever does not fit collapses behind 「更多」, which expands only this row. */
 function FacetRow({ label, size, children }: { label: string; size: number; children: ReactNode }) {
+  const row = useRef<HTMLDivElement>(null);
   const chips = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState(false);
-  const [overflow, setOverflow] = useState(size > INLINE_CHIPS);
+  const [visibleCount, setVisibleCount] = useState(size);
+  const overflow = visibleCount < size;
   useIsomorphicLayoutEffect(() => {
-    const element = chips.current;
-    if (!element || expanded) return;
-    const measure = () => setOverflow(element.scrollHeight > element.clientHeight + 1);
+    const element = row.current;
+    const list = chips.current;
+    if (!element || !list) return;
+    const measure = () => {
+      const widths = Array.from(list.children, child => child.getBoundingClientRect().width);
+      const gap = parseFloat(getComputedStyle(list).columnGap) || 0;
+      const total = widths.reduce((sum, width) => sum + width, 0) + Math.max(0, widths.length - 1) * gap;
+      if (total <= list.clientWidth) { setVisibleCount(size); return; }
+      const available = list.clientWidth;
+      let used = 0;
+      let count = 0;
+      for (const width of widths) {
+        const next = used + (count ? gap : 0) + width;
+        if (next > available) break;
+        used = next;
+        count++;
+      }
+      setVisibleCount(count);
+    };
     measure();
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
     observer.observe(element);
+    Array.from(list.children).forEach(child => observer.observe(child));
     return () => observer.disconnect();
-  }, [expanded, size, children]);
+  }, [size, children]);
   return <div className={styles.facetRow}>
     <span className={styles.facetLabel}>{label}</span>
-    <div ref={chips} className={styles.facetChips} data-expanded={expanded}>
-      {size ? children : <Text type="secondary" className={styles.meta}>暂无</Text>}
-      {overflow && <button type="button" className={styles.facetChip} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+    <div ref={row} className={styles.facetValues}>
+      <div ref={chips} className={styles.facetChips} data-expanded={expanded}>
+        {size ? Children.toArray(children).map((child, index) => <span key={index} className={styles.facetItem}
+          data-hidden={!expanded && index >= visibleCount} aria-hidden={!expanded && index >= visibleCount} inert={!expanded && index >= visibleCount}>{child}</span>) :
+          <span className={styles.facetEmpty}>暂无</span>}
+      </div>
+      <button type="button" className={`${styles.facetChip} ${styles.facetMore}`} data-visible={overflow}
+        aria-hidden={!overflow} inert={!overflow} aria-expanded={expanded} aria-label={`${label} ${expanded ? '收起' : '更多'}`}
+        onClick={() => setExpanded(!expanded)}>
         {expanded ? '收起' : '更多'}<Icon icon={expanded ? ChevronUp : ChevronDown} size="small" />
-      </button>}
+      </button>
     </div>
   </div>;
 }
@@ -151,7 +174,7 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
       </span>
       <span className={styles.cardStatus}>
         <Tag size="small" color={tag.color} icon={tag.spin ? spinner : displayStatus(task) === 'scheduled' ? <Icon icon={Clock} size="small" /> : undefined}>{tag.label}</Tag>
-        {tag.spin && <Text type="secondary" className={styles.cardActivity} title={redactLog(latest?.message ?? '等待首次调度')}>{redactLog(latest?.message ?? '等待首次调度')}</Text>}
+        {tag.spin && <Text type="secondary" className={styles.cardActivity} title={displayLog(latest?.message ?? '等待首次调度')}>{displayLog(latest?.message ?? '等待首次调度')}</Text>}
       </span>
       <span className={styles.cardMeta}>
         <time className={styles.cardTime} dateTime={task.updatedAt} title={new Date(task.updatedAt).toLocaleString('zh-CN')}>{compactTaskTime(task.updatedAt, now)}</time>
@@ -165,7 +188,9 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
       <Button size="small" onClick={() => update(emptySelection())}>清除筛选</Button>
       {olderOpenWork && <Button size="small" onClick={() => update({ ...selection, time: 'all' })}>查看全部</Button>}
     </div>} />}
-    <div className={styles.columns} aria-busy={loading}>
+    {visible.length > 0 && <>
+    <Text type="secondary" className={styles.boardScrollHint}>左右滚动查看其他状态列</Text>
+    <div className={styles.columns} aria-label="任务状态列" role="region" tabIndex={0} aria-busy={loading}>
       {TASK_COLUMNS.map((column, index) => {
         const items = columns[index];
         const expanded = expandedLanes.includes(column.key);
@@ -201,5 +226,6 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
         </div>;
       })}
     </div>
+    </>}
   </section>;
 }

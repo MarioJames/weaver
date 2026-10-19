@@ -127,3 +127,19 @@ test('workspace selection persists and legacy payloads initialize the new dimens
     assert.deepEqual(readTaskFilters(), { status: [], owner: ['Parent'], worker: ['WORKER'], workspace: [], time: 'all' });
   });
 });
+
+
+test('board activity translates lifecycle messages without changing recorded events', () => {
+  for (const [message, label] of [
+    ['Owner runs claude_worker with its built-in subagent tool; waiting for its report', '父 Agent 派发给子 Agent claude_worker'],
+    ['Owner reported the native run complete; output is ready for review', '父 Agent 已报告原生执行完成，等待验收'],
+    ["Policy selected claude_worker on the owner's engine; the owner runs it with its built-in subagent tool (model, high)", '策略已选择子 Agent claude_worker，由父 Agent 使用内置工具执行'],
+    ['Owner review: accepted', '父 Agent 验收：已通过'],
+  ]) {
+    const entry = { ...base.events[0], kind: 'lifecycle' as const, message };
+    const html = card({ ...base, events: [entry] });
+    assert.ok(html.includes(label));
+    assert.doesNotMatch(html, /Owner runs|Owner reported|Policy selected|Owner review/);
+    assert.equal(entry.message, message);
+  }
+});

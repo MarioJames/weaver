@@ -26,7 +26,17 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
   markdown: css`
     min-inline-size: 0;
     padding: ${cssVar.padding};
+    line-height: 1.7;
     overflow-wrap: anywhere;
+    &&& h1, &&& h2, &&& h3 {
+      font-size: ${cssVar.fontSize};
+      font-weight: 600;
+      line-height: 1.7;
+    }
+  `,
+  markdownClamped: css`
+    max-block-size: calc(var(--summary-lines) * 1.7em + 2 * ${cssVar.padding});
+    overflow: hidden;
   `,
   tabs: css`
     min-inline-size: 0;
@@ -37,6 +47,9 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     max-inline-size: 100%;
     flex-wrap: nowrap;
     button { flex-shrink: 0; font: inherit; }
+    &[data-overflow='end'] { mask-image: linear-gradient(to right, ${cssVar.colorText} calc(100% - 24px), transparent); }
+    &[data-overflow='start'] { mask-image: linear-gradient(to right, transparent, ${cssVar.colorText} 24px); }
+    &[data-overflow='both'] { mask-image: linear-gradient(to right, transparent, ${cssVar.colorText} 24px, ${cssVar.colorText} calc(100% - 24px), transparent); }
   `,
   panel: css`
     min-inline-size: 0;

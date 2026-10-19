@@ -59,12 +59,14 @@ export function ArchiveList({ tasks, selected, onSelect, ownerKind, now = Date.n
   const rows = archiveRows(tasks, selection, now);
   const archived = archivedTasks(tasks, now);
   /** Only values with archived work in the chosen range are offered, so a select never leads to an empty table. */
-  const multi = (dimension: FilterDimension) => <NamedSelect key={dimension} mode="multiple" allowClear aria-label={`按${filterLabels[dimension]}筛选归档任务`} placeholder={filterLabels[dimension]} value={selection[dimension]}
+  const filterClassNames = { trigger: styles.archiveFilterTrigger, value: styles.archiveFilterValue };
+  const multi = (dimension: FilterDimension) => <NamedSelect classNames={filterClassNames} key={dimension} mode="multiple" allowClear prefix={`${filterLabels[dimension]}：`} aria-label={`按${filterLabels[dimension]} 筛选归档任务`} placeholder="全部" value={selection[dimension]}
+    labelRender={option => <span className={styles.archiveFilterLabel} title={String(option.label)}>{option.label}</span>}
     options={facetOptions(archived, dimension, selection, now).map(option => ({ value: option.value, label: `${option.label} ${option.count}` }))}
     onChange={value => setSelection({ ...selection, [dimension]: Array.isArray(value) ? value.map(String) : [] })} />;
   return <div className={styles.archiveBody}>
     <div className={styles.archiveFilters}>
-      <NamedSelect aria-label="按时间筛选归档任务" placeholder="时间" value={selection.time} options={TIME_RANGES.map(range => ({ value: range.value, label: `时间：${range.label}` }))}
+      <NamedSelect classNames={filterClassNames} aria-label="按时间筛选归档任务" placeholder="时间" value={selection.time} options={TIME_RANGES.map(range => ({ value: range.value, label: `时间：${range.label}` }))}
         onChange={value => { if (typeof value === 'string') setSelection({ ...selection, time: TIME_RANGES.find(range => range.value === value)?.value ?? 'all' }); }} />
       {multi('owner')}
       {multi('worker')}

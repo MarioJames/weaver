@@ -1,16 +1,29 @@
 import { createStaticStyles } from 'antd-style';
 
 export const scheduleStyles = createStaticStyles(({ css, cssVar }) => ({
-  row: css`
-    flex-wrap: wrap;
-    gap: ${cssVar.marginXS};
+  list: css`
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 72px max-content 24px;
+    column-gap: ${cssVar.marginXS};
   `,
-  controls: css`
-    display: flex;
-    flex-wrap: wrap;
+  columns: css`
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+  `,
+  row: css`
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
     align-items: center;
     gap: ${cssVar.marginXS};
-    max-inline-size: 100%;
+  `,
+  name: css`
+    @media (max-width: 600px) { grid-column: 1 / -1; }
+  `,
+  controls: css`
+    display: contents;
+    > :first-child { grid-column: 2; }
   `,
   presets: css`
     display: inline-flex;
@@ -23,7 +36,7 @@ export const scheduleStyles = createStaticStyles(({ css, cssVar }) => ({
     button + button { border-inline-start: 1px solid ${cssVar.colorBorder}; }
   `,
   heading: css`
-    align-self: flex-end;
+    grid-column: 2;
     font-size: ${cssVar.fontSizeSM};
     color: ${cssVar.colorTextSecondary};
   `,

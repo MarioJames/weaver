@@ -8,8 +8,15 @@ export const composerStyles = createStaticStyles(({ css, cssVar }) => ({
     inline-size: 100%;
     min-inline-size: 0;
     max-block-size: calc(100dvh - 160px);
+    overflow: hidden;
     button, input, textarea { font: inherit; }
     input, textarea { inline-size: 100%; }
+  `,
+  scroll: css`
+    flex: 1 1 auto;
+    min-block-size: 0;
+    overflow-y: auto;
+    padding-block-end: ${cssVar.paddingSM};
   `,
   body: css`
     display: flex;
@@ -17,18 +24,16 @@ export const composerStyles = createStaticStyles(({ css, cssVar }) => ({
     gap: ${cssVar.marginSM};
     min-inline-size: 0;
     min-block-size: 0;
-    overflow-y: auto;
     padding: 0 ${cssVar.paddingXXS} 0 0;
     margin: 0;
     border: 0;
-    flex: 1 1 auto;
     > * { inline-size: 100%; min-inline-size: 0; }
   `,
   footer: css`
-    position: sticky;
-    inset-block-end: 0;
+    position: relative;
     flex-shrink: 0;
-    padding-block-start: ${cssVar.paddingXS};
+    padding-block: ${cssVar.paddingSM} ${cssVar.paddingXXS};
+    border-block-start: 1px solid ${cssVar.colorBorderSecondary};
     background: ${cssVar.colorBgElevated};
   `,
 }));

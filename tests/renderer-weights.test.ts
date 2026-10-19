@@ -35,6 +35,18 @@ test('each worker row offers the three weight presets and caps the input at 10',
   assert.match(body, /aria-pressed="false"[^>]*aria-label="claude_worker 默认"|aria-label="claude_worker 默认"[^>]*aria-pressed="false"/);
 });
 
+test('weight edits keep saved row order until the save is accepted', () => {
+  const config = defaultConfig();
+  const savedRecord = { ...config.owners.claude_owner, workers: ['claude_worker', 'codex_worker'], worker_weights: { claude_worker: 10, codex_worker: 5 } };
+  const record = withWorkerWeight(savedRecord, 'codex_worker', 10);
+  record.worker_weights = { ...record.worker_weights, claude_worker: 0 };
+  const render = (saved: typeof savedRecord) => markup(React.createElement(OwnerScheduleFields, { config, blocks: [], record, savedRecord: saved, update: () => {} })).replace(/<style[\s\S]*?<\/style>/g, '');
+  const draft = render(savedRecord);
+  assert.ok(draft.indexOf('claude_worker 的权重') < draft.indexOf('codex_worker 的权重'));
+  const saved = render(record as typeof savedRecord);
+  assert.ok(saved.indexOf('codex_worker 的权重') < saved.indexOf('claude_worker 的权重'));
+});
+
 test('the content area keeps a stable scrollbar gutter', () => {
   const css = readFileSync(new URL('../src/renderer/style.css', import.meta.url), 'utf8');
   assert.match(css, /overflow-y:\s*scroll/);

@@ -38,7 +38,7 @@ export function ReviewView({ task, manifest, busy, ownerKind, open, comment, onO
   ];
   return <>
     <Descriptions colon={false} column={2} items={items} />
-    <div className={styles.row}><Button type="text" disabled={busy} onClick={onOpen}>手动验收</Button></div>
+    <div className={styles.row}><Button disabled={busy} onClick={onOpen}>手动验收</Button></div>
     <Modal open={open} title="手动验收" onCancel={onClose} footer={<div className={detailStyles.modalFooter}>
       {manifest.delivery !== 'acknowledged' && <Button disabled={busy} onClick={() => onSubmit('results.ack', {})}>确认收到</Button>}
       <Button disabled={busy || manifest.acceptance === 'rejected'} onClick={() => onSubmit('reviews.submit', { decision: 'rejected', ...note })}>要求修改</Button>

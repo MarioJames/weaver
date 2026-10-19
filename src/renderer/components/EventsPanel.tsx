@@ -10,6 +10,7 @@ import { command } from '../commands';
 import { condenseEvents, displayLog, eventBadge, exportEvents, filterCondensed, formatDuration, kindLabels, redactLog, relativeTime, selectEvents, toneColor, toolSteps, type TimelineItem } from '../log-view';
 import { styles } from '../style';
 import { styles as eventStyles } from './events-style';
+import { TaskTextBlock } from './TaskTextBlock';
 
 interface EventPage { events: TaskEvent[]; nextCursor: string | null; hasMore: boolean }
 const kinds = ['all', 'lifecycle', 'log', 'progress', 'artifact', 'result', 'error'];
@@ -50,13 +51,9 @@ function FoldText({ text, label }: { text: string; label: string }) {
 }
 
 function ResultCard({ event }: { event: TaskEvent }) {
-  const text = displayLog(event.message);
   return <div className={`${eventStyles.card} ${eventStyles.cardSuccess}`}>
-    <div className={eventStyles.cardHead}>
-      <Text style={{ fontWeight: 600 }}>执行结果</Text>
-      <CopyButton content={text} size="small" aria-label="复制执行结果" title="复制执行结果" />
-    </div>
-    <FoldText text={text} label="执行结果" />
+    <div className={eventStyles.cardHead}><Text style={{ fontWeight: 600 }}>执行完成</Text><RelativeTime at={event.at} /></div>
+    <TaskTextBlock className={eventStyles.resultText} title="执行结果" content={redactLog(event.message)} markdown clamp={6} />
   </div>;
 }
 
@@ -92,17 +89,17 @@ function dotClass(event: TaskEvent): string {
 const Dot = ({ className = '' }: { className?: string }) => <span aria-hidden="true" className={`${eventStyles.dot} ${className}`} />;
 
 function EventNode({ event, failure }: { event: TaskEvent; failure?: TaskFailure }) {
-  const message = displayLog(event.message);
+  if (event.kind === 'result') return <ResultCard event={event} />;
+  const message = displayLog(event.message).trim() || kindLabels[event.kind];
   const covered = event.kind === 'error' && !!failure && redactLog(failure.message) === message;
   return <div>
     <div className={eventStyles.head}>
       <div className={eventStyles.headMain}>
-        {event.kind !== 'result' && <BadgeTag event={event} />}
-        {event.kind !== 'result' && !covered && <Text className={styles.wrap} type={event.kind === 'error' ? 'danger' : event.kind === 'lifecycle' ? undefined : 'secondary'}>{message}</Text>}
+        <BadgeTag event={event} />
+        {!covered && <Text className={styles.wrap} type={event.kind === 'error' ? 'danger' : event.kind === 'lifecycle' ? undefined : 'secondary'}>{message}</Text>}
       </div>
       <RelativeTime at={event.at} />
     </div>
-    {event.kind === 'result' && <ResultCard event={event} />}
     {event.kind === 'error' && failure && <FailureCard failure={failure} />}
   </div>;
 }

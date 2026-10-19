@@ -336,7 +336,7 @@ test('the archive list is quiet when nothing has aged out yet', () => {
   const html = markup(React.createElement(ArchiveList, { tasks: items, onSelect: () => {}, now }));
   assert.match(html, /还没有归档任务/);
   assert.doesNotMatch(html, /搜索/);
-  assert.match(html, /按父 Agent筛选归档任务/);
+  assert.match(html, /按父 Agent 筛选归档任务/);
   assert.doesNotMatch(html, /重排任务面板/);
 });
 

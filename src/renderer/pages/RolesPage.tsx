@@ -1,4 +1,4 @@
-import { formatDate } from '../log-view';
+import { dateText } from '../quota-view';
 import { notifyError, useNotifyError } from '../notify';
 import { NamedSelect, NamedSwitch, NamedInputNumber } from '../components/NamedControls';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -18,8 +18,8 @@ import { styles } from '../style';
 
 const NAMES: Record<RoleSection, string> = { owners: '父 Agent', workers: '子 Agent' };
 const DESCRIPTIONS: Record<RoleSection, string> = {
-  owners: '父 Agent接收任务并派发给子 Agent。每个引擎最多启用一个父 Agent。',
-  workers: '子 Agent执行父 Agent派发的任务包。',
+  owners: '父 Agent 接收任务并派发给子 Agent。每个引擎最多启用一个父 Agent。',
+  workers: '子 Agent 执行父 Agent 派发的任务包。',
 };
 
 /** What the saved policy lets dispatch do with this role right now. */
@@ -28,7 +28,7 @@ export function availabilityText(availability: Availability | undefined): string
   if (availability.status === 'available') return '可派发';
   if (availability.status === 'disabled') return '已停用';
   if (availability.status === 'engine_disabled') return `引擎未启用`;
-  return `已限制：${availability.reason ?? '未说明原因'}${availability.release_at ? `，${formatDate(availability.release_at)} 恢复` : ''}`;
+  return `已限制：${availability.reason ?? '未说明原因'}${availability.release_at ? `，${dateText(availability.release_at)} 恢复` : ''}`;
 }
 
 /** The one line a list item needs beyond its switch: only states the switch does not already show. */
@@ -92,7 +92,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   return <>
     {header}
     <div className={styles.split}>
-      <nav aria-label={`${name}列表`} className={styles.listPane}>
+      <nav aria-label={`${name} 列表`} className={styles.listPane}>
         {!ids.length && <Text type="secondary" className={styles.meta}>还没有{name}。</Text>}
         {ids.map(id => {
           const item = config[section][id]!;
@@ -111,7 +111,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
       <div ref={editor} tabIndex={-1}><Surface padded>
         {!record || !current ? <Empty title={`还没有${name}`} description={`新建一个${name}，选择引擎和模型后保存。`} action={<Button icon={Plus} onClick={add}>新建{name}</Button>} /> : <Form form={form} layout="vertical" className={styles.stack}>
           <div className={styles.spread}>
-            <Text strong>{name}配置</Text>
+            <Text strong>{name} 配置</Text>
             <Button danger size="small" icon={Trash2} disabled={policy.busy} onClick={() => setAskDelete(true)}>删除</Button>
           </div>
           <div className={styles.pair}>
@@ -124,7 +124,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
             <Form.Field label="模型" required><Input id={`${fieldId}-model`} aria-label="模型" value={record.model} placeholder="例如：gpt-6.1-sol 或 provider/model" onChange={event => update({ ...record, model: event.target.value })} /></Form.Field>
             <Form.Field label="推理强度" required desc={efforts?.length ? undefined : '填写该模型接受的 variant。'}>{efforts?.length ? <NamedSelect id={`${fieldId}-effort`} aria-label="推理强度" value={record.effort} options={efforts.map(value => ({ value, label: value }))} onChange={value => { if (typeof value === 'string') update({ ...record, effort: value }); }} /> : <Input id={`${fieldId}-effort`} aria-label="推理强度" value={record.effort} placeholder="例如：max" onChange={event => update({ ...record, effort: event.target.value })} />}</Form.Field>
           </div>
-          {section === 'workers' ? <WorkerFields key={current} id={current} record={record as Worker} update={next => update(next)} /> : <OwnerFields key={current} config={config} blocks={policy.blocks} record={record as Owner} update={next => update(next)} />}
+          {section === 'workers' ? <WorkerFields key={current} id={current} record={record as Worker} update={next => update(next)} /> : <OwnerFields key={current} savedRecord={policy.snapshot?.config.owners[current]} config={config} blocks={policy.blocks} record={record as Owner} update={next => update(next)} />}
           {impact && <Modal open={askDelete} title={impact.title} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onCancel={() => setAskDelete(false)} onOk={() => { policy.setConfig(removeRole(config, section, current)); setSelected(''); setPendingId(''); setAskDelete(false); }}>
             <Text>{impact.detail}</Text>
           </Modal>}
@@ -177,17 +177,17 @@ function ReplyCard({ result }: { result: HelloResult & { route: string } }) {
         <Tag size="small" color={result.ok ? 'success' : 'error'}>{result.ok ? '可用' : '不可用'}</Tag>
         <Text strong className={styles.wrap}>{result.route}</Text>
       </span>
-      <Text type="secondary" className={`${styles.meta} ${styles.numbers}`} style={{ whiteSpace: 'nowrap' }}>{[seconds, formatDate(result.checkedAt)].filter(Boolean).join(' · ')}</Text>
+      <Text type="secondary" className={`${styles.meta} ${styles.numbers}`} style={{ whiteSpace: 'nowrap' }}>{[seconds, dateText(result.checkedAt)].filter(Boolean).join(' · ')}</Text>
     </header>
     <p className={styles.replyText}>{result.reply}</p>
     {result.model && <Text type="secondary" className={styles.meta}>实际应答模型：{result.model}</Text>}
   </article>;
 }
 
-function OwnerFields({ config, blocks, record, update }: { config: NonNullable<PolicyDraft['config']>; blocks: PolicyDraft['blocks']; record: Owner; update: (next: Owner) => void }) {
+function OwnerFields({ config, blocks, record, savedRecord, update }: { config: NonNullable<PolicyDraft['config']>; blocks: PolicyDraft['blocks']; record: Owner; savedRecord?: Owner; update: (next: Owner) => void }) {
   return <>
-    <Form.Field label="并行上限" required desc="这个父 Agent同时运行的子 Agent数量。"><NamedInputNumber id="owner-parallel" aria-label="并行上限" min={1} step={1} value={record.max_parallel} placeholder="例如：4" onChange={value => update({ ...record, max_parallel: value ?? 1 })} /></Form.Field>
-    <OwnerScheduleFields config={config} blocks={blocks} record={record} update={update} />
+    <Form.Field label="并行上限" required desc="这个父 Agent 同时运行的子 Agent 数量。"><NamedInputNumber id="owner-parallel" aria-label="并行上限" min={1} step={1} value={record.max_parallel} placeholder="例如：4" onChange={value => update({ ...record, max_parallel: value ?? 1 })} /></Form.Field>
+    <OwnerScheduleFields config={config} blocks={blocks} record={record} savedRecord={savedRecord} update={update} />
   </>;
 }
 

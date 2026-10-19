@@ -26,7 +26,8 @@ export function engineVersionText(version: string): string {
 const engineStyles = createStaticStyles(({ css, cssVar }) => ({
   cards: css`display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); align-items: start; gap: 16px; min-inline-size: 0;`,
   enable: css`display: flex; align-items: center; justify-content: flex-end; gap: 8px;`,
-  reason: css`max-inline-size: 180px; color: ${cssVar.colorTextSecondary}; font-size: ${cssVar.fontSizeSM}; overflow-wrap: anywhere;`,
+  version: css`white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-inline-size: 0;`,
+  reason: css`color: ${cssVar.colorTextSecondary}; font-size: ${cssVar.fontSizeSM}; overflow-wrap: anywhere;`,
 }));
 
 const PROBE: Record<string, { label: string; color?: string }> = {
@@ -200,9 +201,10 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
         const reason = enabled && conflict ? `仍启用的${roles.join(' / ')}，请先停用。` : !enabled && probe?.status !== 'installed' ? '未在本机找到这个命令' : kindMismatch ? '已保存的类型与目录不一致' : '';
         const kind = record?.kind ?? entry.kind;
         const engineBlocks = savedBlocks.filter(block => block.engine === entry.id);
-        return <Surface key={entry.id} aria-label={entry.id} title={entry.id} description={<span className={styles.row} style={{ gap: 6 }}><Tag size="small" color={PROBE[status]?.color}>{PROBE[status]?.label ?? status}</Tag><Tooltip title={probe?.version || entry.command}><Text type="secondary" className={styles.wrap}>{engineVersionText(probe?.version || entry.command)}</Text></Tooltip></span>}
-          extra={<div className={engineStyles.enable}>{blocked && reason && <Text type="secondary" className={engineStyles.reason}>{reason}</Text>}<NamedSwitch aria-label={`启用 ${entry.id}`} size="small" checked={enabled} loading={busyId === entry.id} disabled={blocked} onChange={checked => void toggle(entry.id, checked)} /></div>}>
+        return <Surface key={entry.id} aria-label={entry.id} title={entry.id} description={<span className={styles.row} style={{ gap: 6, flexWrap: 'nowrap' }}><Tag size="small" color={PROBE[status]?.color}>{PROBE[status]?.label ?? status}</Tag><Tooltip title={probe?.version || entry.command}><Text type="secondary" className={engineStyles.version}>{engineVersionText(probe?.version || entry.command)}</Text></Tooltip></span>}
+          extra={<div className={engineStyles.enable}><NamedSwitch aria-label={`启用 ${entry.id}`} size="small" checked={enabled} loading={busyId === entry.id} disabled={blocked} onChange={checked => void toggle(entry.id, checked)} /></div>}>
           <div className={styles.cardBody}>
+            {blocked && reason && <Text type="secondary" className={engineStyles.reason}>{reason}</Text>}
             <StallNotice state={stall.snapshot?.engines[entry.id]} now={stall.now} />
             {isQuotaKind(kind) ? <QuotaSummary engine={kind} record={quota.records.find(item => item.engine === kind)} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === kind ? quota.feedback : undefined} onRefresh={() => void quota.refresh(kind)} />
               : <Text type="secondary" className={styles.meta}>免费模型，不探测额度。</Text>}
@@ -241,9 +243,8 @@ export function engineBlockText(block: Block, now: number, state?: EngineBlockSt
   let release = '需手动恢复';
   if (Number.isFinite(time) && time > now) {
     const date = new Date(time), today = new Date(now);
-    const hhmm = `${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
-    const day = date.toDateString() === today.toDateString() ? '' : `${date.getFullYear() === today.getFullYear() ? '' : `${date.getFullYear()}/`}${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')} `;
-    release = `${day}${hhmm} 自动解除`;
+    const text = dateText(deadline!);
+    release = `${date.toDateString() === today.toDateString() ? text.slice(11) : text.slice(5)} 自动解除`;
   } else if (stall && state && state.level >= 1 && state.level <= 2) release = '探测通过后解除';
   const tone: StatusTone = category === '手动暂停' ? 'default' : 'warning';
   return { category, reason, fullReason, release, tone };

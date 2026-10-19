@@ -201,19 +201,43 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     color: ${cssVar.colorTextSecondary};
     font-size: ${cssVar.fontSizeSM};
   `,
-  /** One line of chips; the rest is clipped until 更多 expands the row. */
-  facetChips: css`
+  facetValues: css`
+    position: relative;
     display: flex;
     flex: 1 1 0;
-    flex-wrap: wrap;
+    gap: ${cssVar.marginXS};
+    align-items: flex-start;
+    min-inline-size: 0;
+  `,
+  /** Hidden items retain measurable widths without occupying the chip line. */
+  facetChips: css`
+    position: relative;
+    display: flex;
+    flex: 1 1 0;
     gap: ${cssVar.marginXXS} ${cssVar.marginXS};
     align-items: flex-start;
-    align-content: flex-start;
     min-inline-size: 0;
-    max-block-size: ${cssVar.controlHeightSM};
     overflow: hidden;
 
-    &[data-expanded='true'] { max-block-size: none; }
+    &[data-expanded='true'] { flex-wrap: wrap; }
+  `,
+  facetItem: css`
+    display: inline-flex;
+    flex: none;
+    max-inline-size: 100%;
+
+    &[data-hidden='true'] { position: absolute; visibility: hidden; pointer-events: none; }
+  `,
+  /** Reserve the toggle slot even when unused, keeping measurements stable. */
+  facetMore: css`
+    &[data-visible='false'] { visibility: hidden; pointer-events: none; }
+  `,
+  facetEmpty: css`
+    display: flex;
+    align-items: center;
+    min-block-size: ${cssVar.controlHeightSM};
+    color: ${cssVar.colorTextSecondary};
+    font-size: ${cssVar.fontSizeSM};
   `,
   facetChip: css`
     display: inline-flex;
@@ -306,16 +330,50 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
 
     > * { flex: 1 1 0; min-inline-size: 0; }
   `,
-  /** Keep cards readable; narrower viewports scroll only the lane container. */
+  archiveFilterTrigger: css`
+    block-size: 32px;
+    min-block-size: 32px;
+    max-block-size: 32px;
+    white-space: nowrap;
+    > * { min-inline-size: 0; }
+  `,
+  archiveFilterValue: css`
+    && {
+      display: block;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    > * { flex-wrap: nowrap; overflow: hidden; }
+    [data-role='lobe-select-tag'] { min-inline-size: 0; flex-shrink: 0; }
+  `,
+  archiveFilterLabel: css`
+    display: block;
+    min-inline-size: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  `,
+  boardScrollHint: css`
+    display: none;
+    font-size: ${cssVar.fontSizeSM};
+
+    @media (max-width: 1179px) { display: block; }
+  `,
+  /** Four lanes fit desktop widths; smaller viewports scroll with an explicit hint. */
   columns: css`
     display: grid;
     flex: 1 1 auto;
-    grid-template-columns: repeat(4, minmax(240px, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: ${cssVar.marginSM};
-    align-items: start;
+    align-items: stretch;
+    min-block-size: 320px;
     inline-size: 100%;
     min-inline-size: 0;
     overflow-x: auto;
+    scrollbar-width: auto;
+
+    @media (max-width: 1179px) { grid-template-columns: repeat(4, minmax(240px, 1fr)); }
   `,
   column: css`
     --column-bg: ${cssVar.colorFillTertiary};
@@ -329,11 +387,11 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     background: var(--column-bg);
 
     &[data-status-column='running'] {
-      --column-bg: ${cssVar.colorPrimaryBg};
+      --column-bg: color-mix(in srgb, ${cssVar.colorInfo} 8%, transparent);
       --column-text: ${cssVar.colorPrimary};
     }
     &[data-status-column='review'] {
-      --column-bg: ${cssVar.colorWarningBg};
+      --column-bg: color-mix(in srgb, ${cssVar.colorWarning} 10%, transparent);
       --column-text: ${cssVar.colorWarning};
     }
     &[data-status-column='closed'] {
