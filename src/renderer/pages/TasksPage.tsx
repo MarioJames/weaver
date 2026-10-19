@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Archive, Plus } from 'lucide-react';
 import { PageHeader } from '@lobehub/ui/dashboard';
-import { Button, Drawer } from '@lobehub/ui/base-ui';
+import { Alert, Button, Drawer } from '@lobehub/ui/base-ui';
 import { command } from '../commands';
-import { archivedTasks } from '../task-view';
+import type { OwnerInstance } from '../../shared/commands';
+import { archivedTasks, withOwnerProfiles } from '../task-view';
 import { ArchiveDrawer } from '../components/ArchiveDrawer';
 import { NewTaskDialog } from '../components/NewTaskDialog';
 import { TaskBoard } from '../components/TaskBoard';
@@ -15,15 +16,27 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
   const [archiving, setArchiving] = useState(false);
   const [selected, setSelected] = useState<string>();
   const newTaskRef = useRef<HTMLButtonElement | HTMLAnchorElement>(null);
-  const task = work.tasks.find(item => item.id === selected);
-  const archived = archivedTasks(work.tasks, Date.now()).length;
+  const [owners, setOwners] = useState<OwnerInstance[]>([]);
+  const [ownersError, setOwnersError] = useState('');
+  const [ownersAttempt, setOwnersAttempt] = useState(0);
+  useEffect(() => {
+    let current = true;
+    void command<{ owners: OwnerInstance[] }>('owners.list', {}).then(result => {
+      if (current) { setOwners(result.owners); setOwnersError(''); }
+    }).catch(error => { if (current) setOwnersError(String(error)); });
+    return () => { current = false; };
+  }, [work.tasks, ownersAttempt]);
+  const tasks = withOwnerProfiles(work.tasks, owners);
+  const task = tasks.find(item => item.id === selected);
+  const archived = archivedTasks(tasks, Date.now()).length;
   return <>
     <PageHeader title="任务" description="创建、执行和验收都记录在同一条任务里。" action={<>
       <Button ref={newTaskRef} type="primary" icon={Plus} disabled={work.busy || !work.caps || work.loading} onClick={() => setCreating(true)}>新建任务</Button>
       <Button icon={Archive} disabled={!work.caps || work.loading} onClick={() => setArchiving(true)}>归档 {archived}</Button>
     </>} />
-    <TaskBoard tasks={work.tasks} selected={selected} loading={work.loading} onSelect={setSelected} ownerKind={ownerKind} />
-    <ArchiveDrawer tasks={work.tasks} selected={selected} open={archiving} onClose={() => setArchiving(false)} onSelect={setSelected} ownerKind={ownerKind} />
+    {ownersError && <Alert type="warning" title="负责人资料读取失败" description={ownersError} action={<Button onClick={() => setOwnersAttempt(value => value + 1)}>重试</Button>} />}
+    <TaskBoard tasks={tasks} selected={selected} loading={work.loading} onSelect={setSelected} ownerKind={ownerKind} />
+    <ArchiveDrawer tasks={tasks} selected={selected} open={archiving} onClose={() => setArchiving(false)} onSelect={setSelected} ownerKind={ownerKind} />
     <Drawer open={!!task} title="任务详情" placement="right" width="min(960px, 92vw)" onClose={() => setSelected(undefined)}>
       {task && <TaskDetail key={task.id} task={task} busy={work.busy || !work.caps} action={work.action} ownerKind={ownerKind}
         onStart={id => void work.action(() => window.weaver.startTask(id))}

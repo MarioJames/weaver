@@ -6,7 +6,7 @@ import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Config } from '../src/shared/policy';
 import type { Task } from '../src/shared/types';
-import { ALL_OWNERS, ARCHIVE_AFTER_MS, ENDED_EXPANDED_KEY, TASK_FILTERS_KEY, UNASSIGNED_OWNER, applyTaskFilters, archiveRows, archivedTasks, columnize, dispatchKind, emptySelection, filterButtonLabel, filterByOwner, filterOptions, filterTasks, hasFilters, isArchived, isOpenTask, nonArchived, ownerKindLookup, ownerLabel, projectLabel, readEndedExpanded, readTaskFilters, resolveSelection, taskColumn, taskOwnerId, taskOption, toggleOption, writeEndedExpanded, writeTaskFilters } from '../src/renderer/task-view';
+import { ALL_OWNERS, ARCHIVE_AFTER_MS, ENDED_EXPANDED_KEY, TASK_FILTERS_KEY, UNASSIGNED_OWNER, applyTaskFilters, archiveRows, archivedTasks, columnize, dispatchKind, emptySelection, filterButtonLabel, filterByOwner, filterOptions, filterTasks, hasFilters, isArchived, isOpenTask, nonArchived, ownerKindLookup, ownerLabel, projectLabel, readEndedExpanded, readTaskFilters, resolveSelection, taskColumn, taskOwnerId, taskOption, toggleOption, writeEndedExpanded, writeTaskFilters, withOwnerProfiles } from '../src/renderer/task-view';
 import type { FilterDimension, TaskSelection } from '../src/renderer/task-view';
 import { EngineIcon, AgentLabel } from '../src/renderer/components/EngineIcon';
 import { ArchiveList, archiveColumns, archiveRowProps } from '../src/renderer/components/ArchiveDrawer';
@@ -172,7 +172,7 @@ test('a filter button says the dimension, one choice by name, or how many are on
 
 test('the option a board narrows by is the owner key, the engine kind and the worker', () => {
   assert.deepEqual(taskOption(claude, 'owner'), { value: 'claude_owner', label: 'claude_owner' });
-  /** A task carrying its own owner name is labelled by it and grouped by its policy key. */
+  /** A named instance keeps its name and instance id rather than joining the profile group. */
   assert.deepEqual(taskOption({ ...claude, ownerId: 'p9', owner: { ...owner, name: 'Mario' } }, 'owner'), { value: 'p9', label: 'Mario' });
   assert.deepEqual(taskOption(unassigned, 'owner'), { value: UNASSIGNED_OWNER, label: UNASSIGNED_OWNER });
   assert.deepEqual(taskOption({ ...claude, dispatch: { ...dispatch, engine: 'qoder', engineKind: 'qodercli' } }, 'engine'), { value: 'qodercli', label: 'qodercli' });
@@ -488,4 +488,51 @@ test('the inspector row is the owner, its status and one action', () => {
   const legacy = markup(React.createElement(OwnerInspector, { task: unassigned, busy: false, action: async () => true }));
   assert.match(legacy, /未指定负责人/);
   assert.doesNotMatch(legacy, /工作目录 旧任务未记录|Epoch|Revision/);
+});
+
+
+test('revealing each dropdown includes ended-only options with zero open counts', () => {
+  const ended = tasks.map(task => ({ ...task, status: 'failed' as const, updatedAt: ago(1) }));
+  for (const dimension of ['owner', 'engine', 'worker'] as const) {
+    const options = filterOptions(ended, dimension, emptySelection(), now);
+    assert.ok(options.length > 0);
+    const rows = filterItems(dimension, options, [], () => {}, ownerKind, true);
+    assert.deepEqual(rows.map(row => row.key), options.map(option => option.value));
+    for (const row of rows) assert.match(markup(row.extra as React.ReactNode), />0</);
+  }
+});
+
+test('throwaway owner instances group by profile while named instances keep their identity', () => {
+  const first = { ...claude, id: 'first', ownerId: 'instance-1' };
+  const second = { ...claude, id: 'second', ownerId: 'instance-2' };
+  const named = { ...claude, id: 'named', ownerId: 'attached-1', owner: { ...owner, name: 'Mario' } };
+  assert.equal(taskOwnerId(first), 'claude_owner');
+  assert.deepEqual(taskOption(named, 'owner'), { value: 'attached-1', label: 'Mario' });
+  const options = filterOptions([first, second, named], 'owner', emptySelection(), now);
+  assert.deepEqual(options.map(({ value, label, open }) => ({ value, label, open })), [
+    { value: 'claude_owner', label: 'claude_owner', open: 2 },
+    { value: 'attached-1', label: 'Mario', open: 1 },
+  ]);
+  assert.deepEqual(applyTaskFilters([first, second, named], sel({ owner: ['claude_owner'] })).map(task => task.id), ['first', 'second']);
+  assert.match(markup(filterItems('owner', options, [], () => {}, ownerKind)[1].icon as React.ReactNode), /<title>Claude Code<\/title>/);
+});
+
+
+test('queued throwaways use registry profiles without changing original task records', () => {
+  const queued = { ...unassigned, id: 'queued', status: 'queued' as const, ownerId: 'instance-queued' };
+  const [task] = withOwnerProfiles([queued], [{ id: queued.ownerId, name: 'Task owner', profileId: 'claude_owner' }]);
+  assert.deepEqual(taskOption(task, 'owner'), { value: 'claude_owner', label: 'claude_owner' });
+  assert.equal(taskOwnerId(task), 'claude_owner');
+  assert.equal(taskOwnerId(queued), 'instance-queued');
+  assert.equal(taskOwnerId({ ...task, dispatch: { ...dispatch, owner: 'codex_owner' } }), 'codex_owner');
+  assert.strictEqual(withOwnerProfiles([queued], [])[0], queued);
+});
+
+test('distinct named registrations with the same name have distinguishable filter labels', () => {
+  const options = filterOptions(['attached-one', 'attached-two'].map(ownerId => ({
+    ...claude, id: ownerId, ownerId, owner: { ...owner, name: 'Mario' },
+  })), 'owner', emptySelection(), now);
+  assert.equal(options.length, 2);
+  assert.equal(new Set(options.map(option => option.label)).size, 2);
+  assert.ok(options.every(option => option.label.startsWith('Mario')));
 });

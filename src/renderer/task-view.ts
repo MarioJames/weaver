@@ -1,3 +1,4 @@
+import type { OwnerInstance } from '../shared/commands';
 import type { Config } from '../shared/policy';
 import type { Task, TaskStatus } from '../shared/types';
 export type TaskFilter = 'all' | 'active' | 'review' | 'closed';
@@ -5,15 +6,28 @@ export const statusLabels: Record<TaskStatus, string> = { queued: '待执行', r
 export function isActive(task: Task): boolean { return ['queued', 'running', 'cancelling'].includes(task.status); }
 export const UNASSIGNED_OWNER = '未指定负责人';
 export const ALL_OWNERS = 'all';
-/** The name a task carries when no owner was named. */
+/** Placeholder assigned to per-task throwaway instances. */
 const PLACEHOLDER_OWNER = 'Task owner';
-/** CLI-created tasks carry a placeholder owner name; the frozen dispatch holds the real profile. */
-export function ownerLabel(task: Task): string {
-  return task.dispatch?.owner ?? (task.owner.name !== PLACEHOLDER_OWNER ? task.owner.name : UNASSIGNED_OWNER);
+type ProfiledTask = Task & { owner: Task['owner'] & { profileId?: string } };
+/** Enrich only the renderer's task copies; queued tasks have no frozen dispatch yet. */
+export function withOwnerProfiles(tasks: Task[], owners: Pick<OwnerInstance, 'id' | 'name' | 'profileId'>[]): Task[] {
+  const instances = new Map(owners.map(owner => [owner.id, owner]));
+  return tasks.map(task => {
+    const instance = task.ownerId ? instances.get(task.ownerId) : undefined;
+    return instance ? { ...task, owner: { ...task.owner, name: instance.name, profileId: instance.profileId } } : task;
+  });
 }
-/** The policy key of the owning profile: the frozen dispatch stores it, logical tasks carry it directly. */
+/** Named registrations retain their instance identity; throwaways share the profile. */
+function namedOwnerInstance(task: Task): boolean {
+  return !!task.ownerId && !!logicalOwnerName(task) && task.ownerId !== taskOwnerId(task);
+}
+export function ownerLabel(task: Task): string {
+  if (namedOwnerInstance(task)) return task.owner.name;
+  return task.dispatch?.owner ?? (task as ProfiledTask).owner.profileId ?? (task.owner.name !== PLACEHOLDER_OWNER ? task.owner.name : UNASSIGNED_OWNER);
+}
+/** Resolve the policy profile, never prefer an instance UUID over a frozen profile. */
 export function taskOwnerId(task: Task): string | undefined {
-  return task.ownerId ?? task.dispatch?.owner;
+  return task.dispatch?.owner ?? (task as ProfiledTask).owner.profileId ?? task.ownerId;
 }
 /** Engine kind of the frozen worker dispatch: explicit kind first, otherwise the engine id. */
 export function dispatchKind(task: Task): string | undefined {
@@ -57,13 +71,12 @@ export function emptySelection(): TaskSelection { return { owner: [], engine: []
 /** localStorage key holding the board's filter selection. */
 export const TASK_FILTERS_KEY = 'weaver-task-filters';
 /** One dropdown entry: what it is called, how much live work hides behind it, and the brand to draw. */
-export interface FilterOption { value: string; label: string; kind?: string; open: number }
+export interface FilterOption { value: string; label: string; kind?: string; open: number; ownerProfile?: string }
 /** The value a task answers for in one dimension; undefined when the task has no value to group by. */
 export function taskOption(task: Task, dimension: FilterDimension): { value: string; label: string } | undefined {
   if (dimension === 'owner') {
-    // Group by the policy key when the task carries one, so one owner under two names stays one choice.
-    const value = taskOwnerId(task) ?? ownerLabel(task);
-    return { value, label: logicalOwnerName(task) ?? ownerLabel(task) };
+    const value = namedOwnerInstance(task) ? task.ownerId! : taskOwnerId(task) ?? ownerLabel(task);
+    return { value, label: namedOwnerInstance(task) ? task.owner.name : logicalOwnerName(task) ?? ownerLabel(task) };
   }
   const kind = dispatchKind(task);
   if (dimension === 'engine') return kind ? { value: kind, label: kind } : undefined;
@@ -97,9 +110,16 @@ export function filterOptions(tasks: Task[], dimension: FilterDimension, selecti
       if (live) known.open += 1;
       continue;
     }
-    seen.set(option.value, { value: option.value, label: option.label, kind: dimension === 'owner' ? undefined : dispatchKind(task), open: live ? 1 : 0 });
+    seen.set(option.value, { value: option.value, label: option.label, kind: dimension === 'owner' ? undefined : dispatchKind(task), ...(dimension === 'owner' ? { ownerProfile: taskOwnerId(task) } : {}), open: live ? 1 : 0 });
   }
-  return [...seen.values()].sort((a, b) => b.open - a.open || a.label.localeCompare(b.label));
+  const options = [...seen.values()];
+  // Separate durable registrations may share a name (for example across sessions).
+  if (dimension === 'owner') {
+    const labels = new Map<string, number>();
+    for (const option of options) labels.set(option.label, (labels.get(option.label) ?? 0) + 1);
+    for (const option of options) if (labels.get(option.label)! > 1) option.label = `${option.label} · ${option.value}`;
+  }
+  return options.sort((a, b) => b.open - a.open || a.label.localeCompare(b.label));
 }
 /** Is anything narrowed at all? Only then does 清除 have a job. */
 export function hasFilters(selection: TaskSelection): boolean {

@@ -30,15 +30,15 @@ const isQuiet = (option: FilterOption, chosen: string[]) => option.open === 0 &&
 
 /** The brand behind a choice: owners by their policy engine, engines by their kind, workers by their dispatch engine. */
 function optionIcon(dimension: FilterDimension, option: FilterOption, ownerKind?: (ownerId?: string) => string | undefined) {
-  return <EngineIcon kind={dimension === 'owner' ? ownerKind?.(option.value) : option.kind} />;
+  return <EngineIcon kind={dimension === 'owner' ? ownerKind?.(option.ownerProfile ?? option.value) : option.kind} />;
 }
 
 /**
  * One dimension's checklist. The menu portals its rows, so this builder is also what a
  * server render and a test can see: chosen values stay listed even when their work is done.
  */
-export function filterItems(dimension: FilterDimension, options: FilterOption[], chosen: string[], onToggle: (value: string) => void, ownerKind?: (ownerId?: string) => string | undefined): DropdownMenuCheckboxItem[] {
-  return options.filter(option => !isQuiet(option, chosen)).map(option => ({
+export function filterItems(dimension: FilterDimension, options: FilterOption[], chosen: string[], onToggle: (value: string) => void, ownerKind?: (ownerId?: string) => string | undefined, revealed = false): DropdownMenuCheckboxItem[] {
+  return options.filter(option => revealed || !isQuiet(option, chosen)).map(option => ({
     type: 'checkbox',
     key: option.value,
     checked: chosen.includes(option.value),
@@ -100,7 +100,7 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, now =
         const options = filterOptions(board, dimension, selection, now);
         const chosen = selection[dimension];
         return <DropdownMenu key={dimension} trigger="click" placement="bottomLeft"
-          items={filterItems(dimension, options, chosen, value => choose(dimension, toggleOption(chosen, value)), ownerKind)}
+          items={filterItems(dimension, options, chosen, value => choose(dimension, toggleOption(chosen, value)), ownerKind, revealed[dimension])}
           footer={revealed[dimension] ? undefined : filterReveal(options, chosen, () => setRevealed({ ...revealed, [dimension]: true }))}>
           <Button size="small" type={chosen.length ? 'fill' : 'default'} icon={ChevronDown} iconPosition="end">{filterButtonLabel(dimension, options, chosen)}</Button>
         </DropdownMenu>;

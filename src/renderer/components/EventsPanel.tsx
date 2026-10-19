@@ -5,7 +5,7 @@ import { Button, Input, Segmented, Tag, Text } from '@lobehub/ui/base-ui';
 import { ChevronRight, Loader2 } from 'lucide-react';
 import type { TaskEvent } from '../../shared/types';
 import { command } from '../commands';
-import { condenseEvents, exportEvents, filterCondensed, kindLabels, redactLog, selectEvents, timelineActive, type TimelineItem } from '../log-view';
+import { condenseEvents, exportEvents, filterCondensed, kindLabels, redactLog, selectEvents, type TimelineItem } from '../log-view';
 import { styles } from '../style';
 import { styles as eventStyles } from './events-style';
 
@@ -45,7 +45,7 @@ function StepsGroup({ item, open, onToggle }: { item: Extract<TimelineItem, { ty
   </div>;
 }
 
-export function EventsPanel({ events, taskId, active }: { events: TaskEvent[]; taskId: string; active?: boolean }) {
+export function EventsPanel({ events, taskId, active = false }: { events: TaskEvent[]; taskId: string; active?: boolean }) {
   const [mode, setMode] = useState<Mode>(readMode);
   const [kind, setKind] = useState('all');
   const [query, setQuery] = useState('');
@@ -69,8 +69,7 @@ export function EventsPanel({ events, taskId, active }: { events: TaskEvent[]; t
     catch (cause) { if (id === generation.current) setError(String(cause)); }
     finally { lock.current = false; if (id === generation.current) setBusy(false); }
   }
-  const activeNow = active ?? timelineActive(page.events);
-  const condensed = useMemo(() => filterCondensed(condenseEvents(page.events, { active: activeNow }), query), [page.events, activeNow, query]);
+  const condensed = useMemo(() => filterCondensed(condenseEvents(page.events, { active }), query), [page.events, active, query]);
   const visible = selectEvents(page.events, kind, query);
   function download() {
     const url = URL.createObjectURL(new Blob([exportEvents(taskId, visible)], { type: 'application/json' }));

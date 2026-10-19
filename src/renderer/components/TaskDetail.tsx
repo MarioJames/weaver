@@ -3,7 +3,7 @@ import { Empty, Icon } from '@lobehub/ui';
 import { Alert, Button, Tabs, Tag, Text } from '@lobehub/ui/base-ui';
 import { Loader2 } from 'lucide-react';
 import type { Task } from '../../shared/types';
-import { redactLog } from '../log-view';
+import { redactLog, timelineActive } from '../log-view';
 import { isActive, reviewLabel, statusLabels } from '../task-view';
 import { styles } from '../style';
 import { AgentFacts } from './AgentFacts';
@@ -54,7 +54,7 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
           </div>
           {task.summary && <TaskTextBlock title="执行结果" content={task.summary} />}
         </div> },
-        { key: 'events', label: '时间线 ' + task.events.length, children: <EventsPanel events={task.events} taskId={task.id} /> },
+        { key: 'events', label: '时间线 ' + task.events.length, children: <EventsPanel events={task.events} taskId={task.id} active={timelineActive(task.status)} /> },
         { key: 'artifacts', label: '产物 ' + task.artifacts.length, children: <ArtifactsPanel artifacts={task.artifacts} /> },
         { key: 'review', label: '验收', children: task.status === 'completed' ? <ReviewPanel task={task} busy={busy} action={action} /> : <Empty title="执行成功后进入验收" description="执行结果、收到确认和验收结论各自独立。" /> },
         { key: 'continuation', label: '接续', children: <OwnerInspector task={task} busy={busy} action={action} /> },

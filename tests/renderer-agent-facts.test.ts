@@ -130,3 +130,12 @@ test('the compact block still drops what the task does not record', () => {
   assert.match(workspaceOnly, /<dt[^>]*>目录<\/dt><dd[^>]*>[\s\S]*?>server-4VDE<\/div>/);
   assert.doesNotMatch(workspaceOnly, /\/tmp\/weaver-tasks\/server-4VDE/);
 });
+
+
+test('owner icons use the frozen profile even when ownerId is an instance UUID', () => {
+  for (const compact of [true, false]) {
+    const task = { ...claude, ownerId: 'instance-uuid' };
+    const html = markup(React.createElement(AgentFacts, { task, ownerKind, compact }));
+    assert.match(html, /<dt[^>]*>Owner<\/dt><dd[^>]*><span[^>]*><svg[^>]*><title>Claude Code<\/title>/);
+  }
+});

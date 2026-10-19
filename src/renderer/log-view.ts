@@ -1,4 +1,4 @@
-import type { TaskEvent } from '../shared/types';
+import type { TaskEvent, TaskStatus } from '../shared/types';
 /** Best-effort display redaction. Never claim this catches every secret. */
 export function redactLog(value: string): string {
  return value.replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?(?:-----END [^-]*PRIVATE KEY-----|$)/gi,'[REDACTED PRIVATE KEY]').replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/gi,'$1[REDACTED]@').replace(/\b(Bearer\s+)[^\s"'<>]+/gi,'$1[REDACTED]')
@@ -64,7 +64,8 @@ export function condenseEvents(events: TaskEvent[], options: CondenseOptions): T
   const flush = () => {
     if (!run.length) return;
     const tools = toolCount(run);
-    items.push({ type: 'steps', from: run[0], to: run[run.length - 1], count: tools.reduce((sum, tool) => sum + tool.count, 0), tools, events: [...run], inProgress: false });
+    if (!tools.length) items.push(...run.map(event => ({ type: 'event' as const, event })));
+    else items.push({ type: 'steps', from: run[0], to: run[run.length - 1], count: tools.reduce((sum, tool) => sum + tool.count, 0), tools, events: [...run], inProgress: false });
     run = [];
   };
   for (const event of events) {
@@ -83,12 +84,7 @@ export function filterCondensed(items: TimelineItem[], query: string): TimelineI
   return items.filter(item => (item.type === 'event' ? [item.event.message] : item.events.map(event => event.message)).some(message => redactLog(message).toLocaleLowerCase().includes(needle)));
 }
 
-const TERMINAL_LIFECYCLE = /(?:^| )exited|stopped|cancel(?:led|ed)|receipt|native run complete|owner review:/i;
-export function timelineActive(events: TaskEvent[]): boolean {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index];
-    if (event.kind !== 'lifecycle') continue;
-    return !TERMINAL_LIFECYCLE.test(event.message);
-  }
-  return false;
+/** Task state is authoritative even when only an early page of events is loaded. */
+export function timelineActive(status: TaskStatus): boolean {
+  return status === 'running' || status === 'cancelling';
 }

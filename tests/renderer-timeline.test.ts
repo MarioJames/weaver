@@ -101,13 +101,9 @@ test('the last steps group is marked in-progress only while the task is active',
   assert.equal(closed[1].type, 'event');
 });
 
-test('timeline active state derives from the last lifecycle event', () => {
-  assert.equal(timelineActive([event('1', 'lifecycle', 'Policy selected codex; launching codex in /repo')]), true);
-  assert.equal(timelineActive([event('1', 'lifecycle', 'Cancellation requested; waiting for worker exit')]), true);
-  assert.equal(timelineActive([event('1', 'lifecycle', 'Worker exited successfully; output is ready for owner review')]), false);
-  assert.equal(timelineActive([event('1', 'lifecycle', 'Cancelled before dispatch')]), false);
-  assert.equal(timelineActive([event('1', 'lifecycle', 'Frozen work package created'), event('2', 'log', 'tool started bash')]), true);
-  assert.equal(timelineActive([event('1', 'log', 'tool started bash')]), false);
+test('timeline activity follows task status regardless of loaded lifecycle history', () => {
+  for (const status of ['queued', 'completed', 'failed', 'cancelled'] as const) assert.equal(timelineActive(status), false);
+  for (const status of ['running', 'cancelling'] as const) assert.equal(timelineActive(status), true);
 });
 
 test('search keeps important events whose redacted message matches and groups with matching raw events', () => {
@@ -161,4 +157,25 @@ test('all-events mode keeps today view with export note and load control', () =>
 test('condensed empty state still explains the timeline when nothing loaded', () => {
   const html = markup(React.createElement(EventsPanel, { events: [], taskId: 't' }));
   assert.match(html, /暂无事件。任务状态和 worker 输出会记在这里。/);
+});
+
+
+test('progress-only chatter and malformed tool notes never render zero-step groups', () => {
+  const events = [event('1', 'progress', 'owned scope started'), event('2', 'log', 'tool started'), event('3', 'log', 'plain output')];
+  const items = condenseEvents(events, { active: true });
+  assert.equal(items.length, 3);
+  assert.ok(items.every(item => item.type === 'event'));
+  const html = markup(React.createElement(EventsPanel, { events, taskId: 't', active: true }));
+  assert.doesNotMatch(html, /执行了 0 个步骤/);
+  assert.match(html, /plain output/);
+});
+
+test('a terminal task with only the first timeline page loaded never spins', () => {
+  const events = [event('1', 'lifecycle', 'Policy selected codex; launching'), event('2', 'log', 'tool started bash')];
+  const idle = markup(React.createElement(EventsPanel, { events, taskId: 't', active: false }));
+  const active = markup(React.createElement(EventsPanel, { events, taskId: 't', active: true }));
+  assert.match(idle, /执行了 1 个步骤/);
+  assert.doesNotMatch(idle, /lucide-loader/);
+  assert.match(active, /lucide-loader/);
+  assert.doesNotMatch(markup(React.createElement(EventsPanel, { events, taskId: 't' })), /lucide-loader/);
 });
