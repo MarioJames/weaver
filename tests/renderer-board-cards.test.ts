@@ -38,47 +38,41 @@ function card(task: Task) {
   return result[0];
 }
 
-test('card title stays separate from the dispatched sub agent and compact facts identify the parent', () => {
+test('card title shares its text flow with the sub agent, followed by exactly two information rows', () => {
   const html = card(base);
-  assert.match(html, /<strong[^>]*>CARD_ONE<\/strong>[\s\S]*<title>Claude Code<\/title>[\s\S]*WORKER/);
-  /** One text flow: tag and title live in the same title block, with no separate title column. */
-  const block = html.match(new RegExp(`<span class="${styles.cardTitle}">([\\s\\S]*?)</span></button>|<span class="${styles.cardTitle}">([\\s\\S]*?</strong>)</span>`));
-  assert.ok(block);
-  const inner = block[1] ?? block[2];
-  assert.ok(inner.includes('CARD_ONE'));
-  assert.doesNotMatch(inner, /WORKER/);
+  const title = html.slice(html.indexOf(`class="${styles.cardTitle}"`), html.indexOf(`class="${styles.cardStatus}"`));
+  assert.match(title, /<title>Claude Code<\/title>[\s\S]*WORKER[\s\S]*<strong[^>]*>CARD_ONE<\/strong>/);
   assert.equal((html.match(/>WORKER</g) ?? []).length, 1);
-  assert.equal((html.match(/<dt/g) ?? []).length, 1);
-  assert.match(html, /父 Agent/);
-  assert.doesNotMatch(html, /目录|\/projects|\/frozen/);
+  const meta = html.slice(html.indexOf(`class="${styles.cardMeta}"`));
+  assert.match(meta, /<time[\s\S]*aria-label="父 Agent：Parent"[\s\S]*Parent/);
+  assert.doesNotMatch(html, /<dl|<dt|目录|\/projects|\/frozen/);
   assert.doesNotMatch(card({ ...base, dispatch: undefined }), /WORKER|<title>Claude Code/);
 });
 
-test('running and cancelling cards show redacted activity after status and compact time', () => {
+test('running and cancelling cards show only status and latest redacted activity in the first row', () => {
   for (const task of [base, { ...base, status: 'cancelling' as const }]) {
-    const html = card(task);
-    const row = html.slice(html.indexOf(`class="${styles.cardStatus}"`), html.indexOf('<dl'));
-    assert.ok(row, 'status, activity and time must share one row');
+    const html = card({ ...task, events: [{ ...base.events[0], message: 'OLD_MESSAGE' }, ...base.events] });
+    const row = html.slice(html.indexOf(`class="${styles.cardStatus}"`), html.indexOf(`class="${styles.cardMeta}"`));
     assert.match(row, /ACTIVITY/);
-    assert.doesNotMatch(row, /secret-value/);
-    assert.match(row, /<time[^>]*dateTime="2026-10-18T12:00:00.000Z"/i);
+    assert.match(row, /title="ACTIVITY[^"<>]*"/);
+    assert.doesNotMatch(row, /secret-value|OLD_MESSAGE|<time|WORKER|Parent/);
     assert.equal((row.match(/lucide-loader-2/g) ?? []).length, 1);
-    assert.ok(row.indexOf('ACTIVITY') > row.indexOf('<time'));
+    assert.ok(row.indexOf('ACTIVITY') > row.indexOf(task.status === 'running' ? '运行中' : '停止中'));
   }
   assert.match(card({ ...base, events: [] }), /等待首次调度/);
 });
 
-test('completed, failed, cancelled and unscheduled queued cards keep status and time without activity', () => {
+test('inactive execution cards keep the first row status alone and the second row time plus parent', () => {
   for (const [status, label] of [['completed', '待验收'], ['failed', '失败'], ['cancelled', '已取消'], ['queued', '待执行']] as const) {
     const html = card({ ...base, status });
-    const row = html.slice(html.indexOf(`class="${styles.cardStatus}"`), html.indexOf('<dl'));
-    assert.ok(row, 'status and time must share one row');
+    const row = html.slice(html.indexOf(`class="${styles.cardStatus}"`), html.indexOf(`class="${styles.cardMeta}"`));
     assert.match(row, new RegExp(label));
+    assert.doesNotMatch(row, /<time|WORKER|Parent/);
     assert.doesNotMatch(html, /ACTIVITY|secret-value|等待首次调度|lucide-loader-2/);
-    assert.ok(html.indexOf('</strong>') < html.indexOf(label));
-    assert.ok(html.indexOf(label) < html.indexOf('<time'));
-    assert.ok(html.indexOf('<time') < html.indexOf('<dl'));
+    assert.match(html.slice(html.indexOf(`class="${styles.cardMeta}"`)), /<time[^>]*title="[^"]+"[^>]*>[0-9]{2}:[0-9]{2}<\/time>[\s\S]*aria-label="父 Agent：Parent"/);
   }
+  const yesterday = new Date(now - 86400000).toISOString();
+  assert.match(card({ ...base, updatedAt: yesterday }), /<time[^>]*>10-17 [0-9]{2}:[0-9]{2}<\/time>/);
 });
 
 test('workspace groups use task workspace, sort by newest task and omit headings for a single group', () => {

@@ -1,21 +1,13 @@
 import { formatDate } from '../log-view';
-import type { ReactNode } from 'react';
 import { CopyButton } from '@lobehub/ui';
 import { Descriptions, Text } from '@lobehub/ui/base-ui';
 import type { Task } from '../../shared/types';
 import { dispatchKind, ownerLabel, taskOwnerId } from '../task-view';
 import { AgentLabel } from './EngineIcon';
 import { factsStyles } from './agent-facts-style';
+import { styles } from '../style';
 
 const COLUMNS = 3;
-
-/** Compact key/value pair of a board card. */
-function Fact({ label, children }: { label: string; children: ReactNode }) {
-  return <>
-    <dt className={factsStyles.key}>{label}</dt>
-    <dd className={factsStyles.value}>{children}</dd>
-  </>;
-}
 
 /** `engine / model · effort`, each part only when recorded. */
 export function modelText(task: Task): string | undefined {
@@ -31,7 +23,7 @@ export function modelText(task: Task): string | undefined {
 export function AgentFacts({ task, ownerKind, compact }: { task: Task; ownerKind?: (ownerId?: string) => string | undefined; compact?: boolean }) {
   const dispatch = task.dispatch;
   const parent = <AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerLabel(task)} />;
-  if (compact) return <dl className={factsStyles.gridCompact}><Fact label="父 Agent">{parent}</Fact></dl>;
+  if (compact) return <span className={styles.cardParent} aria-label={`父 Agent：${ownerLabel(task)}`} title={ownerLabel(task)}>{parent}</span>;
   const workspace = dispatch?.workspace || task.workspace;
   const model = modelText(task);
   const first = [

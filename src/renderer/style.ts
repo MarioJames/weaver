@@ -396,7 +396,7 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     text-overflow: ellipsis;
     white-space: nowrap;
   `,
-  /** The full title line is reserved for readable text. */
+  /** Sub agent and title share a single text flow, capped at two lines. */
   cardTitle: css`
     display: -webkit-box;
     min-inline-size: 0;
@@ -407,6 +407,7 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     line-clamp: 2;
   `,
   cardTag: css`
+    margin-inline-end: 4px;
     min-inline-size: 0;
     max-inline-size: 100%;
     overflow: hidden;
@@ -418,15 +419,16 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
   `,
   cardStatus: css`
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 4px;
     min-inline-size: 0;
+    min-block-size: 24px;
     > :first-child { flex: none; }
   `,
   cardActivity: css`
-    flex: 1 1 100%;
-    min-inline-size: min(100%, 12ch);
+    flex: 1 1 0;
+    min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -434,10 +436,28 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
   `,
   cardTime: css`
     flex: none;
-    margin-inline-start: auto;
     color: ${cssVar.colorTextSecondary};
     font-size: ${cssVar.fontSizeSM};
     white-space: nowrap;
+  `,
+  cardMeta: css`
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-inline-size: 0;
+    min-block-size: 20px;
+    color: ${cssVar.colorTextSecondary};
+    font-size: ${cssVar.fontSizeSM};
+  `,
+  cardParent: css`
+    flex: 1 1 0;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    > span { display: inline; }
+    svg { vertical-align: middle; margin-inline-end: 4px; }
   `,
   taskCard: css`
     display: flex;

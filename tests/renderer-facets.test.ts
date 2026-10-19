@@ -179,13 +179,13 @@ test('archive: one row of selects, no search box, shared status tags, 全部 tim
   assert.match(cell(old[2]), /已取消/);
 });
 
-test('the card title uses its whole block and the sub agent tag follows in the status row', () => {
+test('the card title uses one text flow with the sub agent tag before the title', () => {
   const html = board(sel({}));
   const block = html.match(new RegExp(`<span class="${styles.cardTitle}[^"]*">([\\s\\S]*?)</strong></span>`))?.[1];
   assert.ok(block, 'card title block');
   assert.match(block, /<strong[^>]*>T_/);
-  assert.doesNotMatch(block, /w\d/);
-  assert.match(html, /<strong[^>]*>T_[^<]+<\/strong>[\s\S]*w\d/);
+  assert.match(block, /w\d/);
+  assert.match(block, /w\d[\s\S]*<strong[^>]*>T_/);
   assert.equal((block.match(/<strong/g) ?? []).length, 1);
   const source = styles.cardTitle;
   assert.ok(source.length > 0);

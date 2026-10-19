@@ -146,15 +146,17 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
     const latest = task.events.at(-1);
     return <button key={task.id} type="button" className={styles.taskCard} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
       <span className={styles.cardTitle}>
+        {task.dispatch?.worker && <Tag className={styles.cardTag} title={task.dispatch.worker} size="small" icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
         <strong className={styles.cardTitleText}>{task.title}</strong>
       </span>
       <span className={styles.cardStatus}>
         <Tag size="small" color={tag.color} icon={tag.spin ? spinner : displayStatus(task) === 'scheduled' ? <Icon icon={Clock} size="small" /> : undefined}>{tag.label}</Tag>
-        {task.dispatch?.worker && <Tag className={styles.cardTag} title={task.dispatch.worker} size="small" icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
-        <time className={styles.cardTime} dateTime={task.updatedAt} title={new Date(task.updatedAt).toLocaleString('zh-CN')}>{compactTaskTime(task.updatedAt, now)}</time>
         {tag.spin && <Text type="secondary" className={styles.cardActivity} title={redactLog(latest?.message ?? '等待首次调度')}>{redactLog(latest?.message ?? '等待首次调度')}</Text>}
       </span>
-      <AgentFacts compact task={task} ownerKind={ownerKind} />
+      <span className={styles.cardMeta}>
+        <time className={styles.cardTime} dateTime={task.updatedAt} title={new Date(task.updatedAt).toLocaleString('zh-CN')}>{compactTaskTime(task.updatedAt, now)}</time>
+        <AgentFacts compact task={task} ownerKind={ownerKind} />
+      </span>
     </button>;
   };
   return <section aria-label="任务看板" className={styles.board}>

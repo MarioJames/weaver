@@ -117,8 +117,8 @@ test('detail hands owner, worker and workspace to the facts block in the overvie
 
 test('the compact block shows only the parent agent even with a worker and workspace', () => {
   const html = markup(React.createElement(AgentFacts, { task: claude, ownerKind, compact: true }));
-  assert.match(html, /<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?claude_owner<\/span><\/dd>/);
-  assert.equal((html.match(/<dt/g) ?? []).length, 1);
+  assert.match(html, /aria-label="父 Agent：claude_owner"[\s\S]*?claude_owner<\/span>/);
+  assert.doesNotMatch(html, /<dt|<dl/);
   assert.doesNotMatch(html, /claude_worker|目录|复制工作目录/);
   assert.match(html, /fill="#D97757"/);
 });
@@ -126,7 +126,7 @@ test('the compact block shows only the parent agent even with a worker and works
 test('the compact block resolves an unassigned parent and omits standalone workspace', () => {
   const html = markup(React.createElement(AgentFacts, { task: { ...bare, workspace: '/tmp/standalone' }, compact: true }));
   assert.match(html, /未指定父 Agent/);
-  assert.equal((html.match(/<dt/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /<dt|<dl/);
   assert.doesNotMatch(html, /standalone|目录|子 Agent/);
 });
 
@@ -134,6 +134,6 @@ test('owner icons use the frozen profile even when ownerId is an instance UUID',
   for (const compact of [true, false]) {
     const task = { ...claude, ownerId: 'instance-uuid' };
     const html = markup(React.createElement(AgentFacts, { task, ownerKind, compact }));
-    assert.match(html, /<dt[^>]*>父 Agent<\/dt><dd[^>]*><span[^>]*><svg[^>]*><title>Claude Code<\/title>/);
+    assert.match(html, compact ? /aria-label="父 Agent：claude_owner"[\s\S]*<title>Claude Code<\/title>/ : /<dt[^>]*>父 Agent<\/dt><dd[^>]*><span[^>]*><svg[^>]*><title>Claude Code<\/title>/);
   }
 });

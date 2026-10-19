@@ -260,12 +260,12 @@ test('the columns hold the live board work, newest first, with archived work kep
   assert.match(html, /data-status-column="closed"[\s\S]*<strong[^>]*>看板丁<\/strong>/);
 });
 
-test('a card reserves its title line and shows the sub agent afterwards, with only the parent in compact facts', () => {
+test('a card shows sub agent before its title, with only the parent in compact facts', () => {
   const html = markup(React.createElement(TaskBoard, { tasks: [claude], loading: false, onSelect: () => {}, ownerKind, now }));
   assert.match(html, /接入新引擎/);
-  assert.match(html, /<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?claude_owner<\/span>/);
-  assert.match(html, /<strong[^>]*>接入新引擎<\/strong>[\s\S]*claude_worker/);
-  assert.equal((html.match(/<dt/g) ?? []).length, 1);
+  assert.match(html, /aria-label="父 Agent：claude_owner"[\s\S]*?claude_owner<\/span>/);
+  assert.match(html, /claude_worker[\s\S]*<strong[^>]*>接入新引擎<\/strong>/);
+  assert.equal((html.match(/<dt/g) ?? []).length, 0);
   assert.doesNotMatch(html, /<dt[^>]*>Worker|<dt[^>]*>目录|复制工作目录/);
   assert.match(html, /Reading TaskBoard\.tsx/);
 });
