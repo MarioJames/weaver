@@ -31,11 +31,11 @@ CLI 直接用 `--input <file|->` 传 JSON（args 对象或完整信封均可；�
 - 命令名按已知目录解析（`engines set-enabled` 保留连字符）；`capabilities` 是 `capabilities.get` 的显式别名；嵌套动词为三词 `owners continuation get`，也可用带点合并形式 `owners.continuation get` 或全名单词形式 `owners.continuation.get`，均解析到同一目录命令。
 - 输出格式 `--output json|jsonl|text`，缺省 `json`：成功写一个完整 weaver.v1 信封。`jsonl` 每行一个 JSON 对象。`text` 是人性短行，不承诺机器稳定，agent 请用 json/jsonl。`--json` 是 `--output json` 别名，与 `--output` 组合一律拒绝。
 - 错误同格式：`{ok:false,error:{code,message,retryable}}`，无 stack；CLI 退出码 0=成功、1=否则。stdout 无额外闲聊；`weaver web` 缺省打印一行 URL，可用 `--output`/`--json` 转 JSON 就绪信封。
-- `--help` 列举目录，`weaver web --help` 单列 web 选项。
+- `--help` 列举目录，`weaver web --help` 单列 web 选项。`weaver --help --output json` 返回机器可读的 `data.catalog`；命令级帮助（例如 `weaver quota refresh --help --output json`）提供 `command`、`mutation`、`rpc`、`usage`、`inputFields`，无需运行中的控制面。
 
 ## 3. 命令目录
 
-读取（15）与写入（12）共 27 条逻辑命令，如下表；另有 `policy`/`engines` 六个 method-wrapped RPC 动词与 CLI 本地 `tasks wait/watch`。写入命令必须带 commandId。
+CLI 目录共 37 条命令：读取（15）与写入（12）共 27 条逻辑命令，如下表；另有 `policy`/`engines`/`quota` 八个 method-wrapped RPC 动词与 CLI 本地 `tasks wait/watch` 两条命令。逻辑写入命令必须带 commandId；RPC 动词不接收 command/task ID。
 
 | 命令 | CLI 输入要点 |
 |---|---|
@@ -64,9 +64,44 @@ CLI 直接用 `--input <file|->` 传 JSON（args 对象或完整信封均可；�
 | `operations.get` | `{commandId}` |
 | `observability.get` / `observability.export` | `{taskId, kind?}`；export 返回 JSON 文本形式的完整 trace |
 
-六个 RPC 动词：`policy get`（无参，即 `weaver policy get`）、`policy validate --input`（config 文档本体，≤256 KiB，返回 issue 数组，空即通过）、`policy save --input`（`{revision,config,blocks}`，revision 乐观锁，返回新 snapshot）、`policy preview --input`（`{owner, worker?/class?, tag?, runningCount}`）、`engines scan`（无参）、`engines set-enabled --input`（`{id,enabled,revision}`）。这些命令不接受 `--command-id`/`--task-id`；`policy save` 与 `engines set-enabled` 只提交 usage 里给出的 JSON。
+八个 RPC 动词：`policy get`（无参，即 `weaver policy get`）、`policy validate --input`（config 文档本体，≤256 KiB，返回 issue 数组，空即通过）、`policy save --input`（`{revision,config,blocks}`，revision 乐观锁，返回新 snapshot）、`policy preview --input`（`{owner, worker?/class?, tag?, runningCount}`）、`engines scan`（无参）、`engines set-enabled --input`（`{id,enabled,revision}`）、`quota get`（无参）、`quota refresh [--input]`（可选 `{engine}`）。这些命令不接受 `--command-id`/`--task-id`；有输入时直接提交 usage 所示 JSON 对象，不接逻辑命令信封。仅 `quota refresh` 的单参数 RPC 允许省略 `--input`，此时传 `{}`；其余单参数 RPC 继续要求输入。
 
 本地 wait/watch：`tasks wait --task-id` / `tasks watch --task-id`，`--for` 1–600 秒（缺省 30）；轮询 `tasks get`（watch 另加 `tasks events` 增量），不是第二调度器；超时按 `TIMEOUT` 失败退出，退出不取消任务。
+
+### 3.1 原生账户额度
+
+`quota get` → `getQuota`（arity 0），只返回进程内 `{records}`，不读认证文件、不联网、不写策略。首次读取三家都为 `unknown`，`checkedAt/observedAt:null`、`stale:true`。`quota refresh` → `refreshQuota`（arity 1），先探测选定 provider，再将自有阻断合并到当前最新的策略，返回 `{records,snapshot,policyChanged}`。它是 mutation，机器帮助明确标注会同步策略阻断且不做推理。
+
+```sh
+weaver quota get --output json
+weaver quota get --output jsonl
+weaver quota get --output text
+weaver quota refresh --output json
+weaver quota refresh --output jsonl
+weaver quota refresh --output text
+printf '{"engine":"codex"}\n' | weaver quota refresh --input - --output json
+weaver quota refresh --help --output json
+```
+
+以上刷新命令各自会请求额度并可能写策略。缺省输入 `{}` 探测全部三家；单家输入只接受 `{"engine":"codex"}`、`{"engine":"claude"}` 或 `{"engine":"grok"}`，不接受别名、URL、路径、header、force、commandId 或 taskId。HTTP 与 Unix 使用同一 RPC 白名单及参数校验；别名引擎按策略中的 `engines[id].kind` 共用相应原生账户观测。
+
+每条 record 含 `engine/status/source/checkedAt/observedAt/stale/windows/detail/retryAt`，可选 `statusBasis:"account_restriction"` 标识服务端明确的独立全账户消费限制。该限制不会随着套餐窗口 reset 解除，自动阻断不借用套餐 reset 设期限；5 分钟过期及失败状态仍照常生效。窗口保留账户、模型或未知范围、服务端百分比/计数及可信 reset；缺失值保留 `null`，不补 0，不把模型子池耗尽推广为整个账户耗尽。`available` 表示本次有明确账户可继续使用的依据，不证明某个模型可以执行；`exhausted` 表示明确账户耗尽；`unknown`、`unauthenticated`、`unsupported`、`error` 分别保留不确定、原生登录、认证模式与探测失败的信息。读取成功的 CLI 信封可包含失败状态的 provider record，不能只凭 `ok:true` 判定账户可用。
+
+观测仅驻留内存，成功观测 5 分钟后标记 `stale`；进程重启不恢复观测。每家请求合并进行中的刷新，网络请求最短间隔 60 秒，HTTP 429 遵守更晚的 `Retry-After` 并通过 `retryAt` 告知；429 表示探测接口限流，不等于订阅额度耗尽。失败可保留同一凭据的旧窗口，但明确标为过期；身份变化不沿用旧观测。没有后台轮询、循环重试或 force 绕过。
+
+策略只持久保存自有 engine-level 阻断：`by:"weaver-quota:<kind>"`，不设置 model。新鲜 `exhausted` 新增/更新；只有新鲜 `available` 删除自己的 source，其他状态及 stale 观测都不清旧阻断。人工、foreign 和 model-level 阻断原样保留。期限取仍耗尽账户窗口的最晚可信 reset；未知 reset 则不猜期限。新阻断不取消 running 任务；现有队列与新派发继续遵守 policy/pin，不自动改派。
+
+刷新结束后原子合并此刻最新策略，保留请求期间的其他保存；无 block 实质变化不增加 revision。过期人工/foreign engine-level 记录占用唯一 key、导致无法同时保留它并建立有效自动阻断时，整次合并返回 `QUOTA_POLICY_CONFLICT`（HTTP 409），文件、内存策略和 revision 不变；先通过已有策略编辑流程处理该历史记录，再刷新。有效人工阻断正常保留。持久保存失败报 `PERSISTENCE_ERROR`（HTTP 500），不能当作自动阻断成功。退出时先中止探测；draining 后完成的请求不写策略。
+
+主动探测读取既有本地登录的 access token，并仅发送下列固定 HTTPS GET。三个地址均是原生实现或开源客户端使用的**非公开接口**，接口变化可能导致未知、401/403 或限流；当前实现不启动 Codex app-server 或 Claude statusline，也不把它们称为公开额度 API。
+
+| 引擎 / source | 固定 GET | 原生认证来源 |
+|---|---|---|
+| Codex / `codex_usage` | `https://chatgpt.com/backend-api/wham/usage` | `$CODEX_HOME/auth.json`，否则 `~/.codex/auth.json`；准确的 `tokens.access_token` 与同对象 `account_id`，只支持明确的 ChatGPT 登录；API key 或不明确模式拒绝 |
+| Claude Code / `claude_oauth_usage` | `https://api.anthropic.com/api/oauth/usage` | `$CLAUDE_CONFIG_DIR/.credentials.json`，否则 `~/.claude/.credentials.json`；仅 `claudeAiOauth.accessToken`，不读取 MCP OAuth 作为账户 bearer |
+| Grok / `grok_cli_billing` | `https://cli-chat-proxy.grok.com/v1/billing?format=credits` | `~/.grok/auth.json`；唯一官方 `https://auth.x.ai::<client-id>` OIDC 条目的 `key`；多候选不猜 |
+
+这些认证文件只读；不提取或使用 refresh token，不刷新登录、不登录/登出、不切换账户、不扫描浏览器/Keychain、不启动 TUI 或模型。请求禁止重定向，不遵循自定义 base URL；一次探测的总截止时间 8 秒，认证文件与响应均实际限制为 256 KiB，只输出受控字段与错误，不回传 token、账户 ID 或原始响应。Claude Code 即便未接入真实 worker，也可以独立探测额度。Grok CLI 订阅 credits 与 xAI API 团队钱包、美元余额、RPM/TPM、token 费用不同，不能拿后者替代此处的订阅额度。
 
 ## 4. 幂等、续传与修订
 
@@ -143,6 +178,8 @@ weaver reviews submit --task-id <taskId> --input review.json --command-id review
 ## 6. 能力声明
 
 `capabilities.get` 返回了接口全部事实：`workerProviders: ["mock-jsonl","opencode","pi","grok","codex"]`（真实 launcher 加载后）或 `["mock-jsonl"]`；`realExecution` 是布尔；`mcp:false`；`ownerSpawn:'logical-registration'`、`manualAttach:'metadata-only'`、`ownerModelSpawned:false`、`attachmentVerified:false`；`authentication:'ephemeral-local-trusted-user-demo'`、`ownerScopedAuthorization:false`。这些字段精确描述本进程现状，不应做更乐观的解释。
+
+`quota` 提供额外发现入口：`engines:["codex","claude","grok"]`，`get` 的 CLI/RPC 名及 `network:false`，`refresh` 的 CLI/RPC 名及 `updatesPolicyBlocks:true/inference:false`。原有 `commands` 数组列出 27 个逻辑 handler 命令；完整 37 条 CLI 目录应读取 `weaver --help --output json`，不要把两者数量混同。
 
 ## 7. 本地传输与错误
 

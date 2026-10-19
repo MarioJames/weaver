@@ -1,0 +1,29 @@
+{
+  "acceptedQuotaScope": true,
+  "checks": {
+    "tests": 229,
+    "passed": 229,
+    "failed": 0,
+    "typecheck": true,
+    "build": true
+  },
+  "afterQaExternalChanges": {
+    "README.md": "development command dev:web -> dev, foreign staged",
+    "src/cli/main.ts": "process.once -> process.on for repeated stop signals, foreign unstaged",
+    "tests/runtime-http.test.ts": "additional repeated-stop test, foreign unstaged"
+  },
+  "actualWorktreeFreezeMismatches": [
+    "README.md",
+    "src/cli/main.ts",
+    "tests/runtime-http.test.ts"
+  ],
+  "selectiveCommit": "quota hunks only; verify committed CLI and README blobs against frozen hashes; preserve foreign index/worktree",
+  "secretScan": {
+    "nativeValuesComparedInMemory": true,
+    "matches": []
+  },
+  "globalRulesModified": false,
+  "skillFoundryPreserved": true,
+  "temporaryRootReleaseCondition": "selective local commit finished; no running consumers/mounts",
+  "noPush": true
+}

@@ -16,6 +16,8 @@ import { failure, startLocalIPC } from './local-ipc';
 import { TaskManager } from './manager';
 import { validateConfig } from './policy/routing';
 import { PolicyStore } from './policy/store';
+import { applyQuotaSnapshot, parseQuotaRefresh, QuotaPolicyConflict, QUOTA_CAPABILITIES } from './policy/quota';
+import { QuotaProber } from './quota';
 import { RpcError, parseRpcBody } from './rpc';
 import { TaskStore } from './store';
 
@@ -27,6 +29,8 @@ export interface RuntimeOptions {
   rendererRoot?: string;
   repoRoot?: string;
   workerScript?: string;
+  /** Internal dependency injection for isolated runtime tests; never supplied over RPC. */
+  quotaProber?: QuotaProber;
 }
 
 export interface WeaverRuntime {
@@ -76,6 +80,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   let vite: { middlewares: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next: (error?: unknown) => void) => void; close(): Promise<void> } | undefined;
   const inflight = new Set<Promise<unknown>>();
   const prober = new EngineProber();
+  const quotaProber = options.quotaProber ?? new QuotaProber();
   let probes: EngineProbeRecord[] | null = null;
   const remember = (probe: EngineProbeRecord | null) => {
     if (!probe) return probes;
@@ -98,6 +103,22 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     switch (method) {
       case 'command': return active.commands.handle(args[0]);
       case 'getPolicy': return active.policy.snapshot();
+      case 'getQuota': return quotaProber.get();
+      case 'refreshQuota': {
+        const input = parseQuotaRefresh(args[0]);
+        return track((async () => {
+          const quota = await quotaProber.refresh(input);
+          if (draining) throw new RpcError('APP_DRAINING', 'Weaver is shutting down');
+          let result;
+          try { result = applyQuotaSnapshot(active.policy, quota, input); }
+          catch (error) {
+            if (error instanceof QuotaPolicyConflict) throw new RpcError(error.code, error.message);
+            throw new RpcError('PERSISTENCE_ERROR', 'Quota was checked but automatic policy blocks could not be saved');
+          }
+          if (result.policyChanged) active.commands.pump();
+          return result;
+        })());
+      }
       case 'validatePolicy': {
         let encoded = '';
         try { encoded = JSON.stringify(args[0]); } catch { throw new RpcError('INVALID_REQUEST', 'Policy must be JSON'); }
@@ -148,6 +169,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
         owner: 'Logical registration only. The owner is the agent in the skill host and calls this CLI. This process does not spawn an owner model.',
         maxParallel: configuredParallel(active.policy),
         storePath: active.store.path,
+        quota: QUOTA_CAPABILITIES,
       };
       default: throw new RpcError('INVALID_REQUEST', 'Unknown method');
     }
@@ -208,6 +230,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     return runtime;
   } catch (error) {
     ready = false;
+    await quotaProber.close().catch(() => {});
     await vite?.close().catch(() => {});
     await http?.close().catch(() => {});
     await ipc.close().catch(() => {});
@@ -221,6 +244,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     draining = true;
     ready = false;
     if (commands) commands.draining = true;
+    await quotaProber.close().catch(() => {});
     await Promise.allSettled([...inflight]);
     try { await manager?.shutdown(); } catch (error) { console.error(error instanceof Error ? error.message : 'shutdown failed'); }
     await vite?.close().catch(() => {});

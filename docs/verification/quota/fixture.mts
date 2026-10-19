@@ -1,0 +1,31 @@
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { startRuntime } from '/home/mocha/opensource/weaver/src/main/runtime.ts';
+import { QuotaProber } from '/home/mocha/opensource/weaver/src/main/quota/index.ts';
+const root='/tmp/weaver-quota-16z1usfq/browser';
+const home=join(root,'fixture-home');
+for(const dir of ['.codex','.claude','.grok']) mkdirSync(join(home,dir),{recursive:true});
+const jwt=`e30.${Buffer.from(JSON.stringify({exp:4102444800})).toString('base64url')}.fixture`;
+writeFileSync(join(home,'.codex/auth.json'),JSON.stringify({auth_mode:'chatgpt',tokens:{access_token:jwt,account_id:'fixture'}}));
+writeFileSync(join(home,'.claude/.credentials.json'),JSON.stringify({claudeAiOauth:{accessToken:'fixture-claude',expiresAt:4102444800000}}));
+writeFileSync(join(home,'.grok/auth.json'),JSON.stringify({'https://auth.x.ai::fixture':{auth_mode:'oidc',key:'fixture-grok',expires_at:'2100-01-01T00:00:00Z'}}));
+function control(){return JSON.parse(readFileSync(join(root,'control.json'),'utf8'));}
+const calls:any[]=[];
+const now=()=>new Date(Date.now()+(control().offsetMs||0));
+const quotaProber=new QuotaProber({env:{HOME:home,CODEX_HOME:join(home,'.codex'),CLAUDE_CONFIG_DIR:join(home,'.claude')},now,fetch:async(url,init)=>{
+ const engine=String(url).includes('chatgpt')?'codex':String(url).includes('anthropic')?'claude':'grok';
+ const c=control(); const mode=c[engine]||'fresh';
+ calls.push({engine,method:init?.method,mode,time:new Date().toISOString()});writeFileSync(join(root,'provider-calls.json'),JSON.stringify(calls,null,2));
+ if(c.delayMs) await new Promise(resolve=>setTimeout(resolve,c.delayMs));
+ if([401,429,500].includes(+mode)) return new Response('{}',{status:+mode,headers:{'content-type':'application/json','Retry-After':'65'}});
+ const resets=new Date(now().getTime()+(c.resetMs??3600000));
+ const percent=mode==='exhausted'?100:mode==='unknown'?null:23;
+ if(engine==='codex') return Response.json({...(mode==='global' ? {spend_control:{reached:true}} : {}),rate_limit:{allowed:percent!==null&&percent<100,limit_reached:percent===100,primary_window:{used_percent:percent,reset_at:Math.floor(resets.getTime()/1000),limit_window_seconds:18000},secondary_window:{used_percent:48,reset_at:Math.floor(resets.getTime()/1000),limit_window_seconds:604800}},credits:{has_credits:false,unlimited:false,balance:'0'}});
+ if(engine==='claude') return Response.json({five_hour:{utilization:percent,resets_at:resets.toISOString()},seven_day:{utilization:42,resets_at:resets.toISOString()},seven_day_sonnet:{utilization:12,resets_at:resets.toISOString()},extra_usage:{is_enabled:false}});
+ return Response.json({config:{creditUsagePercent:percent,currentPeriod:{type:'USAGE_PERIOD_TYPE_MONTHLY',start:new Date(now().getTime()-86400000).toISOString(),end:resets.toISOString()},monthlyLimit:{val:100},used:{val:23},prepaidBalance:{val:0},onDemandCap:{val:0},productUsage:[{product:'fixture-product',usagePercent:14}]}});
+}});
+const runtime=await startRuntime({dataDir:'/tmp/weaver-quota-16z1usfq/f',port:0,open:false,quotaProber,rendererRoot:'/home/mocha/opensource/weaver/dist/renderer'});
+writeFileSync(join(root,'fixture-runtime.json'),JSON.stringify({url:runtime.url,port:runtime.port,pid:process.pid}));
+console.log(JSON.stringify({APP_URL:runtime.url,pid:process.pid}));
+for(const signal of ['SIGTERM','SIGINT'] as const)process.on(signal,()=>{void runtime.close().then(()=>process.exit(0));});
+await runtime.done;

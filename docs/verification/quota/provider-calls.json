@@ -1,0 +1,56 @@
+[
+  {
+    "engine": "codex",
+    "method": "GET",
+    "mode": "fresh",
+    "time": "2026-10-19T02:35:22.329Z"
+  },
+  {
+    "engine": "claude",
+    "method": "GET",
+    "mode": "fresh",
+    "time": "2026-10-19T02:35:22.329Z"
+  },
+  {
+    "engine": "grok",
+    "method": "GET",
+    "mode": "fresh",
+    "time": "2026-10-19T02:35:22.330Z"
+  },
+  {
+    "engine": "codex",
+    "method": "GET",
+    "mode": "401",
+    "time": "2026-10-19T02:36:23.381Z"
+  },
+  {
+    "engine": "claude",
+    "method": "GET",
+    "mode": "429",
+    "time": "2026-10-19T02:36:25.856Z"
+  },
+  {
+    "engine": "grok",
+    "method": "GET",
+    "mode": "500",
+    "time": "2026-10-19T02:36:28.322Z"
+  },
+  {
+    "engine": "codex",
+    "method": "GET",
+    "mode": "global",
+    "time": "2026-10-19T02:37:49.069Z"
+  },
+  {
+    "engine": "claude",
+    "method": "GET",
+    "mode": "fresh",
+    "time": "2026-10-19T02:37:49.069Z"
+  },
+  {
+    "engine": "grok",
+    "method": "GET",
+    "mode": "fresh",
+    "time": "2026-10-19T02:37:49.069Z"
+  }
+]

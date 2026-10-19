@@ -45,3 +45,11 @@ ACC 使用真实外部 Codex CLI、每轮 staged `.agents/skills/weaver`，不�
 最终资源释放记录及人读报告放 [final](docs/verification/redesign/final/)。自有服务/ACC scopes、记录worker scopes均无active，自有panes已关闭；Chrome/profile最终验读后精确回收。用户自行接管的 p52/4737 未被QA停止；末次只读复核两者已不在、默认capabilities正确APP_NOT_RUNNING，原因未知，未为验证重启默认data。正式 bin、已验收 `~/.agents/skills/weaver` 链接、默认持久数据、原生 auth、旧桌面数据保留。Owner已独立核对28个精确scope均inactive/无cgroup、全部proc引用与mounts为空，随后精确回收唯一任务临时根，现目录不存在；见 [064预检](docs/verification/redesign/final/064-owner-cleanup-preflight.json) 与 [065实际回收](docs/verification/redesign/final/065-owner-temp-reclaim-result.json)。不以验收完成授权清除开发持久数据。
 
 已验收全局技能链接仅在最后clean边界PASS后安装，见 [入口](docs/verification/redesign/final/global-skill-installed.json)。用户当前可运行 `weaver web`；Grok402与Pi连接风险仍保留，不保证四家实时可用。最终补充浏览器观察见 [启用不代改角色、重命名权重、tabs键盘](docs/verification/redesign/final/ui060-remaining-controls.json)，发生在ACC只读快照结束后，仅修改隔离fixture配置。
+
+## 额度探测门禁
+
+本轮新增额度功能的实际验收结果以 [额度验收报告](docs/verification/quota/REPORT.html) 为准；上文的源码冻结、测试数量、PASS/FAIL 与真实供应商结果属于各自历史版本，不作为本轮通过证明。
+
+- 模型范围、未确认全账户的 surface 不得因 `session`、`weekly_all` 等窗口名被提升为账户级封禁；非空 authoritative limits 不得因信息不完整反向取 legacy 窗口制造可用。见 [provider 行为测试](tests/quota-providers.test.ts)。
+- 独立账户消费限制不得借套餐窗口 reset 标记为已过期或设定释放期限；主进程、持久阻断和页面本地 aging 使用同一 `statusBasis` 语义，5 分钟 TTL 与失败状态仍有效。见 [集成测试](tests/quota-integration.test.ts) 与 [展示状态测试](tests/quota-renderer.test.ts)。
+- missing/null/非法额度值保持未知，不补 0；自动阻断只维护本功能 source，保留人工及其他来源。过期 foreign 条目妨碍正确阻断时，整次合并明确冲突且策略原子不变。HTTP 429 是探测限流，不能当作订阅耗尽。对应契约与验证入口见 [额度接口](docs/agent-interface.md#31-原生账户额度) 及上述三组测试。

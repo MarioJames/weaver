@@ -1,0 +1,79 @@
+{
+  "status": "PASS",
+  "scope": "真实built CLI与真实账户一次GET；fixture通过source runtime/真实同源HTTP-RPC/domain/normalizer/built renderer",
+  "date": "2026-10-19T02:39:08.849491+00:00",
+  "freezeAggregate": "599206dfb7e2350a627c53e2f4e3edef3013e5493247fcc36f71e8fb1189b8ec",
+  "frozenFiles": 111,
+  "frozenFileMismatches": [],
+  "appUrls": {
+    "real": "http://127.0.0.1:37539",
+    "fixture": "http://127.0.0.1:34967"
+  },
+  "actualModel": {
+    "model": "gpt-6.1-sol",
+    "effort": "medium",
+    "turnContextPath": "/home/mocha/.codex/sessions/2026/10/18/rollout-2026-10-18T22-27-58-01a151fc-b6df-7281-b8fa-811b2295f31d.jsonl",
+    "turnContextLine": 8
+  },
+  "checks": {
+    "initialUnknownNoFakeZero": "PASS",
+    "getNoProviderHttp": "PASS",
+    "allRefreshLoading": "PASS",
+    "singleRefreshLoading": "PASS",
+    "sourceResetPercentScope": "PASS",
+    "cooldownAndNoAutomaticRetry": "PASS",
+    "provider401429500AndRecovery": "PASS",
+    "cachedHistoryPreserved": "PASS",
+    "resetAgingNoQuotaHttp": "PASS",
+    "globalRestrictionNotReleasedByWindowReset": "PASS",
+    "manualBlockPreserved": "PASS",
+    "dirtyDraftPreservedAndConflict": "PASS",
+    "cacheReadFaultAndExplicitRecovery": "PASS",
+    "viewport900LightDarkNoOverflow": "PASS",
+    "cliGetRefreshJsonJsonlText": "PASS"
+  },
+  "realProviders": {
+    "codex": {
+      "http": 200,
+      "status": "available",
+      "usedPercent": 25
+    },
+    "claude": {
+      "http": 200,
+      "status": "unknown",
+      "reason": "session/weekly scope not confirmed; do not infer account availability"
+    },
+    "grok": {
+      "http": 200,
+      "status": "exhausted",
+      "usedPercent": 100
+    }
+  },
+  "realHttpGetCount": 3,
+  "fixtureHttpGetCount": 9,
+  "modelCalls": 0,
+  "artifact_errors": [],
+  "harnessNotes": [
+    "Initial temporary .ts fixture was treated as CJS by tsx; renamed .mts before tests. No business source changed.",
+    "First recovery click was one second before Retry-After expiry (response time plus65s); remained disabled and sent no HTTP. Retried after deadline.",
+    "Continuation script missed cli variable; restored script-only variable and completed remaining policy checks."
+  ],
+  "limits": [
+    "真实Claude账户作用域unknown，不能确认账户可用。",
+    "未调用模型，额度观测不证明模型实际可执行。",
+    "5min TTL沿用项目229项测试；浏览器实测窗口reset aging。"
+  ],
+  "cleanup": {
+    "status": "released",
+    "resources": "resources.json",
+    "portsClosed": {
+      "37539": true,
+      "34967": true
+    },
+    "browserClosed": true,
+    "profileRemoved": true,
+    "ownTemporaryDataRemoved": true,
+    "ownerTaskRootPreserved": true
+  },
+  "postAcceptanceFreezeCheck": "post-acceptance-freeze-check.json"
+}

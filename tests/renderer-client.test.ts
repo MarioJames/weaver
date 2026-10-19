@@ -129,6 +129,36 @@ test('non-2xx, network, and missing result fail once without a retry', async () 
   }
 });
 
+test('quota cache reads and explicit refreshes keep distinct RPC methods without implicit retries', async () => {
+  installOrigin();
+  const gate = installFetch();
+  try {
+    const client = createBrowserClient();
+    assert.equal(gate.calls.length, 0);
+    const cached = client.getQuota();
+    assert.deepEqual(gate.calls[0].body, { method: 'getQuota', args: [] });
+    gate.calls[0].resolve(jsonResponse({ result: { records: [] } }));
+    assert.deepEqual(await cached, { records: [] });
+    await flush();
+    assert.equal(gate.calls.length, 1);
+
+    const all = client.refreshQuota({});
+    assert.deepEqual(gate.calls[1].body, { method: 'refreshQuota', args: [{}] });
+    gate.calls[1].resolve(jsonResponse({ result: { records: [], policyChanged: false, snapshot: { revision: 4 } } }));
+    assert.deepEqual(await all, { records: [], policyChanged: false, snapshot: { revision: 4 } });
+
+    const one = client.refreshQuota({ engine: 'grok' });
+    assert.deepEqual(gate.calls[2].body, { method: 'refreshQuota', args: [{ engine: 'grok' }] });
+    gate.calls[2].resolve(jsonResponse({ error: { code: 'RATE_LIMITED', message: '冷却中' } }, 429));
+    await assert.rejects(one, /RATE_LIMITED: 冷却中/);
+    await flush();
+    assert.equal(gate.calls.length, 3);
+  } finally {
+    gate.restore();
+    cleanup();
+  }
+});
+
 test('command helper keeps ok:false and commandId on the real client', async () => {
   installOrigin();
   const gate = installFetch();

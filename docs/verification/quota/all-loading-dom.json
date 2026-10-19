@@ -1,0 +1,171 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 8191397036900723114
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:34967/",
+  "refs": {
+    "e1": {
+      "name": "",
+      "role": "generic"
+    },
+    "e10": {
+      "name": "引擎",
+      "role": "link"
+    },
+    "e11": {
+      "name": "负责人",
+      "role": "link"
+    },
+    "e12": {
+      "name": "工作代理",
+      "role": "link"
+    },
+    "e13": {
+      "name": "路由与配额",
+      "role": "link"
+    },
+    "e14": {
+      "name": "重新探测",
+      "role": "button"
+    },
+    "e15": {
+      "name": "订阅额度",
+      "role": "region"
+    },
+    "e16": {
+      "name": "claude",
+      "role": "region"
+    },
+    "e17": {
+      "name": "codex",
+      "role": "region"
+    },
+    "e18": {
+      "name": "grok",
+      "role": "region"
+    },
+    "e19": {
+      "name": "opencode",
+      "role": "region"
+    },
+    "e2": {
+      "name": "跳到内容",
+      "role": "link"
+    },
+    "e20": {
+      "name": "pi",
+      "role": "region"
+    },
+    "e21": {
+      "name": "qoder",
+      "role": "region"
+    },
+    "e22": {
+      "name": "gemini",
+      "role": "region"
+    },
+    "e23": {
+      "name": "订阅额度",
+      "role": "heading"
+    },
+    "e24": {
+      "name": "读取额度缓存",
+      "role": "button"
+    },
+    "e25": {
+      "name": "刷新三家额度",
+      "role": "button"
+    },
+    "e26": {
+      "name": "Codex 额度",
+      "role": "region"
+    },
+    "e27": {
+      "name": "Claude Code 额度",
+      "role": "region"
+    },
+    "e28": {
+      "name": "Grok 额度",
+      "role": "region"
+    },
+    "e29": {
+      "name": "启用 claude",
+      "role": "switch"
+    },
+    "e3": {
+      "name": "Weaver",
+      "role": "button"
+    },
+    "e30": {
+      "name": "启用 codex",
+      "role": "switch"
+    },
+    "e31": {
+      "name": "启用 grok",
+      "role": "switch"
+    },
+    "e32": {
+      "name": "启用 opencode",
+      "role": "switch"
+    },
+    "e33": {
+      "name": "启用 pi",
+      "role": "switch"
+    },
+    "e34": {
+      "name": "启用 qoder",
+      "role": "switch"
+    },
+    "e35": {
+      "name": "启用 gemini",
+      "role": "switch"
+    },
+    "e36": {
+      "name": "刷新 Codex 额度",
+      "role": "button"
+    },
+    "e37": {
+      "name": "刷新 Claude Code 额度",
+      "role": "button"
+    },
+    "e38": {
+      "name": "刷新 Grok 额度",
+      "role": "button"
+    },
+    "e4": {
+      "name": "主导航",
+      "role": "navigation"
+    },
+    "e5": {
+      "name": "展开导航",
+      "role": "button"
+    },
+    "e6": {
+      "name": "切换到浅色",
+      "role": "button"
+    },
+    "e7": {
+      "name": "保存配置",
+      "role": "button"
+    },
+    "e8": {
+      "name": "放弃草稿并重新加载",
+      "role": "button"
+    },
+    "e9": {
+      "name": "任务",
+      "role": "link"
+    }
+  },
+  "snapshot": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - link \"跳到内容\" [ref=e2]\n    - complementary\n      - button \"Weaver\" [ref=e3]\n      - navigation \"主导航\" [ref=e4]\n        - link \"任务\" [ref=e9]\n          - image\n          - StaticText \"任务\"\n        - link \"引擎\" [ref=e10]\n          - image\n          - StaticText \"引擎\"\n        - link \"负责人\" [ref=e11]\n          - image\n          - StaticText \"负责人\"\n        - link \"工作代理\" [ref=e12]\n          - image\n          - StaticText \"工作代理\"\n        - link \"路由与配额\" [ref=e13]\n          - image\n          - StaticText \"路由与配额\"\n      - button \"展开导航\" [ref=e5]\n        - image\n      - button \"切换到浅色\" [ref=e6]\n        - image\n      - status\n        - StaticText \"已同步\"\n    - main\n      - button \"保存配置\" [ref=e7]\n      - button \"放弃草稿并重新加载\" [ref=e8]\n      - StaticText \"有未保存修改\"\n      - generic\n        - StaticText \"本机命令与版本。启用不会创建角色，也不会自动派发。\"\n        - button \"重新探测\" [disabled, ref=e14]\n          - StaticText \"重新探测\"\n        - status\n          - StaticText \"有未保存草稿。先保存或放弃，再启用或停用引擎。\"\n        - region \"订阅额度\" [ref=e15]\n          - heading \"订阅额度\" [level=2, ref=e23]\n          - button \"读取额度缓存\" [disabled, ref=e24]\n          - button \"刷新三家额度\" [disabled, ref=e25]\n            - StaticText \"刷新三家额度\"\n          - StaticText \"刷新会查询三家非公开额度接口并同步自动来源阻断，人工/历史阻断保留；不会调用模型。额度观测不保证模型可运行。\"\n          - region \"Codex 额度\" [ref=e26]\n            - StaticText \"Codex\"\n            - StaticText \"额度未知\"\n            - button \"刷新 Codex 额度\" [disabled, ref=e36]\n              - StaticText \"刷新\"\n            - generic\n              - StaticText \"上次接口说明：尚未探测额度\"\n            - StaticText \"尚无成功观测，当前额度未知。\"\n            - StaticText \"没有可确认的额度窗口。\"\n            - StaticText \"尚不能确认账户额度，未知值不会按 0 处理。\"\n            - generic\n              - StaticText \"来源：Codex 订阅用量 · 非公开接口\"\n            - generic\n              - StaticText \"上次检查：未知 · 上次成功观测：未知\"\n          - region \"Claude Code 额度\" [ref=e27]\n            - StaticText \"Claude Code\"\n            - StaticText \"额度未知\"\n            - button \"刷新 Claude Code 额度\" [disabled, ref=e37]\n              - StaticText \"刷新\"\n            - generic\n              - StaticText \"上次接口说明：尚未探测额度\"\n            - StaticText \"尚无成功观测，当前额度未知。\"\n            - StaticText \"没有可确认的额度窗口。\"\n            - StaticText \"尚不能确认账户额度，未知值不会按 0 处理。\"\n            - generic\n              - StaticText \"来源：Claude Code 订阅用量 · 非公开接口\"\n            - generic\n              - StaticText \"上次检查：未知 · 上次成功观测：未知\"\n          - region \"Grok 额度\" [ref=e28]\n            - StaticText \"Grok\"\n            - StaticText \"额度未知\"\n            - button \"刷新 Grok 额度\" [disabled, ref=e38]\n              - StaticText \"刷新\"\n            - generic\n              - StaticText \"上次接口说明：尚未探测额度\"\n            - StaticText \"尚无成功观测，当前额度未知。\"\n            - StaticText \"没有可确认的额度窗口。\"\n            - StaticText \"尚不能确认账户额度，未知值不会按 0 处理。\"\n            - generic\n              - StaticText \"来源：Grok CLI 订阅账期 · 非公开接口\"\n            - generic\n              - StaticText \"上次检查：未知 · 上次成功观测：未知\"\n        - region \"claude\" [ref=e16]\n          - StaticText \"claude\"\n          - StaticText \"正在探测\"\n          - StaticText \"claude\"\n          - LabelText\n            - StaticText \"启用 claude\"\n          - switch \"启用 claude\" [checked=true, disabled, ref=e29]\n          - group\n            - DisclosureTriangle \"详情\" [expanded=false]\n              - StaticText \"详情\"\n        - region \"codex\" [ref=e17]\n          - StaticText \"codex\"\n          - StaticText \"正在探测\"\n          - StaticText \"codex\"\n          - LabelText\n            - StaticText \"启用 codex\"\n          - switch \"启用 codex\" [checked=true, disabled, ref=e30]\n          - group\n            - DisclosureTriangle \"详情\" [expanded=false]\n              - StaticText \"详情\"\n        - region \"grok\" [ref=e18]\n          - StaticText \"grok\"\n          - StaticText \"正在探测\"\n          - StaticText \"grok\"\n          - LabelText\n            - StaticText \"启用 grok\"\n          - switch \"启用 grok\" [checked=false, disabled, ref=e31]\n          - group\n            - DisclosureTriangle \"详情\" [expanded=false]\n              - StaticText \"详情\"\n        - region \"opencode\" [ref=e19]\n          - StaticText \"opencode\"\n          - StaticText \"正在探测\"\n          - StaticText \"opencode\"\n          - LabelText\n            - StaticText \"启用 opencode\"\n          - switch \"启用 opencode\" [checked=false, disabled, ref=e32]\n          - group\n            - DisclosureTriangle \"详情\" [expanded=false]\n              - StaticText \"详情\"\n        - region \"pi\" [ref=e20]\n          - StaticText \"pi\"\n          - StaticText \"正在探测\"\n          - StaticText \"pi\"\n          - LabelText\n            - StaticText \"启用 pi\"\n          - switch \"启用 pi\" [checked=false, disabled, ref=e33]\n          - group\n            - DisclosureTriangle \"详情\" [expanded=false]\n              - StaticText \"详情\"\n        - region \"qoder\" [ref=e21]\n          - StaticText \"qoder\"\n          - StaticText \"正在探测\"\n          - StaticText \"qodercli\"\n          - LabelText\n            - StaticText \"启用 qoder\"\n          - switch \"启用 qoder\" [checked=false, disabled, ref=e34]\n          - group\n            - DisclosureTriangle \"详情\" [expanded=false]\n              - StaticText \"详情\"\n        - region \"gemini\" [ref=e22]\n          - StaticText \"gemini\"\n          - StaticText \"正在探测\"\n          - StaticText \"gemini\"\n          - LabelText\n            - StaticText \"启用 gemini\"\n          - switch \"启用 gemini\" [checked=false, disabled, ref=e35]\n          - group\n            - DisclosureTriangle \"详情\" [expanded=false]\n              - StaticText \"详情\""
+}

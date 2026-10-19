@@ -1,0 +1,30 @@
+{
+  "storedSecrets": false,
+  "storedFingerprints": false,
+  "files": {
+    "codex": {
+      "checked": true,
+      "existedBefore": true,
+      "existedAfter": true,
+      "unchanged": true
+    },
+    "claude": {
+      "checked": true,
+      "existedBefore": true,
+      "existedAfter": true,
+      "unchanged": true
+    },
+    "grok": {
+      "checked": true,
+      "existedBefore": true,
+      "existedAfter": true,
+      "unchanged": true
+    },
+    "formalPolicy": {
+      "checked": true,
+      "existedBefore": true,
+      "existedAfter": true,
+      "unchanged": true
+    }
+  }
+}

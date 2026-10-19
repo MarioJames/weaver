@@ -1,5 +1,6 @@
 import type { PolicySnapshot, SavePolicyInput, PreviewInput, RoutePreview, Issue } from "./policy";
 import type { EngineProbeRecord, EngineReadiness, ExecutionBoundary } from "./engines";
+import type { QuotaRefreshInput, QuotaRefreshResult, QuotaSnapshot } from './quota';
 export type { EngineProbeRecord, EngineReadiness };
 export interface EngineScan { probedAt: string; probes: EngineProbeRecord[]; readiness: EngineReadiness[]; boundary: ExecutionBoundary }
 export interface EngineToggleInput { id: string; enabled: boolean; revision: number }
@@ -35,6 +36,8 @@ export interface WeaverAPI {
  savePolicy(input: SavePolicyInput): Promise<PolicySnapshot>;
  previewRoute(input: PreviewInput): Promise<RoutePreview>;
  scanEngines(): Promise<EngineScan>;
+ getQuota(): Promise<QuotaSnapshot>;
+ refreshQuota(input: QuotaRefreshInput): Promise<QuotaRefreshResult>;
  setEngineEnabled(input: EngineToggleInput): Promise<EngineToggleResult>;
  listTasks(): Promise<Task[]>;
  createTask(input: TaskInput): Promise<Task>;

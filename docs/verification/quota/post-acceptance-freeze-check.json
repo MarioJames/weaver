@@ -1,0 +1,9 @@
+{
+  "checkedAt": "2026-10-19T02:41:34.925277+00:00",
+  "frozenFiles": 111,
+  "mismatches": [
+    "README.md"
+  ],
+  "srcTestsDistMismatches": [],
+  "note": "验收窗口与归档前两次111文件一致；最终资源释放后发现README文档变化，已回报Owner核对映射。"
+}

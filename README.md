@@ -40,6 +40,7 @@ The skill instructs the owner to use Weaver CLI for capability inspection, routi
 weaver capabilities           # command catalog, limits, realExecution
 weaver engines scan           # PATH + --version probe of the fixed engine catalog
 weaver policy get             # saved owners, workers, weights, pins, blocks, revision
+weaver quota get              # 只读内存中的 Codex / Claude Code / Grok 额度，不联网
 ```
 
 `capabilities.realExecution` means the real launcher module is loaded, not that a model ran or a login was proven. Engine scan proves an installed executable and version only; enabling an engine (`engines set-enabled`) still requires the probe and never creates a worker or owner role. Worker, model, and effort configuration is separate policy work, and real dispatch additionally requires an existing absolute workspace.
@@ -115,6 +116,24 @@ Route preview is non-executing; dispatch separately applies current policy. Edit
 ```json
 { "owner": "codex_owner", "worker": "codex_worker", "runningCount": 2 }
 ```
+
+## 原生账户额度
+
+`quota get` 只读内存；`quota refresh` 手动探测 Codex、Claude Code 和 Grok，并同步 Weaver 自建的 `policy.blocks`。初次读取或进程重启后显示未知，额度观测不持久缓存；自动阻断仍保留在策略文件中。额度状态不保证模型能够运行，引擎启用、角色、权重与 pin 仍独立配置。
+
+```sh
+weaver quota get --output json
+weaver quota refresh --output jsonl
+weaver quota get --output text
+printf '{"engine":"claude"}\n' | weaver quota refresh --input - --output json
+weaver quota refresh --help --output json
+```
+
+两条命令都支持 `json`、`jsonl`、`text`；刷新缺省探测全部三家，输入只接受可选的 `engine: codex|claude|grok`，不接受 command/task ID。当前机器目录共 37 条命令（27 个逻辑命令、8 个 RPC 动词、2 个本地等待动词），可用 `weaver --help --output json` 读取完整目录与参数；`capabilities.quota` 提供发现入口。
+
+成功观测在内存中保鲜 5 分钟，每家网络请求至少间隔 60 秒，并遵守接口的 `Retry-After`。没有后台轮询或强制绕过。只有新鲜、明确的账户耗尽会增加自有阻断，只有新鲜 `available` 会解除自有阻断；未知、失败或过期观测保留旧阻断。人工和其他来源的阻断保持原样；已过期的人工引擎阻断妨碍自动阻断时，刷新返回 `QUOTA_POLICY_CONFLICT`（HTTP 409），整次策略合并不落盘。
+
+探测只读取已有原生登录凭据，通过固定 HTTPS GET 调用三家的非公开额度接口；不刷新或改写登录、不启动推理。接口来源、原生凭据路径、状态解释及完整输出示例见 [额度 CLI 契约](docs/agent-interface.md#31-原生账户额度)。Grok CLI 订阅额度与 xAI API 钱包、RPM/TPM 或 token 费用不同。
 
 ## Result acceptance
 

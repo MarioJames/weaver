@@ -5,7 +5,7 @@ import { CLI_CATALOG, CLI_HELP, applyCallerWorkspace, parseCLI, renderEnvelope }
 import { READ_COMMANDS, WRITE_COMMANDS } from '../src/main/commands';
 
 const serverCommands = [...READ_COMMANDS, ...WRITE_COMMANDS];
-const rpcCommands = ['policy.get', 'policy.validate', 'policy.save', 'policy.preview', 'engines.scan', 'engines.set-enabled'];
+const rpcCommands = ['policy.get', 'policy.validate', 'policy.save', 'policy.preview', 'engines.scan', 'engines.set-enabled', 'quota.get', 'quota.refresh'];
 
 test('catalog covers every handler command, nested continuation, and output flags', () => {
   for (const name of [...serverCommands, ...rpcCommands, 'tasks.wait', 'tasks.watch']) {

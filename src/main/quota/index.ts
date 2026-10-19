@@ -1,0 +1,176 @@
+import type { EngineQuotaRecord, QuotaEngine, QuotaRefreshInput, QuotaSnapshot } from '../../shared/quota';
+import { QUOTA_FRESH_MS } from '../../shared/quota';
+import { QuotaFailure, readNativeCredential, type NativeCredential } from './credentials';
+import { normalizeUsage, PROVIDERS } from './providers';
+
+const ENGINES: QuotaEngine[] = ['codex', 'claude', 'grok'];
+const MIN_INTERVAL_MS = 60_000;
+const MAX_BODY_BYTES = 256 * 1024;
+
+/** Dependency overrides are internal to the main process and tests, never accepted over RPC. */
+export interface QuotaProberOptions {
+  env?: NodeJS.ProcessEnv;
+  now?: () => Date;
+  fetch?: typeof globalThis.fetch;
+  timeoutMs?: number;
+}
+
+function initial(engine: QuotaEngine): EngineQuotaRecord {
+  return { engine, source: PROVIDERS[engine].source, status: 'unknown', checkedAt: null, observedAt: null, stale: true, windows: [], detail: '尚未探测额度', retryAt: null };
+}
+
+function retryAfter(value: string | null, now: number): number | null {
+  if (!value) return null;
+  if (/^\d+(?:\.\d+)?$/.test(value.trim())) {
+    const ms = Number(value) * 1000;
+    return Number.isFinite(ms) && ms <= 8640000000000000 - now ? now + ms : null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && parsed > now ? parsed : null;
+}
+
+export class QuotaProber {
+  private readonly records = new Map(ENGINES.map(engine => [engine, initial(engine)]));
+  private readonly fingerprints = new Map<QuotaEngine, string>();
+  private readonly nextRequests = new Map<QuotaEngine, number>();
+  private readonly inflight = new Map<QuotaEngine, Promise<void>>();
+  private readonly controllers = new Set<AbortController>();
+  private readonly env: NodeJS.ProcessEnv;
+  private readonly clock: () => Date;
+  private readonly fetcher: typeof globalThis.fetch;
+  private readonly timeoutMs: number;
+  private closed = false;
+
+  constructor(options: QuotaProberOptions = {}) {
+    this.env = options.env ?? process.env;
+    this.clock = options.now ?? (() => new Date());
+    this.fetcher = options.fetch ?? globalThis.fetch;
+    this.timeoutMs = Math.max(1, Math.min(8_000, options.timeoutMs ?? 8_000));
+  }
+
+  get(): QuotaSnapshot {
+    const now = this.clock().getTime();
+    return { records: ENGINES.map(engine => {
+      const record = structuredClone(this.records.get(engine)!);
+      const measured = record.windows.filter(w => w.scope === 'account' && w.usedPercent !== null);
+      const onlyExpiredWindows = record.statusBasis !== 'account_restriction' && measured.length > 0 && measured.every(w => w.resetsAt !== null && Date.parse(w.resetsAt) <= now);
+      record.stale ||= !record.observedAt || now - Date.parse(record.observedAt) >= QUOTA_FRESH_MS || onlyExpiredWindows;
+      if (record.retryAt && Date.parse(record.retryAt) <= now) record.retryAt = null;
+      return record;
+    }) };
+  }
+
+  async refresh(input: QuotaRefreshInput): Promise<QuotaSnapshot> {
+    if (this.closed) throw new Error('额度探测器已关闭');
+    if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(key => key !== 'engine') || input.engine !== undefined && !ENGINES.includes(input.engine)) throw new Error('额度刷新参数无效');
+    await Promise.all((input.engine ? [input.engine] : ENGINES).map(engine => this.refreshOne(engine)));
+    return this.get();
+  }
+
+  async close(): Promise<void> {
+    this.closed = true;
+    for (const controller of this.controllers) controller.abort();
+    await Promise.allSettled(this.inflight.values());
+  }
+
+  private refreshOne(engine: QuotaEngine): Promise<void> {
+    const active = this.inflight.get(engine);
+    if (active) return active;
+    const job = this.execute(engine).finally(() => { if (this.inflight.get(engine) === job) this.inflight.delete(engine); });
+    this.inflight.set(engine, job);
+    return job;
+  }
+
+  private async execute(engine: QuotaEngine): Promise<void> {
+    const controller = new AbortController();
+    this.controllers.add(controller);
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    let abort!: () => void;
+    const interrupted = new Promise<never>((_, reject) => { abort = () => reject(new QuotaFailure('error', this.closed ? '额度探测已关闭' : '额度接口请求超时')); controller.signal.addEventListener('abort', abort, { once: true }); });
+    let fingerprint: string | undefined;
+    const started = this.clock().getTime();
+    try {
+      const result = await Promise.race([this.probe(engine, controller.signal, value => { fingerprint = value; }), interrupted]);
+      if (result && !this.closed) this.records.set(engine, result);
+    } catch (error) {
+      if (this.closed) return;
+      const failure = error instanceof QuotaFailure ? error : new QuotaFailure('error', '额度接口请求失败');
+      const previous = this.records.get(engine)!;
+      const sameCredential = fingerprint !== undefined && fingerprint === this.fingerprints.get(engine);
+      if (failure.retryAt !== null) this.nextRequests.set(engine, Math.max(this.nextRequests.get(engine) ?? 0, failure.retryAt));
+      this.records.set(engine, {
+        ...initial(engine), status: failure.status, checkedAt: new Date(started).toISOString(),
+        observedAt: sameCredential ? previous.observedAt : null,
+        windows: sameCredential ? previous.windows : [], stale: true, detail: failure.message,
+        retryAt: this.nextRequests.has(engine) ? new Date(this.nextRequests.get(engine)!).toISOString() : null,
+      });
+    } finally {
+      clearTimeout(timer);
+      controller.signal.removeEventListener('abort', abort);
+      this.controllers.delete(controller);
+    }
+  }
+
+  private async probe(engine: QuotaEngine, signal: AbortSignal, identify: (fingerprint: string) => void): Promise<EngineQuotaRecord | undefined> {
+    const now = this.clock().getTime();
+    const credential = await readNativeCredential(engine, this.env, now);
+    identify(credential.fingerprint);
+    if (signal.aborted || this.closed) throw new QuotaFailure('error', '额度探测已取消');
+    if (this.fingerprints.get(engine) !== credential.fingerprint) {
+      this.records.set(engine, initial(engine));
+      this.fingerprints.set(engine, credential.fingerprint);
+    }
+    const next = this.nextRequests.get(engine) ?? 0;
+    if (next > now) {
+      const record = this.records.get(engine)!;
+      record.retryAt = new Date(next).toISOString();
+      return undefined;
+    }
+    this.nextRequests.set(engine, now + MIN_INTERVAL_MS);
+    const payload = await this.request(engine, credential, signal);
+    if (signal.aborted || this.closed) throw new QuotaFailure('error', '额度探测已取消');
+    const checkedAt = this.clock().toISOString();
+    const measurement = normalizeUsage(engine, payload, this.clock().getTime());
+    // Supplier-controlled model/product strings must not echo a known native credential.
+    const secrets = [credential.token, credential.accountId].filter((value): value is string => !!value);
+    measurement.windows = measurement.windows.map((row, index) => row.model && secrets.some(secret => row.model!.includes(secret)) || secrets.some(secret => row.label.includes(secret))
+      ? { ...row, id: `${engine}:redacted:${index}`, label: '额度窗口', scope: row.scope === 'model' ? 'unknown' : row.scope, model: null }
+      : row);
+    return { engine, source: PROVIDERS[engine].source, ...measurement, checkedAt, observedAt: checkedAt, stale: false, retryAt: new Date(this.nextRequests.get(engine)!).toISOString() };
+  }
+
+  private async request(engine: QuotaEngine, credential: NativeCredential, signal: AbortSignal): Promise<unknown> {
+    const headers: Record<string, string> = { Authorization: `Bearer ${credential.token}`, Accept: 'application/json', 'User-Agent': 'Weaver/0.1.0' };
+    if (engine === 'codex') headers['ChatGPT-Account-Id'] = credential.accountId!;
+    if (engine === 'claude') headers['anthropic-beta'] = 'oauth-2025-04-20';
+    if (engine === 'grok') headers['x-xai-token-auth'] = 'xai-grok-cli';
+    const response = await this.fetcher(PROVIDERS[engine].url, { method: 'GET', headers, signal, redirect: 'error', credentials: 'omit', cache: 'no-store' });
+    if (response.redirected) { void response.body?.cancel().catch(() => undefined); throw new QuotaFailure('error', '额度接口拒绝重定向'); }
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => undefined);
+      if (response.status === 401 || response.status === 403) throw new QuotaFailure('unauthenticated', '原生登录无效或无权读取额度，请在对应工具中确认登录');
+      if (response.status === 429) throw new QuotaFailure('error', '额度探测接口限流，请稍后重试', retryAfter(response.headers.get('Retry-After'), this.clock().getTime()));
+      throw new QuotaFailure('error', '额度接口暂时不可用');
+    }
+    const contentType = response.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase();
+    if (!contentType || contentType !== 'application/json' && !contentType.endsWith('+json')) { void response.body?.cancel().catch(() => undefined); throw new QuotaFailure('error', '额度接口返回了非 JSON 数据'); }
+    const reader = response.body?.getReader();
+    if (!reader) throw new QuotaFailure('error', '额度接口没有返回数据');
+    const cancel = () => { void reader.cancel().catch(() => undefined); };
+    signal.addEventListener('abort', cancel, { once: true });
+    if (signal.aborted) cancel();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > MAX_BODY_BYTES) throw new QuotaFailure('error', '额度响应超过大小限制');
+        chunks.push(value);
+      }
+      try { return JSON.parse(Buffer.concat(chunks, size).toString('utf8')); }
+      catch { throw new QuotaFailure('error', '额度接口返回了无效 JSON'); }
+    } finally { signal.removeEventListener('abort', cancel); cancel(); }
+  }
+}

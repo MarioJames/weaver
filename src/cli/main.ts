@@ -56,6 +56,8 @@ export const CLI_CATALOG: CatalogCommand[] = [
   { command: 'policy.save', inputFields: {"required": {"revision": "current policy revision integer", "config": "full policy config", "blocks": "quota block array (≤500)"}, "optional": {}}, mutation: true, rpc: { method: 'savePolicy', arity: 1 }, usage: 'policy save --input <save.json>' },
   { command: 'policy.preview', inputFields: {"required": {"owner": "owner profile ID"}, "optional": {"worker": "explicit worker ID", "class": "mechanical | routine | judgment", "tag": "judgment domain tag", "runningCount": "integer ≥0"}}, mutation: false, rpc: { method: 'previewRoute', arity: 1 }, usage: 'policy preview --input <preview.json>' },
   { command: 'engines.scan', mutation: false, rpc: { method: 'scanEngines', arity: 0 }, usage: 'engines scan' },
+  { command: 'quota.get', mutation: false, rpc: { method: 'getQuota', arity: 0 }, usage: 'quota get' },
+  { command: 'quota.refresh', inputFields: { required: {}, optional: { engine: 'codex | claude | grok (omitted refreshes all three)' }, notes: 'Refreshes native account quota without inference and synchronizes Weaver-owned policy blocks. Manual blocks are retained. Does not accept commandId, taskId, --command-id, or --task-id.' }, mutation: true, rpc: { method: 'refreshQuota', arity: 1 }, usage: 'quota refresh [--input <refresh.json>]' },
   { command: 'engines.set-enabled', inputFields: {"required": {"id": "engine ID", "enabled": "boolean", "revision": "current policy revision integer"}, "optional": {}}, mutation: true, rpc: { method: 'setEngineEnabled', arity: 1 }, usage: 'engines set-enabled --input <toggle.json>' },
 ];
 
@@ -77,7 +79,7 @@ tasks create: an omitted workspace becomes this CLI process's working directory 
 
 tasks wait and tasks watch poll tasks get and tasks events. --for is 1 through 600 seconds and defaults to 30. They do not start a second scheduler.
 
-Mutations need --command-id, except policy save and engines set-enabled, which send the JSON body shown in their usage. operations get reads that same --command-id. owners attach stores a name and profile plus optional caller labels. It does not contact a host. owners spawn does not start an owner model. capabilities.realExecution means the worker launcher is loaded, not that a model ran or a login was proven. mock-jsonl is an explicit provider. A real route does not fall back to mock.
+Mutations need --command-id, except policy save, engines set-enabled, and quota refresh, which send the JSON body shown in their usage. quota refresh defaults to {} and synchronizes Weaver-owned policy blocks without inference; it does not accept command or task IDs. operations get reads that same --command-id. owners attach stores a name and profile plus optional caller labels. It does not contact a host. owners spawn does not start an owner model. capabilities.realExecution means the worker launcher is loaded, not that a model ran or a login was proven. mock-jsonl is an explicit provider. A real route does not fall back to mock.
 
 ${catalogHelp}
 
@@ -395,10 +397,10 @@ export async function runCLI(argv: string[]): Promise<number> {
     const rpc = item?.rpc;
     let request: Record<string, unknown>;
     if (rpc) {
-      if (options.commandId || options.taskId) throw new LocalIPCError('INVALID_ARGUMENT', 'Policy and engine commands do not take command or task IDs');
+      if (options.commandId || options.taskId) throw new LocalIPCError('INVALID_ARGUMENT', 'Policy, engine, and quota commands do not take command or task IDs');
       if (rpc.arity === 1) {
-        if (!options.input) throw new LocalIPCError('INVALID_ARGUMENT', 'This command requires --input');
-        request = { method: rpc.method, args: [await readInput(options.input)] };
+        if (!options.input && item.command !== 'quota.refresh') throw new LocalIPCError('INVALID_ARGUMENT', 'This command requires --input');
+        request = { method: rpc.method, args: [options.input ? await readInput(options.input) : {}] };
       } else if (options.input) throw new LocalIPCError('INVALID_ARGUMENT', 'This command does not take --input');
       else request = { method: rpc.method, args: [] };
     } else {

@@ -1,0 +1,7 @@
+{
+  "providerCallsBefore": 9,
+  "providerCallsAfter": 9,
+  "quotaRpcBefore": 10,
+  "quotaRpcAfter": 10,
+  "note": "workbench sync.status polling remains independent; quota aging sent no RPC/provider HTTP"
+}

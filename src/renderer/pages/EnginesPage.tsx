@@ -1,3 +1,4 @@
+import { QuotaPanel } from '../components/QuotaPanel';
 import { NamedSwitch } from '../components/NamedControls';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Text } from '@lobehub/ui/base-ui';
@@ -66,6 +67,7 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
     {policy.dirty && <Text role="status">有未保存草稿。先保存或放弃，再启用或停用引擎。</Text>}
     {actionError && <Text role="alert" type="danger">{actionError}</Text>}
     {!scanning && !scanError && !probes.length && <Text type="secondary">没有探测记录。</Text>}
+    <QuotaPanel policy={policy} />
     <div className={styles.engines}>
       {ENGINE_CATALOG.map(entry => {
         const probe = probes.find(item => item.id === entry.id);

@@ -1,0 +1,41 @@
+{
+  "status": "released",
+  "session": "quota-bh-16z1usfq",
+  "profile": "/tmp/weaver-quota-16z1usfq/quota-browser",
+  "real": {
+    "unit": "dev-weaver-quota-real-16z1usfq.scope",
+    "invocationId": "3d35668820094939aacb145a78ea1752",
+    "port": 37539,
+    "stopped": true
+  },
+  "fixture": {
+    "unit": "dev-weaver-quota-fixture-16z1usfq.scope",
+    "invocationId": "3717583f1b2245c9942d5e0b3b34373d",
+    "pid": 3543325,
+    "port": 34967,
+    "MemoryHigh": 8589934592,
+    "MemoryMax": 10737418240,
+    "stopped": true
+  },
+  "hiddenSessionProof": "lane-real.json",
+  "report": "REPORT.html",
+  "portClosed": {
+    "37539": true,
+    "34967": true
+  },
+  "scopesFinal": "scopes-final.txt",
+  "hiddenSessionCleanup": "hidden-session-cleanup.json",
+  "browserClosed": true,
+  "profileRemoved": true,
+  "fixturePidGone": true,
+  "temporaryDataRemoved": [
+    "/tmp/weaver-quota-16z1usfq/r",
+    "/tmp/weaver-quota-16z1usfq/f",
+    "/tmp/weaver-quota-16z1usfq/browser"
+  ],
+  "taskRootPreservedForOwner": "/tmp/weaver-quota-16z1usfq",
+  "formalData": "preserved; auth/formal-policy content unchanged",
+  "unrelatedResources": "4738/.weaver-dev/pnpm/global config not operated",
+  "reportReadability": "report-readability.json",
+  "artifactSafety": "artifact-safety.json"
+}

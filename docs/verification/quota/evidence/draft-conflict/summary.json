@@ -1,0 +1,21 @@
+{
+  "target": "http://127.0.0.1:34967",
+  "mode": "task",
+  "session": "quota-bh-16z1usfq",
+  "reuse_page": true,
+  "profile_dir": "/tmp/weaver-quota-16z1usfq/quota-browser",
+  "timestamp": "20261018T223801",
+  "evidence_dir": "/home/mocha/opensource/weaver/docs/verification/quota/evidence/draft-conflict",
+  "artifacts": {
+    "screenshot": "screenshot.png",
+    "dom": "dom.json",
+    "console": "console.json",
+    "network_xhr": "network-xhr.json",
+    "network_errors": "network-errors.json"
+  },
+  "counts": {
+    "network_xhr": 257,
+    "network_errors": 3
+  },
+  "artifact_errors": []
+}

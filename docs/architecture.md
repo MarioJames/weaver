@@ -35,10 +35,12 @@ Weaver 是本地任务控制面，交付三件套：
           ├─ PolicyStore（policy.v1.json）+ 纯路由 policy/routing.ts
           ├─ TaskStore（tasks.v1.json，fsync+rename 原子替换）
           ├─ engines/{probe,control}.ts（PATH+--version 只读探测）
+          ├─ quota/（原生凭据只读 + 固定 HTTPS GET，进程内额度观测）
+          ├─ policy/quota.ts（新鲜账户观测 → 自有 policy.blocks 原子合并）
           └─ ContinuationService（src/main/continuation.ts，owner 手动上下文）
 ```
 
-进程语义：`weaver web` 前台单实例；端口被占返回 `EADDRINUSE`；`--data-dir` 决定默认 endpoint/state 目录。Ctrl+C/SIGTERM → draining → 等待未响应帧完成 → `manager.shutdown()` 逐个取消本进程拥有的 running 任务并等待子进程退出 → 关闭 HTTP/socket → 退出。任务与策略文件保留。关闭浏览器页不停任务。客户端断开不取消已提交的工作。
+进程语义：`weaver web` 前台单实例；端口被占返回 `EADDRINUSE`；`--data-dir` 决定默认 endpoint/state 目录。Ctrl+C/SIGTERM → draining → 中止在途额度探测 → 等待未响应请求完成 → `manager.shutdown()` 逐个取消本进程拥有的 running 任务并等待子进程退出 → 关闭 HTTP/socket → 退出。draining 后完成的额度请求不再保存策略。任务与策略文件保留。关闭浏览器页不停任务。客户端断开不取消已提交的工作。
 
 ## 3. 单写权威与存储
 
@@ -46,6 +48,8 @@ JSON 双文件即全部持久状态：
 
 - `tasks.v1.json`：任务（含 events/artifacts/run/摘要）、owners 元数据、frozen packages、命令收据 revisions；原子快照 revision 单调递增。上限 32 MiB、200 tasks、200 owners、1000 packages、5000 receipts、每任务 500 events、每任务 20 artifacts（内容 ≤32,000 字符）。
 - `policy.v1.json`：验证过的 policy 配置 + quota blocks；上限 256 KiB、500 blocks；revision 乐观锁，保存整文档替换。
+
+额度观测不增加持久文件：`QuotaProber` 只读原生认证并通过三个固定非公开 HTTPS GET 获取数据，观测在内存保鲜 5 分钟、每 provider 请求间隔至少 60 秒；`quota get` 无网络，`quota refresh` 显式触发探测与自有 blocks 合并。`policy.blocks` 仍是唯一持久阻断来源；人工来源不被自动覆盖，遇到妨碍施加自动阻断的过期 foreign 唯一 key 返回原子冲突。请求/认证边界及错误语义见 [额度接口](agent-interface.md#31-原生账户额度)。
 
 写入模型均在 fsync + rename 原子替换内完成（`src/main/store.ts`），无 directory fsync；中断的写命令先以 durable intent（receipt 写入）暴露为 `COMMAND_INDETERMINATE`，要求用 `operations.get` 查收据并核对现状，不做自动重放。命令收据键为 `local-demo:<commandId>`，同键同参返回原响应、同键不同参拒绝 `IDEMPOTENCY_CONFLICT`。这不是 exactly-once 外部执行保证，也没有事务 outbox。
 

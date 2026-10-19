@@ -229,6 +229,8 @@ export function createBrowserClient(): WeaverAPI {
   return {
     command: request => call('command', [request]) as ReturnType<WeaverAPI['command']>,
     getPolicy: () => call('getPolicy', []) as ReturnType<WeaverAPI['getPolicy']>,
+    getQuota: () => call('getQuota', []) as ReturnType<WeaverAPI['getQuota']>,
+    refreshQuota: input => call('refreshQuota', [input]) as ReturnType<WeaverAPI['refreshQuota']>,
     validatePolicy: config => call('validatePolicy', [config]) as ReturnType<WeaverAPI['validatePolicy']>,
     savePolicy: input => call('savePolicy', [input]) as ReturnType<WeaverAPI['savePolicy']>,
     previewRoute: input => call('previewRoute', [input]) as ReturnType<WeaverAPI['previewRoute']>,

@@ -1,0 +1,20 @@
+[
+  {
+    "url": "https://chatgpt.com/backend-api/wham/usage",
+    "method": "GET",
+    "startedAt": "2026-10-19T02:34:35.978Z",
+    "status": 200
+  },
+  {
+    "url": "https://api.anthropic.com/api/oauth/usage",
+    "method": "GET",
+    "startedAt": "2026-10-19T02:34:35.984Z",
+    "status": 200
+  },
+  {
+    "url": "https://cli-chat-proxy.grok.com/v1/billing?format=credits",
+    "method": "GET",
+    "startedAt": "2026-10-19T02:34:35.985Z",
+    "status": 200
+  }
+]

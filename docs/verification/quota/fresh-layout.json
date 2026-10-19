@@ -1,0 +1,17 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 8191397036900723114
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:34967/",
+  "result": "{\"width\":900,\"scroll\":900,\"main\":{\"x\":56,\"y\":0,\"width\":844,\"height\":650,\"top\":0,\"right\":900,\"bottom\":650,\"left\":56},\"app\":{\"x\":0,\"y\":0,\"width\":900,\"height\":650,\"top\":0,\"right\":900,\"bottom\":650,\"left\":0},\"percent\":[{\"text\":\"已用 23%\",\"rect\":{\"x\":81,\"y\":386.6875,\"width\":389,\"height\":2,\"top\":386.6875,\"right\":470,\"bottom\":388.6875,\"left\":81}},{\"text\":\"已用 48%\",\"rect\":{\"x\":486,\"y\":386.6875,\"width\":389,\"height\":2,\"top\":386.6875,\"right\":875,\"bottom\":388.6875,\"left\":486}},{\"text\":\"已用 23%\",\"rect\":{\"x\":81,\"y\":643.90625,\"width\":254,\"height\":2,\"top\":643.90625,\"right\":335,\"bottom\":645.90625,\"left\":81}},{\"text\":\"已用 42%\",\"rect\":{\"x\":351,\"y\":643.90625,\"width\":254,\"height\":2,\"top\":643.90625,\"right\":605,\"bottom\":645.90625,\"left\":351}},{\"text\":\"已用 12%\",\"rect\":{\"x\":621,\"y\":643.90625,\"width\":254,\"height\":2,\"top\":643.90625,\"right\":875,\"bottom\":645.90625,\"left\":621}},{\"text\":\"已用 23%\",\"rect\":{\"x\":81,\"y\":901.125,\"width\":389,\"height\":2,\"top\":901.125,\"right\":470,\"bottom\":903.125,\"left\":81}},{\"text\":\"已用 14%\",\"rect\":{\"x\":486,\"y\":901.125,\"width\":389,\"height\":2,\"top\":901.125,\"right\":875,\"bottom\":903.125,\"left\":486}}]}"
+}
