@@ -74,7 +74,8 @@ function fail(res: ServerResponse, code: string, message: string): void {
   send(res, statusFor(code), { error: { code, message } });
 }
 
-function contained(rootReal: string, rawUrl: string): string | null {
+/** The renderer-relative path a URL names ("/" is index.html), or null when it is unsafe or not a served type. */
+function staticPath(rawUrl: string): string[] | null {
   const pathOnly = rawUrl.split('?')[0]?.split('#')[0] ?? '/';
   if (pathOnly.includes('\\') || pathOnly.includes('\0') || /%2e|%2f|%5c|%00/i.test(pathOnly)) return null;
   let decoded: string;
@@ -82,8 +83,15 @@ function contained(rootReal: string, rawUrl: string): string | null {
   if (decoded.includes('\0') || decoded.includes('\\') || decoded.includes('%')) return null;
   const parts = decoded.split('/').filter(Boolean);
   if (parts.some(part => part === '.' || part === '..')) return null;
-  const relative = parts.length === 0 ? 'index.html' : parts.join(sep);
-  const full = resolve(rootReal, relative);
+  const path = parts.length === 0 ? ['index.html'] : parts;
+  if (!MIME[extname(path.at(-1)!).toLowerCase()]) return null;
+  return path;
+}
+
+function contained(rootReal: string, rawUrl: string): string | null {
+  const parts = staticPath(rawUrl);
+  if (!parts) return null;
+  const full = resolve(rootReal, parts.join(sep));
   if (full !== rootReal && !full.startsWith(rootReal + sep)) return null;
   if (!MIME[extname(full).toLowerCase()]) return null;
   return full;
@@ -108,6 +116,8 @@ function singleHeader(value: string | string[] | undefined): string | undefined 
 export async function startHttpServer(options: {
   port: number;
   staticRoot?: string;
+  /** The renderer embedded in a standalone executable, keyed by "/"-joined relative path. */
+  staticFiles?: ReadonlyMap<string, Uint8Array>;
   allowUpgrade?: boolean;
   prepare?: (server: Server, port: number) => Promise<void>;
   delegate?: (req: IncomingMessage, res: ServerResponse, next: (error?: unknown) => void) => void;
@@ -192,6 +202,15 @@ export async function startHttpServer(options: {
         options.delegate(req, res, () => {
           if (!res.writableEnded && !res.headersSent) fail(res, 'NOT_FOUND', 'Not found');
         });
+        return;
+      }
+      if (options.staticFiles) {
+        const parts = staticPath(rawUrl);
+        const body = parts ? options.staticFiles.get(parts.join('/')) : undefined;
+        if (!parts || !body) { fail(res, 'NOT_FOUND', 'Not found'); return; }
+        applyHeaders(res, MIME[extname(parts.at(-1)!).toLowerCase()], body.byteLength);
+        res.writeHead(200);
+        res.end(req.method === 'HEAD' ? undefined : body);
         return;
       }
       const file = rootReal ? contained(rootReal, rawUrl) : null;

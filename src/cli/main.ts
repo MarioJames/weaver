@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { failure, LocalIPCError, MAX_FRAME_BYTES, readDiscovery, TRANSPORT_TIMEOUT_MS } from '../main/local-ipc';
 import { startRuntime } from '../main/runtime';
+import { VERSION } from '../shared/version';
 
 export const DEFAULT_WEB_PORT = 4737;
 export type OutputFormat = 'json' | 'jsonl' | 'text';
@@ -355,6 +356,7 @@ export async function runCLI(argv: string[]): Promise<number> {
   let commandId: string | undefined;
   let errorFormat: OutputFormat = requestedOutput(argv);
   try {
+    if (argv.length === 1 && (argv[0] === '--version' || argv[0] === '-v')) { process.stdout.write(`weaver ${VERSION}\n`); return 0; }
     if (argv.includes('--help')) {
       const rest=argv.filter(arg=>arg!=='--help');
       const words=positionals(rest);

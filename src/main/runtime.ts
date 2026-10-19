@@ -7,6 +7,7 @@ import { EXECUTION_BOUNDARY, ENGINE_CATALOG, readinessFor, type EngineProbeRecor
 import { parseId, parseTaskInput } from '../shared/validation';
 import { startCliAgent } from './adapters/cli/index';
 import { HelloJobs, parseHelloInput, sayHi } from './engines/hello';
+import { embeddedApp } from './embedded';
 import { RoutingWorkerAdapter } from './adapters/routing';
 import { MockWorkerAdapter } from './adapters/worker';
 import { CommandHandler, configuredParallel } from './commands';
@@ -72,7 +73,10 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   const dataDir = resolve(options.dataDir);
   const repo = options.repoRoot ?? paths.repo;
   const rendererRoot = options.rendererRoot ?? paths.rendererRoot;
-  const workerScript = options.workerScript ?? paths.workerScript;
+  const embedded = embeddedApp();
+  if (embedded && options.dev) throw new Error('--dev needs a source checkout; this is a standalone executable');
+  // A standalone executable runs the mock worker as itself with a hidden argument.
+  const workerScript = options.workerScript ?? embedded?.mockWorkerArg ?? paths.workerScript;
   let ready = false;
   let draining = false;
   let commands: CommandHandler | undefined;
@@ -228,7 +232,8 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   try {
     http = await startHttpServer({
       port: options.port ?? 0,
-      staticRoot: options.dev ? undefined : rendererRoot,
+      staticRoot: options.dev || (embedded && !options.rendererRoot) ? undefined : rendererRoot,
+      staticFiles: embedded && !options.rendererRoot ? embedded.renderer : undefined,
       allowUpgrade: options.dev === true,
       prepare: options.dev ? async (server, port) => {
         const { createServer } = await import('vite');

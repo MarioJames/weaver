@@ -9,6 +9,7 @@
     "dev": "tsx watch --clear-screen=false src/cli/main.ts web --dev --no-open --port 4738 --data-dir .weaver-dev",
     "start": "node dist/cli/main.mjs web",
     "build": "tsc --noEmit && vite build && node scripts/build-main.mjs",
+    "dist": "npm run build && node scripts/build-standalone.mjs --all",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
     "check": "npm run typecheck && npm test && npm run build"

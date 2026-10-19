@@ -10,7 +10,27 @@ Weaver is a local Node control plane for owner-led agent work. It ships as one p
 
 The owner is the real agent that hosts the skill. It registers logical ownership in Weaver through the CLI and dispatches workers from there; Weaver never spawns an owner model itself. Saved routes launch real OpenCode, Pi, Grok, and Codex launchers through fixed argument adapters. `mock-jsonl` runs only when explicitly requested. A failed or unloaded real engine fails the dispatch; it never falls back to mock, Claude Code, or another engine. Claude Code real execution is deferred. Engine scan checks `PATH` and `--version` only.
 
-## Install and build
+## Install
+
+Download the standalone executable for your platform from GitHub Releases. It needs no Node, npm or source checkout:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/MarioJames/weaver/main/install.sh | bash
+weaver --version
+```
+
+The script picks `weaver-linux-x64`, `weaver-linux-arm64` or `weaver-darwin-arm64`, checks it against the release `SHA256SUMS`, and places it at `~/.local/bin/weaver` (`--bin-dir` to change, `--version v0.1.0` to pin, `--uninstall` to remove only the executable). It refuses to replace an existing `weaver` that is not a Weaver release unless you pass `--force`; state in `~/.local/share/weaver` is never touched. The manual equivalent is a download plus the execute bit:
+
+```sh
+curl -fsSLo ~/.local/bin/weaver https://github.com/MarioJames/weaver/releases/latest/download/weaver-linux-x64
+chmod +x ~/.local/bin/weaver
+```
+
+Each executable embeds the web UI and the mock worker (about 85 MB, the Bun runtime included). `weaver web --dev` needs a source checkout. Real worker launches still need the engine CLIs on `PATH` and, on Linux, `systemd-run --user`; macOS builds are compiled but not yet exercised against real engines.
+
+Releases are built by `.github/workflows/release.yml` on a `v*` tag that matches `package.json`: `npm run dist` builds the renderer, then `scripts/build-standalone.mjs --all` compiles every target with Bun into `dist/release/` with `SHA256SUMS`. Locally, `node scripts/build-standalone.mjs` (after `npm run build`) builds only this machine's target, and `./install.sh --dist-dir dist/release` installs it.
+
+## Build from source
 
 Requires Node.js 22.12+ (`engines` in `package.json`). No system toolchain is installed.
 
