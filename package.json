@@ -7,6 +7,7 @@
   "main": "dist/cli/main.mjs",
   "scripts": {
     "dev": "tsx src/cli/main.ts web --dev",
+    "dev:web": "tsx watch --clear-screen=false src/cli/main.ts web --dev --no-open --port 4738 --data-dir .weaver-dev",
     "start": "node dist/cli/main.mjs web",
     "build": "tsc --noEmit && vite build && node scripts/build-main.mjs",
     "typecheck": "tsc --noEmit",
