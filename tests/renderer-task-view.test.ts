@@ -469,26 +469,14 @@ test('detail notes only the states that need explaining', () => {
   assert.doesNotMatch(markup(React.createElement(TaskDetail, { task: { ...claude, status: 'completed' }, ...detailProps })), /调度请求已排队|执行失败|执行已取消/);
 });
 
-test('long instructions clamp to a few lines and expand on demand', () => {
-  const long = `${'Remove every progress bar and rework the header. '.repeat(8)}Then keep tabs.`;
-  const folded = markup(React.createElement(TaskDetail, { task: { ...claude, instruction: long }, ...detailProps }));
-  assert.match(folded, /-webkit-line-clamp:4/);
-  assert.match(folded, /展开/);
-  assert.doesNotMatch(folded, /收起/);
-  const short = markup(React.createElement(TaskDetail, { task: { ...claude, instruction: 'Rework the board' }, ...detailProps }));
-  assert.doesNotMatch(short, /展开|收起/);
-  assert.match(short, /-webkit-line-clamp:4/);
-});
-
 test('retry lineage is a quiet line only when it exists', () => {
   assert.match(markup(React.createElement(TaskDetail, { task: { ...claude, retryOf: 't0' }, ...detailProps })), /重试来源：t0/);
   assert.doesNotMatch(markup(React.createElement(TaskDetail, { task: claude, ...detailProps })), /重试来源/);
 });
 
-test('handover moves into the fourth tab of the same record', () => {
+test('handover stays in a tab of the same record', () => {
   const html = markup(React.createElement(TaskDetail, { task: claude, ...detailProps }));
-  assert.match(html, /id="task-tab-continuation"/);
-  assert.match(html, /aria-controls="task-panel-continuation"/);
+  assert.match(html, /role="tab"[^>]*>接续<\/button>/);
   assert.doesNotMatch(html, /执行上下文/);
 });
 

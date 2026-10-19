@@ -202,13 +202,3 @@ export function archiveOutcome(task: Task): { label: string; color?: string } {
 }
 export function reviewStatus(task: Task): string { return task.status === 'completed' ? (task.reviewState ?? 'pending') : 'not_ready'; }
 export function reviewLabel(task: Task): string { const status = reviewStatus(task); return ({ pending: '待验收', approved: '已通过', accepted: '已通过', rejected: '需修改', changes_requested: '需修改', not_ready: '尚未进入验收' } as Record<string,string>)[status] ?? status; }
-
-export function nextTab(keys: readonly string[], current: string, key: string): string | undefined {
-  const index = keys.indexOf(current);
-  if (index < 0) return undefined;
-  if (key === 'ArrowRight') return keys[(index + 1) % keys.length];
-  if (key === 'ArrowLeft') return keys[(index - 1 + keys.length) % keys.length];
-  if (key === 'Home') return keys[0];
-  if (key === 'End') return keys[keys.length - 1];
-  return undefined;
-}
