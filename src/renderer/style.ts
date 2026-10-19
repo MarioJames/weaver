@@ -455,4 +455,18 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
       color: ${cssVar.colorText};
     }
   `,
+  /** Stall penalty history: a collapsed list under the penalty line, kept smaller than the card body. */
+  stallHistory: css`
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+    margin-block-start: 2px;
+    font-size: 12px;
+    color: ${cssVar.colorTextSecondary};
+
+    & > summary {
+      cursor: pointer;
+    }
+  `,
 }));

@@ -1,6 +1,17 @@
 import { API_VERSION, type CommandResponse } from '../shared/commands';
 import type { Task, TaskInput, WeaverAPI } from '../shared/types';
 
+/** A probe the monitor ran before deciding a worker scope was stuck. */
+export interface StallProbe { ok: boolean; ms: number; error?: string }
+export interface StallHistoryEntry { at: string; level: number; tasks: string[]; stalledMinutes?: number; probe?: StallProbe }
+export interface StallEngineState { level: number; lastTriggerAt?: string; needsAttention: boolean; history: StallHistoryEntry[] }
+export interface StallSnapshot {
+  engines: Record<string, StallEngineState>;
+  config: { stallMinutes: number; quorum: number; ladder: (number | null)[]; resetHours: number };
+}
+/** `getStall` is an optional capability: a control plane older than the penalty ladder simply does not expose it. */
+export type RendererAPI = Omit<WeaverAPI, 'getStall'> & { getStall: () => Promise<StallSnapshot> };
+
 const RPC_PATH = '/api/rpc';
 const POLL_GAP_MS = 1000;
 const MAX_HANDOFF_BYTES = 65536;
@@ -224,13 +235,14 @@ function importHandoff(create: (input: TaskInput) => Promise<Task>): Promise<Tas
   return promise;
 }
 
-export function createBrowserClient(): WeaverAPI {
+export function createBrowserClient(): RendererAPI {
   const call = rpc;
   return {
     command: request => call('command', [request]) as ReturnType<WeaverAPI['command']>,
     getPolicy: () => call('getPolicy', []) as ReturnType<WeaverAPI['getPolicy']>,
     getQuota: () => call('getQuota', []) as ReturnType<WeaverAPI['getQuota']>,
     refreshQuota: input => call('refreshQuota', [input]) as ReturnType<WeaverAPI['refreshQuota']>,
+    getStall: () => call('getStall', []) as ReturnType<RendererAPI['getStall']>,
     validatePolicy: config => call('validatePolicy', [config]) as ReturnType<WeaverAPI['validatePolicy']>,
     savePolicy: input => call('savePolicy', [input]) as ReturnType<WeaverAPI['savePolicy']>,
     previewRoute: input => call('previewRoute', [input]) as ReturnType<WeaverAPI['previewRoute']>,

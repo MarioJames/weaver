@@ -8,6 +8,7 @@ import type { EngineQuotaRecord, QuotaEngine, QuotaWindow } from '../../shared/q
 import { QUOTA_KINDS, quotaRefreshEnabled, type Block, type Engine } from '../../main/policy/routing';
 import { acceptQuotaPolicy, dateText, quotaPercentText, quotaProgressPercent, quotaRecordStale, quotaRecoveryText, quotaRetryMs, quotaStatusText, quotaNextUpdateMs, quotaCountText } from '../quota-view';
 import type { PolicyDraft, PolicyUpdate } from '../usePolicyDraft';
+import type { RendererAPI, StallEngineState, StallHistoryEntry, StallSnapshot } from '../client';
 import { styles } from '../style';
 
 const PROBE: Record<string, { label: string; color?: string }> = {
@@ -25,8 +26,13 @@ function mergeProbes(current: EngineProbeRecord[], probe: EngineProbeRecord | nu
 
 const isQuotaKind = (kind: string): kind is QuotaEngine => (QUOTA_KINDS as readonly string[]).includes(kind);
 
+/** Penalty blocks are ordinary policy blocks; this `by` value is what tells them apart from a quota or manual pause. */
+const STALL_BY = 'weaver-stall';
+const STALL_HISTORY = 5;
+const STALL_TASK_ID = 8;
+
 /** Quota observations live in the main process; reading them never calls a provider, so polling is cheap. */
-function useQuota(policy: PolicyDraft) {
+function useQuota(policy: PolicyDraft, onTick?: () => void) {
   const [records, setRecords] = useState<EngineQuotaRecord[]>([]);
   const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState<QuotaEngine | null>(null);
@@ -35,6 +41,8 @@ function useQuota(policy: PolicyDraft) {
   const mounted = useRef(true);
   const policyRef = useRef(policy);
   policyRef.current = policy;
+  const tick = useRef(onTick);
+  tick.current = onTick;
   const load = useCallback(async () => {
     if (!window.weaver) { setLoadError('控制面不可用，请通过 weaver web 打开页面。'); return; }
     try {
@@ -44,8 +52,8 @@ function useQuota(policy: PolicyDraft) {
   }, []);
   useEffect(() => {
     mounted.current = true;
-    void load();
-    const timer = setInterval(() => void load(), 30_000);
+    void load().then(() => tick.current?.());
+    const timer = setInterval(() => void load().then(() => tick.current?.()), 30_000);
     return () => { mounted.current = false; clearInterval(timer); };
   }, [load]);
   useEffect(() => {
@@ -69,13 +77,81 @@ function useQuota(policy: PolicyDraft) {
   return { records, loadError, busy, feedback, now, refresh, load };
 }
 
+/** The stall RPC is an optional capability: an older control plane has no `getStall`, and then nothing is shown. */
+function useStall() {
+  const [snapshot, setSnapshot] = useState<StallSnapshot>();
+  const [now, setNow] = useState(Date.now);
+  const mounted = useRef(true);
+  const load = useCallback(async () => {
+    const getStall = (window.weaver as Partial<RendererAPI> | undefined)?.getStall;
+    if (!getStall) return;
+    try {
+      const result = await getStall();
+      if (mounted.current) { setSnapshot(result); setNow(Date.now()); }
+    } catch { if (mounted.current) setSnapshot(undefined); }
+  }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  return { snapshot, now, load };
+}
+
+function stallTasks(tasks: string[]): string {
+  return tasks.map(task => task.slice(0, STALL_TASK_ID)).join('、');
+}
+
+/** A penalty line belongs to the engine only while its penalty block is still in force. */
+function activeStallBlock(blocks: Block[], now: number): Block | undefined {
+  return blocks.find(block => block.by === STALL_BY && (!block.release_at || Date.parse(block.release_at) > now));
+}
+
+function stallReleaseText(block: Block, now: number): string {
+  const release = block.release_at ? Date.parse(block.release_at) : NaN;
+  if (!Number.isFinite(release) || release <= now) return '待探测解封';
+  return `${new Date(release).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 自动解除`;
+}
+
+function stallHistoryText(entry: StallHistoryEntry): string {
+  const parts = [dateText(entry.at), `第 ${entry.level} 级`];
+  if (entry.tasks.length) parts.push(`任务 ${stallTasks(entry.tasks)}`);
+  if (entry.probe) parts.push(entry.probe.ok ? `探测正常 ${entry.probe.ms}ms` : `探测失败${entry.probe.error ? `：${entry.probe.error}` : ''}`);
+  return parts.join(' · ');
+}
+
+function stallAttentionText(state: StallEngineState): string {
+  const last = state.history.at(-1);
+  if (!last) return `最近触发 ${dateText(state.lastTriggerAt ?? null)}。查看后点「恢复派发」解除。`;
+  const tasks = last.tasks.length ? ` · 任务 ${stallTasks(last.tasks)}` : '';
+  const minutes = last.stalledMinutes === undefined ? '' : ` · 已卡住 ${last.stalledMinutes} 分钟`;
+  return `${dateText(last.at)} 第 ${last.level} 级${tasks}${minutes}。查看后点「恢复派发」解除。`;
+}
+
+export function StallNotice({ state, block, now }: { state?: StallEngineState; block?: Block; now: number }) {
+  if (!state) return null;
+  const history = state.history.slice(-STALL_HISTORY);
+  if (!block && !state.needsAttention && !history.length) return null;
+  return <section aria-label="惩罚暂停" className={styles.tight}>
+    {state.needsAttention && <Alert type="warning" title="多个工作代理卡住，已停止自动恢复" description={stallAttentionText(state)} />}
+    {state.level >= 1 && block && <div className={styles.row} style={{ gap: 6 }}>
+      <Tag size="small" color="warning">{`惩罚暂停 · 第 ${state.level} 级`}</Tag>
+      <Text type="secondary" className={styles.meta}>{stallReleaseText(block, now)}</Text>
+    </div>}
+    {history.length > 0 && <details className={styles.stallHistory}>
+      <summary>记录</summary>
+      {history.map((entry, index) => <Text key={`${entry.at}:${entry.level}:${index}`} type="secondary" className={styles.meta}>{stallHistoryText(entry)}</Text>)}
+    </details>}
+  </section>;
+}
+
 export function EnginesPage({ policy }: { policy: PolicyDraft }) {
   const [probes, setProbes] = useState<EngineProbeRecord[]>([]);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState('');
   const [busyId, setBusyId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const quota = useQuota(policy);
+  const stall = useStall();
+  const quota = useQuota(policy, stall.load);
   const scan = useCallback(async () => {
     if (!window.weaver) { setScanError('控制面不可用，请通过 weaver web 打开页面。'); return; }
     setScanning(true); setScanError('');
@@ -89,7 +165,7 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
   async function change(id: string, update: PolicyUpdate) {
     if (busyId) return;
     setBusyId(id); report(id);
-    try { await policy.commit(update); } catch (error) { report(id, error); } finally { setBusyId(''); }
+    try { await policy.commit(update); void stall.load(); } catch (error) { report(id, error); } finally { setBusyId(''); }
   }
   async function toggle(id: string, enabled: boolean) {
     if (!window.weaver || !policy.snapshot || busyId) return;
@@ -123,9 +199,11 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
         const reason = enabled && conflict ? conflict : !enabled && probe?.status !== 'installed' ? '未在本机找到这个命令' : kindMismatch ? '已保存的类型与目录不一致' : '';
         const kind = record?.kind ?? entry.kind;
         const engineBlocks = savedBlocks.filter(block => block.engine === entry.id);
+        const penaltyBlock = activeStallBlock(engineBlocks, stall.now);
         return <Surface key={entry.id} aria-label={entry.id} className={styles.card} title={entry.id} description={<span className={styles.row} style={{ gap: 6 }}><Tag size="small" color={PROBE[status]?.color}>{PROBE[status]?.label ?? status}</Tag><Text type="secondary" className={styles.wrap}>{probe?.version || entry.command}</Text></span>}
           extra={<Tooltip title={blocked && reason ? reason : enabled ? '停用' : '启用'}><span><NamedSwitch aria-label={`启用 ${entry.id}`} checked={enabled} loading={busyId === entry.id} disabled={blocked} onChange={checked => void toggle(entry.id, checked)} /></span></Tooltip>}>
           <div className={styles.cardBody}>
+            <StallNotice state={stall.snapshot?.engines[entry.id]} block={penaltyBlock} now={stall.now} />
             {isQuotaKind(kind) ? <QuotaSummary engine={kind} record={quota.records.find(item => item.engine === kind)} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === kind ? quota.feedback : undefined} onRefresh={() => void quota.refresh(kind)} />
               : <Text type="secondary" className={styles.meta}>免费模型，不探测额度。</Text>}
             <BlockList blocks={engineBlocks} disabled={busyId !== '' || !record} onRemove={block => void change(entry.id, doc => ({ ...doc, blocks: doc.blocks.filter(item => !(item.engine === block.engine && item.model === block.model)) }))} />
