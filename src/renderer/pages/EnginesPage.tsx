@@ -1,3 +1,4 @@
+import { notifyError, useNotifyError } from '../notify';
 import { NamedSwitch } from '../components/NamedControls';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, RefreshCw, ScanSearch } from 'lucide-react';
@@ -34,7 +35,6 @@ const STALL_TASK_ID = 8;
 /** Quota observations live in the main process; reading them never calls a provider, so polling is cheap. */
 function useQuota(policy: PolicyDraft, onTick?: () => void) {
   const [records, setRecords] = useState<EngineQuotaRecord[]>([]);
-  const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState<QuotaEngine | null>(null);
   const [feedback, setFeedback] = useState<{ engine: QuotaEngine; text: string; error: boolean }>();
   const [now, setNow] = useState(Date.now);
@@ -44,11 +44,11 @@ function useQuota(policy: PolicyDraft, onTick?: () => void) {
   const tick = useRef(onTick);
   tick.current = onTick;
   const load = useCallback(async () => {
-    if (!window.weaver) { setLoadError('控制面不可用，请通过 weaver web 打开页面。'); return; }
+    if (!window.weaver) { notifyError('控制面不可用，请通过 weaver web 打开页面。'); return; }
     try {
       const result = await window.weaver.getQuota();
-      if (mounted.current) { setRecords(result.records); setLoadError(''); setNow(Date.now()); }
-    } catch (error) { if (mounted.current) setLoadError(error instanceof Error ? error.message : String(error)); }
+      if (mounted.current) { setRecords(result.records); setNow(Date.now()); }
+    } catch (error) { if (mounted.current) notifyError(error, '额度读取失败'); }
   }, []);
   useEffect(() => {
     mounted.current = true;
@@ -71,10 +71,10 @@ function useQuota(policy: PolicyDraft, onTick?: () => void) {
       setRecords(result.records); setNow(Date.now());
       setFeedback({ engine, text: acceptQuotaPolicy(policyRef.current, result), error: false });
     } catch (error) {
-      if (mounted.current) setFeedback({ engine, text: `刷新失败：${error instanceof Error ? error.message : String(error)}`, error: true });
+      if (mounted.current) notifyError(error, '刷新失败');
     } finally { if (mounted.current) setBusy(null); }
   }
-  return { records, loadError, busy, feedback, now, refresh, load };
+  return { records, busy, feedback, now, refresh, load };
 }
 
 /** The stall RPC is an optional capability: an older control plane has no `getStall`, and then nothing is shown. */
@@ -147,20 +147,19 @@ export function StallNotice({ state, block, now }: { state?: StallEngineState; b
 export function EnginesPage({ policy }: { policy: PolicyDraft }) {
   const [probes, setProbes] = useState<EngineProbeRecord[]>([]);
   const [scanning, setScanning] = useState(false);
-  const [scanError, setScanError] = useState('');
+  useNotifyError(policy.loadError, '配置读取失败');
   const [busyId, setBusyId] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const stall = useStall();
   const quota = useQuota(policy, stall.load);
   const scan = useCallback(async () => {
-    if (!window.weaver) { setScanError('控制面不可用，请通过 weaver web 打开页面。'); return; }
-    setScanning(true); setScanError('');
+    if (!window.weaver) { notifyError('控制面不可用，请通过 weaver web 打开页面。'); return; }
+    setScanning(true);
     try { setProbes((await window.weaver.scanEngines()).probes); }
-    catch (error) { setScanError(error instanceof Error ? error.message : String(error)); }
+    catch (error) { notifyError(error, '引擎探测失败'); }
     finally { setScanning(false); }
   }, []);
   useEffect(() => { void scan(); }, [scan]);
-  const report = (id: string, error?: unknown) => setErrors(current => ({ ...current, [id]: error === undefined ? '' : error instanceof Error ? error.message : String(error) }));
+  const report = (_id: string, error?: unknown) => { if(error !== undefined) notifyError(error, '操作失败'); };
   /** Every control on this page takes effect immediately; a draft on another page is kept and receives the same change. */
   async function change(id: string, update: PolicyUpdate) {
     if (busyId) return;
@@ -183,9 +182,6 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
   const unsupported = Object.entries(saved?.engines ?? {}).filter(([id]) => !catalogEntry(id));
   return <>
     <PageHeader title="引擎" description="本机已安装的 Agent CLI。这里的开关立即生效；是否派发还看额度是否自动暂停了这台引擎。" action={<Button icon={ScanSearch} loading={scanning} onClick={() => void scan()}>重新探测</Button>} />
-    {scanError && <Alert type="error" title="引擎探测失败" description={scanError} action={<Button size="small" onClick={() => void scan()}>重试</Button>} />}
-    {quota.loadError && <Alert type="error" title="额度读取失败" description={quota.loadError} action={<Button size="small" onClick={() => void quota.load()}>重试</Button>} />}
-    {policy.loadError && <Alert type="error" title="配置读取失败" description={policy.loadError} action={<Button size="small" onClick={() => void policy.load(true)}>重新读取</Button>} />}
     {!saved && policy.loading && <Skeleton.Text animated rows={6} />}
     {saved && <div className={styles.cards}>
       {ENGINE_CATALOG.map(entry => {
@@ -214,7 +210,6 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
                   <span><NamedSwitch aria-label={`${entry.id} 主动刷新额度`} size="small" checked={record ? quotaRefreshEnabled(record) : false} disabled={!record || !isQuotaKind(kind) || busyId !== ''} onChange={checked => void setEngine(entry.id, { quota_refresh: checked })} /></span>
                 </Tooltip>
               </div>
-              {errors[entry.id] && <Text role="alert" type="danger" className={styles.meta}>{errors[entry.id]}</Text>}
               {probe?.detail && status !== 'installed' && <Text type="secondary" className={`${styles.meta} ${styles.wrap}`}>{probe.detail}</Text>}
             </div>
           </div>
@@ -259,7 +254,7 @@ function QuotaSummary({ engine, record, now, busy, policyBusy, feedback, onRefre
       {quotaRecoveryText(record) && record.status !== 'unknown' && <Text type="secondary" className={styles.meta}>{quotaRecoveryText(record)}</Text>}
       <Text type="secondary" className={styles.meta}>{record.observedAt ? `${stale ? '已过期 · ' : ''}${dateText(record.observedAt)} 观测` : record.checkedAt ? `${dateText(record.checkedAt)} 检查` : '尚未刷新'}</Text>
     </>}
-    {feedback && <Text role="status" type={feedback.error ? 'danger' : 'secondary'} className={styles.meta}>{feedback.text}</Text>}
+    {feedback && !feedback.error && <Text role="status" type={feedback.error ? 'danger' : 'secondary'} className={styles.meta}>{feedback.text}</Text>}
   </section>;
 }
 

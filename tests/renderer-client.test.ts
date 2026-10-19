@@ -103,7 +103,8 @@ test('rpc posts the exact method and arity and returns result once', async () =>
   }
 });
 
-test('non-2xx, network, and missing result fail once without a retry', async () => {
+test('non-transient HTTP and malformed responses fail once; network reads reconnect', async t => {
+  t.mock.timers.enable({apis:['setTimeout']});
   installOrigin();
   const gate = installFetch();
   try {
@@ -120,9 +121,13 @@ test('non-2xx, network, and missing result fail once without a retry', async () 
     gate.calls[2].resolve(jsonResponse('nope', 500));
     await assert.rejects(bare, /HTTP_500: 请求失败（500）/);
 
-    globalThis.fetch = (async () => { throw new TypeError('Failed to fetch'); }) as typeof fetch;
-    await assert.rejects(client.getPolicy(), /NETWORK: Failed to fetch/);
-    assert.equal(gate.calls.length, 3);
+    const pending = client.getPolicy();
+    gate.calls[3].reject(new TypeError('Failed to fetch')); await flush();
+    t.mock.timers.tick(999); assert.equal(gate.calls.length,4);
+    t.mock.timers.tick(1); await flush();
+    gate.calls[4].resolve(jsonResponse({result:{revision:7}}));
+    assert.deepEqual(await pending,{revision:7});
+    t.mock.timers.tick(2000);
   } finally {
     gate.restore();
     cleanup();
@@ -307,7 +312,10 @@ test('task watch polls sync.status once, notifies on change or error, and stops 
     t.mock.timers.tick(1000);
     gate.calls[3].resolve(jsonResponse({ error: { code: 'UNAVAILABLE', message: 'down' } }, 503));
     await flush();
-    assert.equal(notified, 3);
+    assert.equal(notified, 2);
+    t.mock.timers.tick(1000); await flush();
+    gate.calls[4].resolve(jsonResponse({result:{ok:true,data:{revision:6,changed:true}}})); await flush();
+    assert.equal(notified,3);
 
     const before = gate.calls.length;
     stop();
@@ -378,44 +386,26 @@ test('status listeners share one poll and a listener can unsubscribe itself', as
   }
 });
 
-test('stalled rpc and response body fail once at the transport deadline', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'], now: 0 });
-  installOrigin();
-  const gate = installFetch();
-  const original = globalThis.fetch;
+test('read deadlines reconnect while write deadlines reconcile without replay', async t => {
+  t.mock.timers.enable({apis:['setTimeout']}); installOrigin(); const gate=installFetch();
   try {
-    const client = createBrowserClient();
-    let settled = false;
-    const stalled = client.listTasks().then(value => { settled = true; return value; }, error => { settled = true; throw error; });
-    t.mock.timers.tick(RPC_DEADLINE_MS - 1);
-    await flush();
-    assert.equal(settled, false);
-    assert.equal(gate.calls.length, 1);
-    t.mock.timers.tick(1);
-    await assert.rejects(stalled, /TIMEOUT: 控制面在 15 秒内没有响应/);
-    t.mock.timers.tick(RPC_DEADLINE_MS);
-    await flush();
-    assert.equal(gate.calls.length, 1);
-
-    let bodies = 0;
-    globalThis.fetch = (async () => {
-      bodies += 1;
-      return { ok: true, status: 200, json: () => new Promise(() => {}) } as Response;
-    }) as typeof fetch;
-    const body = client.savePolicy({ revision: 1, config: {}, blocks: [] } as never);
-    t.mock.timers.tick(RPC_DEADLINE_MS - 1);
-    await flush();
-    assert.equal(bodies, 1);
-    t.mock.timers.tick(1);
-    await assert.rejects(body, /TIMEOUT: 控制面在 15 秒内没有响应/);
-    t.mock.timers.tick(RPC_DEADLINE_MS);
-    await flush();
-    assert.equal(bodies, 1);
-  } finally {
-    globalThis.fetch = original;
-    gate.restore();
-    cleanup();
-  }
+    const client=createBrowserClient(); let settled=false;
+    const pending=client.listTasks().then(value=>{settled=true;return value;});
+    t.mock.timers.tick(RPC_DEADLINE_MS); await flush(); assert.equal(settled,false);
+    t.mock.timers.tick(1000); await flush(); assert.equal(gate.calls.length,2);
+    gate.calls[1].resolve(jsonResponse({result:[]})); assert.deepEqual(await pending,[]);
+    t.mock.timers.tick(2000);
+    const write=client.savePolicy({revision:1,config:{},blocks:[]} as never);
+    // Response headers arrive, but its body stalls until the deadline.
+    gate.calls[2].resolve({ok:true,status:200,json:()=>new Promise(()=>{})} as Response); await flush();
+    const rejected=assert.rejects(write,/TIMEOUT/);
+    t.mock.timers.tick(RPC_DEADLINE_MS); await rejected; await flush();
+    assert.equal(gate.calls.filter(call=>call.body.method==='savePolicy').length,1);
+    assert.deepEqual(gate.calls.slice(3).map(call=>call.body.method).sort(),['getPolicy','listTasks']);
+    gate.calls[3].resolve(jsonResponse({result:[]})); gate.calls[4].resolve(jsonResponse({result:{revision:2}})); await flush();
+    t.mock.timers.tick(15000); await flush();
+    assert.equal(gate.calls.filter(call=>call.body.method==='savePolicy').length,1);
+  } finally { gate.restore(); cleanup(); }
 });
 
 test('late status after unsubscribe is ignored and the next subscription still reports its first revision', async () => {
@@ -446,4 +436,21 @@ test('late status after unsubscribe is ignored and the next subscription still r
     globalThis.fetch = original;
     cleanup();
   }
+});
+
+test('uncertain command envelopes trigger read reconciliation without replaying the command', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  installOrigin(); const gate=installFetch();
+  try {
+    const client=installBrowserClient();
+    const pending=command('tasks.create',{title:'test'},true);
+    const failed=assert.rejects(pending,/APP_NOT_RUNNING/);
+    gate.calls[0].resolve(jsonResponse({result:{ok:false,error:{code:'APP_NOT_RUNNING',message:'temporarily unavailable'}}}));
+    await failed; await flush();
+    assert.deepEqual(gate.calls.map(call=>call.body.method),['command','listTasks','getPolicy']);
+    gate.calls[1].resolve(jsonResponse({result:[]}));gate.calls[2].resolve(jsonResponse({result:{revision:3}}));await flush();
+    t.mock.timers.tick(15000);await flush();
+    assert.equal(gate.calls.filter(call=>call.body.method==='command').length,1);
+    assert.ok(client);
+  } finally { gate.restore(); cleanup(); }
 });

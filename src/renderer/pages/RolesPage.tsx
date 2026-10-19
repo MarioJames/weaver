@@ -1,3 +1,4 @@
+import { notifyError, useNotifyError } from '../notify';
 import { NamedSelect, NamedSwitch, NamedInputNumber } from '../components/NamedControls';
 import { useEffect, useId, useState } from 'react';
 import { Plus, Trash2, Zap } from 'lucide-react';
@@ -44,7 +45,6 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   const [pendingId, setPendingId] = useState('');
   const [idError, setIdError] = useState('');
   const [askDelete, setAskDelete] = useState(false);
-  const [toggleError, setToggleError] = useState<{ id: string; message: string }>();
   const [toggling, setToggling] = useState('');
   const form = useForm();
   const fieldId = useId();
@@ -78,11 +78,10 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   }
   /** Saved roles switch immediately on top of the saved policy; a role that was never saved only changes the draft. */
   async function toggle(id: string, enabled: boolean) {
-    setToggleError(undefined);
     if (!policy.snapshot?.config[section][id]) { policy.setConfig({ ...config!, [section]: { ...config![section], [id]: { ...config![section][id]!, enabled } } }); return; }
     setToggling(id);
     try { await policy.commit(doc => ({ ...doc, config: { ...doc.config, [section]: { ...doc.config[section], [id]: { ...doc.config[section][id]!, enabled } } } })); }
-    catch (error) { setToggleError({ id, message: error instanceof Error ? error.message : String(error) }); }
+    catch (error) { notifyError(error, '保存失败'); }
     finally { setToggling(''); }
   }
   const impact = current ? roleDeleteImpact(config, section, current) : undefined;
@@ -97,7 +96,6 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           const unsaved = !saved || JSON.stringify(saved) !== JSON.stringify(item);
           const engineOn = config.engines[item.engine]?.enabled === true;
           const note = roleNote(policy.snapshot?.[section][id], unsaved);
-          const error = toggleError?.id === id ? toggleError.message : '';
           return <div key={id} className={styles.roleItem} aria-current={id === current ? 'true' : undefined}>
             <NamedSwitch size="small" aria-label={`启用 ${id}`} checked={item.enabled} loading={toggling === id} disabled={!engineOn || !!toggling} title={engineOn ? undefined : `引擎 ${item.engine || '未选择'} 未启用，先在引擎页打开它`} onChange={checked => void toggle(id, checked)} />
             <button type="button" className={styles.roleButton} onClick={() => { acceptId(); setSelected(id); setPendingId(id); setIdError(''); }}>
@@ -105,7 +103,6 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
               <span className={`${styles.wrap} ${styles.meta}`}>{item.engine} · {item.model || '未填模型'}</span>
               {note && <span className={`${styles.wrap} ${styles.meta} ${note.warning ? styles.warn : ''}`}>{note.text}</span>}
             </button>
-            {error && <p role="alert" className={styles.error} style={{ gridColumn: '1 / -1' }}>{error}</p>}
           </div>;
         })}
       </nav>
@@ -169,6 +166,8 @@ function HelloCheck({ id, record }: { id: string; record: Worker }) {
 
 /** The model's answer as a message card: who answered, what it said, how long it took. */
 function ReplyCard({ result }: { result: HelloResult & { route: string } }) {
+  useNotifyError(!result.ok ? result.error : '', '探测失败');
+  if (!result.ok) return null;
   const seconds = result.durationMs ? `${(result.durationMs / 1000).toFixed(1)} 秒` : '';
   return <article role="status" aria-label="say hi 结果" className={styles.replyCard} data-ok={result.ok ? 'true' : 'false'}>
     <header className={styles.spread} style={{ flexWrap: 'nowrap' }}>
@@ -178,7 +177,7 @@ function ReplyCard({ result }: { result: HelloResult & { route: string } }) {
       </span>
       <Text type="secondary" className={`${styles.meta} ${styles.numbers}`} style={{ whiteSpace: 'nowrap' }}>{[seconds, new Date(result.checkedAt).toLocaleTimeString()].filter(Boolean).join(' · ')}</Text>
     </header>
-    {result.ok ? <p className={styles.replyText}>{result.reply}</p> : <p className={`${styles.replyText} ${styles.replyError}`}>{result.error}</p>}
+    <p className={styles.replyText}>{result.reply}</p>
     {result.model && <Text type="secondary" className={styles.meta}>实际应答模型：{result.model}</Text>}
   </article>;
 }

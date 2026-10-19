@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Bot, Cpu, ListTodo, Settings2, UserRound } from 'lucide-react';
 import { ConsoleBrand, ConsoleNav, ConsoleShell } from '@lobehub/ui/dashboard';
-import { Alert, Button } from '@lobehub/ui/base-ui';
+import { ToastHost } from '@lobehub/ui/base-ui';
 import weaverIcon from './assets/weaver-icon.png';
 import weaverLockup from './assets/weaver-lockup.svg';
 import { useWorkbench } from './hooks/useWorkbench';
@@ -60,7 +60,7 @@ export function App() {
     navigation={<ConsoleNav label="主导航" items={NAVIGATION} pathname={page} onNavigate={href => open(href as Page)} />}
     openNavigationLabel="打开导航" closeNavigationLabel="关闭导航" collapseLabel="收起导航" expandLabel="展开导航" skipToContentLabel="跳到内容"
   >
-    {work.error && <Alert type="error" title={work.error} closable action={<Button size="small" disabled={work.busy || work.loading} onClick={() => void work.refresh()}>重试连接</Button>} onClose={work.dismissError} />}
+    <ToastHost position="bottom-right" />
     {page === 'tasks' ? <TasksPage work={work} ownerKind={ownerKind} />
       : page === 'engines' ? <EnginesPage policy={policy} />
         : page === 'owners' ? <RolesPage key="owners" section="owners" policy={policy} />

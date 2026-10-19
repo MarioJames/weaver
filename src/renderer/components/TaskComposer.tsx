@@ -1,3 +1,4 @@
+import { notifyError } from '../notify';
 import { NamedSelect } from './NamedControls';
 import { useEffect, useId, useState, type Dispatch, type SetStateAction } from 'react';
 import { Button, Input, Text, TextArea } from '@lobehub/ui/base-ui';
@@ -20,15 +21,12 @@ export function TaskComposer({ disabled, draft, onDraft, onCreate, onImport }: {
   const { title, goal, workspace, profile, acceptance } = draft;
   const fieldId = useId();
   const [policy, setPolicy] = useState<PolicySnapshot>();
-  const [error, setError] = useState('');
-  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let current = true;
-    if (!window.weaver) { setError('控制面不可用。请通过 weaver web 打开这个页面后再读取 Owner profiles。'); return; }
-    setError('');
-    void window.weaver.getPolicy().then(snapshot => { if (current) { setPolicy(snapshot); onDraft(previous => previous.profile ? previous : { ...previous, profile: Object.keys(snapshot.config.owners).find(id => snapshot.owners[id]?.status === 'available') || '' }); } }).catch(cause => { if (current) setError(String(cause)); });
+    if (!window.weaver) { notifyError('控制面不可用。请通过 weaver web 打开这个页面后再读取 Owner profiles。'); return; }
+    void window.weaver.getPolicy().then(snapshot => { if (current) { setPolicy(snapshot); onDraft(previous => previous.profile ? previous : { ...previous, profile: Object.keys(snapshot.config.owners).find(id => snapshot.owners[id]?.status === 'available') || '' }); } }).catch(cause => { if (current) notifyError(String(cause)); });
     return () => { current = false; };
-  }, [attempt]);
+  }, []);
   const criteria = acceptance.split('\n').map(line => line.trim()).filter(Boolean);
   const pathError = workspacePathError(workspace);
   const [workspaceAttempted, setWorkspaceAttempted] = useState(false);
@@ -36,7 +34,6 @@ export function TaskComposer({ disabled, draft, onDraft, onCreate, onImport }: {
   const form = useForm({ onSubmit: () => { setWorkspaceAttempted(true); if (disabled || !valid || pathError) return; return onCreate({ title: title.trim(), goal: goal.trim(), workspace: workspace.trim(), ownerProfileId: profile, acceptanceCriteria: criteria }); } });
   return <Form form={form} className={styles.stack}>
     <div className={styles.spread}><Text style={{ fontWeight: 600 }}>新建任务</Text><Button type="text" disabled={disabled} onClick={onImport}>导入 JSON</Button></div>
-    {error && <div role="alert" className={styles.stack}><Text type="danger">{error}</Text><Button onClick={() => setAttempt(value => value + 1)}>重新读取 Profiles</Button></div>}
     <fieldset disabled={disabled} className={styles.stack}>
       <Form.Field label="任务标题" required><Input id={`${fieldId}-title`} aria-label="任务标题" required maxLength={160} value={title} placeholder="例如：整理本地集成说明" onChange={event => onDraft(current => ({ ...current, title: event.target.value }))} /></Form.Field>
       <Form.Field label="目标与约束" required><TextArea id={`${fieldId}-goal`} aria-label="目标与约束" required maxLength={16000} rows={4} value={goal} placeholder="例如：只改指定目录里的文档" onChange={event => onDraft(current => ({ ...current, goal: event.target.value }))} /></Form.Field>

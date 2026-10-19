@@ -1,7 +1,8 @@
+import { notifyError } from '../notify';
 import { useEffect, useRef, useState } from 'react';
 import { Archive, Plus } from 'lucide-react';
 import { PageHeader } from '@lobehub/ui/dashboard';
-import { Alert, Button, Drawer } from '@lobehub/ui/base-ui';
+import { Button, Drawer } from '@lobehub/ui/base-ui';
 import { command } from '../commands';
 import type { OwnerInstance } from '../../shared/commands';
 import { archivedTasks, readTaskFilters, withOwnerProfiles } from '../task-view';
@@ -18,15 +19,13 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
   const [selected, setSelected] = useState<string>();
   const newTaskRef = useRef<HTMLButtonElement | HTMLAnchorElement>(null);
   const [owners, setOwners] = useState<OwnerInstance[]>([]);
-  const [ownersError, setOwnersError] = useState('');
-  const [ownersAttempt, setOwnersAttempt] = useState(0);
   useEffect(() => {
     let current = true;
     void command<{ owners: OwnerInstance[] }>('owners.list', {}).then(result => {
-      if (current) { setOwners(result.owners); setOwnersError(''); }
-    }).catch(error => { if (current) setOwnersError(String(error)); });
+      if (current) { setOwners(result.owners); }
+    }).catch(error => { if (current) notifyError(error, '资料读取失败'); });
     return () => { current = false; };
-  }, [work.tasks, ownersAttempt]);
+  }, [work.tasks]);
   const tasks = withOwnerProfiles(work.tasks, owners);
   const task = tasks.find(item => item.id === selected);
   const now = Date.now();
@@ -36,7 +35,6 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
       <Button ref={newTaskRef} type="primary" icon={Plus} disabled={work.busy || !work.caps || work.loading} onClick={() => setCreating(true)}>新建任务</Button>
       <Button icon={Archive} disabled={!work.caps || work.loading} onClick={() => setArchiving(true)}>归档 {archived}</Button>
     </>} />
-    {ownersError && <Alert type="warning" title="负责人资料读取失败" description={ownersError} action={<Button onClick={() => setOwnersAttempt(value => value + 1)}>重试</Button>} />}
     <TaskBoard filters={filters} onFiltersChange={setFilters} now={now} tasks={tasks} selected={selected} loading={work.loading} onSelect={setSelected} ownerKind={ownerKind} />
     <ArchiveDrawer now={now} tasks={tasks} selected={selected} open={archiving} onClose={() => setArchiving(false)} onSelect={setSelected} ownerKind={ownerKind} />
     <Drawer open={!!task} title="任务详情" placement="right" width="min(960px, 92vw)" onClose={() => setSelected(undefined)}>

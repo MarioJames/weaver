@@ -1,3 +1,4 @@
+import { useNotifyError } from '../notify';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Text, TextArea } from '@lobehub/ui/base-ui';
 import type { Task } from '../../shared/types';
@@ -10,13 +11,14 @@ const acceptanceLabel = { pending: '待验收', accepted: '已通过', rejected:
 export function ReviewPanel({ task, busy, action }: { task: Task; busy: boolean; action: (fn: () => Promise<unknown>) => Promise<boolean> }) {
   const [manifest, setManifest] = useState<ResultManifest>();
   const [error, setError] = useState('');
+  useNotifyError(error);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState('');
   const [attempt, setAttempt] = useState(0);
   const locked = useRef(false);
   useEffect(() => {
     let current = true;
-    setLoading(true); setManifest(undefined); setError('');
+    setLoading(true); setError('');
     void command<ResultManifest>('tasks.results', { taskId: task.id }).then(result => { if (current) setManifest(result); }).catch(cause => { if (current) setError(String(cause)); }).finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
   }, [task.id, task.revision, task.updatedAt, attempt]);
@@ -32,7 +34,7 @@ export function ReviewPanel({ task, busy, action }: { task: Task; busy: boolean;
   return <section aria-label="交付验收" className={styles.stack}>
     <Text style={{ fontWeight: 600 }}>交付与验收</Text>
     <Text type="secondary">执行完成、确认收到结果和验收通过分别记录。此处确认是当前操作者的结果确认，不代表外部 Owner 宿主自动收到。先读取并检查产物，再提交结论。</Text>
-    {loading ? <Text role="status" type="secondary">正在读取结果清单…</Text> : error ? <div role="alert" className={styles.stack}><Text type="danger">{error}</Text><Button onClick={() => setAttempt(value => value + 1)}>重新读取结果</Button></div> : manifest && <>
+    {loading && !manifest ? <Text role="status" type="secondary">正在读取结果清单…</Text> : !error && manifest && <>
       <Text>交付：{manifest.delivery === 'acknowledged' ? '已确认收到' : '待确认收到'} · 验收：{acceptanceLabel[manifest.acceptance]} · 执行：{manifest.execution}</Text>
       {task.reviewComment && <Text className={styles.wrap}>已保存的验收说明：{task.reviewComment}</Text>}
       <TextArea aria-label="验收说明" rows={3} maxLength={4000} disabled={busy} value={comment} placeholder="补充检查结果，或需要修改的内容" onChange={event => setComment(event.target.value)} />

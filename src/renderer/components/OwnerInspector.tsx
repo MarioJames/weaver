@@ -1,3 +1,4 @@
+import { isTransientError, useNotifyError } from '../notify';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Modal, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
 import type { Config } from '../../shared/policy';
@@ -85,7 +86,7 @@ export function OwnerInspector({ task, busy, action, owners, now = Date.now() }:
     try {
       const applied = await action(async () => {
         try { result = await command<ContinuationResult>(commandName, { taskId: task.id, expectedRevision: task.revision ?? 0, ...extra }, true); }
-        catch (cause) { notice = cause instanceof Error ? cause.message : String(cause); throw cause; }
+        catch (cause) { if (!isTransientError(cause)) notice = cause instanceof Error ? cause.message : String(cause); throw cause; }
       });
       const launch = result?.launch;
       if (notice) setFailure(notice);
@@ -139,14 +140,12 @@ export function ContinuationDialog({ profiles, value, sending, failure, onChange
   onChange: (next?: string) => void;
   onRetry: () => void;
 }) {
+  useNotifyError(failure, '操作失败', {label:'重试启动',run:onRetry});
   return <div className={styles.dialog}>
     <NamedSelect aria-label="接手负责人" className={styles.pick} placeholder="选择接手负责人" disabled={sending} value={value}
       options={ownerOptions(profiles)}
       onChange={next => onChange(typeof next === 'string' ? next : undefined)} />
     <Text type="secondary">Weaver 会生成接续说明，并在 Herdr 中启动新的负责人接手这个任务。</Text>
-    {failure && <div role="alert" className={styles.failure}>
-      <Text className={styles.wrap}>{failure}</Text>
-      <Button disabled={sending} onClick={onRetry}>重试启动</Button>
-    </div>}
+
   </div>;
 }

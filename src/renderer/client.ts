@@ -1,3 +1,4 @@
+import { reconnect, notifyError, notifyInfo, isTransientError } from './notify';
 import { API_VERSION, type CommandResponse } from '../shared/commands';
 import type { Task, TaskInput, WeaverAPI } from '../shared/types';
 
@@ -25,7 +26,7 @@ function isAbort(error: unknown): boolean {
 }
 
 function controlError(code: string, message: string): Error {
-  return new Error(`${code}: ${message}`);
+  return Object.assign(new Error(`${code}: ${message}`), { code });
 }
 
 function abortError(): Error {
@@ -124,7 +125,7 @@ async function rpc(method: string, args: unknown[], external?: AbortSignal, dead
       const record = error && typeof error === 'object' ? error as { code?: unknown; message?: unknown } : {};
       const code = typeof record.code === 'string' && record.code ? record.code : `HTTP_${response.status}`;
       const message = typeof record.message === 'string' && record.message ? record.message : `请求失败（${response.status}）`;
-      throw controlError(code, message);
+      throw Object.assign(controlError(code, message), { status: response.status });
     }
     if (!payload || typeof payload !== 'object' || !('result' in payload)) throw controlError('BAD_RESPONSE', '控制面响应缺少 result');
     return payload.result;
@@ -173,6 +174,7 @@ function watchTasks(call: Rpc): WeaverAPI['onTasksChanged'] {
       if (next.revision !== known || next.changed) notify();
     } catch (error) {
       if (token !== seq || controller.signal.aborted || isAbort(error) || listeners.size === 0) return;
+      notifyError(error, '状态读取失败');
       notify();
     } finally {
       if (active === controller) active = undefined;
@@ -236,7 +238,44 @@ function importHandoff(create: (input: TaskInput) => Promise<Task>): Promise<Tas
 }
 
 export function createBrowserClient(): RendererAPI {
-  const call = rpc;
+  const reads = new Set(['getPolicy','getQuota','getStall','listTasks','capabilities','validatePolicy','previewRoute','sayHiResult']);
+  const commandReads = new Set(['sync.status','tasks.list','tasks.get','tasks.events','tasks.results','owners.list','owners.continuation.get']);
+  const checked = async (method: string, args: unknown[], signal?: AbortSignal) => {
+    const result = await rpc(method,args,signal);
+    if (method === 'command' && result && typeof result === 'object' && 'ok' in result && !result.ok) {
+      const failure = (result as CommandResponse).error;
+      if (isTransientError(failure)) throw controlError(failure?.code ?? 'NETWORK',failure?.message ?? '控制面不可用');
+    }
+    return result;
+  };
+  const inflight = new Map<string,Promise<unknown>>();
+  const invoke: Rpc = async (method,args,signal) => {
+    const request = args[0] as { command?: string; commandId?: string } | undefined;
+    const read = reads.has(method) || (method === 'command' && !request?.commandId && commandReads.has(request?.command ?? ''));
+    try { return await checked(method,args,signal); }
+    catch(error) {
+      if (signal?.aborted) throw error;
+      if (!isTransientError(error)) { notifyError(error); throw error; }
+      if(read) return reconnect.recover(()=>checked(method,args,signal),signal).catch(cause=>{notifyError(cause);throw cause;});
+      notifyInfo('操作结果未确认，正在核对…', 'operation-reconcile', 0);
+      // A fresh authoritative read reconciles the UI, but cannot prove which writer changed it.
+      void Promise.all([call('listTasks',[]),call('getPolicy',[])]).then(()=>{
+        for(const listener of invalidations) listener();
+        notifyInfo('状态已重新读取，请核对操作是否生效。未自动重复操作。', 'operation-reconcile');
+      }).catch(cause=>{notifyInfo('无法核对操作结果，请检查当前状态。', 'operation-reconcile');notifyError(cause,'状态核对失败');});
+      throw error;
+    }
+  };
+  const call: Rpc = (method,args,signal) => {
+    const request=args[0] as {command?:string;commandId?:string}|undefined;
+    const read=reads.has(method)||(method==='command'&&!request?.commandId&&commandReads.has(request?.command??''));
+    if(!read||signal)return invoke(method,args,signal);
+    const key=JSON.stringify([method,args]);
+    const pending=inflight.get(key);if(pending)return pending;
+    const next=invoke(method,args).finally(()=>{inflight.delete(key);});inflight.set(key,next);return next;
+  };
+  const invalidations = new Set<() => void>();
+  const watch = watchTasks(call);
   return {
     command: request => call('command', [request]) as ReturnType<WeaverAPI['command']>,
     getPolicy: () => call('getPolicy', []) as ReturnType<WeaverAPI['getPolicy']>,
@@ -256,7 +295,7 @@ export function createBrowserClient(): RendererAPI {
     cancelTask: id => call('cancelTask', [id]) as ReturnType<WeaverAPI['cancelTask']>,
     capabilities: () => call('capabilities', []) as ReturnType<WeaverAPI['capabilities']>,
     importTask: () => importHandoff(input => call('createTask', [input]) as Promise<Task>),
-    onTasksChanged: watchTasks(call),
+    onTasksChanged: callback => { invalidations.add(callback); const unsubscribe=watch(callback); return ()=>{invalidations.delete(callback);unsubscribe();}; },
   };
 }
 

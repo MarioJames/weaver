@@ -1,3 +1,4 @@
+import { notifyError } from '../notify';
 import { NamedSelect } from './NamedControls';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@lobehub/ui';
@@ -51,22 +52,20 @@ export function EventsPanel({ events, taskId, active = false }: { events: TaskEv
   const [query, setQuery] = useState('');
   const [page, setPage] = useState<EventPage>({ events, nextCursor: null, hasMore: false });
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [attempt, setAttempt] = useState(0);
   const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(() => new Set());
   const generation = useRef(0);
   const lock = useRef(false);
   useEffect(() => {
     const id = ++generation.current;
-    setBusy(true); setError('');
-    void command<EventPage>('tasks.events', { taskId, limit: 100 }).then(result => { if (id === generation.current) setPage(result); }).catch(cause => { if (id === generation.current) setError(String(cause)); }).finally(() => { if (id === generation.current) setBusy(false); });
+    setBusy(true);
+    void command<EventPage>('tasks.events', { taskId, limit: 100 }).then(result => { if (id === generation.current) setPage(result); }).catch(cause => { if (id === generation.current) notifyError(cause); }).finally(() => { if (id === generation.current) setBusy(false); });
     return () => { generation.current += 1; };
-  }, [taskId, events.length, attempt]);
+  }, [taskId, events.length]);
   async function more() {
     if (lock.current || busy || !page.nextCursor) return;
     lock.current = true; setBusy(true); const id = generation.current;
     try { const result = await command<EventPage>('tasks.events', { taskId, after: page.nextCursor, limit: 100 }); if (id === generation.current) setPage(current => ({ ...result, events: [...current.events, ...result.events] })); }
-    catch (cause) { if (id === generation.current) setError(String(cause)); }
+    catch (cause) { if (id === generation.current) notifyError(cause); }
     finally { lock.current = false; if (id === generation.current) setBusy(false); }
   }
   const condensed = useMemo(() => filterCondensed(condenseEvents(page.events, { active }), query), [page.events, active, query]);
@@ -86,7 +85,6 @@ export function EventsPanel({ events, taskId, active = false }: { events: TaskEv
       {mode === 'all' && <Button disabled={!visible.length} onClick={download}>导出已筛选日志</Button>}
     </div>
     {mode === 'all' && <Text type="secondary">已加载 {page.events.length} 条 · 导出会遮盖常见凭据格式</Text>}
-    {error && <div role="alert" className={styles.stack}><Text type="danger">{error}</Text><Button disabled={busy} onClick={() => setAttempt(value => value + 1)}>重新读取时间线</Button></div>}
     {mode === 'condensed' ? (!condensed.length ? <Text type="secondary">{empty}</Text> : condensed.map(item => item.type === 'steps'
       ? <StepsGroup key={item.from.id} item={item} open={openGroups.has(item.from.id)} onToggle={() => toggleGroup(item.from.id)} />
       : <EventRow key={item.event.id} event={item.event} />))

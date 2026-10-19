@@ -1,8 +1,9 @@
+import { notifyError, useNotifyError } from '../notify';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Check } from 'lucide-react';
 import { PageHeader } from '@lobehub/ui/dashboard';
 import { Icon } from '@lobehub/ui';
-import { Alert, Button, Skeleton, Spin, Text } from '@lobehub/ui/base-ui';
+import { Button, Skeleton, Spin, Text } from '@lobehub/ui/base-ui';
 import type { QuotaSchedule } from '../../shared/quota';
 import { QUOTA_INTERVAL_RANGE, chatgptReviewEnabled, quotaSettings, type Config } from '../../main/policy/routing';
 import { NamedInputNumber, NamedSwitch } from '../components/NamedControls';
@@ -26,7 +27,8 @@ function useSaver(policy: PolicyDraft) {
       setStates(current => ({ ...current, [key]: { status: 'saved' } }));
       timers.current[key] = setTimeout(() => setStates(current => { const next = { ...current }; delete next[key]; return next; }), 2000);
     } catch (error) {
-      setStates(current => ({ ...current, [key]: { status: 'error', message: error instanceof Error ? error.message : String(error) } }));
+      notifyError(error, '保存失败');
+      setStates(current => ({ ...current, [key]: { status: 'error', message: '' } }));
     }
   }
   return { states, save };
@@ -40,7 +42,8 @@ function Outcome({ state }: { state?: SaveState }) {
 }
 
 function Setting({ label, desc, htmlFor, state, error, children }: { label: string; desc: ReactNode; htmlFor: string; state?: SaveState; error?: string; children: ReactNode }) {
-  const message = error || (state?.status === 'error' ? `保存失败：${state.message}` : '');
+  const message = error;
+  useNotifyError(state?.status === 'error' ? state.message : '', '保存失败');
   return <div className={settingsStyles.row}>
     <div className={`${settingsStyles.fieldCell} ${styles.tight}`}>
       <label htmlFor={htmlFor}><Text strong>{label}</Text></label>
@@ -97,7 +100,8 @@ export function SettingsPage({ policy }: { policy: PolicyDraft }) {
   const saved = policy.snapshot?.config;
   const schedule = useSchedule(policy.snapshot?.revision);
   const header = <PageHeader title="设置" description="每项修改立即生效。" />;
-  if (!saved) return <>{header}{policy.loadError ? <Alert type="error" title="配置读取失败" description={policy.loadError} action={<Button size="small" onClick={() => void policy.load(true)}>重新读取</Button>} /> : <Skeleton.Text animated rows={6} />}</>;
+  useNotifyError(policy.loadError, '配置读取失败');
+  if (!saved) return <>{header}{!policy.loadError && <Skeleton.Text animated rows={6} /> }</>;
   const quota = quotaSettings(saved);
   const inputError = (key: string) => (message: string) => setInputErrors(current => ({ ...current, [key]: message }));
   const scheduleText = !quota.auto_refresh ? '已关闭，只在引擎卡片上手动刷新。' : schedule?.nextRunAt ? `下次 ${dateText(schedule.nextRunAt)}${schedule.lastRunAt ? ` · 上次 ${dateText(schedule.lastRunAt)}` : ''}` : '按下方间隔自动查询订阅额度，不会调用模型。';

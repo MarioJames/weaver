@@ -89,9 +89,8 @@ test('the dialog picks among enabled owner profiles with the handover sentence',
   assert.match(unselected, /选择接手负责人/);
 });
 
-test('a failed launch stays open with its reason and a retry', () => {
+test('a failed launch keeps the dialog open without inline error feedback', () => {
   const html = markup(React.createElement(ContinuationDialog, { profiles: owners, value: 'codex_owner', sending: false, failure: 'Herdr 启动失败：herdr is not installed', onChange: () => {}, onRetry: () => {} }));
-  assert.match(html, /role="alert"/);
-  assert.match(html, /herdr is not installed/);
-  assert.match(html, /重试启动/);
+  assert.doesNotMatch(html, /role="alert"|herdr is not installed|重试启动/);
+  assert.match(html, /codex_owner/);
 });

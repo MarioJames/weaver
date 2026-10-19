@@ -1,3 +1,4 @@
+import { isTransientError } from './notify';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Block, Config } from '../main/policy/routing';
 import type { Issue, PolicySnapshot } from '../shared/policy';
@@ -51,7 +52,7 @@ export function usePolicyDraft() {
     if (!window.weaver) { setLoadError('控制面不可用。请通过 weaver web 打开这个页面。'); setLoading(false); return false; }
     if (dirtyRef.current && !force) return false;
     setLoading(true); setLoadError('');
-    try { accept(await window.weaver.getPolicy()); return true; }
+    try { const next=await window.weaver.getPolicy(); if (!force && dirtyRef.current) return false; accept(next); return true; }
     catch (error) { setLoadError(error instanceof Error ? error.message : String(error)); return false; }
     finally { setLoading(false); }
   }, [accept]);
@@ -95,7 +96,7 @@ export function usePolicyDraft() {
       return true;
     } catch (error) {
       const text = error instanceof Error ? error.message : String(error);
-      setSaveError(text);
+      if (!isTransientError(error)) setSaveError(text);
       if (isConflict(text)) setConflict(true);
       return false;
     } finally { setBusy(false); }
