@@ -8,7 +8,6 @@ export const ENGINE_CATALOG = [
   { id: 'opencode', kind: 'opencode', command: 'opencode' },
   { id: 'pi', kind: 'pi', command: 'pi' },
   { id: 'qoder', kind: 'qodercli', command: 'qodercli' },
-  { id: 'gemini', kind: 'gemini', command: 'gemini' },
 ] as const;
 
 export type CatalogEngine = (typeof ENGINE_CATALOG)[number];

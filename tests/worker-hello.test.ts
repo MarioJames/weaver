@@ -85,7 +85,9 @@ test('a missing command, an unknown engine and flag-like values are refused clea
   const missing: SpawnPrint = () => { const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), kill: () => true }); setImmediate(() => child.emit('error', Object.assign(new Error('spawn qodercli ENOENT'), { code: 'ENOENT' }))); return child; };
   assert.match((await probe('qodercli', missing)).error ?? '', /找不到命令 qodercli/);
   const calls: Call[] = [];
-  assert.match((await probe('gemini', fake('', 0, '', calls))).error ?? '', /还没有接入/);
+  // Every catalog kind has a greeting adapter, so the not-integrated branch needs a policy kind outside the catalog.
+  assert.equal(Object.hasOwn(HELLO_ENGINES, 'cursor'), false);
+  assert.match((await probe('cursor', fake('', 0, '', calls))).error ?? '', /还没有接入/);
   assert.match((await probe('codex', fake('', 0, '', calls), { model: '--dangerously-bypass-approvals-and-sandbox' })).error ?? '', /模型名称/);
   assert.match((await probe('codex', fake('', 0, '', calls), { effort: '-x' })).error ?? '', /推理强度/);
   assert.equal(calls.length, 0);

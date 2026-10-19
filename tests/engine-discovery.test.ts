@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
-import { defaultConfig, validateConfig } from '../src/main/policy/routing';
+import { ENGINE_KINDS, defaultConfig, validateConfig } from '../src/main/policy/routing';
 import { PolicyStore } from '../src/main/policy/store';
 import { ENGINE_CATALOG } from '../src/shared/engines';
 import { EngineProber } from '../src/main/engines/probe';
@@ -12,9 +12,15 @@ import { applyEngineEnabled, parseEngineToggle } from '../src/main/engines/contr
 
 test('pi is a fixed catalog engine and only claude and codex advertise native subagents', () => {
   const pi = ENGINE_CATALOG.find(entry => entry.id === 'pi');
-  assert.equal(ENGINE_CATALOG.length, 7);
+  assert.equal(ENGINE_CATALOG.length, 6);
   assert.equal(pi?.kind, 'pi');
   assert.equal(pi?.command, 'pi');
+});
+
+test('gemini is not offered by the catalog or the policy schema', () => {
+  const offered: string[] = ENGINE_CATALOG.flatMap(entry => [entry.id, entry.kind, entry.command]);
+  assert.equal(offered.includes('gemini'), false);
+  assert.equal(ENGINE_KINDS.includes('gemini'), false);
 });
 
 function bin(name: string, body: string): { root: string; pathEnv: string } {
@@ -39,7 +45,7 @@ test('path discovery reports installed, missing, nonzero and timeout without a s
     assert.equal(found.modelUsable, false);
     assert.ok(found.path?.endsWith('/codex'));
     assert.equal(readFileSync(args, 'utf8'), '1\n--version\n');
-    const missing = await prober.probeOne('gemini');
+    const missing = await prober.probeOne('pi');
     assert.equal(missing.status, 'missing');
     assert.equal(missing.path, undefined);
   } finally { rmSync(installed.root, { recursive: true, force: true }); }
@@ -78,22 +84,22 @@ test('overlapping scans share one version probe per command', async () => {
 });
 
 test('enabling an installed engine does not create or enable roles and preserves them on disable', async () => {
-  const installed = bin('gemini', '#!/bin/sh\necho "gemini 0.9 ${SECRET_TOKEN:-clean}"\n');
+  const installed = bin('pi', '#!/bin/sh\necho "pi 0.9 ${SECRET_TOKEN:-clean}"\n');
   const root = mkdtempSync(join(tmpdir(), 'weaver-policy-'));
   try {
     const store = new PolicyStore(join(root, 'policy.json'));
     const before = store.snapshot();
     const prober = new EngineProber({ pathEnv: installed.pathEnv, timeoutMs: 1000, env: { SECRET_TOKEN: 'super-secret', PATH: installed.pathEnv } });
-    const enabled = await applyEngineEnabled(store, prober, { id: 'gemini', enabled: true, revision: before.revision });
+    const enabled = await applyEngineEnabled(store, prober, { id: 'pi', enabled: true, revision: before.revision });
     assert.equal(enabled.probe?.status, 'installed');
     assert.equal(enabled.probe?.version?.includes('super-secret'), false);
     assert.equal(enabled.probe?.version?.includes('clean'), true);
     assert.deepEqual(enabled.snapshot.config.owners, before.config.owners);
     assert.deepEqual(enabled.snapshot.config.workers, before.config.workers);
-    assert.equal(enabled.snapshot.config.engines.gemini.enabled, true);
-    assert.equal(enabled.snapshot.config.engines.gemini.kind, 'gemini');
-    const disabled = await applyEngineEnabled(store, prober, { id: 'gemini', enabled: false, revision: enabled.snapshot.revision });
-    assert.equal(disabled.snapshot.config.engines.gemini.enabled, false);
+    assert.equal(enabled.snapshot.config.engines.pi.enabled, true);
+    assert.equal(enabled.snapshot.config.engines.pi.kind, 'pi');
+    const disabled = await applyEngineEnabled(store, prober, { id: 'pi', enabled: false, revision: enabled.snapshot.revision });
+    assert.equal(disabled.snapshot.config.engines.pi.enabled, false);
     assert.deepEqual(disabled.snapshot.config.owners, before.config.owners);
     assert.deepEqual(disabled.snapshot.config.workers, before.config.workers);
     assert.equal(disabled.probe, null);
@@ -109,9 +115,9 @@ test('failed probe, stale revision and enabled roles block enablement without wr
   try {
     const store = new PolicyStore(join(root, 'policy.json'));
     const prober = new EngineProber({ pathEnv: absent, timeoutMs: 300 });
-    await assert.rejects(() => applyEngineEnabled(store, prober, { id: 'gemini', enabled: true, revision: 0 }), /not installed|missing|Version/);
+    await assert.rejects(() => applyEngineEnabled(store, prober, { id: 'opencode', enabled: true, revision: 0 }), /not installed|missing|Version/);
     assert.equal(store.snapshot().revision, 0);
-    assert.equal(store.snapshot().config.engines.gemini, undefined);
+    assert.equal(store.snapshot().config.engines.opencode.enabled, false);
     await assert.rejects(() => applyEngineEnabled(store, prober, { id: 'claude', enabled: false, revision: 0 }), /不能停用|已保留/);
     assert.equal(store.snapshot().config.owners.claude_owner.enabled, true);
     assert.equal(store.snapshot().config.workers.claude_worker.enabled, true);
@@ -138,8 +144,8 @@ test('version probe stops descendants that keep the pipes open', async () => {
   const root = mkdtempSync(join(tmpdir(), 'weaver-cli-'));
   const parent = join(root, 'parent.pid');
   const child = join(root, 'child.pid');
-  writeFileSync(join(root, 'gemini'), `#!/bin/sh\necho $$ > ${JSON.stringify(parent)}\n/bin/sleep 30 &\necho $! > ${JSON.stringify(child)}\nexit 0\n`, { mode: 0o755 });
-  chmodSync(join(root, 'gemini'), 0o755);
+  writeFileSync(join(root, 'opencode'), `#!/bin/sh\necho $$ > ${JSON.stringify(parent)}\n/bin/sleep 30 &\necho $! > ${JSON.stringify(child)}\nexit 0\n`, { mode: 0o755 });
+  chmodSync(join(root, 'opencode'), 0o755);
   const killNoted = () => {
     for (const file of [parent, child]) {
       if (!existsSync(file)) continue;
@@ -150,7 +156,7 @@ test('version probe stops descendants that keep the pipes open', async () => {
   };
   try {
     const started = Date.now();
-    const result = await new EngineProber({ pathEnv: root, timeoutMs: 100 }).probeOne('gemini');
+    const result = await new EngineProber({ pathEnv: root, timeoutMs: 100 }).probeOne('opencode');
     assert.notEqual(result.status, 'installed');
     const pids = [parent, child].map(file => Number(readFileSync(file, 'utf8')));
     const deadline = Math.min(Date.now() + 250, started + 1_000);
