@@ -7,7 +7,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { failure, LocalIPCError, MAX_FRAME_BYTES, readDiscovery, TRANSPORT_TIMEOUT_MS } from '../main/local-ipc';
-import { startRuntime } from '../main/runtime';
+import { openBrowser, startRuntime } from '../main/runtime';
 import { VERSION } from '../shared/version';
 import { installSkill, SKILL_AGENTS, SKILL_NAME, sourceSkill, type SkillAgent } from './skills';
 import { runServer, SERVER_HELP, serverEnv, type Envelope } from './server';
@@ -42,8 +42,8 @@ export const CLI_CATALOG: CatalogCommand[] = [
   { command: 'tasks.list', inputFields: {"required": {}, "optional": {"offset": "integer ≥0 (default 0)", "limit": "integer 1–100 (default 25)", "ownerId": "UUID"}}, mutation: false, usage: 'tasks list [--input <json>]' },
   { command: 'tasks.events', inputFields: {"required": {"taskId": "UUID"}, "optional": {"after": "event cursor UUID", "limit": "integer 1–100 (default 50)"}}, mutation: false, usage: 'tasks events --task-id <id> [--input <json>]' },
   { command: 'tasks.results', inputFields: {"required": {"taskId": "UUID"}, "optional": {}}, mutation: false, usage: 'tasks results --task-id <id>' },
-  { command: 'tasks.wait', inputFields: {"required": {"--task-id": "UUID"}, "optional": {"--for": "seconds 1–600 (default 30)"}}, mutation: false, local: 'wait', usage: 'tasks wait --task-id <id> [--for <seconds>]' },
-  { command: 'tasks.watch', inputFields: {"required": {"--task-id": "UUID"}, "optional": {"--for": "seconds 1–600 (default 30)"}}, mutation: false, local: 'watch', usage: 'tasks watch --task-id <id> [--for <seconds>]' },
+  { command: 'tasks.wait', inputFields: {"required": {"--task-id": "UUID"}, "optional": {"--for": "seconds 1–600 (default min(600, herdr.max_wait_minutes×60), else 30)"}}, mutation: false, local: 'wait', usage: 'tasks wait --task-id <id> [--for <seconds>]' },
+  { command: 'tasks.watch', inputFields: {"required": {"--task-id": "UUID"}, "optional": {"--for": "seconds 1–600 (default min(600, herdr.max_wait_minutes×60), else 30)"}}, mutation: false, local: 'watch', usage: 'tasks watch --task-id <id> [--for <seconds>]' },
   { command: 'packages.create', inputFields: {"required": {"taskId": "UUID", "scope": "string[1–30] (each ≤1000)", "acceptanceCriteria": "string[1–30] (each ≤1000)"}, "optional": {"expectedRevision": "integer"}}, mutation: true, usage: 'packages create --task-id <id> --input <json> --command-id <id>' },
   { command: 'packages.get', inputFields: {"required": {"packageId": "UUID"}, "optional": {}}, mutation: false, usage: 'packages get --input <json>' },
   { command: 'workers.spawn', inputFields: {"required": {"taskId": "UUID"}, "optional": {"expectedRevision": "integer", "packageId": "frozen package UUID", "owner": "profile ID (must match task owner)", "worker": "explicit worker ID (omitted picks the owner's highest-weight available worker)", "provider": "mock-jsonl only for explicit fixture execution"}}, mutation: true, usage: 'workers spawn --task-id <id> [--input <json>] --command-id <id>' },
@@ -68,14 +68,15 @@ export const CLI_CATALOG: CatalogCommand[] = [
 for (const item of CLI_CATALOG) item.inputFields ??= { required: {} };
 
 const catalogHelp = CLI_CATALOG.map(item => `  ${item.usage}`).join('\n');
-export const CLI_HELP = `Weaver local control plane
+export const CLI_HELP = `Weaver
 
   weaver web [--port <0-65535>] [--data-dir <path>] [--no-open] [--dev] [--output json|jsonl|text]
   weaver <command> [--data-dir <path>] [--output json|jsonl|text] [--input <file|->] [--command-id <id>] [--task-id <id>] [--for <seconds>]
   weaver skills install [--agent claude-code,codex] [--dir <skills-root>] [--link] [--force] [--output json|text]
   weaver server <status|start|stop|install|uninstall> [--port <0-65535>] [--data-dir <path>] [--output json|text] [--force] [--timeout <seconds>]
+  weaver --skill prints the bundled agents-weaver SKILL.md
 
-weaver web runs one foreground control plane: loopback HTTP on 127.0.0.1 and the authenticated Unix CLI socket. Closing a browser does not stop tasks. Ctrl+C stops new work and cancels workers this process started. Task and policy files are kept. Default data directory: $XDG_DATA_HOME/weaver or ~/.local/share/weaver.
+weaver web runs the Weaver service in the foreground: loopback HTTP on 127.0.0.1 and the authenticated Unix CLI socket. Closing a browser does not stop tasks. Ctrl+C stops new work and cancels workers this process started. Task and policy files are kept. Default data directory: $XDG_DATA_HOME/weaver or ~/.local/share/weaver.
 
 If a client command reports APP_NOT_RUNNING, start: weaver server start
 
@@ -83,7 +84,7 @@ If a client command reports APP_NOT_RUNNING, start: weaver server start
 
 tasks create: an omitted workspace becomes this CLI process's working directory before the request is sent. An explicit path wins. A relative explicit path is resolved against that same caller directory. The server does not fill a workspace from its own directory. Real dispatch still requires the directory to exist.
 
-tasks wait and tasks watch poll tasks get and tasks events. --for is 1 through 600 seconds and defaults to 30. They do not start a second scheduler.
+tasks wait and tasks watch poll tasks get and tasks events. --for is 1 through 600 seconds; omitted, it defaults to min(600, herdr.max_wait_minutes × 60) from the policy, or 30 seconds when the policy cannot be read. They do not start a second scheduler.
 
 Mutations need --command-id, except policy save, engines set-enabled, and quota refresh, which send the JSON body shown in their usage. quota refresh defaults to {} and synchronizes Weaver-owned policy blocks without inference; it does not accept command or task IDs. operations get reads that same --command-id. owners attach stores a name and profile plus optional caller labels. It does not contact a host. owners spawn does not start an owner model. capabilities.realExecution means the worker launcher is loaded, not that a model ran or a login was proven. mock-jsonl is an explicit provider. A real route does not fall back to mock.
 
@@ -145,8 +146,9 @@ function takeOutput(argv: string[], index: number): { format: OutputFormat; next
   if (value !== 'json' && value !== 'jsonl' && value !== 'text') throw new LocalIPCError('INVALID_ARGUMENT', '--output must be json, jsonl, or text');
   return { format: value, next: index };
 }
-function parseWeb(argv: string[]): { port: number; dataDir: string; open: boolean; dev: boolean; output: OutputFormat; outputExplicit: boolean } {
+function parseWeb(argv: string[]): { port: number; portExplicit: boolean; dataDir: string; open: boolean; dev: boolean; output: OutputFormat; outputExplicit: boolean } {
   let port = DEFAULT_WEB_PORT;
+  let portExplicit = false;
   let dataDir = defaultDataDir();
   let open = true;
   let dev = false;
@@ -171,12 +173,12 @@ function parseWeb(argv: string[]): { port: number; dataDir: string; open: boolea
     if (arg !== '--port' && arg !== '--data-dir') throw new LocalIPCError('INVALID_ARGUMENT', `Unknown option ${arg}`);
     const value = argv[++i];
     if (!value || value.startsWith('--')) throw new LocalIPCError('INVALID_ARGUMENT', `Missing value for ${arg}`);
-    if (arg === '--port') port = parsePort(value);
+    if (arg === '--port') { port = parsePort(value); portExplicit = true; }
     else dataDir = resolve(value);
   }
   if (jsonAlias && seen.has('--output')) throw new LocalIPCError('INVALID_ARGUMENT', '--json cannot be combined with --output');
   if (jsonAlias) output = 'json';
-  return { port, dataDir, open, dev, output, outputExplicit };
+  return { port, portExplicit, dataDir, open, dev, output, outputExplicit };
 }
 function catalogCommand(words: string[]): CatalogCommand | undefined {
   if (words.length === 1 && words[0] === 'capabilities') return CLI_CATALOG.find(item => item.command === 'capabilities.get');
@@ -314,7 +316,7 @@ export async function sendRequest(dataDir: string, request: unknown, timeoutMs =
     const done = (error?: Error, value?: unknown) => { if (settled) return; settled = true; clearTimeout(timer); socket.destroy(); error ? reject(error) : resolvePromise(value); };
     const timer = setTimeout(() => done(new LocalIPCError('TIMEOUT', 'App did not respond; a submitted command may still be running. Retry with the same command ID')), remaining);
     socket.once('connect', () => socket.write(frame));
-    socket.on('error', error => done(new LocalIPCError(['ENOENT', 'ECONNREFUSED'].includes((error as NodeJS.ErrnoException).code || '') ? 'APP_NOT_RUNNING' : 'TRANSPORT_ERROR', 'Could not connect to weaver web')));
+    socket.on('error', error => done(new LocalIPCError(['ENOENT', 'ECONNREFUSED'].includes((error as NodeJS.ErrnoException).code || '') ? 'APP_NOT_RUNNING' : 'TRANSPORT_ERROR', 'Weaver is not running; run weaver server start')));
     socket.on('data', raw => {
       const chunk = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
       if (bytes.length + chunk.length > MAX_FRAME_BYTES) return done(new LocalIPCError('INVALID_RESPONSE', 'App response exceeds transport limit'));
@@ -330,8 +332,17 @@ export async function sendRequest(dataDir: string, request: unknown, timeoutMs =
     socket.once('close', () => { if (!settled) done(new LocalIPCError('TRANSPORT_ERROR', 'App disconnected; a submitted command may still be running')); });
   });
 }
+/** The omitted --for deadline: min(600, herdr.max_wait_minutes×60) from the policy, or 30 when it cannot be read. */
+export async function defaultForSeconds(dataDir: string): Promise<number> {
+  try {
+    const policy = await sendRequest(dataDir, { method: 'getPolicy', args: [] }, 2000) as { ok?: boolean; data?: { config?: { herdr?: { max_wait_minutes?: unknown } } } };
+    const minutes = policy.data?.config?.herdr?.max_wait_minutes;
+    if (policy.ok === true && typeof minutes === 'number' && Number.isFinite(minutes) && minutes > 0) return Math.min(600, minutes * 60);
+  } catch { /* keep the fallback below */ }
+  return 30;
+}
 async function pollTask(options: CLIOptions, mode: 'wait' | 'watch'): Promise<number> {
-  const deadline = Date.now() + (options.forSeconds ?? 30) * 1000;
+  const deadline = Date.now() + (options.forSeconds ?? await defaultForSeconds(options.dataDir)) * 1000;
   const request = (command:string,args:Record<string,unknown>) => sendRequest(options.dataDir, makeRequest({...options,command},args), deadline-Date.now());
   let after: string | undefined;
   for (;;) {
@@ -373,9 +384,18 @@ function startupFailure(error: unknown, port: number): LocalIPCError {
   const message = raw.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, 400);
   return new LocalIPCError('STARTUP_FAILED', message || 'Weaver could not start');
 }
-function readyLine(url: string, port: number, format: OutputFormat): string {
+function readyLine(url: string, port: number, format: OutputFormat, extra: Record<string, unknown> = {}): string {
   if (format === 'text') return url + '\n';
-  return JSON.stringify({ apiVersion: 'weaver.v1', commandId: null, ok: true, data: { url, port } }) + '\n';
+  return JSON.stringify({ apiVersion: 'weaver.v1', commandId: null, ok: true, data: { url, port, ...extra } }) + '\n';
+}
+type RunningInfo = { data: { url: string; port: number } & Record<string, unknown> };
+async function checkRunning(dataDir: string): Promise<RunningInfo | undefined> {
+  try {
+    const response = await sendRequest(dataDir, { method: 'serverInfo', args: [] }, 2000) as { ok?: boolean; data?: unknown };
+    const info = response.ok === true && response.data && typeof response.data === 'object' ? response.data as RunningInfo['data'] : undefined;
+    if (typeof info?.url === 'string' && info.url && typeof info.port === 'number' && Number.isInteger(info.port) && info.port > 0) return { data: info };
+  } catch { /* unreadable endpoints fall through to a normal start */ }
+  return undefined;
 }
 function runSkills(argv: string[], words: string[]): number {
   if (words.length !== 2 || words[1] !== 'install') throw new LocalIPCError('INVALID_ARGUMENT', 'Usage: weaver skills install [--agent claude-code,codex] [--dir <skills-root>] [--link] [--force]');
@@ -417,6 +437,12 @@ export async function runCLI(argv: string[]): Promise<number> {
   let errorFormat: OutputFormat = requestedOutput(argv);
   try {
     if (argv.length === 1 && (argv[0] === '--version' || argv[0] === '-v')) { process.stdout.write(`weaver ${VERSION}\n`); return 0; }
+    if (argv.includes('--skill')) {
+      const skill = sourceSkill().files.get('SKILL.md');
+      if (!skill) throw new LocalIPCError('SKILL_MISSING', 'This executable carries no SKILL.md');
+      writeSync(process.stdout.fd, Buffer.from(skill));
+      return 0;
+    }
     if (argv.includes('--help')) {
       const rest=argv.filter(arg=>arg!=='--help');
       const words=positionals(rest);
@@ -441,6 +467,14 @@ export async function runCLI(argv: string[]): Promise<number> {
       if (words.length !== 1) throw new LocalIPCError('INVALID_ARGUMENT', 'Unexpected web arguments');
       const web = parseWeb(argv);
       if (web.outputExplicit) errorFormat = web.output;
+      const running = await checkRunning(web.dataDir);
+      if (running) {
+        const extra: Record<string, unknown> = { alreadyRunning: true };
+        if (web.portExplicit && running.data.port !== web.port) extra.note = `A Weaver service is already running on port ${running.data.port}; using its URL instead of the requested port ${web.port}`;
+        if (web.open) openBrowser(running.data.url);
+        writeSync(process.stdout.fd, readyLine(running.data.url, running.data.port, web.output, extra));
+        return 0;
+      }
       let runtime;
       try { runtime = await startRuntime({ dataDir: web.dataDir, port: web.port, open: web.open, dev: web.dev }); }
       catch (error) { throw startupFailure(error, web.port); }

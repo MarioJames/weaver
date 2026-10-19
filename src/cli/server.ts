@@ -18,6 +18,7 @@ const POLL_MS = 200;
 const PROBE_MS = 2_000;
 const LOG_TAIL_LINES = 20;
 const LOG_TAIL_CHARS = 2_000;
+const LEGACY_HINT = 'This service predates weaver server; stop it the way it was started, then run weaver server start';
 
 export const SERVER_HELP = `weaver server <status|start|stop|install|uninstall> [--port <0-65535>] [--data-dir <path>] [--output json|text] [--force] [--timeout <seconds>]
 
@@ -293,7 +294,14 @@ function isServerInfo(value: unknown): value is ServerInfo {
     (record.managedBy === null || record.managedBy === 'systemd' || record.managedBy === 'launchd');
 }
 
-type Probe = { state: 'running'; info: ServerInfo } | { state: 'stopped' } | { state: 'error'; code: string; message: string };
+type Probe = { state: 'running'; info: ServerInfo } | { state: 'stopped' } | { state: 'legacy' } | { state: 'error'; code: string; message: string };
+
+/**
+ * A legacy weaver (before serverInfo) answers the envelope with ok:false and
+ * INVALID_REQUEST 'Unknown method', which means the server IS running, just too
+ * old to describe itself. Any other error is a real failure.
+ */
+const isLegacy = (code: string, message: string): boolean => code === 'INVALID_REQUEST' && message === 'Unknown method';
 
 async function probeServer(env: ServerEnv, dataDir: string, timeoutMs = PROBE_MS): Promise<Probe> {
   let envelope: Envelope;
@@ -303,7 +311,12 @@ async function probeServer(env: ServerEnv, dataDir: string, timeoutMs = PROBE_MS
     if (code === 'APP_NOT_RUNNING') return { state: 'stopped' };
     return { state: 'error', code, message: text(error) };
   }
-  if (envelope.ok !== true) return { state: 'error', code: envelope.error?.code ?? 'INTERNAL_ERROR', message: envelope.error?.message ?? 'Weaver returned an error' };
+  if (envelope.ok !== true) {
+    const code = envelope.error?.code ?? 'INTERNAL_ERROR';
+    const message = envelope.error?.message ?? 'Weaver returned an error';
+    if (isLegacy(code, message)) return { state: 'legacy' };
+    return { state: 'error', code, message };
+  }
   if (!isServerInfo(envelope.data)) return { state: 'error', code: 'INVALID_RESPONSE', message: 'Weaver returned an unexpected serverInfo record' };
   return { state: 'running', info: envelope.data };
 }
@@ -336,6 +349,7 @@ export async function serverStatus(env: ServerEnv, args: ServerArgs): Promise<En
   const service = serviceState(env);
   const probe = await probeServer(env, args.dataDir);
   if (probe.state === 'running') return succeed({ status: 'running', ...probe.info, service });
+  if (probe.state === 'legacy') return succeed({ status: 'running', legacy: true, service, hint: LEGACY_HINT });
   if (probe.state === 'stopped') return succeed({ status: 'stopped', service });
   return failure(probe.code, probe.message);
 }
@@ -343,6 +357,8 @@ export async function serverStatus(env: ServerEnv, args: ServerArgs): Promise<En
 export async function serverStart(env: ServerEnv, args: ServerArgs): Promise<Envelope> {
   const current = await probeServer(env, args.dataDir);
   if (current.state === 'running') return succeed({ status: 'running', alreadyRunning: true, ...current.info });
+  if (current.state === 'legacy') return succeed({ status: 'running', alreadyRunning: true, legacy: true });
+  if (current.state === 'error') return failure(current.code, current.message);
   const service = serviceState(env);
   const managed = service.installed ? unitValues(env, service) : undefined;
   if (managed && managed.port === args.port && managed.dataDir === args.dataDir) {
@@ -361,7 +377,8 @@ export async function serverStart(env: ServerEnv, args: ServerArgs): Promise<Env
 export async function serverStop(env: ServerEnv, args: ServerArgs): Promise<Envelope> {
   const current = await probeServer(env, args.dataDir);
   if (current.state === 'stopped') return succeed({ status: 'stopped', alreadyStopped: true });
-  if (current.state !== 'running') return failure(current.code, current.message);
+  if (current.state === 'legacy') return failure('SERVER_LEGACY', LEGACY_HINT);
+  if (current.state === 'error') return failure(current.code, current.message);
   const { pid, runningWorkers } = current.info;
   if (runningWorkers > 0 && !args.force) return failure('SERVER_BUSY', `${runningWorkers} ${runningWorkers === 1 ? 'worker is' : 'workers are'} still running and stopping cancels them. Pass --force to stop anyway.`);
   if (!Number.isInteger(pid) || pid <= 0 || pid === env.pid) return failure('SERVER_STOP_FAILED', `Refusing to signal server pid ${pid}.`);
@@ -410,6 +427,8 @@ export async function serverInstall(env: ServerEnv, args: ServerArgs): Promise<E
     if (current.info.managedBy === layout.manager) return succeed({ ...service, running: 'managed', ...current.info });
     return succeed({ ...service, running: 'unmanaged', hint: 'weaver server stop && weaver server start' });
   }
+  if (current.state === 'legacy') return succeed({ ...service, running: 'unmanaged', hint: LEGACY_HINT });
+  if (current.state === 'error') return succeed({ ...service, running: 'unknown', error: { code: current.code, message: current.message } });
   const launch = layout.manager === 'systemd'
     ? await env.run('systemctl', ['--user', 'start', SERVICE_NAME])
     : await env.run('launchctl', ['bootstrap', `gui/${env.uid}`, layout.path]);
@@ -430,7 +449,7 @@ export async function serverUninstall(env: ServerEnv, args: ServerArgs): Promise
   if (!marked(existing)) return succeed({ installed: false, manager: layout.manager, path: layout.path, note: 'That file was not installed by weaver and was left in place.' });
   if (layout.manager === 'launchd') {
     const current = await probeServer(env, args.dataDir);
-    const workers = current.state === 'running' ? current.info.runningWorkers : 0;
+    const workers = current.state === 'running' ? current.info.runningWorkers : current.state === 'legacy' ? 1 : 0;
     if (workers > 0 && !args.force) return failure('SERVER_BUSY', `${workers} ${workers === 1 ? 'worker is' : 'workers are'} running under ${LAUNCHD_LABEL}. Pass --force to remove the service anyway.`);
     const result = await env.run('launchctl', ['bootout', `gui/${env.uid}/${LAUNCHD_LABEL}`]);
     if (result.code !== 0) return failure('SERVER_UNINSTALL_FAILED', `launchctl bootout gui/${env.uid}/${LAUNCHD_LABEL} failed: ${runText(result)}`);
@@ -445,7 +464,7 @@ export async function serverUninstall(env: ServerEnv, args: ServerArgs): Promise
     if (reload.code !== 0) return failure('SERVER_UNINSTALL_FAILED', `systemctl --user daemon-reload failed: ${runText(reload)}`);
   }
   const running = await probeServer(env, args.dataDir);
-  return succeed({ installed: false, manager: layout.manager, path: layout.path, running: running.state === 'running' });
+  return succeed({ installed: false, manager: layout.manager, path: layout.path, running: running.state === 'running' || running.state === 'legacy' });
 }
 
 export async function serverAction(env: ServerEnv, args: ServerArgs): Promise<Envelope> {

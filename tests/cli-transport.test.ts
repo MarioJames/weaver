@@ -24,7 +24,7 @@ test('CLI parsing supports args/envelopes and explicit retry IDs', () => {
 
 test('missing app returns APP_NOT_RUNNING', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'wv-'));
-  try { await assert.rejects(sendRequest(directory, {}), { code: 'APP_NOT_RUNNING' }); }
+  try { await assert.rejects(sendRequest(directory, {}), { code: 'APP_NOT_RUNNING', message: 'Weaver is not running; run weaver server start' }); }
   finally { await rm(directory, { recursive: true, force: true }); }
 });
 

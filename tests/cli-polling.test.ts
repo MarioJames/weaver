@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { startLocalIPC } from '../src/main/local-ipc';
-import { runCLI } from '../src/cli/main';
+import { runCLI, parseCLI, defaultForSeconds } from '../src/cli/main';
 
 const exec = promisify(execFile);
 const ok = (data: unknown) => ({apiVersion:'weaver.v1',ok:true,data});
@@ -60,5 +60,76 @@ test('bounded wait uses its remaining deadline for an unresponsive transport',as
   assert.equal(await command,1);assert.equal(JSON.parse(output).error.code,'TIMEOUT');
  }finally{
   process.stdout.write=original;t.mock.timers.reset();await app.close();await rm(directory,{recursive:true,force:true});
+ }
+});
+
+test('tasks wait without --for reads the policy before its first poll',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'wv-poll-'));
+ const calls:string[]=[];
+ const app=await startLocalIPC(directory,(request:any)=>{
+  if(request.method==='getPolicy'){calls.push('getPolicy');return ok({config:{herdr:{max_wait_minutes:4}}});}
+  calls.push('tasks.get');return ok({id:'task',title:'Fixture',status:'completed'});
+ });
+ const original=process.stdout.write;
+ let output='';
+ try{
+  process.stdout.write=((chunk:unknown)=>{output+=String(chunk);return true;}) as typeof process.stdout.write;
+  assert.equal(await runCLI(['tasks','wait','--task-id','task','--output','json','--data-dir',directory]),0);
+  assert.equal(JSON.parse(output).data.status,'completed');
+  assert.deepEqual(calls,['getPolicy','tasks.get'],'the omitted --for consults the policy before polling');
+ }finally{
+  process.stdout.write=original;await app.close();await rm(directory,{recursive:true,force:true});
+ }
+});
+
+test('the omitted --for is min(600, max_wait_minutes×60) with 30 as the fallback',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'wv-poll-'));
+ const app=await startLocalIPC(directory,(request:any)=>request.method==='getPolicy'
+  ?ok({config:{herdr:{max_wait_minutes:4}}}):ok({status:'ignored'}));
+ try{
+  assert.equal(await defaultForSeconds(directory),240);
+  assert.equal(await defaultForSeconds(justDataDir()),30,'an unreachable endpoint falls back to 30');
+  await app.close();
+  const big=await startLocalIPC(directory,(request:any)=>ok({config:{herdr:{max_wait_minutes:11}}}));
+  try{assert.equal(await defaultForSeconds(directory),600,'the 10-minute cap binds');}finally{await big.close();}
+  const err=await startLocalIPC(directory,(request:any)=>({apiVersion:'weaver.v1',ok:false,error:{code:'PERSISTENCE_ERROR',message:'Policy',retryable:false}}));
+  try{assert.equal(await defaultForSeconds(directory),30);}finally{await err.close();}
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('the omitted --for falls back to 30 when getPolicy never answers',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'wv-poll-'));
+ const app=await startLocalIPC(directory,()=>new Promise(()=>{}));
+ try{
+  t.mock.timers.enable({apis:['setTimeout'],now:0});
+  const pending=defaultForSeconds(directory);
+  for(let i=0;i<50;i++)await new Promise(resolve=>setImmediate(resolve));
+  t.mock.timers.tick(2_500);
+  assert.equal(await pending,30,'the 2s policy read times out and falls back to 30');
+ }finally{
+  t.mock.timers.reset();await app.close();await rm(directory,{recursive:true,force:true});
+ }
+});
+
+function justDataDir(): string { return join(tmpdir(), 'wv-poll-gone', 'absent'); }
+
+test('an explicit --for is honoured without a policy read and keeps the 1..600 validation',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'wv-poll-'));
+ const calls:string[]=[];
+ const app=await startLocalIPC(directory,(request:any)=>{
+  if(request.method==='getPolicy'){calls.push('getPolicy');return ok({config:{herdr:{max_wait_minutes:4}}});}
+  calls.push('tasks.get');return ok({id:'task',title:'Fixture',status:'completed'});
+ });
+ const original=process.stdout.write;
+ let output='';
+ try{
+  process.stdout.write=((chunk:unknown)=>{output+=String(chunk);return true;}) as typeof process.stdout.write;
+  assert.equal(await runCLI(['tasks','wait','--task-id','task','--for','1','--output','json','--data-dir',directory]),0);
+  assert.equal(JSON.parse(output).data.status,'completed');
+  assert.deepEqual(calls,['tasks.get']);
+  assert.equal(parseCLI(['tasks','wait','--task-id','task','--for','600']).forSeconds,600);
+  for(const invalid of ['0','601','x'])assert.throws(()=>parseCLI(['tasks','wait','--task-id','task','--for',invalid]),(error:{code:string})=>error.code==='INVALID_ARGUMENT');
+ }finally{
+  process.stdout.write=original;await app.close();await rm(directory,{recursive:true,force:true});
  }
 });

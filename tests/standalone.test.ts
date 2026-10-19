@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
+import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import { startHttpServer } from '../src/main/http';
 
 function get(port: number, path: string) {
@@ -48,6 +50,14 @@ test('weaver --version prints the package version', async () => {
   (process.stdout as any).write = (chunk: string) => { written.push(String(chunk)); return true; };
   try { assert.equal(await runCLI(['--version']), 0); } finally { (process.stdout as any).write = write; }
   assert.equal(written.join(''), `weaver ${VERSION}\n`);
+});
+
+test('--skill prints the bundled SKILL.md frontmatter to stdout', () => {
+  const result = spawnSync(process.execPath, ['--import', 'tsx', resolve('src/cli/main.ts'), '--skill'], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^---\nname: agents-weaver\n/);
+  assert.match(result.stdout, /description: /);
+  assert.match(result.stdout, /^# /m);
 });
 
 test('--input takes a file, stdin, or the JSON object inline, and names a missing file', async () => {

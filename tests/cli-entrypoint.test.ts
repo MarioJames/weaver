@@ -15,7 +15,11 @@ test('CLI runs through an actual symlink entrypoint', () => {
     symlinkSync(entry, linked);
     const help = spawnSync(process.execPath, ['--import', 'tsx', linked, '--help'], { encoding: 'utf8' });
     assert.equal(help.status, 0, help.stderr);
-    assert.match(help.stdout, /Weaver local control plane/);
+    assert.equal(help.stdout.split('\n')[0], 'Weaver');
+    assert.equal(help.stdout.includes('control plane'), false);
+    assert.match(help.stdout, /weaver --skill prints the bundled agents-weaver SKILL\.md/);
+    assert.match(help.stdout, /weaver web runs the Weaver service in the foreground/);
+    assert.match(help.stdout, /--for is 1 through 600 seconds; omitted, it defaults to min\(600, herdr\.max_wait_minutes × 60\)/);
     const machine = spawnSync(process.execPath, ['--import', 'tsx', linked, 'results', 'ack', '--help', '--output', 'json'], { encoding: 'utf8' });
     assert.equal(machine.status, 0, machine.stderr);
     assert.equal(JSON.parse(machine.stdout).data.command, 'results.ack');

@@ -1,22 +1,29 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createServer } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { startLocalIPC, LocalIPCError, type Discovery } from '../src/main/local-ipc';
+import { startRuntime } from '../src/main/runtime';
 import {
   LAUNCHD_LABEL, SERVER_HELP, SERVICE_NAME, UNIT_MARKER,
   launchdPlist, parseServer, plistProgramArguments, selfCommand, serverEnv, serverInstall, serverStart,
-  serverStop, serverUninstall, systemdQuote, systemdTokens, systemdUnit, webArgs,
+  serverStatus, serverStop, serverUninstall, systemdQuote, systemdTokens, systemdUnit, webArgs,
   type Envelope, type RunResult, type ServerArgs, type ServerEnv, type ServerInfo,
 } from '../src/cli/server';
+
+const exec = promisify(execFile);
 
 const entry = resolve('src/cli/main.ts');
 const scratch = mkdtempSync(join(tmpdir(), 'wv-server-'));
 const okData = (data: unknown): Envelope => ({ apiVersion: 'weaver.v1', commandId: null, ok: true, data });
+/** How a pre-serverInfo weaver answers: a running server that cannot describe itself. */
+const legacyEnvelope: Envelope = { apiVersion: 'weaver.v1', commandId: null, ok: false, error: { code: 'INVALID_REQUEST', message: 'Unknown method' } };
+const otherErrorEnvelope: Envelope = { apiVersion: 'weaver.v1', commandId: null, ok: false, error: { code: 'INVALID_REQUEST', message: 'Invalid argument arity' } };
 /** A stopped server reaches the CLI as a thrown APP_NOT_RUNNING, the way sendRequest does. */
 const stopped = 'down' as const;
 type Probe = Envelope | typeof stopped;
@@ -73,7 +80,12 @@ const ran = (runs: string[][], ...prefix: string[]) => runs.some(call => call.sl
 
 test('weaver server start, status and stop drive a real control plane on a free port', () => {
   const dataDir = mkdtempSync(join(scratch, 'live-'));
-  const cli = (words: string[]) => spawnSync(process.execPath, ['--import', 'tsx', entry, 'server', ...words, '--data-dir', dataDir, '--output', 'json'], { encoding: 'utf8', cwd: resolve('.') });
+  // Strip service-manager wiring (env var and unit path) so the spawned CLI sees an unmanaged server regardless of host.
+  const isolatedEnv = (): NodeJS.ProcessEnv => {
+    const clean = Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'WEAVER_SERVICE' && key !== 'XDG_CONFIG_HOME'));
+    return { ...clean, XDG_CONFIG_HOME: join(dataDir, 'config') };
+  };
+  const cli = (words: string[]) => spawnSync(process.execPath, ['--import', 'tsx', entry, 'server', ...words, '--data-dir', dataDir, '--output', 'json'], { encoding: 'utf8', cwd: resolve('.'), env: isolatedEnv() });
   let started = false;
   try {
     const start = cli(['start', '--port', '0', '--timeout', '60']);
@@ -130,6 +142,45 @@ test('weaver server --help prints the group help and the CLI help points at it',
   const missing = spawnSync(process.execPath, ['--import', 'tsx', entry, 'sync', 'snapshot', '--data-dir', join(scratch, 'absent')], { encoding: 'utf8', cwd: resolve('.') });
   assert.equal(missing.status, 1);
   assert.match(JSON.parse(missing.stdout).error.message, /weaver server start/);
+});
+
+test('weaver web reuses a running service instead of starting a second instance', async () => {
+  const dataDir = mkdtempSync(join(scratch, 'live-'));
+  // Async spawns only: the runtime answers the CLI probe from this test's own event loop.
+  const cli = (words: string[]) => exec(process.execPath, ['--import', 'tsx', entry, ...words], { encoding: 'utf8', cwd: resolve('.'), maxBuffer: 1 << 24 });
+  let runtime;
+  try {
+    runtime = await startRuntime({ dataDir, port: 0, open: false });
+    const info = { url: runtime.url, port: runtime.port };
+    const endpoint = (): string => readFileSync(join(dataDir, 'control.v1.json'), 'utf8');
+    const published = endpoint();
+
+    const web = await cli(['web', '--data-dir', dataDir, '--output', 'json', '--no-open']);
+    const ready = JSON.parse(web.stdout);
+    assert.equal(ready.ok, true);
+    assert.equal(ready.data.url, info.url, 'the running service URL is returned');
+    assert.equal(ready.data.port, info.port);
+    assert.equal(ready.data.alreadyRunning, true);
+    assert.equal(ready.data.note, undefined, 'no note without an explicit port');
+
+    const text = await cli(['web', '--data-dir', dataDir, '--output', 'text', '--no-open']);
+    assert.equal(text.stdout.trim(), info.url);
+
+    const shifted = await cli(['web', '--port', '4799', '--data-dir', dataDir, '--output', 'json', '--no-open']);
+    const note = JSON.parse(shifted.stdout).data;
+    assert.equal(note.url, info.url, 'the running URL wins over the requested port');
+    assert.equal(note.alreadyRunning, true);
+    assert.match(note.note, /already running/);
+    assert.ok(String(note.note).includes(String(info.port)), String(note.note));
+
+    assert.equal(endpoint(), published, 'a reused web call never republishes the endpoint');
+    assert.equal(readdirSync(dataDir).filter(name => name.startsWith('control-')).length, 1, 'no second instance laid down an endpoint');
+    const stillRunning = await cli(['capabilities', '--data-dir', dataDir, '--output', 'json']);
+    assert.equal(JSON.parse(stillRunning.stdout).ok, true, 'the instance that was already running still answers');
+  } finally {
+    await runtime?.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
 });
 
 // ---------------------------------------------------------------- parsing
@@ -271,6 +322,86 @@ test('stop maps a failed signal to SERVER_STOP_FAILED', async () => {
   const result = await serverStop(env, argsOf({ action: 'stop' }));
   assert.equal(result.error?.code, 'SERVER_STOP_FAILED');
   assert.match(result.error?.message ?? '', /Operation not permitted/);
+});
+
+// ---------------------------------------------------------------- legacy and error probes
+
+test('status reports a legacy server as running with a hint', async () => {
+  const { env } = fake({ probes: [legacyEnvelope] });
+  const result = await serverStatus(env, argsOf({ action: 'status' }));
+  assert.equal(result.ok, true, JSON.stringify(result.error));
+  assert.equal(data(result).status, 'running');
+  assert.equal(data(result).legacy, true);
+  assert.equal(data(result).hint, 'This service predates weaver server; stop it the way it was started, then run weaver server start');
+  assert.deepEqual(data(result).service, { installed: false, manager: 'systemd', path: unitPath(env) });
+
+  const failed = await serverStatus(fake({ probes: [otherErrorEnvelope] }).env, argsOf({ action: 'status' }));
+  assert.equal(failed.ok, false);
+  assert.equal(failed.error?.code, 'INVALID_REQUEST');
+  assert.equal(failed.error?.message, 'Invalid argument arity', 'non-legacy envelope errors stay errors');
+});
+
+test('start on a legacy server reports already running without starting anything', async () => {
+  let spawned = 0;
+  const { env, runs, killed } = fake({ probes: [legacyEnvelope], spawn: () => { spawned++; return new Promise(() => {}); } });
+  const result = await serverStart(env, argsOf({ action: 'start' }));
+  assert.equal(result.ok, true, JSON.stringify(result.error));
+  assert.equal(data(result).status, 'running');
+  assert.equal(data(result).alreadyRunning, true);
+  assert.equal(data(result).legacy, true);
+  assert.equal(runs.length, 0, 'no systemctl start');
+  assert.equal(spawned, 0, 'no spawn');
+  assert.equal(killed.length, 0, 'no kill');
+});
+
+test('start fails with a probe error and never spawns a doomed second process', async () => {
+  let spawned = 0;
+  const { env } = fake({ probes: [otherErrorEnvelope], spawn: () => { spawned++; return new Promise(() => {}); } });
+  const result = await serverStart(env, argsOf({ action: 'start' }));
+  assert.equal(result.ok, false);
+  assert.equal(result.error?.code, 'INVALID_REQUEST');
+  assert.equal(result.error?.message, 'Invalid argument arity');
+  assert.equal(spawned, 0);
+});
+
+test('stop on a legacy server refuses with SERVER_LEGACY and signals nothing', async () => {
+  const { env, runs, killed } = fake({ probes: [legacyEnvelope] });
+  const result = await serverStop(env, argsOf({ action: 'stop' }));
+  assert.equal(result.ok, false);
+  assert.equal(result.error?.code, 'SERVER_LEGACY');
+  assert.equal(result.error?.message, 'This service predates weaver server; stop it the way it was started, then run weaver server start');
+  assert.equal(killed.length, 0);
+  assert.equal(runs.length, 0);
+});
+
+test('install on a legacy server skips starting and reports unmanaged with the legacy hint', async () => {
+  const { env, runs, killed } = fake({ probes: [legacyEnvelope] });
+  const result = await serverInstall(env, argsOf({ action: 'install' }));
+  assert.equal(result.ok, true, JSON.stringify(result.error));
+  assert.equal(data(result).running, 'unmanaged');
+  assert.equal(data(result).hint, 'This service predates weaver server; stop it the way it was started, then run weaver server start');
+  assert.deepEqual(runs, [['systemctl', '--user', 'daemon-reload'], ['systemctl', '--user', 'enable', SERVICE_NAME]], 'written and enabled but not started');
+  assert.equal(existsSync(unitPath(env)), true);
+  assert.equal(killed.length, 0);
+});
+
+test('install with a macOS legacy server never bootstraps', async () => {
+  const { env, runs } = fake({ platform: 'darwin', probes: [legacyEnvelope] });
+  const result = await serverInstall(env, argsOf({ action: 'install' }));
+  assert.equal(result.ok, true, JSON.stringify(result.error));
+  assert.equal(data(result).running, 'unmanaged');
+  assert.equal(runs.length, 0, 'no launchctl bootstrap');
+  assert.equal(existsSync(plistPath(env)), true);
+});
+
+test('install treats a probe error as an unknown running state without starting', async () => {
+  const { env, runs } = fake({ probes: [otherErrorEnvelope] });
+  const result = await serverInstall(env, argsOf({ action: 'install' }));
+  assert.equal(result.ok, true, JSON.stringify(result.error));
+  assert.equal(data(result).running, 'unknown');
+  assert.deepEqual(data(result).error, { code: 'INVALID_REQUEST', message: 'Invalid argument arity' });
+  assert.deepEqual(runs, [['systemctl', '--user', 'daemon-reload'], ['systemctl', '--user', 'enable', SERVICE_NAME]], 'enable happens, start does not');
+  assert.equal(existsSync(unitPath(env)), true);
 });
 
 // ---------------------------------------------------------------- install
