@@ -22,6 +22,7 @@ import { applyQuotaSnapshot, parseQuotaRefresh, QuotaPolicyConflict, QUOTA_CAPAB
 import type { QuotaRefreshInput } from '../shared/quota';
 import { QuotaProber } from './quota';
 import { QuotaScheduler } from './quota/scheduler';
+import { STALL_FILE, StallMonitor } from './stall';
 import { RpcError, parseRpcBody } from './rpc';
 import { TaskStore } from './store';
 import { VERSION } from '../shared/version';
@@ -138,12 +139,21 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     refresh: async engine => { if (ready && !draining) await refreshQuota({ engine }); },
     log: error => console.error(`Scheduled quota refresh failed: ${error instanceof Error ? error.message : 'unknown error'}`),
   });
+  const stall = new StallMonitor({
+    tasks: () => store?.list() ?? [],
+    policy: () => policy!,
+    statePath: join(dataDir, STALL_FILE),
+    ready: () => ready && !draining,
+    onBlocksChanged: () => commands?.pump(),
+    log: message => console.error(`Stall monitor: ${message}`),
+  });
   async function dispatch(method: string, args: unknown[]): Promise<unknown> {
     const active = requireReady();
     switch (method) {
       case 'command': return active.commands.handle(args[0]);
       case 'getPolicy': return active.policy.snapshot();
       case 'getQuota': return { ...quotaProber.get(), schedule: scheduler.status() };
+      case 'getStall': return stall.status();
       case 'refreshQuota': return refreshQuota(parseQuotaRefresh(args[0]));
       case 'validatePolicy': {
         let encoded = '';
@@ -280,6 +290,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     commands.transportStatus = 'ready';
     ready = true;
     scheduler.start();
+    stall.start();
     runtime.port = http.port;
     runtime.url = `http://127.0.0.1:${http.port}`;
     if (options.open) openBrowser(runtime.url);
@@ -301,6 +312,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     ready = false;
     if (commands) commands.draining = true;
     await scheduler.stop().catch(() => {});
+    await stall.stop().catch(() => {});
     await quotaProber.close().catch(() => {});
     greetings.abort();
     await Promise.allSettled([...inflight]);

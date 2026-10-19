@@ -9,6 +9,7 @@ Object.assign(ARITY, {
   scanEngines: 0,
   getQuota: 0,
   refreshQuota: 1,
+  getStall: 0,
   sayHi: 1,
   sayHiResult: 1,
   setEngineEnabled: 1,
