@@ -5,7 +5,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { TaskEvent } from '../src/shared/types';
-import { condenseEvents, filterCondensed, isTimelineNoise, normalizeToolName, timelineActive } from '../src/renderer/log-view';
+import { condenseEvents, eventBadge, filterCondensed, formatDuration, isTimelineNoise, normalizeToolName, relativeTime, timelineActive, toolSteps } from '../src/renderer/log-view';
+import { styles as eventStyles } from '../src/renderer/components/events-style';
 import { EventsPanel } from '../src/renderer/components/EventsPanel';
 
 function event(id: string, kind: TaskEvent['kind'], message: string, seconds = 0): TaskEvent {
@@ -130,11 +131,12 @@ test('condensed timeline renders step summaries and keeps hidden raw chatter col
   const html = markup(React.createElement(EventsPanel, { events, taskId: 't' }));
   assert.match(html, /精简/);
   assert.match(html, /全部/);
-  assert.match(html, /执行了 1 个步骤 · Bash 1/);
+  assert.match(html, /执行了 1 个步骤/);
+  assert.match(html, />Bash 1</);
   assert.match(html, /aria-expanded="false"/);
   assert.doesNotMatch(html, /tool started bash/);
   assert.match(html, /Policy selected codex; launching/);
-  assert.match(html, /状态/);
+  assert.match(html, />执行中</);
   assert.match(html, /done summary/);
   assert.doesNotMatch(html, /已加载 \d+ 条/);
 });
@@ -178,4 +180,88 @@ test('a terminal task with only the first timeline page loaded never spins', () 
   assert.doesNotMatch(idle, /lucide-loader/);
   assert.match(active, /lucide-loader/);
   assert.doesNotMatch(markup(React.createElement(EventsPanel, { events, taskId: 't' })), /lucide-loader/);
+});
+
+const NOW = new Date('2026-10-18T01:00:00Z').getTime();
+
+test('relative time reads in minutes, hours and days', () => {
+  assert.equal(relativeTime('2026-10-18T00:59:40Z', NOW), '刚刚');
+  assert.equal(relativeTime('2026-10-18T00:57:00Z', NOW), '3 分钟前');
+  assert.equal(relativeTime('2026-10-17T22:00:00Z', NOW), '3 小时前');
+  assert.equal(relativeTime('2026-10-15T01:00:00Z', NOW), '3 天前');
+  assert.equal(relativeTime('2026-10-18T02:00:00Z', NOW), '刚刚');
+});
+
+test('lifecycle steps carry status tags, outcomes carry outlined outcome tags', () => {
+  assert.deepEqual(eventBadge(event('1', 'lifecycle', 'Policy selected codex; launching')), { label: '执行中', tone: 'processing', outcome: false });
+  assert.deepEqual(eventBadge(event('2', 'lifecycle', 'Worker exited successfully; output is ready for owner review')), { label: '待验收', tone: 'warning', outcome: false });
+  assert.deepEqual(eventBadge(event('3', 'lifecycle', 'Task queued. Owner reference is metadata only')), { label: '待执行', tone: 'default', outcome: false });
+  assert.deepEqual(eventBadge(event('4', 'lifecycle', 'Cancellation requested; waiting for worker exit')), { label: '停止中', tone: 'warning', outcome: false });
+  assert.deepEqual(eventBadge(event('5', 'lifecycle', 'Cancelled before dispatch')), { label: '已取消', tone: 'default', outcome: true });
+  assert.deepEqual(eventBadge(event('6', 'lifecycle', 'Owner review: accepted')), { label: '通过', tone: 'success', outcome: true });
+  assert.deepEqual(eventBadge(event('7', 'error', 'boom')), { label: '失败', tone: 'error', outcome: true });
+  assert.equal(eventBadge(event('8', 'log', 'plain')), undefined);
+  assert.equal(eventBadge(event('9', 'lifecycle', 'Frozen work package created')), undefined);
+});
+
+test('tool steps pair started notes with finished or failed notes and time them', () => {
+  const steps = toolSteps([
+    event('1', 'log', 'tool started bash', 0),
+    event('2', 'log', 'tool started read', 1),
+    event('3', 'log', 'tool finished read', 2),
+    event('4', 'log', 'tool failed bash', 5),
+    event('5', 'log', 'tool finished grep', 6),
+    event('6', 'progress', 'owned scope started', 6),
+  ]);
+  assert.deepEqual(steps.map(step => [step.name, step.durationMs, step.failed]), [['Bash', 5000, true], ['Read', 1000, false], ['Grep', undefined, false]]);
+  assert.equal(formatDuration(500), '<1s');
+  assert.equal(formatDuration(5000), '5s');
+  assert.equal(formatDuration(125000), '2m05s');
+});
+
+test('timeline is a vertical list of nodes with relative time and an absolute-time tooltip', () => {
+  const html = markup(React.createElement(EventsPanel, { events: [event('1', 'lifecycle', 'Policy selected codex; launching'), event('2', 'log', 'plain output')], taskId: 't' }));
+  assert.match(html, /<ol[^>]*>[\s\S]*<li/);
+  assert.match(html, /<time[^>]*dateTime="2026-10-18T00:00:00Z"/);
+  assert.match(html, /天前/);
+  assert.match(html, /data-base-ui-tooltip-trigger=/);
+});
+
+test('statuses are solid tags and the outcome is an outlined tag', () => {
+  const html = markup(React.createElement(EventsPanel, { events: [event('1', 'lifecycle', 'Policy selected codex; launching'), event('2', 'lifecycle', 'Cancelled before dispatch')], taskId: 't' }));
+  const status = html.match(/<span[^>]*>执行中<\/span>/)?.[0] ?? '';
+  const outcome = html.match(/<span[^>]*>已取消<\/span>/)?.[0] ?? '';
+  assert.ok(status && outcome);
+  assert.match(status, /background:var\(--ant-color-info\)/);
+  assert.doesNotMatch(outcome, /background:var\(--ant-color-(?:info|text)/);
+  assert.notEqual(status.replace(/>.*/, ''), outcome.replace(/>.*/, ''));
+});
+
+test('the result event is a success card with copy and folds when long', () => {
+  const long = Array.from({ length: 12 }, (_, index) => `line ${index}`).join('\n');
+  const html = markup(React.createElement(EventsPanel, { events: [event('1', 'result', long)], taskId: 't' }));
+  assert.ok(html.includes(eventStyles.cardSuccess));
+  assert.match(String(eventStyles.cardSuccess), /acss/);
+  assert.match(html, /aria-label="复制执行结果"/);
+  assert.match(html, /aria-label="展开执行结果"/);
+  const short = markup(React.createElement(EventsPanel, { events: [event('1', 'result', 'done')], taskId: 't' }));
+  assert.doesNotMatch(short, /展开执行结果/);
+});
+
+test('a failed task shows an error card with message, stderr tail and vendor error', () => {
+  const failure = { kind: 'rate_limit' as const, message: 'Provider rate limited', stderrTail: 'stderr line 9', vendorError: 'AI_APICallError 429' };
+  const html = markup(React.createElement(EventsPanel, { events: [event('1', 'error', 'Worker failed')], taskId: 't', failure }));
+  assert.ok(html.includes(eventStyles.cardError));
+  assert.match(html, /Provider rate limited/);
+  assert.match(html, /stderr line 9/);
+  assert.match(html, /AI_APICallError 429/);
+  assert.match(html, />失败</);
+});
+
+test('expanding is client-only; the merged node lists tools as small tags', () => {
+  const events = [event('1', 'log', 'tool started bash'), event('2', 'log', 'tool finished bash', 1), event('3', 'log', 'tool started read', 1), event('4', 'log', 'tool started bash', 2)];
+  const html = markup(React.createElement(EventsPanel, { events, taskId: 't' }));
+  assert.match(html, /执行了 3 个步骤/);
+  assert.match(html, />Bash 2</);
+  assert.match(html, />Read 1</);
 });

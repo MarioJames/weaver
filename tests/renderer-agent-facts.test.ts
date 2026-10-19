@@ -70,7 +70,9 @@ test('the brand icon is the first item of one inline row with the name', () => {
 test('facts name the owner, the worker and the workspace as one key value block', () => {
   const html = markup(React.createElement(AgentFacts, { task: claude, ownerKind }));
   assert.match(html, /<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?claude_owner<\/span><\/dd>/);
-  assert.match(html, /<dt[^>]*>Worker<\/dt><dd[^>]*>[\s\S]*?claude_worker<\/span><\/dd>/);
+  assert.match(html, /<dt[^>]*>子 Agent<\/dt><dd[^>]*>[\s\S]*?claude_worker<\/span><\/dd>/);
+  assert.match(html, /<dt[^>]*>模型<\/dt><dd[^>]*>[\s\S]*?claude \/ sonnet · high[\s\S]*?<\/dd>/);
+  assert.match(html, /<dt[^>]*>更新时间<\/dt><dd[^>]*><time[^>]*dateTime="2026-10-18T01:00:00Z"/);
   assert.match(html, /<dt[^>]*>工作目录<\/dt><dd[^>]*>[\s\S]*?\/home\/mocha\/opensource\/weaver[\s\S]*?<\/dd>/);
   assert.match(html, /fill="#D97757"/);
 });
@@ -78,14 +80,15 @@ test('facts name the owner, the worker and the workspace as one key value block'
 test('the worker mark follows the dispatch engine kind, the owner mark the policy engine', () => {
   const qoder: Task = { ...claude, dispatch: { ...dispatch, engine: 'qoder', engineKind: 'qodercli' } };
   const html = markup(React.createElement(AgentFacts, { task: qoder, ownerKind }));
-  assert.match(html, /<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?fill="#D97757"[\s\S]*?<\/dd><dt[^>]*>Worker<\/dt>/);
-  assert.match(html, /<dt[^>]*>Worker<\/dt><dd[^>]*>[\s\S]*?fill="#2ADB5C"[\s\S]*?claude_worker/);
+  assert.match(html, /<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?fill="#D97757"/);
+  assert.match(html, /<dt[^>]*>子 Agent<\/dt><dd[^>]*>[\s\S]*?fill="#2ADB5C"[\s\S]*?claude_worker/);
 });
 
 test('facts drop the rows a task has no value for', () => {
   const html = markup(React.createElement(AgentFacts, { task: bare }));
   assert.match(html, /未指定负责人/);
-  assert.doesNotMatch(html, /Worker|工作目录/);
+  assert.doesNotMatch(html, /子 Agent|模型|工作目录/);
+  assert.match(html, /<dt[^>]*>更新时间<\/dt>/);
   assert.match(markup(React.createElement(AgentFacts, { task: { ...bare, workspace: '/tmp/weaver-tasks/server-4VDE' } })), /\/tmp\/weaver-tasks\/server-4VDE/);
 });
 
@@ -107,7 +110,7 @@ test('detail hands owner, worker and workspace to the facts block in the overvie
   assert.ok(tabs > 0);
   assert.doesNotMatch(html.slice(0, tabs), /<dt/);
   assert.match(html.slice(tabs), /role="tabpanel"[\s\S]*<dt[^>]*>父 Agent<\/dt>/);
-  assert.match(html, /claude \/ sonnet · high · 更新于/);
+  assert.doesNotMatch(html, /更新于/);
   assert.doesNotMatch(html, /→/);
   assert.doesNotMatch(html, / · weaver · /);
 });
@@ -124,7 +127,7 @@ test('the compact block resolves an unassigned parent and omits standalone works
   const html = markup(React.createElement(AgentFacts, { task: { ...bare, workspace: '/tmp/standalone' }, compact: true }));
   assert.match(html, /未指定负责人/);
   assert.equal((html.match(/<dt/g) ?? []).length, 1);
-  assert.doesNotMatch(html, /standalone|目录|Worker/);
+  assert.doesNotMatch(html, /standalone|目录|子 Agent/);
 });
 
 test('owner icons use the frozen profile even when ownerId is an instance UUID', () => {

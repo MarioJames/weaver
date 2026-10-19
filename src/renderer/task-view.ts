@@ -1,11 +1,12 @@
 import type { OwnerInstance } from '../shared/commands';
 import type { Config } from '../shared/policy';
 import type { Task, TaskStatus } from '../shared/types';
+import { DISPLAY_LABELS, DISPLAY_STATUSES, displayStatus } from './status-colors';
+import type { DisplayStatus } from './status-colors';
 export type TaskFilter = 'all' | 'active' | 'review' | 'closed';
 export const statusLabels: Record<TaskStatus, string> = { queued: '待执行', running: '执行中', cancelling: '停止中', completed: '执行完成', failed: '执行失败', cancelled: '已取消' };
 export function isActive(task: Task): boolean { return ['queued', 'running', 'cancelling'].includes(task.status); }
 export const UNASSIGNED_OWNER = '未指定负责人';
-export const ALL_OWNERS = 'all';
 /** Placeholder assigned to per-task throwaway instances. */
 const PLACEHOLDER_OWNER = 'Task owner';
 type ProfiledTask = Task & { owner: Task['owner'] & { profileId?: string } };
@@ -54,28 +55,25 @@ export function projectLabel(task: Task): string {
   if (!path) return '';
   return path.slice(path.lastIndexOf('/') + 1);
 }
-export function filterTasks(tasks: Task[], filter: TaskFilter, query: string): Task[] {
- const needle = query.trim().toLocaleLowerCase();
- return tasks.filter(task => (!needle || `${task.title} ${task.owner.name} ${ownerLabel(task)} ${projectLabel(task)} ${task.id}`.toLocaleLowerCase().includes(needle)) && (filter === 'all' || (filter === 'active' && isActive(task)) || (filter === 'review' && task.status === 'completed' && reviewStatus(task) === 'pending') || (filter === 'closed' && !isActive(task))));
+export function filterTasks(tasks: Task[], filter: TaskFilter): Task[] {
+  return tasks.filter(task => filter === 'all' || (filter === 'active' && isActive(task)) || (filter === 'review' && task.status === 'completed' && reviewStatus(task) === 'pending') || (filter === 'closed' && !isActive(task)));
 }
-export function filterByOwner(tasks: Task[], owner: string): Task[] {
-  return !owner || owner === ALL_OWNERS ? tasks : tasks.filter(task => ownerLabel(task) === owner);
-}
-/** The board's filter dimensions, in toolbar order. */
-export type FilterDimension = 'owner' | 'worker' | 'workspace';
-export const FILTER_DIMENSIONS: readonly FilterDimension[] = ['owner', 'worker', 'workspace'];
-export const filterLabels: Record<FilterDimension, string> = { owner: '父 Agent', worker: '工作代理', workspace: '工作目录' };
-/** The chosen values per dimension. */
+/** The facet rows below 时间, in display order. */
+export type FilterDimension = 'status' | 'owner' | 'worker' | 'workspace';
+export const FILTER_DIMENSIONS: readonly FilterDimension[] = ['status', 'owner', 'worker', 'workspace'];
+export const filterLabels: Record<FilterDimension, string> = { status: '状态', owner: '父 Agent', worker: '子 Agent', workspace: '工作目录' };
 export const TIME_RANGES = [
-  { value: 'all', label: '全部' },
-  { value: '1h', label: '近 1 小时' },
   { value: 'today', label: '今天' },
+  { value: '1h', label: '近 1 小时' },
   { value: '24h', label: '近 24 小时' },
   { value: '7d', label: '近 7 天' },
   { value: '30d', label: '近 30 天' },
+  { value: 'all', label: '全部' },
 ] as const;
 export type TaskTimeRange = typeof TIME_RANGES[number]['value'];
+/** The chosen values per row, plus the single time scope. */
 export type TaskSelection = Record<FilterDimension, string[]> & { time: TaskTimeRange };
+export const timeLabel = (range: TaskTimeRange): string => TIME_RANGES.find(item => item.value === range)?.label ?? '';
 /** Last activity since a local-day or elapsed-time boundary; the caller supplies the clock. */
 export function filterByTime(tasks: Task[], range: TaskTimeRange, now: number): Task[] {
   if (range === 'all') return tasks;
@@ -88,17 +86,21 @@ export function filterByTime(tasks: Task[], range: TaskTimeRange, now: number): 
     return updated >= since && updated <= now;
   });
 }
-export function emptySelection(): TaskSelection { return { owner: [], worker: [], workspace: [], time: 'today' }; }
+export function emptySelection(): TaskSelection { return { status: [], owner: [], worker: [], workspace: [], time: 'today' }; }
 /** localStorage key holding the board's filter selection. */
 export const TASK_FILTERS_KEY = 'weaver-task-filters';
-/** One dropdown entry: what it is called, how much live work hides behind it, and the brand to draw. */
-export interface FilterOption { value: string; label: string; kind?: string; open: number; ownerProfile?: string }
+/** One chip: what it is called, how many tasks in scope carry it, and the brand to draw. */
+export interface FilterOption { value: string; label: string; kind?: string; count: number; ownerProfile?: string }
 /** The value a task answers for in one dimension; undefined when the task has no value to group by. */
 export function taskOption(task: Task, dimension: FilterDimension): { value: string; label: string } | undefined {
   if (dimension === 'owner') {
     const named = !!task.ownerId && !!logicalOwnerName(task);
     const value = named ? task.owner.name : taskOwnerId(task) ?? ownerLabel(task);
     return { value, label: named ? task.owner.name : logicalOwnerName(task) ?? ownerLabel(task) };
+  }
+  if (dimension === 'status') {
+    const status = displayStatus(task);
+    return { value: status, label: DISPLAY_LABELS[status] };
   }
   if (dimension === 'workspace') {
     const workspace = task.workspace;
@@ -108,8 +110,8 @@ export function taskOption(task: Task, dimension: FilterDimension): { value: str
   return worker ? { value: worker, label: worker } : undefined;
 }
 /**
- * Same dimension ORs its choices, dimensions AND each other.
- * `skip` leaves one dimension unfiltered, which is how a dropdown counts what adding a choice would show.
+ * Same row ORs its choices, rows AND each other, and 时间 scopes all of them.
+ * `skip` leaves one row unfiltered, which is how a facet counts what adding a choice would show.
  */
 export function applyTaskFilters(tasks: Task[], selection: TaskSelection, skip?: FilterDimension, now: number = Date.now()): Task[] {
   return filterByTime(tasks, selection.time, now).filter(task => FILTER_DIMENSIONS.every(dimension => {
@@ -120,24 +122,41 @@ export function applyTaskFilters(tasks: Task[], selection: TaskSelection, skip?:
     return option !== undefined && chosen.includes(option.value);
   }));
 }
-/** Every value the board holds for one dimension, busiest first. Archived work is not on the board, so it never counts. */
-export function filterOptions(tasks: Task[], dimension: FilterDimension, selection: TaskSelection, now: number = Date.now()): FilterOption[] {
-  const board = nonArchived(tasks, now);
-  const narrowed = new Set(applyTaskFilters(board, selection, dimension, now).map(task => task.id));
+/**
+ * The chips of one row over a pool of tasks. Only values with tasks in the chosen time range (and in the
+ * other rows' selections) are offered, counted in that scope; a chosen value with none stays at count 0 so it can be unchecked.
+ */
+export function facetOptions(pool: Task[], dimension: FilterDimension, selection: TaskSelection, now: number = Date.now()): FilterOption[] {
+  const scoped = new Set(applyTaskFilters(pool, selection, dimension, now).map(task => task.id));
   const seen = new Map<string, FilterOption>();
-  for (const task of board) {
+  for (const task of pool) {
     const option = taskOption(task, dimension);
     if (!option) continue;
-    const live = narrowed.has(task.id) && isOpenTask(task);
+    const counted = scoped.has(task.id);
     const known = seen.get(option.value);
     if (known) {
-      if (live) known.open += 1;
+      if (counted) known.count += 1;
       continue;
     }
-    seen.set(option.value, { value: option.value, label: option.label, kind: dimension === 'worker' ? dispatchKind(task) : undefined, ...(dimension === 'owner' ? { ownerProfile: taskOwnerId(task) } : {}), open: live ? 1 : 0 });
+    seen.set(option.value, { value: option.value, label: option.label, kind: dimension === 'worker' ? dispatchKind(task) : undefined, ...(dimension === 'owner' ? { ownerProfile: taskOwnerId(task) } : {}), count: counted ? 1 : 0 });
   }
-  const options = [...seen.values()];
-  return options.sort((a, b) => b.open - a.open || a.label.localeCompare(b.label));
+  const chosen = selection[dimension];
+  for (const value of chosen) if (!seen.has(value)) seen.set(value, { value, label: dimension === 'status' ? DISPLAY_LABELS[value as DisplayStatus] ?? value : value, count: 0 });
+  const options = [...seen.values()].filter(option => option.count > 0 || chosen.includes(option.value));
+  if (dimension === 'status') return options.sort((a, b) => DISPLAY_STATUSES.indexOf(a.value as DisplayStatus) - DISPLAY_STATUSES.indexOf(b.value as DisplayStatus));
+  return options.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+/** The board's chips: archived work is not on the board, so it never counts. */
+export function filterOptions(tasks: Task[], dimension: FilterDimension, selection: TaskSelection, now: number = Date.now()): FilterOption[] {
+  return facetOptions(nonArchived(tasks, now), dimension, selection, now);
+}
+/** Chosen values with their names, in row order; the 已选 tags and the collapsed summary read from this. */
+export function selectedEntries(selection: TaskSelection, options: Record<FilterDimension, FilterOption[]>): { dimension: FilterDimension; value: string; label: string }[] {
+  return FILTER_DIMENSIONS.flatMap(dimension => selection[dimension].map(value => ({ dimension, value, label: options[dimension].find(option => option.value === value)?.label ?? value })));
+}
+/** The collapsed block's one line, e.g. 筛选：今天 · 执行中 · claude_owner. */
+export function filterSummary(selection: TaskSelection, options: Record<FilterDimension, FilterOption[]>): string {
+  return `筛选：${[timeLabel(selection.time), ...selectedEntries(selection, options).map(entry => entry.label)].join(' · ')}`;
 }
 /** 清除 is available only when the selection differs from the default today view. */
 export function hasFilters(selection: TaskSelection): boolean {
@@ -146,13 +165,6 @@ export function hasFilters(selection: TaskSelection): boolean {
 /** The checklist toggles: choosing a value that is already chosen drops it. */
 export function toggleOption(values: string[], value: string): string[] {
   return values.includes(value) ? values.filter(item => item !== value) : [...values, value];
-}
-/** What a filter button says: the dimension, one choice by name, or how many choices are on. */
-export function filterButtonLabel(dimension: FilterDimension, options: FilterOption[], chosen: string[]): string {
-  const label = filterLabels[dimension];
-  if (chosen.length === 1) return `${label}：${options.find(option => option.value === chosen[0])?.label ?? chosen[0]}`;
-  if (chosen.length > 1) return `${label}：${chosen.length} 个`;
-  return label;
 }
 /** A stored payload decodes to a selection; anything malformed or of the wrong shape is no selection at all. */
 function parseSelection(raw: string | null): TaskSelection {
@@ -178,10 +190,18 @@ export function readTaskFilters(): TaskSelection {
 export function writeTaskFilters(selection: TaskSelection): void {
   try { localStorage.setItem(TASK_FILTERS_KEY, JSON.stringify(selection)); } catch { /* The choice stays for this session only. */ }
 }
-/** Choices that no longer name anything on the board are dropped, so a stale payload never empties it. */
+/** localStorage key recording whether the facet block is collapsed to its summary line. */
+export const FILTERS_COLLAPSED_KEY = 'weaver-task-filters-collapsed';
+export function readFiltersCollapsed(): boolean {
+  try { return localStorage.getItem(FILTERS_COLLAPSED_KEY) === 'true'; } catch { return false; }
+}
+export function writeFiltersCollapsed(collapsed: boolean): void {
+  try { localStorage.setItem(FILTERS_COLLAPSED_KEY, String(collapsed)); } catch { /* The choice stays for this session only. */ }
+}
+/** Choices that no longer name anything on the board (in any time range) are dropped, so a stale payload never empties it. */
 export function resolveSelection(selection: TaskSelection, tasks: Task[], now: number = Date.now()): TaskSelection {
   return FILTER_DIMENSIONS.reduce((next, dimension) => {
-    const known = new Set(filterOptions(tasks, dimension, emptySelection(), now).map(option => option.value));
+    const known = new Set(filterOptions(tasks, dimension, { ...emptySelection(), time: 'all' }, now).map(option => option.value));
     next[dimension] = [...new Set(selection[dimension].map(value => {
       if (dimension !== 'owner' || known.has(value)) return value;
       const task = tasks.find(task => task.ownerId === value);
@@ -247,18 +267,9 @@ export function nonArchived(tasks: Task[], now: number = Date.now()): Task[] {
 export function archivedTasks(tasks: Task[], now: number = Date.now()): Task[] {
  return tasks.filter(task => isArchived(task, now)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
-/** Archive rows narrowed by the drawer's search box and owner select. */
-export function archiveRows(tasks: Task[], query: string, owner: string, now: number = Date.now()): Task[] {
- return filterByOwner(filterTasks(archivedTasks(tasks, now), 'all', query), owner);
-}
-/** How archived work ended; the board no longer says, because it no longer shows it. */
-export function archiveOutcome(task: Task): { label: string; color?: string } {
- if (task.status === 'failed') return { label: '失败', color: 'error' };
- if (task.status === 'cancelled') return { label: '已取消' };
- const status = reviewStatus(task);
- if (status === 'rejected') return { label: '需修改', color: 'warning' };
- if (status === 'pending') return { label: '待验收', color: 'warning' };
- return { label: '已通过', color: 'success' };
+/** Archive rows narrowed by the drawer's time, status, parent and sub agent selects. */
+export function archiveRows(tasks: Task[], selection: TaskSelection, now: number = Date.now()): Task[] {
+  return applyTaskFilters(archivedTasks(tasks, now), selection, undefined, now);
 }
 export function reviewStatus(task: Task): string { return task.status === 'completed' ? (task.reviewState ?? 'pending') : 'not_ready'; }
 export function reviewLabel(task: Task): string { const status = reviewStatus(task); return ({ pending: '待验收', approved: '已通过', accepted: '已通过', rejected: '需修改', changes_requested: '需修改', not_ready: '尚未进入验收' } as Record<string,string>)[status] ?? status; }

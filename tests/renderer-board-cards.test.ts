@@ -6,7 +6,7 @@ import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../src/shared/types';
 import { styles } from '../src/renderer/style';
-import { TaskBoard, filterItems, filterReveal } from '../src/renderer/components/TaskBoard';
+import { TaskBoard } from '../src/renderer/components/TaskBoard';
 import { applyTaskFilters, emptySelection, filterOptions, readTaskFilters, writeTaskFilters, TASK_FILTERS_KEY, ENDED_EXPANDED_KEY } from '../src/renderer/task-view';
 
 const now = Date.parse('2026-10-18T12:00:00Z');
@@ -41,6 +41,11 @@ function card(task: Task) {
 test('card title starts with the dispatched worker tag and compact facts only identify the parent', () => {
   const html = card(base);
   assert.match(html, /<title>Claude Code<\/title>[\s\S]*WORKER[\s\S]*<strong[^>]*>CARD_ONE<\/strong>/);
+  /** One text flow: tag and title live in the same title block, with no separate title column. */
+  const block = html.match(new RegExp(`<span class="${styles.cardTitle}">([\\s\\S]*?)</span></button>|<span class="${styles.cardTitle}">([\\s\\S]*?</strong>)</span>`));
+  assert.ok(block);
+  const inner = block[1] ?? block[2];
+  assert.ok(inner.includes('WORKER') && inner.includes('CARD_ONE') && inner.indexOf('WORKER') < inner.indexOf('CARD_ONE'));
   assert.equal((html.match(/WORKER/g) ?? []).length, 1);
   assert.equal((html.match(/<dt/g) ?? []).length, 1);
   assert.match(html, /父 Agent/);
@@ -63,7 +68,7 @@ test('running, cancelling and scheduled cards share status, redacted activity an
 });
 
 test('completed, failed, cancelled and unscheduled queued cards keep status and time without activity', () => {
-  for (const [status, label] of [['completed', '待验收'], ['failed', '执行失败'], ['cancelled', '已取消'], ['queued', '待执行']] as const) {
+  for (const [status, label] of [['completed', '待验收'], ['failed', '失败'], ['cancelled', '已取消'], ['queued', '待执行']] as const) {
     const html = card({ ...base, status });
     const row = html.match(new RegExp(`<span class="${styles.cardStatus}">([\\s\\S]*?)</time></span>`))?.[1];
     assert.ok(row, 'status and time must share one row');
@@ -104,19 +109,17 @@ test('all four status columns group independently and the closed column remains 
   assert.doesNotMatch(folded, />failed-0<|>failed-1</);
 });
 
-test('workspace multi-select ANDs other filters and time, counts open work, and reveals quiet choices', () => {
+test('workspace multi-select ANDs other filters and time, counts tasks in scope, and keeps a chosen empty value checked', () => {
   const tasks = [base, { ...base, id: 'beta', workspace: '/elsewhere/alpha', status: 'failed' as const }, { ...base, id: 'old', workspace: '/projects/old', updatedAt: '2026-10-18T08:00:00Z' }];
   const selection = { ...emptySelection(), workspace: ['/projects/alpha', '/elsewhere/alpha'], owner: ['Parent'], worker: ['WORKER'], time: '1h' as const };
   assert.deepEqual(applyTaskFilters(tasks, selection, undefined, now).map(task => task.id), ['one', 'beta']);
   assert.deepEqual(applyTaskFilters(tasks, { ...selection, worker: ['other'] }, undefined, now), []);
+  /** Time scopes the options: the 4-hour-old directory is not offered; labels are the last segment, full path is identity. */
   const options = filterOptions(tasks, 'workspace', selection, now);
-  assert.deepEqual(options.map(option => [option.value, option.label, option.open]), [['/projects/alpha', 'alpha', 1], ['/elsewhere/alpha', 'alpha', 0], ['/projects/old', 'old', 0]]);
-  assert.equal(filterItems('workspace', options, [], () => {}).length, 1);
-  assert.equal(filterItems('workspace', options, ['/elsewhere/alpha'], () => {}).length, 2);
-  assert.equal(filterItems('workspace', options, [], () => {}, undefined, true).length, 3);
-  assert.match(markup(filterItems('workspace', options, [], () => {})[0].label as React.ReactNode), /title="\/projects\/alpha"/);
-  assert.ok(filterReveal(options, [], () => {}));
-  assert.match(board(tasks), /工作目录/);
+  assert.deepEqual(options.map(option => [option.value, option.label, option.count]), [['/projects/alpha', 'alpha', 1], ['/elsewhere/alpha', 'alpha', 1]]);
+  const html = board(tasks);
+  assert.match(html, /工作目录/);
+  assert.match(html, /title="\/projects\/alpha"/);
 });
 
 test('workspace selection persists and legacy payloads initialize the new dimension empty', () => {
@@ -126,6 +129,6 @@ test('workspace selection persists and legacy payloads initialize the new dimens
     writeTaskFilters(selection);
     assert.deepEqual(readTaskFilters(), selection);
     values[TASK_FILTERS_KEY] = JSON.stringify({ owner: ['Parent'], worker: ['WORKER'], time: 'all' });
-    assert.deepEqual(readTaskFilters(), { owner: ['Parent'], worker: ['WORKER'], workspace: [], time: 'all' });
+    assert.deepEqual(readTaskFilters(), { status: [], owner: ['Parent'], worker: ['WORKER'], workspace: [], time: 'all' });
   });
 });

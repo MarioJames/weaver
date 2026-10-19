@@ -6,11 +6,11 @@ import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Config } from '../src/shared/policy';
 import type { Task } from '../src/shared/types';
-import { ALL_OWNERS, ARCHIVE_AFTER_MS, ENDED_EXPANDED_KEY, TASK_FILTERS_KEY, UNASSIGNED_OWNER, applyTaskFilters, archiveRows, archivedTasks, columnize, dispatchKind, emptySelection, filterButtonLabel, filterByTime, filterByOwner, filterOptions, filterTasks, hasFilters, isArchived, isOpenTask, nonArchived, ownerKindLookup, ownerLabel, projectLabel, readEndedExpanded, readTaskFilters, resolveSelection, taskColumn, taskOwnerId, taskOption, toggleOption, writeEndedExpanded, writeTaskFilters, withOwnerProfiles } from '../src/renderer/task-view';
+import { ARCHIVE_AFTER_MS, ENDED_EXPANDED_KEY, TASK_FILTERS_KEY, UNASSIGNED_OWNER, applyTaskFilters, archiveRows, archivedTasks, columnize, dispatchKind, emptySelection, filterByTime, filterOptions, filterTasks, hasFilters, isArchived, isOpenTask, nonArchived, ownerKindLookup, ownerLabel, projectLabel, readEndedExpanded, readTaskFilters, resolveSelection, taskColumn, taskOwnerId, taskOption, toggleOption, writeEndedExpanded, writeTaskFilters, withOwnerProfiles } from '../src/renderer/task-view';
 import type { FilterDimension, TaskSelection } from '../src/renderer/task-view';
 import { EngineIcon, AgentLabel } from '../src/renderer/components/EngineIcon';
 import { ArchiveList, archiveColumns, archiveRowProps } from '../src/renderer/components/ArchiveDrawer';
-import { TaskBoard, filterItems, filterReveal } from '../src/renderer/components/TaskBoard';
+import { TaskBoard } from '../src/renderer/components/TaskBoard';
 import { TaskDetail } from '../src/renderer/components/TaskDetail';
 import { TaskTextBlock } from '../src/renderer/components/TaskTextBlock';
 import { OwnerInspector } from '../src/renderer/components/OwnerInspector';
@@ -124,21 +124,21 @@ const tasks = [...live, aged];
 const sel = (part: Partial<TaskSelection>): TaskSelection => ({ ...emptySelection(), ...part });
 const optionsFor = (dimension: FilterDimension, chosen: TaskSelection = emptySelection()) => filterOptions(tasks, dimension, chosen, now);
 
-test('each dimension offers the values the board holds, busiest first', () => {
-  assert.deepEqual(optionsFor('owner').map(option => [option.value, option.label, option.open]), [['claude_owner', 'claude_owner', 2], ['codex_owner', 'codex_owner', 1]]);
-  assert.deepEqual(optionsFor('worker').map(option => [option.value, option.open]), [['codex_worker', 2], ['claude_worker', 1]]);
+test('each dimension offers the values the board holds in the chosen range, busiest first', () => {
+  assert.deepEqual(optionsFor('owner').map(option => [option.value, option.label, option.count]), [['claude_owner', 'claude_owner', 2], ['codex_owner', 'codex_owner', 2]]);
+  assert.deepEqual(optionsFor('worker').map(option => [option.value, option.count]), [['claude_worker', 2], ['codex_worker', 2]]);
   /** A task with no owner recorded is still somebody's task; a task with no dispatch has no worker. */
   assert.deepEqual(filterOptions(items, 'owner', emptySelection(), now).map(option => option.value), ['claude_owner', 'codex_owner', UNASSIGNED_OWNER]);
   /** Work that has aged out is neither a choice nor a count. */
-  assert.equal(optionsFor('worker').find(option => option.value === 'claude_worker')?.open, 1);
+  assert.equal(optionsFor('worker').find(option => option.value === 'claude_worker')?.count, 2);
   assert.deepEqual(filterOptions([], 'owner', emptySelection(), now), []);
 });
 
-test('a choice counts the live work the other dimensions leave standing', () => {
-  /** Narrowed to codex_worker, each owner has one open task left of their own. */
-  assert.deepEqual(optionsFor('owner', sel({ worker: ['codex_worker'] })).map(option => [option.value, option.open]), [['claude_owner', 1], ['codex_owner', 1]]);
-  /** A dimension never applies to its own counts. */
-  assert.equal(optionsFor('worker', sel({ worker: ['codex_worker'] })).find(option => option.value === 'claude_worker')?.open, 1);
+test('a choice counts the tasks the other rows leave standing', () => {
+  /** Narrowed to codex_worker, each owner has one task left of their own. */
+  assert.deepEqual(optionsFor('owner', sel({ worker: ['codex_worker'] })).map(option => [option.value, option.count]), [['claude_owner', 1], ['codex_owner', 1]]);
+  /** A row never applies to its own counts. */
+  assert.equal(optionsFor('worker', sel({ worker: ['codex_worker'] })).find(option => option.value === 'claude_worker')?.count, 2);
 });
 
 test('choices OR within a dimension and AND across dimensions', () => {
@@ -154,16 +154,6 @@ test('choices OR within a dimension and AND across dimensions', () => {
   assert.deepEqual(toggleOption(['claude', 'codex'], 'claude'), ['codex']);
   assert.equal(hasFilters(emptySelection()), false);
   assert.equal(hasFilters(sel({ time: 'all', worker: ['claude_worker'] })), true);
-});
-
-test('a filter button says the dimension, one choice by name, or how many are on', () => {
-  const owners = optionsFor('owner');
-  assert.equal(filterButtonLabel('owner', owners, []), '父 Agent');
-  assert.equal(filterButtonLabel('owner', owners, ['codex_owner']), '父 Agent：codex_owner');
-  assert.equal(filterButtonLabel('owner', owners, ['claude_owner', 'codex_owner']), '父 Agent：2 个');
-  assert.equal(filterButtonLabel('worker', optionsFor('worker'), ['claude_worker', 'codex_worker']), '工作代理：2 个');
-  /** A value the board no longer names still says what was picked. */
-  assert.equal(filterButtonLabel('owner', owners, ['gone_owner']), '父 Agent：gone_owner');
 });
 
 test('the option a board narrows by is the owner key and the worker', () => {
@@ -195,78 +185,42 @@ test('a saved selection round-trips, and values that name nothing are dropped', 
   assert.deepEqual(resolveSelection(emptySelection(), [], now), emptySelection());
 });
 
-test('the board is one column grid under a filter bar, with no owner swimlanes', () => {
+test('the board is one lane grid under a facet block, with no search box and no owner swimlanes', () => {
   const html = markup(React.createElement(TaskBoard, { tasks, loading: false, onSelect: () => {}, ownerKind, now }));
-  assert.match(html, /搜索标题、负责人、项目或任务 ID/);
-  assert.match(html, /父 Agent/);
-  assert.match(html, /时间：今天/);
-  assert.match(html, /工作代理/);
-  /** The owner Segmented and the lanes are gone. */
+  assert.doesNotMatch(html, /搜索|<input/);
+  for (const label of ['时间', '状态', '父 Agent', '子 Agent', '工作目录']) assert.match(html, new RegExp(`>${label}<`));
+  assert.doesNotMatch(html, /工作代理/);
   assert.doesNotMatch(html, /按负责人筛选/);
   assert.doesNotMatch(html, /aria-label="[^"]* 的任务"/);
-  assert.doesNotMatch(html, /全部 3/);
-  assert.doesNotMatch(html, /清除/);
-  /** One board: the live columns are open and every card appears once. */
-  assert.match(html, /待执行/);
-  assert.match(html, /执行中/);
-  assert.match(html, /待验收/);
+  /** One board: the live lanes are open and every card appears once. */
   assert.match(html, /看板甲/);
   assert.match(html, /看板丙/);
   assert.equal((html.match(/看板乙/g) ?? []).length, 1);
-  assert.equal((html.match(/待执行/g) ?? []).length, 2);
+  assert.match(html, /待执行/);
+  assert.match(html, /执行中/);
+  assert.match(html, /待验收/);
 });
 
-test('the saved selection narrows one board and the button names the choice', () => {
+test('the saved selection narrows one board and shows as checked chips and 已选 tags', () => {
   withStorage({ [TASK_FILTERS_KEY]: JSON.stringify(sel({ owner: ['claude_owner'] })) }, () => {
     const html = markup(React.createElement(TaskBoard, { tasks, loading: false, onSelect: () => {}, ownerKind, now }));
-    assert.match(html, /父 Agent：claude_owner/);
-    assert.match(html, /清除/);
+    assert.ok([...html.matchAll(/<button\b[^>]*aria-pressed="true"[^>]*>[\s\S]*?<\/button>/g)].some(match => match[0].includes('claude_owner')));
+    assert.match(html, /移除 claude_owner/);
     assert.match(html, /看板甲/);
     assert.doesNotMatch(html, /看板丙|看板丁/);
   });
   withStorage({ [TASK_FILTERS_KEY]: JSON.stringify(sel({ owner: ['claude_owner', 'codex_owner'], worker: ['claude_worker'] })) }, () => {
     const html = markup(React.createElement(TaskBoard, { tasks, loading: false, onSelect: () => {}, ownerKind, now }));
-    assert.match(html, /父 Agent：2 个/);
-    assert.match(html, /工作代理：claude_worker/);
-    /** AND across dimensions: only the claude worker work of both owners remains. */
+    /** AND across rows: only the claude worker work of both owners remains. */
     assert.match(html, /看板甲/);
     assert.doesNotMatch(html, /看板乙|看板丙/);
   });
   /** A stored choice that no task carries is ignored rather than emptying the board. */
   withStorage({ [TASK_FILTERS_KEY]: JSON.stringify(sel({ owner: ['gone_owner'] })) }, () => {
     const html = markup(React.createElement(TaskBoard, { tasks, loading: false, onSelect: () => {}, ownerKind, now }));
-    assert.doesNotMatch(html, /父 Agent：|清除/);
+    assert.doesNotMatch(html, /移除 gone_owner/);
     assert.match(html, /看板甲/);
   });
-});
-
-test('the checklist offers each choice with its live count and stays open for the next click', () => {
-  const rows = filterItems('owner', optionsFor('owner'), ['codex_owner'], () => {}, ownerKind);
-  assert.deepEqual(rows.map(row => [row.key, row.checked]), [['claude_owner', false], ['codex_owner', true]]);
-  for (const row of rows) assert.equal(row.type, 'checkbox');
-  /** A menu that closed on the first tick could not hold an OR of two choices. */
-  assert.equal(rows[0].closeOnClick, false);
-  assert.match(markup(rows[0].label as React.ReactNode), /claude_owner/);
-  assert.match(markup(rows[0].extra as React.ReactNode), /2/);
-  assert.match(markup(rows[0].icon as React.ReactNode), /<title>Claude Code<\/title>/);
-  /** Workers carry their dispatch brand; an owner the policy does not know gets the neutral mark. */
-  assert.match(markup(filterItems('worker', optionsFor('worker'), [], () => {}, ownerKind)[0].icon as React.ReactNode), /<title>Codex<\/title>/);
-  assert.match(markup(filterItems('owner', [{ value: 'codex_owner', label: 'codex_owner', open: 1 }], [], () => {}, ownerKind)[0].icon as React.ReactNode), /lucide lucide-bot/);
-  /** Ticking a row is the only way the menu changes the selection. */
-  const toggled: string[] = [];
-  filterItems('owner', optionsFor('owner'), [], value => toggled.push(value))[0].onCheckedChange?.(true);
-  assert.deepEqual(toggled, ['claude_owner']);
-});
-
-test('choices with nothing live wait behind 显示全部, but a picked one stays in sight', () => {
-  const quiet = [...optionsFor('owner'), { value: 'idle_owner', label: 'idle_owner', open: 0 }];
-  assert.deepEqual(filterItems('owner', quiet, [], () => {}).map(row => row.key), ['claude_owner', 'codex_owner']);
-  assert.match(markup(React.createElement('div', null, filterReveal(quiet, [], () => {}))), /显示全部/);
-  /** Nothing to hide, so no row. */
-  assert.equal(filterReveal(optionsFor('owner'), [], () => {}), undefined);
-  /** A picked owner whose work has all ended stays listed, so it can be unticked. */
-  assert.deepEqual(filterItems('owner', quiet, ['idle_owner'], () => {}).map(row => row.key), ['claude_owner', 'codex_owner', 'idle_owner']);
-  assert.equal(filterReveal(quiet, ['idle_owner'], () => {}), undefined);
 });
 
 test('the 已结束 column is folded by default and opens for the whole board', () => {
@@ -332,24 +286,20 @@ test('a closed task leaves the board a day after it ended, and live work never d
   assert.equal(isArchived({ ...staleFailed, updatedAt: 'never' }, now), false);
 });
 
-test('archive rows are the aged-out work, newest first, narrowed by search and owner', () => {
+test('archive rows are the aged-out work, newest first, narrowed by the drawer selects', () => {
+  const all = { ...emptySelection(), time: 'all' as const };
   assert.deepEqual(archivedTasks([...tasks, ...archived, onTheDay], now).map(task => task.id), ['a3', 'f5', 'a1', 'a2']);
-  assert.deepEqual(archiveRows([...archived, onTheDay], '', ALL_OWNERS, now).map(task => task.id), ['a3', 'a1', 'a2']);
-  assert.deepEqual(archiveRows([...archived, onTheDay], '', 'codex_owner', now).map(task => task.id), ['a3', 'a2']);
-  assert.deepEqual(archiveRows(archived, '通过', ALL_OWNERS, now).map(task => task.id), ['a2']);
-  assert.deepEqual(archiveRows(archived, 'FRONTEND', ALL_OWNERS, now).map(task => task.id), ['a3', 'a2']);
-  assert.deepEqual(archiveRows(archived, 'a1', ALL_OWNERS, now).map(task => task.id), ['a1']);
-  assert.deepEqual(archiveRows(items, '', ALL_OWNERS, now), []);
-  /** The drawer keeps its own owner select, by the label a task shows rather than the board's policy key. */
-  assert.deepEqual(filterByOwner(items, 'claude_owner').map(task => task.id), ['t2']);
-  assert.equal(filterByOwner(items, ALL_OWNERS).length, 3);
-  assert.deepEqual(filterByOwner(items, 'missing'), []);
+  assert.deepEqual(archiveRows([...archived, onTheDay], all, now).map(task => task.id), ['a3', 'a1', 'a2']);
+  assert.deepEqual(archiveRows([...archived, onTheDay], { ...all, owner: ['codex_owner'] }, now).map(task => task.id), ['a3', 'a2']);
+  assert.deepEqual(archiveRows(archived, { ...all, status: ['accepted'] }, now).map(task => task.id), ['a2']);
+  assert.deepEqual(archiveRows(archived, { ...all, worker: ['claude_worker'] }, now).map(task => task.id), ['a1']);
+  assert.deepEqual(archiveRows(items, all, now), []);
 });
 
 test('the archive table names, pairs and tags each archived row, newest first', () => {
   const columns = archiveColumns(ownerKind);
-  assert.deepEqual(columns.map(column => column.title), ['任务', '负责人 → 工作代理', '项目', '结果', '结束于']);
-  const rows = archiveRows([...archived, onTheDay], '', ALL_OWNERS, now);
+  assert.deepEqual(columns.map(column => column.title), ['任务', '父 Agent → 子 Agent', '项目', '结果', '结束于']);
+  const rows = archiveRows([...archived, onTheDay], { ...emptySelection(), time: 'all' }, now);
   assert.deepEqual(rows.map(task => task.title), ['归档取消案', '归档失败案', '归档通过案']);
   const cell = (key: string, task: Task) => {
     const column = columns.find(item => item.key === key)!;
@@ -363,7 +313,7 @@ test('the archive table names, pairs and tags each archived row, newest first', 
   assert.match(cell('ended', rows[0]), /2026/);
   assert.match(cell('title', rows[2]), /归档通过案/);
   /** A legacy task with no frozen dispatch still names its owner and admits the agent is unknown. */
-  assert.match(cell('agents', { ...staleFailed, id: 'a9', dispatch: undefined }), /未记录代理/);
+  assert.match(cell('agents', { ...staleFailed, id: 'a9', dispatch: undefined }), /未记录子 Agent/);
 });
 
 test('an archive row opens the record by click and by key', () => {
@@ -385,15 +335,9 @@ test('an archive row opens the record by click and by key', () => {
 test('the archive list is quiet when nothing has aged out yet', () => {
   const html = markup(React.createElement(ArchiveList, { tasks: items, onSelect: () => {}, now }));
   assert.match(html, /还没有归档任务/);
-  assert.match(html, /搜索标题、负责人、项目或任务 ID/);
-  assert.match(html, /按负责人筛选归档任务/);
+  assert.doesNotMatch(html, /搜索/);
+  assert.match(html, /按父 Agent筛选归档任务/);
   assert.doesNotMatch(html, /重排任务面板/);
-});
-
-test('search reaches the real owner and the project, not only the placeholder name', () => {
-  assert.deepEqual(filterTasks(items, 'all', 'claude_owner').map(task => task.id), ['t2']);
-  assert.deepEqual(filterTasks(items, 'all', 'FRONTEND').map(task => task.id), ['t3']);
-  assert.deepEqual(filterTasks(items, 'all', '未指定').map(task => task.id), ['t1']);
 });
 
 test('running and queued cards spin, finished cards do not, and a running card carries exactly one loader', () => {
@@ -422,9 +366,10 @@ test('detail is one column: status tag, facts block and route line, no progress 
   assert.doesNotMatch(html, /最近活动/);
   /** The agents and the directory are the facts block; what is left of the meta line is the route and the clock. */
   assert.match(html, /<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?claude_owner<\/span><\/dd>/);
-  assert.match(html, /<dt[^>]*>Worker<\/dt><dd[^>]*>[\s\S]*?claude_worker<\/span><\/dd>/);
+  assert.match(html, /<dt[^>]*>子 Agent<\/dt><dd[^>]*>[\s\S]*?claude_worker<\/span><\/dd>/);
   assert.match(html, /<dt[^>]*>工作目录<\/dt><dd[^>]*>[\s\S]*?\/home\/mocha\/opensource\/weaver[\s\S]*?<\/dd>/);
-  assert.match(html, /claude \/ sonnet · high · 更新于/);
+  assert.match(html, /<dt[^>]*>模型<\/dt>/);
+  assert.match(html, /<dt[^>]*>更新时间<\/dt>/);
   assert.match(html, /<title>Claude Code<\/title>/);
   assert.doesNotMatch(html, /→/);
   assert.doesNotMatch(html, /已通过/);
@@ -481,17 +426,6 @@ test('the inspector row is the owner, its status and one action', () => {
 });
 
 
-test('revealing each dropdown includes ended-only options with zero open counts', () => {
-  const ended = tasks.map(task => ({ ...task, status: 'failed' as const, updatedAt: ago(1) }));
-  for (const dimension of ['owner', 'worker'] as const) {
-    const options = filterOptions(ended, dimension, emptySelection(), now);
-    assert.ok(options.length > 0);
-    const rows = filterItems(dimension, options, [], () => {}, ownerKind, true);
-    assert.deepEqual(rows.map(row => row.key), options.map(option => option.value));
-    for (const row of rows) assert.match(markup(row.extra as React.ReactNode), />0</);
-  }
-});
-
 test('throwaway owner instances group by profile while named instances group by name', () => {
   const first = { ...claude, id: 'first', ownerId: 'instance-1' };
   const second = { ...claude, id: 'second', ownerId: 'instance-2' };
@@ -499,12 +433,11 @@ test('throwaway owner instances group by profile while named instances group by 
   assert.equal(taskOwnerId(first), 'claude_owner');
   assert.deepEqual(taskOption(named, 'owner'), { value: 'Mario', label: 'Mario' });
   const options = filterOptions([first, second, named], 'owner', emptySelection(), now);
-  assert.deepEqual(options.map(({ value, label, open }) => ({ value, label, open })), [
-    { value: 'claude_owner', label: 'claude_owner', open: 2 },
-    { value: 'Mario', label: 'Mario', open: 1 },
+  assert.deepEqual(options.map(({ value, label, count }) => ({ value, label, count })), [
+    { value: 'claude_owner', label: 'claude_owner', count: 2 },
+    { value: 'Mario', label: 'Mario', count: 1 },
   ]);
   assert.deepEqual(applyTaskFilters([first, second, named], sel({ owner: ['claude_owner'] }), undefined, now).map(task => task.id), ['first', 'second']);
-  assert.match(markup(filterItems('owner', options, [], () => {}, ownerKind)[1].icon as React.ReactNode), /<title>Claude Code<\/title>/);
 });
 
 
@@ -522,14 +455,13 @@ test('named registrations merge by name and legacy instance selections resolve t
   const options = filterOptions(['attached-one', 'attached-two'].map(ownerId => ({
     ...claude, id: ownerId, ownerId, owner: { ...owner, name: 'Mario' },
   })), 'owner', emptySelection(), now);
-  assert.deepEqual(options.map(({ value, label, open, ownerProfile }) => ({ value, label, open, ownerProfile })), [{ value: 'Mario', label: 'Mario', open: 2, ownerProfile: 'claude_owner' }]);
+  assert.deepEqual(options.map(({ value, label, count, ownerProfile }) => ({ value, label, count, ownerProfile })), [{ value: 'Mario', label: 'Mario', count: 2, ownerProfile: 'claude_owner' }]);
   const named = ['attached-one', 'attached-two'].map(ownerId => ({ ...claude, id: ownerId, ownerId, owner: { ...owner, name: 'Mario' } }));
   const selection = resolveSelection(sel({ owner: ['attached-one', 'attached-two', 'gone'] }), named, now);
   assert.deepEqual(selection.owner, ['Mario']);
   assert.equal(applyTaskFilters(named, selection, undefined, now).length, 2);
   assert.deepEqual(taskOption({ ...named[0], dispatch: undefined }, 'owner'), { value: 'Mario', label: 'Mario' });
-  assert.equal(filterOptions([...named, { ...named[0], id: 'closed', status: 'failed' }], 'owner', emptySelection(), now)[0].open, 2);
-  assert.match(markup(filterItems('owner', options, [], () => {}, ownerKind)[0].icon as React.ReactNode), /<title>Claude Code<\/title>/);
+  assert.equal(filterOptions([...named, { ...named[0], id: 'closed', status: 'failed' }], 'owner', emptySelection(), now)[0].count, 3);
 });
 
 
@@ -554,7 +486,7 @@ test('time ANDs with dimensions and constrains their open counts without droppin
   assert.deepEqual(resolveSelection(selection, [recent, old], now), selection);
   for (const dimension of ['owner', 'worker'] as const) {
     const options = filterOptions([recent, old], dimension, sel({ time: '1h' }), now);
-    assert.equal(options.reduce((sum, option) => sum + option.open, 0), 1);
+    assert.equal(options.reduce((sum, option) => sum + option.count, 0), 1);
   }
   assert.equal(hasFilters(sel({ time: '1h' })), true);
 
@@ -566,8 +498,8 @@ test('time selection persists, defaults old payloads, and resets with clear', ()
     writeTaskFilters(sel({ time: '7d' }));
     assert.deepEqual(readTaskFilters(), sel({ time: '7d' }));
     const html = markup(React.createElement(TaskBoard, { tasks, loading: false, onSelect: () => {}, now }));
-    assert.match(html, /时间：近 7 天/);
-    assert.match(html, /清除/);
+    assert.match(html, /aria-pressed="true"[^>]*>(?:(?!<\/button>)[\s\S])*近 7 天/);
+    assert.match(html, /移除 近 7 天/);
     writeTaskFilters(emptySelection());
     assert.equal(readTaskFilters().time, 'today');
     assert.equal(hasFilters(readTaskFilters()), false);
@@ -579,7 +511,7 @@ test('time selection persists, defaults old payloads, and resets with clear', ()
 
 
 test('today is the default for fresh storage, legacy payloads and clear; explicit ranges survive', () => {
-  const expected = { owner: [], worker: [], workspace: [], time: 'today' };
+  const expected = { status: [], owner: [], worker: [], workspace: [], time: 'today' };
   assert.deepEqual(emptySelection(), expected);
   assert.deepEqual(withStorage({}, readTaskFilters), expected);
   assert.deepEqual(withStorage({ [TASK_FILTERS_KEY]: '{}' }, readTaskFilters), expected);
@@ -589,21 +521,21 @@ test('today is the default for fresh storage, legacy payloads and clear; explici
     assert.equal(hasFilters(sel({ time })), true);
   }
   const html = withStorage({}, () => markup(React.createElement(TaskBoard, { tasks, loading: false, onSelect: () => {}, now })));
-  assert.match(html, /时间：今天/);
-  assert.doesNotMatch(html, /清除/);
+  assert.match(html, /aria-pressed="true"[^>]*>(?:(?!<\/button>)[\s\S])*今天/);
+  assert.doesNotMatch(html, /移除 今天/);
   const all = markup(React.createElement(TaskBoard, { tasks, filters: sel({ time: 'all' }), loading: false, onSelect: () => {}, now }));
-  assert.match(all, /时间：全部/);
-  assert.match(all, /清除/);
+  assert.match(all, /aria-pressed="true"[^>]*>(?:(?!<\/button>)[\s\S])*全部/);
+  assert.match(all, /移除 全部/);
 });
 
-test('archive keeps old work across board time choices and still narrows by owner and search', () => {
+test('archive keeps old work across board time choices and still narrows by owner, worker and status', () => {
   const tooOld = { ...staleFailed, id: 'older', updatedAt: ago(31 * 24) };
   const entries = [...archived, tooOld];
   for (const time of ['today', '1h', 'all'] as const) {
     withStorage({ [TASK_FILTERS_KEY]: JSON.stringify(sel({ time })) }, () => {
-      assert.equal(archiveRows(entries, '', ALL_OWNERS, now).length, 4);
-      assert.deepEqual(archiveRows(entries, 'older', 'claude_owner', now).map(task => task.id), ['older']);
-      assert.deepEqual(archiveRows(entries, 'older', 'codex_owner', now), []);
+      assert.equal(archiveRows(entries, { ...emptySelection(), time: 'all' }, now).length, 4);
+      assert.deepEqual(archiveRows(entries, { ...emptySelection(), time: 'all', owner: ['claude_owner'], status: ['failed'] }, now).map(task => task.id), ['a1', 'older']);
+      assert.deepEqual(archiveRows(entries, { ...emptySelection(), time: 'all', owner: ['codex_owner'], worker: ['claude_worker'] }, now), []);
     });
   }
 });

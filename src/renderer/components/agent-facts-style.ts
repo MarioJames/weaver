@@ -21,6 +21,10 @@ export const factsStyles = createStaticStyles(({ css, cssVar }) => ({
     min-inline-size: 0;
     font-size: 12px;
   `,
+  /** The full block: Descriptions with room-keeping values (long paths and models ellipsize). */
+  descriptions: css`
+    min-inline-size: 0;
+  `,
   /** A key: definition-list semantics without the user-agent indent or emphasis. */
   key: css`
     margin: 0;

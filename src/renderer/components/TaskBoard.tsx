@@ -1,81 +1,137 @@
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Empty, Icon } from '@lobehub/ui';
-import type { DropdownMenuCheckboxItem } from '@lobehub/ui/base-ui';
-import { Button, DropdownMenu, Input, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
-import { ChevronDown, ChevronRight, Folder, Loader2 } from 'lucide-react';
+import { Button, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
+import { ChevronDown, ChevronRight, ChevronUp, Folder, Loader2, X } from 'lucide-react';
 import type { Task } from '../../shared/types';
 import { redactLog } from '../log-view';
-import type { FilterDimension, FilterOption, TaskSelection } from '../task-view';
-import { FILTER_DIMENSIONS, TIME_RANGES, TASK_COLUMNS, applyTaskFilters, columnize, dispatchKind, emptySelection, filterButtonLabel, filterOptions, filterTasks, hasFilters, isOpenTask, nonArchived, readEndedExpanded, readTaskFilters, resolveSelection, reviewLabel, statusLabels, toggleOption, workspaceGroups, writeEndedExpanded, writeTaskFilters } from '../task-view';
+import type { FilterDimension, FilterOption, TaskSelection, TaskTimeRange } from '../task-view';
+import { FILTER_DIMENSIONS, TASK_COLUMNS, TIME_RANGES, applyTaskFilters, columnize, dispatchKind, emptySelection, filterLabels, filterOptions, filterSummary, hasFilters, isOpenTask, nonArchived, readEndedExpanded, readFiltersCollapsed, readTaskFilters, resolveSelection, selectedEntries, toggleOption, workspaceGroups, writeEndedExpanded, writeFiltersCollapsed, writeTaskFilters } from '../task-view';
+import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../status-colors';
+import type { DisplayStatus } from '../status-colors';
 import { styles } from '../style';
 import { AgentFacts } from './AgentFacts';
 import { EngineIcon } from './EngineIcon';
 
-/** Every card has a status; active dispatch also carries a spinner and activity. */
-function outcome(task: Task): { label: string; color?: string; spin?: boolean } {
-  if (task.status === 'failed') return { label: statusLabels.failed, color: 'error' };
-  if (task.status === 'cancelled') return { label: statusLabels.cancelled };
-  if (task.status === 'cancelling') return { label: statusLabels.cancelling, color: 'warning', spin: true };
-  if (task.status === 'completed') return { label: reviewLabel(task), color: task.reviewState === 'accepted' ? 'success' : 'warning' };
-  if (task.status === 'running') return { label: statusLabels.running, color: 'processing', spin: true };
-  if (task.scheduled) return { label: '排队中', color: 'processing', spin: true };
-  return { label: statusLabels[task.status] };
+/** Every card has a shared status tag; dispatching states also carry a spinner and activity. */
+function cardStatus(task: Task): { label: string; color?: string; spin: boolean } {
+  const status = displayStatus(task);
+  const tone = DISPLAY_TONES[status];
+  return { label: DISPLAY_LABELS[status], color: tone === 'default' ? undefined : tone, spin: status === 'running' || status === 'cancelling' || status === 'scheduled' };
 }
 
 const spinner = <Icon icon={Loader2} spin size="small" />;
 const ENDED_BODY_ID = 'board-ended';
+/** Rows with more chips than this start with 更多 until the first measurement says otherwise. */
+const INLINE_CHIPS = 8;
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
-/** A choice only the curious should have to look for: nothing live behind it and not already picked. */
-const isQuiet = (option: FilterOption, chosen: string[]) => option.open === 0 && !chosen.includes(option.value);
+/** One checkable chip: label, optional brand/dot, and how many tasks in scope carry it. */
+export function FacetChip({ checked, label, count, icon, tone, title, onClick }: { checked: boolean; label: string; count?: number; icon?: ReactNode; tone?: string; title?: string; onClick: () => void }) {
+  return <button type="button" className={styles.facetChip} aria-pressed={checked} title={title} onClick={onClick}>
+    {tone && <span className={styles.facetDot} data-tone={tone} aria-hidden="true" />}
+    {icon}
+    <span className={styles.facetChipLabel}>{label}</span>
+    {count !== undefined && <span className={`${styles.facetChipCount} ${styles.numbers}`}>{count}</span>}
+  </button>;
+}
 
-/** The brand behind a choice: owners by their policy engine, workers by their dispatch engine. */
+/** A single-line row of chips; whatever does not fit collapses behind 「更多」, which expands only this row. */
+function FacetRow({ label, size, children }: { label: string; size: number; children: ReactNode }) {
+  const chips = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [overflow, setOverflow] = useState(size > INLINE_CHIPS);
+  useIsomorphicLayoutEffect(() => {
+    const element = chips.current;
+    if (!element || expanded) return;
+    const measure = () => setOverflow(element.scrollHeight > element.clientHeight + 1);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [expanded, size, children]);
+  return <div className={styles.facetRow}>
+    <span className={styles.facetLabel}>{label}</span>
+    <div ref={chips} className={styles.facetChips} data-expanded={expanded}>
+      {size ? children : <Text type="secondary" className={styles.meta}>暂无</Text>}
+      {overflow && <button type="button" className={styles.facetChip} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+        {expanded ? '收起' : '更多'}<Icon icon={expanded ? ChevronUp : ChevronDown} size="small" />
+      </button>}
+    </div>
+  </div>;
+}
+
+/** The brand behind a chip: parents by their policy engine, sub agents by their dispatch engine, directories by a folder. */
 function optionIcon(dimension: FilterDimension, option: FilterOption, ownerKind?: (ownerId?: string) => string | undefined) {
+  if (dimension === 'status') return undefined;
   if (dimension === 'workspace') return <Icon icon={Folder} size="small" />;
   return <EngineIcon kind={dimension === 'owner' ? ownerKind?.(option.ownerProfile ?? option.value) : option.kind} />;
 }
 
 /**
- * One dimension's checklist. The menu portals its rows, so this builder is also what a
- * server render and a test can see: chosen values stay listed even when their work is done.
+ * The facet block: 时间 scopes everything, the other rows OR within and AND across.
+ * It is persistent content: the 已选 row is always present, so choosing never moves the board.
  */
-export function filterItems(dimension: FilterDimension, options: FilterOption[], chosen: string[], onToggle: (value: string) => void, ownerKind?: (ownerId?: string) => string | undefined, revealed = false): DropdownMenuCheckboxItem[] {
-  return options.filter(option => revealed || !isQuiet(option, chosen)).map(option => ({
-    type: 'checkbox',
-    key: option.value,
-    checked: chosen.includes(option.value),
-    /** Multi-select: a menu that closes on the first tick would make an OR across choices impossible. */
-    closeOnClick: false,
-    icon: optionIcon(dimension, option, ownerKind),
-    label: <span className={styles.filterOptionLabel} title={dimension === 'workspace' ? option.value : undefined}>{option.label}</span>,
-    extra: <Text type="secondary" className={styles.numbers}>{option.open}</Text>,
-    onCheckedChange: () => onToggle(option.value),
-  }));
-}
-
-/** Under the list: how many choices are hidden, and the way to see them. */
-export function filterReveal(options: FilterOption[], chosen: string[], onReveal: () => void) {
-  const quiet = options.filter(option => isQuiet(option, chosen));
-  if (!quiet.length) return undefined;
-  return <Button size="small" type="text" block onClick={onReveal}>显示全部 {quiet.length}</Button>;
+export function TaskFacets({ board, selection, collapsed, now, ownerKind, onChange, onCollapse }: { board: Task[]; selection: TaskSelection; collapsed: boolean; now: number; ownerKind?: (ownerId?: string) => string | undefined; onChange: (selection: TaskSelection) => void; onCollapse: (collapsed: boolean) => void }) {
+  const options = Object.fromEntries(FILTER_DIMENSIONS.map(dimension => [dimension, filterOptions(board, dimension, selection, now)])) as Record<FilterDimension, FilterOption[]>;
+  const entries = selectedEntries(selection, options);
+  if (collapsed) return <div className={styles.facets} role="group" aria-label="任务筛选">
+    <div className={styles.facetSelected}>
+      <span className={styles.facetSummary}>{filterSummary(selection, options)}</span>
+      <Button size="small" type="text" icon={ChevronDown} aria-expanded={false} onClick={() => onCollapse(false)}>展开筛选</Button>
+    </div>
+  </div>;
+  return <div className={styles.facets} role="group" aria-label="任务筛选">
+    <FacetRow label="时间" size={TIME_RANGES.length}>
+      {TIME_RANGES.map(range => <FacetChip key={range.value} checked={selection.time === range.value} label={range.label}
+        count={applyTaskFilters(board, { ...selection, time: range.value as TaskTimeRange }, undefined, now).length}
+        onClick={() => onChange({ ...selection, time: range.value })} />)}
+    </FacetRow>
+    {FILTER_DIMENSIONS.map(dimension => <FacetRow key={dimension} label={filterLabels[dimension]} size={options[dimension].length}>
+      {options[dimension].map(option => <FacetChip key={option.value} checked={selection[dimension].includes(option.value)} label={option.label} count={option.count}
+        tone={dimension === 'status' ? DISPLAY_TONES[option.value as DisplayStatus] : undefined}
+        icon={optionIcon(dimension, option, ownerKind)} title={dimension === 'workspace' ? option.value : undefined}
+        onClick={() => onChange({ ...selection, [dimension]: toggleOption(selection[dimension], option.value) })} />)}
+    </FacetRow>)}
+    <div className={styles.facetSelected}>
+      <span>已选：</span>
+      <span className={styles.facetSelectedList}>
+        {selection.time !== 'today' && <button type="button" className={styles.facetChip} aria-label={`移除 ${TIME_RANGES.find(range => range.value === selection.time)?.label}`} onClick={() => onChange({ ...selection, time: 'today' })}>
+          {TIME_RANGES.find(range => range.value === selection.time)?.label}<Icon icon={X} size="small" />
+        </button>}
+        {entries.map(entry => <button key={`${entry.dimension}:${entry.value}`} type="button" className={styles.facetChip} aria-label={`移除 ${entry.label}`}
+          onClick={() => onChange({ ...selection, [entry.dimension]: selection[entry.dimension].filter(value => value !== entry.value) })}>
+          {entry.label}<Icon icon={X} size="small" />
+        </button>)}
+        {!entries.length && selection.time === 'today' && <Text type="secondary" className={styles.meta}>未选择</Text>}
+      </span>
+      <Button size="small" type="text" disabled={!hasFilters(selection)} onClick={() => onChange(emptySelection())}>清除全部</Button>
+      <Button size="small" type="text" icon={ChevronUp} aria-expanded onClick={() => onCollapse(true)}>收起</Button>
+    </div>
+  </div>;
 }
 
 export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filters, onFiltersChange, now = Date.now() }: { filters?: TaskSelection; onFiltersChange?: (selection: TaskSelection) => void; tasks: Task[]; selected?: string; loading: boolean; onSelect: (id: string) => void; ownerKind?: (ownerId?: string) => string | undefined; now?: number }) {
-  const [query, setQuery] = useState('');
   const [stored, setStored] = useState(readTaskFilters);
   const [ended, setEnded] = useState(readEndedExpanded);
-  const [revealed, setRevealed] = useState<Record<FilterDimension, boolean>>({ owner: false, worker: false, workspace: false });
+  const [collapsed, setCollapsed] = useState(readFiltersCollapsed);
   if (loading && !tasks.length) return <div role="status" className={styles.stack}><Skeleton animated /><Text type="secondary">正在加载本地任务…</Text></div>;
   if (!tasks.length) return <Empty title="还没有任务" description="从右上角新建第一个任务。" />;
   const selection = resolveSelection(filters ?? stored, tasks, now);
   const board = nonArchived(tasks, now);
-  const visible = filterTasks(applyTaskFilters(board, selection, undefined, now), 'all', query);
+  const visible = applyTaskFilters(board, selection, undefined, now);
   const columns = columnize(visible);
   const olderOpenWork = !visible.length && selection.time === 'today' &&
-    filterTasks(applyTaskFilters(board, { ...selection, time: 'all' }, undefined, now), 'all', query).some(isOpenTask);
+    applyTaskFilters(board, { ...selection, time: 'all' }, undefined, now).some(isOpenTask);
   const update = (next: TaskSelection) => {
     setStored(next);
     onFiltersChange?.(next);
     writeTaskFilters(next);
+  };
+  const collapse = (next: boolean) => {
+    setCollapsed(next);
+    writeFiltersCollapsed(next);
   };
   /** 已结束 starts folded: its count is the whole story until someone asks for more. */
   const toggleEnded = () => {
@@ -84,11 +140,11 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
     writeEndedExpanded(next);
   };
   const card = (task: Task) => {
-    const tag = outcome(task);
+    const tag = cardStatus(task);
     const latest = task.events.at(-1);
     return <button key={task.id} type="button" className={styles.taskCard} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
       <span className={styles.cardTitle}>
-        {task.dispatch?.worker && <Tag size="small" icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
+        {task.dispatch?.worker && <Tag className={styles.cardTag} size="small" icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
         <strong className={styles.cardTitleText}>{task.title}</strong>
       </span>
       <span className={styles.cardStatus}>
@@ -100,28 +156,7 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
     </button>;
   };
   return <section aria-label="任务看板" className={styles.board}>
-    <div className={styles.filterBar}>
-      <Input className={styles.filterSearch} aria-label="搜索任务" placeholder="搜索标题、负责人、项目或任务 ID" value={query} onChange={event => setQuery(event.target.value)} />
-      {FILTER_DIMENSIONS.map(dimension => {
-        const options = filterOptions(board, dimension, selection, now);
-        const chosen = selection[dimension];
-        return <DropdownMenu key={dimension} trigger="click" placement="bottomLeft" popupProps={{ className: styles.filterMenu }}
-          items={filterItems(dimension, options, chosen, value => update({ ...selection, [dimension]: toggleOption(chosen, value) }), ownerKind, revealed[dimension])}
-          footer={revealed[dimension] ? undefined : filterReveal(options, chosen, () => setRevealed({ ...revealed, [dimension]: true }))}>
-          <Button className={styles.filterButton} size="small" type={chosen.length ? 'fill' : 'default'} icon={ChevronDown} iconPosition="end">{filterButtonLabel(dimension, options, chosen)}</Button>
-        </DropdownMenu>;
-      })}
-      <DropdownMenu trigger="click" placement="bottomLeft" popupProps={{ className: styles.filterMenu }} items={TIME_RANGES.map(range => ({
-        type: 'checkbox' as const,
-        key: range.value,
-        label: range.label,
-        checked: selection.time === range.value,
-        onCheckedChange: () => update({ ...selection, time: range.value }),
-      }))}>
-        <Button className={styles.filterButton} size="small" type={selection.time === 'all' ? 'default' : 'fill'} icon={ChevronDown} iconPosition="end">{`时间：${TIME_RANGES.find(range => range.value === selection.time)?.label}`}</Button>
-      </DropdownMenu>
-      {hasFilters(selection) && <Button size="small" type="text" onClick={() => update(emptySelection())}>清除</Button>}
-    </div>
+    <TaskFacets board={board} selection={selection} collapsed={collapsed} now={now} ownerKind={ownerKind} onChange={update} onCollapse={collapse} />
     {!visible.length ? olderOpenWork ? <div className={styles.row}>
       <Text type="secondary">今天没有任务，还有更早的未结束任务。</Text>
       <Button size="small" onClick={() => update({ ...selection, time: 'all' })}>查看全部</Button>

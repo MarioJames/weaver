@@ -78,4 +78,14 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     overflow-wrap: anywhere;
     tab-size: 2;
   `,
+  modalFooter: css`
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${cssVar.marginXS};
+    justify-content: flex-end;
+  `,
+  /** The header status tag keeps its spinner and label on one line. */
+  statusTag: css`
+    margin: 0;
+  `,
 }));

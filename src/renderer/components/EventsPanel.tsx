@@ -1,12 +1,12 @@
 import { notifyError } from '../notify';
 import { NamedSelect } from './NamedControls';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Icon } from '@lobehub/ui';
-import { Button, Input, Segmented, Tag, Text } from '@lobehub/ui/base-ui';
-import { ChevronRight, Loader2 } from 'lucide-react';
-import type { TaskEvent } from '../../shared/types';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { CopyButton, Icon } from '@lobehub/ui';
+import { Button, Input, Segmented, Steps, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
+import { ChevronRight, FilePen, FileText, Loader2, Search, Terminal, Wrench } from 'lucide-react';
+import type { TaskEvent, TaskFailure } from '../../shared/types';
 import { command } from '../commands';
-import { condenseEvents, exportEvents, filterCondensed, kindLabels, redactLog, selectEvents, type TimelineItem } from '../log-view';
+import { condenseEvents, eventBadge, exportEvents, filterCondensed, formatDuration, kindLabels, redactLog, relativeTime, selectEvents, toneColor, toolSteps, type TimelineItem } from '../log-view';
 import { styles } from '../style';
 import { styles as eventStyles } from './events-style';
 
@@ -15,6 +15,7 @@ const kinds = ['all', 'lifecycle', 'log', 'progress', 'artifact', 'result', 'err
 const MODE_KEY = 'weaver-timeline-mode';
 type Mode = 'condensed' | 'all';
 const MODE_OPTIONS = [{ value: 'condensed', label: '精简' }, { value: 'all', label: '全部' }] as const;
+const TOOL_ICONS: Record<string, typeof Wrench> = { Bash: Terminal, Read: FileText, Edit: FilePen, Write: FilePen, Grep: Search };
 
 function readMode(): Mode {
   try { return localStorage.getItem(MODE_KEY) === 'all' ? 'all' : 'condensed'; } catch { return 'condensed'; }
@@ -22,31 +23,114 @@ function readMode(): Mode {
 function saveMode(mode: Mode) { try { localStorage.setItem(MODE_KEY, mode); } catch {} }
 function timeLabel(at: string) { return new Date(at).toLocaleTimeString(); }
 
+/** Relative time, right aligned, with the absolute time in a tooltip. */
+function RelativeTime({ at }: { at: string }) {
+  return <Tooltip title={new Date(at).toLocaleString()}>
+    <time className={eventStyles.time} dateTime={at}>{relativeTime(at)}</time>
+  </Tooltip>;
+}
+
 function EventRow({ event }: { event: TaskEvent }) {
   return <div className={eventStyles.rawRow}>
-    <time className={eventStyles.time} dateTime={event.at}>{timeLabel(event.at)}</time>
-    <Tag size="small" className={event.kind === 'error' ? `${eventStyles.kindTag} ${eventStyles.kindDanger}` : eventStyles.kindTag}>{kindLabels[event.kind]}</Tag>
+    <time className={eventStyles.rawTime} dateTime={event.at}>{timeLabel(event.at)}</time>
+    <Tag size="small" className={eventStyles.tag}>{kindLabels[event.kind]}</Tag>
     <Text className={styles.wrap} type={event.kind === 'error' ? 'danger' : 'secondary'}>{redactLog(event.message)}</Text>
   </div>;
 }
 
-function StepsGroup({ item, open, onToggle }: { item: Extract<TimelineItem, { type: 'steps' }>; open: boolean; onToggle: () => void }) {
-  const tools = item.tools.map(tool => `${tool.name} ${tool.count}`).join(' · ');
-  const fromTime = timeLabel(item.from.at);
-  const toTime = timeLabel(item.to.at);
-  const range = fromTime === toTime ? fromTime : `${fromTime}–${toTime}`;
-  return <div className={styles.tight}>
-    <button type="button" className={eventStyles.stepRow} aria-expanded={open} aria-label={`步骤明细 ${range}`} onClick={onToggle}>
-      <span className={eventStyles.time}>{range}</span>
-      {item.inProgress && <Icon icon={Loader2} spin size="small" />}
-      <Text className={eventStyles.tools}>执行了 {item.count} 个步骤{tools ? ` · ${tools}` : ''}</Text>
-      <span className={eventStyles.chevron} data-expanded={open} aria-hidden="true"><Icon icon={ChevronRight} size="small" /></span>
-    </button>
-    {open && <div className={eventStyles.stepBody} role="region" aria-label={`原始事件 ${range}`}>{item.events.map(event => <EventRow key={event.id} event={event} />)}</div>}
+/** Long text folds to a few lines with an expand toggle. */
+function FoldText({ text, label }: { text: string; label: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const long = text.split('\n').length > 6 || text.length > 600;
+  return <>
+    <pre className={`${eventStyles.cardText}${long && !expanded ? ` ${eventStyles.cardClamped}` : ''}`}>{text}</pre>
+    {long && <div><Button size="small" type="text" aria-expanded={expanded} aria-label={`${expanded ? '收起' : '展开'}${label}`} onClick={() => setExpanded(value => !value)}>{expanded ? '收起' : '展开'}</Button></div>}
+  </>;
+}
+
+function ResultCard({ event }: { event: TaskEvent }) {
+  const text = redactLog(event.message);
+  return <div className={`${eventStyles.card} ${eventStyles.cardSuccess}`}>
+    <div className={eventStyles.cardHead}>
+      <Text style={{ fontWeight: 600 }}>执行结果</Text>
+      <CopyButton content={text} size="small" aria-label="复制执行结果" title="复制执行结果" />
+    </div>
+    <FoldText text={text} label="执行结果" />
   </div>;
 }
 
-export function EventsPanel({ events, taskId, active = false }: { events: TaskEvent[]; taskId: string; active?: boolean }) {
+function FailureCard({ failure }: { failure: TaskFailure }) {
+  const message = redactLog(failure.message);
+  return <div className={`${eventStyles.card} ${eventStyles.cardError}`}>
+    <div className={eventStyles.cardHead}>
+      <Text style={{ fontWeight: 600 }} type="danger">失败原因</Text>
+      <CopyButton content={[message, failure.stderrTail && redactLog(failure.stderrTail), failure.vendorError && redactLog(failure.vendorError)].filter(Boolean).join('\n\n')} size="small" aria-label="复制失败信息" title="复制失败信息" />
+    </div>
+    <FoldText text={message} label="失败原因" />
+    {failure.vendorError && <div><Text type="secondary" fontSize={12}>供应商错误</Text><pre className={eventStyles.cardCode}>{redactLog(failure.vendorError)}</pre></div>}
+    {failure.stderrTail && <div><Text type="secondary" fontSize={12}>stderr 末尾</Text><pre className={eventStyles.cardCode}>{redactLog(failure.stderrTail)}</pre></div>}
+  </div>;
+}
+
+/** Status tags are solid in the shared status scheme; outcomes are outlined so the two never look alike. */
+function BadgeTag({ event }: { event: TaskEvent }): ReactNode {
+  const badge = eventBadge(event);
+  if (!badge) return null;
+  return <Tag size="small" className={eventStyles.tag} variant={badge.outcome ? 'outlined' : 'solid'} color={toneColor(badge.tone)}>{badge.label}</Tag>;
+}
+
+function dotClass(event: TaskEvent): string {
+  switch (event.kind) {
+    case 'lifecycle': return eventStyles.dotLifecycle;
+    case 'result': return eventStyles.dotSuccess;
+    case 'error': return eventStyles.dotError;
+    case 'artifact': return eventStyles.dotInfo;
+    default: return '';
+  }
+}
+const Dot = ({ className = '' }: { className?: string }) => <span aria-hidden="true" className={`${eventStyles.dot} ${className}`} />;
+
+function EventNode({ event, failure }: { event: TaskEvent; failure?: TaskFailure }) {
+  const message = redactLog(event.message);
+  const covered = event.kind === 'error' && !!failure && redactLog(failure.message) === message;
+  return <div>
+    <div className={eventStyles.head}>
+      <div className={eventStyles.headMain}>
+        {event.kind !== 'result' && <BadgeTag event={event} />}
+        {event.kind !== 'result' && !covered && <Text className={styles.wrap} type={event.kind === 'error' ? 'danger' : event.kind === 'lifecycle' ? undefined : 'secondary'}>{message}</Text>}
+      </div>
+      <RelativeTime at={event.at} />
+    </div>
+    {event.kind === 'result' && <ResultCard event={event} />}
+    {event.kind === 'error' && failure && <FailureCard failure={failure} />}
+  </div>;
+}
+
+function StepsNode({ item, open, onToggle }: { item: Extract<TimelineItem, { type: 'steps' }>; open: boolean; onToggle: () => void }) {
+  const fromTime = timeLabel(item.from.at);
+  const toTime = timeLabel(item.to.at);
+  const range = fromTime === toTime ? fromTime : `${fromTime}–${toTime}`;
+  const steps = open ? toolSteps(item.events) : [];
+  return <div>
+    <div className={eventStyles.head}>
+      <button type="button" className={eventStyles.stepButton} aria-expanded={open} aria-label={`步骤明细 ${range}`} onClick={onToggle}>
+        {item.inProgress && <Icon icon={Loader2} spin size="small" />}
+        <Text>执行了 {item.count} 个步骤</Text>
+        {item.tools.map(tool => <Tag key={tool.name} size="small" className={eventStyles.tag}>{tool.name} {tool.count}</Tag>)}
+        <span className={eventStyles.chevron} data-expanded={open} aria-hidden="true"><Icon icon={ChevronRight} size="small" /></span>
+      </button>
+      <RelativeTime at={item.to.at} />
+    </div>
+    {open && <ul className={eventStyles.stepList} aria-label={`原始事件 ${range}`}>{steps.map(step => <li key={step.id} className={`${eventStyles.stepItem}${step.failed ? ` ${eventStyles.stepItemFailed}` : ''}`}>
+      <Icon icon={TOOL_ICONS[step.name] ?? Wrench} size="small" />
+      <span className={eventStyles.stepName}>{step.name}</span>
+      {step.failed && <span>失败</span>}
+      <span className={eventStyles.stepDuration}>{step.durationMs === undefined ? '' : formatDuration(step.durationMs)}</span>
+    </li>)}</ul>}
+  </div>;
+}
+
+export function EventsPanel({ events, taskId, active = false, failure }: { events: TaskEvent[]; taskId: string; active?: boolean; failure?: TaskFailure }) {
   const [mode, setMode] = useState<Mode>(readMode);
   const [kind, setKind] = useState('all');
   const [query, setQuery] = useState('');
@@ -70,6 +154,7 @@ export function EventsPanel({ events, taskId, active = false }: { events: TaskEv
   }
   const condensed = useMemo(() => filterCondensed(condenseEvents(page.events, { active }), query), [page.events, active, query]);
   const visible = selectEvents(page.events, kind, query);
+  const lastError = [...page.events].reverse().find(event => event.kind === 'error');
   function download() {
     const url = URL.createObjectURL(new Blob([exportEvents(taskId, visible)], { type: 'application/json' }));
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = `weaver-events-${taskId}.json`; document.body.appendChild(anchor); anchor.click(); anchor.remove();
@@ -85,9 +170,9 @@ export function EventsPanel({ events, taskId, active = false }: { events: TaskEv
       {mode === 'all' && <Button disabled={!visible.length} onClick={download}>导出已筛选日志</Button>}
     </div>
     {mode === 'all' && <Text type="secondary">已加载 {page.events.length} 条 · 导出会遮盖常见凭据格式</Text>}
-    {mode === 'condensed' ? (!condensed.length ? <Text type="secondary">{empty}</Text> : condensed.map(item => item.type === 'steps'
-      ? <StepsGroup key={item.from.id} item={item} open={openGroups.has(item.from.id)} onToggle={() => toggleGroup(item.from.id)} />
-      : <EventRow key={item.event.id} event={item.event} />))
+    {mode === 'condensed' ? (!condensed.length ? <Text type="secondary">{empty}</Text> : <Steps className={eventStyles.timeline} orientation="vertical" classNames={{ indicator: eventStyles.indicator, title: eventStyles.nodeTitle }} items={condensed.map(item => item.type === 'steps'
+      ? { key: item.from.id, icon: <Dot />, title: <StepsNode item={item} open={openGroups.has(item.from.id)} onToggle={() => toggleGroup(item.from.id)} /> }
+      : { key: item.event.id, icon: <Dot className={dotClass(item.event)} />, title: <EventNode event={item.event} failure={item.event.id === lastError?.id ? failure : undefined} /> })} />)
       : (!visible.length ? <Text type="secondary">{empty}</Text> : visible.map(event => <EventRow key={event.id} event={event} />))}
     {page.hasMore && <Button disabled={busy} onClick={() => void more()}>{busy ? '加载中…' : '加载更多事件'}</Button>}
   </div>;

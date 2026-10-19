@@ -3,8 +3,9 @@ import { Empty, Icon } from '@lobehub/ui';
 import { Alert, Button, Tabs, Tag, Text } from '@lobehub/ui/base-ui';
 import { Loader2 } from 'lucide-react';
 import type { Task } from '../../shared/types';
-import { redactLog, timelineActive } from '../log-view';
-import { isActive, reviewLabel, statusLabels } from '../task-view';
+import { redactLog, timelineActive, toneColor } from '../log-view';
+import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../status-colors';
+import { isActive } from '../task-view';
 import { styles } from '../style';
 import { AgentFacts } from './AgentFacts';
 import { ArtifactsPanel } from './ArtifactsPanel';
@@ -20,8 +21,7 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
   if (!task) return <Empty title="选择一项任务" description="创建或导入后，执行、交接和验收都留在同一条记录里。" />;
   const latest = task.events.at(-1);
   const failure = [...task.events].reverse().find(event => event.kind === 'error');
-  const dispatch = task.dispatch;
-  const rest = [dispatch && `${dispatch.engine} / ${dispatch.model}`, dispatch?.effort, `更新于 ${new Date(task.updatedAt).toLocaleString()}`].filter(Boolean).join(' · ');
+  const status = displayStatus(task);
   const summary = task.summary?.trim();
   const artifacts = task.summary ? task.artifacts.filter(artifact => artifact.content.trim() !== summary) : task.artifacts;
   const queueNotice = task.scheduled || (task.status === 'queued' && task.queueReason);
@@ -30,8 +30,7 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
       <div className={styles.tight}>
         <Text className={styles.wrap} style={{ fontSize: 18, fontWeight: 600 }}>{task.title}</Text>
         <div className={styles.row}>
-          <Tag icon={isActive(task) ? <Icon icon={Loader2} spin size="small" /> : undefined}>{statusLabels[task.status]}</Tag>
-          {task.status === 'completed' && <Tag>{reviewLabel(task)}</Tag>}
+          <Tag className={detailStyles.statusTag} variant="solid" color={toneColor(DISPLAY_TONES[status])} icon={timelineActive(task.status) ? <Icon icon={Loader2} spin size="small" /> : undefined}>{DISPLAY_LABELS[status]}</Tag>
         </div>
       </div>
       <div className={styles.row}>
@@ -48,7 +47,7 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
               : task.status === 'cancelled' ? <Alert type="secondary" title="执行已取消" description={redactLog(failure?.message ?? latest?.message ?? '查看时间线。')} /> : task.status === 'running' ? <Text type="secondary" className={detailStyles.activity}>{redactLog(latest?.message ?? '等待首次调度').replace(/\s+/g, ' ').trim()}</Text> : undefined}
           {task.summary && <TaskTextBlock key={`${task.id}:summary`} title="执行结果" content={task.summary} clamp={6} />}
           <AgentFacts task={task} ownerKind={ownerKind} />
-          <Text type="secondary" className={styles.wrap}>{rest}{task.retryOf && ` · 重试来源：${task.retryOf}`}</Text>
+          {task.retryOf && <Text type="secondary" className={styles.wrap}>重试来源：{task.retryOf}</Text>}
         </div> },
         { key: 'prompt', label: 'Prompt', children: <TaskTextBlock key={`${task.id}:prompt`} title="Prompt" content={task.instruction} /> },
         { key: 'requirements', label: '要求' + (task.acceptanceCriteria?.length ? ` ${task.acceptanceCriteria.length}` : ''), children: <div className={detailStyles.overview}>
@@ -57,9 +56,9 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
             {task.acceptanceCriteria?.length ? <ol className={detailStyles.list}>{task.acceptanceCriteria.map((criterion, index) => <li key={index}>{criterion}</li>)}</ol> : <Text type="secondary">此旧任务未记录结构化验收标准。</Text>}
           </div>
         </div> },
-        { key: 'events', label: '时间线 ' + task.events.length, children: <EventsPanel events={task.events} taskId={task.id} active={timelineActive(task.status)} /> },
+        { key: 'events', label: '时间线 ' + task.events.length, children: <EventsPanel events={task.events} taskId={task.id} active={timelineActive(task.status)} failure={task.failure} /> },
         { key: 'artifacts', label: '产物 ' + artifacts.length, children: <ArtifactsPanel artifacts={artifacts} /> },
-        { key: 'review', label: '验收', children: task.status === 'completed' ? <ReviewPanel task={task} busy={busy} action={action} /> : <Empty title="执行成功后进入验收" description="执行结果、收到确认和验收结论各自独立。" /> },
+        { key: 'review', label: '验收', children: task.status === 'completed' ? <ReviewPanel task={task} busy={busy} action={action} ownerKind={ownerKind} /> : <Empty title="执行成功后进入验收" description="执行结果、收到确认和验收结论各自独立。" /> },
         { key: 'continuation', label: '接续', children: <OwnerInspector task={task} busy={busy} action={action} /> },
       ]} />
     </div>

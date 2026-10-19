@@ -168,54 +168,140 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
       grid-template-columns: minmax(0, 1fr);
     }
   `,
-  /** Kanban: the filter row above one column grid. */
+  /** Kanban: the facet block above one lane grid. */
   board: css`
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
     gap: ${cssVar.marginSM};
     min-inline-size: 0;
   `,
-  filterBar: css`
+  /** Shopping-site facets: one fixed-label row per dimension, summary row always present. */
+  facets: css`
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    flex-direction: column;
+    gap: ${cssVar.marginXS};
+    min-inline-size: 0;
+    padding: ${cssVar.paddingSM};
+    border-radius: ${cssVar.borderRadiusLG};
+    background: ${cssVar.colorFillQuaternary};
+  `,
+  facetRow: css`
+    display: flex;
+    align-items: flex-start;
     gap: ${cssVar.marginSM};
     min-inline-size: 0;
-
-    @media (max-width: 600px) {
-      > :first-child { flex-basis: 100%; }
-    }
   `,
-  filterSearch: css`
-    flex: 1;
-    min-inline-size: min(220px, 100%);
-  `,
-  filterButton: css`
-    min-inline-size: min(140px, 100%);
-    max-inline-size: 100%;
-    block-size: auto;
+  facetLabel: css`
+    flex: none;
+    inline-size: 64px;
     min-block-size: ${cssVar.controlHeightSM};
-    white-space: normal;
-    overflow-wrap: anywhere;
-    text-align: start;
-    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    color: ${cssVar.colorTextSecondary};
+    font-size: ${cssVar.fontSizeSM};
   `,
-  filterMenu: css`
-    min-inline-size: min(260px, calc(100vw - 24px));
-    inline-size: max-content;
-    max-inline-size: min(360px, calc(100vw - 24px));
+  /** One line of chips; the rest is clipped until 更多 expands the row. */
+  facetChips: css`
+    display: flex;
+    flex: 1 1 0;
+    flex-wrap: wrap;
+    gap: ${cssVar.marginXXS} ${cssVar.marginXS};
+    align-items: flex-start;
+    align-content: flex-start;
+    min-inline-size: 0;
+    max-block-size: ${cssVar.controlHeightSM};
+    overflow: hidden;
+
+    &[data-expanded='true'] { max-block-size: none; }
   `,
-  filterOptionLabel: css`
-    display: block;
-    white-space: normal;
-    overflow-wrap: anywhere;
+  facetChip: css`
+    display: inline-flex;
+    flex: none;
+    gap: 4px;
+    align-items: center;
+    max-inline-size: 100%;
+    block-size: ${cssVar.controlHeightSM};
+    padding-inline: ${cssVar.paddingXS};
+    border: 0;
+    border-radius: ${cssVar.borderRadiusSM};
+    background: transparent;
+    color: ${cssVar.colorTextSecondary};
+    font: inherit;
+    font-size: ${cssVar.fontSizeSM};
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+
+    &:hover { background: ${cssVar.colorFillSecondary}; color: ${cssVar.colorText}; }
+    &[aria-pressed='true'] { background: ${cssVar.colorPrimaryBg}; color: ${cssVar.colorPrimary}; }
+    &:focus-visible { outline: 2px solid ${cssVar.colorPrimaryBorder}; outline-offset: 1px; }
   `,
-  /** The four status columns side by side, stacked on small screens. */
+  facetChipLabel: css`
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  `,
+  facetChipCount: css`
+    color: ${cssVar.colorTextTertiary};
+    font-variant-numeric: tabular-nums;
+  `,
+  facetDot: css`
+    flex: none;
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: 50%;
+    background: ${cssVar.colorTextQuaternary};
+
+    &[data-tone='processing'] { background: ${cssVar.colorPrimary}; }
+    &[data-tone='warning'] { background: ${cssVar.colorWarning}; }
+    &[data-tone='success'] { background: ${cssVar.colorSuccess}; }
+    &[data-tone='error'] { background: ${cssVar.colorError}; }
+  `,
+  /** Always rendered at a fixed height, so choosing values never moves the board. */
+  facetSelected: css`
+    display: flex;
+    gap: ${cssVar.marginXS};
+    align-items: center;
+    min-inline-size: 0;
+    min-block-size: ${cssVar.controlHeightSM};
+    color: ${cssVar.colorTextSecondary};
+    font-size: ${cssVar.fontSizeSM};
+  `,
+  facetSelectedList: css`
+    display: flex;
+    flex: 1 1 0;
+    gap: ${cssVar.marginXS};
+    align-items: center;
+    min-inline-size: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  `,
+  facetSummary: css`
+    flex: 1 1 0;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  `,
+  /** Archive drawer: every filter on one row. */
+  archiveFilters: css`
+    display: flex;
+    flex-wrap: nowrap;
+    gap: ${cssVar.marginXS};
+    align-items: center;
+    min-inline-size: 0;
+
+    > * { flex: 1 1 0; min-inline-size: 0; }
+  `,
+  /** The four status lanes side by side, stacked on small screens, each full height. */
   columns: css`
     display: grid;
+    flex: 1 1 auto;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: ${cssVar.marginSM};
-    align-items: start;
+    align-items: stretch;
+    min-block-size: 320px;
     min-inline-size: 0;
 
     ${responsive.laptop} {
@@ -228,49 +314,40 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
   `,
   column: css`
     --column-bg: ${cssVar.colorFillTertiary};
-    --column-accent: ${cssVar.colorTextTertiary};
+    --column-text: ${cssVar.colorTextSecondary};
     display: flex;
     flex-direction: column;
     gap: ${cssVar.marginXS};
     min-inline-size: 0;
     padding: ${cssVar.paddingSM};
-    border-block-start: 3px solid var(--column-accent);
     border-radius: ${cssVar.borderRadiusLG};
     background: var(--column-bg);
 
     &[data-status-column='running'] {
       --column-bg: ${cssVar.colorPrimaryBg};
-      --column-accent: ${cssVar.colorPrimary};
+      --column-text: ${cssVar.colorPrimary};
     }
     &[data-status-column='review'] {
       --column-bg: ${cssVar.colorWarningBg};
-      --column-accent: ${cssVar.colorWarning};
+      --column-text: ${cssVar.colorWarning};
     }
     &[data-status-column='closed'] {
       --column-bg: ${cssVar.colorFillQuaternary};
-      --column-accent: ${cssVar.colorTextQuaternary};
+      --column-text: ${cssVar.colorTextTertiary};
     }
     &[data-collapsed='true'] { gap: 0; }
   `,
   columnHead: css`
-    position: sticky;
-    inset-block-start: 0;
-    z-index: 1;
     display: flex;
     gap: ${cssVar.marginXS};
     align-items: center;
     justify-content: space-between;
     padding-block: ${cssVar.paddingXXS};
-    background: var(--column-bg);
-    color: var(--column-accent);
+    color: var(--column-text);
   `,
   columnCount: css`
-    padding: 0 ${cssVar.paddingXS};
-    border-radius: ${cssVar.borderRadiusSM};
-    background: ${cssVar.colorBgContainer};
-    color: var(--column-accent);
+    color: var(--column-text);
     font-size: ${cssVar.fontSizeSM};
-    line-height: 1.7;
   `,
   /** The 已结束 count is also its fold: label, number and chevron in one clickable row. */
   fold: css`
@@ -314,19 +391,24 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     text-overflow: ellipsis;
     white-space: nowrap;
   `,
+  /** One text flow: the sub agent tag is inline at the start and the title wraps beneath it. */
   cardTitle: css`
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
+    display: -webkit-box;
     min-inline-size: 0;
-    > :first-child:not(strong) {
-      flex: none;
-      max-inline-size: 45%;
-      overflow: hidden;
-    }
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  `,
+  cardTag: css`
+    max-inline-size: 60%;
+    margin-inline-end: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
   `,
   cardTitleText: css`
-    min-inline-size: 0;
     overflow-wrap: anywhere;
   `,
   cardStatus: css`

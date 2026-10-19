@@ -1,4 +1,5 @@
 import type { TaskEvent, TaskStatus } from '../shared/types';
+import { DISPLAY_LABELS, DISPLAY_TONES, type DisplayStatus, type StatusTone } from './status-colors';
 /** Best-effort display redaction. Never claim this catches every secret. */
 export function redactLog(value: string): string {
  return value.replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?(?:-----END [^-]*PRIVATE KEY-----|$)/gi,'[REDACTED PRIVATE KEY]').replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/gi,'$1[REDACTED]@').replace(/\b(Bearer\s+)[^\s"'<>]+/gi,'$1[REDACTED]')
@@ -88,3 +89,78 @@ export function filterCondensed(items: TimelineItem[], query: string): TimelineI
 export function timelineActive(status: TaskStatus): boolean {
   return status === 'running' || status === 'cancelling';
 }
+
+/** Short Chinese relative time ("3 分钟前"); the absolute time lives in a tooltip next to it. */
+export function relativeTime(at: string, now: number = Date.now()): string {
+  const diff = Math.max(0, now - new Date(at).getTime());
+  const minutes = Math.floor(diff / 60000);
+  if (!Number.isFinite(minutes) || minutes < 1) return '刚刚';
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  return `${Math.floor(hours / 24)} 天前`;
+}
+
+/** A tag in front of a timeline event: a status (solid, status scheme) or an outcome (outlined). */
+export interface EventBadge { label: string; tone: StatusTone; outcome: boolean }
+
+const LIFECYCLE_STATUS: [RegExp, DisplayStatus][] = [
+  [/^Cancellation requested/, 'cancelling'],
+  [/^Dispatch admitted to queue/, 'scheduled'],
+  [/^Task queued/, 'queued'],
+  [/output is ready for (?:owner )?review|native run complete/i, 'review'],
+  [/^Started .* in Herdr|^Policy selected|launching|waiting for its report|^Owner runs /, 'running'],
+];
+const LIFECYCLE_OUTCOME: [RegExp, EventBadge][] = [
+  [/^(?:Cancelled|Worker stopped after cancellation)/, { label: DISPLAY_LABELS.cancelled, tone: DISPLAY_TONES.cancelled, outcome: true }],
+  [/^Owner review: accepted/, { label: '通过', tone: 'success', outcome: true }],
+  [/^Owner review: rejected/, { label: DISPLAY_LABELS.rejected, tone: DISPLAY_TONES.rejected, outcome: true }],
+];
+
+/** The tag an event carries; lifecycle steps are status tags, outcomes (passed, failed, cancelled) are outlined. */
+export function eventBadge(event: TaskEvent): EventBadge | undefined {
+  if (event.kind === 'error') return { label: DISPLAY_LABELS.failed, tone: DISPLAY_TONES.failed, outcome: true };
+  if (event.kind === 'artifact') return { label: kindLabels.artifact, tone: 'default', outcome: false };
+  if (event.kind !== 'lifecycle') return undefined;
+  const message = event.message.trim();
+  const outcome = LIFECYCLE_OUTCOME.find(([pattern]) => pattern.test(message));
+  if (outcome) return outcome[1];
+  const status = LIFECYCLE_STATUS.find(([pattern]) => pattern.test(message))?.[1];
+  return status ? { label: DISPLAY_LABELS[status], tone: DISPLAY_TONES[status], outcome: false } : undefined;
+}
+
+/** One tool call inside a merged step run. */
+export interface ToolStep { id: string; name: string; at: string; durationMs?: number; failed: boolean }
+
+/** Pair started notes with their finished/failed note (same tool, oldest first) into one row per call. */
+export function toolSteps(events: TaskEvent[]): ToolStep[] {
+  const steps: ToolStep[] = [];
+  const open = new Map<string, ToolStep[]>();
+  for (const event of events) {
+    if (event.kind !== 'log') continue;
+    const match = TOOL_NOTE.exec(event.message);
+    if (!match) continue;
+    const name = normalizeToolName(match[2].trim());
+    if (match[1] === 'started') {
+      const step: ToolStep = { id: event.id, name, at: event.at, failed: false };
+      steps.push(step);
+      open.set(name, [...(open.get(name) ?? []), step]);
+      continue;
+    }
+    const step = open.get(name)?.shift();
+    const failed = match[1] === 'failed';
+    if (step) { step.durationMs = Math.max(0, new Date(event.at).getTime() - new Date(step.at).getTime()); step.failed = failed; }
+    else steps.push({ id: event.id, name, at: event.at, failed });
+  }
+  return steps;
+}
+
+export function formatDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 1000) return '<1s';
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m${String(seconds % 60).padStart(2, '0')}s`;
+}
+
+/** Tag color preset of a status tone; the neutral tone uses the Tag default. */
+export function toneColor(tone: StatusTone): string | undefined { return tone === 'default' ? undefined : tone; }
