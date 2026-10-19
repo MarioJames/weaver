@@ -5,6 +5,7 @@ import { Alert, Button } from '@lobehub/ui/base-ui';
 import weaverIcon from './assets/weaver-icon.png';
 import weaverLockup from './assets/weaver-lockup.svg';
 import { useWorkbench } from './hooks/useWorkbench';
+import { ownerKindLookup } from './task-view';
 import { EnginesPage } from './pages/EnginesPage';
 import { RolesPage } from './pages/RolesPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -48,6 +49,7 @@ export function App() {
   const work = useWorkbench();
   const policy = usePolicyDraft();
   const [page, open] = usePage();
+  const ownerKind = ownerKindLookup(policy.config);
   return <ConsoleShell
     className={styles.shell}
     storageKey="weaver-nav"
@@ -59,7 +61,7 @@ export function App() {
     openNavigationLabel="打开导航" closeNavigationLabel="关闭导航" collapseLabel="收起导航" expandLabel="展开导航" skipToContentLabel="跳到内容"
   >
     {work.error && <Alert type="error" title={work.error} closable action={<Button size="small" disabled={work.busy || work.loading} onClick={() => void work.refresh()}>重试连接</Button>} onClose={work.dismissError} />}
-    {page === 'tasks' ? <TasksPage work={work} />
+    {page === 'tasks' ? <TasksPage work={work} ownerKind={ownerKind} />
       : page === 'engines' ? <EnginesPage policy={policy} />
         : page === 'owners' ? <RolesPage key="owners" section="owners" policy={policy} />
           : page === 'workers' ? <RolesPage key="workers" section="workers" policy={policy} />

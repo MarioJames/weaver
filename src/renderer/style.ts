@@ -168,31 +168,19 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
       grid-template-columns: minmax(0, 1fr);
     }
   `,
-  detail: css`
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 260px;
-    gap: 16px;
-    min-inline-size: 0;
-
-    @media (max-width: 1100px) {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  `,
-  /** Kanban: lanes side by side, scrolled sideways when they do not fit. */
+  /** Kanban: lanes stacked below the search row. */
   board: css`
     display: flex;
     flex-direction: column;
     gap: 12px;
     min-inline-size: 0;
   `,
+  /** Task board: one owner swimlane after another, stacked vertically. */
   lanes: css`
-    display: grid;
-    grid-auto-columns: minmax(260px, 1fr);
-    grid-auto-flow: column;
+    display: flex;
+    flex-direction: column;
     gap: 12px;
-    align-items: start;
-    overflow-x: auto;
-    padding-block-end: 4px;
+    min-inline-size: 0;
   `,
   lane: css`
     display: flex;
@@ -206,13 +194,56 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     gap: 8px;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 12px 6px;
+    padding: 8px 12px 8px;
   `,
+  /** The owner name and fold chevron sit in one clickable row. */
+  laneToggle: css`
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    min-inline-size: 0;
+    padding: 2px 6px 2px 2px;
+    border: 0;
+    border-radius: ${cssVar.borderRadiusSM};
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid ${cssVar.colorPrimaryBorder};
+      outline-offset: 1px;
+    }
+  `,
+  /** Inside one owner lane: its four status columns side by side, stacked on small screens. */
   laneBody: css`
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
+    min-inline-size: 0;
+    padding: 4px 12px 12px;
+
+    ${responsive.laptop} {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    ${responsive.mobile} {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  `,
+  laneColumn: css`
     display: flex;
     flex-direction: column;
+    gap: 6px;
+    min-inline-size: 0;
+  `,
+  laneColHead: css`
+    display: flex;
     gap: 8px;
-    padding: 4px 8px 8px;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-block-end: 2px;
   `,
   taskCard: css`
     display: flex;
@@ -352,6 +383,13 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
   meta: css`
     font-size: 12px;
     color: ${cssVar.colorTextSecondary};
+  `,
+  /** Engine icon and name share one baseline-aligned inline row. */
+  agentLabel: css`
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    min-inline-size: 0;
   `,
   error: css`
     margin: 0;
