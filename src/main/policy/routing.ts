@@ -33,10 +33,12 @@ export function quotaSettings(config: { quota?: QuotaSettings }): QuotaSettings 
   return config.quota ?? { auto_refresh: true, interval_minutes: 15 };
 }
 export interface Owner { enabled: boolean; engine: string; model: string; effort: string; workers: string[]; max_parallel: number; worker_weights?: Record<string, number> }
-/** Omitted weights are 100. Higher is tried first; 0 never dispatches. This is priority, not a probability. */
+/** Weights are integers 0..10. Omitted means 5 (the middle). Higher is tried first; 0 never dispatches. This is priority, not a probability. */
+export const WEIGHT_MAX = 10;
+export const DEFAULT_WEIGHT = 5;
 export function effectiveWeight(owner: Owner, workerId: string): number {
   const weights = owner.worker_weights;
-  if (!weights || !Object.hasOwn(weights, workerId)) return 100;
+  if (!weights || !Object.hasOwn(weights, workerId)) return DEFAULT_WEIGHT;
   return weights[workerId]!;
 }
 export interface Worker { enabled: boolean; engine: string; model: string; effort: string; description?: string }
@@ -72,7 +74,7 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
       for (const [workerId, weight] of Object.entries(owner.worker_weights)) {
         const atWeight = `${at}.worker_weights[${JSON.stringify(workerId)}]`;
         if (!owner.workers.includes(workerId)) bad(atWeight, `weight key ${workerId} is not in this owner's workers`);
-        if (!Number.isInteger(weight) || weight < 0 || weight > 1000) bad(atWeight, "weight must be an integer from 0 to 1000");
+        if (!Number.isInteger(weight) || weight < 0 || weight > WEIGHT_MAX) bad(atWeight, `weight must be an integer from 0 to ${WEIGHT_MAX}`);
       }
     }
     if (!owner.enabled) continue;
@@ -131,7 +133,7 @@ export interface Dispatch {
  owner: string; worker: string; engine: string; model: string; effort: string;
  execution: 'disabled'; dispatch: 'preview'; warnings: string[];
  selected_by?: 'worker' | 'weight'; skipped?: {worker:string; reason:string}[];
- /** Effective weight of the selected worker. Omitted config means 100. */
+ /** Effective weight of the selected worker. Omitted config means 5. */
  weight?: number;
  /** Dispatchable workers in the order they would be chosen, with the running count the choice used. */
  candidates?: {worker:string; weight:number; running:number}[];

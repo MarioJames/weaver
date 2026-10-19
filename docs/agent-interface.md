@@ -68,7 +68,7 @@ CLI 直接用 `--input <file|->` 传 JSON（args 对象或完整信封均可；�
 | `artifacts.read` | `{taskId, artifactId}`；内容 ≤32,000 字符 |
 | `packages.create` | `{scope, acceptanceCriteria}`（task 由 `--task-id` 给出，可选 `expectedRevision`）；scope/明细各 1–30 条 |
 | `packages.get` | `{packageId}` |
-| `workers.spawn` | 可选 `{worker?, owner?, provider?('mock-jsonl'才合法), packageId?, expectedRevision?}`；省略 `worker` 时在 owner 可用且权重非 0 的 worker 里选全局负载最低的一个：比较 `(running+cancelling+1)/weight`，平手取权重高者，再平手按策略列表顺序，其中 `running+cancelling` 是跨全部 owner 的全局计数。容量按 owner **实例**的 `max_parallel` 准入；拿不到槽位时 `scheduled:true` + `queueReason{code:'waiting_for_capacity'}` 且路由已冻结。响应除任务快照外还附 `next`（负责人要做的那一步）与 `excludedEngines`（本次被重试链排除的引擎，非空才出现）；显式 provider 非 mock 直接拒绝 |
+| `workers.spawn` | 可选 `{worker?, owner?, provider?('mock-jsonl'才合法), packageId?, expectedRevision?}`；省略 `worker` 时在 owner 可用且权重非 0（权重整数 0..10，缺省 5）的 worker 里选全局负载最低的一个：比较 `(running+cancelling+1)/weight`，平手取权重高者，再平手按策略列表顺序，其中 `running+cancelling` 是跨全部 owner 的全局计数。容量按 owner **实例**的 `max_parallel` 准入；拿不到槽位时 `scheduled:true` + `queueReason{code:'waiting_for_capacity'}` 且路由已冻结。响应除任务快照外还附 `next`（负责人要做的那一步）与 `excludedEngines`（本次被重试链排除的引擎，非空才出现）；显式 provider 非 mock 直接拒绝 |
 | `workers.complete` | `{taskId, expectedRevision?, outcome:'completed'/'failed', summary≤8000, artifacts?≤20}`；只接受运行中的 native 任务，且只接受一次 |
 | `results.deliver` | `{taskId}`；manual owner 显式 `CAPABILITY_UNAVAILABLE`，只有 mock owner 有投递 |
 | `results.ack` | `{expectedRevision(必), manifestDigest(当前)}`；ack ≠ 验收 |

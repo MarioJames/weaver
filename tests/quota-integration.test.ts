@@ -32,7 +32,7 @@ test('quota merge preserves manual/model blocks and applies aliases without chan
     const current = f.policy.snapshot();
     current.config.engines.codex_alias = { kind: 'codex', enabled: false };
     current.config.engines.codex_foreign = { kind: 'codex', enabled: false };
-    current.config.owners.codex_owner.worker_weights = { codex_worker: 37 };
+    current.config.owners.codex_owner.worker_weights = { codex_worker: 4 };
     const manual = { engine: 'codex', reason: 'manual', since, by: 'person' };
     const model = { engine: 'codex_alias', model: 'specific', reason: 'model only', since, by: 'external' };
     const foreign = { engine: 'codex_foreign', reason: 'other quota source', since, by: 'weaver-quota:claude' };

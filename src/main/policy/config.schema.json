@@ -186,7 +186,7 @@
           "minimum": 1
         },
         "worker_weights": {
-          "description": "Priority weight per worker, integer 0..1000. Omitted means 100. Higher weight is tried first; 0 excludes that worker for this owner. This is priority, not a random probability. Every key must be in workers.",
+          "description": "Priority weight per worker, integer 0..10. Omitted means 5. Higher weight is tried first; 0 excludes that worker for this owner. This is priority, not a random probability. Every key must be in workers.",
           "type": "object",
           "propertyNames": {
             "$ref": "#/$defs/workerId"

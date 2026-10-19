@@ -30,7 +30,7 @@ function setup(engines = ['qoder', 'codex', 'opencode']) {
   const snapshot = policy.snapshot();
   const owner = snapshot.config.owners.codex_owner;
   owner.workers = engines.map(engine => `${engine}_worker`);
-  owner.worker_weights = Object.fromEntries(engines.map((engine, i) => [`${engine}_worker`, 100 - i * 20]));
+  owner.worker_weights = Object.fromEntries(engines.map((engine, i) => [`${engine}_worker`, 10 - i * 2]));
   owner.max_parallel = 10;
   for (const engine of engines) { snapshot.config.workers[`${engine}_worker`].enabled = true; snapshot.config.engines[engine].enabled = true; }
   policy.save({ revision: snapshot.revision, config: snapshot.config, blocks: [] }, { allowEngineEnable: true });

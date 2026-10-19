@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { activeBlocks, availabilityOf, chatgptReviewEnabled, defaultConfig, EFFORTS, parseReleaseAt, resolveDispatch, validateConfig, type Config, type Block } from '../src/main/policy/routing';
+import { activeBlocks, availabilityOf, chatgptReviewEnabled, defaultConfig, effectiveWeight, EFFORTS, parseReleaseAt, resolveDispatch, validateConfig, type Config, type Block } from '../src/main/policy/routing';
 import { lintSchema, validate } from '../src/main/policy/json-schema';
 import { PolicyStore } from '../src/main/policy/store';
 const now=Date.parse('2026-10-18T12:00:00Z');
@@ -94,15 +94,15 @@ test('disabled pi template validates and stays out of claude routing',()=>{
  const open=defaultConfig(); open.engines.opencode.enabled=true; open.workers.opencode_worker.enabled=true;
  open.owners.opencode_owner={enabled:true,engine:'opencode',model:'opencode/glm-5.3-flash-free',effort:'max',workers:['opencode_worker'],max_parallel:1};
  assert.deepEqual(validateConfig(open),[]);
- assert.equal(route(all()).worker,'claude_worker'); assert.equal(route(all()).weight,100);
+ assert.equal(route(all()).worker,'claude_worker'); assert.equal(route(all()).weight,5);
 });
 test('the highest-weight available worker wins; equal weights keep list order',()=>{
  const c=all(); assert.equal(route(c).worker,'claude_worker');
- c.owners.claude_owner.worker_weights={grok_worker:300,opencode_worker:200};
- const r=route(c); assert.equal(r.worker,'grok_worker'); assert.equal(r.weight,300); assert.equal(r.selected_by,'weight');
+ c.owners.claude_owner.worker_weights={grok_worker:9,opencode_worker:6};
+ const r=route(c); assert.equal(r.worker,'grok_worker'); assert.equal(r.weight,9); assert.equal(r.selected_by,'weight');
  c.workers.grok_worker.enabled=false; const next=route(c);
  assert.equal(next.worker,'opencode_worker'); assert.deepEqual(next.skipped,[{worker:'grok_worker',reason:'disabled'}]);
- c.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:100,opencode_worker:100,grok_worker:100};
+ c.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:10,opencode_worker:10,grok_worker:10};
  assert.equal(route(c).worker,'qoder_worker');
 });
 test('weight 0 never dispatches, even when named explicitly; an explicit worker may sit outside the list',()=>{
@@ -113,7 +113,7 @@ test('weight 0 never dispatches, even when named explicitly; an explicit worker 
 });
 test('invalid weights are rejected',()=>{
  const missing=defaultConfig(); missing.owners.claude_owner.worker_weights={missing_worker:10}; assert.ok(validateConfig(missing).some(issue=>issue.message.includes("not in this owner's workers")));
- const high=defaultConfig(); high.owners.claude_owner.worker_weights={claude_worker:1001}; assert.ok(validateConfig(high).some(issue=>issue.message.includes('0 to 1000')));
+ const high=defaultConfig(); high.owners.claude_owner.worker_weights={claude_worker:11}; assert.ok(validateConfig(high).some(issue=>issue.message.includes('0 to 10')));
  const fraction=defaultConfig(); fraction.owners.claude_owner.worker_weights={claude_worker:1.5}; assert.ok(validateConfig(fraction).length);
 });
 test('a saved policy with retired tags and engine pins still loads without them',()=>fixture((store,path)=>{
@@ -124,10 +124,10 @@ test('a saved policy with retired tags and engine pins still loads without them'
  assert.equal(loaded.revision,1);
 }));
 test('weights balance load: the lowest (running + 1) / weight wins, ties go to the higher weight then list order',()=>{
- const c=all(); c.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:50,opencode_worker:100,grok_worker:0};
+ const c=all(); c.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:5,opencode_worker:10,grok_worker:0};
  const pick=(load:Record<string,number>)=>resolveDispatch(c,[],{owner:'claude_owner',workerLoad:load}).worker;
  assert.equal(pick({}),'opencode_worker');
- // 2/100 ties 1/50: the higher weight takes it.
+ // 2/10 ties 1/5: the higher weight takes it.
  assert.equal(pick({opencode_worker:1}),'opencode_worker');
  assert.equal(pick({opencode_worker:2}),'qoder_worker');
  assert.equal(pick({opencode_worker:3,qoder_worker:1}),'opencode_worker');
@@ -137,17 +137,17 @@ test('weights balance load: the lowest (running + 1) / weight wins, ties go to t
  for(let i=0;i<6;i++){const w=pick(load);load[w]=(load[w]??0)+1;}
  assert.deepEqual(load,{opencode_worker:4,qoder_worker:2});
  // Equal weights spread one by one in list order.
- c.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:100,opencode_worker:100,grok_worker:0};
+ c.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:10,opencode_worker:10,grok_worker:0};
  assert.equal(pick({}),'qoder_worker'); assert.equal(pick({qoder_worker:1}),'opencode_worker');
  // An explicit worker ignores load; weight 0 still never dispatches.
  assert.equal(resolveDispatch(c,[],{owner:'claude_owner',worker:'opencode_worker',workerLoad:{opencode_worker:9}}).worker,'opencode_worker');
- assert.equal(pick({qoder_worker:50,opencode_worker:50}),'qoder_worker');
+ assert.equal(pick({qoder_worker:5,opencode_worker:5}),'qoder_worker');
 });
 test('preview reports each candidate load and score',()=>{
- const c=all(); c.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:50,opencode_worker:100,grok_worker:0};
+ const c=all(); c.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:5,opencode_worker:10,grok_worker:0};
  const r=resolveDispatch(c,[],{owner:'claude_owner',workerLoad:{opencode_worker:2}});
  assert.equal(r.worker,'qoder_worker');
- assert.deepEqual(r.candidates,[{worker:'qoder_worker',weight:50,running:0},{worker:'opencode_worker',weight:100,running:2}]);
+ assert.deepEqual(r.candidates,[{worker:'qoder_worker',weight:5,running:0},{worker:'opencode_worker',weight:10,running:2}]);
  assert.deepEqual(r.skipped,[{worker:'claude_worker',reason:'priority weight 0'},{worker:'grok_worker',reason:'priority weight 0'}]);
 });
 test('excluded engines are skipped with their reason and load balancing still works',()=>{
@@ -156,11 +156,11 @@ test('excluded engines are skipped with their reason and load balancing still wo
  const moved=pick(['claude']);
  assert.equal(moved.worker,'qoder_worker');
  assert.deepEqual(moved.skipped,[{worker:'claude_worker',reason:'failed earlier in this retry chain'}]);
- assert.deepEqual(moved.candidates,[{worker:'qoder_worker',weight:100,running:0},{worker:'opencode_worker',weight:100,running:0},{worker:'grok_worker',weight:100,running:0}]);
+ assert.deepEqual(moved.candidates,[{worker:'qoder_worker',weight:5,running:0},{worker:'opencode_worker',weight:5,running:0},{worker:'grok_worker',weight:5,running:0}]);
  // The excluded engine is out of the balancing, the rest keeps its weighted order.
  assert.equal(resolveDispatch(c,[],{owner:'claude_owner',excludeEngines:['claude'],workerLoad:{qoder_worker:5}}).worker,'opencode_worker');
  // Weight 0 is reported before exclusion: it was never a candidate at all.
- const weighted=all(); weighted.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:100,opencode_worker:100,grok_worker:100};
+ const weighted=all(); weighted.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:10,opencode_worker:10,grok_worker:10};
  assert.deepEqual(resolveDispatch(weighted,[],{owner:'claude_owner',excludeEngines:['claude']}).skipped,[{worker:'claude_worker',reason:'priority weight 0'}]);
 });
 test('an explicit worker on an excluded engine and an exhausted chain both refuse to dispatch',()=>{
@@ -185,4 +185,58 @@ test('preview takes excluded engines and rejects a malformed list',()=>fixture((
  for(const bad of ['claude',[1],Array(51).fill('claude'),['']]) assert.throws(()=>store.preview({owner:'claude_owner',excludeEngines:bad}),/excluded engine/);
  assert.equal(store.preview({owner:'claude_owner',excludeEngines:[]}).worker,'claude_worker');
  assert.throws(()=>store.preview({owner:'claude_owner',excludeEngines:['claude'],argv:['unsafe']}),/Unknown/);
+}));
+test('omitted weight is 5 and weights above 10 are rejected',()=>{
+ const c=all(); const owner=c.owners.claude_owner; owner.worker_weights={claude_worker:0};
+ assert.equal(effectiveWeight(owner,'qoder_worker'),5); assert.equal(effectiveWeight(owner,'claude_worker'),0);
+ owner.worker_weights={claude_worker:10}; assert.deepEqual(validateConfig(c),[]);
+ owner.worker_weights={claude_worker:11}; assert.ok(validateConfig(c).some(i=>i.message==='weight must be an integer from 0 to 10'));
+ owner.worker_weights={claude_worker:-1}; assert.ok(validateConfig(c).length);
+});
+const legacyStore=(weights:Record<string,Record<string,number>>,run:(path:string,dir:string)=>void,marker=false)=>{
+ const root=mkdtempSync(join(tmpdir(),'weaver-weight10-'));
+ try{
+  const path=join(root,'policy.v1.json'); const seed=new PolicyStore(path,()=>now); const s=seed.snapshot();
+  seed.save({revision:s.revision,config:s.config,blocks:[]});
+  const raw=JSON.parse(readFileSync(path,'utf8'));
+  for(const o of Object.values<any>(raw.config.owners)) delete o.worker_weights;
+  for(const [owner,w] of Object.entries(weights)) raw.config.owners[owner].worker_weights=w;
+  if(!marker) delete raw.weightScale;
+  writeFileSync(path,JSON.stringify(raw,null,2)); run(path,root);
+ } finally {rmSync(root,{recursive:true,force:true});}
+};
+const backups=(dir:string)=>readdirSync(dir).filter(f=>f.startsWith('policy.v1.json.pre-weight10-'));
+test('a marker-less 0-100 policy migrates every owner once: values divided, omitted listed workers become 10',()=>legacyStore(
+ {claude_owner:{claude_worker:100,qoder_worker:50,opencode_worker:0,grok_worker:4},codex_owner:{codex_worker:7}},(path,dir)=>{
+ const before=readFileSync(path,'utf8');
+ const loaded=new PolicyStore(path,()=>now).snapshot();
+ assert.deepEqual(loaded.config.owners.claude_owner.worker_weights,{claude_worker:10,qoder_worker:5,opencode_worker:0,grok_worker:1});
+ // Small old values are divided too (7/100 -> 1); omitted workers keep the old implicit 100 as an explicit 10.
+ for(const [id,o] of Object.entries(loaded.config.owners)) for(const w of o.workers) assert.ok(Object.hasOwn(o.worker_weights??{},w),`${id}/${w}`);
+ assert.equal(loaded.config.owners.codex_owner.worker_weights!.codex_worker,1);
+ const raw=JSON.parse(readFileSync(path,'utf8')); assert.equal(raw.weightScale,10);
+ assert.deepEqual(raw.config.owners.claude_owner.worker_weights,loaded.config.owners.claude_owner.worker_weights);
+ const found=backups(dir); assert.equal(found.length,1); assert.equal(readFileSync(join(dir,found[0]),'utf8'),before);
+ // Idempotent: reloading changes nothing and writes no second backup.
+ const after=readFileSync(path,'utf8'); const again=new PolicyStore(path,()=>now).snapshot();
+ assert.equal(readFileSync(path,'utf8'),after); assert.equal(backups(dir).length,1); assert.deepEqual(again.config,loaded.config);
+}));
+test('an explicit 50 next to an omitted worker keeps its 1:2 ratio (5 vs 10)',()=>legacyStore({claude_owner:{claude_worker:50}},(path)=>{
+ const o=new PolicyStore(path,()=>now).snapshot().config.owners.claude_owner;
+ assert.equal(o.worker_weights!.claude_worker,5); assert.equal(o.worker_weights!.qoder_worker,10);
+}));
+test('a policy with the weightScale marker is never migrated',()=>legacyStore({claude_owner:{claude_worker:5,qoder_worker:0}},(path,dir)=>{
+ const before=readFileSync(path,'utf8'); const loaded=new PolicyStore(path,()=>now).snapshot();
+ assert.equal(readFileSync(path,'utf8'),before); assert.equal(backups(dir).length,0);
+ assert.deepEqual(loaded.config.owners.claude_owner.worker_weights,{claude_worker:5,qoder_worker:0});
+ assert.equal(effectiveWeight(loaded.config.owners.claude_owner,'grok_worker'),5);
+},true));
+test('an unknown weightScale is refused and save writes the marker',()=>fixture((store,path)=>{
+ const s=store.snapshot(); store.save({revision:s.revision,config:s.config,blocks:[]});
+ const raw=JSON.parse(readFileSync(path,'utf8')); assert.equal(raw.weightScale,10);
+ raw.weightScale=100; writeFileSync(path,JSON.stringify(raw)); assert.throws(()=>new PolicyStore(path,()=>now),/weight scale/);
+}));
+test('policy save rejects weights above 10',()=>fixture((store)=>{
+ const s=store.snapshot(); s.config.owners.claude_owner.worker_weights={claude_worker:100};
+ assert.throws(()=>store.save({revision:s.revision,config:s.config,blocks:[]}),/0 to 10/);
 }));

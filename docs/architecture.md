@@ -64,7 +64,7 @@ Weaver 是本地任务控制面，交付三件套：
 路由基于 policy 配置（`engines`/`owners`/`workers`/`herdr` + `blocks`）：
 
 - `resolveDispatch` 在 owner.workers 里按权重做**全局负载最少化**：可用候选（worker 启用、引擎启用、无生效 block、权重 >0、引擎未被本次重试链排除）中，比较 `(running + 1) / weight`，最小者胜出；并列先取权重更高者，再按 owner.workers 列表顺序。这里的 `running` 是全局数：所有 owner 下 `running`+`cancelling` 的任务数之和（`workerLoad()` 扫全表），跟任务绑在哪个 owner 实例无关。空闲时这个比较退化为按权重试用，有负载时按权重比例分摊。比较用交叉相乘，不做除法。
-- `worker_weights`：整数 0..1000，缺省 100；0 表示永不调度该 worker，显式指定 worker 也不能绕过权重 0，也不能绕过被排除引擎（后者报 `NO_ALTERNATIVE_ENGINE`）。所有权键必须在该 owner 的 workers 列表里。
+- `worker_weights`：整数 0..10，缺省 5；0 表示永不调度该 worker，显式指定 worker 也不能绕过权重 0，也不能绕过被排除引擎（后者报 `NO_ALTERNATIVE_ENGINE`）。所有权键必须在该 owner 的 workers 列表里。
 - 重试链排除：此前在链上 failed/cancelled/cancelling 的尝试的引擎进 `excludeEngines`；当前 `cancel:true` 放弃的尝试即使仍在 cancelling、仍占槽，也排除其引擎。completed 尝试的引擎仍可入选，因此不保证每次重试都换引擎。链上候选全被排除时，在取消原任务或创建子任务前明确报 `NO_ALTERNATIVE_ENGINE` 并保留原状；不排除无关任务的引擎。
 - 配额 block 按引擎/model 精确匹配，绝对时间戳 `release_at` 只有明确恢复时间才自动到期，其余手动解除。
 - 准入与派发同一 resolve 函数：`policy preview` 只读（`dispatch:"preview"`、`execution:"disabled"`）不执行；`workers.spawn` 实际校验 workspace/provider/容量后按结果 start 或入队。页面走的 `previewRoute` 由服务端当场补上同一份全局负载，所以预览显示的选择就是此刻派发会走的选择。

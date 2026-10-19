@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync, renameSync, openSync, closeSync, fsyncSync, unlinkSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync, renameSync, openSync, closeSync, fsyncSync, unlinkSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { object } from '../../shared/validation';
 import type { PolicySnapshot, RoutePreview } from '../../shared/policy';
-import { activeBlocks, availabilityOf, chatgptReviewEnabled, defaultConfig, parseReleaseAt, resolveDispatch, validateConfig, type Config, type Block, type RouteOptions } from './routing';
+import { WEIGHT_MAX, activeBlocks, availabilityOf, chatgptReviewEnabled, defaultConfig, parseReleaseAt, resolveDispatch, validateConfig, type Config, type Block, type RouteOptions } from './routing';
 const LIMIT=256*1024;
 function bounded(value: unknown): void { if (Buffer.byteLength(JSON.stringify(value))>LIMIT) throw new Error('Policy exceeds 256 KiB'); }
 function exact(value: Record<string, unknown>, keys: string[]): void { if (Object.keys(value).some(key=>!keys.includes(key))) throw new Error('Unknown policy field'); }
@@ -34,15 +34,42 @@ function dropRetiredFields(value: unknown): unknown {
  for(const engine of Object.values(object(config.engines))) if(engine&&typeof engine==='object') delete (engine as Record<string,unknown>).native_subagents;
  return config;
 }
+/** Store-level marker: weights in this file are on the 0..10 scale. */
+const WEIGHT_SCALE=10;
+/** Pre-marker files used 0..100 with an omitted weight meaning 100: convert every owner once, omitted listed workers become an explicit 10. */
+function migrateWeights(value: unknown): void {
+ for(const owner of Object.values(object(object(value).owners))){
+  if(!owner||typeof owner!=='object') continue;
+  const o=owner as Record<string,unknown>;
+  const map: Record<string,unknown>=o.worker_weights&&typeof o.worker_weights==='object'?o.worker_weights as Record<string,unknown>:{};
+  for(const [k,w] of Object.entries(map)) if(typeof w==='number') map[k]=w===0?0:Math.min(WEIGHT_MAX,Math.max(1,Math.round(w/10)));
+  if(Array.isArray(o.workers)) for(const id of o.workers) if(typeof id==='string'&&!Object.hasOwn(map,id)) map[id]=WEIGHT_MAX;
+  if(Object.keys(map).length) o.worker_weights=map;
+ }
+}
+function writeAtomic(path: string, data: string): void {
+ const temp=`${path}.${randomUUID()}.tmp`;
+ try {
+  writeFileSync(temp,data,{mode:0o600,flag:'wx'}); const fd=openSync(temp,'r'); try {fsyncSync(fd);} finally {closeSync(fd);}
+  renameSync(temp,path);
+ } finally { if(existsSync(temp)) unlinkSync(temp); }
+}
 /** App-owned single-writer settings. Never reads or changes upstream config/SQLite or a host home. */
 export class PolicyStore {
  private config=defaultConfig(); private blocks: Block[]=[]; private revision=0;
  constructor(readonly path: string, private now: ()=>number=Date.now) {
   if(!existsSync(path)) return;
   if(statSync(path).size>LIMIT) throw new Error('Policy exceeds 256 KiB; file retained');
-  const data=object(JSON.parse(readFileSync(path,'utf8'))); exact(data,['version','revision','config','blocks']);
+  const data=object(JSON.parse(readFileSync(path,'utf8'))); exact(data,['version','revision','weightScale','config','blocks']);
   if(data.version!==1||!Number.isSafeInteger(data.revision)||Number(data.revision)<0) throw new Error('Unsupported policy store');
+  if(data.weightScale!==undefined&&data.weightScale!==WEIGHT_SCALE) throw new Error('Unsupported policy weight scale');
+  const migrated=data.weightScale===undefined; if(migrated) migrateWeights(data.config);
   const parsed=this.parse(dropRetiredFields(data.config),data.blocks); this.config=parsed.config; this.blocks=parsed.blocks; this.revision=Number(data.revision);
+  if(migrated){
+   // One-time 0..100 -> 0..10 migration (marker absent): keep the previous file, then replace atomically. Never runs again once weights fit.
+   copyFileSync(path,`${path}.pre-weight10-${new Date(this.now()).toISOString().replace(/[:.]/g,'-')}`);
+   writeAtomic(path,JSON.stringify({version:1,revision:this.revision,weightScale:WEIGHT_SCALE,...parsed},null,2));
+  }
  }
  private parse(config: unknown, blocks: unknown): {config:Config;blocks:Block[]} {
   bounded({config,blocks}); const issues=validateConfig(config);
@@ -64,12 +91,8 @@ export class PolicyStore {
     if (engine.enabled && this.config.engines[id]?.enabled !== true) throw new Error(`Engine ${id} cannot be enabled by policy save; use the probe toggle`);
    }
   }
-  const data=JSON.stringify({version:1,revision:this.revision+1,...parsed},null,2); bounded(JSON.parse(data));
-  mkdirSync(dirname(this.path),{recursive:true}); const temp=`${this.path}.${randomUUID()}.tmp`;
-  try {
-   writeFileSync(temp,data,{mode:0o600,flag:'wx'}); const fd=openSync(temp,'r'); try {fsyncSync(fd);} finally {closeSync(fd);}
-   renameSync(temp,this.path);
-  } finally { if(existsSync(temp)) unlinkSync(temp); }
+  const data=JSON.stringify({version:1,revision:this.revision+1,weightScale:WEIGHT_SCALE,...parsed},null,2); bounded(JSON.parse(data));
+  mkdirSync(dirname(this.path),{recursive:true}); writeAtomic(this.path,data);
   this.config=parsed.config; this.blocks=parsed.blocks; this.revision++; return this.snapshot();
  }
  preview(value: unknown): RoutePreview {
