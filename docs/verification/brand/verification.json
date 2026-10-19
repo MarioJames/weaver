@@ -1,0 +1,107 @@
+{
+  "app_url": "http://127.0.0.1:4738/#/tasks",
+  "timestamp": "20261019T001359",
+  "status": "passed",
+  "scope": "M 珊瑚图标、透明路径字标组合与浏览器图标",
+  "desktop": {
+    "viewport": [
+      1440,
+      900
+    ],
+    "lockup_px": [
+      128,
+      26.65625
+    ],
+    "standalone_text": "",
+    "icon_display": "none"
+  },
+  "collapsed": {
+    "lockup_display": "none",
+    "icon_px": [
+      24,
+      24
+    ],
+    "flex_shrink": "0"
+  },
+  "mobile": {
+    "viewport": [
+      390,
+      844
+    ],
+    "lockup_px": [
+      128,
+      26.65625
+    ],
+    "closed_dialogs": 0
+  },
+  "navigation": {
+    "from": "#/settings",
+    "brand_target": "#/tasks",
+    "passed": true
+  },
+  "assets": {
+    "lockup": {
+      "status": 200,
+      "mime": "image/svg+xml",
+      "bytes": 49573,
+      "intrinsic_px": [
+        720,
+        150
+      ]
+    },
+    "favicon_and_touch": {
+      "status": 200,
+      "mime": "image/png",
+      "bytes": 36113
+    }
+  },
+  "requests": {
+    "observed": 124,
+    "failed": 0,
+    "pending": 0,
+    "scan_engines": 0
+  },
+  "artifact_errors": [],
+  "checks": {
+    "build": "npm run build: passed",
+    "renderer_tests": "not rerun for SVG sizing adjustment; previous renderer check: 13 passed",
+    "source_assets": "Original PNG and wordmark path data preserved; wordmark scale and centering adjusted for UI"
+  },
+  "build_warnings": [
+    "Existing dependency use client directives",
+    "Bundle exceeds default 500 kB warning"
+  ],
+  "source_sha256": {
+    "src/renderer/App.tsx": "d3c5fb5ca6f137bfeec86d3c3302eee3ebd39bb23033d26b87d2b3111f8aff90",
+    "src/renderer/style.ts": "407f530a0061a81e593b21cc536d9c2d0976ba45be8652184d472efd11e6a080",
+    "src/renderer/index.html": "6be7b29fe33e4a4d48d8675055724436258ab1eefe2b9490f12ce6819f2018e6",
+    "src/renderer/assets/weaver-icon.png": "70c7b25087f8e6592d0591cff925b9993bc94e93108c6bb3a8b713a2ed73db7d",
+    "src/renderer/assets/weaver-lockup.svg": "9355e3d711909ac8f2194cc5a186c6d023164f1e916ee21bab0c32ac352498bc"
+  },
+  "resources": {
+    "borrowed_service": {
+      "pid": 3717779,
+      "port": 4738,
+      "preserved": true
+    },
+    "browser_closed": true,
+    "profile_removed": true,
+    "business_data": "unchanged"
+  },
+  "screenshots": [
+    "desktop.png",
+    "collapsed.png",
+    "mobile.png"
+  ],
+  "console": {
+    "errors": 0,
+    "warnings": 0,
+    "page_errors": 0
+  },
+  "proportions": {
+    "visible_icon_height_px": 24.36,
+    "visible_wordmark_height_px": 17.6,
+    "wordmark_reduction_percent": 26.92,
+    "icon_scale_unchanged": true
+  }
+}

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Bot, Cpu, ListTodo, Settings2, UserRound } from 'lucide-react';
 import { ConsoleBrand, ConsoleNav, ConsoleShell } from '@lobehub/ui/dashboard';
 import { Alert, Button } from '@lobehub/ui/base-ui';
+import weaverIcon from './assets/weaver-icon.png';
+import weaverLockup from './assets/weaver-lockup.svg';
 import { useWorkbench } from './hooks/useWorkbench';
 import { EnginesPage } from './pages/EnginesPage';
 import { RolesPage } from './pages/RolesPage';
@@ -49,7 +51,10 @@ export function App() {
   return <ConsoleShell
     className={styles.shell}
     storageKey="weaver-nav"
-    brand={<ConsoleBrand title="Weaver" label="Weaver 任务" logo={<span className={styles.mark} aria-hidden="true">W</span>} href="#/tasks" />}
+    brand={<ConsoleBrand label="Weaver 任务" logo={<>
+      <img className={styles.brandLockup} src={weaverLockup} width={128} height={27} alt="" aria-hidden="true" draggable={false} />
+      <img className={styles.mark} src={weaverIcon} width={24} height={24} alt="" aria-hidden="true" draggable={false} />
+    </>} href="#/tasks" />}
     navigation={<ConsoleNav label="主导航" items={NAVIGATION} pathname={page} onNavigate={href => open(href as Page)} />}
     openNavigationLabel="打开导航" closeNavigationLabel="关闭导航" collapseLabel="收起导航" expandLabel="展开导航" skipToContentLabel="跳到内容"
   >

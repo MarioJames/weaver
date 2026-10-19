@@ -15,16 +15,27 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
   shell: css`
     block-size: 100%;
   `,
-  mark: css`
-    display: grid;
+  brandLockup: css`
+    display: block;
     flex-shrink: 0;
-    place-items: center;
+    inline-size: 128px;
+    block-size: auto;
+    object-fit: contain;
+
+    [data-collapsed='true'] & {
+      display: none;
+    }
+  `,
+  mark: css`
+    display: none;
+    flex-shrink: 0;
     inline-size: 24px;
     block-size: 24px;
-    border-radius: ${cssVar.borderRadiusSM};
-    background: ${cssVar.colorPrimary};
-    color: ${cssVar.colorTextLightSolid};
-    font-weight: 600;
+    object-fit: contain;
+
+    [data-collapsed='true'] & {
+      display: block;
+    }
   `,
   /** List on the left, the selected record on the right. Collapses to one column on narrow screens. */
   split: css`

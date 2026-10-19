@@ -1,4 +1,10 @@
+![Weaver 珊瑚版品牌标识](docs/assets/brand/weaver-lockup.png)
+
 # Weaver
+
+**让负责人 Agent，把任务编织给不同引擎的工作代理。**
+
+[品牌素材与使用规范](docs/assets/brand/README.md)
 
 Weaver is a local Node control plane for owner-led agent work. It ships as one public skill (`skills/weaver`, skill name `weaver`), one `weaver` CLI, and one foreground web process. The browser UI and the CLI call the same `CommandHandler`: the web serves loopback HTTP on `127.0.0.1`, the CLI connects through an authenticated Unix-socket transport, and both speak `weaver.v1`. There is no second daemon, no separate owner-model process, no MCP service, no remote API, and no database: state is a versioned JSON store owned by the running process.
 
