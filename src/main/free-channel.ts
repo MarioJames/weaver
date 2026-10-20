@@ -10,7 +10,7 @@ import { redactContext } from './continuation';
 import { escalateEngineBlock } from './policy/routing';
 import { classifyVendorError, vendorBlockReason } from './adapters/cli/vendor-errors';
 import { boundedProbeError, LADDER_RESET_MS, STALL_BLOCK_BY, STALL_LADDER, PROBE_MS, PROBE_SUCCESSES, type ProbeRoute } from './stall';
-import { VENDOR_LADDER_MINUTES } from './commands';
+import { VENDOR_LADDER_MINUTES } from './application/scheduling/vendor-limits';
 
 /** Quota bans written by this monitor. It releases only what it wrote; manual blocks stay. */
 export const FREE_PROBE_BLOCK_BY = 'weaver-free-probe';

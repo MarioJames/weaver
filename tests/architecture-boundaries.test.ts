@@ -106,3 +106,18 @@ test('the cli-to-main exceptions are real imports', () => {
   assert.deepEqual([...CLI_MAIN_ALLOWED].filter(target => !used.has(target)).sort(), []);
   assert.deepEqual([...used].filter(target => !CLI_MAIN_ALLOWED.has(target)).sort(), []);
 });
+
+// The application layer holds the use cases; it never reaches back into the entry points that call it.
+const APPLICATION_FORBIDDEN = new Set(['main/commands', 'main/runtime', 'main/http', 'main/local-ipc', 'main/embedded', 'main/rpc']);
+
+test('main/application does not import transport, runtime or the command handler', () => {
+  const bad = scan().edges
+    .filter(edge => edge.from.startsWith('main/application/') && (edge.to.startsWith('main/transport/') || APPLICATION_FORBIDDEN.has(edge.to)))
+    .map(edge => `${edge.from} -> ${edge.to}`);
+  assert.deepEqual(bad, []);
+});
+
+test('only the runtime and transport entry points import the command handler module', () => {
+  const importers = scan().edges.filter(edge => edge.to === 'main/commands').map(edge => edge.from.replace(/\.ts$/, '')).sort();
+  assert.deepEqual(importers, ['main/runtime', 'main/transport/handlers']);
+});

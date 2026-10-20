@@ -5,7 +5,9 @@ import type { QuotaRefreshInput, QuotaRefreshResult } from '../../shared/contrac
 import { EXECUTION_BOUNDARY, ENGINE_CATALOG, readinessFor, type EngineProbeRecord } from '../../shared/engines';
 import { parseId, parseTaskInput } from '../../shared/validation';
 import { VERSION } from '../../shared/version';
-import { configuredParallel, workerLoad, type CommandHandler } from '../commands';
+import { configuredParallel } from '../application/tasks/queries';
+import { workerLoad } from '../application/scheduling/dispatch';
+import type { CommandHandler } from '../commands';
 import { HelloJobs, parseHelloInput } from '../engines/hello';
 import { applyEngineEnabled, parseEngineToggle } from '../engines/control';
 import { EngineModelLister, parseModelListInput } from '../engines/models';
