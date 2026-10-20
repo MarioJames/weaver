@@ -10,8 +10,9 @@ import { SCHEMA_VERSION, migrate } from '../src/main/migrate';
 import { TaskManager } from '../src/main/manager';
 import { CommandHandler } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
-import type { Task } from '../src/shared/types';
-import type { LogicalOwner, WorkPackage } from '../src/shared/commands';
+import type { Task } from '../src/shared/contracts/tasks';
+import type { LogicalOwner } from '../src/shared/contracts/owners';
+import type { WorkPackage } from '../src/shared/contracts/tasks';
 const turn=()=>new Promise<void>(resolve=>setImmediate(resolve));
 const input={title:'SQLite fixture',instruction:'local only',owner:{name:'fixture',transport:'herdr-visible' as const,session:'test',pane:'1'}};
 function fixture():Task{const at=new Date().toISOString();return {...input,id:randomUUID(),status:'queued',progress:0,events:[],artifacts:[],createdAt:at,updatedAt:at};}

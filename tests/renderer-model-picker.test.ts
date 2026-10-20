@@ -6,7 +6,7 @@ import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { readFileSync } from 'node:fs';
 import { ModelListSession, type ModelListSink } from '../src/renderer/engine-models';
-import type { EngineModelList, EngineModelListInput } from '../src/main/engines/models';
+import type { EngineModelList, EngineModelListInput } from '../src/shared/engines';
 import { ModelPicker } from '../src/renderer/components/ModelPicker';
 
 const listOf = (engine: string, ...ids: string[]): EngineModelList => ({ engine, status: 'ok', source: 'test', models: ids.map(id => ({ id })), fetchedAt: '2026-01-01T00:00:00.000Z' });

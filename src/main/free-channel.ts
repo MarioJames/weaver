@@ -1,12 +1,15 @@
 // Free-channel probe: scheduled light probes of free_channel workers to renew free quota.
 // Reuses the stall recovery ladder and its probe cadence; no second ladder is defined here.
 import { object } from '../shared/validation';
-import type { TaskFailure } from '../shared/types';
-import type { PolicySnapshot } from '../shared/policy';
+import type { TaskFailure } from '../shared/contracts/tasks';
+import type { Block, Config, PolicySnapshot } from '../shared/contracts/policy';
+import type { FreeChannelStatus, FreeProbeHistoryRecord, FreeProbeMode, FreeWorkerStatus, ProbeOutcome } from '../shared/contracts/monitoring';
+import { activeBlocks } from '../shared/policy/availability';
+import { freeChannelProbeSettings } from '../shared/policy/settings';
 import { redactContext } from './continuation';
-import { activeBlocks, escalateEngineBlock, freeChannelProbeSettings, type Block, type Config } from './policy/routing';
+import { escalateEngineBlock } from './policy/routing';
 import { classifyVendorError, vendorBlockReason } from './adapters/cli/vendor-errors';
-import { boundedProbeError, LADDER_RESET_MS, STALL_BLOCK_BY, STALL_LADDER, PROBE_MS, PROBE_SUCCESSES, type ProbeOutcome, type ProbeRoute } from './stall';
+import { boundedProbeError, LADDER_RESET_MS, STALL_BLOCK_BY, STALL_LADDER, PROBE_MS, PROBE_SUCCESSES, type ProbeRoute } from './stall';
 import { VENDOR_LADDER_MINUTES } from './commands';
 
 /** Quota bans written by this monitor. It releases only what it wrote; manual blocks stay. */
@@ -26,7 +29,7 @@ export interface WorkerProbe {
   level: number;
   lastTriggerAt: number | null;
   /** stall: ladder without deadline; rate_limit: vendor ladder; quota: free-quota ban. null is healthy. */
-  mode: 'stall' | 'rate_limit' | 'quota' | null;
+  mode: FreeProbeMode;
   needsAttention: boolean;
   /** Nominal deadline of the current stage; a level 3 stall stage has none. Not a policy release time. */
   blockedUntil: number | null;
@@ -43,38 +46,7 @@ export interface WorkerProbe {
 export interface FreeProbeState { version: 1; workers: Record<string, WorkerProbe>; history: ProbeRecord[] }
 
 /** One history line: a probe with its answer and what the answer wrote into the policy. */
-export interface ProbeRecord {
-  worker: string;
-  engine: string;
-  level: number;
-  at: number;
-  probe: { ok: boolean; ms: number; error?: string };
-  classification?: TaskFailure['kind'];
-  block?: { by: string; reason: string; since: string; release_at?: string };
-  message?: string;
-}
-
-export interface FreeWorkerStatus {
-  worker: string;
-  engine: string;
-  model: string;
-  probed: boolean;
-  level: number;
-  mode: WorkerProbe['mode'];
-  needsAttention: boolean;
-  lastTriggerAt: string | null;
-  blockedUntil: string | null;
-  nextProbeAt: string | null;
-  probeSuccesses: number;
-  /** What the policy right now answers for this worker's route, exactly as routing sees it. */
-  availability: { status: string; reason?: string; release_at?: string };
-  history: (Omit<ProbeRecord, 'at'> & { at: string })[];
-}
-
-export interface FreeChannelStatus {
-  schedule: { enabled: boolean; interval_minutes: number; lastRunAt: string | null; nextRunAt: string | null };
-  workers: FreeWorkerStatus[];
-}
+export type ProbeRecord = Omit<FreeProbeHistoryRecord, 'at'> & { at: number };
 
 /** The main-process policy writer, narrowed to what a penalty needs. */
 export interface FreeProbePolicy {

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Empty, Icon } from '@lobehub/ui';
 import { Button, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
 import { ChevronDown, ChevronRight, ChevronUp, Clock, Folder, Loader2, X } from 'lucide-react';
-import type { Task } from '../../shared/types';
+import type { Task } from '../../shared/contracts/tasks';
 import { displayLog } from '../log-view';
 import type { FilterDimension, FilterOption, TaskSelection, TaskTimeRange } from '../task-view';
 import { FILTER_DIMENSIONS, TASK_COLUMNS, boardRows, TIME_RANGES, applyTaskFilters, cardFooter, childSummary, childSummaryLabel, columnize, dispatchKind, emptySelection, facetOptions, filterLabels, filterSummary, hasFilters, isOpenTask, nonArchived, readEndedExpanded, readFiltersCollapsed, readTaskFilters, resolveSelection, selectedEntries, toggleOption, workspaceGroups, writeEndedExpanded, writeFiltersCollapsed, writeTaskFilters } from '../task-view';

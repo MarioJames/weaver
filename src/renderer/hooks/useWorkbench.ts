@@ -1,6 +1,6 @@
 import { useNotifyError, isTransientError } from '../notify';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Capabilities, Task } from '../../shared/types';
+import type { Capabilities, Task } from '../../shared/contracts/tasks';
 import { createTaskSynchronizer } from '../task-sync';
 export function useWorkbench() {
  const [tasks,setTasks]=useState<Task[]>([]);const [caps,setCaps]=useState<Capabilities>();const [error,setError]=useState('');const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);

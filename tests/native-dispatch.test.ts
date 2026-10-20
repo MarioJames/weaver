@@ -10,8 +10,8 @@ import { CommandHandler } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
 import { workerInstruction } from '../src/main/adapters/instruction';
 import type { WorkerAdapter } from '../src/main/adapters/worker';
-import type { Task } from '../src/shared/types';
-import type { WorkPackage } from '../src/shared/commands';
+import type { Task } from '../src/shared/contracts/tasks';
+import type { WorkPackage } from '../src/shared/contracts/tasks';
 import { metadataOf } from './helpers/store-metadata';
 
 /** A real (non-mock) adapter that must never be asked to launch a process for native work. */

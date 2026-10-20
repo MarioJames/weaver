@@ -4,7 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
-import type { Task } from '../src/shared/types';
+import type { Task } from '../src/shared/contracts/tasks';
 import { styles } from '../src/renderer/style';
 import { TaskBoard } from '../src/renderer/components/TaskBoard';
 import { applyTaskFilters, emptySelection, filterOptions, readTaskFilters, writeTaskFilters, TASK_FILTERS_KEY, ENDED_EXPANDED_KEY } from '../src/renderer/task-view';

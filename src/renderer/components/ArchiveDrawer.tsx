@@ -4,7 +4,7 @@ import type { HTMLAttributes } from 'react';
 import { Empty } from '@lobehub/ui';
 import { Drawer, Table, Tag, Text } from '@lobehub/ui/base-ui';
 import type { TableColumnsType } from '@lobehub/ui/base-ui';
-import type { Task } from '../../shared/types';
+import type { Task } from '../../shared/contracts/tasks';
 import type { FilterDimension, TaskSelection } from '../task-view';
 import { TIME_RANGES, archiveRows, ARCHIVE_TABLE_WIDTH, archiveScrollY, archivedTasks, dispatchKind, facetOptions, filterLabels, ownerLabel, projectLabel, taskOwnerId } from '../task-view';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../status-colors';

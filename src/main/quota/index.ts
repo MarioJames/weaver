@@ -1,8 +1,8 @@
-import type { EngineQuotaRecord, QuotaEngine, QuotaRefreshInput, QuotaSnapshot, QuotaStatus } from '../../shared/quota';
-import { QUOTA_FRESH_MS } from '../../shared/quota';
+import type { EngineQuotaRecord, QuotaEngine, QuotaRefreshInput, QuotaSnapshot, QuotaStatus } from '../../shared/contracts/quota';
+import { QUOTA_FRESH_MS } from '../../shared/contracts/quota';
 import { VERSION } from '../../shared/version';
 import { QuotaFailure, QuotaRenewalPending, readNativeCredential, type NativeCredential } from './credentials';
-import { THIRD_PARTY_DETAIL } from './messages';
+import { THIRD_PARTY_DETAIL } from '../../shared/contracts/quota';
 import { normalizeUsage, PROVIDERS } from './providers';
 import { usesThirdPartyProvider } from './third-party';
 

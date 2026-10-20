@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import test from 'node:test';
 import { startCliAgent } from '../src/main/adapters/cli';
-import type { WorkerRecord } from '../src/shared/types';
+import type { WorkerRecord } from '../src/shared/contracts/tasks';
 
 for (const framing of ['complete', 'unterminated'] as const) for (const terminal of ['success', 'error', 'missing'] as const) {
   test(`launch skips oversized ${framing} stdout and preserves later ${terminal} terminal`, async t => {

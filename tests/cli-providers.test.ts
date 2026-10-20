@@ -7,7 +7,8 @@ import { parseWorkerRecord } from '../src/shared/validation';
 import { CliAgentInputError, prepareCliAgentInput, startCliAgent } from '../src/main/adapters/cli';
 import { createNormalizer } from '../src/main/adapters/cli/normalize';
 import { createRedactedLineBuffer } from '../src/main/adapters/cli/redact';
-import type { CliAgentInput, RealEngineKind } from '../src/main/adapters/cli';
+import type { CliAgentInput } from '../src/main/adapters/cli';
+import type { RealEngineKind } from '../src/shared/contracts/tasks';
 
 const instruction = 'MARKER-do-not-put-this-on-argv Reply PONG only.';
 

@@ -1,4 +1,4 @@
-import type { TaskInput, WorkerRecord } from './types';
+import type { TaskInput, WorkerRecord } from './contracts/tasks';
 export function object(value: unknown): Record<string, unknown> {
  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected an object');
  return value as Record<string, unknown>;

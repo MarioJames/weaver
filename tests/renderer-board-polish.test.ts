@@ -4,7 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
-import type { Task } from '../src/shared/types';
+import type { Task } from '../src/shared/contracts/tasks';
 import { TaskBoard, TaskFacets } from '../src/renderer/components/TaskBoard';
 import { TasksPage } from '../src/renderer/pages/TasksPage';
 import { archiveColumns, archiveRowProps } from '../src/renderer/components/ArchiveDrawer';

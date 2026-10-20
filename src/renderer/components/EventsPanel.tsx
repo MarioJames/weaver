@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CopyButton, Icon } from '@lobehub/ui';
 import { Button, Input, Segmented, Steps, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
 import { ChevronRight, FilePen, FileText, Loader2, Search, Terminal, Wrench } from 'lucide-react';
-import type { TaskEvent, TaskFailure } from '../../shared/types';
+import type { TaskEvent, TaskFailure } from '../../shared/contracts/tasks';
 import { command } from '../commands';
 import { condenseEvents, displayLog, eventBadge, exportEvents, filterCondensed, formatDuration, kindLabels, redactLog, relativeTime, selectEvents, toneColor, toolSteps, type TimelineItem } from '../log-view';
 import { styles } from '../style';

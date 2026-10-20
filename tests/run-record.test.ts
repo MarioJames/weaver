@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { prepareCliAgentInput, startCliAgent } from '../src/main/adapters/cli';
-import type { RealEngineKind } from '../src/main/adapters/cli';
+import type { RealEngineKind } from '../src/shared/contracts/tasks';
 import { TaskStore } from '../src/main/store';
 import { TaskManager } from '../src/main/manager';
 import { MockWorkerAdapter } from '../src/main/adapters/worker';

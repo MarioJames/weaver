@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JsonlParser } from '../src/main/protocol';
 import { parseTaskInput, parseWorkerRecord, parseId } from '../src/shared/validation';
-import type { WorkerRecord } from '../src/shared/types';
+import type { WorkerRecord } from '../src/shared/contracts/tasks';
 test('JSONL survives fragmented UTF-8, CRLF, blank lines, and final unterminated record',() => {
  const records: WorkerRecord[]=[]; const parser=new JsonlParser(record => records.push(record));
  const buffer=Buffer.from('\n'+JSON.stringify({type:'log',message:'你好 👋'})+'\r\n'+JSON.stringify({type:'result',summary:'done'}));

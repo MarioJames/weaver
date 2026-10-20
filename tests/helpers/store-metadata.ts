@@ -1,4 +1,6 @@
-import type { CommandReceipt, LogicalOwner, WorkPackage } from '../../src/shared/commands';
+import type { CommandReceipt } from '../../src/shared/contracts/commands';
+import type { LogicalOwner } from '../../src/shared/contracts/owners';
+import type { WorkPackage } from '../../src/shared/contracts/tasks';
 import type { TaskStore } from '../../src/main/store';
 
 export type StoreMetadata = { owners: LogicalOwner[]; packages: WorkPackage[]; receipts: Record<string, CommandReceipt> };

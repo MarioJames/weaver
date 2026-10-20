@@ -1,5 +1,6 @@
-import type { FreeChannelStatus, FreeWorkerStatus } from '../main/free-channel';
-import { activeBlocks, coveringBlock, type Block, type Owner, type Worker } from '../main/policy/routing';
+import type { FreeChannelStatus, FreeWorkerStatus } from '../shared/contracts/monitoring';
+import { activeBlocks, coveringBlock } from '../shared/policy/availability';
+import { type Block, type Owner, type Worker } from '../shared/contracts/policy';
 import { dateText } from './quota-view';
 import type { StatusTone } from './status-colors';
 

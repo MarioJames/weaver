@@ -1,10 +1,11 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Task } from '../../shared/types';
-import type { WorkPackage } from '../../shared/commands';
+import type { Task } from '../../shared/contracts/tasks';
+import type { WorkPackage } from '../../shared/contracts/tasks';
 import { workerInstruction } from './instruction';
 import { assertFrozenWorkspace } from '../workspace';
-import { isRealEngineKind, type RealEngineKind } from '../workspace';
+import { isRealEngineKind } from '../workspace';
+import type { RealEngineKind } from '../../shared/contracts/tasks';
 import type { StartCliAgent } from './launch';
 import type { ManagedProcess, WorkerAdapter } from './worker';
 

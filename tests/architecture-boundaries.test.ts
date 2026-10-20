@@ -26,27 +26,7 @@ const ALLOWED: Record<Layer, readonly Layer[]> = {
 const CLI_MAIN_ALLOWED = new Set(['main/local-ipc', 'main/runtime', 'main/embedded']);
 
 /** "<importing file> -> <imported module>", both relative to src and without extension. */
-const LEGACY_VIOLATIONS = new Set<string>([
-  'shared/commands.ts -> main/adapters/logical',
-  'shared/policy.ts -> main/policy/json-schema',
-  'shared/policy.ts -> main/policy/routing',
-  'shared/types.ts -> main/adapters/cli/types',
-  'shared/types.ts -> main/continuation',
-  'renderer/client.ts -> main/engines/models',
-  'renderer/client.ts -> main/free-channel',
-  'renderer/components/FreeProbePanel.tsx -> main/free-channel',
-  'renderer/components/OwnerSchedule.tsx -> main/policy/routing',
-  'renderer/engine-models.ts -> main/engines/models',
-  'renderer/hooks/useFreeProbe.ts -> main/free-channel',
-  'renderer/pages/EnginesPage.tsx -> main/policy/routing',
-  'renderer/pages/RolesPage.tsx -> main/policy/routing',
-  'renderer/pages/SettingsPage.tsx -> main/policy/routing',
-  'renderer/policy-edit.ts -> main/policy/routing',
-  'renderer/probe-view.ts -> main/free-channel',
-  'renderer/probe-view.ts -> main/policy/routing',
-  'renderer/quota-view.ts -> main/quota/messages',
-  'renderer/usePolicyDraft.tsx -> main/policy/routing',
-]);
+const LEGACY_VIOLATIONS = new Set<string>([]);
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {

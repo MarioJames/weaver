@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { EngineModelList, EngineModelListInput } from '../main/engines/models';
+import type { EngineModelList, EngineModelListInput } from '../shared/engines';
 import { validateProxy } from '../shared/proxy';
 import { notifyError } from './notify';
 
-export type { EngineModelList } from '../main/engines/models';
 export const NO_LIST_TEXT = '该引擎不提供模型列表，请手动填写';
 
 /** Asks the control plane for the engine CLI's model list. */

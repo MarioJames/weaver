@@ -10,7 +10,7 @@ import { TaskStore } from '../src/main/store';
 import { TaskManager } from '../src/main/manager';
 import { CommandHandler } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
-import type { Task, TaskDispatch } from '../src/shared/types';
+import type { Task, TaskDispatch } from '../src/shared/contracts/tasks';
 import { metadataOf, setMetadataOf } from './helpers/store-metadata';
 
 /** In-memory worker: cancellation holds its slot until this fixture emits close. No OS process exists. */

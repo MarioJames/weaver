@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { TaskStore } from '../src/main/store';
-import type { Task } from '../src/shared/types';
+import type { Task } from '../src/shared/contracts/tasks';
 
 const at='2026-10-19T00:00:00Z';
 function fixture(i:number):Task {

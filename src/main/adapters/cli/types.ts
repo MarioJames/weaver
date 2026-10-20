@@ -1,7 +1,6 @@
 import type { EventEmitter } from 'node:events';
 import type { Readable } from 'node:stream';
-
-export type RealEngineKind = 'opencode' | 'pi' | 'grok' | 'codex' | 'qodercli' | 'zcode';
+import type { CliAgentEvidence, RealEngineKind } from '../../../shared/contracts/tasks';
 
 export interface CliAgentInput {
   proxy?: string;
@@ -13,23 +12,6 @@ export interface CliAgentInput {
   stateDir: string;
   name?: string;
   role?: 'worker' | 'owner';
-}
-
-/** Vendor facts actually present on the event stream. Absent fields stay unknown. */
-export interface CliAgentEvidence {
-  engine: RealEngineKind;
-  requestedModel: string;
-  requestedEffort: string;
-  workspace: string;
-  role?: 'worker' | 'owner';
-  vendorSessionId?: string;
-  /** The private prompt file this run was started from (under agent-state). */
-  promptPath?: string;
-  /** Pi only: the session directory created for this run. */
-  sessionDir?: string;
-  vendorModel?: string;
-  usage?: { inputTokens?: number; outputTokens?: number };
-  terminal: 'pending' | 'success' | 'error' | 'cancelled' | 'missing' | 'truncated';
 }
 
 export interface ManagedAgentProcess extends EventEmitter {

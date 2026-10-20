@@ -1,6 +1,6 @@
-import type { EngineQuotaRecord, QuotaRefreshResult, QuotaWindow } from '../shared/quota';
-import { QUOTA_FRESH_MS } from '../shared/quota';
-import { THIRD_PARTY_DETAIL } from '../main/quota/messages';
+import type { EngineQuotaRecord, QuotaRefreshResult, QuotaWindow } from '../shared/contracts/quota';
+import { QUOTA_FRESH_MS } from '../shared/contracts/quota';
+import { THIRD_PARTY_DETAIL } from '../shared/contracts/quota';
 import type { PolicyDraft } from './usePolicyDraft';
 import { compactTime } from './timezone';
 

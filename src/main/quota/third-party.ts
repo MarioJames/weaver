@@ -2,7 +2,7 @@ import { constants } from 'node:fs';
 import { open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import type { QuotaEngine } from '../../shared/quota';
+import type { QuotaEngine } from '../../shared/contracts/quota';
 import { object, readObject } from './credentials';
 
 const MAX_FILE_BYTES = 256 * 1024;

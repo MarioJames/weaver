@@ -1,4 +1,4 @@
-import type { RealEngineKind } from './types';
+import type { RealEngineKind } from '../../../shared/contracts/tasks';
 
 const PI_THINKING = new Set(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
 

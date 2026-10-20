@@ -4,7 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
-import type { TaskEvent } from '../src/shared/types';
+import type { TaskEvent } from '../src/shared/contracts/tasks';
 import { condenseEvents, eventBadge, filterCondensed, formatDuration, isTimelineNoise, normalizeToolName, relativeTime, timelineActive, toolSteps } from '../src/renderer/log-view';
 import { styles as eventStyles } from '../src/renderer/components/events-style';
 import { EventsPanel } from '../src/renderer/components/EventsPanel';

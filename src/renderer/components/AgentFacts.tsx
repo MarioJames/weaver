@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CopyButton } from '@lobehub/ui';
 import { Descriptions, Text, Tooltip } from '@lobehub/ui/base-ui';
-import type { Task } from '../../shared/types';
+import type { Task } from '../../shared/contracts/tasks';
 import { dispatchKind, ownerHostName, ownerLabel, taskOwnerId } from '../task-view';
 import { AgentLabel } from './EngineIcon';
 import { TimeText } from './TimeText';

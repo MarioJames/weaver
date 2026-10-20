@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { OwnerMessage } from '../../shared/contracts/owners';
 
 export interface LogicalAdapter {
  readonly id: string;
@@ -19,18 +20,6 @@ export interface OwnerHostEvidence extends OwnerHostInput {
  pane?: string;
  createdAt: string;
  closedAt?: string;
-}
-export interface OwnerMessage {
- id: string;
- ownerId: string;
- kind: 'message' | 'result';
- message?: string;
- taskId?: string;
- manifestDigest?: string;
- transport: 'mock-memory';
- status: 'delivered' | 'acknowledged';
- createdAt: string;
- acknowledgedAt?: string;
 }
 export interface OwnerHostAdapter extends LogicalAdapter {
  restore(host: OwnerHostEvidence, messages?: OwnerMessage[]): void;

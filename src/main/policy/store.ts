@@ -2,8 +2,11 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { object } from '../../shared/validation';
-import type { PolicySnapshot, RoutePreview } from '../../shared/policy';
-import { activeBlocks, availabilityOf, chatgptReviewEnabled, defaultConfig, parseReleaseAt, resolveDispatch, validateConfig, type Config, type Block, type Engine, type Owner, type RouteOptions, type Worker } from './routing';
+import type { PolicySnapshot, RoutePreview } from '../../shared/contracts/policy';
+import { activeBlocks, availabilityOf } from '../../shared/policy/availability';
+import { chatgptReviewEnabled } from '../../shared/policy/settings';
+import { defaultConfig, parseReleaseAt, resolveDispatch, validateConfig } from './routing';
+import { type Config, type Block, type Engine, type Owner, type RouteOptions, type Worker } from '../../shared/contracts/policy';
 import { migrate } from '../migrate';
 const LIMIT=256*1024;
 function bounded(value: unknown): void { if (Buffer.byteLength(JSON.stringify(value))>LIMIT) throw new Error('Policy exceeds 256 KiB'); }

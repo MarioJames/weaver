@@ -3,7 +3,7 @@ import { constants } from 'node:fs';
 import { open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import type { QuotaEngine, QuotaStatus } from '../../shared/quota';
+import type { QuotaEngine, QuotaStatus } from '../../shared/contracts/quota';
 import { parseProviderTimestamp } from './timestamps';
 
 const MAX_FILE_BYTES = 256 * 1024;

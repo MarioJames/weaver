@@ -1,6 +1,7 @@
-import type { QuotaEngine, QuotaSchedule } from '../../shared/quota';
+import type { QuotaEngine, QuotaSchedule } from '../../shared/contracts/quota';
 import { quotaRefreshTargets } from '../policy/quota';
-import { quotaSettings, type Config } from '../policy/routing';
+import { quotaSettings } from '../../shared/policy/settings';
+import { type Config } from '../../shared/contracts/policy';
 
 export interface QuotaSchedulerOptions {
   config: () => Config;

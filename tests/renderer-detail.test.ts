@@ -4,7 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
-import type { Task } from '../src/shared/types';
+import type { Task } from '../src/shared/contracts/tasks';
 import { PENDING_TASK_TITLE } from '../src/shared/validation';
 import { TaskDetail } from '../src/renderer/components/TaskDetail';
 

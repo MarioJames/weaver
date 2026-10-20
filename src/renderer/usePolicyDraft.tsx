@@ -1,7 +1,7 @@
 import { isTransientError } from './notify';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Block, Config } from '../main/policy/routing';
-import type { Issue, PolicySnapshot } from '../shared/policy';
+import type { Block, Config } from '../shared/contracts/policy';
+import type { Issue, PolicySnapshot } from '../shared/contracts/policy';
 
 export interface PolicyDocument { config: Config; blocks: Block[] }
 export type PolicyUpdate = (current: PolicyDocument) => PolicyDocument;

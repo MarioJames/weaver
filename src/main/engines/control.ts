@@ -1,4 +1,4 @@
-import type { PolicySnapshot } from '../../shared/policy';
+import type { PolicySnapshot } from '../../shared/contracts/policy';
 import { catalogEntry, type EngineProbeRecord } from '../../shared/engines';
 import { object } from '../../shared/validation';
 import type { PolicyStore } from '../policy/store';

@@ -8,14 +8,9 @@ import { randomUUID } from 'node:crypto';
 import { defaultConfig } from '../src/main/policy/routing';
 import { PolicyStore } from '../src/main/policy/store';
 import { parseRpcBody } from '../src/main/rpc';
-import {
-  CPU_IDLE_SHARE, LADDER_RESET_MS, PROBE_MS, PROBE_SUCCESSES, STALL_BLOCK_BY, STALL_LADDER, STALL_MS,
-  STALL_QUORUM, STALL_RECOVERY, StallMonitor, emptyPenalty, idleSince, isStalled, nextPenalty, silenceMs,
-  parseStallState, stalledTasks, systemdCpuUsage, unhealthyEngines,
-  type CpuReader, type CpuSample, type EnginePenalty, type ProbeOutcome, type ProbeRoute, type RecoveryProbe,
-  type StallPolicy, type StallState, type StallStatus,
-} from '../src/main/stall';
-import type { Task } from '../src/shared/types';
+import { CPU_IDLE_SHARE, LADDER_RESET_MS, PROBE_MS, PROBE_SUCCESSES, STALL_BLOCK_BY, STALL_LADDER, STALL_MS, STALL_QUORUM, STALL_RECOVERY, StallMonitor, emptyPenalty, idleSince, isStalled, nextPenalty, silenceMs, parseStallState, stalledTasks, systemdCpuUsage, unhealthyEngines, type CpuReader, type CpuSample, type EnginePenalty, type ProbeRoute, type RecoveryProbe, type StallPolicy, type StallState } from '../src/main/stall';
+import { type ProbeOutcome, type StallStatus } from '../src/shared/contracts/monitoring';
+import type { Task } from '../src/shared/contracts/tasks';
 import { readStall, seedStall, stallStoreAt } from './helpers/state-db';
 
 const START = Date.parse('2030-01-01T00:00:00Z');

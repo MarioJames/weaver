@@ -1,8 +1,7 @@
 import { readdirSync, realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
-import type { TaskDispatch } from '../shared/types';
-import type { RealEngineKind } from './adapters/cli/index';
-export type { RealEngineKind } from './adapters/cli/index';
+import type { TaskDispatch } from '../shared/contracts/tasks';
+import type { RealEngineKind } from '../shared/contracts/tasks';
 
 /** Kinds with a real worker launcher. Claude Code stays deferred. */
 export const REAL_ENGINE_KINDS = ['opencode', 'pi', 'grok', 'codex', 'qodercli', 'zcode'] as const;

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Artifact, Task, TaskInput, TaskFailure, WorkerRecord } from '../shared/types';
+import type { Artifact, Task, TaskInput, TaskFailure, WorkerRecord } from '../shared/contracts/tasks';
 import { parseTaskInput } from '../shared/validation';
 import type { ManagedProcess, WorkerAdapter } from './adapters/worker';
 import { JsonlParser } from './protocol';

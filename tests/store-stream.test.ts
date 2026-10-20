@@ -10,8 +10,8 @@ import { TaskStore, event } from '../src/main/store';
 import { TaskManager } from '../src/main/manager';
 import { CommandHandler } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
-import { API_VERSION } from '../src/shared/commands';
-import type { Task } from '../src/shared/types';
+import { API_VERSION } from '../src/shared/contracts/commands';
+import type { Task } from '../src/shared/contracts/tasks';
 import { metadataOf, setMetadataOf } from './helpers/store-metadata';
 
 const input = { title: 'Stream fixture', instruction: 'Local test', owner: { name: 'owner', transport: 'herdr-visible' as const, session: 'main', pane: '1' } };

@@ -38,3 +38,6 @@ export interface QuotaSchedule { enabled: boolean; intervalMinutes: number; last
 export interface QuotaSnapshot { records: EngineQuotaRecord[]; schedule?: QuotaSchedule }
 export interface QuotaRefreshInput { engine?: QuotaEngine }
 export interface QuotaRefreshResult extends QuotaSnapshot { snapshot: PolicySnapshot; policyChanged: boolean }
+
+/** Shown for an engine whose CLI is switched to a third-party provider (for example by cc-switch). The renderer matches on this exact text. */
+export const THIRD_PARTY_DETAIL = '当前使用第三方供应商（如 cc-switch 配置），无原生额度可查';

@@ -12,8 +12,8 @@ import type { ManagedProcess } from '../src/main/adapters/worker';
 import { CommandHandler, workerLoad } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
 import { OwnerLaunchError, type OwnerLaunchInput, type OwnerLaunchResult } from '../src/main/owner-host';
-import type { LogicalOwner } from '../src/shared/commands';
-import type { Task, TaskInput } from '../src/shared/types';
+import type { LogicalOwner } from '../src/shared/contracts/owners';
+import type { Task, TaskInput } from '../src/shared/contracts/tasks';
 import { metadataOf, setMetadataOf } from './helpers/store-metadata';
 
 /** A worker that stays alive until Weaver stops it: these tests measure who holds a slot, not what a process prints. */

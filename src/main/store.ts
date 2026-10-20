@@ -2,8 +2,11 @@ import { mkdirSync, chmodSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { ownerSession, type LogicalOwner, type WorkPackage, type CommandReceipt } from '../shared/commands';
-import type { Task, TaskEvent, TaskSummary } from '../shared/types';
+import { ownerSession } from '../shared/policy/owner-instance';
+import { type LogicalOwner } from '../shared/contracts/owners';
+import { type WorkPackage } from '../shared/contracts/tasks';
+import { type CommandReceipt } from '../shared/contracts/commands';
+import type { Task, TaskEvent, TaskSummary } from '../shared/contracts/tasks';
 import { migrate } from './migrate';
 export const active = (task: Task) => task.status === 'running' || task.status === 'cancelling';
 /** Slots belong to the exact owner instance a task is bound to; unbound work shares only its own profile group. */

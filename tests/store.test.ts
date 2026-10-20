@@ -8,7 +8,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { TaskStore, event } from '../src/main/store';
 import { SCHEMA_VERSION } from '../src/main/migrate';
 import { REAL_ENGINE_KINDS } from '../src/main/workspace';
-import type { Task } from '../src/shared/types';
+import type { Task } from '../src/shared/contracts/tasks';
 function fixture(): Task {return {id:randomUUID(),title:'test',instruction:'test',owner:{name:'owner',transport:'herdr-visible',session:'main',pane:'1'},createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),status:'running',progress:20,events:[],artifacts:[],run:{id:randomUUID(),adapter:'mock-jsonl',status:'running',pid:123}};}
 test('persists, returns isolated copies, and recovers interrupted task without PID reuse',() => {
  const dir=mkdtempSync(join(tmpdir(),'weaver-store-')); try {

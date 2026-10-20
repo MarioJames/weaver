@@ -11,7 +11,8 @@ import { CommandHandler, type TaskDiagnostics } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
 import { OwnerLaunchError, type OwnerLaunchInput, type OwnerLaunchResult } from '../src/main/owner-host';
 import { readStall, stallStoreAt } from './helpers/state-db';
-import { STALL_BLOCK_BY, STALL_MS, StallMonitor, type StallState, type StallStatus } from '../src/main/stall';
+import { STALL_BLOCK_BY, STALL_MS, StallMonitor, type StallState } from '../src/main/stall';
+import { type StallStatus } from '../src/shared/contracts/monitoring';
 import { metadataOf } from './helpers/store-metadata';
 
 /** A fixed clock and a CPU reader that can only ever say "not observed": nothing here is a real process. */

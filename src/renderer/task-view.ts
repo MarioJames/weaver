@@ -1,6 +1,6 @@
-import type { OwnerInstance } from '../shared/commands';
-import type { Config } from '../shared/policy';
-import type { Task } from '../shared/types';
+import type { OwnerInstance } from '../shared/contracts/owners';
+import type { Config } from '../shared/contracts/policy';
+import type { Task } from '../shared/contracts/tasks';
 import { DISPLAY_LABELS, DISPLAY_STATUSES, displayStatus } from './status-colors';
 import type { DisplayStatus } from './status-colors';
 import { compactTime, projectTimeZone, startOfZonedDay } from './timezone';

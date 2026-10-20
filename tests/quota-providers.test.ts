@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { QuotaProber } from '../src/main/quota';
 import { QuotaFailure, QuotaRenewalPending, readNativeCredential } from '../src/main/quota/credentials';
-import type { QuotaEngine } from '../src/shared/quota';
+import type { QuotaEngine } from '../src/shared/contracts/quota';
 
 const start = Date.parse('2026-10-18T12:00:00Z');
 const reset = '2026-10-19T12:00:00Z';

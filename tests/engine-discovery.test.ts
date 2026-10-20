@@ -4,7 +4,8 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
-import { ENGINE_KINDS, availabilityOf, defaultConfig, validateConfig } from '../src/main/policy/routing';
+import { ENGINE_KINDS, defaultConfig, validateConfig } from '../src/main/policy/routing';
+import { availabilityOf } from '../src/shared/policy/availability';
 import { PolicyStore } from '../src/main/policy/store';
 import { ENGINE_CATALOG } from '../src/shared/engines';
 import { EngineProber } from '../src/main/engines/probe';

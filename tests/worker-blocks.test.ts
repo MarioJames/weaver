@@ -13,8 +13,9 @@ import { PolicyStore } from '../src/main/policy/store';
 import { StallMonitor } from '../src/main/stall';
 import { applyEngineEnabled } from '../src/main/engines/control';
 import type { EngineProber } from '../src/main/engines/probe';
-import { validateConfig, type Block } from '../src/main/policy/routing';
-import type { Task, TaskDispatch, TaskFailure } from '../src/shared/types';
+import { validateConfig } from '../src/main/policy/routing';
+import { type Block } from '../src/shared/contracts/policy';
+import type { Task, TaskDispatch, TaskFailure } from '../src/shared/contracts/tasks';
 import { stallStoreAt } from './helpers/state-db';
 
 class HeldWorker extends EventEmitter {

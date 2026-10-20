@@ -1,5 +1,5 @@
 import { Text } from '@lobehub/ui/base-ui';
-import type { Artifact, TaskStatus } from '../../shared/types';
+import type { Artifact, TaskStatus } from '../../shared/contracts/tasks';
 import { styles } from '../style';
 import { TaskTextBlock } from './TaskTextBlock';
 

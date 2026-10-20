@@ -1,5 +1,5 @@
-import type { Task } from '../../shared/types';
-import type { WorkPackage } from '../../shared/commands';
+import type { Task } from '../../shared/contracts/tasks';
+import type { WorkPackage } from '../../shared/contracts/tasks';
 
 export const MAX_WORKER_INSTRUCTION = 16000;
 /** Trusted role contract surrounds untrusted task data; never omit scope or constraints to fit. The work package is the only source of the worker's goal and acceptance criteria: the root task's own criteria are never merged in. */

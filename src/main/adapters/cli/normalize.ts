@@ -1,5 +1,5 @@
-import type { WorkerRecord } from '../../../shared/types';
-import type { RealEngineKind } from './types';
+import type { WorkerRecord } from '../../../shared/contracts/tasks';
+import type { RealEngineKind } from '../../../shared/contracts/tasks';
 import { clip, redact } from './redact';
 
 const LOG_MAX = 4000;

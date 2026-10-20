@@ -7,7 +7,7 @@ import { motion } from 'motion/react';
 import { EnginesPage, engineVersionText } from '../src/renderer/pages/EnginesPage';
 import { quotaVisibleWindows } from '../src/renderer/quota-view';
 import { defaultConfig } from '../src/main/policy/routing';
-import type { EngineQuotaRecord, QuotaWindow } from '../src/shared/quota';
+import type { EngineQuotaRecord, QuotaWindow } from '../src/shared/contracts/quota';
 import type { PolicyDraft } from '../src/renderer/usePolicyDraft';
 
 test('version label drops only a trailing commit hash, leaving the full probe available to the tooltip', () => {

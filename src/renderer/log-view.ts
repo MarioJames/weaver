@@ -1,4 +1,4 @@
-import type { TaskEvent, TaskStatus } from '../shared/types';
+import type { TaskEvent, TaskStatus } from '../shared/contracts/tasks';
 import { DISPLAY_LABELS, DISPLAY_TONES, type DisplayStatus, type StatusTone } from './status-colors';
 /** Best-effort display redaction. Never claim this catches every secret. */
 export function redactLog(value: string): string {

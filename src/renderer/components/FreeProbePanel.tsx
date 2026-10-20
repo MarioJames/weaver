@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Activity } from 'lucide-react';
 import { Button, Descriptions, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
-import type { FreeWorkerStatus } from '../../main/free-channel';
+import type { FreeWorkerStatus } from '../../shared/contracts/monitoring';
 import type { FreeProbe } from '../hooks/useFreeProbe';
 import { PROBE_HISTORY_SHOWN, lastProbeOf, nextProbeText, probeDurationText, probeNoteText, probeStateView, recentProbes, type ProbeHistoryRecord } from '../probe-view';
 import { TimeText } from './TimeText';

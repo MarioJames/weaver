@@ -1,5 +1,5 @@
 import { Button, Descriptions, Tag, Text } from '@lobehub/ui/base-ui';
-import type { Task } from '../../shared/types';
+import type { Task } from '../../shared/contracts/tasks';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../status-colors';
 import { dispatchKind, isActive, taskOwnerId } from '../task-view';
 import { AgentLabel } from './EngineIcon';

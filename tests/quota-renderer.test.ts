@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { dateText } from '../src/renderer/quota-view';
 import test from 'node:test';
 import { defaultConfig } from '../src/main/policy/routing';
-import type { PolicySnapshot } from '../src/shared/policy';
-import type { EngineQuotaRecord, QuotaRefreshResult, QuotaWindow } from '../src/shared/quota';
+import type { PolicySnapshot } from '../src/shared/contracts/policy';
+import type { EngineQuotaRecord, QuotaRefreshResult, QuotaWindow } from '../src/shared/contracts/quota';
 import {
   acceptQuotaPolicy, quotaCountText, quotaNextUpdateMs, quotaPercentText, quotaProgressPercent, quotaRecordStale,
   quotaRecoveryText, quotaRetryMs, quotaScopeText, quotaStatusText, quotaWindowStale,

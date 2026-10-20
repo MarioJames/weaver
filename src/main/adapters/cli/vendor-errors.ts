@@ -1,4 +1,4 @@
-import type { TaskFailure } from '../../../shared/types';
+import type { TaskFailure } from '../../../shared/contracts/tasks';
 import { redact } from './redact';
 
 const LIMITS = [

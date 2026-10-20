@@ -2,10 +2,11 @@ import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { object } from '../shared/validation';
-import type { Config, PolicySnapshot } from '../shared/policy';
-import type { Task } from '../shared/types';
+import type { Config, Block, PolicySnapshot } from '../shared/contracts/policy';
+import type { ProbeOutcome, StallHistoryRecord, StallStatus } from '../shared/contracts/monitoring';
+import type { Task } from '../shared/contracts/tasks';
+import { activeBlocks } from '../shared/policy/availability';
 import { redactContext } from './continuation';
-import { activeBlocks, type Block } from './policy/routing';
 
 /** Silence plus an idle scope for this long is a stall. */
 export const STALL_MS = 5 * 60_000;
@@ -41,24 +42,10 @@ export type CpuSamples = Record<string, CpuSample[]>;
 
 /** The light call a penalty is lifted with: one enabled worker's own route on the penalized engine. */
 export interface ProbeRoute { engine: string; kind: string; worker: string; model: string; effort: string }
-export interface ProbeOutcome { ok: boolean; ms: number; error?: string }
 export type RecoveryProbe = (route: ProbeRoute, signal: AbortSignal) => Promise<ProbeOutcome>;
 
 /** One line of the record: a trigger carries tasks, a probe carries its route and outcome, a recovery carries a message. */
-export interface StallRecord {
-  engine: string;
-  level: number;
-  at: number;
-  /** The ids this record still names, at most RECORD_TASKS_MAX of them. */
-  tasks: string[];
-  /** How many tasks the evidence really covered, when the list above had to stop early. */
-  taskCount?: number;
-  stalledMinutes?: number;
-  probe?: ProbeOutcome;
-  model?: string;
-  effort?: string;
-  message?: string;
-}
+export type StallRecord = Omit<StallHistoryRecord, 'at'> & { at: number };
 
 export interface EnginePenalty {
   level: number;
@@ -74,21 +61,6 @@ export interface EnginePenalty {
 }
 
 export interface StallState { engines: Record<string, EnginePenalty>; history: StallRecord[] }
-
-export interface StallStatus {
-  engines: Record<string, {
-    level: number;
-    lastTriggerAt: string | null;
-    needsAttention: boolean;
-    /** Effective stall block in force in the policy right now. */
-    blocked: boolean;
-    blockedUntil: string | null;
-    nextProbeAt: string | null;
-    probeSuccesses: number;
-    history: (Omit<StallRecord, 'at'> & { at: string })[];
-  }>;
-  config: { stallMinutes: number; quorum: number; ladder: (number | null)[]; resetHours: number };
-}
 
 /** What a running worker looks like from the outside: the monitor's own samples, no second classifier. */
 export interface TaskHealth {

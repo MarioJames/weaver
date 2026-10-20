@@ -4,7 +4,7 @@ import { NamedSelect } from './NamedControls';
 import { useEffect, useId, useState, type Dispatch, type SetStateAction } from 'react';
 import { Button, Text, TextArea } from '@lobehub/ui/base-ui';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
-import type { PolicySnapshot } from '../../shared/policy';
+import type { PolicySnapshot } from '../../shared/contracts/policy';
 import { styles } from '../style';
 import { composerStyles } from './task-composer-style';
 

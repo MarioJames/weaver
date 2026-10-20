@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FreeChannelStatus } from '../../main/free-channel';
+import type { FreeChannelStatus } from '../../shared/contracts/monitoring';
 import { notifyError } from '../notify';
 
 const POLL_MS = 30_000;

@@ -4,7 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
-import type { Task } from '../src/shared/types';
+import type { Task } from '../src/shared/contracts/tasks';
 import { ContinuationDialog, ownerOptions, OwnerInspector } from '../src/renderer/components/OwnerInspector';
 
 function markup(node: React.ReactNode) {

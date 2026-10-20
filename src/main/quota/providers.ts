@@ -1,4 +1,4 @@
-import type { EngineQuotaRecord, QuotaEngine, QuotaStatus, QuotaWindow } from '../../shared/quota';
+import type { EngineQuotaRecord, QuotaEngine, QuotaStatus, QuotaWindow } from '../../shared/contracts/quota';
 import { object, type JsonObject } from './credentials';
 import { parseProviderTimestamp } from './timestamps';
 

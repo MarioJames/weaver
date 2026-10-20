@@ -6,12 +6,13 @@ import { chmodSync, lstatSync, mkdirSync, realpathSync, writeFileSync } from 'no
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
-import type { WorkerRecord } from '../../../shared/types';
+import type { WorkerRecord } from '../../../shared/contracts/tasks';
 import { buildLaunchSpec } from './argv';
 import { createNormalizer } from './normalize';
 import { clip, createRedactedLineBuffer, redact } from './redact';
 import { decodeLines, startOwnedScope, type LineOverflow, type OwnedScope } from './scope';
-import type { CliAgentEvidence, CliAgentInput, ManagedAgentProcess, RealEngineKind } from './types';
+import type { CliAgentInput, ManagedAgentProcess } from './types';
+import type { CliAgentEvidence, RealEngineKind } from '../../../shared/contracts/tasks';
 
 const ENGINES = new Set<RealEngineKind>(['opencode', 'pi', 'grok', 'codex', 'qodercli', 'zcode']);
 const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/;

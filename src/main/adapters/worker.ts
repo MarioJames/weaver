@@ -1,12 +1,12 @@
 import { spawn } from 'node:child_process';
 import type { Readable } from 'node:stream';
-import type { Task } from '../../shared/types';
+import type { Task } from '../../shared/contracts/tasks';
 
 /** Structural child used by mock processes and by startCliAgent. */
 export interface ManagedProcess {
   pid?: number;
   readonly scopeUnit?: string;
-  readonly evidence?: import('./cli/types').CliAgentEvidence;
+  readonly evidence?: import('../../shared/contracts/tasks').CliAgentEvidence;
   stdout: Readable;
   stderr: Readable;
   kill(signal?: NodeJS.Signals): boolean;

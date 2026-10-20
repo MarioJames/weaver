@@ -6,7 +6,7 @@ import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { toast } from '@lobehub/ui/base-ui';
 import { motion } from 'motion/react';
 import { defaultConfig } from '../src/main/policy/routing';
-import type { Task } from '../src/shared/types';
+import type { Task } from '../src/shared/contracts/tasks';
 import { TaskBoard } from '../src/renderer/components/TaskBoard';
 import { TimeText } from '../src/renderer/components/TimeText';
 import { TimeZoneSelect, timeZoneOptions, FOLLOW_BROWSER } from '../src/renderer/components/TimeZoneSelect';

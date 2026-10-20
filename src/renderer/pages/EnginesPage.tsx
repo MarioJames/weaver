@@ -5,11 +5,13 @@ import { Play, RefreshCw, ScanSearch } from 'lucide-react';
 import { PageHeader, Surface } from '@lobehub/ui/dashboard';
 import { ActionIcon, Button, Progress, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
 import { ENGINE_CATALOG, catalogEntry, type EngineProbeRecord } from '../../shared/engines';
-import type { EngineQuotaRecord, QuotaEngine, QuotaWindow } from '../../shared/quota';
-import { QUOTA_KINDS, quotaRefreshEnabled, type Block, type Engine } from '../../main/policy/routing';
+import type { EngineQuotaRecord, QuotaEngine, QuotaWindow } from '../../shared/contracts/quota';
+import { QUOTA_KINDS, quotaRefreshEnabled } from '../../shared/policy/settings';
+import { type Block, type Engine } from '../../shared/contracts/policy';
 import { acceptQuotaPolicy, dateText, quotaPercentText, quotaProgressPercent, quotaRecordStale, quotaRecoveryText, quotaRetryMs, quotaStatusText, quotaNextUpdateMs, quotaCountText, quotaVisibleWindows, quotaThirdParty } from '../quota-view';
 import type { PolicyDraft, PolicyUpdate } from '../usePolicyDraft';
 import type { StallEngineState, StallHistoryEntry, StallSnapshot } from '../client';
+import type { EngineStallStatus } from '../../shared/contracts/monitoring';
 import { styles } from '../style';
 import { TimeText } from '../components/TimeText';
 import { compactTime } from '../timezone';
@@ -48,7 +50,7 @@ function mergeProbes(current: EngineProbeRecord[], probe: EngineProbeRecord | nu
 const isQuotaKind = (kind: string): kind is QuotaEngine => (QUOTA_KINDS as readonly string[]).includes(kind);
 
 /** Penalty blocks are ordinary policy blocks; this `by` value is what tells them apart from a quota or manual pause. */
-type EngineBlockState = StallEngineState & { blockedUntil?: string | null };
+type EngineBlockState = StallEngineState & Partial<Pick<EngineStallStatus, 'blockedUntil'>>;
 const STALL_BY = 'weaver-stall';
 const STALL_HISTORY = 5;
 const STALL_TASK_ID = 8;

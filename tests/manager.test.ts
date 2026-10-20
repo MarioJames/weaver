@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { TaskStore } from '../src/main/store';
 import { executionTimeoutMs, TaskManager } from '../src/main/manager';
 import { MockWorkerAdapter, type WorkerAdapter } from '../src/main/adapters/worker';
-import type { TaskInput } from '../src/shared/types';
+import type { TaskInput } from '../src/shared/contracts/tasks';
 const input: TaskInput={title:'Demo',instruction:'Safe local fixture only',owner:{name:'owner',transport:'herdr-visible',session:'main',pane:'1'}};
 const fixture=(code: string): WorkerAdapter => ({id:'mock-jsonl',start:() => {const child=spawn(process.execPath,['-e',code],{stdio:['pipe','pipe','pipe'],shell:false});child.stdin.end();return child;}});
 async function terminal(store: TaskStore,id: string) { const deadline=Date.now()+5000; while (Date.now()<deadline) {const task=store.get(id); if (['completed','failed','cancelled'].includes(task.status)) return task; await new Promise(resolve => setTimeout(resolve,15));} throw new Error('Timed out waiting for task'); }

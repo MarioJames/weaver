@@ -238,7 +238,7 @@ test('a real task launch starts the engine with the role proxy in its environmen
 
 // Renderer side: what the model picker and the proxy field show.
 import { modelListView, modelSelectOptions, proxyUrlError, requestEngineModels, usableProxy, NO_LIST_TEXT } from '../src/renderer/engine-models';
-import type { EngineModelList } from '../src/main/engines/models';
+import type { EngineModelList } from '../src/shared/engines';
 
 const listOf = (over: Partial<EngineModelList>): EngineModelList => ({ engine: 'pi', status: 'ok', source: 'pi --list-models', models: [], fetchedAt: '2026-10-20T00:00:00Z', ...over });
 

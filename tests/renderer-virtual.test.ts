@@ -5,7 +5,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
-import type { Task } from '../src/shared/types';
+import type { Task } from '../src/shared/contracts/tasks';
 import { ARCHIVE_TABLE_HEADER, ARCHIVE_TABLE_MIN_BODY, archiveScrollY, boardRows, workspaceGroups } from '../src/renderer/task-view';
 import { ArchiveList } from '../src/renderer/components/ArchiveDrawer';
 import { SSR_ROWS, VirtualLane } from '../src/renderer/components/VirtualLane';

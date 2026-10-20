@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import { DatabaseSync } from 'node:sqlite';
 import { PolicyStore } from '../src/main/policy/store';
 import { applyQuotaSnapshot, parseQuotaRefresh } from '../src/main/policy/quota';
-import type { EngineQuotaRecord, QuotaWindow } from '../src/shared/quota';
+import type { EngineQuotaRecord, QuotaWindow } from '../src/shared/contracts/quota';
 import { QuotaProber, dbQuotaStore } from '../src/main/quota';
 import { migrate } from '../src/main/migrate';
 import { startRuntime, type WeaverRuntime } from '../src/main/runtime';

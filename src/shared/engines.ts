@@ -1,4 +1,4 @@
-import type { Config } from './policy';
+import type { Config } from './contracts/policy';
 
 /** Fixed allowlist. Discovery never accepts a caller-supplied command. */
 export const ENGINE_CATALOG = [
@@ -95,3 +95,24 @@ export interface HelloInput { proxy?: string; engine: string; model: string; eff
 export interface HelloResult { ok: boolean; reply?: string; model?: string; error?: string; durationMs: number; checkedAt: string }
 /** A greeting runs longer than one HTTP request may wait, so it is started and then polled. */
 export interface HelloJob { id: string; status: 'running' | 'done'; startedAt: string; result?: HelloResult }
+
+/** A model name an engine accepts for `--model`. */
+export interface EngineModel { id: string; label?: string; hint?: string }
+
+/**
+ * ok: the list came from the engine (or its documented built-in names).
+ * unsupported: the CLI has no way to list models, so the user types one.
+ * unavailable: the command is not installed.
+ * failed: the list command ran but did not produce a list.
+ */
+export type EngineModelStatus = 'ok' | 'unsupported' | 'unavailable' | 'failed';
+export interface EngineModelList {
+  engine: string;
+  status: EngineModelStatus;
+  /** Where the names come from, in words a person can check, for example the exact command. */
+  source: string;
+  models: EngineModel[];
+  message?: string;
+  fetchedAt: string;
+}
+export interface EngineModelListInput { engine: string; proxy?: string; refresh?: boolean }

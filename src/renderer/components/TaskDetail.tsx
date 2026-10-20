@@ -4,7 +4,7 @@ import { Alert, Button, Modal, Tabs, Tag, Text } from '@lobehub/ui/base-ui';
 import { Loader2 } from 'lucide-react';
 import { useNotifyError } from '../notify';
 import { TaskAgents } from './TaskAgents';
-import type { Task } from '../../shared/types';
+import type { Task } from '../../shared/contracts/tasks';
 import { displayLog, redactLog, timelineActive, toneColor } from '../log-view';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../status-colors';
 import { isActive, rootCancelNotice } from '../task-view';

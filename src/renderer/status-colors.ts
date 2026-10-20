@@ -1,4 +1,4 @@
-import type { Task } from '../shared/types';
+import type { Task } from '../shared/contracts/tasks';
 
 /**
  * One color scheme for every place that shows where a task is: board lanes, card and detail tags,

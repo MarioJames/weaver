@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { defaultConfig, quotaRefreshEnabled, quotaSettings, validateConfig } from '../src/main/policy/routing';
+import { defaultConfig, validateConfig } from '../src/main/policy/routing';
+import { quotaRefreshEnabled, quotaSettings } from '../src/shared/policy/settings';
 import { PolicyStore } from '../src/main/policy/store';
 import { applyQuotaSnapshot, quotaRefreshTargets } from '../src/main/policy/quota';
 import { QuotaScheduler } from '../src/main/quota/scheduler';
-import type { EngineQuotaRecord, QuotaEngine } from '../src/shared/quota';
+import type { EngineQuotaRecord, QuotaEngine } from '../src/shared/contracts/quota';
 
 const now = Date.parse('2030-01-01T00:00:00Z');
 

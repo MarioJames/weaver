@@ -1,7 +1,7 @@
 import { useNotifyError } from '../notify';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Descriptions, Modal, Tag, Text, TextArea } from '@lobehub/ui/base-ui';
-import type { Task } from '../../shared/types';
+import type { Task } from '../../shared/contracts/tasks';
 import { command } from '../commands';
 import { toneColor } from '../log-view';
 import { DISPLAY_LABELS, DISPLAY_TONES, type DisplayStatus } from '../status-colors';

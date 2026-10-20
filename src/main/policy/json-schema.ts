@@ -1,7 +1,8 @@
 // Derived from skill-foundry agents-cooperation, revision 61989b1 (Apache-2.0).
 // Weaver adaptation: pure policy only; no CLI, sessions, launch flags, or host reads.
+import type { Issue } from '../../shared/contracts/policy';
+
 /** Minimal JSON Schema (draft 2020-12 subset) validator for the keywords our schemas use. */
-export interface Issue { path: string; message: string }
 export type Schema = { [key: string]: any };
 
 const ANNOTATIONS = new Set(["$schema", "$id", "$comment", "$defs", "title", "description", "default", "examples"]);

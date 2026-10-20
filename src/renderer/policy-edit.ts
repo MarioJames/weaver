@@ -1,4 +1,5 @@
-import { DEFAULT_WEIGHT, WEIGHT_MAX, type Config, type Owner, type Worker } from '../main/policy/routing';
+import { DEFAULT_WEIGHT, WEIGHT_MAX } from '../shared/policy/weights';
+import { type Config, type Owner, type Worker } from '../shared/contracts/policy';
 
 export { DEFAULT_WEIGHT, WEIGHT_MAX };
 

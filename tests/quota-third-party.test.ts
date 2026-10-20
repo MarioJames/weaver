@@ -4,9 +4,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { QuotaProber } from '../src/main/quota';
-import { THIRD_PARTY_DETAIL } from '../src/main/quota/messages';
+import { THIRD_PARTY_DETAIL } from '../src/shared/contracts/quota';
 import { codexModelProvider } from '../src/main/quota/third-party';
-import type { EngineQuotaRecord } from '../src/shared/quota';
+import type { EngineQuotaRecord } from '../src/shared/contracts/quota';
 import { quotaRecoveryText, quotaStatusText } from '../src/renderer/quota-view';
 
 const start = Date.parse('2026-10-18T12:00:00Z');

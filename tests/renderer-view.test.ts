@@ -4,7 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
-import type { Task } from '../src/shared/types';
+import type { Task } from '../src/shared/contracts/tasks';
 import { TASK_COLUMNS, filterTasks, isActive, reviewLabel, reviewStatus, taskColumn } from '../src/renderer/task-view';
 import { TaskBoard } from '../src/renderer/components/TaskBoard';
 import { TaskDetail } from '../src/renderer/components/TaskDetail';
@@ -14,7 +14,8 @@ import { ArtifactsPanel } from '../src/renderer/components/ArtifactsPanel';
 import { NamedInputNumber, NamedSelect, NamedSwitch } from '../src/renderer/components/NamedControls';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
 import { EnginesPage } from '../src/renderer/pages/EnginesPage';
-import { defaultConfig, type Block } from '../src/main/policy/routing';
+import { defaultConfig } from '../src/main/policy/routing';
+import { type Block } from '../src/shared/contracts/policy';
 import type { PolicyDraft } from '../src/renderer/usePolicyDraft';
 function markup(node: React.ReactNode) {
   const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;

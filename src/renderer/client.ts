@@ -1,19 +1,16 @@
 import { reconnect, notifyError, notifyInfo, isTransientError } from './notify';
 import { isFieldError } from './policy-edit';
-import { API_VERSION, type CommandResponse } from '../shared/commands';
-import type { WeaverAPI } from '../shared/types';
-import type { FreeChannelStatus } from '../main/free-channel';
+import { API_VERSION, type CommandResponse } from '../shared/contracts/commands';
+import type { WeaverAPI } from '../shared/contracts/api';
+import type { EngineModelList, EngineModelListInput } from '../shared/engines';
+import type { EngineStallStatus, FreeChannelStatus, StallHistoryRecord, StallStatus } from '../shared/contracts/monitoring';
 
-/** A probe the monitor ran before deciding a worker scope was stuck. */
-export interface StallProbe { ok: boolean; ms: number; error?: string }
-export interface StallHistoryEntry { at: string; level: number; tasks: string[]; stalledMinutes?: number; probe?: StallProbe }
-export interface StallEngineState { level: number; lastTriggerAt?: string; needsAttention: boolean; history: StallHistoryEntry[] }
-export interface StallSnapshot {
-  engines: Record<string, StallEngineState>;
-  config: { stallMinutes: number; quorum: number; ladder: (number | null)[]; resetHours: number };
-}
+/** The renderer reads a subset of the control plane's stall status; the wire shape is defined once in shared/contracts/monitoring. */
+export type StallHistoryEntry = Pick<StallHistoryRecord, 'at' | 'level' | 'tasks' | 'stalledMinutes' | 'probe'>;
+export type StallEngineState = Pick<EngineStallStatus, 'level' | 'lastTriggerAt' | 'needsAttention'> & { history: StallHistoryEntry[] };
+export type StallSnapshot = Pick<StallStatus, 'config'> & { engines: Record<string, StallEngineState> };
 /** What `window.weaver` exposes: the shared task/policy API plus the stall, free-probe and model-list reads the web control plane serves. */
-export type RendererAPI = Omit<WeaverAPI, 'getStall'> & FreeProbeAPI & { getStall: () => Promise<StallSnapshot>; listEngineModels: (input: import('../main/engines/models').EngineModelListInput) => Promise<import('../main/engines/models').EngineModelList> };
+export type RendererAPI = Omit<WeaverAPI, 'getStall'> & FreeProbeAPI & { getStall: () => Promise<StallSnapshot>; listEngineModels: (input: EngineModelListInput) => Promise<EngineModelList> };
 /** Free-channel probing: `workerProbeStatus` reads, `workerProbe` runs one real greeting per named worker. */
 export interface FreeProbeAPI {
   workerProbeStatus: () => Promise<FreeChannelStatus>;

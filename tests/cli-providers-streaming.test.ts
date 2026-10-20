@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { promisify } from 'node:util';
 import { startCliAgent } from '../src/main/adapters/cli';
-import type { WorkerRecord } from '../src/shared/types';
+import type { WorkerRecord } from '../src/shared/contracts/tasks';
 
 const run = promisify(execFile);
 async function fixture(script: string) {

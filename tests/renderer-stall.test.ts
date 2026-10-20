@@ -5,7 +5,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { BlockList, EnginesPage, StallNotice } from '../src/renderer/pages/EnginesPage';
-import { defaultConfig, type Block } from '../src/main/policy/routing';
+import { defaultConfig } from '../src/main/policy/routing';
+import { type Block } from '../src/shared/contracts/policy';
 import type { StallEngineState, StallHistoryEntry } from '../src/renderer/client';
 import type { PolicyDraft } from '../src/renderer/usePolicyDraft';
 

@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TaskStore } from '../src/main/store';
 import { MockOwnerHostAdapter } from '../src/main/adapters/logical';
-import { ContinuationService, handoffPrompt, idleContinuationDue, redactContext, MAX_HANDOFF_PROMPT_CHARS, MAX_CONTEXT_PACK_BYTES, type ContinuationTask, type ContextPack } from '../src/main/continuation';
+import { ContinuationService, handoffPrompt, idleContinuationDue, redactContext, MAX_HANDOFF_PROMPT_CHARS, MAX_CONTEXT_PACK_BYTES, type ContinuationTask } from '../src/main/continuation';
+import type { ContextPack } from '../src/shared/contracts/continuation';
 import { metadataOf, setMetadataOf } from './helpers/store-metadata';
 function fixture() {
  const dir = mkdtempSync(join(tmpdir(), 'weaver-continuation-'));

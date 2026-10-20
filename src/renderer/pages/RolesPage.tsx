@@ -13,7 +13,8 @@ import { Button, Checkbox, Input, Modal, Skeleton, Tag, Text } from '@lobehub/ui
 import type { HelloResult } from '../../shared/engines';
 import { startHello, useHelloRun } from '../hello-runs';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
-import { EFFORTS, type Availability, type Block, type Owner, type Worker } from '../../main/policy/routing';
+import { EFFORTS } from '../../shared/policy/settings';
+import { type Availability, type Block, type Owner, type Worker } from '../../shared/contracts/policy';
 import { blankOwner, blankWorker, removeRole, renameRole, roleDeleteImpact, roleIdError, syncRoleEditor, type RoleSection } from '../policy-edit';
 import { OwnerScheduleFields } from '../components/OwnerSchedule';
 import { ModelPicker } from '../components/ModelPicker';

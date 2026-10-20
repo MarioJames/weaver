@@ -1,6 +1,6 @@
 import { StringDecoder } from 'node:string_decoder';
 import { parseWorkerRecord } from '../shared/validation';
-import type { WorkerRecord } from '../shared/types';
+import type { WorkerRecord } from '../shared/contracts/tasks';
 /** Strict UTF-8 JSONL framing. Each line is a complete JSON object, not a vendor-specific event. */
 export class JsonlParser {
  private decoder = new StringDecoder('utf8');
