@@ -13,6 +13,7 @@ import { startLocalIPC } from '../src/main/local-ipc';
 import { startCliAgent } from '../src/main/adapters/cli/index';
 import { startRuntime, type WeaverRuntime } from '../src/main/runtime';
 import { ENGINE_CATALOG, EXECUTION_BOUNDARY } from '../src/shared/engines';
+import { RPC_METHODS } from '../src/shared/contracts/rpc';
 
 const REPO = process.cwd();
 const TASK = { title: 'Imported', instruction: 'demo only', owner: { name: 'demo', transport: 'herdr-visible', session: 's', pane: 'p' } };
@@ -577,8 +578,12 @@ test('listEngineModels is a one-argument read RPC: valid input lists, malformed 
     }
   } finally { await runtime.close(); await rm(dataDir, { recursive: true, force: true }); }
   const client = await readFile(new URL('../src/renderer/api/client.ts', import.meta.url), 'utf8');
-  assert.match(client, /METHOD_DEADLINE_MS[^\n]*listEngineModels: 40_000/, 'the renderer waits up to 40 seconds for a model list');
-  assert.match(client, /listEngineModels: input => call\('listEngineModels', \[input\]\)/);
+  assert.equal(RPC_METHODS.listEngineModels.timeoutMs, 40_000, 'the renderer waits up to 40 seconds for a model list');
+  assert.equal(RPC_METHODS.workerProbe.timeoutMs, 130_000);
+  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'timeoutMs' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['listEngineModels', 'workerProbe']);
+  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'retryable' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['capabilities', 'getPolicy', 'getQuota', 'getStall', 'getTask', 'listEngineModels', 'listTasks', 'previewRoute', 'sayHiResult', 'validatePolicy', 'workerProbeStatus']);
+  assert.match(client, /from '\.\.\/\.\.\/shared\/contracts\/rpc'/, 'the renderer client derives its method table, deadlines and retryable reads from the shared RPC contract');
+  assert.doesNotMatch(client, /call\('listEngineModels'|\w+: \d+_000/, 'the renderer client does not hand-write method wrappers or deadlines');
 });
 
 test('policy saves are numbered revisions over RPC: history lists them, rollback is a new revision, a stale save is a 409 conflict', async t => {

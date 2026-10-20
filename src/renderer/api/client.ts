@@ -1,6 +1,7 @@
 import { reconnect, notifyError, notifyInfo, isTransientError } from './notify';
 import { isFieldError } from '../policy/policy-edit';
-import { API_VERSION, type CommandResponse } from '../../shared/contracts/commands';
+import { API_VERSION, type CommandResponse, type ReadCommand } from '../../shared/contracts/commands';
+import { RPC_METHODS, type RpcMethod, type RpcMethodSpec } from '../../shared/contracts/rpc';
 import type { WeaverAPI } from '../../shared/contracts/api';
 import type { EngineModelList, EngineModelListInput } from '../../shared/engines';
 import type { EngineStallStatus, FreeChannelStatus, StallHistoryRecord, StallStatus } from '../../shared/contracts/monitoring';
@@ -21,8 +22,23 @@ const RPC_PATH = '/api/rpc';
 const POLL_GAP_MS = 1000;
 /** Same bound as the local IPC transport deadline. It covers the fetch and the response body. */
 export const RPC_DEADLINE_MS = 15_000;
-/** A probe waits on a real model reply (up to 120 s per worker), so its call outlives the default deadline. */
-const METHOD_DEADLINE_MS: Record<string, number> = { workerProbe: 130_000, listEngineModels: 40_000 };
+
+/** Methods the shared RPC table serves that the browser never calls (CLI and diagnostics only). */
+const NOT_BROWSER_METHODS = ['policyHistory', 'policyRollback', 'serverInfo'] as const satisfies readonly RpcMethod[];
+type BrowserMethod = Exclude<RpcMethod, (typeof NOT_BROWSER_METHODS)[number]>;
+/** Every method `window.weaver` forwards over RPC; the table and RendererAPI must agree. */
+type RemoteMethods = Exclude<keyof RendererAPI, 'onTasksChanged'>;
+const browserMethodsMatchRendererAPI: [BrowserMethod] extends [RemoteMethods] ? ([RemoteMethods] extends [BrowserMethod] ? true : never) : never = true;
+void browserMethodsMatchRendererAPI;
+
+const specOf = (method: string): RpcMethodSpec | undefined => (RPC_METHODS as Record<string, RpcMethodSpec>)[method];
+const BROWSER_METHODS = (Object.keys(RPC_METHODS) as RpcMethod[]).filter((method): method is BrowserMethod => !(NOT_BROWSER_METHODS as readonly string[]).includes(method));
+/** Reads the shared table marks retryable: repeated after a transient failure and de-duplicated while in flight. */
+const RETRYABLE_READS: ReadonlySet<string> = new Set(BROWSER_METHODS.filter(method => specOf(method)?.retryable));
+/** Deadline overrides from the shared table. A probe waits on a real model reply, so its call outlives the default deadline. */
+const METHOD_DEADLINE_MS: ReadonlyMap<string, number> = new Map(BROWSER_METHODS.flatMap(method => { const ms = specOf(method)?.timeoutMs; return ms === undefined ? [] : [[method, ms] as const]; }));
+/** Logical commands the renderer repeats and de-duplicates: the polling and detail reads, a deliberate subset of READ_COMMANDS. */
+const RETRYABLE_COMMAND_READS: ReadonlySet<string> = new Set<ReadCommand>(['sync.status', 'tasks.list', 'tasks.get', 'tasks.events', 'tasks.results', 'owners.list', 'owners.continuation.get']);
 
 type Rpc = (method: string, args: unknown[], signal?: AbortSignal) => Promise<unknown>;
 
@@ -203,10 +219,8 @@ function watchTasks(call: Rpc): WeaverAPI['onTasksChanged'] {
 }
 
 export function createBrowserClient(): RendererAPI {
-  const reads = new Set(['getPolicy','getQuota','getStall','listTasks','getTask','capabilities','validatePolicy','previewRoute','sayHiResult','workerProbeStatus','listEngineModels']);
-  const commandReads = new Set(['sync.status','tasks.list','tasks.get','tasks.events','tasks.results','owners.list','owners.continuation.get']);
   const checked = async (method: string, args: unknown[], signal?: AbortSignal) => {
-    const result = await rpc(method,args,signal,METHOD_DEADLINE_MS[method]);
+    const result = await rpc(method,args,signal,METHOD_DEADLINE_MS.get(method));
     if (method === 'command' && result && typeof result === 'object' && 'ok' in result && !result.ok) {
       const failure = (result as CommandResponse).error;
       if (isTransientError(failure)) throw controlError(failure?.code ?? 'NETWORK',failure?.message ?? '控制面不可用');
@@ -216,7 +230,7 @@ export function createBrowserClient(): RendererAPI {
   const inflight = new Map<string,Promise<unknown>>();
   const invoke: Rpc = async (method,args,signal) => {
     const request = args[0] as { command?: string; commandId?: string } | undefined;
-    const read = reads.has(method) || (method === 'command' && !request?.commandId && commandReads.has(request?.command ?? ''));
+    const read = RETRYABLE_READS.has(method) || (method === 'command' && !request?.commandId && RETRYABLE_COMMAND_READS.has(request?.command ?? ''));
     try { return await checked(method,args,signal); }
     catch(error) {
       if (signal?.aborted) throw error;
@@ -234,7 +248,7 @@ export function createBrowserClient(): RendererAPI {
   };
   const call: Rpc = (method,args,signal) => {
     const request=args[0] as {command?:string;commandId?:string}|undefined;
-    const read=reads.has(method)||(method==='command'&&!request?.commandId&&commandReads.has(request?.command??''));
+    const read=RETRYABLE_READS.has(method)||(method==='command'&&!request?.commandId&&RETRYABLE_COMMAND_READS.has(request?.command??''));
     if(!read||signal)return invoke(method,args,signal);
     const key=JSON.stringify([method,args]);
     const pending=inflight.get(key);if(pending)return pending;
@@ -242,28 +256,9 @@ export function createBrowserClient(): RendererAPI {
   };
   const invalidations = new Set<() => void>();
   const watch = watchTasks(call);
+  const remote = Object.fromEntries(BROWSER_METHODS.map(method => [method, RPC_METHODS[method].arity === 0 ? () => call(method, []) : (arg: unknown) => call(method, [arg])])) as unknown as Omit<RendererAPI, 'onTasksChanged'>;
   return {
-    command: request => call('command', [request]) as ReturnType<WeaverAPI['command']>,
-    getPolicy: () => call('getPolicy', []) as ReturnType<WeaverAPI['getPolicy']>,
-    getQuota: () => call('getQuota', []) as ReturnType<WeaverAPI['getQuota']>,
-    refreshQuota: input => call('refreshQuota', [input]) as ReturnType<WeaverAPI['refreshQuota']>,
-    getStall: () => call('getStall', []) as ReturnType<RendererAPI['getStall']>,
-    workerProbeStatus: () => call('workerProbeStatus', []) as ReturnType<RendererAPI['workerProbeStatus']>,
-    workerProbe: input => call('workerProbe', [input]) as ReturnType<RendererAPI['workerProbe']>,
-    validatePolicy: config => call('validatePolicy', [config]) as ReturnType<WeaverAPI['validatePolicy']>,
-    savePolicy: input => call('savePolicy', [input]) as ReturnType<WeaverAPI['savePolicy']>,
-    previewRoute: input => call('previewRoute', [input]) as ReturnType<WeaverAPI['previewRoute']>,
-    scanEngines: () => call('scanEngines', []) as ReturnType<WeaverAPI['scanEngines']>,
-    listEngineModels: input => call('listEngineModels', [input]) as ReturnType<RendererAPI['listEngineModels']>,
-    sayHi: input => call('sayHi', [input]) as ReturnType<WeaverAPI['sayHi']>,
-    sayHiResult: id => call('sayHiResult', [id]) as ReturnType<WeaverAPI['sayHiResult']>,
-    setEngineEnabled: input => call('setEngineEnabled', [input]) as ReturnType<WeaverAPI['setEngineEnabled']>,
-    listTasks: () => call('listTasks', []) as ReturnType<WeaverAPI['listTasks']>,
-    getTask: id => call('getTask', [id]) as ReturnType<WeaverAPI['getTask']>,
-    createTask: input => call('createTask', [input]) as ReturnType<WeaverAPI['createTask']>,
-    startTask: id => call('startTask', [id]) as ReturnType<WeaverAPI['startTask']>,
-    cancelTask: id => call('cancelTask', [id]) as ReturnType<WeaverAPI['cancelTask']>,
-    capabilities: () => call('capabilities', []) as ReturnType<WeaverAPI['capabilities']>,
+    ...remote,
     onTasksChanged: callback => { invalidations.add(callback); const unsubscribe=watch(callback); return ()=>{invalidations.delete(callback);unsubscribe();}; },
   };
 }
