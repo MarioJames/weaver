@@ -6,7 +6,7 @@ import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../src/shared/contracts/tasks';
 import { PENDING_TASK_TITLE } from '../src/shared/validation';
-import { TaskDetail } from '../src/renderer/components/TaskDetail';
+import { TaskDetail } from '../src/renderer/features/tasks/TaskDetail';
 
 function markup(node: React.ReactNode) {
   const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;

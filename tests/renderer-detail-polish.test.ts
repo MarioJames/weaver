@@ -5,13 +5,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { toast, type ToastOptions } from '@lobehub/ui/base-ui';
-import { ArtifactsPanel } from '../src/renderer/components/ArtifactsPanel';
-import { displayLog } from '../src/renderer/log-view';
-import { compactTime, fullTime } from '../src/renderer/timezone';
-import { notifyError } from '../src/renderer/notify';
+import { ArtifactsPanel } from '../src/renderer/features/tasks/ArtifactsPanel';
+import { displayLog } from '../src/renderer/features/tasks/log-view';
+import { compactTime, fullTime } from '../src/renderer/format/timezone';
+import { notifyError } from '../src/renderer/api/notify';
 import { readFileSync } from 'node:fs';
 import { transformSync } from 'esbuild';
-const app = readFileSync(new URL('../src/renderer/App.tsx', import.meta.url), 'utf8');
+const app = readFileSync(new URL('../src/renderer/app/App.tsx', import.meta.url), 'utf8');
 const routeSource = app.slice(app.indexOf('function pageFromHash'), app.indexOf('/** The hash'));
 const pageFromHash = new Function('PAGES', transformSync(routeSource.replace('export ', ''), { loader: 'ts' }).code + '; return pageFromHash;' )(['tasks', 'engines', 'owners', 'workers', 'settings']) as () => string;
 const markup = (node: React.ReactNode) => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { enableCustomFonts: false, children: node }) }));
@@ -60,7 +60,7 @@ test('direct and copied legacy URLs resolve to the same page', () => {
 });
 
 test('accepted detail omits retry and counts constraints with acceptance criteria', async () => {
-  const { TaskDetail } = await import('../src/renderer/components/TaskDetail');
+  const { TaskDetail } = await import('../src/renderer/features/tasks/TaskDetail');
   const task = { id: 'accepted', title: '已验收任务', instruction: '检查', owner: { name: 'parent', transport: 'herdr-visible', session: 's', pane: 'p' }, status: 'completed', reviewState: 'accepted', constraints: ['约束一', '约束二'], acceptanceCriteria: ['标准'], events: [], artifacts: [], progress: 100, createdAt: '2026-10-19T12:00:00Z', updatedAt: '2026-10-19T12:00:00Z' } as const;
   const html = markup(React.createElement(TaskDetail, { task: { ...task, constraints: [...task.constraints], acceptanceCriteria: [...task.acceptanceCriteria], events: [], artifacts: [] }, busy: false, action: async () => true, onStart() {}, onCancel() {}, onRetry() {} }));
   assert.doesNotMatch(html, /新建重试任务/);

@@ -5,9 +5,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { TaskEvent } from '../src/shared/contracts/tasks';
-import { condenseEvents, eventBadge, filterCondensed, formatDuration, isTimelineNoise, normalizeToolName, relativeTime, timelineActive, toolSteps } from '../src/renderer/log-view';
-import { styles as eventStyles } from '../src/renderer/components/events-style';
-import { EventsPanel } from '../src/renderer/components/EventsPanel';
+import { condenseEvents, eventBadge, filterCondensed, formatDuration, isTimelineNoise, normalizeToolName, relativeTime, timelineActive, toolSteps } from '../src/renderer/features/tasks/log-view';
+import { styles as eventStyles } from '../src/renderer/features/tasks/events-style';
+import { EventsPanel } from '../src/renderer/features/tasks/EventsPanel';
 
 function event(id: string, kind: TaskEvent['kind'], message: string, seconds = 0): TaskEvent {
   return { id, at: `2026-10-18T00:00:${String(seconds).padStart(2, '0')}Z`, kind, message };

@@ -5,11 +5,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../src/shared/contracts/tasks';
-import { TaskBoard, TaskFacets } from '../src/renderer/components/TaskBoard';
-import { TasksPage } from '../src/renderer/pages/TasksPage';
-import { archiveColumns, archiveRowProps } from '../src/renderer/components/ArchiveDrawer';
-import { DISPLAY_TONES } from '../src/renderer/status-colors';
-import { emptySelection, ENDED_EXPANDED_KEY } from '../src/renderer/task-view';
+import { TaskBoard, TaskFacets } from '../src/renderer/features/tasks/TaskBoard';
+import { TasksPage } from '../src/renderer/features/tasks/TasksPage';
+import { archiveColumns, archiveRowProps } from '../src/renderer/features/tasks/ArchiveDrawer';
+import { DISPLAY_TONES } from '../src/renderer/format/status-colors';
+import { emptySelection } from '../src/renderer/features/tasks/task-filters';
+import { ENDED_EXPANDED_KEY } from '../src/renderer/features/tasks/task-persistence';
 
 const now = new Date(2026, 9, 19, 14, 25).getTime();
 const task: Task = { id: 'one', title: 'POLISH_TITLE', status: 'running', owner: { name: 'Parent', transport: 'herdr-visible', session: '', pane: '' }, instruction: '', workspace: '/projects/enterprise', progress: 0, createdAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString(), events: [], artifacts: [] };

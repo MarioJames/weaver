@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const source = readFileSync(new URL('../src/renderer/style.ts', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/renderer/features/tasks/task-style.ts', import.meta.url), 'utf8');
 const block = (key: string, next: string) => source.slice(source.indexOf(`  ${key}: css\``), source.indexOf(`  ${next}: css\``));
 
 test('lane styles use theme tokens rather than literal colors and carry no accent bar or header border', () => {
@@ -30,7 +30,7 @@ test('the card title is a plain text block, not a two-column flex layout', () =>
 
 test('generated lane CSS has visible semantic mixes and scrolls below 1180px', async () => {
   const { extractStaticStyle } = await import('antd-style');
-  const { styles } = await import('../src/renderer/style');
+  const { taskStyles: styles } = await import('../src/renderer/features/tasks/task-style');
   const css = extractStaticStyle(`<div class="${styles.columns} ${styles.column} ${styles.boardScrollHint}"></div>`, { includeAntd: false }).map(item => item.css).join('');
   assert.match(css, /color-mix\(in srgb,\s*var\(--ant-color-info\) 8%,\s*transparent\)/);
   assert.match(css, /color-mix\(in srgb,\s*var\(--ant-color-warning\) 10%,\s*transparent\)/);

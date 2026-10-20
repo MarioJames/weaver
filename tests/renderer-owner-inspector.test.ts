@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../src/shared/contracts/tasks';
-import { ContinuationDialog, ownerOptions, OwnerInspector } from '../src/renderer/components/OwnerInspector';
+import { ContinuationDialog, ownerOptions, OwnerInspector } from '../src/renderer/features/roles/OwnerInspector';
 
 function markup(node: React.ReactNode) {
   const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;

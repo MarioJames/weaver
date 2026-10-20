@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../src/shared/contracts/tasks';
-import { ReviewPanel, ReviewView, decisionEvent } from '../src/renderer/components/ReviewPanel';
+import { ReviewPanel, ReviewView, decisionEvent } from '../src/renderer/features/tasks/ReviewPanel';
 
 function markup(node: React.ReactNode) {
   const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;

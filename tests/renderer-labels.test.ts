@@ -5,9 +5,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { defaultConfig } from '../src/main/policy/routing';
-import { RolesPage } from '../src/renderer/pages/RolesPage';
-import { TaskComposer } from '../src/renderer/components/TaskComposer';
-import type { PolicyDraft } from '../src/renderer/usePolicyDraft';
+import { RolesPage } from '../src/renderer/features/roles/RolesPage';
+import { TaskComposer } from '../src/renderer/features/tasks/TaskComposer';
+import type { PolicyDraft } from '../src/renderer/policy/usePolicyDraft';
 
 function markup(node: React.ReactNode) {
   return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { enableCustomFonts: false }, node) }));
@@ -68,8 +68,8 @@ test('task native input and textareas have visible label links even with workspa
 });
 
 test('the model field is one input with suggestions: typing narrows, a complete name offers the whole list again', async () => {
-  const { matchModel } = await import('../src/renderer/engine-models');
-  const { ModelPicker } = await import('../src/renderer/components/ModelPicker');
+  const { matchModel } = await import('../src/renderer/features/engines/engine-models');
+  const { ModelPicker } = await import('../src/renderer/features/engines/ModelPicker');
   const options = [{ value: 'gpt-5', label: 'gpt-5 · GPT-5' }, { value: 'gpt-5-mini' }, { value: 'claude-opus-4-1', label: 'claude-opus-4-1 · Claude Opus 4.1' }];
   const shown = (query: string) => options.filter(item => matchModel(options, query, item)).map(item => item.value);
   assert.deepEqual(shown(''), ['gpt-5', 'gpt-5-mini', 'claude-opus-4-1']);

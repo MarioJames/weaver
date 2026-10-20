@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { startHello } from '../src/renderer/hello-runs';
+import { startHello } from '../src/renderer/features/engines/hello-runs';
 
 test('a say hi run is kept per worker, polls until done, and ignores a second start while running', async () => {
   const calls: string[] = [];
@@ -15,7 +15,7 @@ test('a say hi run is kept per worker, polls until done, and ignores a second st
   assert.deepEqual(calls, ['start:codex']);
   assert.equal(polls, 2);
   // The store outlives any component; read it the way the hook does.
-  const store = await import('../src/renderer/hello-runs');
+  const store = await import('../src/renderer/features/engines/hello-runs');
   let seen: unknown;
   const React = await import('react');
   const { renderToStaticMarkup } = await import('react-dom/server');

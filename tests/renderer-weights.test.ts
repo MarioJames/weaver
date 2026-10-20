@@ -6,8 +6,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { defaultConfig } from '../src/main/policy/routing';
-import { OwnerScheduleFields } from '../src/renderer/components/OwnerSchedule';
-import { withWorkerWeight, workerWeight } from '../src/renderer/policy-edit';
+import { OwnerScheduleFields } from '../src/renderer/features/roles/OwnerSchedule';
+import { withWorkerWeight, workerWeight } from '../src/renderer/policy/policy-edit';
 
 function markup(node: React.ReactNode) {
   const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;
@@ -48,7 +48,7 @@ test('weight edits keep saved row order until the save is accepted', () => {
 });
 
 test('the content area keeps a stable scrollbar gutter', () => {
-  const css = readFileSync(new URL('../src/renderer/style.css', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../src/renderer/app/style.css', import.meta.url), 'utf8');
   assert.match(css, /overflow-y:\s*scroll/);
   assert.match(css, /scrollbar-gutter:\s*stable/);
 });

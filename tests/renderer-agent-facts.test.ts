@@ -6,10 +6,10 @@ import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Config } from '../src/shared/contracts/policy';
 import type { Task } from '../src/shared/contracts/tasks';
-import { ownerKindLookup } from '../src/renderer/task-view';
-import { AgentFacts } from '../src/renderer/components/AgentFacts';
-import { AgentLabel, EngineIcon } from '../src/renderer/components/EngineIcon';
-import { TaskDetail } from '../src/renderer/components/TaskDetail';
+import { ownerKindLookup } from '../src/renderer/features/tasks/task-view';
+import { AgentFacts } from '../src/renderer/features/tasks/AgentFacts';
+import { AgentLabel, EngineIcon } from '../src/renderer/ui/EngineIcon';
+import { TaskDetail } from '../src/renderer/features/tasks/TaskDetail';
 
 function markup(node: React.ReactNode) {
   const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;

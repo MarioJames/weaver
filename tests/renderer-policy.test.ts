@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { defaultConfig } from '../src/main/policy/routing';
-import { appendWorker, removeRole, renameRole, roleDeleteImpact, syncRoleEditor, withWorkerWeight, withoutListedWorker, workerWeight } from '../src/renderer/policy-edit';
+import { appendWorker, removeRole, renameRole, roleDeleteImpact, syncRoleEditor, withWorkerWeight, withoutListedWorker, workerWeight } from '../src/renderer/policy/policy-edit';
 
 
 test('role id editor follows the visible record', () => {
@@ -41,7 +41,7 @@ test('renaming or removing a worker keeps weight keys saveable', () => {
 });
 
 test('a role list item only notes states its enable switch does not already show', async () => {
-  const { roleNote } = await import('../src/renderer/pages/RolesPage');
+  const { roleNote } = await import('../src/renderer/features/roles/RolesPage');
   assert.equal(roleNote({ status: 'available' }, false), undefined);
   assert.equal(roleNote({ status: 'disabled' }, false), undefined);
   assert.deepEqual(roleNote({ status: 'engine_disabled' }, false), { text: '引擎未启用' });

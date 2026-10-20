@@ -4,7 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
-import { BlockList, engineBlockText } from '../src/renderer/pages/EnginesPage';
+import { BlockList, engineBlockText } from '../src/renderer/features/engines/EnginesPage';
 import type { Block } from '../src/shared/contracts/policy';
 const NOW=new Date(2030,0,1,14,0).getTime();
 const block=(patch:Partial<Block>={}):Block=>({engine:'codex',reason:'A long manual reason '+ 'details '.repeat(100),since:new Date(NOW).toISOString(),...patch});

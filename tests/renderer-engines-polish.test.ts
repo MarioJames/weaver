@@ -4,11 +4,11 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
-import { EnginesPage, engineVersionText } from '../src/renderer/pages/EnginesPage';
-import { quotaVisibleWindows } from '../src/renderer/quota-view';
+import { EnginesPage, engineVersionText } from '../src/renderer/features/engines/EnginesPage';
+import { quotaVisibleWindows } from '../src/renderer/features/quota/quota-view';
 import { defaultConfig } from '../src/main/policy/routing';
 import type { EngineQuotaRecord, QuotaWindow } from '../src/shared/contracts/quota';
-import type { PolicyDraft } from '../src/renderer/usePolicyDraft';
+import type { PolicyDraft } from '../src/renderer/policy/usePolicyDraft';
 
 test('version label drops only a trailing commit hash, leaving the full probe available to the tooltip', () => {
   assert.equal(engineVersionText('grok 1.0.62 (1474f9cbdd91)'), 'grok 1.0.62');

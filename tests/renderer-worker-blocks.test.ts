@@ -7,10 +7,10 @@ import { motion } from 'motion/react';
 import { availabilityOf, coveringBlock } from '../src/shared/policy/availability';
 import { defaultConfig } from '../src/main/policy/routing';
 import { type Block } from '../src/shared/contracts/policy';
-import { workerStatusTag } from '../src/renderer/components/OwnerSchedule';
-import { BlockList, removeBlock } from '../src/renderer/pages/EnginesPage';
-import { roleNote } from '../src/renderer/pages/RolesPage';
-import { VENDOR_BLOCK_BY, blockOf } from '../src/renderer/probe-view';
+import { workerStatusTag } from '../src/renderer/features/roles/OwnerSchedule';
+import { BlockList, removeBlock } from '../src/renderer/features/engines/EnginesPage';
+import { roleNote } from '../src/renderer/features/roles/RolesPage';
+import { VENDOR_BLOCK_BY, blockOf } from '../src/renderer/features/probes/probe-view';
 
 const FUTURE = '2999-01-01T00:00:00.000Z';
 const NOW = Date.now();

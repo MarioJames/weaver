@@ -7,15 +7,15 @@ import { motion } from 'motion/react';
 import type { FreeChannelStatus, FreeWorkerStatus } from '../src/shared/contracts/monitoring';
 import { defaultConfig, validateConfig } from '../src/main/policy/routing';
 import { type Block } from '../src/shared/contracts/policy';
-import { FreeProbePanel } from '../src/renderer/components/FreeProbePanel';
-import { workerStatusTag } from '../src/renderer/components/OwnerSchedule';
-import type { FreeProbe } from '../src/renderer/hooks/useFreeProbe';
-import { RolesPage, roleNote } from '../src/renderer/pages/RolesPage';
-import { SettingsPage } from '../src/renderer/pages/SettingsPage';
-import { minutesError } from '../src/renderer/policy-edit';
-import { FREE_PROBE_BLOCK_BY, STALL_BLOCK_BY, VENDOR_BLOCK_BY, blockOf, blockText, lastProbeOf, nextProbeText, pauseOfBlock, probeDurationText, probeNoteText, probeScheduleText, probeStateView, recentProbes } from '../src/renderer/probe-view';
-import { createBrowserClient } from '../src/renderer/client';
-import type { PolicyDraft } from '../src/renderer/usePolicyDraft';
+import { FreeProbePanel } from '../src/renderer/features/probes/FreeProbePanel';
+import { workerStatusTag } from '../src/renderer/features/roles/OwnerSchedule';
+import type { FreeProbe } from '../src/renderer/features/probes/useFreeProbe';
+import { RolesPage, roleNote } from '../src/renderer/features/roles/RolesPage';
+import { SettingsPage } from '../src/renderer/features/settings/SettingsPage';
+import { minutesError } from '../src/renderer/policy/policy-edit';
+import { FREE_PROBE_BLOCK_BY, STALL_BLOCK_BY, VENDOR_BLOCK_BY, blockOf, blockText, lastProbeOf, nextProbeText, pauseOfBlock, probeDurationText, probeNoteText, probeScheduleText, probeStateView, recentProbes } from '../src/renderer/features/probes/probe-view';
+import { createBrowserClient } from '../src/renderer/api/client';
+import type { PolicyDraft } from '../src/renderer/policy/usePolicyDraft';
 
 function markup(node: React.ReactNode) {
   return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) })).replace(/<style[\s\S]*?<\/style>/g, '');

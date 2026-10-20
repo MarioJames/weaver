@@ -7,12 +7,16 @@ import { motion } from 'motion/react';
 import { defaultConfig } from '../src/main/policy/routing';
 import { type Block } from '../src/shared/contracts/policy';
 import type { Task } from '../src/shared/contracts/tasks';
-import { OwnerScheduleFields, workerStatusTag, workerWeightLock } from '../src/renderer/components/OwnerSchedule';
-import { TaskAgents } from '../src/renderer/components/TaskAgents';
-import { TaskBoard } from '../src/renderer/components/TaskBoard';
-import { TaskComposer, criteriaError, criteriaLines } from '../src/renderer/components/TaskComposer';
-import { createTask } from '../src/renderer/task-create';
-import { ENDED_EXPANDED_KEY, archivedTasks, childSummary, childSummaryLabel, columnize, emptySelection, nonArchived, recentWorkspaces, rootCancelNotice } from '../src/renderer/task-view';
+import { OwnerScheduleFields, workerStatusTag, workerWeightLock } from '../src/renderer/features/roles/OwnerSchedule';
+import { TaskAgents } from '../src/renderer/features/tasks/TaskAgents';
+import { TaskBoard } from '../src/renderer/features/tasks/TaskBoard';
+import { TaskComposer, criteriaError, criteriaLines } from '../src/renderer/features/tasks/TaskComposer';
+import { createTask } from '../src/renderer/features/tasks/task-create';
+import { childSummary, childSummaryLabel, recentWorkspaces, rootCancelNotice } from '../src/renderer/features/tasks/task-view';
+import { columnize } from '../src/renderer/features/tasks/task-columns';
+import { archivedTasks, nonArchived } from '../src/renderer/features/tasks/task-archive';
+import { emptySelection } from '../src/renderer/features/tasks/task-filters';
+import { ENDED_EXPANDED_KEY } from '../src/renderer/features/tasks/task-persistence';
 
 function markup(node: React.ReactNode) {
   return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) }));

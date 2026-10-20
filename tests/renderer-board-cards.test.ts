@@ -5,9 +5,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../src/shared/contracts/tasks';
-import { styles } from '../src/renderer/style';
-import { TaskBoard } from '../src/renderer/components/TaskBoard';
-import { applyTaskFilters, emptySelection, filterOptions, readTaskFilters, writeTaskFilters, TASK_FILTERS_KEY, ENDED_EXPANDED_KEY } from '../src/renderer/task-view';
+import { taskStyles as styles } from '../src/renderer/features/tasks/task-style';
+import { TaskBoard } from '../src/renderer/features/tasks/TaskBoard';
+import { applyTaskFilters, emptySelection, filterOptions } from '../src/renderer/features/tasks/task-filters';
+import { readTaskFilters, writeTaskFilters, TASK_FILTERS_KEY, ENDED_EXPANDED_KEY } from '../src/renderer/features/tasks/task-persistence';
 
 const now = Date.parse('2026-10-18T12:00:00Z');
 const base: Task = {

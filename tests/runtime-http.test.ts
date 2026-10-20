@@ -576,7 +576,7 @@ test('listEngineModels is a one-argument read RPC: valid input lists, malformed 
       assert.equal(rejected.json.error.code, 'INVALID_REQUEST', JSON.stringify(bad));
     }
   } finally { await runtime.close(); await rm(dataDir, { recursive: true, force: true }); }
-  const client = await readFile(new URL('../src/renderer/client.ts', import.meta.url), 'utf8');
+  const client = await readFile(new URL('../src/renderer/api/client.ts', import.meta.url), 'utf8');
   assert.match(client, /METHOD_DEADLINE_MS[^\n]*listEngineModels: 40_000/, 'the renderer waits up to 40 seconds for a model list');
   assert.match(client, /listEngineModels: input => call\('listEngineModels', \[input\]\)/);
 });

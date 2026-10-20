@@ -5,9 +5,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { readFileSync } from 'node:fs';
-import { ModelListSession, type ModelListSink } from '../src/renderer/engine-models';
+import { ModelListSession, type ModelListSink } from '../src/renderer/features/engines/engine-models';
 import type { EngineModelList, EngineModelListInput } from '../src/shared/engines';
-import { ModelPicker } from '../src/renderer/components/ModelPicker';
+import { ModelPicker } from '../src/renderer/features/engines/ModelPicker';
 
 const listOf = (engine: string, ...ids: string[]): EngineModelList => ({ engine, status: 'ok', source: 'test', models: ids.map(id => ({ id })), fetchedAt: '2026-01-01T00:00:00.000Z' });
 
@@ -118,6 +118,6 @@ test('the picker no longer tells the user to open the field to fetch models, and
 });
 
 test('the engines page has no model probe block, say-hi check or disable conflict', () => {
-  const source = readFileSync(new URL('../src/renderer/pages/EnginesPage.tsx', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/renderer/features/engines/EnginesPage.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /EngineModelProbe|HelloCheck|ModelPicker|模型探测|engineDisableConflict|请先停用/);
 });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { redactLog, selectEvents, exportEvents, displayLog } from '../src/renderer/log-view';
+import { redactLog, selectEvents, exportEvents, displayLog } from '../src/renderer/features/tasks/log-view';
 test('log redaction removes common credential formats',()=>{const value='Bearer ABCDEFG token=hidden password="secretpass" https://user:pw@example.com sk-abcdefghijklmnop ghp_abcdefghijklmnop';const redacted=redactLog(value);for(const secret of ['ABCDEFG','hidden','secretpass','user:pw','abcdefghijklmnop'])assert.equal(redacted.includes(secret),false);assert.match(redacted,/REDACTED/);});
 test('private key bodies are excluded from export',()=>{const events=[{id:'e',at:'2026-10-18T00:00:00Z',kind:'log' as const,message:'-----BEGIN PRIVATE KEY-----\nsensitivebody\n-----END PRIVATE KEY-----'}];const content=exportEvents('t',events);assert.doesNotMatch(content,/sensitivebody/);assert.match(content,/REDACTED PRIVATE KEY/);});
 test('kind and text filters operate on redacted display',()=>{const events=[{id:'a',at:'now',kind:'log' as const,message:'token=hidden hello'},{id:'b',at:'now',kind:'error' as const,message:'hello'}];assert.equal(selectEvents(events,'log','hello').length,1);assert.equal(selectEvents(events,'all','hidden').length,0);});

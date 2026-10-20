@@ -5,14 +5,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../src/shared/contracts/tasks';
-import { styles } from '../src/renderer/style';
-import { TaskBoard } from '../src/renderer/components/TaskBoard';
-import { ArchiveList, archiveColumns } from '../src/renderer/components/ArchiveDrawer';
-import {
-  FILTERS_COLLAPSED_KEY, FILTER_DIMENSIONS, TASK_FILTERS_KEY, TIME_RANGES, applyTaskFilters, archiveRows, archivedTasks, emptySelection, facetOptions,
-  filterOptions, filterSummary, readFiltersCollapsed, readTaskFilters, resolveSelection, selectedEntries, writeFiltersCollapsed,
-} from '../src/renderer/task-view';
-import type { TaskSelection } from '../src/renderer/task-view';
+import { taskStyles as styles } from '../src/renderer/features/tasks/task-style';
+import { TaskBoard } from '../src/renderer/features/tasks/TaskBoard';
+import { ArchiveList, archiveColumns } from '../src/renderer/features/tasks/ArchiveDrawer';
+import { archivedTasks } from '../src/renderer/features/tasks/task-archive';
+import { FILTER_DIMENSIONS, TIME_RANGES, applyTaskFilters, archiveRows, emptySelection, facetOptions, filterOptions, filterSummary, resolveSelection, selectedEntries } from '../src/renderer/features/tasks/task-filters';
+import { FILTERS_COLLAPSED_KEY, TASK_FILTERS_KEY, readFiltersCollapsed, readTaskFilters, writeFiltersCollapsed } from '../src/renderer/features/tasks/task-persistence';
+import type { TaskSelection } from '../src/renderer/features/tasks/task-filters';
 
 const now = Date.parse('2026-10-18T12:00:00Z');
 const hoursAgo = (hours: number) => new Date(now - hours * 3600000).toISOString();

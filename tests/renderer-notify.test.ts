@@ -5,12 +5,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { toast, type ToastOptions } from '@lobehub/ui/base-ui';
 import { motion } from 'motion/react';
-import { ConnectionNotice } from '../src/renderer/components/ConnectionNotice';
-import { ContinuationDialog } from '../src/renderer/components/OwnerInspector';
-import { PolicyHeader } from '../src/renderer/components/PolicyHeader';
-import { SettingsPage } from '../src/renderer/pages/SettingsPage';
-import type { PolicyDraft } from '../src/renderer/usePolicyDraft';
-import { notifyError } from '../src/renderer/notify';
+import { ConnectionNotice } from '../src/renderer/api/ConnectionNotice';
+import { ContinuationDialog } from '../src/renderer/features/roles/OwnerInspector';
+import { PolicyHeader } from '../src/renderer/policy/PolicyHeader';
+import { SettingsPage } from '../src/renderer/features/settings/SettingsPage';
+import type { PolicyDraft } from '../src/renderer/policy/usePolicyDraft';
+import { notifyError } from '../src/renderer/api/notify';
 
 function markup(node: React.ReactNode) {
   return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode:'dark',enableCustomFonts:false,children:node }) }));

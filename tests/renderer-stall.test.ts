@@ -4,11 +4,11 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
-import { BlockList, EnginesPage, StallNotice } from '../src/renderer/pages/EnginesPage';
+import { BlockList, EnginesPage, StallNotice } from '../src/renderer/features/engines/EnginesPage';
 import { defaultConfig } from '../src/main/policy/routing';
 import { type Block } from '../src/shared/contracts/policy';
-import type { StallEngineState, StallHistoryEntry } from '../src/renderer/client';
-import type { PolicyDraft } from '../src/renderer/usePolicyDraft';
+import type { StallEngineState, StallHistoryEntry } from '../src/renderer/api/client';
+import type { PolicyDraft } from '../src/renderer/policy/usePolicyDraft';
 
 function markup(node: React.ReactNode) {
   const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;

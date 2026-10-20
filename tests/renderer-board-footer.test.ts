@@ -5,9 +5,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../src/shared/contracts/tasks';
-import { styles } from '../src/renderer/style';
-import { TaskBoard } from '../src/renderer/components/TaskBoard';
-import { ENDED_EXPANDED_KEY, applyTaskFilters, archiveRows, cardFooter, cardFooterText, columnize, emptySelection, facetOptions, filterOptions, nonArchived, ownerHostName, ownerLabel, resolveSelection, taskOptions, childIndex } from '../src/renderer/task-view';
+import { taskStyles as styles } from '../src/renderer/features/tasks/task-style';
+import { TaskBoard } from '../src/renderer/features/tasks/TaskBoard';
+import { ownerHostName, ownerLabel } from '../src/renderer/features/tasks/task-view';
+import { cardFooter, cardFooterText } from '../src/renderer/features/tasks/task-footer';
+import { columnize } from '../src/renderer/features/tasks/task-columns';
+import { nonArchived } from '../src/renderer/features/tasks/task-archive';
+import { applyTaskFilters, archiveRows, emptySelection, facetOptions, filterOptions, resolveSelection, taskOptions, childIndex } from '../src/renderer/features/tasks/task-filters';
+import { ENDED_EXPANDED_KEY } from '../src/renderer/features/tasks/task-persistence';
 
 const now = new Date(2026, 9, 19, 23, 0).getTime();
 const at = (hour: number, minute: number, day = 19) => new Date(2026, 9, day, hour, minute).toISOString();

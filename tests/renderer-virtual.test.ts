@@ -6,9 +6,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../src/shared/contracts/tasks';
-import { ARCHIVE_TABLE_HEADER, ARCHIVE_TABLE_MIN_BODY, archiveScrollY, boardRows, workspaceGroups } from '../src/renderer/task-view';
-import { ArchiveList } from '../src/renderer/components/ArchiveDrawer';
-import { SSR_ROWS, VirtualLane } from '../src/renderer/components/VirtualLane';
+import { boardRows, workspaceGroups } from '../src/renderer/features/tasks/task-columns';
+import { ARCHIVE_TABLE_HEADER, ARCHIVE_TABLE_MIN_BODY, archiveScrollY } from '../src/renderer/features/tasks/task-archive';
+import { ArchiveList } from '../src/renderer/features/tasks/ArchiveDrawer';
+import { SSR_ROWS, VirtualLane } from '../src/renderer/features/tasks/VirtualLane';
 
 function markup(node: React.ReactNode) {
   const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;
@@ -61,7 +62,7 @@ test('the archive table is virtual with a numeric body height, so 300 archived t
   assert.ok(rows.length > 0, 'the visible rows are rendered');
   assert.ok(rows.length < 40, `only a window of rows is mounted, got ${rows.length}`);
   assert.doesNotMatch(html, /CROWD_299\b/);
-  const source = readFileSync(new URL('../src/renderer/components/ArchiveDrawer.tsx', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/renderer/features/tasks/ArchiveDrawer.tsx', import.meta.url), 'utf8');
   assert.match(source, /<Table<Task>[^>]*\svirtual\s/);
   assert.match(source, /scroll=\{\{[^}]*y: archiveScrollY\(/);
 });
@@ -75,7 +76,7 @@ test('the archive body height follows the room the drawer leaves, never collapsi
 });
 
 test('the board columns render through the virtual lane and keep the selected card mounted', () => {
-  const source = readFileSync(new URL('../src/renderer/components/TaskBoard.tsx', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/renderer/features/tasks/TaskBoard.tsx', import.meta.url), 'utf8');
   assert.match(source, /<VirtualLane rows=\{rows\}/);
   assert.match(source, /pinned=\{[^}]*task\.id === selected/);
   assert.doesNotMatch(source, /group\.tasks\.map/);

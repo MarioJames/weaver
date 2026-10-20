@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import type { RendererAPI } from './client';
+import type { RendererAPI } from './api/client';
 
 declare global {
   interface Window {

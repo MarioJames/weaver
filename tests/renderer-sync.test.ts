@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createTaskSynchronizer } from '../src/renderer/task-sync';
+import { createTaskSynchronizer } from '../src/renderer/features/tasks/task-sync';
 const deferred=<T>()=>{let resolve!:(value:T)=>void;let reject!:(error:Error)=>void;const promise=new Promise<T>((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};};
 test('burst invalidations coalesce and suppress stale in-flight snapshot',async()=>{const a=deferred<number>(),b=deferred<number>();let loads=0;const values:number[]=[];const sync=createTaskSynchronizer(()=>++loads===1?a.promise:b.promise,value=>values.push(value),()=>{},{minIntervalMs:0});const first=sync.refresh();sync.refresh();sync.refresh();a.resolve(1);await Promise.resolve();await Promise.resolve();assert.deepEqual(values,[]);b.resolve(2);await first;assert.equal(loads,2);assert.deepEqual(values,[2]);});
 test('failed snapshot can recover on next invalidation',async()=>{let count=0;const values:number[]=[];const errors:unknown[]=[];const sync=createTaskSynchronizer(async()=>{if(++count===1)throw new Error('Disconnected');return count;},value=>values.push(value),error=>errors.push(error),{minIntervalMs:0});await assert.rejects(sync.refresh(),/Disconnected/);await sync.refresh();assert.equal(errors.length,1);assert.deepEqual(values,[2]);});

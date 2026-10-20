@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Reconnector, isTransientError } from '../src/renderer/hooks/reconnect';
+import { Reconnector, isTransientError } from '../src/renderer/api/reconnect';
 
 test('classifies transport failures without retrying business failures or user aborts', () => {
   for (const error of ['TIMEOUT: 超时', 'NETWORK: Failed to fetch', 'HTTP_502: 网关', 'HTTP_503: unavailable', 'HTTP_504: 超时', 'APP_NOT_RUNNING: absent', new TypeError('Failed to fetch'), new DOMException('deadline', 'TimeoutError')]) assert.equal(isTransientError(error), true, String(error));

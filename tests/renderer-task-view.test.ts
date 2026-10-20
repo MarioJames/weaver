@@ -6,14 +6,18 @@ import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Config } from '../src/shared/contracts/policy';
 import type { Task } from '../src/shared/contracts/tasks';
-import { ARCHIVE_AFTER_MS, ENDED_EXPANDED_KEY, TASK_FILTERS_KEY, UNASSIGNED_OWNER, applyTaskFilters, archiveRows, archivedTasks, columnize, dispatchKind, emptySelection, filterByTime, filterOptions, hasFilters, isArchived, isOpenTask, nonArchived, ownerKindLookup, ownerLabel, projectLabel, readEndedExpanded, readTaskFilters, resolveSelection, taskColumn, taskOwnerId, taskOption, toggleOption, writeEndedExpanded, writeTaskFilters, withOwnerProfiles } from '../src/renderer/task-view';
-import type { FilterDimension, TaskSelection } from '../src/renderer/task-view';
-import { EngineIcon, AgentLabel } from '../src/renderer/components/EngineIcon';
-import { ArchiveList, archiveColumns, archiveRowProps } from '../src/renderer/components/ArchiveDrawer';
-import { TaskBoard } from '../src/renderer/components/TaskBoard';
-import { TaskDetail } from '../src/renderer/components/TaskDetail';
-import { TaskTextBlock } from '../src/renderer/components/TaskTextBlock';
-import { OwnerInspector } from '../src/renderer/components/OwnerInspector';
+import { UNASSIGNED_OWNER, dispatchKind, ownerKindLookup, ownerLabel, projectLabel, taskOwnerId, withOwnerProfiles } from '../src/renderer/features/tasks/task-view';
+import { columnize, isOpenTask, taskColumn } from '../src/renderer/features/tasks/task-columns';
+import { ARCHIVE_AFTER_MS, archivedTasks, isArchived, nonArchived } from '../src/renderer/features/tasks/task-archive';
+import { applyTaskFilters, archiveRows, emptySelection, filterByTime, filterOptions, hasFilters, resolveSelection, taskOption, toggleOption } from '../src/renderer/features/tasks/task-filters';
+import { ENDED_EXPANDED_KEY, TASK_FILTERS_KEY, readEndedExpanded, readTaskFilters, writeEndedExpanded, writeTaskFilters } from '../src/renderer/features/tasks/task-persistence';
+import type { FilterDimension, TaskSelection } from '../src/renderer/features/tasks/task-filters';
+import { EngineIcon, AgentLabel } from '../src/renderer/ui/EngineIcon';
+import { ArchiveList, archiveColumns, archiveRowProps } from '../src/renderer/features/tasks/ArchiveDrawer';
+import { TaskBoard } from '../src/renderer/features/tasks/TaskBoard';
+import { TaskDetail } from '../src/renderer/features/tasks/TaskDetail';
+import { TaskTextBlock } from '../src/renderer/features/tasks/TaskTextBlock';
+import { OwnerInspector } from '../src/renderer/features/roles/OwnerInspector';
 
 function markup(node: React.ReactNode) {
   const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;
