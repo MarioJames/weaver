@@ -48,15 +48,15 @@ export class Coordinator {
     if(engineBlocked||workerBlocked){
       if(frozen.execution==='real'){phase='workspace_changed';assertFrozenWorkspace(frozen);phase='policy_blocked';}
       const reroute=this.dispatch.routeOf(frozen.owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner)),engineBlocked?[frozen.engine]:[],undefined,workerBlocked?[frozen.worker]:[]);
-      const decision=this.dispatch.decideExecution(reroute.engine,undefined,{...task,workspace:frozen.workspace??task.workspace},this.policy.snapshot().config.owners[reroute.owner]?.engine,reroute.proxy,this.policy.snapshot().config.owners[reroute.owner]?.proxy);
-      task.dispatch={...frozen,worker:reroute.worker,engine:reroute.engine,model:reroute.model,effort:reroute.effort,proxy:reroute.proxy,execution:decision.execution,adapter:decision.adapter,engineKind:decision.engineKind,maxParallel:reroute.maxParallel,...(decision.workspace?{workspace:decision.workspace,workspaceIdentity:workspaceIdentity(decision.workspace)}:{})};
+      const decision=this.dispatch.decideExecution(reroute.engine,undefined,{...task,workspace:frozen.workspace??task.workspace},this.policy.snapshot().config.owners[reroute.owner]?.engine);
+      task.dispatch={...frozen,worker:reroute.worker,engine:reroute.engine,model:reroute.model,effort:reroute.effort,execution:decision.execution,adapter:decision.adapter,engineKind:decision.engineKind,maxParallel:reroute.maxParallel,...(decision.workspace?{workspace:decision.workspace,workspaceIdentity:workspaceIdentity(decision.workspace)}:{})};
       event(task,'lifecycle',`Vendor limit rerouted queued worker to ${reroute.engine} (${reroute.worker})`);this.records.put(task);this.pump();continue;
     }
 
     const running=slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner));
     const route=this.policy.preview({owner:frozen.owner,worker:frozen.worker,runningCount:running});
     const kind=this.policy.snapshot().config.engines[route.engine]?.kind;
-    if(route.worker!==frozen.worker||route.engine!==frozen.engine||route.model!==frozen.model||route.effort!==frozen.effort||route.proxy!==frozen.proxy||(frozen.engineKind!==undefined&&kind!==frozen.engineKind)){
+    if(route.worker!==frozen.worker||route.engine!==frozen.engine||route.model!==frozen.model||route.effort!==frozen.effort||(frozen.engineKind!==undefined&&kind!==frozen.engineKind)){
      this.queueBlocked(task,'frozen_route_changed','Current worker engine, kind, model or effort no longer matches the frozen dispatch; restore the route or cancel and create a new task.');continue;
     }
     if(!route.capacityAvailable){this.queueBlocked(task,'waiting_for_capacity',this.dispatch.capacityWait(frozen.owner,task.ownerId,route.maxParallel));continue;}

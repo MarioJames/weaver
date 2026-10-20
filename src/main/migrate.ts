@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 /** Every schema change lands here as one ordered step; PRAGMA user_version tracks what ran. */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 const STEPS: string[][] = [
   // 1: the task store tables.
@@ -53,6 +53,14 @@ const STEPS: string[][] = [
     `ALTER TABLE policy_blocks ADD COLUMN worker TEXT`,
     `DROP TABLE IF EXISTS vendor_limits`,
     `CREATE TABLE IF NOT EXISTS vendor_worker_limits(worker TEXT PRIMARY KEY, level INTEGER NOT NULL, last_trigger_at INTEGER NOT NULL)`,
+  ],
+  // 8: owners and workers no longer carry a proxy; every agent process uses the service process environment.
+  // Saved policy snapshots drop the field too (a JSON merge-patch with null deletes the key; only snapshots that hold at least one role object are touched), or a rollback to one would be refused by the schema.
+  [
+    `ALTER TABLE policy_owners DROP COLUMN proxy`,
+    `ALTER TABLE policy_workers DROP COLUMN proxy`,
+    `UPDATE policy_revisions SET body=json_patch(body, json_object('config', json_object('owners', json((SELECT json_group_object(key, json_object('proxy', json('null'))) FROM json_each(body, '$.config.owners') WHERE type='object'))))) WHERE CASE WHEN json_valid(body) THEN json_type(body, '$.config.owners')='object' AND EXISTS (SELECT 1 FROM json_each(body, '$.config.owners') WHERE type='object') ELSE 0 END`,
+    `UPDATE policy_revisions SET body=json_patch(body, json_object('config', json_object('workers', json((SELECT json_group_object(key, json_object('proxy', json('null'))) FROM json_each(body, '$.config.workers') WHERE type='object'))))) WHERE CASE WHEN json_valid(body) THEN json_type(body, '$.config.workers')='object' AND EXISTS (SELECT 1 FROM json_each(body, '$.config.workers') WHERE type='object') ELSE 0 END`,
   ],
 ];
 

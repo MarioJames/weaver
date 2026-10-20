@@ -18,7 +18,6 @@ import { type Availability, type Block, type Owner, type Worker } from '../../..
 import { blankOwner, blankWorker, removeRole, renameRole, roleDeleteImpact, roleIdError, syncRoleEditor, type RoleSection } from '../../policy/policy-edit';
 import { OwnerScheduleFields } from './OwnerSchedule';
 import { ModelPicker } from '../engines/ModelPicker';
-import { ProxyUrlInput } from '../engines/ProxyUrlInput';
 import { PolicyHeader } from '../../policy/PolicyHeader';
 import type { PolicyDraft } from '../../policy/usePolicyDraft';
 import { styles } from '../../ui/styles';
@@ -137,13 +136,9 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
             <Form.Field label="所属引擎" required><NamedSelect id={`${fieldId}-engine`} aria-label="所属引擎" value={record.engine || undefined} options={Object.keys(config.engines).map(id => ({ value: id, label: `${id}${config.engines[id]?.enabled ? '' : '（未启用）'}` }))} onChange={value => { if (typeof value === 'string') update({ ...record, engine: value, effort: EFFORTS[config.engines[value]?.kind ?? '']?.includes(record.effort) === false ? EFFORTS[config.engines[value]!.kind]![0]! : record.effort, enabled: config.engines[value]?.enabled ? record.enabled : false }); }} /></Form.Field>
           </div>
           <div className={rolesStyles.pair} style={{ alignItems: 'start' }}>
-            <Form.Field label="模型" required><ModelPicker engine={record.engine} proxy={record.proxy} id={`${fieldId}-model`} value={record.model} onChange={model => update({ ...record, model })} /></Form.Field>
+            <Form.Field label="模型" required><ModelPicker engine={record.engine} id={`${fieldId}-model`} value={record.model} onChange={model => update({ ...record, model })} /></Form.Field>
             <Form.Field label="推理强度" required desc={efforts?.length ? undefined : '填写该模型接受的 variant。'}>{efforts?.length ? <NamedSelect id={`${fieldId}-effort`} aria-label="推理强度" value={record.effort} options={efforts.map(value => ({ value, label: value }))} onChange={value => { if (typeof value === 'string') update({ ...record, effort: value }); }} /> : <Input id={`${fieldId}-effort`} aria-label="推理强度" value={record.effort} placeholder="例如：max" onChange={event => update({ ...record, effort: event.target.value })} />}</Form.Field>
           </div>
-          <Form.Field label="网络代理" desc="按此 Agent 独立设置，保存后用于启动和探测。">
-            <NamedSelect aria-label="代理方式" value={!record.proxy || record.proxy === 'inherit' ? 'inherit' : record.proxy === 'direct' ? 'direct' : 'custom'} options={[{ value: 'inherit', label: '继承系统代理' }, { value: 'direct', label: '直接连接' }, { value: 'custom', label: '自定义代理 URL' }]} onChange={value => update({ ...record, proxy: value === 'custom' ? 'http://127.0.0.1:7890' : String(value) })} />
-            {record.proxy && !['inherit', 'direct'].includes(record.proxy) && <ProxyUrlInput value={record.proxy} onChange={proxy => update({ ...record, proxy })} />}
-          </Form.Field>
           {section === 'owners' && <HelloCheck id={`owners:${current}`} record={record} />}
           {section === 'workers' ? <WorkerFields key={current} id={current} record={record as Worker} probe={freeProbe} update={next => update(next)} /> : <OwnerFields key={current} savedRecord={policy.snapshot?.config.owners[current]} config={config} blocks={policy.blocks} record={record as Owner} update={next => update(next)} />}
           {impact && <Modal open={askDelete} title={impact.title} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onCancel={() => setAskDelete(false)} onOk={() => { policy.setConfig(removeRole(config, section, current)); setSelected(''); setPendingId(''); setAskDelete(false); }}>
@@ -166,7 +161,7 @@ function WorkerFields({ id, record, probe, update }: { id: string; record: Worke
 }
 
 /** Sends one real "say hi" through the route as currently filled in, saved or not. The run outlives this form. */
-export function HelloCheck({ id, record }: { id: string; record: Pick<Worker, 'engine' | 'model' | 'effort' | 'proxy'> }) {
+export function HelloCheck({ id, record }: { id: string; record: Pick<Worker, 'engine' | 'model' | 'effort'> }) {
   const run = useHelloRun(id);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -182,7 +177,7 @@ export function HelloCheck({ id, record }: { id: string; record: Pick<Worker, 'e
         <Text strong>可用性</Text>
         <Text type="secondary" className={styles.meta}>用当前填写的引擎、模型和推理强度发送一条简短问候，检查能否正常回复。不调用工具，不保存会话，会消耗少量额度。</Text>
       </div>
-      <Button icon={Zap} loading={run?.running} disabled={!ready} onClick={() => void startHello(id, { engine: record.engine, model: record.model.trim(), effort: record.effort.trim(), proxy: record.proxy }, `${record.engine} · ${record.model.trim()} · ${record.effort.trim()}`)}>连通测试</Button>
+      <Button icon={Zap} loading={run?.running} disabled={!ready} onClick={() => void startHello(id, { engine: record.engine, model: record.model.trim(), effort: record.effort.trim() }, `${record.engine} · ${record.model.trim()} · ${record.effort.trim()}`)}>连通测试</Button>
     </div>
     {run?.running && <Text type="secondary" className={styles.meta} role="status">正在等待 {run.route.split(' · ')[0]} 回复… {elapsed} 秒</Text>}
     {run?.result && !run.running && <ReplyCard result={{ ...run.result, route: run.route }} />}

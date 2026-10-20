@@ -2,7 +2,6 @@ import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { catalogEntry, type EngineModel, type EngineModelList, type EngineModelListInput } from '../../shared/engines';
-import { proxyEnvironment, validateProxy } from '../../shared/proxy';
 import { findExecutable, runCapture, type CaptureResult } from './probe';
 
 export const NO_LIST_MESSAGE = '该引擎不提供模型列表，请手动填写';
@@ -118,11 +117,10 @@ export async function claudeKnownModels(env: NodeJS.ProcessEnv): Promise<EngineM
 export function parseModelListInput(value: unknown): EngineModelListInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('模型列表参数必须是对象');
   const raw = value as Record<string, unknown>;
-  if (Object.keys(raw).some(key => !['engine', 'proxy', 'refresh'].includes(key))) throw new Error('模型列表参数包含未知字段');
+  if (Object.keys(raw).some(key => !['engine', 'refresh'].includes(key))) throw new Error('模型列表参数包含未知字段');
   if (typeof raw.engine !== 'string' || !catalogEntry(raw.engine)) throw new Error('该引擎不在支持范围内');
   if (raw.refresh !== undefined && typeof raw.refresh !== 'boolean') throw new Error('refresh 必须是布尔值');
-  if (raw.proxy !== undefined) validateProxy(raw.proxy as string);
-  return { engine: raw.engine, ...(raw.proxy !== undefined ? { proxy: raw.proxy as string } : {}), ...(raw.refresh ? { refresh: true } : {}) };
+  return { engine: raw.engine, ...(raw.refresh ? { refresh: true } : {}) };
 }
 
 export interface ModelListerOptions {
@@ -136,7 +134,7 @@ export interface ModelListerOptions {
 
 /**
  * Lists the models an installed engine offers. Only the engines' own list commands run, with fixed arguments and without
- * a shell; none of them calls a model. Results are cached for a minute per engine and proxy, and concurrent calls share one run.
+ * a shell; none of them calls a model. Results are cached for a minute per engine, and concurrent calls share one run.
  */
 export class EngineModelLister {
   private readonly cache = new Map<string, { at: number; list: EngineModelList }>();
@@ -144,7 +142,7 @@ export class EngineModelLister {
   constructor(private readonly options: ModelListerOptions = {}) {}
 
   list(input: EngineModelListInput): Promise<EngineModelList> {
-    const key = `${input.engine}\0${input.proxy ?? ''}`;
+    const key = input.engine;
     const clock = (this.options.now ?? (() => new Date()))().getTime();
     const hit = this.cache.get(key);
     if (!input.refresh && hit && clock - hit.at < CACHE_MS) return Promise.resolve(hit.list);
@@ -163,7 +161,7 @@ export class EngineModelLister {
     const fetchedAt = (this.options.now ?? (() => new Date()))().toISOString();
     const base = { engine: input.engine, fetchedAt, models: [] as EngineModel[] };
     if (!entry) return { ...base, status: 'unsupported', source: '', message: NO_LIST_MESSAGE };
-    const env = proxyEnvironment(this.options.env ?? process.env, input.proxy);
+    const env = { ...(this.options.env ?? process.env) };
     delete env.ELECTRON_RUN_AS_NODE;
     if (entry.kind === 'claude') {
       return { ...base, status: 'ok', source: 'Claude Code 无列表命令，用内置名称与 settings.json 已配置的模型', models: await claudeKnownModels(env) };

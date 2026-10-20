@@ -20,9 +20,7 @@ const REASON_MAX = 120;
 const NO_PROBER = '本进程没有装载探测执行器，无法探测。';
 const PROBE_TICK_MS = 60_000;
 
-/** The route one free_channel worker answers probes on; ProbeRoute plus the account URL path. */
-export type FreeProbeRoute = ProbeRoute & { proxy?: string };
-export type FreeRecoveryProbe = (route: FreeProbeRoute, signal: AbortSignal) => Promise<ProbeOutcome>;
+export type FreeRecoveryProbe = (route: ProbeRoute, signal: AbortSignal) => Promise<ProbeOutcome>;
 
 /** What one worker carries: one open question to the vendor, or nothing. */
 export interface WorkerProbe {
@@ -93,27 +91,27 @@ function armStall(level: number, now: number): Pick<WorkerProbe, 'blockedUntil' 
   return { blockedUntil: at, nextProbeAt: at };
 }
 
-/** The saved route of one free_channel worker, including its proxy path. */
-function probeRouteOf(config: Config, worker: string): FreeProbeRoute | undefined {
+/** The saved route of one free_channel worker. */
+function probeRouteOf(config: Config, worker: string): ProbeRoute | undefined {
   const profile = config.workers[worker];
   const engine = profile ? config.engines[profile.engine] : undefined;
   if (!profile || !engine) return undefined;
-  return { engine: profile.engine, kind: engine.kind, worker, model: profile.model, effort: profile.effort, ...(profile.proxy ? { proxy: profile.proxy } : {}) };
+  return { engine: profile.engine, kind: engine.kind, worker, model: profile.model, effort: profile.effort };
 }
 
 /** Does this block reach the route's worker? A worker-level block names exactly one worker. */
-function reaches(block: Block, route: FreeProbeRoute): boolean {
+function reaches(block: Block, route: ProbeRoute): boolean {
   return block.engine === route.engine && (block.worker === undefined || block.worker === route.worker) && (block.model === undefined || block.model === route.model);
 }
 
 /** A block this monitor wrote for the route: its worker, its model and one of its markers. A pre-worker block (no worker field) on the same model is still recognised as ours. */
-function owned(block: Block, route: FreeProbeRoute, by?: string): boolean {
+function owned(block: Block, route: ProbeRoute, by?: string): boolean {
   return block.engine === route.engine && block.model === route.model && (block.worker === route.worker || block.worker === undefined) &&
     (by !== undefined ? block.by === by : block.by === STALL_BLOCK_BY || block.by === VENDOR_BLOCK_BY || block.by === FREE_PROBE_BLOCK_BY);
 }
 
 /** Is this route currently kept out by a block that this monitor did not write? */
-function foreignBlock(blocks: Block[], route: FreeProbeRoute): Block | undefined {
+function foreignBlock(blocks: Block[], route: ProbeRoute): Block | undefined {
   return blocks.find(block => reaches(block, route) && !owned(block, route));
 }
 
@@ -466,7 +464,7 @@ export class FreeChannelProbeMonitor {
   }
 
   /** One probe at a time per worker; a manual probe during a round returns the job already running. */
-  private probeOne(route: FreeProbeRoute, fence: number): Promise<void> {
+  private probeOne(route: ProbeRoute, fence: number): Promise<void> {
     const existing = this.jobs.get(route.worker);
     if (existing) return existing;
     const job = this.runProbe(route, fence).finally(() => { this.jobs.delete(route.worker); });
@@ -474,7 +472,7 @@ export class FreeChannelProbeMonitor {
     return job;
   }
 
-  private async runProbe(route: FreeProbeRoute, fence: number): Promise<void> {
+  private async runProbe(route: ProbeRoute, fence: number): Promise<void> {
     const controller = new AbortController();
     this.aborts.add(controller);
     let outcome: ProbeOutcome;
@@ -491,7 +489,7 @@ export class FreeChannelProbeMonitor {
     this.apply(route, outcome);
   }
 
-  private apply(route: FreeProbeRoute, outcome: ProbeOutcome): void {
+  private apply(route: ProbeRoute, outcome: ProbeOutcome): void {
     const now = this.clock();
     const failure = outcome.ok ? undefined : classifyVendorError(route.kind, outcome.error ?? '', now);
     const item = this.state.workers[route.worker] ?? emptyWorkerProbe();
@@ -513,7 +511,7 @@ export class FreeChannelProbeMonitor {
   }
 
   /** A passing probe releases this monitor's own block by the rules of the ladder it followed. */
-  private recover(route: FreeProbeRoute, item: WorkerProbe, record: ProbeRecord): void {
+  private recover(route: ProbeRoute, item: WorkerProbe, record: ProbeRecord): void {
     const snapshot = this.options.policy().snapshot();
     const now = this.clock();
     const by = item.mode ? modeBlockBy(item.mode) : undefined;
@@ -546,7 +544,7 @@ export class FreeChannelProbeMonitor {
   }
 
   /** Quota exhaustion: ban this worker's engine+model until the vendor names a time, then keep probing. */
-  private ban(route: FreeProbeRoute, item: WorkerProbe, record: ProbeRecord, failure: NonNullable<ReturnType<typeof classifyVendorError>>, now: number): void {
+  private ban(route: ProbeRoute, item: WorkerProbe, record: ProbeRecord, failure: NonNullable<ReturnType<typeof classifyVendorError>>, now: number): void {
     const settings = freeChannelProbeSettings(this.options.policy().snapshot().config);
     const reason = vendorBlockReason({ kind: 'quota', message: failure.message });
     const release = failure.retryAt ? Date.parse(failure.retryAt) : NaN;
@@ -573,7 +571,7 @@ export class FreeChannelProbeMonitor {
   }
 
   /** Rate limiting: the vendor ladder dispatch failures already use, model-scoped to this worker. */
-  private vendorLimit(route: FreeProbeRoute, item: WorkerProbe, record: ProbeRecord, failure: NonNullable<ReturnType<typeof classifyVendorError>>, now: number): void {
+  private vendorLimit(route: ProbeRoute, item: WorkerProbe, record: ProbeRecord, failure: NonNullable<ReturnType<typeof classifyVendorError>>, now: number): void {
     const level = nextLevel(item, now, VENDOR_LADDER_MINUTES.length);
     const minutes = VENDOR_LADDER_MINUTES[level - 1]!;
     const retryAt = failure.retryAt ? Date.parse(failure.retryAt) : NaN;
@@ -599,7 +597,7 @@ export class FreeChannelProbeMonitor {
   }
 
   /** Every other failure: the stall ladder on this worker's engine+model, never on a policy deadline. */
-  private stallPenalty(route: FreeProbeRoute, item: WorkerProbe, record: ProbeRecord, message: string, now: number): void {
+  private stallPenalty(route: ProbeRoute, item: WorkerProbe, record: ProbeRecord, message: string, now: number): void {
     const level = nextLevel(item, now, STALL_LADDER.length);
     const armed = armStall(level, now);
     const reason = boundedReason(message);
@@ -641,7 +639,7 @@ export class FreeChannelProbeMonitor {
    * A foreign block (manual, or another monitor's whole-engine statement) means the route is already kept
    * out; no second block is stacked onto the same key. A replaced block keeps its original `since`.
    */
-  private writeBlock(route: FreeProbeRoute, by: string, reason: string, release_at: string | undefined, now: number, escalate = false): Block | undefined {
+  private writeBlock(route: ProbeRoute, by: string, reason: string, release_at: string | undefined, now: number, escalate = false): Block | undefined {
     let final: Block | undefined;
     const ok = this.saveWithRetry(blocks => {
       final = undefined;
@@ -656,7 +654,7 @@ export class FreeChannelProbeMonitor {
   }
 
   /** Removes only the block this monitor wrote with this marker on this route; anything else stays. */
-  private removeBlock(route: FreeProbeRoute, by: string): boolean {
+  private removeBlock(route: ProbeRoute, by: string): boolean {
     return this.saveWithRetry(blocks => blocks.filter(block => !owned(block, route, by)));
   }
 

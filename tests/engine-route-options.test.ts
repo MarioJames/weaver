@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os';
 import { defaultConfig, resolveDispatch, validateConfig } from '../src/main/policy/routing';
 import { availabilityOf } from '../src/shared/policy/availability';
 import { type Block } from '../src/shared/contracts/policy';
-import { proxyEnvironment, validateProxy } from '../src/shared/proxy';
 import { PolicyStore } from '../src/main/policy/store';
 import { createNormalizer } from '../src/main/adapters/cli/normalize';
 import { HELLO_ENGINES } from '../src/main/engines/hello';
@@ -41,35 +40,21 @@ test('the free-channel probe interval is validated like the quota refresh interv
   assert.deepEqual(validateConfig(config), []);
 });
 
-test('proxy modes isolate role environments and reject credentials and malformed protocols', () => {
-  const source = { HTTPS_PROXY: 'http://old:80', ALL_PROXY: 'socks5://old:90', NO_PROXY: '*', KEEP: 'yes' };
-  assert.deepEqual(proxyEnvironment(source), source);
-  assert.deepEqual(proxyEnvironment(source, 'direct'), { KEEP: 'yes' });
-  const custom = proxyEnvironment(source, 'http://127.0.0.1:7890');
-  assert.equal(custom.HTTPS_PROXY, 'http://127.0.0.1:7890');
-  assert.equal(custom.http_proxy, custom.HTTPS_PROXY);
-  assert.equal(custom.ALL_PROXY, undefined);
-  assert.equal(custom.NO_PROXY, undefined);
-  assert.equal(source.ALL_PROXY, 'socks5://old:90');
-  for (const value of ['', 'socks5://localhost:1', 'http://user:secret@localhost:1', 'http://host/path', 'http://host?key=value', 'http://host\nBAD=1']) assert.throws(() => validateProxy(value));
-});
-
-test('role proxy and free channel roundtrip; route preview freezes the selected proxy', () => {
+test('free channel roundtrips, and a role carrying a proxy field is refused by the config schema', () => {
   const root = mkdtempSync(join(tmpdir(), 'engine-options-'));
   try {
     const file = join(root,'weaver.db');
     const store = new PolicyStore(file);
     const snapshot = store.snapshot();
-    snapshot.config.owners.claude_owner!.proxy = 'direct';
-    snapshot.config.workers.codex_worker!.proxy = 'http://127.0.0.1:7890';
     snapshot.config.workers.codex_worker!.free_channel = true;
     store.save({ revision: snapshot.revision, config: snapshot.config, blocks: snapshot.blocks });
     const reloaded = new PolicyStore(file);
     assert.equal(reloaded.snapshot().config.workers.codex_worker!.free_channel, true);
-    assert.equal(reloaded.snapshot().config.owners.claude_owner!.proxy, 'direct');
-    assert.equal(reloaded.preview({ owner: 'claude_owner', worker: 'codex_worker' }).proxy, 'http://127.0.0.1:7890');
-    snapshot.config.workers.codex_worker!.proxy = 'ftp://localhost';
-    assert.ok(validateConfig(snapshot.config).some(issue => issue.path === '$.workers.codex_worker.proxy'));
+    assert.equal('proxy' in reloaded.preview({ owner: 'claude_owner', worker: 'codex_worker' }), false);
+    const withProxy = structuredClone(snapshot.config) as unknown as { owners: Record<string, Record<string, unknown>>; workers: Record<string, Record<string, unknown>> };
+    withProxy.owners.claude_owner!.proxy = 'direct';
+    withProxy.workers.codex_worker!.proxy = 'http://127.0.0.1:7890';
+    assert.deepEqual(validateConfig(withProxy as never).map(issue => issue.path).sort(), ['$.owners.claude_owner.proxy', '$.workers.codex_worker.proxy']);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

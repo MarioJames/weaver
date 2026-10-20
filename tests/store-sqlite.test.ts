@@ -104,7 +104,7 @@ test('upgrading a version 6 database keeps its blocks, adds the worker column an
   seeded.save({revision:base.revision,config:base.config,blocks:[{engine:'codex',reason:'manual hold',since:'2026-10-19T00:00:00.000Z',by:'manual'},{engine:'qoder',model:'m1',reason:'model hold',since:'2026-10-19T00:00:00.000Z',release_at:'2030-01-01T00:00:00.000Z',by:'weaver-free-probe'}]});
   const before=seeded.snapshot().blocks;
   const raw=new DatabaseSync(path);
-  raw.exec('ALTER TABLE policy_blocks DROP COLUMN worker; DROP TABLE vendor_worker_limits; CREATE TABLE vendor_limits(engine TEXT PRIMARY KEY, level INTEGER NOT NULL, last_trigger_at INTEGER NOT NULL); INSERT INTO vendor_limits VALUES (\'codex\',2,123); PRAGMA user_version=6');
+  raw.exec('ALTER TABLE policy_owners ADD COLUMN proxy TEXT; ALTER TABLE policy_workers ADD COLUMN proxy TEXT; ALTER TABLE policy_blocks DROP COLUMN worker; DROP TABLE vendor_worker_limits; CREATE TABLE vendor_limits(engine TEXT PRIMARY KEY, level INTEGER NOT NULL, last_trigger_at INTEGER NOT NULL); INSERT INTO vendor_limits VALUES (\'codex\',2,123); PRAGMA user_version=6');
   assert.deepEqual((raw.prepare('PRAGMA table_info(policy_blocks)').all() as {name:string}[]).map(column=>column.name).includes('worker'),false);
   raw.close();
   for(let round=0;round<3;round++){
@@ -120,5 +120,52 @@ test('upgrading a version 6 database keeps its blocks, adds the worker column an
   const store=new PolicyStore(path);const snapshot=store.snapshot();
   store.save({revision:snapshot.revision,config:snapshot.config,blocks:[...snapshot.blocks,{engine:'codex',worker:'codex_worker',reason:'worker hold',since:'2026-10-19T00:00:00.000Z',by:'weaver-vendor-limit'}]});
   assert.equal(new PolicyStore(path).snapshot().blocks.at(-1)?.worker,'codex_worker','the worker field round-trips through policy_blocks');
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+test('upgrading a version 7 database drops the role proxy columns and strips proxy from saved policy snapshots, so a rollback still works',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'weaver-migrate8-'));const path=join(dir,'weaver.db');
+ try{
+  const seeded=new PolicyStore(path);
+  const base=seeded.snapshot();
+  const changed=structuredClone(base.config);const ownerId=Object.keys(changed.owners)[0]!;const workerId=Object.keys(changed.workers)[0]!;
+  changed.owners[ownerId]!.max_parallel=3;
+  const first=seeded.save({revision:base.revision,config:changed,blocks:[]});
+  const later=structuredClone(first.config);later.owners[ownerId]!.max_parallel=4;
+  seeded.save({revision:first.revision,config:later,blocks:[]});
+  const expected=seeded.snapshot().config;
+  const raw=new DatabaseSync(path);
+  // Rebuild the shape version 7 left behind: proxy columns with values, and snapshots that carry the field.
+  raw.exec('ALTER TABLE policy_owners ADD COLUMN proxy TEXT; ALTER TABLE policy_workers ADD COLUMN proxy TEXT');
+  raw.prepare('UPDATE policy_owners SET proxy=?').run('direct');raw.prepare('UPDATE policy_workers SET proxy=?').run('http://127.0.0.1:7890');
+  const revisions=raw.prepare('SELECT revision,body FROM policy_revisions ORDER BY revision').all() as {revision:number;body:string}[];
+  assert.ok(revisions.length>=2);
+  const withProxy=(body:string)=>{const data=JSON.parse(body);for(const owner of Object.values(data.config.owners))(owner as Record<string,unknown>).proxy='inherit';for(const worker of Object.values(data.config.workers))(worker as Record<string,unknown>).proxy='http://127.0.0.1:7890';return JSON.stringify(data);};
+  const originals=new Map<number,string>();
+  for(const row of revisions){originals.set(row.revision,row.body);raw.prepare('UPDATE policy_revisions SET body=? WHERE revision=?').run(withProxy(row.body),row.revision);}
+  // Snapshots with no owners or workers, or without a config section, must come through unchanged.
+  const empty=JSON.stringify({version:1,revision:90,config:{version:1,owners:{},workers:{}},blocks:[]});
+  const bare=JSON.stringify({version:1,revision:91,config:{version:1},blocks:[]});
+  const odd=JSON.stringify({version:1,revision:92,config:{owners:{a:'text',b:{proxy:'direct',keep:1}},workers:[]},blocks:[]});
+  const broken='not json';
+  for(const [revision,body] of [[90,empty],[91,bare],[92,odd],[93,broken]] as const)raw.prepare("INSERT INTO policy_revisions(revision,saved_at,source,body) VALUES (?,?,'test',?)").run(revision,'2026-10-19T00:00:00.000Z',body);
+  raw.exec('PRAGMA user_version=7');
+  raw.close();
+  for(let round=0;round<3;round++){
+   const upgraded=new DatabaseSync(path);migrate(upgraded);
+   assert.equal(Number(upgraded.prepare('PRAGMA user_version').get()!.user_version),SCHEMA_VERSION);
+   for(const table of ['policy_owners','policy_workers'])assert.equal((upgraded.prepare(`PRAGMA table_info(${table})`).all() as {name:string}[]).some(column=>column.name==='proxy'),false,`${table}.proxy is gone`);
+   assert.equal(Number(upgraded.prepare('SELECT count(*) n FROM policy_owners').get()!.n),Object.keys(expected.owners).length,'role rows survive');
+   const bodies=new Map((upgraded.prepare('SELECT revision,body FROM policy_revisions').all() as {revision:number;body:string}[]).map(row=>[row.revision,row.body]));
+   for(const [revision,body] of originals)assert.equal(bodies.get(revision),body,`round ${round}: revision ${revision} is back to its pre-proxy snapshot, every other field intact`);
+   assert.equal(bodies.get(93),broken);assert.equal(bodies.get(90),empty);assert.equal(bodies.get(91),bare);
+   assert.deepEqual(JSON.parse(bodies.get(92)!),{version:1,revision:92,config:{owners:{a:'text',b:{keep:1}},workers:[]},blocks:[]});
+   upgraded.close();
+  }
+  const store=new PolicyStore(path);
+  assert.deepEqual(store.snapshot().config,expected,'live config reads without the proxy columns');
+  const rolled=store.rollback(Math.min(...originals.keys()));
+  assert.equal(rolled.config.owners[ownerId]!.max_parallel,3,'the oldest snapshot is restored');
+  assert.equal('proxy' in rolled.config.owners[ownerId]!,false);assert.equal('proxy' in rolled.config.workers[workerId]!,false);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });

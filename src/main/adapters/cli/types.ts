@@ -3,7 +3,6 @@ import type { Readable } from 'node:stream';
 import type { CliAgentEvidence, RealEngineKind } from '../../../shared/contracts/tasks';
 
 export interface CliAgentInput {
-  proxy?: string;
   engine: RealEngineKind;
   model: string;
   effort: string;

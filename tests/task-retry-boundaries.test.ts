@@ -135,3 +135,19 @@ test('no remaining engine refuses a later --cancel retry before touching its act
     assert.equal(f.manager.runningCount, 2, 'both original fixture slots are still held');
   } finally { await f.close(); }
 });
+
+test('a task written before proxies were removed still reads and retries; the retired dispatch.proxy is ignored', async () => {
+  const f = setup(['qoder', 'codex']);
+  try {
+    const legacy = f.create();
+    legacy.dispatch = { ...f.route('qoder'), proxy: 'http://127.0.0.1:7890' } as TaskDispatch;
+    legacy.status = 'failed';
+    f.store.put(legacy);
+    const reopened = new TaskStore(f.path);
+    try { assert.equal(reopened.get(legacy.id).dispatch?.engine, 'qoder'); } finally { reopened.close(); }
+    const retry = f.call('tasks.retry', { taskId: legacy.id });
+    assert.equal(retry.dispatch.engine, 'codex');
+    assert.equal('proxy' in retry.dispatch, false, 'the retry is routed afresh and carries no proxy');
+    assert.equal('proxy' in (f.store.get(retry.id).dispatch as object), false);
+  } finally { await f.close(); }
+});

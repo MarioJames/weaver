@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EngineModelList, EngineModelListInput } from '../../../shared/engines';
-import { validateProxy } from '../../../shared/proxy';
 import { notifyError } from '../../api/notify';
 
 export const NO_LIST_TEXT = '该引擎不提供模型列表，请手动填写';
@@ -8,11 +7,6 @@ export const NO_LIST_TEXT = '该引擎不提供模型列表，请手动填写';
 /** Asks the control plane for the engine CLI's model list. */
 export async function requestEngineModels(input: EngineModelListInput): Promise<EngineModelList> {
   return window.weaver.listEngineModels(input);
-}
-
-/** A proxy the form has not finished typing cannot be sent; the list then goes out without it. */
-export function usableProxy(proxy: string | undefined): string | undefined {
-  try { validateProxy(proxy); return proxy; } catch { return undefined; }
 }
 
 export type ModelListView =
@@ -57,28 +51,22 @@ export interface ModelListSink {
 
 /**
  * One model field's loading state, free of React so the rules can be tested directly.
- * `sync` is called whenever the field's engine or proxy may have changed: it fetches once per distinct engine + proxy,
+ * `sync` is called whenever the field's engine may have changed: it fetches once per distinct engine,
  * drops the previous engine's list when the engine changes, and fetches nothing without an engine.
  * `load(true)` is the explicit refresh. Only the newest request of a session may write its result (the generation counter).
  */
 export class ModelListSession {
   private generation = 0;
   private engine = '';
-  private proxy: string | undefined;
-  private key = '';
 
   constructor(private readonly sink: ModelListSink, private readonly request: Request = requestEngineModels) {}
 
-  sync(engine: string, proxy?: string): void {
-    const engineChanged = engine !== this.engine;
-    // A proxy address still being typed is not sent; the list stays as it is until the address is complete.
-    if (!engineChanged && proxy && usableProxy(proxy) === undefined) return;
+  sync(engine: string): void {
+    if (engine === this.engine) return;
     this.engine = engine;
-    this.proxy = proxy;
-    const key = engine ? `${engine}\n${usableProxy(proxy) ?? ''}` : '';
-    if (key === this.key && !engineChanged) return;
-    this.key = key;
-    if (engineChanged) { this.generation += 1; this.sink.list(undefined); this.sink.loading(false); }
+    this.generation += 1;
+    this.sink.list(undefined);
+    this.sink.loading(false);
     if (engine) void this.load();
   }
 
@@ -88,8 +76,7 @@ export class ModelListSession {
     const mine = ++this.generation;
     this.sink.loading(true);
     try {
-      const proxyValue = usableProxy(this.proxy);
-      const result = await this.request({ engine, ...(proxyValue ? { proxy: proxyValue } : {}), ...(refresh ? { refresh: true } : {}) });
+      const result = await this.request({ engine, ...(refresh ? { refresh: true } : {}) });
       if (this.generation !== mine) return;
       this.sink.list(result);
       if (result.status === 'failed') this.sink.failed(result.message ?? '未获取到模型列表', '模型列表获取失败');
@@ -100,30 +87,15 @@ export class ModelListSession {
 }
 
 /**
- * Loads one engine's model list as soon as the field mounts, and again whenever its engine or proxy changes; `load(true)` forces a refresh.
+ * Loads one engine's model list as soon as the field mounts, and again whenever its engine changes; `load(true)` forces a refresh.
  * A failure is reported as a notification; the manual field stays usable whatever happens.
  */
-export function useEngineModels(engine: string, proxy?: string) {
+export function useEngineModels(engine: string) {
   const [list, setList] = useState<EngineModelList>();
   const [loading, setLoading] = useState(false);
   const session = useRef<ModelListSession>(undefined);
   session.current ??= new ModelListSession({ list: setList, loading: setLoading, failed: notifyError });
-  useEffect(() => { session.current?.sync(engine, proxy); }, [engine, proxy]);
+  useEffect(() => { session.current?.sync(engine); }, [engine]);
   const load = useCallback((refresh = false) => session.current!.load(refresh), []);
   return { list, loading, load };
-}
-
-/** The first reason a custom proxy address is refused, in the words the form shows under the field; empty when it is acceptable. */
-export function proxyUrlError(value: string): string {
-  const text = value.trim();
-  if (!text) return '请填写代理地址，例如 http://127.0.0.1:7890';
-  if (text !== value) return '代理地址首尾不能有空白';
-  try { validateProxy(value); return ''; } catch { /* the specific reason is worked out below */ }
-  if (/\s/.test(value)) return '代理地址不能包含空白字符';
-  let url: URL;
-  try { url = new URL(value); } catch { return '代理地址必须是完整的 URL，例如 http://127.0.0.1:7890'; }
-  if (!['http:', 'https:'].includes(url.protocol)) return '代理仅支持 http:// 或 https:// 协议';
-  if (url.username || url.password) return '代理地址不能带用户名或密码';
-  if (url.search || url.hash || url.pathname !== '/') return '代理地址不能带路径或查询参数';
-  return '代理地址无效';
 }

@@ -83,7 +83,6 @@ export class PolicyStore {
    const id=String(row.id);
    const links=ownerWorkerRows.filter(item=>String(item.owner_id)===id);
    const owner={enabled:Number(row.enabled)===1,engine:String(row.engine),model:String(row.model),effort:String(row.effort),workers:links.map(item=>String(item.worker_id)),max_parallel:Number(row.max_parallel)} as Owner;
-   if(row.proxy!==null&&row.proxy!==undefined)owner.proxy=String(row.proxy);
    const weights:Record<string,number>={};
    for(const item of links)if(item.weight!==null&&item.weight!==undefined)weights[String(item.worker_id)]=Number(item.weight);
    if(Object.keys(weights).length)owner.worker_weights=weights;
@@ -93,7 +92,6 @@ export class PolicyStore {
   for(const row of this.db.prepare('SELECT * FROM policy_workers ORDER BY position').all() as Record<string,unknown>[]){
    const id=String(row.id);
    const worker={enabled:Number(row.enabled)===1,engine:String(row.engine),model:String(row.model),effort:String(row.effort)} as Worker;
-   if(row.proxy!==null&&row.proxy!==undefined)worker.proxy=String(row.proxy);
    if(row.description!==null&&row.description!==undefined)worker.description=String(row.description);
    if(row.free_channel!==null&&row.free_channel!==undefined)worker.free_channel=Number(row.free_channel)===1;
    workers[id]=worker;
@@ -130,15 +128,15 @@ export class PolicyStore {
   Object.entries(config.engines).forEach(([id,engine],index)=>insertEngine.run(id,index,bit(engine.enabled),engine.kind,engine.quota_refresh===undefined?null:bit(engine.quota_refresh)));
   this.db.exec('DELETE FROM policy_owner_workers');
   this.db.exec('DELETE FROM policy_owners');
-  const insertOwner=this.db.prepare('INSERT INTO policy_owners(id,position,enabled,engine,model,effort,proxy,max_parallel) VALUES (?,?,?,?,?,?,?,?)');
+  const insertOwner=this.db.prepare('INSERT INTO policy_owners(id,position,enabled,engine,model,effort,max_parallel) VALUES (?,?,?,?,?,?,?)');
   const insertLink=this.db.prepare('INSERT INTO policy_owner_workers(owner_id,worker_id,position,weight) VALUES (?,?,?,?)');
   Object.entries(config.owners).forEach(([id,owner],index)=>{
-   insertOwner.run(id,index,bit(owner.enabled),owner.engine,owner.model,owner.effort,optionalText(owner.proxy),owner.max_parallel);
+   insertOwner.run(id,index,bit(owner.enabled),owner.engine,owner.model,owner.effort,owner.max_parallel);
    owner.workers.forEach((workerId,position)=>insertLink.run(id,workerId,position,owner.worker_weights&&Object.hasOwn(owner.worker_weights,workerId)?owner.worker_weights[workerId]!:null));
   });
   this.db.exec('DELETE FROM policy_workers');
-  const insertWorker=this.db.prepare('INSERT INTO policy_workers(id,position,enabled,engine,model,effort,proxy,description,free_channel) VALUES (?,?,?,?,?,?,?,?,?)');
-  Object.entries(config.workers).forEach(([id,worker],index)=>insertWorker.run(id,index,bit(worker.enabled),worker.engine,worker.model,worker.effort,optionalText(worker.proxy),optionalText(worker.description),worker.free_channel===undefined?null:bit(worker.free_channel)));
+  const insertWorker=this.db.prepare('INSERT INTO policy_workers(id,position,enabled,engine,model,effort,description,free_channel) VALUES (?,?,?,?,?,?,?,?)');
+  Object.entries(config.workers).forEach(([id,worker],index)=>insertWorker.run(id,index,bit(worker.enabled),worker.engine,worker.model,worker.effort,optionalText(worker.description),worker.free_channel===undefined?null:bit(worker.free_channel)));
   this.db.exec('DELETE FROM policy_settings');
   const insertSetting=this.db.prepare('INSERT INTO policy_settings(key,body) VALUES (?,?)');
   insertSetting.run('herdr',JSON.stringify(config.herdr));

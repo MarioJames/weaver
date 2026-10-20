@@ -4,8 +4,8 @@ export interface Engine { enabled: boolean; kind: string; quota_refresh?: boolea
 export interface QuotaSettings { auto_refresh: boolean; interval_minutes: number }
 /** Scheduled live probes of free_channel workers; missing means enabled every 10 minutes. */
 export interface FreeChannelProbeSettings { enabled: boolean; interval_minutes: number }
-export interface Owner { proxy?: string; enabled: boolean; engine: string; model: string; effort: string; workers: string[]; max_parallel: number; worker_weights?: Record<string, number> }
-export interface Worker { proxy?: string; free_channel?: boolean; enabled: boolean; engine: string; model: string; effort: string; description?: string }
+export interface Owner { enabled: boolean; engine: string; model: string; effort: string; workers: string[]; max_parallel: number; worker_weights?: Record<string, number> }
+export interface Worker { free_channel?: boolean; enabled: boolean; engine: string; model: string; effort: string; description?: string }
 export interface Herdr { max_wait_minutes: number }
 /** Rendering preferences; missing means follow the browser. */
 export interface Display { timezone?: string }
@@ -15,7 +15,6 @@ export interface Block { engine: string; model?: string; worker?: string; reason
 export interface State { version: 1; blocks: Block[] }
 export interface Availability { status: "available" | "disabled" | "engine_disabled" | "blocked"; engine?: string; model?: string; worker?: string; reason?: string; release_at?: string }
 export interface Dispatch {
- proxy?: string;
  owner: string; worker: string; engine: string; model: string; effort: string;
  execution: 'disabled'; dispatch: 'preview'; warnings: string[];
  selected_by?: 'worker' | 'weight'; skipped?: {worker:string; reason:string}[];

@@ -27,7 +27,6 @@ export interface Artifact { id: string; name: string; mediaType: 'text/plain' | 
 export interface TaskEvent { id: string; at: string; kind: 'lifecycle' | 'log' | 'progress' | 'artifact' | 'result' | 'error'; message: string }
 export interface TaskOwnerHost { kind: 'herdr'; session: string; workspaceId: string; paneId: string; agentName: string; launchedAt: string }
 export interface TaskDispatch {
-  proxy?: string;
   owner: string; worker: string; engine: string; model: string; effort: string;
   /** native: the owner runs this same-engine worker with its built-in subagent tool; no process is launched. */
   execution: 'real' | 'mock' | 'native'; maxParallel: number; maxWaitMinutes?: number;

@@ -12,13 +12,13 @@ const pickerStyles = createStaticStyles(({ css, cssVar }) => ({
 }));
 
 /**
- * A model name is typed or picked in one field. Its suggestions are what the engine itself reports (fetched when the field appears and whenever its engine or proxy changes),
+ * A model name is typed or picked in one field. Its suggestions are what the engine itself reports (fetched when the field appears and whenever its engine changes),
  * the refresh button sits inside the field, and an engine with no list leaves a plain text field.
  */
-export function ModelPicker({ engine, proxy, value, onChange, id, placeholder = '例如：gpt-6.1-sol 或 provider/model', label = '模型' }: {
-  engine: string; proxy?: string; value: string; onChange: (model: string) => void; id?: string; placeholder?: string; label?: string;
+export function ModelPicker({ engine, value, onChange, id, placeholder = '例如：gpt-6.1-sol 或 provider/model', label = '模型' }: {
+  engine: string; value: string; onChange: (model: string) => void; id?: string; placeholder?: string; label?: string;
 }) {
-  const models = useEngineModels(engine, proxy);
+  const models = useEngineModels(engine);
   const [open, setOpen] = useState(false);
   const options = modelSelectOptions(models.list);
   const view = modelListView(models.list, models.loading);

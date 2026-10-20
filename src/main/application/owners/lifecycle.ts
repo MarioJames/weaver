@@ -62,7 +62,7 @@ export class OwnerLifecycle {
     if(!workspace)throw new OwnerLaunchError('OWNER_LAUNCH_FAILED','Task has no workspace to launch the owner in');
     const config=this.policy.snapshot().config;const ownerConfig=config.owners[profile];
     if(!ownerConfig)throw new OwnerLaunchError('OWNER_LAUNCH_FAILED',`Owner profile ${profile} is missing from the policy`);
-    launched=(yield {kind:'launch',input:{taskId:task.id,epoch,title:task.title,workspace,engineKind:config.engines[ownerConfig.engine]?.kind??'',model:ownerConfig.model,effort:ownerConfig.effort,proxy:ownerConfig.proxy,prompt}})!;
+    launched=(yield {kind:'launch',input:{taskId:task.id,epoch,title:task.title,workspace,engineKind:config.engines[ownerConfig.engine]?.kind??'',model:ownerConfig.model,effort:ownerConfig.effort,prompt}})!;
     const fresh=current();
     if(!fresh){
      // A newer binding or shutdown owns the task now. Only this attempt's successful host is disposable.

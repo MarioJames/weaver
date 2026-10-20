@@ -226,10 +226,6 @@
             "type": "integer",
             "minimum": 0
           }
-        },
-        "proxy": {
-          "type": "string",
-          "description": "inherit (default), direct, or an HTTP(S) proxy URL without credentials."
         }
       }
     },
@@ -258,10 +254,6 @@
         },
         "description": {
           "type": "string"
-        },
-        "proxy": {
-          "type": "string",
-          "description": "inherit (default), direct, or an HTTP(S) proxy URL without credentials."
         },
         "free_channel": {
           "type": "boolean",

@@ -4,8 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ENGINE_CATALOG } from '../src/shared/engines';
-import { proxyEnvironment, validateProxy } from '../src/shared/proxy';
-import { sayHi } from '../src/main/engines/hello';
+import { parseHelloInput, sayHi } from '../src/main/engines/hello';
 import { startCliAgent } from '../src/main/adapters/cli';
 import type { CaptureResult } from '../src/main/engines/probe';
 import {
@@ -105,7 +104,7 @@ test('a missing, failing, slow or empty list command is reported as such and is 
   }
 });
 
-test('lists are cached for a minute per engine and proxy, shared by concurrent calls, and refresh bypasses the cache', async () => {
+test('lists are cached for a minute per engine, shared by concurrent calls, and refresh bypasses the cache', async () => {
   let now = Date.parse('2026-10-20T00:00:00Z');
   let runs = 0;
   const lister = new EngineModelLister({ now: () => new Date(now), find: async () => '/fake/pi', run: async () => { runs++; await new Promise(r => setTimeout(r, 5)); return ok(PI); } });
@@ -113,31 +112,23 @@ test('lists are cached for a minute per engine and proxy, shared by concurrent c
   assert.equal(runs, 1);
   await lister.list({ engine: 'pi' });
   assert.equal(runs, 1);
-  await lister.list({ engine: 'pi', proxy: 'direct' });
-  assert.equal(runs, 2);
   await lister.list({ engine: 'pi', refresh: true });
-  assert.equal(runs, 3);
+  assert.equal(runs, 2);
   now += 61_000;
   await lister.list({ engine: 'pi' });
-  assert.equal(runs, 4);
+  assert.equal(runs, 3);
 });
 
-test('the role proxy reaches the list command environment: inherit keeps the host proxy, direct removes it, custom replaces it', async () => {
+test('the list command runs with the service process environment untouched, apart from ELECTRON_RUN_AS_NODE', async () => {
   const seen: NodeJS.ProcessEnv[] = [];
   const lister = new EngineModelLister({
     pathEnv: '/bin', env: { HOME: '/h', HTTPS_PROXY: 'http://system.invalid:1', ELECTRON_RUN_AS_NODE: '1', KEEP: 'yes' },
     find: async () => '/fake/opencode', run: async (_exe, _args, _t, _m, env) => { seen.push(env); return ok(OPENCODE); },
   });
   await lister.list({ engine: 'opencode' });
-  await lister.list({ engine: 'opencode', proxy: 'direct' });
-  await lister.list({ engine: 'opencode', proxy: 'http://127.0.0.1:7890' });
   assert.equal(seen[0]!.HTTPS_PROXY, 'http://system.invalid:1');
   assert.equal(seen[0]!.ELECTRON_RUN_AS_NODE, undefined);
-  assert.equal(seen[1]!.HTTPS_PROXY, undefined);
-  assert.equal(seen[1]!.KEEP, 'yes');
-  assert.equal(seen[2]!.HTTPS_PROXY, 'http://127.0.0.1:7890');
-  assert.equal(seen[2]!.http_proxy, 'http://127.0.0.1:7890');
-  assert.equal(seen[2]!.NODE_USE_ENV_PROXY, '1');
+  assert.equal(seen[0]!.KEEP, 'yes');
 });
 
 test('Claude has no list command: names come from built-in aliases plus model names in settings.json, never other values', async t => {
@@ -164,22 +155,17 @@ test('Claude has no list command: names come from built-in aliases plus model na
   assert.deepEqual(empty.map(m => m.id), ['sonnet', 'opus', 'haiku', 'claude-fable-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']);
 });
 
-test('model list input rejects unknown engines and fields, credentials in proxies and non-boolean refresh', () => {
-  assert.deepEqual(parseModelListInput({ engine: 'codex', proxy: 'direct', refresh: true }), { engine: 'codex', proxy: 'direct', refresh: true });
+test('model list input rejects unknown engines and fields (a proxy included) and non-boolean refresh', () => {
+  assert.deepEqual(parseModelListInput({ engine: 'codex', refresh: true }), { engine: 'codex', refresh: true });
   assert.deepEqual(parseModelListInput({ engine: 'pi' }), { engine: 'pi' });
-  for (const bad of [null, [], { engine: 'rm' }, { engine: 'pi', command: 'x' }, { engine: 'pi', proxy: 'http://u:p@127.0.0.1:1' }, { engine: 'pi', proxy: 'socks5://127.0.0.1:1' }, { engine: 'pi', refresh: 'yes' }]) {
+  for (const bad of [null, [], { engine: 'rm' }, { engine: 'pi', command: 'x' }, { engine: 'pi', proxy: 'direct' }, { engine: 'pi', proxy: 'http://127.0.0.1:7890' }, { engine: 'pi', refresh: 'yes' }]) {
     assert.throws(() => parseModelListInput(bad), Error, JSON.stringify(bad));
   }
 });
 
-test('custom proxy addresses are validated: only plain HTTP(S) hosts without credentials, paths or queries', () => {
-  for (const good of [undefined, 'inherit', 'direct', 'http://127.0.0.1:7890', 'https://proxy.example.com:8443']) assert.doesNotThrow(() => validateProxy(good), String(good));
-  for (const bad of ['', 'http://user:pass@127.0.0.1:7890', 'socks5://127.0.0.1:1080', 'ftp://x', '127.0.0.1:7890', 'http://h/path', 'http://h/?q=1', 'http://h/#x', 'http://h bad', 'file:///etc/passwd']) assert.throws(() => validateProxy(bad), Error, bad);
-});
-
 /** Replaces PATH with a directory holding one fake CLI that records the proxy variables it was started with. */
 async function withFakeCli<T>(name: string, run: (dir: string, dump: string) => Promise<T>): Promise<T> {
-  const dir = mkdtempSync(join(tmpdir(), 'wm-proxy-'));
+  const dir = mkdtempSync(join(tmpdir(), 'wm-env-'));
   const dump = join(dir, 'env.json');
   writeFileSync(join(dir, name), `#!${process.execPath}\nconst keys=['HTTP_PROXY','HTTPS_PROXY','http_proxy','https_proxy','ALL_PROXY','NO_PROXY','NODE_USE_ENV_PROXY'];\nrequire('node:fs').writeFileSync(${JSON.stringify(dump)},JSON.stringify(Object.fromEntries(keys.map(k=>[k,process.env[k]??null]))));\nconsole.log(JSON.stringify({type:'message_end',message:{role:'assistant',content:[{type:'text',text:'hi'}]}}));\n`, { mode: 0o700 });
   const saved = { PATH: process.env.PATH, HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY };
@@ -194,50 +180,44 @@ async function withFakeCli<T>(name: string, run: (dir: string, dump: string) => 
 }
 const read = (file: string) => JSON.parse(readFileSync(file, 'utf8')) as Record<string, string | null>;
 
-test('connectivity test starts the engine with the role proxy: custom injects it, direct strips the host proxy, inherit keeps it', async () => {
+test('hello input rejects a proxy field like any other unknown field', () => {
+  assert.deepEqual(parseHelloInput({ engine: 'codex', model: 'm-1', effort: 'high' }), { engine: 'codex', model: 'm-1', effort: 'high' });
+  for (const bad of [{ engine: 'codex', model: 'm-1', effort: 'high', proxy: 'direct' }, { engine: 'codex', model: 'm-1', effort: 'high', proxy: 'http://127.0.0.1:7890' }, { engine: 'codex', model: 'm-1', effort: 'high', command: 'x' }]) {
+    assert.throws(() => parseHelloInput(bad), /Unknown probe field/, JSON.stringify(bad));
+  }
+});
+
+test('connectivity test starts the engine with the service process environment as it is', async () => {
   await withFakeCli('codex', async (dir, dump) => {
     const root = join(dir, 'hello');
     mkdirSync(root, { recursive: true });
-    const run = async (proxy?: string) => { await sayHi({ engine: 'codex', kind: 'codex', model: 'm-1', effort: 'high', ...(proxy ? { proxy } : {}) }, { root, timeoutMs: 8000 }); return read(dump); };
-    const custom = await run('http://127.0.0.1:7890');
-    assert.equal(custom.HTTPS_PROXY, 'http://127.0.0.1:7890');
-    assert.equal(custom.https_proxy, 'http://127.0.0.1:7890');
-    assert.equal(custom.HTTP_PROXY, 'http://127.0.0.1:7890');
-    assert.equal(custom.NODE_USE_ENV_PROXY, '1');
-    const direct = await run('direct');
-    assert.equal(direct.HTTPS_PROXY, null);
-    assert.equal(direct.HTTP_PROXY, null);
-    assert.equal(direct.NODE_USE_ENV_PROXY, null);
-    const inherit = await run();
-    assert.equal(inherit.HTTPS_PROXY, 'http://host-proxy.invalid:3128');
+    await sayHi({ engine: 'codex', kind: 'codex', model: 'm-1', effort: 'high' }, { root, timeoutMs: 8000 });
+    const seen = read(dump);
+    assert.equal(seen.HTTPS_PROXY, 'http://host-proxy.invalid:3128');
+    assert.equal(seen.HTTP_PROXY, 'http://host-proxy.invalid:3128');
+    assert.equal(seen.NODE_USE_ENV_PROXY, null);
   });
 });
 
-test('a real task launch starts the engine with the role proxy in its environment', { timeout: 40_000 }, async () => {
+test('a real task launch starts the engine with the service process environment as it is', { timeout: 40_000 }, async () => {
   await withFakeCli('pi', async (dir, dump) => {
-    const launch = async (proxy?: string) => {
-      const agent = startCliAgent({ engine: 'pi', model: 'fixture/pi', effort: 'high', workspace: dir, stateDir: join(dir, 'state'), instruction: 'Fixture only. No model calls.', ...(proxy ? { proxy } : {}) });
-      try {
-        await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => { agent.kill('SIGKILL'); reject(new Error('launcher did not close')); }, 15_000);
-          agent.stdout.resume(); agent.stderr.resume();
-          agent.once('close', () => { clearTimeout(timer); resolve(); });
-        });
-      } finally { agent.kill('SIGKILL'); }
-      return read(dump);
-    };
-    const custom = await launch('http://127.0.0.1:7890');
-    assert.equal(custom.HTTPS_PROXY, 'http://127.0.0.1:7890');
-    assert.equal(custom.NODE_USE_ENV_PROXY, '1');
-    const direct = await launch('direct');
-    assert.equal(direct.HTTPS_PROXY, null);
-    assert.equal(direct.http_proxy, null);
-    assert.deepEqual(proxyEnvironment({}, 'direct'), {});
+    const agent = startCliAgent({ engine: 'pi', model: 'fixture/pi', effort: 'high', workspace: dir, stateDir: join(dir, 'state'), instruction: 'Fixture only. No model calls.' });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => { agent.kill('SIGKILL'); reject(new Error('launcher did not close')); }, 15_000);
+        agent.stdout.resume(); agent.stderr.resume();
+        agent.once('close', () => { clearTimeout(timer); resolve(); });
+      });
+    } finally { agent.kill('SIGKILL'); }
+    const seen = read(dump);
+    assert.equal(seen.HTTPS_PROXY, 'http://host-proxy.invalid:3128');
+    assert.equal(seen.http_proxy, null);
+    assert.equal(seen.NODE_USE_ENV_PROXY, null);
   });
 });
 
-// Renderer side: what the model picker and the proxy field show.
-import { modelListView, modelSelectOptions, proxyUrlError, requestEngineModels, usableProxy, NO_LIST_TEXT } from '../src/renderer/features/engines/engine-models';
+// Renderer side: what the model picker shows.
+import { modelListView, modelSelectOptions, requestEngineModels, NO_LIST_TEXT } from '../src/renderer/features/engines/engine-models';
 import type { EngineModelList } from '../src/shared/engines';
 
 const listOf = (over: Partial<EngineModelList>): EngineModelList => ({ engine: 'pi', status: 'ok', source: 'pi --list-models', models: [], fetchedAt: '2026-10-20T00:00:00Z', ...over });
@@ -259,27 +239,7 @@ test('the model list request goes straight to the control plane client', async (
   try {
     const seen: unknown[] = [];
     globals.window = { weaver: { listEngineModels: async (input: unknown) => { seen.push(input); return listOf({ models: [{ id: 'a/b' }] }); } } };
-    assert.equal((await requestEngineModels({ engine: 'pi', proxy: 'direct' })).models.length, 1);
-    assert.deepEqual(seen, [{ engine: 'pi', proxy: 'direct' }]);
+    assert.equal((await requestEngineModels({ engine: 'pi' })).models.length, 1);
+    assert.deepEqual(seen, [{ engine: 'pi' }]);
   } finally { globals.window = saved; }
-});
-
-test('the proxy field states why an address is refused, and a half-typed address is never sent with the list request', () => {
-  assert.equal(proxyUrlError('http://127.0.0.1:7890'), '');
-  assert.equal(proxyUrlError('https://proxy.example.com:8443'), '');
-  assert.match(proxyUrlError(''), /请填写/);
-  assert.match(proxyUrlError(' http://127.0.0.1:7890'), /空白/);
-  assert.match(proxyUrlError('http://user:secret@127.0.0.1:7890'), /用户名或密码/);
-  assert.match(proxyUrlError('socks5://127.0.0.1:1080'), /http:\/\/ 或 https:\/\//);
-  assert.match(proxyUrlError('ftp://127.0.0.1'), /http:\/\/ 或 https:\/\//);
-  assert.match(proxyUrlError('127.0.0.1:7890'), /完整的 URL|协议/);
-  assert.match(proxyUrlError('http://h/path'), /路径或查询/);
-  assert.match(proxyUrlError('http://h/?a=1'), /路径或查询/);
-  assert.match(proxyUrlError('http://h b'), /空白|完整/);
-  assert.ok(!proxyUrlError('http://user:secret@127.0.0.1:7890').includes('secret'));
-  assert.equal(usableProxy('http://127.0.0.1:7890'), 'http://127.0.0.1:7890');
-  assert.equal(usableProxy('direct'), 'direct');
-  assert.equal(usableProxy('http://'), undefined);
-  assert.equal(usableProxy('http://u:p@h:1'), undefined);
-  assert.equal(usableProxy(undefined), undefined);
 });

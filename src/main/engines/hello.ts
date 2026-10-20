@@ -1,4 +1,3 @@
-import { proxyEnvironment, validateProxy } from '../../shared/proxy';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, rmSync } from 'node:fs';
@@ -117,10 +116,10 @@ export interface HelloProcess {
   kill(signal?: NodeJS.Signals): boolean;
   once(event: string, listener: (...args: any[]) => void): unknown;
 }
-export type SpawnPrint = (command: string, argv: string[], cwd: string, proxy?: string) => HelloProcess;
+export type SpawnPrint = (command: string, argv: string[], cwd: string) => HelloProcess;
 
-const spawnPrint: SpawnPrint = (command, argv, cwd, proxy) => {
-  const env = proxyEnvironment(process.env, proxy);
+const spawnPrint: SpawnPrint = (command, argv, cwd) => {
+  const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   return spawn(command, argv, { cwd, env, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 };
@@ -128,12 +127,11 @@ const spawnPrint: SpawnPrint = (command, argv, cwd, proxy) => {
 export function parseHelloInput(value: unknown): HelloInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Probe input must be an object');
   const raw = value as Record<string, unknown>;
-  if (Object.keys(raw).some(key => !['engine', 'model', 'effort', 'proxy'].includes(key))) throw new Error('Unknown probe field');
+  if (Object.keys(raw).some(key => !['engine', 'model', 'effort'].includes(key))) throw new Error('Unknown probe field');
   for (const key of ['engine', 'model', 'effort'] as const) {
     if (typeof raw[key] !== 'string' || !raw[key].trim() || raw[key].length > 200) throw new Error(`Probe ${key} is required`);
   }
-  validateProxy(raw.proxy as string | undefined);
-  return { ...(raw.proxy !== undefined ? { proxy: raw.proxy as string } : {}), engine: raw.engine as string, model: raw.model as string, effort: raw.effort as string };
+  return { engine: raw.engine as string, model: raw.model as string, effort: raw.effort as string };
 }
 
 function clip(text: string): string {
@@ -162,7 +160,7 @@ export function sayHi(route: HelloInput & { kind: string }, deps: { root: string
   let child: HelloProcess;
   try {
     mkdirSync(scratch, { recursive: true, mode: 0o700 });
-    child = (deps.spawn ?? spawnPrint)(engine.command, engine.argv(route.model, route.effort), scratch, route.proxy);
+    child = (deps.spawn ?? spawnPrint)(engine.command, engine.argv(route.model, route.effort), scratch);
   } catch (error) {
     cleanup();
     return Promise.resolve(done({ ok: false, error: error instanceof Error ? error.message : String(error) }));

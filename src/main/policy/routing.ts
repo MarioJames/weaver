@@ -1,6 +1,5 @@
 // Derived from skill-foundry agents-cooperation, revision 61989b1 (Apache-2.0).
 // Weaver adaptation: pure policy only; no CLI, sessions, launch flags, or host reads.
-import { validateProxy } from '../../shared/proxy';
 import type { Availability, Block, Config, Dispatch, Issue, Owner, RouteOptions } from '../../shared/contracts/policy';
 import { availabilityOf, coveringBlock, isBlockActive } from '../../shared/policy/availability';
 import { EFFORTS, FREE_CHANNEL_INTERVAL_RANGE, QUOTA_INTERVAL_RANGE, hasQuotaProbe, isValidTimezone } from '../../shared/policy/settings';
@@ -27,11 +26,6 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
     const allowed = kind ? EFFORTS[kind] : undefined;
     if (allowed && !allowed.includes(effort)) bad(`${path}.effort`, `${kind} effort must be one of ${allowed.join("|")}`);
   };
-  for (const [section, records] of [["owners", c.owners], ["workers", c.workers]] as const) {
-    for (const [id, role] of Object.entries(records)) {
-      try { validateProxy(role.proxy); } catch (error) { bad(`$.${section}.${id}.proxy`, (error as Error).message); }
-    }
-  }
   const owned = new Map<string, string>();
   for (const [id, owner] of Object.entries(c.owners)) {
     const at = `$.owners.${id}`;
@@ -125,7 +119,7 @@ export function parseReleaseAt(value: string, now: number): string {
 function previewSelection(config: Config, ownerId: string, workerId: string, warnings: string[]): Dispatch {
  const owner = config.owners[ownerId]!;
  const worker = config.workers[workerId]!;
- return {proxy:worker.proxy,owner:ownerId,worker:workerId,engine:worker.engine,model:worker.model,effort:worker.effort,
+ return {owner:ownerId,worker:workerId,engine:worker.engine,model:worker.model,effort:worker.effort,
   execution:'disabled',dispatch:'preview',warnings,weight:effectiveWeight(owner,workerId)};
 }
 function requireOwner(config: Config, blocks: Block[], id: string, what = "owner"): Owner {

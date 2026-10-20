@@ -208,7 +208,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       policy: () => policy!,
       stateStore: dbFreeProbeStore(store.db),
       ready: () => ready && !draining,
-      // The same light greeting the penalty recovery uses, extended with the worker's own proxy path.
+      // The same light greeting the penalty recovery uses.
       probe: (route, signal) => track(sayHi({ ...route, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal })
         .then(result => ({ ok: result.ok, ms: result.durationMs, error: result.error }))),
       onBlocksChanged: () => commands?.pump(),

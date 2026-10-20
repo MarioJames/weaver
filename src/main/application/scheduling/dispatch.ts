@@ -38,12 +38,12 @@ export class Dispatcher {
   return `${slotGroupName(this.manager.store.listOwners(),ownerId,profile)} is at its current concurrency limit (${limit}).`;
  }
  /** maxWaitMinutes is frozen for the owner and the UI as their polling bound; Weaver never stops a worker with it. */
- decideExecution(engine:string,provider:unknown,task:Task,ownerEngine?:string,workerProxy?:string,ownerProxy?:string):{execution:'real'|'mock'|'native';adapter:string;maxWaitMinutes:number;workspace?:string;engineKind?:string} {
+ decideExecution(engine:string,provider:unknown,task:Task,ownerEngine?:string):{execution:'real'|'mock'|'native';adapter:string;maxWaitMinutes:number;workspace?:string;engineKind?:string} {
   const minutes=this.policy.snapshot().config.herdr.max_wait_minutes;
   if(!Number.isSafeInteger(minutes)||minutes<1||minutes>1440)fail('INVALID_REQUEST','Configured max_wait_minutes is invalid');
   if(provider==='mock-jsonl'||this.manager.adapterId==='mock-jsonl') return {execution:'mock',adapter:'mock-jsonl',maxWaitMinutes:minutes};
   // A worker on the owner's own engine runs inside the owner with its built-in subagent tool; Weaver launches nothing.
-  if(ownerEngine!==undefined&&engine===ownerEngine&&(workerProxy??'inherit')===(ownerProxy??'inherit')) return {execution:'native',adapter:'native',maxWaitMinutes:minutes,...(task.workspace?{workspace:task.workspace}:{})};
+  if(ownerEngine!==undefined&&engine===ownerEngine) return {execution:'native',adapter:'native',maxWaitMinutes:minutes,...(task.workspace?{workspace:task.workspace}:{})};
   const kind=this.policy.snapshot().config.engines[engine]?.kind??'';
   if(kind==='claude')fail('CAPABILITY_UNAVAILABLE','Claude Code real execution is deferred. No mock provider was substituted.');
   if(!isRealEngineKind(kind))fail('CAPABILITY_UNAVAILABLE',`Engine ${engine} (${kind||'unknown kind'}) cannot be launched. No mock provider was substituted.`);
@@ -95,7 +95,7 @@ export class Dispatcher {
   for(const engine of forcedEngines)if(!excluded.includes(engine))excluded.push(engine);
   const running=slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,owner));
   const route=this.routeOf(owner,running,excluded,a.worker);
-  const decision=this.decideExecution(route.engine,a.provider,task,this.policy.snapshot().config.owners[route.owner]?.engine,route.proxy,this.policy.snapshot().config.owners[route.owner]?.proxy);
+  const decision=this.decideExecution(route.engine,a.provider,task,this.policy.snapshot().config.owners[route.owner]?.engine);
   const pendingPackage:WorkPackage=task.packageId?this.manager.store.getPackage(task.packageId!)!:{id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:[decision.workspace??task.workspace??'Explicit mock fixture'],acceptanceCriteria:task.acceptanceCriteria?.length?task.acceptanceCriteria:[decision.execution==='mock'?'Mock output returned for owner review':'Provider result returned for owner review'],createdAt:new Date().toISOString()};
   if(!pendingPackage||pendingPackage.taskId!==task.id)fail('INVALID_REQUEST','Frozen work package is missing');
   // Real launch and native handoff freeze the same instruction, so it must fit before any state changes.
@@ -103,7 +103,7 @@ export class Dispatcher {
   this.prepareOwnerActivity(command,a);task=this.records.task(a);
   if(decision.workspace)task.workspace=decision.workspace;
   if(!task.packageId){this.manager.store.transaction(()=>{this.manager.store.putPackage(pendingPackage);task.packageId=pendingPackage.id;this.records.put(task);});}
-  task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,proxy:route.proxy,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,...(decision.execution==='real'?{workspaceIdentity:workspaceIdentity(decision.workspace)}:{})}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
+  task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,...(decision.execution==='real'?{workspaceIdentity:workspaceIdentity(decision.workspace)}:{})}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
   const selected=decision.execution==='real'?`Policy selected ${route.worker}; launching ${decision.engineKind} in ${decision.workspace}`:decision.execution==='native'?`Policy selected ${route.worker} on the owner's engine; the owner runs it with its built-in subagent tool (${route.model}, ${route.effort})`:`Policy selected ${route.worker}; explicit mock-jsonl provider`;
   event(task,'lifecycle',`${selected}${excluded.length?`; engines excluded because they ${EXCLUDED_ENGINE_REASON}: ${excluded.join(', ')}`:''}`);
   if(!route.capacityAvailable){task.scheduled=true;task.queueReason={code:'waiting_for_capacity',message:this.capacityWait(route.owner,task.ownerId,route.maxParallel)};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.records.put(task);return this.dispatchResponse(task,excluded);}this.records.put(task);return this.dispatchResponse(this.manager.start(task.id,route.maxParallel),excluded);

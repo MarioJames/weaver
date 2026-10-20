@@ -22,7 +22,7 @@ function harness(answer: (input: EngineModelListInput) => Promise<EngineModelLis
 
 test('mounting the field fetches the engine models once, without any user action', async () => {
   const h = harness();
-  h.session.sync('claude', undefined);
+  h.session.sync('claude');
   assert.equal(h.state.loading, true);
   await h.settle();
   assert.deepEqual(h.requests, [{ engine: 'claude' }]);
@@ -30,34 +30,34 @@ test('mounting the field fetches the engine models once, without any user action
   assert.deepEqual(h.state.list?.models, [{ id: 'claude/m' }]);
 });
 
-test('the same engine and proxy never fetches twice (re-renders, strict-mode effect replays)', async () => {
+test('the same engine never fetches twice (re-renders, strict-mode effect replays)', async () => {
   const h = harness();
-  h.session.sync('codex', 'direct');
-  h.session.sync('codex', 'direct');
-  h.session.sync('codex', 'direct');
+  h.session.sync('codex');
+  h.session.sync('codex');
+  h.session.sync('codex');
   await h.settle();
-  h.session.sync('codex', 'direct');
+  h.session.sync('codex');
   await h.settle();
   assert.equal(h.requests.length, 1);
 });
 
 test('no engine, no request; choosing one later fetches it', async () => {
   const h = harness();
-  h.session.sync('', undefined);
-  h.session.sync('', 'direct');
+  h.session.sync('');
+  h.session.sync('');
   await h.settle();
   assert.equal(h.requests.length, 0);
   assert.equal(h.state.loading, false);
-  h.session.sync('grok', undefined);
+  h.session.sync('grok');
   await h.settle();
   assert.deepEqual(h.requests, [{ engine: 'grok' }]);
 });
 
-test('a changed engine or proxy fetches again, and a slow answer for the old engine cannot overwrite the new list', async () => {
+test('a changed engine fetches again, and a slow answer for the old engine cannot overwrite the new list', async () => {
   const pending = new Map<string, (list: EngineModelList) => void>();
-  const h = harness(input => new Promise(resolve => pending.set(input.engine + (input.proxy ?? ''), resolve)));
-  h.session.sync('claude', undefined);
-  h.session.sync('codex', undefined);
+  const h = harness(input => new Promise(resolve => pending.set(input.engine, resolve)));
+  h.session.sync('claude');
+  h.session.sync('codex');
   assert.equal((h.state as { list?: EngineModelList }).list, undefined, 'the previous engine list is dropped at once');
   pending.get('codex')!(listOf('codex', 'gpt'));
   await h.settle();
@@ -65,41 +65,27 @@ test('a changed engine or proxy fetches again, and a slow answer for the old eng
   await h.settle();
   assert.deepEqual(h.state.list?.models, [{ id: 'gpt' }]);
   assert.equal(h.state.loading, false);
-  h.session.sync('codex', 'http://127.0.0.1:7890');
-  pending.get('codexhttp://127.0.0.1:7890')!(listOf('codex', 'via-proxy'));
-  await h.settle();
-  assert.deepEqual(h.requests.map(item => [item.engine, item.proxy]), [['claude', undefined], ['codex', undefined], ['codex', 'http://127.0.0.1:7890']]);
-  assert.deepEqual(h.state.list?.models, [{ id: 'via-proxy' }]);
-});
-
-test('a proxy address still being typed does not trigger a request', async () => {
-  const h = harness();
-  h.session.sync('claude', 'http://127.0.0.1:7890');
-  await h.settle();
-  h.session.sync('claude', 'http://');
-  h.session.sync('claude', 'http://127.0.0.1:78 90');
-  await h.settle();
-  assert.equal(h.requests.length, 1);
+  assert.deepEqual(h.requests.map(item => item.engine), ['claude', 'codex']);
 });
 
 test('refresh forces a new request with refresh=true even for an unchanged engine', async () => {
   const h = harness();
-  h.session.sync('claude', undefined);
+  h.session.sync('claude');
   await h.settle();
   await h.session.load(true);
   assert.deepEqual(h.requests, [{ engine: 'claude' }, { engine: 'claude', refresh: true }]);
-  await h.session.load(true).then(() => h.session.sync('claude', undefined));
+  await h.session.load(true).then(() => h.session.sync('claude'));
   assert.equal(h.requests.length, 3);
 });
 
 test('a failed or rejected fetch is reported and leaves the field usable', async () => {
   const failed = harness(async input => ({ ...listOf(input.engine), status: 'failed', message: '命令失败' }));
-  failed.session.sync('claude', undefined);
+  failed.session.sync('claude');
   await failed.settle();
   assert.deepEqual(failed.state.errors, ['模型列表获取失败:命令失败']);
   assert.equal(failed.state.loading, false);
   const rejected = harness(async () => { throw new Error('boom'); });
-  rejected.session.sync('claude', undefined);
+  rejected.session.sync('claude');
   await rejected.settle();
   assert.equal(rejected.state.errors.length, 1);
   assert.equal(rejected.state.loading, false);

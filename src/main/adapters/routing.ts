@@ -33,7 +33,6 @@ export class RoutingWorkerAdapter implements WorkerAdapter {
     const stateDir = join(this.stateRoot, task.id);
     mkdirSync(stateDir, { recursive: true, mode: 0o700 });
     return this.launch({
-      proxy: task.dispatch.proxy,
       engine: kind as RealEngineKind,
       model: task.dispatch.model,
       effort: task.dispatch.effort,

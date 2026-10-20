@@ -1,4 +1,3 @@
-import { proxyEnvironment, validateProxy } from '../../../shared/proxy';
 import { classifyVendorError } from './vendor-errors';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
@@ -28,7 +27,6 @@ export class CliAgentInputError extends Error {
 }
 
 export interface PreparedCliAgent {
-  proxy?: string;
   engine: RealEngineKind;
   model: string;
   effort: string;
@@ -85,7 +83,6 @@ function existingDirectory(field: string, value: string): string {
 
 /** Validate input and write the private prompt. Does not start a process. */
 export function prepareCliAgentInput(input: CliAgentInput): PreparedCliAgent {
-  validateProxy(input.proxy);
   if (!ENGINES.has(input.engine)) fail('engine', 'Engine must be opencode, pi, grok, codex, qodercli, or zcode');
   if (typeof input.model !== 'string' || !MODEL.test(input.model) || input.model.includes('..')) fail('model', 'Model must be a bounded identifier');
   if (typeof input.effort !== 'string' || !EFFORT.test(input.effort)) fail('effort', 'Effort must be a bounded identifier');
@@ -110,7 +107,7 @@ export function prepareCliAgentInput(input: CliAgentInput): PreparedCliAgent {
   } catch (error) {
     fail('effort', error instanceof Error ? error.message : 'Invalid effort');
   }
-  return { proxy: input.proxy, engine: input.engine, model: input.model, effort: input.effort, workspace, stateDir, instruction: input.instruction, role: input.role, argv: spec.argv, stdin: spec.stdin, promptPath, ...(input.engine === 'pi' ? { sessionDir } : {}), unit: `weaver-cli-${input.engine}-${id}` };
+  return { engine: input.engine, model: input.model, effort: input.effort, workspace, stateDir, instruction: input.instruction, role: input.role, argv: spec.argv, stdin: spec.stdin, promptPath, ...(input.engine === 'pi' ? { sessionDir } : {}), unit: `weaver-cli-${input.engine}-${id}` };
 }
 
 class CliAgent extends EventEmitter implements ManagedAgentProcess {
@@ -151,7 +148,7 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
       }
       this.emitRecords(records);
     }, detail => this.logOversizedLine(detail));
-    const env = proxyEnvironment(process.env, prepared.proxy);
+    const env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
     this.scope = startOwnedScope({ command: prepared.argv, cwd: prepared.workspace, env, stdin: prepared.stdin, ...(prepared.stdin!==null?{stdinPath:prepared.promptPath}:{}), unit: prepared.unit });
     this.pid = this.scope.pid;
