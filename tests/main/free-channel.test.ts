@@ -12,7 +12,7 @@ import { unblockEngine } from '../../src/main/application/engines/unblock';
 import { PolicyBlockService } from '../../src/main/policy/blocks';
 import { StallMonitor } from '../../src/main/stall';
 import { FREE_PROBE_BLOCK_BY, STALL_BLOCK_BY } from '../../src/shared/policy/blocks';
-import { parseFreeProbeState } from '../../src/main/storage/free-probe-state';
+import { parseFreeProbeState, type FreeProbeState, type FreeProbeStore } from '../../src/main/storage/free-probe-state';
 import { classifyVendorError } from '../../src/main/adapters/cli/vendor-errors';
 
 const START = Date.parse('2026-10-19T08:00:00Z');
@@ -444,6 +444,66 @@ test('a greeting that answers only after stop() becomes neither a block nor a ro
       assert.equal(l.pumps(), 0);
     } finally { await l.monitor.stop(); l.cleanup(); }
   }
+});
+
+test('a probeNow that lands after stop() does not flush the dirty state a failed save left behind', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wv-free-dirty-stop-'));
+  let now = START;
+  const config = defaultConfig();
+  config.engines.qoder.enabled = true;
+  config.workers.qoder_worker.enabled = true;
+  const policy = new PolicyStore(join(dir, 'weaver.db'), () => now);
+  const base = policy.snapshot();
+  policy.save({ revision: base.revision, config, blocks: [] }, { allowEngineEnable: true });
+  const statePath = join(dir, 'state.db');
+  const inner = freeStoreAt(statePath);
+  let failNextSave = false;
+  let saves = 0;
+  const store: FreeProbeStore = {
+    ...inner,
+    save(state: FreeProbeState): void {
+      saves += 1;
+      if (failNextSave) { failNextSave = false; throw new Error('save failed once'); }
+      inner.save(state);
+    },
+  };
+  let release: () => void = () => {};
+  let pumps = 0;
+  const monitor = new FreeChannelProbeMonitor({
+    policy: () => policy, stateStore: store, vendorLadder: vendorLadderAt(statePath),
+    // The greeting ignores the abort signal, like a process already past the point of being killed, and only lands after stop() is done.
+    probe: () => new Promise<ProbeOutcomeLike>(resolve => { release = () => resolve({ ok: true, ms: 5 }); }),
+    now: () => now, ready: () => true, onBlocksChanged: () => { pumps += 1; }, log: () => {},
+  });
+  try {
+    // An open quota question, adopted and persisted while saves still work.
+    const snapshot = policy.snapshot();
+    policy.save({ revision: snapshot.revision, config: snapshot.config, blocks: [{ engine: 'qoder', model: 'Qwen3.8-Flash', worker: 'qoder_worker', reason: '额度耗尽：免费额度已用完', since: iso(now), by: FREE_PROBE_BLOCK_BY }] });
+    monitor.start();
+    now += MINUTE;
+    await monitor.tick();
+    assert.equal(readFree(statePath).workers.qoder_worker!.mode, 'quota');
+    // The block is lifted by hand; resetEngine() then clears the question, but that save fails and leaves dirty set in memory.
+    policy.save({ revision: policy.snapshot().revision, config: policy.snapshot().config, blocks: [] });
+    failNextSave = true;
+    assert.throws(() => monitor.resetEngine('qoder'), /save failed once/, 'the reset\'s own save fails, leaving dirty set in memory');
+    assert.equal(readFree(statePath).workers.qoder_worker!.mode, 'quota', 'the failed save left the old row on disk');
+    const savedBeforeStop = saves;
+    const revision = policy.snapshot().revision;
+    const ladder = vendorLadderAt(statePath).list();
+    // A manual probe is in flight when stop() fences everything; its answer only arrives after the stop is done.
+    const inFlight = monitor.probeNow('qoder_worker');
+    await new Promise<void>(resolve => setImmediate(resolve));
+    const stopping = monitor.stop();
+    release();
+    await Promise.all([inFlight, stopping]);
+    assert.equal(saves, savedBeforeStop, 'nothing is saved after the stop, not even the leftover dirty state');
+    assert.equal(policy.snapshot().revision, revision, 'nor a policy revision');
+    assert.deepEqual(vendorLadderAt(statePath).list(), ladder, 'nor a vendor ladder row');
+    assert.equal(readFree(statePath).workers.qoder_worker!.mode, 'quota', 'the persisted question is exactly what the stop left there');
+    assert.equal(readFree(statePath).history.length, 0, 'and no history line appeared');
+    assert.equal(pumps, 0, 'nor a change notification');
+  } finally { await monitor.stop(); rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('probe state is parsed, persisted in weaver.db and reloaded; an empty database adopts its own held block', async () => {

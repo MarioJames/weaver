@@ -192,7 +192,8 @@ export class FreeChannelProbeMonitor {
       await this.probeOne(route, fence);
       if (!this.lifecycle.writable(fence)) break;
     }
-    if (this.dirty) this.flushState();
+    // The loop's breaks and the tail flush share one fence: a probe that awaited past a stop flushes nothing.
+    if (this.dirty && this.lifecycle.writable(fence)) this.flushState();
     if (this.changed && this.lifecycle.writable(fence)) { this.changed = false; this.blocks.notifyChanged(); }
     return this.status();
   }
@@ -225,7 +226,7 @@ export class FreeChannelProbeMonitor {
       // A greeting awaited on a model: nothing from here on may land after a drain.
       if (!this.lifecycle.writable(fence)) return;
     }
-    if (this.dirty) this.flushState();
+    if (this.dirty && this.lifecycle.writable(fence)) this.flushState();
     if (this.changed && this.lifecycle.writable(fence)) { this.changed = false; this.blocks.notifyChanged(); }
   }
 
