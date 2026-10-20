@@ -2,12 +2,57 @@ import type { EngineQuotaRecord, QuotaEngine, QuotaRefreshInput, QuotaSnapshot, 
 import { QUOTA_FRESH_MS } from '../../shared/quota';
 import { VERSION } from '../../shared/version';
 import { QuotaFailure, QuotaRenewalPending, readNativeCredential, type NativeCredential } from './credentials';
+import { THIRD_PARTY_DETAIL } from './messages';
 import { normalizeUsage, PROVIDERS } from './providers';
+import { usesThirdPartyProvider } from './third-party';
 
 const ENGINES: QuotaEngine[] = ['codex', 'claude', 'grok'];
 const OBSERVED: QuotaStatus[] = ['available', 'exhausted', 'unknown'];
 const MIN_INTERVAL_MS = 60_000;
 const MAX_BODY_BYTES = 256 * 1024;
+
+/** What the prober keeps across restarts: the last observation per engine plus its credential and pacing state. */
+export interface QuotaPersistence {
+  records: Partial<Record<QuotaEngine, EngineQuotaRecord>>;
+  fingerprints: Partial<Record<QuotaEngine, string>>;
+  lastAccounts: Partial<Record<QuotaEngine, string>>;
+  nextRequests: Partial<Record<QuotaEngine, number>>;
+}
+
+/** Where the prober persists its snapshot: a DatabaseSync-backed adapter in product, nothing in tests. */
+export interface QuotaSnapshotStore { load(): QuotaPersistence | undefined; save(snapshot: QuotaPersistence): void }
+
+/** The weaver.db quota tables: one observation row per engine plus the prober's own pacing keys. */
+export function dbQuotaStore(db: import('node:sqlite').DatabaseSync): QuotaSnapshotStore {
+  return {
+    load(): QuotaPersistence | undefined {
+      const records: QuotaPersistence['records'] = {};
+      for (const row of db.prepare('SELECT engine,body FROM quota_records').all() as Record<string, unknown>[]) {
+        const engine = String(row.engine) as QuotaEngine;
+        if (ENGINES.includes(engine)) records[engine] = JSON.parse(String(row.body)) as EngineQuotaRecord;
+      }
+      const state: QuotaPersistence = { records, fingerprints: {}, lastAccounts: {}, nextRequests: {} };
+      for (const row of db.prepare('SELECT key,body FROM quota_state').all() as Record<string, unknown>[]) {
+        const key = String(row.key);
+        if (!(key in state)) continue;
+        Object.assign(state[key as keyof QuotaPersistence] as Record<string, unknown>, JSON.parse(String(row.body)));
+      }
+      return state;
+    },
+    save(snapshot: QuotaPersistence): void {
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.exec('DELETE FROM quota_records');
+        const insertRecord = db.prepare('INSERT INTO quota_records(engine,body) VALUES (?,?)');
+        for (const [engine, record] of Object.entries(snapshot.records)) if (record) insertRecord.run(engine, JSON.stringify(record));
+        db.exec('DELETE FROM quota_state');
+        const insertState = db.prepare('INSERT INTO quota_state(key,body) VALUES (?,?)');
+        for (const key of ['fingerprints', 'lastAccounts', 'nextRequests'] as const) insertState.run(key, JSON.stringify(snapshot[key]));
+        db.exec('COMMIT');
+      } catch (error) { try { db.exec('ROLLBACK'); } catch { /* SQLite may already have rolled back. */ } throw error; }
+    },
+  };
+}
 
 /** Dependency overrides are internal to the main process and tests, never accepted over RPC. */
 export interface QuotaProberOptions {
@@ -15,6 +60,8 @@ export interface QuotaProberOptions {
   now?: () => Date;
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
+  /** Restart-durable observations; product passes the weaver.db adapter. */
+  snapshotStore?: QuotaSnapshotStore;
 }
 
 function initial(engine: QuotaEngine): EngineQuotaRecord {
@@ -42,6 +89,7 @@ export class QuotaProber {
   private readonly clock: () => Date;
   private readonly fetcher: typeof globalThis.fetch;
   private readonly timeoutMs: number;
+  private readonly snapshotStore?: QuotaSnapshotStore;
   private closed = false;
 
   constructor(options: QuotaProberOptions = {}) {
@@ -49,6 +97,29 @@ export class QuotaProber {
     this.clock = options.now ?? (() => new Date());
     this.fetcher = options.fetch ?? globalThis.fetch;
     this.timeoutMs = Math.max(1, Math.min(8_000, options.timeoutMs ?? 8_000));
+    this.snapshotStore = options.snapshotStore;
+    const restored = options.snapshotStore?.load();
+    if (restored) {
+      for (const engine of ENGINES) {
+        const record = restored.records[engine];
+        if (record) this.records.set(engine, record);
+        const fingerprint = restored.fingerprints[engine];
+        if (fingerprint !== undefined) this.fingerprints.set(engine, fingerprint);
+        const account = restored.lastAccounts[engine];
+        if (account !== undefined) this.lastAccounts.set(engine, account);
+        const next = restored.nextRequests[engine];
+        if (next !== undefined) this.nextRequests.set(engine, next);
+      }
+    }
+  }
+
+  private persist(): void {
+    this.snapshotStore?.save({
+      records: Object.fromEntries([...this.records].filter(([engine]) => ENGINES.includes(engine))) as QuotaPersistence['records'],
+      fingerprints: Object.fromEntries(this.fingerprints) as QuotaPersistence['fingerprints'],
+      lastAccounts: Object.fromEntries(this.lastAccounts) as QuotaPersistence['lastAccounts'],
+      nextRequests: Object.fromEntries(this.nextRequests) as QuotaPersistence['nextRequests'],
+    });
   }
 
   get(): QuotaSnapshot {
@@ -94,7 +165,7 @@ export class QuotaProber {
     const started = this.clock().getTime();
     try {
       const result = await Promise.race([this.probe(engine, controller.signal, value => { fingerprint = value; }), interrupted]);
-      if (result && !this.closed) this.records.set(engine, result);
+      if (result && !this.closed) { this.records.set(engine, result); this.persist(); }
     } catch (error) {
       if (this.closed) return;
       const failure = error instanceof QuotaFailure ? error : new QuotaFailure('error', '额度接口请求失败');
@@ -112,6 +183,7 @@ export class QuotaProber {
           observedAt: sameAccount ? previous.observedAt : null,
           windows: sameAccount ? previous.windows : [], stale: true, detail: observation?.detail ?? '', retryAt: cooldown,
         });
+        this.persist();
         return;
       }
       const sameCredential = fingerprint !== undefined && fingerprint === this.fingerprints.get(engine);
@@ -121,6 +193,7 @@ export class QuotaProber {
         windows: sameCredential ? previous.windows : [], stale: true, detail: failure.message,
         retryAt: cooldown,
       });
+      this.persist();
     } finally {
       clearTimeout(timer);
       controller.signal.removeEventListener('abort', abort);
@@ -130,6 +203,8 @@ export class QuotaProber {
 
   private async probe(engine: QuotaEngine, signal: AbortSignal, identify: (fingerprint: string) => void): Promise<EngineQuotaRecord | undefined> {
     const now = this.clock().getTime();
+    // The native endpoint reports the subscription, not the provider the CLI is actually switched to; do not read or show it.
+    if (await usesThirdPartyProvider(engine, this.env)) throw new QuotaFailure('unsupported', THIRD_PARTY_DETAIL);
     const credential = await readNativeCredential(engine, this.env, now);
     identify(credential.fingerprint);
     if (signal.aborted || this.closed) throw new QuotaFailure('error', '额度探测已取消');
@@ -138,6 +213,7 @@ export class QuotaProber {
       this.records.set(engine, initial(engine));
       this.fingerprints.set(engine, credential.fingerprint);
     }
+    this.persist();
     const next = this.nextRequests.get(engine) ?? 0;
     if (next > now) {
       const record = this.records.get(engine)!;
@@ -145,6 +221,7 @@ export class QuotaProber {
       return undefined;
     }
     this.nextRequests.set(engine, now + MIN_INTERVAL_MS);
+    this.persist();
     const payload = await this.request(engine, credential, signal);
     if (signal.aborted || this.closed) throw new QuotaFailure('error', '额度探测已取消');
     const checkedAt = this.clock().toISOString();

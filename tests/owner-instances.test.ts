@@ -34,9 +34,9 @@ const blockedLaunch = (input: OwnerLaunchInput): OwnerLaunchResult => { throw ne
 const ownerRef = { name: 'legacy', transport: 'herdr-visible' as const, session: 'reference', pane: 'reference' };
 
 function setup(dir = mkdtempSync(join(tmpdir(), 'weaver-owner-instance-'))) {
-  const store = new TaskStore(join(dir, 'tasks.json'));
+  const store = new TaskStore(join(dir,'weaver.db'));
   const manager = new TaskManager(store, { id: 'mock-jsonl', start: () => heldProcess() }, () => {}, undefined, error => { throw error; });
-  const policy = new PolicyStore(join(dir, 'policy.json'));
+  const policy = new PolicyStore(join(dir,'weaver.db'));
   const handler = new CommandHandler(manager, policy, blockedLaunch, () => false);
   const raw = (command: string, args: Record<string, unknown> = {}, commandId = randomUUID()) => handler.handle({ apiVersion: 'weaver.v1', commandId, command, args });
   const call = (command: string, args: Record<string, unknown> = {}, commandId = randomUUID()): any => { const response = raw(command, args, commandId); assert.equal(response.ok, true, JSON.stringify(response)); return response.data; };
@@ -135,7 +135,7 @@ test('a changed session, name or profile is a different instance, while implicit
   } finally { await f.close(); }
 });
 
-test('a repeated attach is still admitted at the owner limit, while a new instance is refused', async () => {
+test('attach deduplicates existing instances and admits new ones beyond the former JSON limit', async () => {
   const f = setup();
   try {
     const meta = f.store.getMetadata();
@@ -145,8 +145,8 @@ test('a repeated attach is still admitted at the owner limit, while a new instan
     assert.equal(f.owners().length, 200);
     assert.deepEqual(f.attach('Full house', 'pane-last'), last, 'a duplicate consumes no room in the registry');
     assert.equal(f.owners().length, 200);
-    assert.equal(f.raw('owners.attach', { name: 'Fresh', profileId: 'codex_owner', session: 'pane-new' }).error?.code, 'RESOURCE_LIMIT');
-    assert.equal(f.owners().length, 200);
+    assert.equal(f.raw('owners.attach', { name: 'Fresh', profileId: 'codex_owner', session: 'pane-new' }).ok, true);
+    assert.equal(f.owners().length, 201);
   } finally { await f.close(); }
 });
 

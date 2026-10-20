@@ -331,6 +331,8 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     > * { flex: 1 1 0; min-inline-size: 0; }
   `,
   archiveFilterTrigger: css`
+    justify-content: flex-start;
+    text-align: start;
     block-size: 32px;
     min-block-size: 32px;
     max-block-size: 32px;
@@ -340,9 +342,11 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
   archiveFilterValue: css`
     && {
       display: block;
+      flex: 1 1 auto;
       overflow: hidden;
       white-space: nowrap;
       text-overflow: ellipsis;
+      text-align: start;
     }
     > * { flex-wrap: nowrap; overflow: hidden; }
     [data-role='lobe-select-tag'] { min-inline-size: 0; flex-shrink: 0; }
@@ -492,32 +496,66 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     white-space: nowrap;
     font-size: ${cssVar.fontSizeSM};
   `,
-  cardTime: css`
-    flex: none;
-    color: ${cssVar.colorTextSecondary};
-    font-size: ${cssVar.fontSizeSM};
-    white-space: nowrap;
-  `,
-  cardMeta: css`
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-inline-size: 0;
-    min-block-size: 20px;
-    color: ${cssVar.colorTextSecondary};
-    font-size: ${cssVar.fontSizeSM};
-  `,
-  cardParent: css`
-    flex: 1 1 0;
+  cardChildren: css`
     min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: ${cssVar.fontSizeSM};
+  `,
+  cardTime: css`
+    flex: none;
+    color: ${cssVar.colorTextSecondary};
+    font-size: ${cssVar.fontSizeSM};
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  `,
+  /**
+   * The card's one footer sentence: who dispatched and when, then the latest word, a dot between. In a narrow card it is running text that wraps
+   * between its three parts (each part stays whole); from 300px up it is one line.
+   */
+  cardMeta: css`
+    display: block;
+    min-inline-size: 0;
+    min-block-size: 20px;
+    color: ${cssVar.colorTextSecondary};
+    font-size: ${cssVar.fontSizeSM};
+    line-height: 20px;
+
+    @container (min-width: 300px) {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: baseline;
+      gap: 4px;
+    }
+  `,
+  cardWho: css`
+    min-inline-size: 0;
+
+    @container (min-width: 300px) {
+      white-space: nowrap;
+    }
+  `,
+  cardTail: css`
+    white-space: nowrap;
+  `,
+  /** The dot closes the first part, so a wrapped second part starts clean on its own line instead of with a stray dot. */
+  cardSep: css`
+    white-space: nowrap;
+  `,
+  cardParent: css`
+    display: inline-block;
+    max-inline-size: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
 
     > span { display: inline; }
     svg { vertical-align: middle; margin-inline-end: 4px; }
   `,
   taskCard: css`
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -586,6 +624,14 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
       outline-offset: 2px;
       border-radius: ${cssVar.borderRadiusSM};
     }
+  `,
+  /** A list entry's pause: its kind as a tag, then the reason; the reason moves under the tag when the pane is narrow. */
+  roleNote: css`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    align-items: center;
+    min-inline-size: 0;
   `,
   /** Setting label and description on the left, the control on the right. */
   setting: css`

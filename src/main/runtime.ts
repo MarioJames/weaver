@@ -7,10 +7,12 @@ import { EXECUTION_BOUNDARY, ENGINE_CATALOG, readinessFor, type EngineProbeRecor
 import { parseId, parseTaskInput } from '../shared/validation';
 import { startCliAgent } from './adapters/cli/index';
 import { HelloJobs, parseHelloInput, sayHi } from './engines/hello';
+import { EngineModelLister, parseModelListInput } from './engines/models';
+import { FreeChannelProbeMonitor, dbFreeProbeStore, parseFreeProbeInput } from './free-channel';
 import { embeddedApp } from './embedded';
 import { RoutingWorkerAdapter } from './adapters/routing';
 import { MockWorkerAdapter } from './adapters/worker';
-import { CommandHandler, configuredParallel, workerLoad } from './commands';
+import { CommandHandler, configuredParallel, workerLoad, type AsyncOwnerHost } from './commands';
 import { applyEngineEnabled, parseEngineToggle } from './engines/control';
 import { EngineProber } from './engines/probe';
 import { SECURITY_HEADERS, startHttpServer, type HttpRuntime } from './http';
@@ -20,9 +22,9 @@ import { validateConfig } from './policy/routing';
 import { PolicyStore } from './policy/store';
 import { applyQuotaSnapshot, parseQuotaRefresh, QuotaPolicyConflict, QUOTA_CAPABILITIES } from './policy/quota';
 import type { QuotaRefreshInput } from '../shared/quota';
-import { QuotaProber } from './quota';
+import { QuotaProber, dbQuotaStore } from './quota';
 import { QuotaScheduler } from './quota/scheduler';
-import { STALL_FILE, StallMonitor } from './stall';
+import { StallMonitor, dbStallStore } from './stall';
 import { RpcError, parseRpcBody } from './rpc';
 import { TaskStore } from './store';
 import { VERSION } from '../shared/version';
@@ -37,6 +39,7 @@ export interface RuntimeOptions {
   workerScript?: string;
   /** Internal dependency injection for isolated runtime tests; never supplied over RPC. */
   quotaProber?: QuotaProber;
+  ownerHost?: AsyncOwnerHost;
 }
 
 export interface WeaverRuntime {
@@ -91,6 +94,9 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   let manager: TaskManager | undefined;
   let store: TaskStore | undefined;
   let policy: PolicyStore | undefined;
+  let quotaProber: QuotaProber | undefined;
+  let stall: StallMonitor | undefined;
+  let freeProbe: FreeChannelProbeMonitor | undefined;
   let http: HttpRuntime | undefined;
   let vite: { middlewares: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next: (error?: unknown) => void) => void; close(): Promise<void> } | undefined;
   const inflight = new Set<Promise<unknown>>();
@@ -100,7 +106,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     return track(sayHi({ ...route, kind: engine?.kind ?? route.engine }, { root: join(dataDir, 'agent-state'), signal: greetings.signal }));
   });
   const prober = new EngineProber();
-  const quotaProber = options.quotaProber ?? new QuotaProber();
+  const modelLister = new EngineModelLister();
   let probes: EngineProbeRecord[] | null = null;
   const remember = (probe: EngineProbeRecord | null) => {
     if (!probe) return probes;
@@ -115,14 +121,14 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   };
   const requireReady = () => {
     if (draining) throw new RpcError('APP_DRAINING', 'Weaver is shutting down');
-    if (!ready || !commands || !manager || !store || !policy) throw new RpcError('APP_STARTING', 'Weaver is still starting');
-    return { commands, manager, store, policy };
+    if (!ready || !commands || !manager || !store || !policy || !quotaProber) throw new RpcError('APP_STARTING', 'Weaver is still starting');
+    return { commands, manager, store, policy, prober: quotaProber };
   };
   /** Manual and scheduled refresh share one probe-then-merge path. */
   function refreshQuota(input: QuotaRefreshInput) {
     const active = requireReady();
     return track((async () => {
-      const quota = await quotaProber.refresh(input);
+      const quota = await active.prober.refresh(input);
       if (draining) throw new RpcError('APP_DRAINING', 'Weaver is shutting down');
       let result;
       try { result = applyQuotaSnapshot(active.policy, quota, input); }
@@ -139,24 +145,27 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     refresh: async engine => { if (ready && !draining) await refreshQuota({ engine }); },
     log: error => console.error(`Scheduled quota refresh failed: ${error instanceof Error ? error.message : 'unknown error'}`),
   });
-  const stall = new StallMonitor({
-    tasks: () => store?.list() ?? [],
-    policy: () => policy!,
-    statePath: join(dataDir, STALL_FILE),
-    ready: () => ready && !draining,
-    // Recovery is verified with the same light greeting the engines page runs, in this data dir's own scratch.
-    probe: (route, signal) => track(sayHi({ engine: route.engine, model: route.model, effort: route.effort, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal })
-      .then(result => ({ ok: result.ok, ms: result.durationMs, error: result.error }))),
-    onBlocksChanged: () => commands?.pump(),
-    log: message => console.error(`Stall monitor: ${message}`),
-  });
   async function dispatch(method: string, args: unknown[]): Promise<unknown> {
     const active = requireReady();
     switch (method) {
       case 'command': return active.commands.handleAsync(args[0]);
       case 'getPolicy': return active.policy.snapshot();
-      case 'getQuota': return { ...quotaProber.get(), schedule: scheduler.status() };
-      case 'getStall': return stall.status();
+      case 'policyHistory': return { revisions: active.policy.history() };
+      case 'policyRollback': {
+        if (!args[0] || typeof args[0] !== 'object' || Array.isArray(args[0])) throw new RpcError('INVALID_REQUEST', 'Rollback input must be an object');
+        const revision = (args[0] as Record<string, unknown>).revision;
+        if (!Number.isSafeInteger(revision) || Number(revision) < 1) throw new RpcError('INVALID_REQUEST', 'revision must be a positive integer');
+        return active.policy.rollback(Number(revision));
+      }
+      case 'getQuota': return { ...active.prober.get(), schedule: scheduler.status() };
+      case 'getStall': return stall!.status();
+      case 'workerProbeStatus': return freeProbe!.status();
+      case 'workerProbe': return freeProbe!.probeNow(parseFreeProbeInput(args[0]).worker);
+      case 'listEngineModels': {
+        let input;
+        try { input = parseModelListInput(args[0]); } catch (error) { throw new RpcError('INVALID_REQUEST', error instanceof Error ? error.message : String(error)); }
+        return track(modelLister.list(input));
+      }
       case 'refreshQuota': return refreshQuota(parseQuotaRefresh(args[0]));
       case 'validatePolicy': {
         let encoded = '';
@@ -165,7 +174,13 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
         return validateConfig(args[0]);
       }
       case 'savePolicy': {
-        const snapshot = active.policy.save(args[0]);
+        let snapshot;
+        try { snapshot = active.policy.save(args[0]); }
+        catch (error) {
+          // A stale revision is a conflict the caller resolves by reloading, not a malformed request.
+          if (error instanceof Error && error.message.startsWith('Settings changed')) throw new RpcError('REVISION_CONFLICT', error.message);
+          throw error;
+        }
         active.commands.pump();
         return snapshot;
       }
@@ -184,7 +199,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       case 'previewRoute': {
         // The route shown is the route a dispatch would take now, so the server supplies the live load.
         const input = args[0] && typeof args[0] === 'object' && !Array.isArray(args[0]) ? args[0] as Record<string, unknown> : {};
-        return active.policy.preview({ ...input, workerLoad: workerLoad(active.store.list()) });
+        return active.policy.preview({ ...input, workerLoad: workerLoad(active.store.listHeads()) });
       }
       case 'scanEngines': {
         const found = await track(prober.scan());
@@ -208,7 +223,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       }
       case 'startTask': {
         const id = parseId(args[0]);
-        const response = await active.commands.handleAsync({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'workers.spawn', args: { taskId: id } });
+        const response = await active.commands.handleAsync({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'tasks.start', args: { taskId: id } });
         if (!response.ok) throw new RpcError(response.error?.code ?? 'COMMAND_FAILED', response.error?.message ?? 'Command failed');
         return active.store.get(id);
       }
@@ -283,29 +298,54 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       delegate: options.dev ? (req, res, next) => { vite!.middlewares(req, res, next); } : undefined,
       call,
     });
-    store = new TaskStore(join(dataDir, 'tasks.v1.json'));
+    store = new TaskStore(join(dataDir, 'weaver.db'));
     store.recover();
-    policy = new PolicyStore(join(dataDir, 'policy.v1.json'));
-    const workers = new RoutingWorkerAdapter(new MockWorkerAdapter(process.execPath, workerScript), startCliAgent, join(dataDir, 'agent-state'), id => store!.getMetadata().packages.find(pkg => pkg.id === id));
+    policy = new PolicyStore(store.db);
+    quotaProber = options.quotaProber ?? new QuotaProber({ snapshotStore: dbQuotaStore(store.db) });
+    // Ladders and probe answers live in the same weaver.db, so a restart keeps its penalties and history.
+    stall = new StallMonitor({
+      tasks: () => store!.list(),
+      policy: () => policy!,
+      stateStore: dbStallStore(store.db),
+      ready: () => ready && !draining,
+      // Recovery is verified with the same light greeting the engines page runs, in this data dir's own scratch.
+      probe: (route, signal) => track(sayHi({ engine: route.engine, model: route.model, effort: route.effort, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal })
+        .then(result => ({ ok: result.ok, ms: result.durationMs, error: result.error }))),
+      onBlocksChanged: () => commands?.pump(),
+      log: message => console.error(`Stall monitor: ${message}`),
+    });
+    freeProbe = new FreeChannelProbeMonitor({
+      policy: () => policy!,
+      stateStore: dbFreeProbeStore(store.db),
+      ready: () => ready && !draining,
+      // The same light greeting the penalty recovery uses, extended with the worker's own proxy path.
+      probe: (route, signal) => track(sayHi({ ...route, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal })
+        .then(result => ({ ok: result.ok, ms: result.durationMs, error: result.error }))),
+      onBlocksChanged: () => commands?.pump(),
+      log: message => console.error(`Free channel probe: ${message}`),
+    });
+    const workers = new RoutingWorkerAdapter(new MockWorkerAdapter(process.execPath, workerScript), startCliAgent, join(dataDir, 'agent-state'), id => store!.getPackage(id));
     manager = new TaskManager(store, workers, () => {}, undefined, error => {
       console.error(error instanceof Error ? error.message : 'Task history could not be saved');
     });
     // Health and penalties are this monitor's own answers, so the command face reads them from it rather than inventing them.
-    commands = new CommandHandler(manager, policy, undefined, undefined, stall);
+    commands = new CommandHandler(manager, policy, undefined, undefined, stall, options.ownerHost);
     commands.transportStatus = 'ready';
     ready = true;
     scheduler.start();
     stall.start();
+    freeProbe.start();
     runtime.port = http.port;
     runtime.url = `http://127.0.0.1:${http.port}`;
     if (options.open) openBrowser(runtime.url);
     return runtime;
   } catch (error) {
     ready = false;
-    await quotaProber.close().catch(() => {});
+    await quotaProber?.close().catch(() => {});
     await vite?.close().catch(() => {});
     await http?.close().catch(() => {});
     await ipc.close().catch(() => {});
+    try { store?.close(); } catch { /* Preserve the initialization error. */ }
     resolveDone();
     throw error;
   }
@@ -317,8 +357,9 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     ready = false;
     const ownerDrain = commands?.drain();
     await scheduler.stop().catch(() => {});
-    await stall.stop().catch(() => {});
-    await quotaProber.close().catch(() => {});
+    await stall?.stop().catch(() => {});
+    await freeProbe?.stop().catch(() => {});
+    await quotaProber?.close().catch(() => {});
     greetings.abort();
     await ownerDrain;
     await Promise.allSettled([...inflight]);

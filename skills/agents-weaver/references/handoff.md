@@ -46,6 +46,8 @@ Use `ownerId`, the owner instance from the attach above. `ownerProfileId` is onl
 }
 ```
 
+The package is the **only** source of the sub-Agent's goal and acceptance criteria: the worker instruction and the native `run_subagent` prompt carry just the package instruction, scope, constraints and the package's `acceptanceCriteria`, never the root task's goal or criteria. Put everything the branch needs into the package: context, interface contracts, the areas it must not touch and complete, concrete, checkable criteria; never "see the task". Omitting `acceptanceCriteria` defaults to the child task's own list; an explicit list wins and does not overwrite the task.
+
 The revision above is illustrative; read the actual current value from the earlier response before each mutation.
 
 `weaver workers spawn --input dispatch.json --command-id spawn-001`:
@@ -78,6 +80,42 @@ Only a running native task accepts one report; cancelling ends the task without 
 
 - `weaver results ack --task-id <id> --input ack.json`: `{ "expectedRevision": <current>, "manifestDigest": <digest from tasks results> }` — receipt only; ack itself bumps the task revision.
 - `weaver reviews submit --task-id <id> --input review.json`: re-read the revision, then `{ "expectedRevision": <fresh>, "manifestDigest": <same digest>, "decision": "accepted" | "rejected", "comment": "what you verified yourself" }`. A revision copied from before the ack is already stale.
+
+## Shell-safe input and result review
+
+Keep JSON requests and literal text files under the task scratch root. Prefer a JSON file or a quoted heredoc to inline JSON when text contains newlines, quotes or shell characters:
+
+```sh
+weaver tasks describe --task-id "$task_id" --command-id "$describe_id" --input - <<'JSON'
+{
+  "expectedRevision": 2,
+  "title": "验证中文与引号",
+  "acceptanceCriteria": ["保留字面量 \"引号\" 与换行\n第二行"]
+}
+JSON
+```
+
+The revision above is illustrative; replace it with the actual value. `--input -` still requires valid JSON; the quoted heredoc prevents shell expansion. A UTF-8 JSON file passed with `--input request.json` is equivalent. Never forward a captured JSON response using `echo`: zsh can turn its `\n` escapes into real newlines. Use `printf '%s\n' "$response"` if forwarding is necessary.
+
+For receipt and review, no JSON parsing or construction is needed:
+
+```sh
+digest=$(weaver tasks results --task-id "$task_id" --field data.manifestDigest) || exit
+revision=$(weaver tasks get --task-id "$task_id" --field data.revision) || exit
+weaver results ack --task-id "$task_id" --expected-revision "$revision" \
+  --manifest-digest "$digest" --command-id "$ack_id" || exit
+
+# Read changed files and independently verify the result before accepting it.
+# review.txt contains literal UTF-8 text; quotes, backslashes and newlines need no JSON escaping.
+revision=$(weaver tasks get --task-id "$task_id" --field data.revision) || exit
+weaver reviews submit --task-id "$task_id" --expected-revision "$revision" \
+  --manifest-digest "$digest" --decision accepted --comment-file "$scratch/review.txt" \
+  --command-id "$review_id" || exit
+```
+
+Use stable IDs supplied by the owner. Preserve the digest of the result actually reviewed; do not silently substitute a newer digest. The server still enforces revision and digest checks. After an uncertain mutation reply, inspect `operations get` using the same command ID before resubmitting. `--comment` accepts literal argv text for short comments; `--comment-file` reads at most 4000 characters and is mutually exclusive with `--comment`. Convenience flags reject different values in `--input` rather than overwriting them.
+
+`--field` accepts a dot-separated path from the full response envelope and prints one scalar (literal strings, JSON numbers/booleans/null) plus a newline. Missing fields, objects and arrays fail; failed server responses remain error envelopes with nonzero exit status. Always check the exit status. Do not combine it with `--output`/`--json`, mutations, wait or watch. For full structured responses, retain the default JSON output and redirect it directly to a file.
 
 ## Continuation pointer
 

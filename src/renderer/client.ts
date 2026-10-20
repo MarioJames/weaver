@@ -1,6 +1,8 @@
 import { reconnect, notifyError, notifyInfo, isTransientError } from './notify';
+import { isFieldError } from './policy-edit';
 import { API_VERSION, type CommandResponse } from '../shared/commands';
-import type { Task, TaskInput, WeaverAPI } from '../shared/types';
+import type { WeaverAPI } from '../shared/types';
+import type { FreeChannelStatus } from '../main/free-channel';
 
 /** A probe the monitor ran before deciding a worker scope was stuck. */
 export interface StallProbe { ok: boolean; ms: number; error?: string }
@@ -11,13 +13,19 @@ export interface StallSnapshot {
   config: { stallMinutes: number; quorum: number; ladder: (number | null)[]; resetHours: number };
 }
 /** `getStall` is an optional capability: a control plane older than the penalty ladder simply does not expose it. */
-export type RendererAPI = Omit<WeaverAPI, 'getStall'> & { getStall: () => Promise<StallSnapshot> };
+export type RendererAPI = Omit<WeaverAPI, 'getStall'> & FreeProbeAPI & { getStall: () => Promise<StallSnapshot>; listEngineModels: (input: import('../main/engines/models').EngineModelListInput) => Promise<import('../main/engines/models').EngineModelList> };
+/** Free-channel probing is optional the same way: `workerProbeStatus` reads, `workerProbe` runs one real greeting per named worker. */
+export interface FreeProbeAPI {
+  workerProbeStatus: () => Promise<FreeChannelStatus>;
+  workerProbe: (input: { worker?: string }) => Promise<FreeChannelStatus>;
+}
 
 const RPC_PATH = '/api/rpc';
 const POLL_GAP_MS = 1000;
-const MAX_HANDOFF_BYTES = 65536;
 /** Same bound as the local IPC transport deadline. It covers the fetch and the response body. */
 export const RPC_DEADLINE_MS = 15_000;
+/** A probe waits on a real model reply (up to 120 s per worker), so its call outlives the default deadline. */
+const METHOD_DEADLINE_MS: Record<string, number> = { workerProbe: 130_000, listEngineModels: 40_000 };
 
 type Rpc = (method: string, args: unknown[], signal?: AbortSignal) => Promise<unknown>;
 
@@ -197,51 +205,11 @@ function watchTasks(call: Rpc): WeaverAPI['onTasksChanged'] {
   };
 }
 
-function importHandoff(create: (input: TaskInput) => Promise<Task>): Promise<Task | null> {
-  const picker = document.createElement('input');
-  picker.type = 'file';
-  picker.accept = 'application/json,.json';
-  picker.multiple = false;
-  picker.style.display = 'none';
-  let settled = false;
-  const promise = new Promise<Task | null>((resolve, reject) => {
-    const finish = (value: Task | null) => {
-      if (settled) return;
-      settled = true;
-      picker.remove();
-      resolve(value);
-    };
-    const fail = (error: unknown) => {
-      if (settled) return;
-      settled = true;
-      picker.remove();
-      reject(error instanceof Error ? error : new Error(String(error)));
-    };
-    picker.addEventListener('cancel', () => finish(null));
-    picker.addEventListener('change', () => {
-      if (settled) return;
-      const file = picker.files?.item(0);
-      if (!file) { finish(null); return; }
-      if (file.size > MAX_HANDOFF_BYTES) { fail(new Error('任务交接必须是不超过 64 KiB 的 JSON 文件')); return; }
-      void file.text().then(raw => {
-        if (settled) return;
-        let parsed: unknown;
-        try { parsed = JSON.parse(raw); } catch { fail(new Error('任务交接不是有效 JSON')); return; }
-        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) { fail(new Error('任务交接必须是 JSON 对象')); return; }
-        void create(parsed as TaskInput).then(task => finish(task), fail);
-      }, fail);
-    });
-  });
-  document.body.append(picker);
-  picker.click();
-  return promise;
-}
-
 export function createBrowserClient(): RendererAPI {
-  const reads = new Set(['getPolicy','getQuota','getStall','listTasks','getTask','capabilities','validatePolicy','previewRoute','sayHiResult']);
+  const reads = new Set(['getPolicy','getQuota','getStall','listTasks','getTask','capabilities','validatePolicy','previewRoute','sayHiResult','workerProbeStatus','listEngineModels']);
   const commandReads = new Set(['sync.status','tasks.list','tasks.get','tasks.events','tasks.results','owners.list','owners.continuation.get']);
   const checked = async (method: string, args: unknown[], signal?: AbortSignal) => {
-    const result = await rpc(method,args,signal);
+    const result = await rpc(method,args,signal,METHOD_DEADLINE_MS[method]);
     if (method === 'command' && result && typeof result === 'object' && 'ok' in result && !result.ok) {
       const failure = (result as CommandResponse).error;
       if (isTransientError(failure)) throw controlError(failure?.code ?? 'NETWORK',failure?.message ?? '控制面不可用');
@@ -255,7 +223,8 @@ export function createBrowserClient(): RendererAPI {
     try { return await checked(method,args,signal); }
     catch(error) {
       if (signal?.aborted) throw error;
-      if (!isTransientError(error)) { notifyError(error); throw error; }
+      // A refused setting names its own field: the page says it under that field, so a floating notice would only repeat it.
+      if (!isTransientError(error)) { if (!(method === 'savePolicy' && isFieldError(error))) notifyError(error); throw error; }
       if(read) return reconnect.recover(()=>checked(method,args,signal),signal).catch(cause=>{notifyError(cause);throw cause;});
       notifyInfo('操作结果未确认，正在核对…', 'operation-reconcile', 0);
       // A fresh authoritative read reconciles the UI, but cannot prove which writer changed it.
@@ -282,10 +251,13 @@ export function createBrowserClient(): RendererAPI {
     getQuota: () => call('getQuota', []) as ReturnType<WeaverAPI['getQuota']>,
     refreshQuota: input => call('refreshQuota', [input]) as ReturnType<WeaverAPI['refreshQuota']>,
     getStall: () => call('getStall', []) as ReturnType<RendererAPI['getStall']>,
+    workerProbeStatus: () => call('workerProbeStatus', []) as ReturnType<RendererAPI['workerProbeStatus']>,
+    workerProbe: input => call('workerProbe', [input]) as ReturnType<RendererAPI['workerProbe']>,
     validatePolicy: config => call('validatePolicy', [config]) as ReturnType<WeaverAPI['validatePolicy']>,
     savePolicy: input => call('savePolicy', [input]) as ReturnType<WeaverAPI['savePolicy']>,
     previewRoute: input => call('previewRoute', [input]) as ReturnType<WeaverAPI['previewRoute']>,
     scanEngines: () => call('scanEngines', []) as ReturnType<WeaverAPI['scanEngines']>,
+    listEngineModels: input => call('listEngineModels', [input]) as ReturnType<RendererAPI['listEngineModels']>,
     sayHi: input => call('sayHi', [input]) as ReturnType<WeaverAPI['sayHi']>,
     sayHiResult: id => call('sayHiResult', [id]) as ReturnType<WeaverAPI['sayHiResult']>,
     setEngineEnabled: input => call('setEngineEnabled', [input]) as ReturnType<WeaverAPI['setEngineEnabled']>,
@@ -295,12 +267,11 @@ export function createBrowserClient(): RendererAPI {
     startTask: id => call('startTask', [id]) as ReturnType<WeaverAPI['startTask']>,
     cancelTask: id => call('cancelTask', [id]) as ReturnType<WeaverAPI['cancelTask']>,
     capabilities: () => call('capabilities', []) as ReturnType<WeaverAPI['capabilities']>,
-    importTask: () => importHandoff(input => call('createTask', [input]) as Promise<Task>),
     onTasksChanged: callback => { invalidations.add(callback); const unsubscribe=watch(callback); return ()=>{invalidations.delete(callback);unsubscribe();}; },
   };
 }
 
-export function installBrowserClient(): WeaverAPI {
+export function installBrowserClient(): RendererAPI {
   const client = createBrowserClient();
   window.weaver = client;
   return client;

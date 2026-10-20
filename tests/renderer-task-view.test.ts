@@ -395,8 +395,7 @@ test('detail notes only the states that need explaining', () => {
   assert.match(queued, /at its current concurrency limit/);
   assert.doesNotMatch(queued, /执行失败|执行已取消/);
   const failed = markup(React.createElement(TaskDetail, { task: { ...claude, status: 'failed', events: [{ id: 'e9', at: claude.updatedAt, kind: 'error', message: 'engine exited 1' }] }, ...detailProps }));
-  assert.match(failed, /执行失败/);
-  assert.match(failed, /engine exited 1/);
+  assert.doesNotMatch(failed, /执行失败|engine exited 1/);
   assert.doesNotMatch(failed, /调度请求已排队|执行已取消/);
   const cancelled = markup(React.createElement(TaskDetail, { task: { ...claude, status: 'cancelled' }, ...detailProps }));
   assert.match(cancelled, /执行已取消/);

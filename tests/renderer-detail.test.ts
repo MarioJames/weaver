@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../src/shared/types';
+import { PENDING_TASK_TITLE } from '../src/shared/validation';
 import { TaskDetail } from '../src/renderer/components/TaskDetail';
 
 function markup(node: React.ReactNode) {
@@ -59,7 +60,7 @@ test('the notice and the result block stay in the overview', () => {
   const html = render({ ...task, status: 'completed', summary: 'all green' });
   assert.match(html, /执行结果/);
   assert.match(html, /all green/);
-  assert.match(render({ ...task, status: 'failed', failure: { kind: 'other', message: 'boom' } }), /执行失败/);
+  assert.doesNotMatch(render({ ...task, status: 'failed', failure: { kind: 'other', message: 'boom' } }), /boom/);
 });
 
 test('queued tasks without a dispatch only show the rows they have', () => {
@@ -75,4 +76,29 @@ test('summary renders markdown and running dispatch metadata stays in the facts'
   assert.match(html, /<strong>通过<\/strong>/);
   const running = render({ ...task, events: [{ id: 'dispatch', kind: 'lifecycle', at: task.updatedAt, message: 'Owner runs claude_worker natively; waiting for its report' }] });
   assert.doesNotMatch(running, /父 Agent 派发给子 Agent/);
+});
+
+
+test('pending root can start before the parent agent names it', () => {
+  const html = render({ ...task, title: PENDING_TASK_TITLE, status: 'queued', dispatch: undefined });
+  assert.match(html, /开始执行/);
+});
+
+test('failed parent launch retries the same root and children never start as roots', () => {
+  const root = { ...task, executionRole: 'owner' as const, status: 'failed' as const, dispatch: undefined };
+  const renderWithRetry = (value: Task) => markup(React.createElement(TaskDetail, { task: value, ...props, onRetry() {} }));
+  assert.match(renderWithRetry(root), /重试启动父 Agent/);
+  assert.doesNotMatch(renderWithRetry(root), /新建重试任务/);
+  assert.doesNotMatch(renderWithRetry({ ...root, ownerHost: { kind: 'herdr', session: 's', workspaceId: 'w', paneId: 'p', agentName: 'parent', launchedAt: task.createdAt } }), /重试启动父 Agent/);
+  assert.doesNotMatch(render({ ...task, parentTaskId: 'root', status: 'queued' }), /开始执行/);
+});
+
+test('root overview shows its Herdr host and only its own child agents', () => {
+  const root: Task = { ...task, executionRole: 'owner', dispatch: undefined, ownerHost: { kind: 'herdr', session: 'session-p3', workspaceId: 'workspace-p3', paneId: 'pane-p3', agentName: 'parent-p3', launchedAt: task.createdAt } };
+  const children: Task[] = [{ ...task, id: 'child', title: '实现子任务', parentTaskId: root.id }, { ...task, id: 'other', title: '不相关任务', parentTaskId: 'other-root' }];
+  const html = markup(React.createElement(TaskDetail, { ...props, task: root, tasks: children, onSelect() {} }));
+  for (const text of ['在 Herdr 中运行', 'session-p3', 'workspace-p3', 'pane-p3', 'parent-p3', '子任务 · 1', '实现子任务', 'claude_worker']) assert.ok(html.includes(text), text);
+  assert.doesNotMatch(html, /不相关任务/);
+  assert.match(render({ ...root, ownerHost: undefined }), /正在 Herdr 中启动/);
+  assert.match(render({ ...root, status: 'completed' }), /Herdr 启动记录/);
 });

@@ -1,9 +1,10 @@
 import type { EventEmitter } from 'node:events';
 import type { Readable } from 'node:stream';
 
-export type RealEngineKind = 'opencode' | 'pi' | 'grok' | 'codex' | 'qodercli';
+export type RealEngineKind = 'opencode' | 'pi' | 'grok' | 'codex' | 'qodercli' | 'zcode';
 
 export interface CliAgentInput {
+  proxy?: string;
   engine: RealEngineKind;
   model: string;
   effort: string;
@@ -22,6 +23,10 @@ export interface CliAgentEvidence {
   workspace: string;
   role?: 'worker' | 'owner';
   vendorSessionId?: string;
+  /** The private prompt file this run was started from (under agent-state). */
+  promptPath?: string;
+  /** Pi only: the session directory created for this run. */
+  sessionDir?: string;
   vendorModel?: string;
   usage?: { inputTokens?: number; outputTokens?: number };
   terminal: 'pending' | 'success' | 'error' | 'cancelled' | 'missing' | 'truncated';

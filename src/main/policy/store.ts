@@ -1,9 +1,10 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync, renameSync, openSync, closeSync, fsyncSync, unlinkSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { DatabaseSync } from 'node:sqlite';
 import { object } from '../../shared/validation';
 import type { PolicySnapshot, RoutePreview } from '../../shared/policy';
-import { WEIGHT_MAX, activeBlocks, availabilityOf, chatgptReviewEnabled, defaultConfig, parseReleaseAt, resolveDispatch, validateConfig, type Config, type Block, type RouteOptions } from './routing';
+import { WEIGHT_MAX, activeBlocks, availabilityOf, chatgptReviewEnabled, defaultConfig, parseReleaseAt, resolveDispatch, validateConfig, type Config, type Block, type Engine, type Owner, type RouteOptions, type Worker } from './routing';
+import { migrate } from '../migrate';
 const LIMIT=256*1024;
 function bounded(value: unknown): void { if (Buffer.byteLength(JSON.stringify(value))>LIMIT) throw new Error('Policy exceeds 256 KiB'); }
 function exact(value: Record<string, unknown>, keys: string[]): void { if (Object.keys(value).some(key=>!keys.includes(key))) throw new Error('Unknown policy field'); }
@@ -26,7 +27,7 @@ function blocksOf(value: unknown, config: Config): Block[] {
   return block;
  });
 }
-/** Task classes, worker tags, owner engine pins and the engine native-subagent flag were removed; saved policies keep loading without them. */
+/** Task classes, worker tags, owner engine pins and the engine native-subagent flag were removed; imported policies keep loading without them. */
 function dropRetiredFields(value: unknown): unknown {
  const config=object(value);
  for(const owner of Object.values(object(config.owners))) if(owner&&typeof owner==='object') delete (owner as Record<string,unknown>).only_engine;
@@ -34,7 +35,7 @@ function dropRetiredFields(value: unknown): unknown {
  for(const engine of Object.values(object(config.engines))) if(engine&&typeof engine==='object') delete (engine as Record<string,unknown>).native_subagents;
  return config;
 }
-/** Store-level marker: weights in this file are on the 0..10 scale. */
+/** Import marker: weights in this file are on the 0..10 scale. */
 const WEIGHT_SCALE=10;
 /** Pre-marker files used 0..100 with an omitted weight meaning 100: convert every owner once, omitted listed workers become an explicit 10. */
 function migrateWeights(value: unknown): void {
@@ -47,29 +48,118 @@ function migrateWeights(value: unknown): void {
   if(Object.keys(map).length) o.worker_weights=map;
  }
 }
-function writeAtomic(path: string, data: string): void {
- const temp=`${path}.${randomUUID()}.tmp`;
- try {
-  writeFileSync(temp,data,{mode:0o600,flag:'wx'}); const fd=openSync(temp,'r'); try {fsyncSync(fd);} finally {closeSync(fd);}
-  renameSync(temp,path);
- } finally { if(existsSync(temp)) unlinkSync(temp); }
-}
-/** App-owned single-writer settings. Never reads or changes upstream config/SQLite or a host home. */
+/** Top-level config sections kept as one settings row each (engines, owners and workers have their own tables). */
+const SETTING_KEYS=['$schema','chatgpt_review','quota','free_channel_probe','display'];
+const bit=(value:boolean)=>value?1:0;
+const optionalText=(value:string|undefined)=>value===undefined?null:value;
+/** App-owned single-writer settings in the same weaver.db as the task store. Never touches upstream config or a host home. */
 export class PolicyStore {
- private config=defaultConfig(); private blocks: Block[]=[]; private revision=0;
- constructor(readonly path: string, private now: ()=>number=Date.now) {
-  if(!existsSync(path)) return;
-  if(statSync(path).size>LIMIT) throw new Error('Policy exceeds 256 KiB; file retained');
-  const data=object(JSON.parse(readFileSync(path,'utf8'))); exact(data,['version','revision','weightScale','config','blocks']);
-  if(data.version!==1||!Number.isSafeInteger(data.revision)||Number(data.revision)<0) throw new Error('Unsupported policy store');
-  if(data.weightScale!==undefined&&data.weightScale!==WEIGHT_SCALE) throw new Error('Unsupported policy weight scale');
-  const migrated=data.weightScale===undefined; if(migrated) migrateWeights(data.config);
-  const parsed=this.parse(dropRetiredFields(data.config),data.blocks); this.config=parsed.config; this.blocks=parsed.blocks; this.revision=Number(data.revision);
-  if(migrated){
-   // One-time 0..100 -> 0..10 migration (marker absent): keep the previous file, then replace atomically. Never runs again once weights fit.
-   copyFileSync(path,`${path}.pre-weight10-${new Date(this.now()).toISOString().replace(/[:.]/g,'-')}`);
-   writeAtomic(path,JSON.stringify({version:1,revision:this.revision,weightScale:WEIGHT_SCALE,...parsed},null,2));
+ private db:DatabaseSync;
+ private config:Config=defaultConfig();
+ private blocks: Block[]=[];
+ private revision=0;
+ readonly path: string;
+ constructor(source: string|DatabaseSync, private now: ()=>number=Date.now) {
+  if(typeof source==='string'){
+   this.path=source;
+   mkdirSync(dirname(this.path),{recursive:true});
+   this.db=new DatabaseSync(this.path);
+   try{this.db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;');migrate(this.db);}catch(error){this.db.close();throw error;}
+  }else{
+   this.db=source;
+   this.path=(this.db as unknown as {location?:string}).location??':memory:';
+   migrate(this.db);
   }
+  this.load();
+ }
+ /** The normalized tables are the state; the newest revision row carries the same snapshot for history reads. */
+ private load():void {
+  const saved=this.db.prepare('SELECT max(revision) AS r FROM policy_revisions').get() as {r:number|null};
+  if(saved.r===null){this.config=defaultConfig();this.blocks=[];this.revision=0;return;}
+  const engines:Config['engines']={};
+  for(const row of this.db.prepare('SELECT * FROM policy_engines ORDER BY position').all() as Record<string,unknown>[]){
+   const engine={enabled:Number(row.enabled)===1,kind:String(row.kind)} as Engine;
+   if(row.quota_refresh!==null&&row.quota_refresh!==undefined)engine.quota_refresh=Number(row.quota_refresh)===1;
+   engines[String(row.id)]=engine;
+  }
+  const ownerWorkerRows=this.db.prepare('SELECT * FROM policy_owner_workers ORDER BY position').all() as Record<string,unknown>[];
+  const owners:Config['owners']={};
+  for(const row of this.db.prepare('SELECT * FROM policy_owners ORDER BY position').all() as Record<string,unknown>[]){
+   const id=String(row.id);
+   const links=ownerWorkerRows.filter(item=>String(item.owner_id)===id);
+   const owner={enabled:Number(row.enabled)===1,engine:String(row.engine),model:String(row.model),effort:String(row.effort),workers:links.map(item=>String(item.worker_id)),max_parallel:Number(row.max_parallel)} as Owner;
+   if(row.proxy!==null&&row.proxy!==undefined)owner.proxy=String(row.proxy);
+   const weights:Record<string,number>={};
+   for(const item of links)if(item.weight!==null&&item.weight!==undefined)weights[String(item.worker_id)]=Number(item.weight);
+   if(Object.keys(weights).length)owner.worker_weights=weights;
+   owners[id]=owner;
+  }
+  const workers:Config['workers']={};
+  for(const row of this.db.prepare('SELECT * FROM policy_workers ORDER BY position').all() as Record<string,unknown>[]){
+   const id=String(row.id);
+   const worker={enabled:Number(row.enabled)===1,engine:String(row.engine),model:String(row.model),effort:String(row.effort)} as Worker;
+   if(row.proxy!==null&&row.proxy!==undefined)worker.proxy=String(row.proxy);
+   if(row.description!==null&&row.description!==undefined)worker.description=String(row.description);
+   if(row.free_channel!==null&&row.free_channel!==undefined)worker.free_channel=Number(row.free_channel)===1;
+   workers[id]=worker;
+  }
+  const settings:Record<string,unknown>={};
+  for(const row of this.db.prepare('SELECT key,body FROM policy_settings').all() as Record<string,unknown>[])settings[String(row.key)]=JSON.parse(String(row.body));
+  // Same key order as the saved document, so reading the policy back looks like what was saved.
+  const built:Record<string,unknown>={};
+  if(settings.$schema!==undefined)built.$schema=settings.$schema;
+  built.version=1;
+  if(settings.chatgpt_review!==undefined)built.chatgpt_review=settings.chatgpt_review;
+  built.engines=engines;built.owners=owners;built.workers=workers;
+  built.herdr=settings.herdr!==undefined?settings.herdr:defaultConfig().herdr;
+  for(const key of ['quota','free_channel_probe','display'])if(settings[key]!==undefined)built[key]=settings[key];
+  const config=built as unknown as Config;
+  const blocks=(this.db.prepare('SELECT * FROM policy_blocks ORDER BY position').all() as Record<string,unknown>[]).map(row=>{
+   const block:Block={engine:String(row.engine),reason:String(row.reason),since:String(row.since)};
+   if(row.model!==null&&row.model!==undefined)block.model=String(row.model);
+   if(row.release_at!==null&&row.release_at!==undefined)block.release_at=String(row.release_at);
+   if(row.by!==null&&row.by!==undefined)block.by=String(row.by);
+   return block;
+  });
+  const parsed=this.parse(config,blocks);
+  this.config=parsed.config;this.blocks=parsed.blocks;
+  this.revision=Number(saved.r);
+ }
+ private writeAll(config:Config,blocks:Block[]):void {
+  this.db.exec('DELETE FROM policy_blocks');
+  const insertBlock=this.db.prepare('INSERT INTO policy_blocks(position,engine,model,reason,since,release_at,by) VALUES (?,?,?,?,?,?,?)');
+  blocks.forEach((block,index)=>insertBlock.run(index,block.engine,optionalText(block.model),block.reason,block.since,optionalText(block.release_at),optionalText(block.by)));
+  this.db.exec('DELETE FROM policy_engines');
+  const insertEngine=this.db.prepare('INSERT INTO policy_engines(id,position,enabled,kind,quota_refresh) VALUES (?,?,?,?,?)');
+  Object.entries(config.engines).forEach(([id,engine],index)=>insertEngine.run(id,index,bit(engine.enabled),engine.kind,engine.quota_refresh===undefined?null:bit(engine.quota_refresh)));
+  this.db.exec('DELETE FROM policy_owner_workers');
+  this.db.exec('DELETE FROM policy_owners');
+  const insertOwner=this.db.prepare('INSERT INTO policy_owners(id,position,enabled,engine,model,effort,proxy,max_parallel) VALUES (?,?,?,?,?,?,?,?)');
+  const insertLink=this.db.prepare('INSERT INTO policy_owner_workers(owner_id,worker_id,position,weight) VALUES (?,?,?,?)');
+  Object.entries(config.owners).forEach(([id,owner],index)=>{
+   insertOwner.run(id,index,bit(owner.enabled),owner.engine,owner.model,owner.effort,optionalText(owner.proxy),owner.max_parallel);
+   owner.workers.forEach((workerId,position)=>insertLink.run(id,workerId,position,owner.worker_weights&&Object.hasOwn(owner.worker_weights,workerId)?owner.worker_weights[workerId]!:null));
+  });
+  this.db.exec('DELETE FROM policy_workers');
+  const insertWorker=this.db.prepare('INSERT INTO policy_workers(id,position,enabled,engine,model,effort,proxy,description,free_channel) VALUES (?,?,?,?,?,?,?,?,?)');
+  Object.entries(config.workers).forEach(([id,worker],index)=>insertWorker.run(id,index,bit(worker.enabled),worker.engine,worker.model,worker.effort,optionalText(worker.proxy),optionalText(worker.description),worker.free_channel===undefined?null:bit(worker.free_channel)));
+  this.db.exec('DELETE FROM policy_settings');
+  const insertSetting=this.db.prepare('INSERT INTO policy_settings(key,body) VALUES (?,?)');
+  insertSetting.run('herdr',JSON.stringify(config.herdr));
+  const extra=config as unknown as Record<string,unknown>;
+  for(const key of SETTING_KEYS)if(extra[key]!==undefined)insertSetting.run(key,JSON.stringify(extra[key]));
+ }
+ /** Replace every row and stamp the snapshot as one revision, all or nothing. */
+ private commit(config:Config,blocks:Block[],revision:number,source:string):void {
+  const savedAt=new Date(this.now()).toISOString();
+  const body=JSON.stringify({version:1,revision,config,blocks});
+  this.db.exec('BEGIN IMMEDIATE');
+  try{
+   this.writeAll(config,blocks);
+   this.db.prepare('INSERT INTO policy_revisions(revision,saved_at,source,body) VALUES (?,?,?,?)').run(revision,savedAt,source,body);
+   this.db.exec('COMMIT');
+  }catch(error){try{this.db.exec('ROLLBACK');}catch{/* SQLite may already have rolled back an I/O failure. */}throw error;}
+  this.config=config;this.blocks=blocks;this.revision=revision;
  }
  private parse(config: unknown, blocks: unknown): {config:Config;blocks:Block[]} {
   bounded({config,blocks}); const issues=validateConfig(config);
@@ -91,9 +181,36 @@ export class PolicyStore {
     if (engine.enabled && this.config.engines[id]?.enabled !== true) throw new Error(`Engine ${id} cannot be enabled by policy save; use the probe toggle`);
    }
   }
-  const data=JSON.stringify({version:1,revision:this.revision+1,weightScale:WEIGHT_SCALE,...parsed},null,2); bounded(JSON.parse(data));
-  mkdirSync(dirname(this.path),{recursive:true}); writeAtomic(this.path,data);
-  this.config=parsed.config; this.blocks=parsed.blocks; this.revision++; return this.snapshot();
+  this.commit(parsed.config,parsed.blocks,this.revision+1,'save');
+  return this.snapshot();
+ }
+ /** Every retained revision, newest first: one entry per save, import or rollback. */
+ history(): {revision:number;savedAt:string;source:string}[] {
+  return (this.db.prepare('SELECT revision,saved_at,source FROM policy_revisions ORDER BY revision DESC').all() as Record<string,unknown>[])
+   .map(row=>({revision:Number(row.revision),savedAt:String(row.saved_at),source:String(row.source)}));
+ }
+ /** The retained snapshot of one revision becomes a new revision; nothing is rewritten in place. */
+ rollback(revision:number): PolicySnapshot {
+  if(!Number.isSafeInteger(revision)||revision<1) throw new Error('Invalid policy revision');
+  const row=this.db.prepare('SELECT body FROM policy_revisions WHERE revision=?').get(revision) as {body:string}|undefined;
+  if(!row) throw new Error(`Policy revision ${revision} not found`);
+  const data=object(JSON.parse(row.body)); exact(data,['version','revision','config','blocks']);
+  if(data.version!==1) throw new Error('Unsupported policy snapshot');
+  const parsed=this.parse(dropRetiredFields(data.config),data.blocks);
+  this.commit(parsed.config,parsed.blocks,this.revision+1,`rollback:${revision}`);
+  return this.snapshot();
+ }
+ /** One-time import of a legacy policy.v1.json: used by the out-of-repo migration script, never by product startup. */
+ importSnapshot(value:unknown): PolicySnapshot {
+  const data=object(value); exact(data,['version','revision','weightScale','config','blocks']);
+  if(data.version!==1||!Number.isSafeInteger(data.revision)||Number(data.revision)<0) throw new Error('Unsupported policy store');
+  if(data.weightScale!==undefined&&data.weightScale!==WEIGHT_SCALE) throw new Error('Unsupported policy weight scale');
+  if(data.weightScale===undefined) migrateWeights(data.config);
+  const parsed=this.parse(dropRetiredFields(data.config),data.blocks);
+  const occupied=['policy_engines','policy_owners','policy_workers','policy_settings','policy_blocks'].some(table=>Number((this.db.prepare(`SELECT count(*) AS n FROM ${table}`).get() as {n:number}).n)>0);
+  if(occupied) throw new Error('Policy store already holds a saved policy');
+  this.commit(parsed.config,parsed.blocks,Number(data.revision),'import');
+  return this.snapshot();
  }
  preview(value: unknown): RoutePreview {
   const input=object(value); exact(input,['owner','worker','runningCount','workerLoad','excludeEngines']);

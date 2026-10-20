@@ -6,7 +6,8 @@ import { Button, Drawer, Skeleton } from '@lobehub/ui/base-ui';
 import { command } from '../commands';
 import type { OwnerInstance } from '../../shared/commands';
 import type { Task } from '../../shared/types';
-import { archivedTasks, readTaskFilters, withOwnerProfiles } from '../task-view';
+import { createTask } from '../task-create';
+import { archivedTasks, readTaskFilters, recentWorkspaces, withOwnerProfiles } from '../task-view';
 import { ArchiveDrawer } from '../components/ArchiveDrawer';
 import { NewTaskDialog } from '../components/NewTaskDialog';
 import { TaskBoard } from '../components/TaskBoard';
@@ -52,13 +53,17 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
     <ArchiveDrawer now={now} tasks={tasks} selected={selected} open={archiving} onClose={() => setArchiving(false)} onSelect={setSelected} ownerKind={ownerKind} />
     <Drawer open={!!task} title={<span ref={detailTitleRef} tabIndex={-1}>任务详情</span>} afterOpenChange={open => { if (open) detailTitleRef.current?.focus({ preventScroll: true }); }} placement="right" width="min(960px, 92vw)" onClose={() => setSelected(undefined)}>
       {task && !fullTask && <div role="status" aria-label="正在加载任务详情"><Skeleton animated /></div>}
-      {task && fullTask && <TaskDetail key={task.id} task={{...fullTask, owner: task.owner}} busy={work.busy || !work.caps} action={work.action} ownerKind={ownerKind}
+      {task && fullTask && <TaskDetail key={task.id} task={{...fullTask, owner: task.owner}} tasks={tasks} onSelect={setSelected} busy={work.busy || !work.caps} action={work.action} ownerKind={ownerKind}
         onStart={id => void work.action(() => window.weaver.startTask(id))}
         onCancel={id => void work.action(() => window.weaver.cancelTask(id))}
         onRetry={id => void work.action(async () => { const next = await command<{ id: string }>('tasks.retry', { taskId: id }, true); setSelected(next.id); })} />}
     </Drawer>
-    <NewTaskDialog open={creating} busy={work.busy} close={() => setCreating(false)} onClosed={() => newTaskRef.current?.focus()}
-      create={input => work.action(async () => { const created = await command<{ id: string }>('tasks.create', { ...input }, true); setSelected(created.id); })}
-      importTask={() => void work.action(async () => { const imported = await window.weaver.importTask(); if (imported) { setSelected(imported.id); setCreating(false); } })} />
+    <NewTaskDialog open={creating} busy={work.busy} recentWorkspaces={recentWorkspaces(tasks, 5)} close={() => setCreating(false)} onClosed={() => newTaskRef.current?.focus()}
+      create={(input, start) => work.action(() => createTask(input, start, {
+        create: value => command<{ id: string }>('tasks.create', { ...value }, true),
+        start: id => window.weaver.startTask(id),
+        select: setSelected,
+        startFailed: (id, error) => notifyError(error, '任务已创建，启动失败', { label: '重试启动', run: () => { void work.action(() => window.weaver.startTask(id)); } }),
+      }))} />
   </>;
 }

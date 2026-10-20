@@ -14,7 +14,7 @@ function fixture(i:number):Task {
 }
 test('300-task list stays below 300 KB while single-task reads retain full history and artifact bodies',()=>{
  const root=mkdtempSync(join(tmpdir(),'weaver-list-summary-'));
- const store=new TaskStore(join(root,'store.json'));
+ const store=new TaskStore(join(root,'weaver.db'));
  try {
   store.transaction(()=>{for(let i=0;i<300;i++)store.put(fixture(i));});
   const summaries=store.listSummaries();

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -13,20 +13,18 @@ import { PolicyStore } from '../src/main/policy/store';
 import { API_VERSION } from '../src/shared/commands';
 import type { Task } from '../src/shared/types';
 
-const root = join(tmpdir(), 'weaver-store-stream');
 const input = { title: 'Stream fixture', instruction: 'Local test', owner: { name: 'owner', transport: 'herdr-visible' as const, session: 'main', pane: '1' } };
 function fixture(): Task {
   const at = new Date().toISOString();
   return { ...input, id: randomUUID(), createdAt: at, updatedAt: at, status: 'queued', progress: 0, events: [], artifacts: [] };
 }
 function setup() {
-  mkdirSync(root, { recursive: true });
-  const dir = mkdtempSync(join(root, 'coalescing-'));
-  const path = join(dir, 'tasks.json');
+  const dir = mkdtempSync(join(tmpdir(), 'weaver-store-stream-'));
+  const path = join(dir,'weaver.db');
   let writes = 0, fail = false;
-  const store = new TaskStore(path, (temp, content) => {
+  const store = new TaskStore(path, () => {
     if (fail) throw new Error('disk unavailable');
-    writes++; writeFileSync(temp, content, { mode: 0o600 });
+    writes++;
   });
   return { dir, path, store, writes: () => writes, fail: (value: boolean) => { fail = value; }, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
@@ -45,7 +43,7 @@ test('500 stream records over a large store coalesce, stay visible, and survive 
         f.store.put(task);
       }
     });
-    assert.ok(readFileSync(f.path).length > 5_000_000);
+    assert.ok(Buffer.byteLength(JSON.stringify(f.store.list())) > 5_000_000);
     const task = manager.create(input); manager.start(task.id);
     assert.equal(new TaskStore(f.path).get(task.id).run?.pid, 123);
     const before = f.writes(), notices = notifications, revision = f.store.revision;
@@ -69,7 +67,7 @@ test('500 stream records over a large store coalesce, stay visible, and survive 
     assert.equal(saved.status, 'completed'); assert.equal(saved.summary, 'done');
     assert.ok(saved.events.some(e => e.message === 'stderr: diagnostic'));
     t.mock.timers.tick(1000); assert.equal(f.writes() - before, 3);
-    assert.equal(readFileSync(f.path, 'utf8').includes('\n'), false);
+    assert.equal(new TaskStore(f.path).list().length,101);
   } finally { await manager.shutdown(); f.cleanup(); }
 });
 
@@ -81,7 +79,7 @@ test('command receipts synchronously persist pending streams, and failed transac
     event(task, 'log', 'pending'); f.store.put(task, 'stream');
     assert.throws(() => f.store.transaction(() => { f.store.put({ ...task, title: 'rolled back' }); throw new Error('rollback'); }), /rollback/);
     const manager = new TaskManager(f.store, { id: 'mock-jsonl', start: () => { throw new Error('unused'); } });
-    const handler = new CommandHandler(manager, new PolicyStore(join(f.dir, 'policy.json')));
+    const handler = new CommandHandler(manager, new PolicyStore(join(f.dir,'weaver.db')));
     const response = handler.handle({ apiVersion: API_VERSION, commandId: 'durable-create', command: 'tasks.create', args: input });
     assert.equal(response.ok, true);
     const disk = new TaskStore(f.path);
@@ -90,7 +88,7 @@ test('command receipts synchronously persist pending streams, and failed transac
     assert.deepEqual(disk.getMetadata().receipts['local-demo:durable-create'].response, response);
     const count = f.writes(); t.mock.timers.tick(1000); assert.equal(f.writes(), count);
     event(task, 'log', 'drain'); f.store.put(task, 'stream');
-    f.store.close(); assert.equal(new TaskStore(f.path).get(task.id).events.at(-1)?.message, 'drain');
+    handler.draining=true;f.store.close(); assert.equal(new TaskStore(f.path).get(task.id).events.at(-1)?.message, 'drain');
     t.mock.timers.tick(1000); assert.equal(f.writes(), count + 1);
   } finally { f.store.close(); f.cleanup(); }
 });

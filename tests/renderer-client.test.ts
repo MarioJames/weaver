@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { toast } from '@lobehub/ui/base-ui';
 import type { CommandRequest } from '../src/shared/commands';
 import { command } from '../src/renderer/commands';
 import { RPC_DEADLINE_MS, createBrowserClient, installBrowserClient } from '../src/renderer/client';
@@ -188,94 +189,11 @@ test('command helper keeps ok:false and commandId on the real client', async () 
   }
 });
 
-interface Picker {
-  accept: string;
-  clicked: boolean;
-  parent: boolean;
-  file?: { size: number; text: () => Promise<string> };
-  fire: (type: string) => void;
-}
-
-function installPicker(): { current: () => Picker } {
-  let picker: Picker | undefined;
-  const document = {
-    body: { append(node: Picker) { node.parent = true; } },
-    createElement() {
-      const listeners = new Map<string, Array<() => void>>();
-      const input = {
-        type: '',
-        accept: '',
-        multiple: false,
-        style: { display: '' },
-        file: undefined as Picker['file'],
-        clicked: false,
-        parent: false,
-        files: { item: (index: number) => index === 0 ? input.file ?? null : null },
-        addEventListener(type: string, fn: () => void) {
-          listeners.set(type, [...(listeners.get(type) ?? []), fn]);
-        },
-        remove() { input.parent = false; },
-        click() { input.clicked = true; },
-        fire(type: string) { for (const fn of listeners.get(type) ?? []) fn(); },
-      };
-      picker = input;
-      return input;
-    },
-  };
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: document });
-  return { current: () => { if (!picker) throw new Error('picker was not created'); return picker; } };
-}
-
-test('file import sends one createTask and cancel or invalid files do not', async () => {
+test('the browser client exposes no JSON import entry', () => {
   installOrigin();
-  const gate = installFetch();
-  const picker = installPicker();
   try {
-    const client = createBrowserClient();
-    const cancelled = client.importTask();
-    const input = picker.current();
-    assert.equal(input.accept, 'application/json,.json');
-    assert.equal(input.clicked, true);
-    input.fire('cancel');
-    assert.equal(await cancelled, null);
-    input.file = { size: 2, text: async () => '{"title":"late"}' };
-    input.fire('change');
-    await flush();
-    assert.equal(gate.calls.length, 0);
-    assert.equal(input.parent, false);
-
-    const empty = client.importTask();
-    picker.current().fire('change');
-    assert.equal(await empty, null);
-
-    const huge = client.importTask();
-    picker.current().file = { size: 65537, text: async () => { throw new Error('should not read'); } };
-    picker.current().fire('change');
-    await assert.rejects(huge, /64 KiB/);
-
-    const broken = client.importTask();
-    picker.current().file = { size: 1, text: async () => '{' };
-    picker.current().fire('change');
-    await assert.rejects(broken, /有效 JSON/);
-
-    const array = client.importTask();
-    picker.current().file = { size: 3, text: async () => '[1]' };
-    picker.current().fire('change');
-    await assert.rejects(array, /JSON 对象/);
-    assert.equal(gate.calls.length, 0);
-
-    const handoff = { title: '交接', instruction: '做' };
-    const imported = client.importTask();
-    const selected = picker.current();
-    selected.file = { size: 65536, text: async () => JSON.stringify(handoff) };
-    selected.fire('change');
-    await flush();
-    assert.deepEqual(gate.calls[0].body, { method: 'createTask', args: [handoff] });
-    gate.calls[0].resolve(jsonResponse({ result: { id: 'imported' } }));
-    assert.deepEqual(await imported, { id: 'imported' });
-    assert.equal(gate.calls.length, 1);
+    assert.equal('importTask' in createBrowserClient(), false);
   } finally {
-    gate.restore();
     cleanup();
   }
 });
@@ -466,4 +384,25 @@ test('selected task read receives complete events and artifact bodies separately
   gate.calls[1].resolve(jsonResponse({result:full}));const result=await detail;
   assert.equal(result.events.length,300);assert.equal(result.artifacts[0].content,'full result');
  } finally {gate.restore();cleanup();}
+});
+
+test('a refused setting is left to the field that shows it; other save failures still raise one notice', async t => {
+  const notices: unknown[] = [];
+  t.mock.method(toast, 'error', (options: unknown) => { notices.push(options); return { id: 'x', close() {}, update() {} }; });
+  installOrigin();
+  const gate = installFetch();
+  try {
+    const client = createBrowserClient();
+    const field = client.savePolicy({ revision: 1, config: {}, blocks: [] } as never);
+    gate.calls[0].resolve(jsonResponse({ error: { code: 'VALIDATION', message: '$.display.timezone: timezone Mars/Base is not an IANA timezone name Intl supports' } }, 400));
+    await assert.rejects(field, /Mars\/Base/);
+    assert.equal(notices.length, 0);
+    const locked = client.savePolicy({ revision: 1, config: {}, blocks: [] } as never);
+    gate.calls[1].resolve(jsonResponse({ error: { code: 'POLICY_LOCKED', message: 'Policy file is locked by another process' } }, 423));
+    await assert.rejects(locked, /POLICY_LOCKED/);
+    assert.equal(notices.length, 1);
+  } finally {
+    gate.restore();
+    cleanup();
+  }
 });

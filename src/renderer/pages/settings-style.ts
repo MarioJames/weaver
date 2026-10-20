@@ -54,7 +54,7 @@ export const settingsStyles = createStaticStyles(({ css, cssVar }) => ({
   /** Field text and control share one row; the control track is fixed so the separators line up across rows. */
   row: css`
     display: grid;
-    grid-template-columns: minmax(0, 480px) minmax(180px, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 400px);
     flex: 1 1 auto;
 
     & + & {
@@ -64,6 +64,21 @@ export const settingsStyles = createStaticStyles(({ css, cssVar }) => ({
     @container (max-width: 860px) {
       grid-template-columns: minmax(0, 1fr);
     }
+  `,
+  /** The control with its inline message underneath. */
+  controlStack: css`
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 4px;
+    min-inline-size: 0;
+  `,
+  controlRow: css`
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    align-items: center;
+    min-inline-size: 0;
   `,
   fieldCell: css`
     padding: 12px 20px;

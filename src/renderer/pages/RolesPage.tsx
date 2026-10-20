@@ -1,17 +1,23 @@
 import { dateText } from '../quota-view';
+import { blockOf, blockText, pauseOfBlock } from '../probe-view';
+import { useFreeProbe } from '../hooks/useFreeProbe';
+import { FreeProbePanel } from '../components/FreeProbePanel';
+import { TimeText } from '../components/TimeText';
 import { notifyError, useNotifyError } from '../notify';
 import { NamedSelect, NamedSwitch, NamedInputNumber } from '../components/NamedControls';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Plus, Trash2, Zap } from 'lucide-react';
 import { Empty } from '@lobehub/ui';
 import { Surface } from '@lobehub/ui/dashboard';
-import { Button, Input, Modal, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
+import { Button, Checkbox, Input, Modal, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
 import type { HelloResult } from '../../shared/engines';
 import { startHello, useHelloRun } from '../hello-runs';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
-import { EFFORTS, type Availability, type Owner, type Worker } from '../../main/policy/routing';
+import { EFFORTS, type Availability, type Block, type Owner, type Worker } from '../../main/policy/routing';
 import { blankOwner, blankWorker, removeRole, renameRole, roleDeleteImpact, roleIdError, syncRoleEditor, type RoleSection } from '../policy-edit';
 import { OwnerScheduleFields } from '../components/OwnerSchedule';
+import { ModelPicker } from '../components/ModelPicker';
+import { ProxyUrlInput } from '../components/ProxyUrlInput';
 import { PolicyHeader } from '../components/PolicyHeader';
 import type { PolicyDraft } from '../usePolicyDraft';
 import { styles } from '../style';
@@ -31,11 +37,15 @@ export function availabilityText(availability: Availability | undefined): string
   return `已限制：${availability.reason ?? '未说明原因'}${availability.release_at ? `，${dateText(availability.release_at)} 恢复` : ''}`;
 }
 
-/** The one line a list item needs beyond its switch: only states the switch does not already show. */
-export function roleNote(availability: Availability | undefined, unsaved: boolean): { text: string; warning?: boolean } | undefined {
+/** The one line a list item needs beyond its switch: only states the switch does not already show. A pause written by the penalty ladders or the free probe also names its kind as a tag. */
+export function roleNote(availability: Availability | undefined, unsaved: boolean, block?: Block): { text: string; warning?: boolean; tag?: { label: string; color: string } } | undefined {
   if (unsaved) return { text: availability ? '有未保存的修改' : '尚未保存', warning: true };
   if (availability?.status === 'engine_disabled') return { text: '引擎未启用' };
-  if (availability?.status === 'blocked') return { text: availabilityText(availability), warning: true };
+  if (availability?.status === 'blocked') {
+    const pause = pauseOfBlock(block);
+    if (pause && block) return { text: blockText(block), warning: true, tag: { label: pause.label, color: pause.tone } };
+    return { text: availabilityText(availability), warning: true };
+  }
   return undefined;
 }
 
@@ -51,6 +61,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   const [toggling, setToggling] = useState('');
   const form = useForm();
   const fieldId = useId();
+  const freeProbe = useFreeProbe(policy.snapshot?.revision);
   const current = syncRoleEditor(ids, selected).selected;
   useEffect(() => {
     const next = syncRoleEditor(ids, selected);
@@ -97,13 +108,16 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
         {ids.map(id => {
           const item = config[section][id]!;
           const engineOn = config.engines[item.engine]?.enabled === true;
-          const note = roleNote(policy.snapshot?.[section][id], false);
+          const saved = policy.snapshot?.config[section][id];
+          const note = roleNote(policy.snapshot?.[section][id], false, policy.snapshot && saved ? blockOf(policy.snapshot.config, policy.snapshot.blocks, saved) : undefined);
           return <div key={id} className={styles.roleItem} aria-current={id === current ? 'true' : undefined}>
             <NamedSwitch size="small" aria-label={`启用 ${id}`} checked={item.enabled} loading={toggling === id} disabled={!engineOn || !!toggling} title={engineOn ? undefined : `引擎 ${item.engine || '未选择'} 未启用，先在引擎页打开它`} onChange={checked => void toggle(id, checked)} />
             <button type="button" className={styles.roleButton} style={{ font: 'inherit' }} onClick={() => { acceptId(); setSelected(id); setPendingId(id); setIdError(''); scrollToEditor(); }}>
               <strong className={styles.wrap}>{id}</strong>
               <span className={`${styles.wrap} ${styles.meta}`}>{item.engine} · {item.model || '未填模型'}</span>
-              {note && <span className={`${styles.wrap} ${styles.meta} ${note.warning ? styles.warn : ''}`}>{note.text}</span>}
+              {note && (note.tag
+                ? <span className={styles.roleNote}><Tag size="small" color={note.tag.color}>{note.tag.label}</Tag><span className={`${styles.wrap} ${styles.meta} ${styles.warn}`}>{note.text}</span></span>
+                : <span className={`${styles.wrap} ${styles.meta} ${note.warning ? styles.warn : ''}`}>{note.text}</span>)}
             </button>
           </div>;
         })}
@@ -118,13 +132,18 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           <Form.Field label="配置 ID" required desc="改名后按 Enter 或离开输入框，引用处一起更新。">
             <Input id={`${fieldId}-id`} aria-label="配置 ID" aria-invalid={!!idError} value={pendingId} placeholder={section === 'workers' ? '例如：research_worker' : '例如：codex_owner'} onChange={event => setPendingId(event.target.value)} onBlur={acceptId} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); acceptId(); } }} />
           </Form.Field>
-            <Form.Field label="所属引擎" required><NamedSelect id={`${fieldId}-engine`} aria-label="所属引擎" value={record.engine || undefined} options={Object.keys(config.engines).map(id => ({ value: id, label: `${id}${config.engines[id]?.enabled ? '' : '（未启用）'}` }))} onChange={value => { if (typeof value === 'string') update({ ...record, engine: value, enabled: config.engines[value]?.enabled ? record.enabled : false }); }} /></Form.Field>
+            <Form.Field label="所属引擎" required><NamedSelect id={`${fieldId}-engine`} aria-label="所属引擎" value={record.engine || undefined} options={Object.keys(config.engines).map(id => ({ value: id, label: `${id}${config.engines[id]?.enabled ? '' : '（未启用）'}` }))} onChange={value => { if (typeof value === 'string') update({ ...record, engine: value, effort: EFFORTS[config.engines[value]?.kind ?? '']?.includes(record.effort) === false ? EFFORTS[config.engines[value]!.kind]![0]! : record.effort, enabled: config.engines[value]?.enabled ? record.enabled : false }); }} /></Form.Field>
           </div>
-          <div className={styles.pair}>
-            <Form.Field label="模型" required><Input id={`${fieldId}-model`} aria-label="模型" value={record.model} placeholder="例如：gpt-6.1-sol 或 provider/model" onChange={event => update({ ...record, model: event.target.value })} /></Form.Field>
+          <div className={styles.pair} style={{ alignItems: 'start' }}>
+            <Form.Field label="模型" required><ModelPicker engine={record.engine} proxy={record.proxy} id={`${fieldId}-model`} value={record.model} onChange={model => update({ ...record, model })} /></Form.Field>
             <Form.Field label="推理强度" required desc={efforts?.length ? undefined : '填写该模型接受的 variant。'}>{efforts?.length ? <NamedSelect id={`${fieldId}-effort`} aria-label="推理强度" value={record.effort} options={efforts.map(value => ({ value, label: value }))} onChange={value => { if (typeof value === 'string') update({ ...record, effort: value }); }} /> : <Input id={`${fieldId}-effort`} aria-label="推理强度" value={record.effort} placeholder="例如：max" onChange={event => update({ ...record, effort: event.target.value })} />}</Form.Field>
           </div>
-          {section === 'workers' ? <WorkerFields key={current} id={current} record={record as Worker} update={next => update(next)} /> : <OwnerFields key={current} savedRecord={policy.snapshot?.config.owners[current]} config={config} blocks={policy.blocks} record={record as Owner} update={next => update(next)} />}
+          <Form.Field label="网络代理" desc="按此 Agent 独立设置，保存后用于启动和探测。">
+            <NamedSelect aria-label="代理方式" value={!record.proxy || record.proxy === 'inherit' ? 'inherit' : record.proxy === 'direct' ? 'direct' : 'custom'} options={[{ value: 'inherit', label: '继承系统代理' }, { value: 'direct', label: '直接连接' }, { value: 'custom', label: '自定义代理 URL' }]} onChange={value => update({ ...record, proxy: value === 'custom' ? 'http://127.0.0.1:7890' : String(value) })} />
+            {record.proxy && !['inherit', 'direct'].includes(record.proxy) && <ProxyUrlInput value={record.proxy} onChange={proxy => update({ ...record, proxy })} />}
+          </Form.Field>
+          {section === 'owners' && <HelloCheck id={`owners:${current}`} record={record} />}
+          {section === 'workers' ? <WorkerFields key={current} id={current} record={record as Worker} probe={freeProbe} update={next => update(next)} /> : <OwnerFields key={current} savedRecord={policy.snapshot?.config.owners[current]} config={config} blocks={policy.blocks} record={record as Owner} update={next => update(next)} />}
           {impact && <Modal open={askDelete} title={impact.title} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onCancel={() => setAskDelete(false)} onOk={() => { policy.setConfig(removeRole(config, section, current)); setSelected(''); setPendingId(''); setAskDelete(false); }}>
             <Text>{impact.detail}</Text>
           </Modal>}
@@ -134,16 +153,18 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   </>;
 }
 
-function WorkerFields({ id, record, update }: { id: string; record: Worker; update: (next: Worker) => void }) {
+function WorkerFields({ id, record, probe, update }: { id: string; record: Worker; probe: ReturnType<typeof useFreeProbe>; update: (next: Worker) => void }) {
   const fieldId = useId();
   return <>
+    <Form.Field label="免费渠道" desc="仅跳过原生账户额度暂停；手动暂停、供应商限流仍生效。调度权重由父 Agent 分别设置。"><Checkbox checked={record.free_channel === true} onChange={checked => update({ ...record, free_channel: checked === true })}>此子 Agent 使用免费渠道</Checkbox></Form.Field>
     <Form.Field label="用途说明"><Input id={`${fieldId}-description`} aria-label="用途说明" value={record.description ?? ''} placeholder="例如：负责前端界面与浏览器验收" onChange={event => update({ ...record, description: event.target.value })} /></Form.Field>
+    {record.free_channel === true && <FreeProbePanel worker={id} probe={probe} />}
     <HelloCheck id={id} record={record} />
   </>;
 }
 
 /** Sends one real "say hi" through the route as currently filled in, saved or not. The run outlives this form. */
-function HelloCheck({ id, record }: { id: string; record: Worker }) {
+export function HelloCheck({ id, record }: { id: string; record: Pick<Worker, 'engine' | 'model' | 'effort' | 'proxy'> }) {
   const run = useHelloRun(id);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -159,7 +180,7 @@ function HelloCheck({ id, record }: { id: string; record: Worker }) {
         <Text strong>可用性</Text>
         <Text type="secondary" className={styles.meta}>用当前填写的引擎、模型和推理强度发送一条简短问候，检查能否正常回复。不调用工具，不保存会话，会消耗少量额度。</Text>
       </div>
-      <Button icon={Zap} loading={run?.running} disabled={!ready} onClick={() => void startHello(id, { engine: record.engine, model: record.model.trim(), effort: record.effort.trim() }, `${record.engine} · ${record.model.trim()} · ${record.effort.trim()}`)}>连通测试</Button>
+      <Button icon={Zap} loading={run?.running} disabled={!ready} onClick={() => void startHello(id, { engine: record.engine, model: record.model.trim(), effort: record.effort.trim(), proxy: record.proxy }, `${record.engine} · ${record.model.trim()} · ${record.effort.trim()}`)}>连通测试</Button>
     </div>
     {run?.running && <Text type="secondary" className={styles.meta} role="status">正在等待 {run.route.split(' · ')[0]} 回复… {elapsed} 秒</Text>}
     {run?.result && !run.running && <ReplyCard result={{ ...run.result, route: run.route }} />}
@@ -177,7 +198,7 @@ function ReplyCard({ result }: { result: HelloResult & { route: string } }) {
         <Tag size="small" color={result.ok ? 'success' : 'error'}>{result.ok ? '可用' : '不可用'}</Tag>
         <Text strong className={styles.wrap}>{result.route}</Text>
       </span>
-      <Text type="secondary" className={`${styles.meta} ${styles.numbers}`} style={{ whiteSpace: 'nowrap' }}>{[seconds, dateText(result.checkedAt)].filter(Boolean).join(' · ')}</Text>
+      <Text type="secondary" className={`${styles.meta} ${styles.numbers}`} style={{ whiteSpace: 'nowrap' }}>{seconds && `${seconds} · `}<TimeText value={result.checkedAt} /></Text>
     </header>
     <p className={styles.replyText}>{result.reply}</p>
     {result.model && <Text type="secondary" className={styles.meta}>实际应答模型：{result.model}</Text>}

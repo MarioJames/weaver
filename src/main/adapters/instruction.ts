@@ -2,7 +2,7 @@ import type { Task } from '../../shared/types';
 import type { WorkPackage } from '../../shared/commands';
 
 export const MAX_WORKER_INSTRUCTION = 16000;
-/** Trusted role contract surrounds untrusted task data; never omit scope or constraints to fit. */
+/** Trusted role contract surrounds untrusted task data; never omit scope or constraints to fit. The work package is the only source of the worker's goal and acceptance criteria: the root task's own criteria are never merged in. */
 export function workerInstruction(task: Task, pkg: WorkPackage): string {
   if (pkg.taskId !== task.id) throw new Error('Frozen work package does not belong to task');
   const instruction = `You are a Weaver worker executing one frozen work package, not an owner.

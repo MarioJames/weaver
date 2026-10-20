@@ -1,3 +1,4 @@
+import { validateProxy } from '../../shared/proxy';
 // Derived from skill-foundry agents-cooperation, revision 61989b1 (Apache-2.0).
 // Weaver adaptation: pure policy only; no CLI, sessions, launch flags, or host reads.
 import { type Issue, type Schema, lintSchema, validate } from "./json-schema";
@@ -7,20 +8,21 @@ lintSchema(CONFIG_SCHEMA);
 export const defaultConfig = (): Config => structuredClone(DEFAULT_CONFIG) as Config;
 /** The single kind -> legal effort table; kinds not listed accept any non-empty string. */
 export const EFFORTS: Record<string, string[]> = {
+  zcode: ["auto"],
   claude: ["low", "medium", "high", "xhigh", "max"],
   codex: ["low", "medium", "high", "xhigh", "max"],
   grok: ["none", "minimal", "low", "medium", "high", "xhigh", "max"],
   pi: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
   qodercli: ["auto", "none", "low", "medium", "high", "xhigh", "max", "ultracode"],
 };
-const SUPPORTED_POLICY_KINDS = ["claude", "codex", "opencode", "qodercli", "grok", "pi"];
+const SUPPORTED_POLICY_KINDS = ["claude", "codex", "opencode", "qodercli", "grok", "pi", "zcode"];
 export const ENGINE_KINDS: string[] = CONFIG_SCHEMA.$defs?.engine?.properties?.kind?.enum ?? [];
 
 export class PolicyError extends Error {
   constructor(message: string, public issues: Issue[] = []) { super(message); }
 }
 export interface Engine { enabled: boolean; kind: string; quota_refresh?: boolean }
-/** Kinds with a native account quota probe. Every other kind is treated as free and is never probed. */
+/** Kinds with a native account quota probe. Other kinds have no native quota probe; this does not imply a free route. */
 export const QUOTA_KINDS = ["codex", "claude", "grok"] as const;
 const hasQuotaProbe = (kind: string) => (QUOTA_KINDS as readonly string[]).includes(kind);
 /** Missing means on for kinds with a quota probe, off otherwise. */
@@ -32,7 +34,13 @@ export const QUOTA_INTERVAL_RANGE = { min: 5, max: 1440 } as const;
 export function quotaSettings(config: { quota?: QuotaSettings }): QuotaSettings {
   return config.quota ?? { auto_refresh: true, interval_minutes: 15 };
 }
-export interface Owner { enabled: boolean; engine: string; model: string; effort: string; workers: string[]; max_parallel: number; worker_weights?: Record<string, number> }
+/** Scheduled live probes of free_channel workers; missing means enabled every 10 minutes. */
+export interface FreeChannelProbeSettings { enabled: boolean; interval_minutes: number }
+export const FREE_CHANNEL_INTERVAL_RANGE = { min: 5, max: 1440 } as const;
+export function freeChannelProbeSettings(config: { free_channel_probe?: FreeChannelProbeSettings }): FreeChannelProbeSettings {
+  return config.free_channel_probe ?? { enabled: true, interval_minutes: 10 };
+}
+export interface Owner { proxy?: string; enabled: boolean; engine: string; model: string; effort: string; workers: string[]; max_parallel: number; worker_weights?: Record<string, number> }
 /** Weights are integers 0..10. Omitted means 5 (the middle). Higher is tried first; 0 never dispatches. This is priority, not a probability. */
 export const WEIGHT_MAX = 10;
 export const DEFAULT_WEIGHT = 5;
@@ -41,9 +49,15 @@ export function effectiveWeight(owner: Owner, workerId: string): number {
   if (!weights || !Object.hasOwn(weights, workerId)) return DEFAULT_WEIGHT;
   return weights[workerId]!;
 }
-export interface Worker { enabled: boolean; engine: string; model: string; effort: string; description?: string }
+export interface Worker { proxy?: string; free_channel?: boolean; enabled: boolean; engine: string; model: string; effort: string; description?: string }
 export interface Herdr { max_wait_minutes: number }
-export interface Config { version: 1; chatgpt_review?: boolean; quota?: QuotaSettings; engines: Record<string, Engine>; owners: Record<string, Owner>; workers: Record<string, Worker>; herdr: Herdr }
+/** Rendering preferences; missing means follow the browser. */
+export interface Display { timezone?: string }
+export interface Config { version: 1; chatgpt_review?: boolean; quota?: QuotaSettings; free_channel_probe?: FreeChannelProbeSettings; display?: Display; engines: Record<string, Engine>; owners: Record<string, Owner>; workers: Record<string, Worker>; herdr: Herdr }
+/** An IANA timezone name Intl can format; empty keeps the browser's zone. */
+export function isValidTimezone(value: string): boolean {
+  try { new Intl.DateTimeFormat(undefined, { timeZone: value }); return true; } catch { return false; }
+}
 /** Effective automatic ChatGPT review switch. Only boolean false disables it; a missing field stays enabled. Non-booleans are schema errors and are not coerced. */
 export function chatgptReviewEnabled(config: { chatgpt_review?: unknown }): boolean {
   return config.chatgpt_review !== false;
@@ -63,6 +77,11 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
     const allowed = kind ? EFFORTS[kind] : undefined;
     if (allowed && !allowed.includes(effort)) bad(`${path}.effort`, `${kind} effort must be one of ${allowed.join("|")}`);
   };
+  for (const [section, records] of [["owners", c.owners], ["workers", c.workers]] as const) {
+    for (const [id, role] of Object.entries(records)) {
+      try { validateProxy(role.proxy); } catch (error) { bad(`$.${section}.${id}.proxy`, (error as Error).message); }
+    }
+  }
   const owned = new Map<string, string>();
   for (const [id, owner] of Object.entries(c.owners)) {
     const at = `$.owners.${id}`;
@@ -89,6 +108,10 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
     if (engine.quota_refresh === true && !hasQuotaProbe(engine.kind)) bad(`$.engines.${id}.quota_refresh`, `kind ${engine.kind} has no quota probe`);
   }
   if (c.quota && (c.quota.interval_minutes < QUOTA_INTERVAL_RANGE.min || c.quota.interval_minutes > QUOTA_INTERVAL_RANGE.max)) bad("$.quota.interval_minutes", `interval must be ${QUOTA_INTERVAL_RANGE.min}-${QUOTA_INTERVAL_RANGE.max} minutes`);
+  if (c.display?.timezone) {
+    if (!isValidTimezone(c.display.timezone)) bad("$.display.timezone", `timezone ${c.display.timezone} is not an IANA timezone name Intl supports`);
+  }
+  if (c.free_channel_probe && (c.free_channel_probe.interval_minutes < FREE_CHANNEL_INTERVAL_RANGE.min || c.free_channel_probe.interval_minutes > FREE_CHANNEL_INTERVAL_RANGE.max)) bad("$.free_channel_probe.interval_minutes", `interval must be ${FREE_CHANNEL_INTERVAL_RANGE.min}-${FREE_CHANNEL_INTERVAL_RANGE.max} minutes`);
   for (const [id, worker] of Object.entries(c.workers)) {
     const at = `$.workers.${id}`;
     const kind = Object.hasOwn(c.engines, worker.engine) ? c.engines[worker.engine]?.kind : undefined;
@@ -108,7 +131,7 @@ export function activeBlocks(state: State, now: number): Block[] {
 export function availabilityOf(config: Config, blocks: Block[], entity: Owner | Worker): Availability {
   if (!entity.enabled) return { status: "disabled" };
   if (!config.engines[entity.engine]?.enabled) return { status: "engine_disabled" };
-  const hit = blocks.find(b => b.engine === entity.engine && (b.model === undefined || b.model === entity.model));
+  const hit = blocks.find(b => b.engine === entity.engine && (b.model === undefined || b.model === entity.model) && !("free_channel" in entity && entity.free_channel === true && b.by?.startsWith("weaver-quota:")));
   if (hit) return { status: "blocked", engine: hit.engine, ...(hit.model ? { model: hit.model } : {}), reason: hit.reason, ...(hit.release_at ? { release_at: hit.release_at } : {}) };
   return { status: "available" };
 }
@@ -130,6 +153,7 @@ export function parseReleaseAt(value: string, now: number): string {
 
 // ---- resolve ----
 export interface Dispatch {
+ proxy?: string;
  owner: string; worker: string; engine: string; model: string; effort: string;
  execution: 'disabled'; dispatch: 'preview'; warnings: string[];
  selected_by?: 'worker' | 'weight'; skipped?: {worker:string; reason:string}[];
@@ -141,7 +165,7 @@ export interface Dispatch {
 function previewSelection(config: Config, ownerId: string, workerId: string, warnings: string[]): Dispatch {
  const owner = config.owners[ownerId]!;
  const worker = config.workers[workerId]!;
- return {owner:ownerId,worker:workerId,engine:worker.engine,model:worker.model,effort:worker.effort,
+ return {proxy:worker.proxy,owner:ownerId,worker:workerId,engine:worker.engine,model:worker.model,effort:worker.effort,
   execution:'disabled',dispatch:'preview',warnings,weight:effectiveWeight(owner,workerId)};
 }
 function requireOwner(config: Config, blocks: Block[], id: string, what = "owner"): Owner {

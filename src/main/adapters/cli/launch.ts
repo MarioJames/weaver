@@ -1,3 +1,4 @@
+import { proxyEnvironment, validateProxy } from '../../../shared/proxy';
 import { classifyVendorError } from './vendor-errors';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
@@ -12,7 +13,7 @@ import { clip, createRedactedLineBuffer, redact } from './redact';
 import { decodeLines, startOwnedScope, type LineOverflow, type OwnedScope } from './scope';
 import type { CliAgentEvidence, CliAgentInput, ManagedAgentProcess, RealEngineKind } from './types';
 
-const ENGINES = new Set<RealEngineKind>(['opencode', 'pi', 'grok', 'codex', 'qodercli']);
+const ENGINES = new Set<RealEngineKind>(['opencode', 'pi', 'grok', 'codex', 'qodercli', 'zcode']);
 const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/;
 const EFFORT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
 const STDERR_CAP = 24 * 1024;
@@ -26,6 +27,7 @@ export class CliAgentInputError extends Error {
 }
 
 export interface PreparedCliAgent {
+  proxy?: string;
   engine: RealEngineKind;
   model: string;
   effort: string;
@@ -36,6 +38,8 @@ export interface PreparedCliAgent {
   argv: string[];
   stdin: string | null;
   promptPath: string;
+  /** Only pi keeps a per-run session directory; other engines have none. */
+  sessionDir?: string;
   unit: string;
 }
 
@@ -45,7 +49,7 @@ function fail(field: string, message: string): never {
 
 function credentialRoots(): string[] {
   const home = homedir();
-  return ['.codex', '.grok', '.pi', '.opencode', '.qoder', '.qoder-cli', '.ssh'].map(name => path.join(home, name)).concat([
+  return ['.codex', '.grok', '.pi', '.opencode', '.qoder', '.qoder-cli', '.zcode', '.ssh'].map(name => path.join(home, name)).concat([
     path.join(home, '.config', 'opencode'),
     path.join(home, '.config', 'agents-cooperation'),
   ]);
@@ -80,7 +84,8 @@ function existingDirectory(field: string, value: string): string {
 
 /** Validate input and write the private prompt. Does not start a process. */
 export function prepareCliAgentInput(input: CliAgentInput): PreparedCliAgent {
-  if (!ENGINES.has(input.engine)) fail('engine', 'Engine must be opencode, pi, grok, codex, or qodercli');
+  validateProxy(input.proxy);
+  if (!ENGINES.has(input.engine)) fail('engine', 'Engine must be opencode, pi, grok, codex, qodercli, or zcode');
   if (typeof input.model !== 'string' || !MODEL.test(input.model) || input.model.includes('..')) fail('model', 'Model must be a bounded identifier');
   if (typeof input.effort !== 'string' || !EFFORT.test(input.effort)) fail('effort', 'Effort must be a bounded identifier');
   if (typeof input.instruction !== 'string' || !input.instruction.trim() || input.instruction.length > 16000) fail('instruction', 'Instruction must be 1–16000 characters');
@@ -95,7 +100,7 @@ export function prepareCliAgentInput(input: CliAgentInput): PreparedCliAgent {
   const promptPath = path.join(stateDir, `prompt-${id}.txt`);
   const sessionDir = path.join(stateDir, `pi-session-${id}`);
   const leaderSocket = path.join(stateDir, `leader-${id}.sock`);
-  mkdirSync(sessionDir, { recursive: true, mode: 0o700 });
+  if (input.engine === 'pi') mkdirSync(sessionDir, { recursive: true, mode: 0o700 });
   writeFileSync(promptPath, input.instruction, { mode: 0o600 });
   chmodSync(promptPath, 0o600);
   let spec: ReturnType<typeof buildLaunchSpec>;
@@ -104,7 +109,7 @@ export function prepareCliAgentInput(input: CliAgentInput): PreparedCliAgent {
   } catch (error) {
     fail('effort', error instanceof Error ? error.message : 'Invalid effort');
   }
-  return { engine: input.engine, model: input.model, effort: input.effort, workspace, stateDir, instruction: input.instruction, role: input.role, argv: spec.argv, stdin: spec.stdin, promptPath, unit: `weaver-cli-${input.engine}-${id}` };
+  return { proxy: input.proxy, engine: input.engine, model: input.model, effort: input.effort, workspace, stateDir, instruction: input.instruction, role: input.role, argv: spec.argv, stdin: spec.stdin, promptPath, ...(input.engine === 'pi' ? { sessionDir } : {}), unit: `weaver-cli-${input.engine}-${id}` };
 }
 
 class CliAgent extends EventEmitter implements ManagedAgentProcess {
@@ -131,12 +136,13 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
     super();
     this.engine = prepared.engine;
     this.scopeUnit = prepared.unit;
-    this.evidence = { engine: prepared.engine, requestedModel: prepared.model, requestedEffort: prepared.effort, workspace: prepared.workspace, role: prepared.role, terminal: 'pending' };
+    this.evidence = { engine: prepared.engine, requestedModel: prepared.model, requestedEffort: prepared.effort, workspace: prepared.workspace, role: prepared.role, promptPath: prepared.promptPath, ...(prepared.sessionDir ? { sessionDir: prepared.sessionDir } : {}), terminal: 'pending' };
     this.normalizer = createNormalizer(prepared.engine);
     this.stderrBuffer = createRedactedLineBuffer(text => this.writeStderrText(text));
     this.lines = decodeLines(line => {
       this.vendorFrames = Math.min(Number.MAX_SAFE_INTEGER, this.vendorFrames + 1);
       const records=this.normalizer.push(line);
+      const sessionId=this.normalizer.sessionId();if(sessionId&&this.evidence.vendorSessionId!==sessionId)this.evidence.vendorSessionId=sessionId;
       if(records.length && !this.firstOutput){this.firstOutput=true;this.emit('first-output',new Date().toISOString());}
       let value: Record<string,unknown>|undefined;try{value=JSON.parse(line);}catch{}
       if(value && (/error|fail/i.test(String(value.type)) || value.error || value.is_error || (value.type==='result'&&value.subtype!=='success') || (value.message && typeof value.message==='object' && ['error','aborted'].includes(String((value.message as Record<string,unknown>).stopReason))))) {
@@ -144,7 +150,7 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
       }
       this.emitRecords(records);
     }, detail => this.logOversizedLine(detail));
-    const env = { ...process.env };
+    const env = proxyEnvironment(process.env, prepared.proxy);
     delete env.ELECTRON_RUN_AS_NODE;
     this.scope = startOwnedScope({ command: prepared.argv, cwd: prepared.workspace, env, stdin: prepared.stdin, ...(prepared.stdin!==null?{stdinPath:prepared.promptPath}:{}), unit: prepared.unit });
     this.pid = this.scope.pid;
@@ -221,6 +227,7 @@ function permissionNote(engine: RealEngineKind): string {
     case 'codex': return 'codex runs with danger-full-access (no vendor sandbox); this is not OS isolation';
     case 'opencode': return 'opencode --auto approves permissions inside the CLI; it is not OS isolation';
     case 'pi': return 'pi --approve trusts project files for this run; it is not OS isolation';
+    case 'zcode': return 'zcode yolo mode auto-approves tool permissions inside the CLI; it is not OS isolation';
     case 'qodercli': return 'qodercli permission mode bypass_permissions is a CLI policy, not OS filesystem isolation';
   }
 }

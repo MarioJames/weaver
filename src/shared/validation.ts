@@ -7,13 +7,14 @@ export function text(value: unknown, name: string, max: number, allowEmpty = fal
  if (typeof value !== 'string' || (!allowEmpty && !value.trim()) || value.length > max) throw new Error(`Invalid ${name} (maximum ${max} characters)`);
  return value;
 }
-export function parseTaskInput(value: unknown): TaskInput {
+export const PENDING_TASK_TITLE = '等待父 Agent 命名';
+export function parseTaskInput(value: unknown): TaskInput & { title: string } {
  const input = object(value); const owner = object(input.owner);
  if (owner.transport !== 'herdr-visible') throw new Error('Owner transport must be herdr-visible');
  const extra: Pick<TaskInput,'workspace'|'acceptanceCriteria'|'constraints'>={};
  if(input.workspace!==undefined) extra.workspace=text(input.workspace,'workspace',2000);
  for(const key of ['acceptanceCriteria','constraints'] as const)if(input[key]!==undefined){if(!Array.isArray(input[key])||(input[key] as unknown[]).length>30)throw new Error('Invalid '+key);extra[key]=(input[key] as unknown[]).map(v=>text(v,key,1000));}
- return {...extra, title: text(input.title, 'title', 160), instruction: text(input.instruction, 'instruction', 16000), owner: {
+ return {...extra, title: input.title === undefined ? PENDING_TASK_TITLE : text(input.title, 'title', 160), instruction: text(input.instruction, 'instruction', 16000), owner: {
  name: text(owner.name, 'owner name', 120), transport: 'herdr-visible', session: text(owner.session, 'session', 120), pane: text(owner.pane, 'pane', 120)
  }};
 }

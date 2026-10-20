@@ -13,7 +13,7 @@ const input: TaskInput={title:'Demo',instruction:'Safe local fixture only',owner
 const fixture=(code: string): WorkerAdapter => ({id:'mock-jsonl',start:() => {const child=spawn(process.execPath,['-e',code],{stdio:['pipe','pipe','pipe'],shell:false});child.stdin.end();return child;}});
 async function terminal(store: TaskStore,id: string) { const deadline=Date.now()+5000; while (Date.now()<deadline) {const task=store.get(id); if (['completed','failed','cancelled'].includes(task.status)) return task; await new Promise(resolve => setTimeout(resolve,15));} throw new Error('Timed out waiting for task'); }
 async function harness(adapter: WorkerAdapter,fn:(manager:TaskManager,store:TaskStore)=>Promise<void>,timeout=3000) {
- const dir=mkdtempSync(join(tmpdir(),'weaver-manager-')); const store=new TaskStore(join(dir,'tasks.json')); const manager=new TaskManager(store,adapter,()=>{},timeout,error=>{throw error;});
+ const dir=mkdtempSync(join(tmpdir(),'weaver-manager-')); const store=new TaskStore(join(dir,'weaver.db')); const manager=new TaskManager(store,adapter,()=>{},timeout,error=>{throw error;});
  try {await fn(manager,store);} finally {await manager.shutdown();rmSync(dir,{recursive:true,force:true});}
 }
 test('bundled mock worker completes a task and persists artifact',async () => {

@@ -1,4 +1,3 @@
-import { formatDate } from '../log-view';
 import { useNotifyError } from '../notify';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Descriptions, Modal, Tag, Text, TextArea } from '@lobehub/ui/base-ui';
@@ -9,6 +8,7 @@ import { DISPLAY_LABELS, DISPLAY_TONES, type DisplayStatus } from '../status-col
 import { ownerLabel, taskOwnerId } from '../task-view';
 import { styles } from '../style';
 import { AgentLabel } from './EngineIcon';
+import { TimeText } from './TimeText';
 import { styles as detailStyles } from './task-detail-style';
 
 interface ResultManifest { taskId: string; execution: string; manifestDigest: string; delivery: 'pending' | 'acknowledged'; acceptance: 'pending' | 'accepted' | 'rejected' }
@@ -32,7 +32,7 @@ export function ReviewView({ task, manifest, busy, ownerKind, open, comment, onO
     { key: 'decision', label: '验收结论', children: <Tag size="small" variant="solid" color={toneColor(DISPLAY_TONES[status])}>{DISPLAY_LABELS[status]}</Tag> },
     ...(decided ? [
       { key: 'by', label: '决定者', children: <AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerLabel(task)} /> },
-      ...(decision ? [{ key: 'at', label: '决定时间', children: <time dateTime={decision.at}>{formatDate(decision.at)}</time> }] : []),
+      ...(decision ? [{ key: 'at', label: '决定时间', children: <TimeText value={decision.at} /> }] : []),
     ] : []),
     ...(task.reviewComment ? [{ key: 'comment', label: '验收说明', span: 2, children: <Text className={styles.wrap}>{task.reviewComment}</Text> }] : []),
   ];

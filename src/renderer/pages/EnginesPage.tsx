@@ -1,16 +1,20 @@
+import { HelloCheck } from './RolesPage';
 import { notifyError, useNotifyError } from '../notify';
 import { NamedSwitch } from '../components/NamedControls';
+import { ModelPicker } from '../components/ModelPicker';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, RefreshCw, ScanSearch } from 'lucide-react';
 import { PageHeader, Surface } from '@lobehub/ui/dashboard';
-import { ActionIcon, Button, Progress, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
+import { ActionIcon, Button, Input, Progress, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
 import { ENGINE_CATALOG, catalogEntry, engineDisableConflict, type EngineProbeRecord } from '../../shared/engines';
 import type { EngineQuotaRecord, QuotaEngine, QuotaWindow } from '../../shared/quota';
 import { QUOTA_KINDS, quotaRefreshEnabled, type Block, type Engine } from '../../main/policy/routing';
-import { acceptQuotaPolicy, dateText, quotaPercentText, quotaProgressPercent, quotaRecordStale, quotaRecoveryText, quotaRetryMs, quotaStatusText, quotaNextUpdateMs, quotaCountText, quotaVisibleWindows } from '../quota-view';
+import { acceptQuotaPolicy, dateText, quotaPercentText, quotaProgressPercent, quotaRecordStale, quotaRecoveryText, quotaRetryMs, quotaStatusText, quotaNextUpdateMs, quotaCountText, quotaVisibleWindows, quotaThirdParty } from '../quota-view';
 import type { PolicyDraft, PolicyUpdate } from '../usePolicyDraft';
 import type { RendererAPI, StallEngineState, StallHistoryEntry, StallSnapshot } from '../client';
 import { styles } from '../style';
+import { TimeText } from '../components/TimeText';
+import { compactTime } from '../timezone';
 import { createStaticStyles } from 'antd-style';
 import type { StatusTone } from '../status-colors';
 
@@ -25,9 +29,9 @@ export function engineVersionText(version: string): string {
 
 const engineStyles = createStaticStyles(({ css, cssVar }) => ({
   cards: css`display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); align-items: start; gap: 16px; min-inline-size: 0;`,
-  enable: css`display: flex; align-items: center; justify-content: flex-end; gap: 8px;`,
+  enable: css`display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-inline-size: 0; max-inline-size: 190px; > :last-child { flex-shrink: 0; }`,
   version: css`white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-inline-size: 0;`,
-  reason: css`color: ${cssVar.colorTextSecondary}; font-size: ${cssVar.fontSizeSM}; overflow-wrap: anywhere;`,
+  switchReason: css`color: ${cssVar.colorTextSecondary}; font-size: ${cssVar.fontSizeSM}; min-inline-size: 0; overflow: hidden; text-align: end; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;`,
 }));
 
 const PROBE: Record<string, { label: string; color?: string }> = {
@@ -202,12 +206,12 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
         const kind = record?.kind ?? entry.kind;
         const engineBlocks = savedBlocks.filter(block => block.engine === entry.id);
         return <Surface key={entry.id} aria-label={entry.id} title={entry.id} description={<span className={styles.row} style={{ gap: 6, flexWrap: 'nowrap' }}><Tag size="small" color={PROBE[status]?.color}>{PROBE[status]?.label ?? status}</Tag><Tooltip title={probe?.version || entry.command}><Text type="secondary" className={engineStyles.version}>{engineVersionText(probe?.version || entry.command)}</Text></Tooltip></span>}
-          extra={<div className={engineStyles.enable}><NamedSwitch aria-label={`启用 ${entry.id}`} size="small" checked={enabled} loading={busyId === entry.id} disabled={blocked} onChange={checked => void toggle(entry.id, checked)} /></div>}>
+          extra={<div className={engineStyles.enable}>{blocked && reason && <Tooltip title={reason}><Text type="secondary" data-switch-reason={entry.id} className={engineStyles.switchReason}>{reason}</Text></Tooltip>}<NamedSwitch aria-label={`启用 ${entry.id}`} size="small" checked={enabled} loading={busyId === entry.id} disabled={blocked} onChange={checked => void toggle(entry.id, checked)} /></div>}>
           <div className={styles.cardBody}>
-            {blocked && reason && <Text type="secondary" className={engineStyles.reason}>{reason}</Text>}
             <StallNotice state={stall.snapshot?.engines[entry.id]} now={stall.now} />
             {isQuotaKind(kind) ? <QuotaSummary engine={kind} record={quota.records.find(item => item.engine === kind)} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === kind ? quota.feedback : undefined} onRefresh={() => void quota.refresh(kind)} />
-              : <Text type="secondary" className={styles.meta}>免费模型，不探测额度。</Text>}
+              : <Text type="secondary" className={styles.meta}>未提供原生额度接口。</Text>}
+            {(record || status === 'installed') && <EngineModelProbe id={entry.id} />}
             <BlockList blocks={engineBlocks} state={stall.snapshot?.engines[entry.id]} now={stall.now} disabled={busyId !== '' || !record} onRemove={block => void change(entry.id, doc => ({ ...doc, blocks: doc.blocks.filter(item => !(item.engine === block.engine && item.model === block.model)) }))} />
             <div className={styles.cardFoot}>
               <div className={styles.spread}>
@@ -242,9 +246,7 @@ export function engineBlockText(block: Block, now: number, state?: EngineBlockSt
   const time = deadline ? Date.parse(deadline) : NaN;
   let release = '需手动恢复';
   if (Number.isFinite(time) && time > now) {
-    const date = new Date(time), today = new Date(now);
-    const text = dateText(deadline!);
-    release = `${date.toDateString() === today.toDateString() ? text.slice(11) : text.slice(5)} 自动解除`;
+    release = `${compactTime(time, now)} 自动解除`;
   } else if (stall && state && state.level >= 1 && state.level <= 2) release = '探测通过后解除';
   const tone: StatusTone = category === '手动暂停' ? 'default' : 'warning';
   return { category, reason, fullReason, release, tone };
@@ -281,9 +283,9 @@ function QuotaSummary({ engine, record, now, busy, policyBusy, feedback, onRefre
       {quotaVisibleWindows(record).map(window => <QuotaWindowRow key={window.id} window={window} />)}
       {!record.windows.length && record.status !== 'unknown' && <Text type="secondary" className={styles.meta}>{record.detail}</Text>}
       {quotaRecoveryText(record) && record.status !== 'unknown' && <Text type="secondary" className={styles.meta}>{quotaRecoveryText(record)}</Text>}
-      <Text type="secondary" className={styles.meta}>{record.observedAt ? `${stale ? '已过期 · ' : ''}${dateText(record.observedAt)} 观测` : record.checkedAt ? `${dateText(record.checkedAt)} 检查` : '尚未刷新'}</Text>
+      <Text type="secondary" className={styles.meta}>{record.observedAt ? <>{stale ? '已过期 · ' : ''}<TimeText value={record.observedAt} now={now} /> 观测</> : record.checkedAt ? <><TimeText value={record.checkedAt} now={now} /> 检查</> : '尚未刷新'}</Text>
     </>}
-    {feedback && !feedback.error && <Text role="status" type={feedback.error ? 'danger' : 'secondary'} className={styles.meta}>{feedback.text}</Text>}
+    {feedback && !feedback.error && !(record && quotaThirdParty(record)) && <Text role="status" type={feedback.error ? 'danger' : 'secondary'} className={styles.meta}>{feedback.text}</Text>}
   </section>;
 }
 
@@ -296,6 +298,16 @@ function QuotaWindowRow({ window }: { window: QuotaWindow }) {
       <Text className={`${styles.meta} ${styles.numbers}`}>{amount}</Text>
     </div>
     {percent !== null && <Progress size="small" percent={percent} showInfo={false} status={percent >= 100 ? 'exception' : undefined} aria-label={`${window.label} 已用比例`} />}
-    {window.resetsAt && <Text type="secondary" className={styles.meta}>{dateText(window.resetsAt)} 重置</Text>}
+    {window.resetsAt && <Text type="secondary" className={styles.meta}><TimeText value={window.resetsAt} /> 重置</Text>}
   </div>;
+}
+
+function EngineModelProbe({ id }: { id: string }) {
+  const [model, setModel] = useState('');
+  const [effort, setEffort] = useState(id === 'zcode' ? 'auto' : 'high');
+  return <details><summary>模型探测</summary><div className={styles.tight}>
+    <ModelPicker engine={id} value={model} label={`${id} 探测模型`} onChange={setModel} placeholder="例如：provider/model" />
+    <Input aria-label={`${id} 探测强度`} value={effort} placeholder="例如：high" onChange={event => setEffort(event.target.value)} />
+    <HelloCheck id={`engine:${id}`} record={{ engine: id, model, effort }} />
+  </div></details>;
 }

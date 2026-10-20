@@ -28,7 +28,6 @@ export class TaskManager {
   constructor(readonly store: TaskStore, private adapter: WorkerAdapter, private changed: () => void = () => {}, private timeoutMs?: number, private fatal: (error: unknown) => void = console.error) {}
   create(input: TaskInput): Task {
     const valid = parseTaskInput(input);
-    if (this.store.list().length >= 200) throw new Error('MVP store limit reached (200 tasks)');
     const at = new Date().toISOString();
     const task: Task = { ...valid, id: randomUUID(), createdAt: at, updatedAt: at, status: 'queued', revision: 0, reviewState: 'pending', progress: 0, events: [], artifacts: [] };
     event(task, 'lifecycle', 'Task queued. Owner reference is metadata only; no Herdr session was contacted.');
@@ -41,8 +40,8 @@ export class TaskManager {
       const limit = liveMaxParallel ?? task.dispatch.maxParallel;
       if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('Configured max_parallel is invalid');
       const group = slotGroupOf(task);
-      const running = slotGroupCount(this.store.list(), group);
-      if (running >= limit) throw new Error(`${slotGroupName(this.store.getMetadata().owners, task.ownerId, task.dispatch.owner)} is at its configured concurrency limit (${limit})`);
+      const running = slotGroupCount(this.store.listHeads(), group);
+      if (running >= limit) throw new Error(`${slotGroupName(this.store.listOwners(), task.ownerId, task.dispatch.owner)} is at its configured concurrency limit (${limit})`);
     }
     const timeoutMs = executionTimeoutMs(task, this.timeoutMs);
     const execution = task.dispatch?.execution ?? 'mock';
@@ -200,7 +199,7 @@ export class TaskManager {
     if (child.scopeUnit) task.run.scopeUnit = child.scopeUnit.slice(0,200);
     if (child.evidence) {
       const source=child.evidence;
-      task.run.evidence={engine:source.engine,requestedModel:source.requestedModel.slice(0,200),requestedEffort:source.requestedEffort.slice(0,120),workspace:source.workspace.slice(0,2000),terminal:source.terminal,...(source.role?{role:source.role}:{}),...(source.vendorModel?{vendorModel:redactContext(source.vendorModel,512)}:{}),...(source.vendorSessionId?{vendorSessionId:redactContext(source.vendorSessionId,512)}:{})};
+      task.run.evidence={engine:source.engine,requestedModel:source.requestedModel.slice(0,200),requestedEffort:source.requestedEffort.slice(0,120),workspace:source.workspace.slice(0,2000),terminal:source.terminal,...(source.role?{role:source.role}:{}),...(source.vendorModel?{vendorModel:redactContext(source.vendorModel,512)}:{}),...(source.vendorSessionId?{vendorSessionId:redactContext(source.vendorSessionId,512)}:{}),...(source.promptPath?{promptPath:source.promptPath.slice(0,2000)}:{}),...(source.sessionDir?{sessionDir:source.sessionDir.slice(0,2000)}:{})};
       if(source.usage){task.run.evidence.usage={};for(const key of ['inputTokens','outputTokens'] as const){const value=source.usage[key];if(Number.isSafeInteger(value)&&typeof value==='number'&&value>=0)task.run.evidence.usage[key]=value;}}
     }
   }

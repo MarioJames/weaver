@@ -64,7 +64,10 @@ function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   try { child.kill(signal); } catch { /* the direct child is already gone */ }
 }
 
-function runVersion(executable: string, timeoutMs: number, maxOutputBytes: number, env: NodeJS.ProcessEnv): Promise<{ code: number | null; timedOut: boolean; overflow: boolean; stdout: string; stderr: string; error?: string }> {
+export interface CaptureResult { code: number | null; timedOut: boolean; overflow: boolean; stdout: string; stderr: string; error?: string }
+
+/** Runs one allowlisted executable with fixed arguments, no shell and no stdin, bounded in time and output. */
+export function runCapture(executable: string, args: readonly string[], timeoutMs: number, maxOutputBytes: number, env: NodeJS.ProcessEnv): Promise<CaptureResult> {
   return new Promise(resolve => {
     let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
     let stderr: Buffer<ArrayBufferLike> = Buffer.alloc(0);
@@ -81,7 +84,7 @@ function runVersion(executable: string, timeoutMs: number, maxOutputBytes: numbe
       windowsHide: true,
       detached: process.platform !== 'win32',
     };
-    const child = spawn(executable, ['--version'], options);
+    const child = spawn(executable, [...args], options);
     const finish = (code: number | null, error?: string) => {
       if (settled) return;
       settled = true;
@@ -123,6 +126,10 @@ function runVersion(executable: string, timeoutMs: number, maxOutputBytes: numbe
 
 function record(entry: (typeof ENGINE_CATALOG)[number], status: ProbeStatus, probedAt: string, extra: Partial<EngineProbeRecord> = {}): EngineProbeRecord {
   return { id: entry.id, kind: entry.kind, command: entry.command, status, probedAt, authenticated: false, modelUsable: false, ...extra };
+}
+
+function runVersion(executable: string, timeoutMs: number, maxOutputBytes: number, env: NodeJS.ProcessEnv): Promise<CaptureResult> {
+  return runCapture(executable, ['--version'], timeoutMs, maxOutputBytes, env);
 }
 
 /** Read-only PATH plus `--version` probe. One in-flight probe per engine; never starts a model session. */

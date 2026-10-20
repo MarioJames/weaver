@@ -18,6 +18,16 @@ export const scheduleStyles = createStaticStyles(({ css, cssVar }) => ({
     align-items: center;
     gap: ${cssVar.marginXS};
   `,
+  /** The pause reason beside its tag: one line, the rest in the tooltip. */
+  reason: css`
+    flex: 1 1 0;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: ${cssVar.colorTextSecondary};
+    font-size: ${cssVar.fontSizeSM};
+  `,
   name: css`
     @media (max-width: 600px) { grid-column: 1 / -1; }
   `,
@@ -34,6 +44,8 @@ export const scheduleStyles = createStaticStyles(({ css, cssVar }) => ({
     button { border-radius: 0; font: inherit; }
     button[aria-pressed="true"] { background: ${cssVar.colorFillSecondary}; color: ${cssVar.colorText}; }
     button + button { border-inline-start: 1px solid ${cssVar.colorBorder}; }
+    &[data-locked] { border-color: ${cssVar.colorBorderSecondary}; }
+    &[data-locked] button + button { border-inline-start-color: ${cssVar.colorBorderSecondary}; }
   `,
   heading: css`
     grid-column: 2;

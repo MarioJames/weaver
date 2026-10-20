@@ -23,9 +23,9 @@ async function run(stderr: string, sleepMs = 60000) {
   process.env.PATH = dir + ':' + previous;
   const kills: string[] = [];
   const agents: ReturnType<typeof startCliAgent>[] = [];
-  const store = new TaskStore(join(dir, 'tasks.json'));
+  const store = new TaskStore(join(dir,'weaver.db'));
   const manager = new TaskManager(store, { id: 'opencode', canLaunchReal: () => true, start: task => { const a = startCliAgent({ engine: 'opencode', model: 'opencode/glm-5.3-flash-free', effort: 'max', workspace: dir, stateDir: join(dir, 'state'), instruction: task.instruction }); const kill = a.kill.bind(a); a.kill = signal => { kills.push(String(signal ?? 'SIGTERM')); return kill(signal); }; agents.push(a); return a; } });
-  const policy = new PolicyStore(join(dir, 'policy.json'));
+  const policy = new PolicyStore(join(dir,'weaver.db'));
   const handler = new CommandHandler(manager, policy);
   const task = manager.create({ title: 'rl', instruction: 'fake only', workspace: dir, owner: { name: 'o', transport: 'herdr-visible', session: 's', pane: 'p' } });
   task.dispatch = { execution: 'real', adapter: 'opencode', engineKind: 'opencode', engine: 'opencode', model: 'opencode/glm-5.3-flash-free', effort: 'max', owner: 'o', worker: 'w', maxParallel: 2, workspace: dir };

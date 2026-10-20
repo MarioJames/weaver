@@ -1,7 +1,8 @@
 import { notifyError } from '../notify';
+import { WorkspacePicker } from './WorkspacePicker';
 import { NamedSelect } from './NamedControls';
 import { useEffect, useId, useState, type Dispatch, type SetStateAction } from 'react';
-import { Button, Input, Text, TextArea } from '@lobehub/ui/base-ui';
+import { Button, Text, TextArea } from '@lobehub/ui/base-ui';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
 import type { PolicySnapshot } from '../../shared/policy';
 import { styles } from '../style';
@@ -10,16 +11,27 @@ import { composerStyles } from './task-composer-style';
 /** Browser tasks name an absolute project directory. Blank and `.` are not submitted. */
 export function workspacePathError(value: string): string {
   const path = value.trim();
-  if (!path) return '填写目标项目的绝对路径。';
+  if (!path) return '选择目标项目目录。';
   if (!path.startsWith('/')) return '需要目标项目的绝对路径，不能使用 . 或相对路径。';
   return '';
 }
 
-export interface CreateTaskDraft { title: string; goal: string; workspace: string; ownerProfileId: string; acceptanceCriteria: string[] }
-export interface TaskDraftFields { title: string; goal: string; workspace: string; profile: string; acceptance: string }
+export interface CreateTaskDraft { goal: string; workspace: string; ownerProfileId: string; acceptanceCriteria?: string[] }
+/** `criteria` is one acceptance criterion per line; left empty, the parent Agent writes them once it takes the task over. */
+export interface TaskDraftFields { goal: string; workspace: string; profile: string; criteria?: string }
 
-export function TaskComposer({ disabled, draft, onDraft, onCreate, onImport }: { disabled: boolean; draft: TaskDraftFields; onDraft: Dispatch<SetStateAction<TaskDraftFields>>; onCreate: (input: CreateTaskDraft) => Promise<boolean>; onImport: () => void }) {
-  const { title, goal, workspace, profile, acceptance } = draft;
+/** One criterion per non-empty line. */
+export const criteriaLines = (text: string | undefined): string[] => (text ?? '').split('\n').map(line => line.trim()).filter(Boolean);
+/** The server keeps 1–30 criteria of up to 1000 characters each. */
+export function criteriaError(text: string | undefined): string {
+  const lines = criteriaLines(text);
+  if (lines.length > 30) return '验收标准最多 30 条。';
+  if (lines.some(line => line.length > 1000)) return '每条验收标准不超过 1000 个字符。';
+  return '';
+}
+
+export function TaskComposer({ disabled, draft, recentWorkspaces, onDraft, onCreate }: { disabled: boolean; draft: TaskDraftFields; recentWorkspaces?: string[]; onDraft: Dispatch<SetStateAction<TaskDraftFields>>; onCreate: (input: CreateTaskDraft, start: boolean) => Promise<boolean> }) {
+  const { goal, workspace, profile, criteria = '' } = draft;
   const fieldId = useId();
   const [policy, setPolicy] = useState<PolicySnapshot>();
   useEffect(() => {
@@ -28,22 +40,35 @@ export function TaskComposer({ disabled, draft, onDraft, onCreate, onImport }: {
     void window.weaver.getPolicy().then(snapshot => { if (current) { setPolicy(snapshot); onDraft(previous => previous.profile ? previous : { ...previous, profile: Object.keys(snapshot.config.owners).find(id => snapshot.owners[id]?.status === 'available') || '' }); } }).catch(cause => { if (current) notifyError(String(cause)); });
     return () => { current = false; };
   }, []);
-  const criteria = acceptance.split('\n').map(line => line.trim()).filter(Boolean);
   const pathError = workspacePathError(workspace);
-  const valid = Boolean(title.trim() && goal.trim() && !pathError && profile && criteria.length > 0 && criteria.length <= 30 && criteria.every(line => line.length <= 1000));
-  const form = useForm({ onSubmit: () => { if (pathError) notifyError(pathError, '目标项目目录有误'); if (disabled || !valid || pathError) return; return onCreate({ title: title.trim(), goal: goal.trim(), workspace: workspace.trim(), ownerProfileId: profile, acceptanceCriteria: criteria }); } });
+  const criteriaProblem = criteriaError(criteria);
+  const valid = Boolean(goal.trim() && !pathError && !criteriaProblem && profile);
+  /** Which button was pressed: only that one shows loading, and both stay disabled until the request settles. */
+  const [mode, setMode] = useState<'start' | 'create'>();
+  const submit = async (start: boolean) => {
+    if (pathError) notifyError(pathError, '目标项目目录有误');
+    if (disabled || !valid || pathError) return;
+    setMode(start ? 'start' : 'create');
+    const acceptanceCriteria = criteriaLines(criteria);
+    try { return await onCreate({ goal: goal.trim(), workspace: workspace.trim(), ownerProfileId: profile, ...(acceptanceCriteria.length ? { acceptanceCriteria } : {}) }, start); } finally { setMode(undefined); }
+  };
+  const form = useForm({ onSubmit: () => submit(true) });
   return <Form form={form} layout="vertical" className={composerStyles.form}>
-    <div className={styles.spread}><Button type="text" disabled={disabled} onClick={onImport}>导入 JSON</Button></div>
     <div className={composerStyles.scroll}><fieldset disabled={disabled} className={composerStyles.body}>
-      <Form.Field label="任务标题" required><Input id={`${fieldId}-title`} aria-label="任务标题" required maxLength={160} value={title} placeholder="例如：整理本地集成说明" onChange={event => onDraft(current => ({ ...current, title: event.target.value }))} /></Form.Field>
       <Form.Field label="目标与约束" required><TextArea id={`${fieldId}-goal`} aria-label="目标与约束" required maxLength={16000} rows={4} value={goal} placeholder="例如：只改指定目录里的文档" onChange={event => onDraft(current => ({ ...current, goal: event.target.value }))} /></Form.Field>
-      <Form.Field label="目标项目目录" required desc="绝对路径。留空或 . 不会提交，草稿保留。服务端仍会检查目录是否存在。">
-        <Input id={`${fieldId}-workspace`} aria-label="目标项目目录" required maxLength={4000} value={workspace} placeholder="/home/user/project" onBlur={() => { if (pathError) notifyError(pathError, '目标项目目录有误'); }} onChange={event => onDraft(current => ({ ...current, workspace: event.target.value }))} />
+      <Form.Field label="验收标准" desc="可留空：父 Agent 接手后会根据目标生成并填入。每行一条。">
+        <TextArea id={`${fieldId}-criteria`} aria-label="验收标准" rows={3} maxLength={30000} value={criteria} placeholder="例如：README 的安装步骤逐条核对过&#10;不修改任何文件" onChange={event => onDraft(current => ({ ...current, criteria: event.target.value }))} />
+        {criteriaProblem && <p role="alert" className={styles.error}>{criteriaProblem}</p>}
+      </Form.Field>
+      <Form.Field label="目标项目目录" required desc="选择已有工作区，或浏览 Weaver 服务所在机器上的其他文件夹。">
+        <WorkspacePicker value={workspace} disabled={disabled} recent={recentWorkspaces} onChange={workspace => onDraft(current => ({ ...current, workspace }))} />
       </Form.Field>
       <Form.Field label="父 Agent 配置" required><NamedSelect id={`${fieldId}-profile`} aria-label="父 Agent 配置" value={profile || undefined} placeholder={policy ? '选择可用父 Agent' : '正在读取…'} options={policy ? Object.keys(policy.config.owners).map(id => ({ value: id, label: `${id}${policy.owners[id]?.status === 'available' ? '' : ' · 不可用'}`, disabled: policy.owners[id]?.status !== 'available' })) : []} onChange={value => { if (typeof value === 'string') onDraft(current => ({ ...current, profile: value })); }} /></Form.Field>
-      <Form.Field label="验收标准" required desc="每行一项，1–30 项，每项最多 1000 字。"><TextArea id={`${fieldId}-acceptance`} aria-label="验收标准" required maxLength={30000} rows={4} value={acceptance} placeholder={'例如：输出变更摘要\n列出验证结果'} onChange={event => onDraft(current => ({ ...current, acceptance: event.target.value }))} /></Form.Field>
-      <Text type="secondary">创建时登记外部父 Agent 的逻辑引用，宿主引用未经验证，不会启动新的 AI。默认空闲 60 分钟后提醒手动接续；真实 CLI 自行读取接续包和切换上下文。</Text>
+      <Text type="secondary">「创建并开始」会立即在 Herdr 中启动父 Agent，由它生成任务标题和验收标准，拆分子任务并派发给子 Agent；「仅创建」只保存任务，稍后在详情中开始。</Text>
     </fieldset></div>
-    <div className={composerStyles.footer}><Button htmlType="submit" type="primary" block disabled={disabled || !valid}>创建任务</Button></div>
+    <div className={composerStyles.footer}>
+      <Button htmlType="button" disabled={disabled || !valid} loading={disabled && mode === 'create'} onClick={() => void submit(false)}>仅创建</Button>
+      <Button htmlType="submit" type="primary" disabled={disabled || !valid} loading={disabled && mode === 'start'}>创建并开始</Button>
+    </div>
   </Form>;
 }

@@ -6,11 +6,12 @@ import { Drawer, Table, Tag, Text } from '@lobehub/ui/base-ui';
 import type { TableColumnsType } from '@lobehub/ui/base-ui';
 import type { Task } from '../../shared/types';
 import type { FilterDimension, TaskSelection } from '../task-view';
-import { TIME_RANGES, archiveRows, archivedTasks, compactTaskTime, dispatchKind, facetOptions, filterLabels, ownerLabel, projectLabel, taskOwnerId } from '../task-view';
+import { TIME_RANGES, archiveRows, archivedTasks, dispatchKind, facetOptions, filterLabels, ownerLabel, projectLabel, taskOwnerId } from '../task-view';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../status-colors';
 import { styles } from '../style';
 import { AgentLabel } from './EngineIcon';
 import { NamedSelect } from './NamedControls';
+import { TimeText } from './TimeText';
 
 /** What the archive table shows per owner: who ran the work and which agent did it. */
 export function archiveColumns(ownerKind?: (ownerId?: string) => string | undefined, now: number = Date.now()): TableColumnsType<Task> {
@@ -31,7 +32,7 @@ export function archiveColumns(ownerKind?: (ownerId?: string) => string | undefi
       key: 'outcome',
       render: (_, task) => { const status = displayStatus(task); const tone = DISPLAY_TONES[status]; return <Tag size="small" color={tone === 'default' ? undefined : tone}>{DISPLAY_LABELS[status]}</Tag>; },
     },
-    { title: '结束于', key: 'ended', render: (_, task) => <time className={styles.cardTime} dateTime={task.updatedAt} title={new Date(task.updatedAt).toLocaleString('zh-CN')}>{compactTaskTime(task.updatedAt, now)}</time> },
+    { title: '结束于', key: 'ended', render: (_, task) => <TimeText className={styles.cardTime} value={task.updatedAt} now={now} /> },
   ];
 }
 
@@ -62,7 +63,7 @@ export function ArchiveList({ tasks, selected, onSelect, ownerKind, now = Date.n
   const filterClassNames = { trigger: styles.archiveFilterTrigger, value: styles.archiveFilterValue };
   const multi = (dimension: FilterDimension) => <NamedSelect classNames={filterClassNames} key={dimension} mode="multiple" allowClear prefix={`${filterLabels[dimension]}：`} aria-label={`按${filterLabels[dimension]} 筛选归档任务`} placeholder="全部" value={selection[dimension]}
     labelRender={option => <span className={styles.archiveFilterLabel} title={String(option.label)}>{option.label}</span>}
-    options={facetOptions(archived, dimension, selection, now).map(option => ({ value: option.value, label: `${option.label} ${option.count}` }))}
+    options={facetOptions(archived, dimension, selection, now, tasks).map(option => ({ value: option.value, label: `${option.label} ${option.count}` }))}
     onChange={value => setSelection({ ...selection, [dimension]: Array.isArray(value) ? value.map(String) : [] })} />;
   return <div className={styles.archiveBody}>
     <div className={styles.archiveFilters}>

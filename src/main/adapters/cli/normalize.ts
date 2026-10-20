@@ -112,6 +112,8 @@ function toolNote(name: unknown, status: string): WorkerRecord | undefined {
 export function createNormalizer(engine: RealEngineKind): {
   push(line: string): WorkerRecord[];
   finish(outcome: { exitCode: number | null; cancelled: boolean; truncated: boolean }): { records: WorkerRecord[]; evidence: NormalizerEvidence };
+  /** The vendor session or thread id once an event has carried it, before the run ends. */
+  sessionId(): string | undefined;
 } {
   const state: MutableEvidence = { terminal: 'pending', assistantText: '', vendorTerminal: false, assistantClipped: false, clipped: {} };
   let unparsed = 0;
@@ -127,6 +129,7 @@ export function createNormalizer(engine: RealEngineKind): {
   };
   return {
     push,
+    sessionId: () => state.vendorSessionId,
     finish(outcome) {
       const records: WorkerRecord[] = [];
       if (unparsed > 0) records.push(record('log', `ignored ${unparsed} non-JSON vendor lines`));
@@ -164,6 +167,32 @@ function accept(engine: RealEngineKind, state: MutableEvidence, event: Record<st
     case 'opencode': return acceptOpencode(state, event, markError);
     case 'grok': return acceptGrok(state, event, markError);
     case 'codex': return acceptCodex(state, event, markError);
+    case 'zcode': {
+      // Verified event shapes from zcode 0.16.9 `--output-format stream-json`:
+      // every line carries {type, seq, sessionId, ...}; failures arrive as
+      // {type:"turn.failed",payload:{error:{message,detail}}}; success arrives as a
+      // trailing {type:"result",response} summary. Other event kinds carry only
+      // intermediate progress and never finalize the turn.
+      if (typeof event.sessionId === 'string') state.vendorSessionId ??= identifier(state, 'vendor_session_id', event.sessionId);
+      if (event.type === 'result') {
+        if (typeof event.response === 'string' && event.response.trim() && !event.error && !event.is_error) {
+          rememberAssistant(state, event.response); state.vendorTerminal = true;
+          return [record('progress', 'zcode completed', 95)];
+        }
+        markError(); noteFailure(state, 'ZCode returned no successful response'); return [];
+      }
+      if (event.type === 'turn.failed') {
+        state.failure = 'turn.failed';
+        markError();
+        const error = asRecord(event.payload);
+        const inner = asRecord(error?.error);
+        const message = textOf(inner?.message).trim() || textOf(event.message).trim() || 'turn failed';
+        const detail = typeof inner?.detail === 'string' && inner.detail.trim() ? `${message} (${inner.detail.trim()})` : message;
+        noteFailure(state, detail);
+        return [record('log', detail)];
+      }
+      return [];
+    }
     case 'qodercli': return acceptQoder(state, event, markError);
   }
 }

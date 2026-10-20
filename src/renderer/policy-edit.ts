@@ -126,3 +126,41 @@ export function roleDeleteImpact(config: Config, section: RoleSection, id: strin
   }
   return { title: `删除父 Agent ${id}`, detail: '只从草稿移除这条父 Agent，子 Agent 配置保留。取消不改草稿。' };
 }
+
+/** A whole-number minutes field: empty, fractional or out-of-range input is refused with one sentence, and nothing is saved. */
+export function minutesError(value: number | null, min: number, max: number): string {
+  return value === null || !Number.isInteger(value) || value < min || value > max ? `请输入 ${min} 到 ${max} 之间的整数。` : '';
+}
+
+/** The setting group the web UI shows time in: `display.timezone` is an IANA zone name, absent or empty to follow the browser. */
+export type DisplaySettings = NonNullable<Config['display']>;
+export type SettingsPatch = Partial<Config>;
+
+/** The saved project time zone, or undefined to follow the browser. */
+export function displayTimeZone(config: object | undefined): string | undefined {
+  const value = (config as { display?: { timezone?: unknown } } | undefined)?.display?.timezone;
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+/** `display` after setting or clearing the zone. Clearing drops the key; other display fields stay, and an empty group disappears. */
+export function displayWithTimeZone(config: object, zone: string | undefined): DisplaySettings | undefined {
+  const { timezone: _previous, ...rest } = (config as { display?: DisplaySettings }).display ?? {};
+  const next: DisplaySettings = zone ? { ...rest, timezone: zone } : rest;
+  return Object.keys(next).length ? next : undefined;
+}
+
+/** A failed save in the words under the field it belongs to: the server's message without its code prefix. */
+export function fieldErrorText(error: unknown): string {
+  const raw = typeof error === 'object' && error !== null && 'message' in error ? String((error as { message: unknown }).message) : String(error);
+  const text = raw.replace(/^Error: /, '').replace(/^[A-Z][A-Z_0-9]+:\s*/, '').trim();
+  const zone = /^\$\.display\.timezone: timezone (.+?) is not an IANA timezone name/.exec(text);
+  if (zone) return `「${zone[1]}」不是有效的 IANA 时区名，例如 Asia/Shanghai。`;
+  return text || '保存失败';
+}
+
+/** A rejected value names its field (`$.display.timezone: ...`) or carries the validation code: that message belongs under the field, not in a notice. */
+export function isFieldError(error: unknown): boolean {
+  const code = typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
+  const raw = typeof error === 'object' && error !== null && 'message' in error ? String((error as { message: unknown }).message) : String(error);
+  return code === 'VALIDATION' || /^(?:[A-Z][A-Z_0-9]+:\s*)?\$\./.test(raw.replace(/^Error: /, ''));
+}

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { formatDate } from '../log-view';
 import { CopyButton } from '@lobehub/ui';
 import { Descriptions, Text, Tooltip } from '@lobehub/ui/base-ui';
 import type { Task } from '../../shared/types';
-import { dispatchKind, ownerLabel, taskOwnerId } from '../task-view';
+import { dispatchKind, ownerHostName, ownerLabel, taskOwnerId } from '../task-view';
 import { AgentLabel } from './EngineIcon';
+import { TimeText } from './TimeText';
 import { factsStyles } from './agent-facts-style';
 import { styles } from '../style';
 
@@ -33,13 +33,14 @@ export function AgentFacts({ task, ownerKind, compact }: { task: Task; ownerKind
   }, [compact]);
   const dispatch = task.dispatch;
   const parent = <AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerLabel(task)} />;
-  if (compact) return <span className={styles.cardParent} aria-label={`父 Agent：${ownerLabel(task)}`} title={ownerLabel(task)}>{parent}</span>;
+  // A card shows the owner host only: the full instance name also carries the workspace and a session time, and stays in the tooltip.
+  if (compact) return <span className={styles.cardParent} aria-label={`父 Agent：${ownerHostName(task)}`} title={ownerLabel(task)}><AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerHostName(task)} /></span>;
   const workspace = dispatch?.workspace || task.workspace;
   const model = modelText(task);
   const first = [
     dispatch?.worker ? { key: 'worker', label: '子 Agent', children: <Tooltip title={dispatch.worker}><AgentLabel kind={dispatchKind(task)} name={dispatch.worker} /></Tooltip> } : undefined,
     model ? { key: 'model', label: '模型', children: <Text ellipsis={{ rows: 1, tooltip: model }}>{model}</Text> } : undefined,
-    { key: 'updated', label: '更新时间', children: <time title={formatDate(task.updatedAt)} dateTime={task.updatedAt}>{formatDate(task.updatedAt)}</time> },
+    { key: 'updated', label: '更新时间', children: <TimeText value={task.updatedAt} /> },
   ].filter(item => !!item);
   // The last item of a short first row takes the free columns so the second row always starts on a new line.
   const items = [

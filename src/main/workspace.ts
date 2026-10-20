@@ -1,11 +1,11 @@
-import { realpathSync, statSync } from 'node:fs';
-import { isAbsolute } from 'node:path';
+import { readdirSync, realpathSync, statSync } from 'node:fs';
+import { dirname, isAbsolute, join } from 'node:path';
 import type { TaskDispatch } from '../shared/types';
 import type { RealEngineKind } from './adapters/cli/index';
 export type { RealEngineKind } from './adapters/cli/index';
 
 /** Kinds with a real worker launcher. Claude Code stays deferred. */
-export const REAL_ENGINE_KINDS = ['opencode', 'pi', 'grok', 'codex', 'qodercli'] as const;
+export const REAL_ENGINE_KINDS = ['opencode', 'pi', 'grok', 'codex', 'qodercli', 'zcode'] as const;
 
 export function isRealEngineKind(kind: string): kind is RealEngineKind {
   return (REAL_ENGINE_KINDS as readonly string[]).includes(kind);
@@ -35,4 +35,14 @@ export function assertFrozenWorkspace(dispatch: TaskDispatch): void {
   if (path !== dispatch.workspace || (dispatch.workspaceIdentity && workspaceIdentity(path) !== dispatch.workspaceIdentity)) {
     throw new Error('Frozen workspace changed or was replaced; cancel this queued dispatch and create a new task for the intended directory.');
   }
+}
+
+/** Local trusted-user directory browser: names and paths only, never file contents. */
+export function listWorkspaceDirectories(raw?: unknown) {
+  const path = absoluteExistingWorkspace(raw === undefined ? process.cwd() : raw);
+  const entries = readdirSync(path, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+    .map(entry => ({ name: entry.name, path: join(path, entry.name) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { path, parent: dirname(path) === path ? null : dirname(path), directories: entries };
 }

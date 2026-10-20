@@ -6,7 +6,8 @@ import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { toast, type ToastOptions } from '@lobehub/ui/base-ui';
 import { ArtifactsPanel } from '../src/renderer/components/ArtifactsPanel';
-import { displayLog, formatDate } from '../src/renderer/log-view';
+import { displayLog } from '../src/renderer/log-view';
+import { compactTime, fullTime } from '../src/renderer/timezone';
 import { notifyError } from '../src/renderer/notify';
 import { readFileSync } from 'node:fs';
 import { transformSync } from 'esbuild';
@@ -34,9 +35,12 @@ test('known lifecycle labels translate without modifying unknown content or expo
   assert.equal(displayLog('custom message'), 'custom message');
   assert.equal(displayLog('token=abcdef'), 'token=[REDACTED]');
 });
-test('dates use one Chinese absolute format independent of machine locale', () => {
-  assert.match(formatDate('2026-10-19T12:05:00Z'), /^2026-10-19 \d{2}:05$/);
-  assert.equal(formatDate('invalid'), '时间未知');
+test('times use one compact format independent of machine locale', () => {
+  const now = Date.parse('2026-10-19T14:00:00Z');
+  assert.equal(compactTime('2026-10-19T12:05:00Z', now, 'UTC'), '12:05');
+  assert.equal(compactTime('2026-10-18T12:05:00Z', now, 'UTC'), '10-18 12:05');
+  assert.equal(compactTime('invalid', now, 'UTC'), '时间未知');
+  assert.equal(fullTime('invalid', 'UTC'), '时间未知');
 });
 test('not found error displays one Chinese message without raw duplicated codes', t => {
   const calls: ToastOptions[] = [];

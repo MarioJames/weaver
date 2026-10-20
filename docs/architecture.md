@@ -32,9 +32,9 @@ Weaver 是本地任务控制面，交付三件套：
           ├─ TaskManager ─ worker 子进程监督（SIGTERM→1.5s SIGKILL）
           │    ├─ MockWorkerAdapter（显式 mock-jsonl，bundled scripts/mock-worker.mjs）
           │    └─ RoutingWorkerAdapter → startCliAgent（src/main/adapters/cli）真实引擎（含 qodercli）
-          ├─ PolicyStore（policy.v1.json）+ 纯路由 policy/routing.ts
-          ├─ TaskStore（tasks.v1.json，fsync+rename 原子替换）
-          ├─ StallMonitor（src/main/stall.ts → stall.v1.json，60 秒一次采样/惩罚/恢复探测）
+          ├─ PolicyStore（weaver.db 的 policy_* 表）+ 纯路由 policy/routing.ts
+          ├─ TaskStore（weaver.db，SQLite 事务）
+          ├─ StallMonitor（src/main/stall.ts → weaver.db 的 stall_* 表，60 秒一次采样/惩罚/恢复探测）
           ├─ engines/{probe,control}.ts（PATH+--version 只读探测）
           ├─ engines/hello.ts（sayHi 最轻一次性调用：页面探测与惩罚恢复探测共用）
           ├─ owner-host.ts（Herdr 可见 owner 宿主，仅 owners.switch launch / owners.launch 显式调用）
@@ -47,15 +47,20 @@ Weaver 是本地任务控制面，交付三件套：
 
 ## 3. 单写权威与存储
 
-持久状态按写入者分成三个 JSON store，都在 `--data-dir` 下、0600、fsync + rename 原子替换。除此之外这个目录里只有认证用的 endpoint/control 文件、后台模式的 `server.log`、`agent-state/` 下每个 launch 私有的 job 临时目录以及 dev 模式的 Vite 缓存——它们都不是状态权威：
+全部持久状态只有一个权威：`--data-dir` 下的 `weaver.db`（SQLite，0600）。进程启动只认它，不读也不写任何 `*.v1.json`。目录里其余内容都不是状态权威：认证用的 endpoint/control 文件（`control.v1.json`）、后台模式的 `server.log`、`agent-state/` 下每个 launch 私有的提示词与厂商会话目录（保留，不回收）以及 dev 模式的 Vite 缓存。Agent 与用户读取状态一律经提示词 + CLI，不直接读文件或库。
 
-- `tasks.v1.json`：任务（含 events/artifacts/run/摘要）、owners 元数据、frozen packages、命令收据 revisions；原子快照 revision 单调递增。上限 32 MiB、200 tasks、200 owners、1000 packages、5000 receipts、每任务 500 events、每任务 20 artifacts（内容 ≤32,000 字符）。
-- `policy.v1.json`：验证过的 policy 配置 + blocks；上限 256 KiB、500 blocks；revision 乐观锁，保存整文档替换。`blocks` 是唯一的持久阻断来源，额度自动阻断（`by:"weaver-quota:<kind>"`）与卡住惩罚（`by:"weaver-stall"`）都写在这里，人工条目按来源保留。
-- `stall.v1.json`：StallMonitor 自有的惩罚阶梯与触发/探测记录，上限 256 KiB、全局 history 最近 50 条。结构是 `{version:1, engines:{<engineId>:{level, lastTriggerAt, needsAttention, blockedUntil, nextProbeAt, probeSuccesses, head}}, history:[…]}`：`blockedUntil`/`nextProbeAt` 是名义期限与下次探测时刻（epoch ms，不是策略 `release_at`），`probeSuccesses` 是 level 3 的连续成功数，`head` 是当初触发它的证据行；history 每条留 `engine`、`level`、`at`、`tasks`（至多 50 个完整任务 ID，并以 `taskCount` 保留实际涉及的任务总数）、触发时的 `stalledMinutes`，或探测结果 `probe:{ok, ms, error?}` 加所用 `model`/`effort`，或一条恢复 `message`；探测错误经脱敏并截到 200 字符（超长另加省略号）。重启后期限、连击与记录都接着用；文件损坏、超限，或 level/连击不在允许的整数范围、时间戳超出 Date 有效范围等语义校验失败，就整份忽略、记一行日志，阶梯从 0 重新开始——但策略里那条 stall block 还在，下一 tick 会按它把级别补到至少 1 并重新武装探测，不会静默放行。这个文件不由 CLI 直接写，只有监控器与手动解除会改它。
+- `weaver.db`：内置 `node:sqlite` DatabaseSync，WAL + synchronous=FULL，所有写者共用同一个连接与事务。结构由有序迁移步骤建立，`PRAGMA user_version` 记录已执行到哪一步（当前 6）：空库从 0 逐步升到最新，已是最新时为空操作，版本比本构建新则拒绝启动；后续结构变更只追加新步骤。
+  - 任务面（步骤 1、6）：`tasks` 保存主字段及不含 events/artifacts 的 JSON；`task_events`、`artifacts`（content 独立列）、`owners`、`packages`、`receipts`、`kv`（sequence）按访问模式分表；`vendor_limits`（engine、level、last_trigger_at）是供应商限流阶梯。命令 intent、spawn 前状态都先同步提交再产生进程效果。保留每任务 500 events、20 artifacts（内容 ≤32,000 字符）。流式输出只缓冲被改动任务，500ms 合并检查点；同步命令同时提交待落盘流式记录，失败回滚数据库及内存 sequence/缓冲。子 Agent 运行记录（task 的 `run.evidence`）登记 `promptPath`、仅 pi 引擎才有的 `sessionDir` 与从事件流解析出的厂商会话 ID（`vendorSessionId`，如 codex thread id、claude session id），`tasks get` 原样返回。
+  - 策略（步骤 2）：`policy_engines`、`policy_owners`、`policy_owner_workers`（owner 的子 Agent 顺序与权重）、`policy_workers`、`policy_settings`（`herdr`、`chatgpt_review`、`quota`、`free_channel_probe`、`display` 等按键一行）、`policy_blocks`，整体上限 256 KiB、500 blocks；`revision` 乐观锁，保存在单个事务里整体替换各表并追加一行 `policy_revisions`（修订号、时间、来源 `save`/`rollback:N`/`import`、完整快照），取代原来的 `.bak`/`pre-*` 备份文件；回滚把某修订的快照作为新修订写入，从不原地改写历史。`blocks` 是唯一的持久阻断来源，额度自动阻断（`by:"weaver-quota:<kind>"`）与卡住惩罚（`by:"weaver-stall"`）都写在这里，人工条目按来源保留。`display.timezone` 是可选 IANA 时区名，保存时按 Intl 校验。
+  - 惩罚（步骤 3）：`stall_penalties`（每引擎一行：level、lastTriggerAt、needsAttention、blockedUntil、nextProbeAt、probeSuccesses、head）与 `stall_history`（全局最近 50 条，每条 `engine`、`level`、`at` 与 JSON 明细：`tasks` 至多 50 个完整任务 ID 并以 `taskCount` 保留总数、触发时的 `stalledMinutes`，或探测结果 `probe:{ok, ms, error?}` 加 `model`/`effort`，或恢复 `message`；探测错误经脱敏并截到 200 字符）。`blockedUntil`/`nextProbeAt` 是名义期限与下次探测时刻（epoch ms，不是策略 `release_at`），`probeSuccesses` 是 level 3 的连续成功数。重启后期限、连击与记录接着用；某次读取的语义校验失败（level/连击超出整数范围、时间戳无效等）则整份忽略、记一行日志，阶梯从 0 重新开始——但策略里那条 stall block 还在，下一 tick 会按它把级别补到至少 1 并重新武装探测，不会静默放行。只有监控器与手动解除会改这些表。
+  - 免费渠道探测（步骤 4）：`free_probe_workers`（每个 free_channel 子 Agent 一行的梯度与未决问题）与 `free_probe_history`（最近 50 条探测记录）。
+  - 额度（步骤 5）：`quota_records`（每引擎最近一次观测）与 `quota_state`（凭据指纹、上次账号、下次请求时刻）。
+  - 读取入口都是 CLI：`tasks get/list`、`policy get`、`policy history`、`engines health/penalty`、`workers probe-status`、`quota get`。
+  - 旧 JSON 数据的一次性迁入不在产品内：产品里没有任何 JSON 自动导入；迁移由仓库外的单文件脚本在部署时手动对真实数据执行（目标库有数据即拒绝；在临时库构建并校验后原子替换；不改不删源 JSON）。回滚方式是停服务后移走 `weaver.db`，原 JSON 未被改动（需旧版本二进制读取）。
 
-额度观测不增加持久文件：`QuotaProber` 只读原生认证并通过三个固定非公开 HTTPS GET 获取数据，观测在内存保鲜 5 分钟、每 provider 请求间隔至少 60 秒；`quota get` 无网络，`quota refresh` 显式触发探测与自有 blocks 合并。`QuotaScheduler` 每分钟按已保存的 `quota.auto_refresh` / `quota.interval_minutes`（缺省开启、15 分钟，5–1440）检查一次，到期后对已启用且 `quota_refresh` 生效的引擎所属 kind 走同一探测与合并路径；进程启动后首轮至少等一个检查周期。`policy.blocks` 仍是唯一持久阻断来源；人工来源不被自动覆盖，遇到妨碍施加自动阻断的过期 foreign 唯一 key 返回原子冲突。请求/认证边界及错误语义见 [额度接口](agent-interface.md#31-原生账户额度)。
+额度观测：`QuotaProber` 只读原生认证并通过三个固定非公开 HTTPS GET 获取数据，观测保鲜 5 分钟（之后显示陈旧）、每 provider 请求间隔至少 60 秒，每次观测写入 `quota_records`，重启后可读；`quota get` 无网络，`quota refresh` 显式触发探测与自有 blocks 合并。`QuotaScheduler` 每分钟按已保存的 `quota.auto_refresh` / `quota.interval_minutes`（缺省开启、15 分钟，5–1440）检查一次，到期后对已启用且 `quota_refresh` 生效的引擎所属 kind 走同一探测与合并路径；进程启动后首轮至少等一个检查周期。`policy.blocks` 仍是唯一持久阻断来源；人工来源不被自动覆盖，遇到妨碍施加自动阻断的过期 foreign 唯一 key 返回原子冲突。请求/认证边界及错误语义见 [额度接口](agent-interface.md#31-原生账户额度)。
 
-写入模型均在 fsync + rename 原子替换内完成（`src/main/store.ts`），无 directory fsync；中断的写命令先以 durable intent（receipt 写入）暴露为 `COMMAND_INDETERMINATE`，要求用 `operations.get` 查收据并核对现状，不做自动重放。命令收据键为 `local-demo:<commandId>`，同键同参返回原响应、同键不同参拒绝 `IDEMPOTENCY_CONFLICT`。这不是 exactly-once 外部执行保证，也没有事务 outbox。
+写入模型均在 SQLite 事务内完成（`src/main/store.ts`）；中断的写命令先以 durable intent（receipt 写入）暴露为 `COMMAND_INDETERMINATE`，要求用 `operations.get` 查收据并核对现状，不做自动重放。命令收据键为 `local-demo:<commandId>`，同键同参返回原响应、同键不同参拒绝 `IDEMPOTENCY_CONFLICT`。这不是 exactly-once 外部执行保证，也没有事务 outbox。
 
 同步面只有拉取：`sync.status`（revision 比对）、`sync.snapshot`（受界摘要）、`tasks.events`（保留事件 ID 游标，过期 `CURSOR_EXPIRED`）。网页 `listTasks` 只返回最近 3 条事件及产物元数据（无正文），详情通过 `getTask(id)` 按需读取完整任务。renderer 失效通知只表示"revision 变了"，不是持久 push 流。
 
@@ -79,7 +84,7 @@ Weaver 是本地任务控制面，交付三件套：
 - 派发响应除任务快照外还带 `next`——父 Agent 照它做一步即可，不需要理解引擎：非 native（real/mock）和还没拿到容量的排队任务是 `{action:'wait', command:'weaver tasks wait --task-id <id>'}`；已 running 的 native 任务是 `{action:'run_subagent', model, effort, prompt, then}`，`prompt` 与真实 worker 拿到的角色指令逐字相同（`workerInstruction`），`then` 是回报命令 `weaver workers complete --task-id <id> --input report.json`。`tasks.get` 对 running 的 native 任务同样给出 `next`，所以 spawn 回复丢了也能找回那份指令。
 - pump 复核当前资格/容量/配额/pin/workspace：route 改变（含 kind 不符）、容量不足、workspace 失效或 launch 失败都会给 `task.queueReason`（有界 message，仅变化落盘），代码取 `waiting_for_capacity/policy_blocked/frozen_route_changed/workspace_changed/launch_blocked`。除供应商限流/额度阻断外，冻结路由不会被默默改派或跨引擎替换；`by:"weaver-vendor-limit"` 的生效阻断会让排队任务重新选择其他可用引擎，已失败尝试仍需显式重试。
 - 取消：queued 直接转 cancelled；running 先 `cancelling` 再等待本进程拥有的 worker 子进程退出（SIGTERM → 1.5s SIGKILL）。取消/文件损坏不删除已有 history 与事件。
-- `tasks.retry` 是单次自动派发：先完成路由、worker 能力、workspace、指令长度（≤16000）、任务数（<200）、包数（<1000）及冻结包存在性等全部预检，再按需取消原尝试并原子创建带 `retryOf` 的新任务与新冻结包。原任务有冻结包也会消耗一个新包。复制 owner/workspace/constraints 与冻结 scope/criteria，指令只加一份上次尝试与读取 git diff/部分产出的接续说明，再接链根的原始目标，避免逐代堆叠前缀；复用 `workers.spawn` 同一派发路径，直接返回任务、`next` 与非空的 `excludedEngines`。显式 mock 保持 mock，real 不回退 mock；写命令拒绝仍保留可回放收据。
+- `tasks.retry` 是单次自动派发：先完成路由、worker 能力、workspace、指令长度（≤16000）、冻结包存在性等全部预检，再按需取消原尝试并原子创建带 `retryOf` 的新任务与新冻结包。原任务有冻结包也会创建一个新包；不再受 JSON 存储的总数上限限制。复制 owner/workspace/constraints 与冻结 scope/criteria，指令只加一份上次尝试与读取 git diff/部分产出的接续说明，再接链根的原始目标，避免逐代堆叠前缀；复用 `workers.spawn` 同一派发路径，直接返回任务、`next` 与非空的 `excludedEngines`。显式 mock 保持 mock，real 不回退 mock；写命令拒绝仍保留可回放收据。
 
 ## 5. 真实 worker 执行（src/main/adapters/cli）
 
@@ -108,7 +113,7 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 - 手动解除（`engines unblock --engine <id>`）：清除所选引擎的全部 block（含人工、额度及 model 级），复位它的阶梯、期限与连击；history、配置、其他引擎和任务事件保留。自动恢复仍只删除监控器自己的 stall block。刚解除或刚恢复的引擎在同一次 tick 里不会被再次惩罚。用户单独删掉策略里的 stall block 会复位相应阶梯，不会替它清除其他来源。
 - 惩罚只暂停引擎的派发资格：从不取消任务、从不杀进程；running 的任务继续跑完并照常回报。
 
-监控器每 60 秒 tick 一次，并发 tick 合并成在途那一次；只在 ready 窗口内写状态，await 采样与 await 探测之后都重新确认窗口仍然开着。期限、连击与记录落 `stall.v1.json`（见 §3），重启后继续；`stop()` 中止在途探测并等当前 tick 收束，独立于服务 ready 回调也会阻止晚到的采样/探测写入，只有再次 `start()` 才恢复 tick。`taskHealth` 与引擎页/CLI 用的是**同一套**样本与分类器，不存在第二个判定者：`ended`（已完成/失败/取消，带最终 `taskStatus`）、`starting`（running real 尚无首个有效输出）、`stalled`（两条都满足）、`waiting_model`（静默 ≥5 分钟且 CPU 没有证明在忙，包含读不到的情况）、`working`（其余），非 running real 任务的 `silenceMs`/`cpuActive`/`cpuIdleMs` 保留为 `null` 而不是猜。`tasks.health`、`engines.health`、`engines.penalty`、`engines.unblock` 已接入同一 `CommandHandler`：health 返回不含 history 的摘要，penalty 返回单引擎完整保留记录，unblock 返回清理结果；缺监控器时返回 `CAPABILITY_UNAVAILABLE`。逐项命令语义见 [agent-interface](agent-interface.md#33-卡住健康与引擎惩罚命令)。
+监控器每 60 秒 tick 一次，并发 tick 合并成在途那一次；只在 ready 窗口内写状态，await 采样与 await 探测之后都重新确认窗口仍然开着。期限、连击与记录落 `weaver.db` 的 `stall_*` 表（见 §3），重启后继续；`stop()` 中止在途探测并等当前 tick 收束，独立于服务 ready 回调也会阻止晚到的采样/探测写入，只有再次 `start()` 才恢复 tick。`taskHealth` 与引擎页/CLI 用的是**同一套**样本与分类器，不存在第二个判定者：`ended`（已完成/失败/取消，带最终 `taskStatus`）、`starting`（running real 尚无首个有效输出）、`stalled`（两条都满足）、`waiting_model`（静默 ≥5 分钟且 CPU 没有证明在忙，包含读不到的情况）、`working`（其余），非 running real 任务的 `silenceMs`/`cpuActive`/`cpuIdleMs` 保留为 `null` 而不是猜。`tasks.health`、`engines.health`、`engines.penalty`、`engines.unblock` 已接入同一 `CommandHandler`：health 返回不含 history 的摘要，penalty 返回单引擎完整保留记录，unblock 返回清理结果；缺监控器时返回 `CAPABILITY_UNAVAILABLE`。逐项命令语义见 [agent-interface](agent-interface.md#33-卡住健康与引擎惩罚命令)。
 
 ## 7. Owner 手动上下文与结果（ContinuationService）
 

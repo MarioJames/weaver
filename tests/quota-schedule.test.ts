@@ -53,7 +53,7 @@ function exhausted(engine: QuotaEngine): EngineQuotaRecord {
 test('an engine that does not refresh quota is never auto-blocked', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'wv-qs-'));
   try {
-    const policy = new PolicyStore(join(dir, 'policy.json'), () => now);
+    const policy = new PolicyStore(join(dir,'weaver.db'), () => now);
     const current = policy.snapshot();
     current.config.engines.codex.quota_refresh = false;
     current.config.engines.codex_alias = { enabled: false, kind: 'codex' };

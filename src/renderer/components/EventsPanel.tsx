@@ -1,4 +1,3 @@
-import { formatDate } from '../log-view';
 import { notifyError } from '../notify';
 import { NamedSelect } from './NamedControls';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -11,6 +10,8 @@ import { condenseEvents, displayLog, eventBadge, exportEvents, filterCondensed, 
 import { styles } from '../style';
 import { styles as eventStyles } from './events-style';
 import { TaskTextBlock } from './TaskTextBlock';
+import { TimeText } from './TimeText';
+import { compactTime, fullTime, useProjectTimeZone } from '../timezone';
 
 interface EventPage { events: TaskEvent[]; nextCursor: string | null; hasMore: boolean }
 const kinds = ['all', 'lifecycle', 'log', 'progress', 'artifact', 'result', 'error'];
@@ -23,18 +24,20 @@ function readMode(): Mode {
   try { return localStorage.getItem(MODE_KEY) === 'all' ? 'all' : 'condensed'; } catch { return 'condensed'; }
 }
 function saveMode(mode: Mode) { try { localStorage.setItem(MODE_KEY, mode); } catch {} }
-function timeLabel(at: string) { return formatDate(at); }
+
+function timeLabel(at: string) { return compactTime(at); }
 
 /** Relative time, right aligned, with the absolute time in a tooltip. */
 function RelativeTime({ at }: { at: string }) {
-  return <Tooltip title={formatDate(at)}>
+  const zone = useProjectTimeZone();
+  return <Tooltip title={fullTime(at, zone)}>
     <time className={eventStyles.time} dateTime={at}>{relativeTime(at)}</time>
   </Tooltip>;
 }
 
 function EventRow({ event }: { event: TaskEvent }) {
   return <div className={eventStyles.rawRow}>
-    <time className={eventStyles.rawTime} dateTime={event.at}>{timeLabel(event.at)}</time>
+    <TimeText className={eventStyles.rawTime} value={event.at} />
     <Tag size="small" className={eventStyles.tag}>{kindLabels[event.kind]}</Tag>
     <Text className={styles.wrap} type={event.kind === 'error' ? 'danger' : 'secondary'}>{displayLog(event.message)}</Text>
   </div>;

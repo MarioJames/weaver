@@ -75,7 +75,7 @@ export function OwnerInspector({ task, busy, action, owners, now = Date.now() }:
   const due = !blocked && interval !== null && idleMinutes >= interval;
   const owner = ownerLabel(task);
   const kind = profiles.find(item => item.id === currentProfile(task, profiles))?.kind;
-  const blockedReason = blocked ? '子 Agent 执行中，完成或取消后再接续。'
+  const blockedReason = blocked ? `${task.executionRole === 'owner' ? '父 Agent' : '子 Agent'} 执行中，完成或取消后再接续。`
     : !task.ownerId ? '任务尚未登记父 Agent，无法接续。'
       : profiles.length === 0 ? '父 Agent 配置里还没有启用的父 Agent。' : '';
 
@@ -105,7 +105,7 @@ export function OwnerInspector({ task, busy, action, owners, now = Date.now() }:
       <span className={styles.lead}>
         <EngineIcon kind={kind} size={16} />
         <Text className={styles.owner}>{owner}</Text>
-        {blocked ? <Tag size="small">子 Agent 执行中，暂不可接续</Tag>
+        {blocked ? <Tag size="small">{task.executionRole === 'owner' ? '父 Agent' : '子 Agent'} 执行中，暂不可接续</Tag>
           : due ? <Tag size="small" color="warning">{`已空闲 ${idleMinutes} 分钟，建议接续`}</Tag>
             : <Tag size="small" color="success">可接续</Tag>}
       </span>

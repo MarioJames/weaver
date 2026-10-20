@@ -41,6 +41,36 @@
         }
       }
     },
+    "free_channel_probe": {
+      "description": "Scheduled live probing of free_channel workers. Missing means enabled every 10 minutes. A probe failure applies the stall ladder; an exhausted free quota blocks that worker until the vendor reset time or a passing probe.",
+      "type": "object",
+      "required": [
+        "enabled",
+        "interval_minutes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "interval_minutes": {
+          "description": "Minutes between scheduled free-channel probe rounds, 5-1440 (range enforced by policy validation).",
+          "type": "integer",
+          "minimum": 5
+        }
+      }
+    },
+    "display": {
+      "description": "Rendering preferences. Missing or empty fields follow the browser.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timezone": {
+          "description": "IANA timezone name (for example Asia/Shanghai) used to render dates in the UI; empty or missing follows the browser. Validated against Intl by the script.",
+          "type": "string"
+        }
+      }
+    },
     "engines": {
       "description": "Agent CLI engines keyed by engine id.",
       "type": "object",
@@ -137,7 +167,8 @@
             "qwen",
             "letta",
             "maki",
-            "muse"
+            "muse",
+            "zcode"
           ]
         },
         "quota_refresh": {
@@ -195,6 +226,10 @@
             "type": "integer",
             "minimum": 0
           }
+        },
+        "proxy": {
+          "type": "string",
+          "description": "inherit (default), direct, or an HTTP(S) proxy URL without credentials."
         }
       }
     },
@@ -223,6 +258,14 @@
         },
         "description": {
           "type": "string"
+        },
+        "proxy": {
+          "type": "string",
+          "description": "inherit (default), direct, or an HTTP(S) proxy URL without credentials."
+        },
+        "free_channel": {
+          "type": "boolean",
+          "description": "Explicit free route; ignores native account quota blocks only. Manual and vendor limits still apply."
         }
       }
     }

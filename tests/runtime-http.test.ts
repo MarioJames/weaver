@@ -1,10 +1,11 @@
+import { TaskStore } from '../src/main/store';
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { promisify } from 'node:util';
 import { connect, createServer } from 'node:net';
 import { request } from 'node:http';
-import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -151,8 +152,9 @@ test('HTTP guards reject unsafe requests before any task state exists', async t 
     assert.equal(rawEscape.status, 404);
     assert.equal(rawEscape.text.includes('SECRET-TOKEN'), false);
 
-    assert.equal(await readFile(join(dataDir, 'tasks.v1.json'), 'utf8').then(() => true, () => false), false);
-    assert.equal(await readFile(join(dataDir, 'policy.v1.json'), 'utf8').then(() => true, () => false), false);
+    const files = await readdir(dataDir);
+    assert.ok(files.includes('weaver.db'), 'all persistence is in weaver.db');
+    assert.deepEqual(files.filter(name => /\.v1\.json/.test(name) && name !== 'control.v1.json'), [], 'no other *.v1.json is read or written');
 
     const page = await httpCall(port, { path: '/', headers: { host: `127.0.0.1:${port}` } });
     assert.equal(page.status, 200);
@@ -167,7 +169,7 @@ test('HTTP guards reject unsafe requests before any task state exists', async t 
     const caps = await post(rpcHeaders(port), JSON.stringify({ method: 'capabilities', args: [] }));
     assert.equal(caps.status, 200);
     assert.equal(caps.json.result.worker.includes('mock'), true);
-    assert.equal(caps.json.result.storePath, join(dataDir, 'tasks.v1.json'));
+    assert.equal(caps.json.result.storePath, join(dataDir, 'weaver.db'));
 
     const unknown = await post(rpcHeaders(port), JSON.stringify({ method: 'importTask', args: [] }));
     assert.equal(unknown.status, 400);
@@ -196,7 +198,7 @@ test('HTTP guards reject unsafe requests before any task state exists', async t 
 
 test('second web invocation does not open or recover live task state', async t => {
   const dataDir = await mkdtemp(join(tmpdir(), 'wv-lock-'));
-  const taskPath = join(dataDir, 'tasks.v1.json');
+  const taskPath = join(dataDir,'weaver.db');
   await writeFile(taskPath, '{');
   let lock: Awaited<ReturnType<typeof startLocalIPC>> | undefined;
   try {
@@ -209,7 +211,7 @@ test('second web invocation does not open or recover live task state', async t =
 
 test('failed HTTP bind releases only this attempt', async t => {
   const dataDir = await mkdtemp(join(tmpdir(), 'wv-bind-'));
-  const taskPath = join(dataDir, 'tasks.v1.json');
+  const taskPath = join(dataDir,'weaver.db');
   await writeFile(taskPath, '{');
   const held = await listenPort();
   try {
@@ -238,14 +240,14 @@ test('weaver web reports bind and damaged-store failures', async t => {
     assert.match(busy.json.error.message, /--port/);
     assert.equal(Object.hasOwn(busy.json.error, 'stack'), false);
     await assert.rejects(readFile(join(dataDir, 'control.v1.json'), 'utf8'));
-    const taskPath = join(dataDir, 'tasks.v1.json');
-    await writeFile(taskPath, '{');
+    const taskPath = join(dataDir, 'weaver.db');
+    await writeFile(taskPath, 'this is not a database file at all, just text');
     const damaged = await cli(dataDir, ['web', '--no-open', '--port', '0']);
     assert.equal(damaged.status, 1, damaged.stdout + damaged.stderr);
     assert.equal(damaged.stdout.trim().split('\n').length, 1);
     assert.notEqual(damaged.json.error.code, 'CLI_ERROR');
-    assert.match(damaged.json.error.message, /JSON|damaged|Unsupported/);
-    assert.equal(await readFile(taskPath, 'utf8'), '{');
+    assert.match(damaged.json.error.message, /SQLite|not a database|damaged|Unsupported/);
+    assert.equal(await readFile(taskPath, 'utf8'), 'this is not a database file at all, just text', 'the damaged database is retained untouched');
     await assert.rejects(readFile(join(dataDir, 'control.v1.json'), 'utf8'));
   } finally { await held.close(); await rm(dataDir, { recursive: true, force: true }); }
 });
@@ -339,8 +341,8 @@ test('shutdown and restart keep task history', { timeout: 20_000 }, async t => {
     const exit = await new Promise<number | null>(resolve => child.once('exit', code => resolve(code)));
     assert.equal(exit === 0 || exit === null, true);
     await assert.rejects(readFile(join(dataDir, 'control.v1.json'), 'utf8'));
-    const saved = JSON.parse(await readFile(join(dataDir, 'tasks.v1.json'), 'utf8'));
-    assert.equal(saved.tasks.length, 1);
+    const saved = new TaskStore(join(dataDir,'weaver.db'));
+    assert.equal(saved.list().length, 1);saved.close();
     const restarted = await boot(t, dataDir);
     if (!restarted) return;
     try {
@@ -415,8 +417,8 @@ test('a rejected engine enable leaves the server and policy usable', async t => 
   try {
     const before = await httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'getPolicy', args: [] }) });
     assert.equal(before.status, 200, before.text);
-    let beforeBytes: string | undefined;
-    try { beforeBytes = await readFile(join(dataDir, 'policy.v1.json'), 'utf8'); } catch { beforeBytes = undefined; }
+    const history = async () => (await httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'policyHistory', args: [] }) })).json.result;
+    const beforeHistory = await history();
     const rejected = await httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'setEngineEnabled', args: [{ id: 'claude', enabled: true, revision: before.json.result.revision + 999 }] }) });
     assert.notEqual(rejected.status, 200);
     assert.equal(rejected.json.error.code.length > 0, true);
@@ -428,9 +430,7 @@ test('a rejected engine enable leaves the server and policy usable', async t => 
     assert.equal(after.status, 200, after.text);
     assert.equal(after.json.result.revision, before.json.result.revision);
     assert.deepEqual(after.json.result.config, before.json.result.config);
-    let afterBytes: string | undefined;
-    try { afterBytes = await readFile(join(dataDir, 'policy.v1.json'), 'utf8'); } catch { afterBytes = undefined; }
-    assert.equal(afterBytes, beforeBytes);
+    assert.deepEqual(await history(), beforeHistory, 'a rejected enable records no policy revision');
   } finally {
     process.off('unhandledRejection', onUnhandled);
     await runtime.close();
@@ -557,4 +557,56 @@ test('HTTP startup timeout begins after origin and complete RPC validation and r
   timeout.mock.resetCalls();const response=await httpCall(server.port,{method:'POST',path:'/api/rpc',headers:rpcHeaders(server.port),body:JSON.stringify({method:'command',args:[launch]})});
   assert.equal(response.status,200);const timeouts=timeout.mock.calls.map(call=>call.arguments[0]);assert.ok(timeouts.includes(210000));assert.ok(timeouts.lastIndexOf(15000)>timeouts.indexOf(210000));
  }finally{await server.close();}
+});
+
+test('listEngineModels is a one-argument read RPC: valid input lists, malformed input is INVALID_REQUEST', async t => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'wv-models-'));
+  const runtime = await boot(t, dataDir);
+  if (!runtime) { await rm(dataDir, { recursive: true, force: true }); return; }
+  const call = (args: unknown[]) => httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'listEngineModels', args }) });
+  try {
+    const listed = await call([{ engine: 'claude' }]);
+    assert.equal(listed.status, 200, listed.text);
+    assert.equal(listed.json.result.engine, 'claude');
+    assert.equal(listed.json.result.status, 'ok');
+    assert.ok(listed.json.result.models.some((model: { id: string }) => model.id === 'sonnet'));
+    for (const bad of [[], [{ engine: 'not-an-engine' }], [{ engine: 'claude', surprise: true }], [{ engine: 'claude', refresh: 'yes' }], ['claude'], [{ engine: 'claude' }, 'extra']]) {
+      const rejected = await call(bad);
+      assert.equal(rejected.status, 400, JSON.stringify(bad));
+      assert.equal(rejected.json.error.code, 'INVALID_REQUEST', JSON.stringify(bad));
+    }
+  } finally { await runtime.close(); await rm(dataDir, { recursive: true, force: true }); }
+  const client = await readFile(new URL('../src/renderer/client.ts', import.meta.url), 'utf8');
+  assert.match(client, /METHOD_DEADLINE_MS[^\n]*listEngineModels: 40_000/, 'the renderer waits up to 40 seconds for a model list');
+  assert.match(client, /listEngineModels: input => call\('listEngineModels', \[input\]\)/);
+});
+
+test('policy saves are numbered revisions over RPC: history lists them, rollback is a new revision, a stale save is a 409 conflict', async t => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'wv-revisions-'));
+  const runtime = await boot(t, dataDir);
+  if (!runtime) { await rm(dataDir, { recursive: true, force: true }); return; }
+  const call = (method: string, args: unknown[]) => httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method, args }) });
+  try {
+    const first = (await call('getPolicy', [])).json.result;
+    assert.equal(first.revision, 0);
+    const config = structuredClone(first.config);
+    config.display = { timezone: 'Asia/Shanghai' };
+    const saved = await call('savePolicy', [{ revision: 0, config, blocks: [] }]);
+    assert.equal(saved.status, 200, saved.text);
+    assert.equal(saved.json.result.revision, 1);
+    const stale = await call('savePolicy', [{ revision: 0, config, blocks: [] }]);
+    assert.equal(stale.status, 409);
+    assert.equal(stale.json.error.code, 'REVISION_CONFLICT');
+    config.display = { timezone: 'Not/AZone' };
+    const bad = await call('savePolicy', [{ revision: 1, config, blocks: [] }]);
+    assert.equal(bad.status, 400);
+    assert.match(bad.json.error.message, /\$\.display\.timezone/);
+    assert.deepEqual((await call('policyHistory', [])).json.result.revisions.map((item: { revision: number; source: string }) => [item.revision, item.source]), [[1, 'save']]);
+    const rolled = await call('policyRollback', [{ revision: 1 }]);
+    assert.equal(rolled.json.result.revision, 2);
+    assert.deepEqual((await call('policyHistory', [])).json.result.revisions.map((item: { revision: number; source: string }) => [item.revision, item.source]), [[2, 'rollback:1'], [1, 'save']]);
+    assert.equal((await call('policyRollback', [{ revision: 77 }])).status, 400);
+    const files = await readdir(dataDir);
+    assert.deepEqual(files.filter(name => /\.v1\.json|\.bak|pre-weight/.test(name) && name !== 'control.v1.json'), [], 'no backup or JSON policy files');
+  } finally { await runtime.close(); await rm(dataDir, { recursive: true, force: true }); }
 });

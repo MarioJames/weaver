@@ -32,6 +32,19 @@ function nativeFieldLinks(html: string, names: string[], instances = 1) {
   assert.equal(new Set(ids).size, ids.length, 'rendered control ids must be unique');
 }
 
+/** The model field is one combobox (AutoComplete): its native input carries the id the visible Form label targets. */
+function comboboxLinks(html: string, name: string, instances = 1) {
+  const controls = [...html.matchAll(/<input\b[^>]*role="combobox"[^>]*>/g)].map(([tag]) => tag);
+  assert.equal(controls.length, instances, `${name}: exactly one combobox per field`);
+  const labels = [...html.matchAll(/<label\b([^>]*)>([\s\S]*?)<\/label>/g)];
+  for (const control of controls) {
+    const id = control.match(/\bid="([^"]+)"/)?.[1];
+    assert.ok(id, `${name}: combobox needs an id`);
+    const linked = labels.filter(([, attributes, content]) => attributes.includes(`for="${id}"`) && content.replace(/<[^>]*>/g, '').includes(name));
+    assert.equal(linked.length, 1, `${name}: exactly one visible label must target the combobox`);
+  }
+}
+
 function roles() {
   const config = defaultConfig();
   config.workers = { opencode_worker: config.workers.opencode_worker };
@@ -39,13 +52,36 @@ function roles() {
 }
 
 function composer() {
-  return React.createElement(TaskComposer, { disabled: false, draft: { title: '', goal: '', workspace: '.', profile: '', acceptance: '' }, onDraft: () => {}, onCreate: async () => true, onImport: () => {} });
+  return React.createElement(TaskComposer, { disabled: false, draft: { goal: '', workspace: '', profile: '' }, onDraft: () => {}, onCreate: async () => true });
 }
 
 test('role native inputs have visible label links, including config id and freeform effort', () => {
-  nativeFieldLinks(markup(React.createElement(React.Fragment, null, roles(), roles())), ['配置 ID', '模型', '推理强度', '用途说明'], 2);
+  const html = markup(React.createElement(React.Fragment, null, roles(), roles()));
+  nativeFieldLinks(html, ['配置 ID', '推理强度', '用途说明'], 2);
+  comboboxLinks(html, '模型', 2);
+  // One control per model field: no separate picker select next to the text input.
+  assert.equal((html.match(/aria-label="模型列表"/g) ?? []).length, 0);
 });
 
 test('task native input and textareas have visible label links even with workspace validation shown', () => {
-  nativeFieldLinks(markup(React.createElement(React.Fragment, null, composer(), composer())), ['任务标题', '目标与约束', '目标项目目录', '验收标准'], 2);
+  nativeFieldLinks(markup(React.createElement(React.Fragment, null, composer(), composer())), ['目标与约束'], 2);
+});
+
+test('the model field is one input with suggestions: typing narrows, a complete name offers the whole list again', async () => {
+  const { matchModel } = await import('../src/renderer/engine-models');
+  const { ModelPicker } = await import('../src/renderer/components/ModelPicker');
+  const options = [{ value: 'gpt-5', label: 'gpt-5 · GPT-5' }, { value: 'gpt-5-mini' }, { value: 'claude-opus-4-1', label: 'claude-opus-4-1 · Claude Opus 4.1' }];
+  const shown = (query: string) => options.filter(item => matchModel(options, query, item)).map(item => item.value);
+  assert.deepEqual(shown(''), ['gpt-5', 'gpt-5-mini', 'claude-opus-4-1']);
+  assert.deepEqual(shown('mini'), ['gpt-5-mini']);
+  assert.deepEqual(shown('OPUS'), ['claude-opus-4-1']);
+  assert.deepEqual(shown('no-such-model'), []);
+  assert.deepEqual(shown('Claude Opus 4.1'), ['claude-opus-4-1']);
+  assert.deepEqual(shown('gpt-5'), ['gpt-5', 'gpt-5-mini', 'claude-opus-4-1']);
+  const html = markup(React.createElement(ModelPicker, { engine: 'claude', value: '', onChange: () => {}, label: 'claude 探测模型' }));
+  assert.equal((html.match(/role="combobox"/g) ?? []).length, 1);
+  assert.equal((html.match(/<input\b[^>]*aria-hidden="true"/g) ?? []).length, 1, 'only the library\'s own hidden form input besides the visible one');
+  assert.match(html, /<label[^>]*>claude 探测模型<\/label>/);
+  assert.match(html, /aria-label="刷新 claude 模型列表"/);
+  assert.doesNotMatch(html, /模型列表"[^>]*role="combobox"|从引擎的模型列表选择|选中后填入上方输入框/);
 });

@@ -1,7 +1,6 @@
 import { execFile } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { object } from '../shared/validation';
 import type { Config, PolicySnapshot } from '../shared/policy';
 import type { Task } from '../shared/types';
@@ -23,16 +22,14 @@ export const PROBE_SUCCESSES = 3;
 export const LADDER_RESET_MS = 2 * 60 * 60_000;
 export const STALL_TICK_MS = 60_000;
 export const STALL_BLOCK_BY = 'weaver-stall';
-export const STALL_FILE = 'stall.v1.json';
 /** What the retained record says when level 3 recovered without a human. */
 export const STALL_RECOVERY = '自动恢复，请留意';
 const HISTORY_LIMIT = 50;
 /** How many of a trigger's task ids the record keeps: the count stays whole, the ids are bounded. */
 const RECORD_TASKS_MAX = 50;
-const STATE_LIMIT = 256 * 1024;
 const PROBE_ERROR_MAX = 200;
-const NO_WORKER = '这台引擎没有可用的工作代理，无法探测。';
-const NO_HEAD = `${STALL_QUORUM} 个工作代理超过 ${STALL_MS / 60_000} 分钟无响应`;
+const NO_WORKER = '这台引擎没有可用的子 Agent，无法探测。';
+const NO_HEAD = `${STALL_QUORUM} 个子 Agent 超过 ${STALL_MS / 60_000} 分钟无响应`;
 /** 60s samples, enough to cover the stall window and the ladder's shortest penalty. */
 const SAMPLE_LIMIT = 12;
 const NS_PER_MS = 1_000_000;
@@ -96,7 +93,7 @@ export interface StallStatus {
 /** What a running worker looks like from the outside: the monitor's own samples, no second classifier. */
 export interface TaskHealth {
   taskId: string;
-  state: 'ended' | 'starting' | 'working' | 'waiting_model' | 'stalled';
+  state: 'ended' | 'starting' | 'working' | 'waiting_model' | 'stalled' | 'owner_starting' | 'owner_running';
   taskStatus: Task['status'];
   engine: string | null;
   lastEventAt: string | null;
@@ -104,6 +101,8 @@ export interface TaskHealth {
   cpuActive: boolean | null;
   cpuIdleMs: number | null;
   scopeUnit: string | null;
+  /** Owner roots only: how their sub-agents stand. */
+  children?: { total: number; running: number; completed: number };
 }
 
 /** The main-process policy writer, narrowed to what a penalty needs. */
@@ -128,11 +127,11 @@ function arm(level: number, now: number): Pick<EnginePenalty, 'blockedUntil' | '
 
 function reasonFor(head: string): string {
   // Recovery timing and task evidence have their own status fields and history.
-  return head.replace(/（task .*$/, '').replace(/工作代理/g, '子 Agent ').slice(0, 120);
+  return head.replace(/（task .*$/, '').slice(0, 120);
 }
 
 /** A vendor message is evidence, not a log file: credentials are stripped, then one bounded line, never the argv. */
-function boundedProbeError(value: string): string {
+export function boundedProbeError(value: string): string {
   const line = redactContext(value).replace(/\s+/g, ' ').trim();
   return line.length > PROBE_ERROR_MAX ? `${line.slice(0, PROBE_ERROR_MAX)}…` : line;
 }
@@ -197,7 +196,7 @@ export function nextPenalty(state: StallState, engine: string, now: number, stal
   if (pending(penalty)) return null;
   const level = Math.min((penalty.lastTriggerAt !== null && now - penalty.lastTriggerAt >= LADDER_RESET_MS ? 0 : penalty.level) + 1, STALL_LADDER.length);
   const ids = stalled.slice(0, 4).map(task => task.id.slice(0, 8));
-  const head = `${stalled.length} 个工作代理超过 ${STALL_MS / 60_000} 分钟无响应（task ${ids.join('、')}）`;
+  const head = `${stalled.length} 个子 Agent 超过 ${STALL_MS / 60_000} 分钟无响应（task ${ids.join('、')}）`;
   // No release_at: only a passing probe or the user lifts this block.
   return { level, head, block: { engine, reason: reasonFor(head), since: new Date(now).toISOString(), by: STALL_BLOCK_BY } };
 }
@@ -289,36 +288,56 @@ export function parseStallState(value: unknown): StallState {
   return { engines, history: data.history.map(parseRecord) };
 }
 
-/** Private, atomically replaced like the other data-dir stores. A damaged file starts the ladder over. */
-export function loadStallState(path: string, log: (message: string) => void): StallState {
-  if (!existsSync(path)) return emptyState();
-  try {
-    if (statSync(path).size > STATE_LIMIT) throw new Error('Stall store exceeds its size limit');
-    return parseStallState(JSON.parse(readFileSync(path, 'utf8')));
-  } catch (error) {
-    log(`Stall state ignored: ${error instanceof Error ? error.message : 'unreadable'}`);
-    return emptyState();
-  }
-}
+/** Where the monitor keeps its ladder and history: the weaver.db tables. */
+export interface StallStateStore { load(): StallState; save(state: StallState): void }
 
-export function saveStallState(path: string, state: StallState): void {
-  mkdirSync(dirname(path), { recursive: true });
-  const temp = `${path}.${randomUUID()}.tmp`;
-  try {
-    writeFileSync(temp, JSON.stringify({ version: 1, ...state }, null, 2), { mode: 0o600, flag: 'wx' });
-    const fd = openSync(temp, 'r');
-    try { fsyncSync(fd); } finally { closeSync(fd); }
-    renameSync(temp, path);
-  } finally {
-    if (existsSync(temp)) unlinkSync(temp);
-  }
+/** Same rows the migration script fills: penalties per engine, history bounded like the file kept it. */
+export function dbStallStore(db: import('node:sqlite').DatabaseSync, log: (message: string) => void = message => console.error(message)): StallStateStore {
+  return {
+    load(): StallState {
+      const engines: Record<string, EnginePenalty> = {};
+      for (const row of db.prepare('SELECT * FROM stall_penalties').all() as Record<string, unknown>[]) {
+        engines[String(row.engine)] = {
+          level: Number(row.level),
+          lastTriggerAt: row.last_trigger_at === null || row.last_trigger_at === undefined ? null : Number(row.last_trigger_at),
+          needsAttention: Number(row.needs_attention) === 1,
+          blockedUntil: row.blocked_until === null || row.blocked_until === undefined ? null : Number(row.blocked_until),
+          nextProbeAt: row.next_probe_at === null || row.next_probe_at === undefined ? null : Number(row.next_probe_at),
+          probeSuccesses: Number(row.probe_successes),
+          head: String(row.head ?? ''),
+        };
+      }
+      const history = (db.prepare('SELECT body FROM stall_history ORDER BY id').all() as Record<string, unknown>[])
+        .map(row => JSON.parse(String(row.body)) as StallRecord);
+      try { return parseStallState({ version: 1, engines, history }); }
+      catch (error) {
+        log(`Stall state ignored: ${error instanceof Error ? error.message : 'unreadable'}`);
+        return emptyState();
+      }
+    },
+    save(state: StallState): void {
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.exec('DELETE FROM stall_penalties');
+        const insertPenalty = db.prepare('INSERT INTO stall_penalties(engine,level,last_trigger_at,needs_attention,blocked_until,next_probe_at,probe_successes,head) VALUES (?,?,?,?,?,?,?,?)');
+        for (const [engine, penalty] of Object.entries(state.engines)) {
+          insertPenalty.run(engine, penalty.level, penalty.lastTriggerAt, penalty.needsAttention ? 1 : 0, penalty.blockedUntil, penalty.nextProbeAt, penalty.probeSuccesses, penalty.head);
+        }
+        db.exec('DELETE FROM stall_history');
+        const insertRecord = db.prepare('INSERT INTO stall_history(engine,level,at,body) VALUES (?,?,?,?)');
+        for (const record of state.history) insertRecord.run(record.engine, record.level, record.at, JSON.stringify(record));
+        db.exec('COMMIT');
+      } catch (error) { try { db.exec('ROLLBACK'); } catch { /* SQLite may already have rolled back. */ } throw error; }
+    },
+  };
 }
 
 export interface StallMonitorOptions {
   /** Live task list, newest first, same order the RPC returns. */
   tasks: () => Task[];
   policy: () => StallPolicy;
-  statePath: string;
+  /** weaver.db-backed state, so restarts keep the ladder and history. */
+  stateStore: StallStateStore;
   cpu?: CpuReader;
   /** The engine's own light greeting. Without it nothing is probed and only the user can lift a penalty. */
   probe?: RecoveryProbe;
@@ -353,12 +372,14 @@ export class StallMonitor {
   private stopped = false;
   /** Bumped by stop(). Work that awaited past it sees a different value and writes nothing at all. */
   private fence = 0;
+  private readonly store: StallStateStore;
 
   constructor(private readonly options: StallMonitorOptions) {
     this.clock = options.now ?? Date.now;
     this.readCpu = options.cpu ?? systemdCpuUsage;
     this.log = options.log ?? (message => console.error(message));
-    this.state = loadStallState(options.statePath, this.log);
+    this.store = options.stateStore;
+    this.state = this.store.load();
   }
 
   status(): StallStatus {
@@ -386,6 +407,29 @@ export class StallMonitor {
 
   /** The engines page and the CLI read the same silence and idle samples the monitor judged the penalty with. */
   taskHealth(task: Task): TaskHealth {
+    // An owner root has no worker process of its own and never counts as stalled: the owner host is its answer.
+    if (task.executionRole === 'owner') {
+      const children = this.options.tasks().filter(child => child.parentTaskId === task.id);
+      const state: TaskHealth['state'] = ['completed', 'failed', 'cancelled'].includes(task.status)
+        ? 'ended'
+        : task.ownerHost ? 'owner_running' : 'owner_starting';
+      return {
+        taskId: task.id,
+        state,
+        taskStatus: task.status,
+        engine: null,
+        lastEventAt: task.ownerLastActivityAt ?? task.events.at(-1)?.at ?? task.run?.startedAt ?? null,
+        silenceMs: null,
+        cpuActive: null,
+        cpuIdleMs: null,
+        scopeUnit: null,
+        children: {
+          total: children.length,
+          running: children.filter(child => child.status === 'running' || child.status === 'cancelling').length,
+          completed: children.filter(child => child.status === 'completed').length,
+        },
+      };
+    }
     const now = this.clock();
     const samples = this.samples.get(task.id);
     const active = cpuActive(samples);
@@ -421,7 +465,7 @@ export class StallMonitor {
     const penalty = this.state.engines[engine];
     if (penalty) this.state.engines[engine] = emptyPenalty();
     this.held.add(engine);
-    saveStallState(this.options.statePath, this.state);
+    this.store.save(this.state);
     if (owned.length > 0) this.options.onBlocksChanged?.();
   }
 
@@ -508,7 +552,7 @@ export class StallMonitor {
       penalized = true;
     }
     if (this.dirty) {
-      saveStallState(this.options.statePath, this.state);
+      this.store.save(this.state);
       this.dirty = false;
     }
     if (penalized || this.changed) this.options.onBlocksChanged?.();

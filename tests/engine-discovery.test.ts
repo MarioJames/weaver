@@ -12,7 +12,7 @@ import { applyEngineEnabled, parseEngineToggle } from '../src/main/engines/contr
 
 test('pi is a fixed catalog engine and only claude and codex advertise native subagents', () => {
   const pi = ENGINE_CATALOG.find(entry => entry.id === 'pi');
-  assert.equal(ENGINE_CATALOG.length, 6);
+  assert.equal(ENGINE_CATALOG.length, 7);
   assert.equal(pi?.kind, 'pi');
   assert.equal(pi?.command, 'pi');
 });
@@ -87,7 +87,7 @@ test('enabling an installed engine does not create or enable roles and preserves
   const installed = bin('pi', '#!/bin/sh\necho "pi 0.9 ${SECRET_TOKEN:-clean}"\n');
   const root = mkdtempSync(join(tmpdir(), 'weaver-policy-'));
   try {
-    const store = new PolicyStore(join(root, 'policy.json'));
+    const store = new PolicyStore(join(root,'weaver.db'));
     const before = store.snapshot();
     const prober = new EngineProber({ pathEnv: installed.pathEnv, timeoutMs: 1000, env: { SECRET_TOKEN: 'super-secret', PATH: installed.pathEnv } });
     const enabled = await applyEngineEnabled(store, prober, { id: 'pi', enabled: true, revision: before.revision });
@@ -113,7 +113,7 @@ test('failed probe, stale revision and enabled roles block enablement without wr
   const root = mkdtempSync(join(tmpdir(), 'weaver-policy-'));
   const absent = mkdtempSync(join(tmpdir(), 'weaver-cli-'));
   try {
-    const store = new PolicyStore(join(root, 'policy.json'));
+    const store = new PolicyStore(join(root,'weaver.db'));
     const prober = new EngineProber({ pathEnv: absent, timeoutMs: 300 });
     await assert.rejects(() => applyEngineEnabled(store, prober, { id: 'opencode', enabled: true, revision: 0 }), /not installed|missing|Version/);
     assert.equal(store.snapshot().revision, 0);
@@ -188,7 +188,7 @@ test('policy save cannot enable an engine, and a mismatched kind is not probed o
   const marker = join(root, 'probed');
   const trap = bin('grok', `#!/bin/sh\necho probed > ${JSON.stringify(marker)}\necho "grok 1.0"\n`);
   try {
-    const store = new PolicyStore(join(root, 'policy.json'));
+    const store = new PolicyStore(join(root,'weaver.db'));
     const enabled = structuredClone(store.snapshot().config);
     enabled.engines.grok.enabled = true;
     assert.throws(() => store.save({ revision: 0, config: enabled, blocks: [] }), /probe toggle/);

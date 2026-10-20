@@ -24,7 +24,9 @@ weaver tasks wait --help --output json   # fields and required input of one comm
 weaver --skill                           # prints this skill
 ```
 
-Read IDs, revisions and digests from the JSON responses instead of predicting them.
+Read IDs, revisions and digests from responses instead of predicting them. For a scalar, use `--field data.id`, `--field data.revision`, or `--field data.manifestDigest`; this reads a response field without shell JSON parsing. Check every command's exit status before using its output. `--field` is for non-streaming read commands only and cannot be combined with `--output`/`--json`.
+
+Use JSON files or `--input -` with a quoted heredoc for request bodies containing Chinese text, newlines or quotes. Do not use `echo "$response" | ...` to parse JSON: zsh echo expands backslash escapes. If forwarding existing JSON is unavoidable, use `printf '%s\n' "$response"`. The [handoff reference](references/handoff.md#shell-safe-input-and-result-review) shows file/stdin input and ack/review without constructing JSON.
 
 ## Preflight (once per session)
 
@@ -40,15 +42,27 @@ Read IDs, revisions and digests from the JSON responses instead of predicting th
    `name` = `<Host> · <workspace dir name> · <HH:MM session start>`; `session` = `$CODEX_THREAD_ID` when set, else `$HERDR_PANE_ID` when set, else the absolute workspace path; the `--command-id` stays the same for the whole session, so a lost reply re-issued with it returns the same owner. Keep the returned `id` and use it as `ownerId` in every task below; if you lost it, `weaver owners list` and take the entry with the same name/session — never fall back to `ownerProfileId`, which registers a new throwaway owner for that one task.
 5. `weaver policy preview --input '{"owner":"<profile>"}'` shows the route Weaver would pick right now, without launching anything.
 
+## UI root tasks
+
+The UI starts a root with `weaver tasks start --task-id <root> --command-id <stable-id>`. This command returns immediately with a running owner root; Herdr starts the configured claude/codex owner in the background. Inspect `tasks get` and `tasks events` for `ownerHost` or a launch failure. A failed launch without an owner host can be retried with `tasks start` and a new stable command ID; `tasks retry` remains for child worker attempts.
+
+If the prompt identifies you as the root owner, reuse its existing `ownerId` instead of attaching a new instance. Read the full task goal, generate a concrete title and verifiable acceptance criteria with `tasks describe` (including `expectedRevision`), then split the work along natural boundaries into at least one child. The parent Agent does not implement itself; an indivisible goal still dispatches to a single sub-Agent rather than being verified hands-on. Create each with `parentTaskId: <root>`; the root supplies the owner instance, workspace and constraints unless the child provides its own workspace/constraints. Freeze and dispatch each child through the normal flow below. Do not freeze or dispatch the root as one worker package. The root does not consume a worker slot.
+
+**The root task is a meta task.** The parent Agent's output is the decomposition, dispatch, review, and the final acceptance of the whole against the root acceptance criteria. Allocate the root criteria across the branches yourself: every work package must be self-contained, because the sub-Agent receives only the package (its goal, write scope, constraints and the package's own acceptance criteria) and never the root goal or the root criteria. Write into each package what that branch needs to finish: the context, interface contracts, the areas it must not touch, and complete, concrete, independently checkable acceptance criteria. Do not write "see the task" or any other reference to the root. If a sub-Agent goes off course, that is a decomposition problem: fix the split or the package and re-dispatch; do not paste global context into the sub-Agent.
+
+`tasks list --input '{"parentTaskId":"<root>"}'` lists children and retry history. Review each child independently with `reviews submit`; receipt acknowledgement alone is insufficient. Retries retain `parentTaskId`; a superseded attempt remains history while its final attempt must pass review. Once the root acceptance criteria are verified and at least one final subtask exists with all final subtasks completed and accepted, call `tasks complete --task-id <root> --input '{"outcome":"completed","summary":"<verified results>","expectedRevision":<current>}' --command-id <stable-id>`. Optional artifacts use the same format as `workers complete`. If the root cannot finish, report `outcome: "failed"` with the actual reason. `workers complete` is only for native child workers. Cancelling a running root cancels its active children and asynchronously closes its parent Agent host; inspect task events for cleanup failures.
+
 ## Flow
 
+接到尚未命名的任务后，先读取完整目标，生成简短标题与可验证的验收标准，使用 `weaver tasks describe --task-id <id> --input <json> --command-id <stable-id>` 回填；JSON 含 `title`、`acceptanceCriteria` 和 `tasks get` 返回的 `expectedRevision`。回填后再冻结和派发，验收标准不得用占位内容代替。
+
 1. `weaver tasks create --input task.json --command-id <stable-id>` — `ownerId` from preflight, goal, absolute workspace, constraints, acceptance criteria ([shapes](references/handoff.md)).
-2. `weaver packages create --task-id <id> --input package.json --command-id <stable-id>` — freezes the exact read/write scope.
+2. `weaver packages create --task-id <id> --input package.json --command-id <stable-id>` — freezes the exact read/write scope and this branch's own acceptance criteria (omitted `acceptanceCriteria` defaults to the child task's own; explicit ones win and never overwrite the task).
 3. `weaver workers spawn --task-id <id> --input dispatch.json --command-id <stable-id>` — follow the returned `next` action.
 4. For a wait action, check first events within 1–2 minutes, then `weaver tasks wait --task-id <id>` at its default interval; see below.
 5. `weaver tasks results --task-id <id>` and `weaver artifacts read --task-id <id> --input read.json` — then read the real changed files and run the checks yourself; a worker's success text is evidence, not proof.
-6. `weaver results ack --task-id <id> --input ack.json --command-id <stable-id>` — records receipt only.
-7. `weaver reviews submit --task-id <id> --input review.json --command-id <stable-id>` — your `accepted`/`rejected` decision after independent review.
+6. `weaver results ack --task-id <id> --expected-revision <current> --manifest-digest <digest> --command-id <stable-id>` — records receipt only.
+7. `weaver reviews submit --task-id <id> --expected-revision <fresh> --manifest-digest <digest> --decision accepted --comment-file review.txt --command-id <stable-id>` — your `accepted`/`rejected` decision after independent review.
 
 `workers spawn` and `tasks retry` return `next`: real or queued work gives a wait command; native gives `run_subagent` with model, effort, the full prompt and a completion command (`then`). For `run_subagent`, use your built-in subagent tool, then report with `weaver workers complete` using a stable command ID ([report](references/handoff.md#native-execution-report)). Queued routes stay frozen except when a vendor-limit block reroutes queued work; after a wait, `weaver tasks get --task-id <id>` recovers `next` for a now-running native dispatch. Never create duplicate attempts.
 

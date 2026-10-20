@@ -12,7 +12,7 @@ import { classifyVendorError } from '../src/main/adapters/cli/vendor-errors';
 function harness() {
  const dir=mkdtempSync(join(tmpdir(),'weaver-test-'));
  const child=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill:()=>true});
- const store=new TaskStore(join(dir,'tasks.json'));
+ const store=new TaskStore(join(dir,'weaver.db'));
  const manager=new TaskManager(store,{id:'pi',start:()=>child});
  const task=manager.create({title:'fixture',instruction:'fake only',owner:{name:'o',transport:'herdr-visible',session:'s',pane:'p'}});
  task.dispatch={execution:'real',adapter:'pi',engineKind:'pi',engine:'pi',model:'fake',effort:'high',owner:'o',worker:'w',maxParallel:2};store.put(task);
@@ -32,7 +32,7 @@ test('early exit retains redacted stderr and round trips failure',()=>{
  const h=harness();try {
  h.child.stderr.write('No input provided via stdin\n');h.child.emit('close',42,null);
  const task=h.store.get(h.id);assert.equal(task.failure?.kind,'early_exit');assert.equal(task.failure?.exitCode,42);assert.match(task.failure?.stderrTail??'',/No input/);
- assert.deepEqual(new TaskStore(join(h.dir,'tasks.json')).get(h.id).failure,task.failure);
+ assert.deepEqual(new TaskStore(join(h.dir,'weaver.db')).get(h.id).failure,task.failure);
  }finally{h.cleanup();}
 });
 test('vendor classifier handles limits, quota and retry-after',()=>{
@@ -71,7 +71,7 @@ test('commands wait for actual output, retain next and publish failure results',
  const h=harness();h.child.emit('close',42,null);
  const children:ReturnType<typeof harness>['child'][]=[];
  const manager=new TaskManager(h.store,{id:'routing',canLaunchReal:()=>true,start:()=>{const child=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill:()=>true});children.push(child);return child;}});
- const policy=new PolicyStore(join(h.dir,'policy.json'));const handler=new CommandHandler(manager,policy);
+ const policy=new PolicyStore(join(h.dir,'weaver.db'));const handler=new CommandHandler(manager,policy);
  const request=(command:string,args:Record<string,unknown>)=>({apiVersion:'weaver.v1',commandId:randomUUID(),command,args});
  try{
  const task=manager.create({title:'async',instruction:'fake',workspace:h.dir,owner:{name:'o',transport:'herdr-visible',session:'s',pane:'p'}});
@@ -86,7 +86,7 @@ test('commands wait for actual output, retain next and publish failure results',
 
 test('vendor blocks use policy and reroute queued work to another enabled engine',async()=>{
  const {CommandHandler}=await import('../src/main/commands');const {PolicyStore}=await import('../src/main/policy/store');
- const h=harness();const policy=new PolicyStore(join(h.dir,'policy.json'));const starts:string[]=[];
+ const h=harness();const policy=new PolicyStore(join(h.dir,'weaver.db'));const starts:string[]=[];
  const manager=new TaskManager(h.store,{id:'routing',canLaunchReal:()=>true,start:task=>{starts.push(task.dispatch!.engine);return Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill:()=>true});}});
  const handler=new CommandHandler(manager,policy);
  try{
@@ -94,7 +94,7 @@ test('vendor blocks use policy and reroute queued work to another enabled engine
  const queued=manager.create({title:'queued',instruction:'fake',workspace:h.dir,owner:{name:'o',transport:'herdr-visible',session:'s',pane:'p'}});
  queued.scheduled=true;queued.dispatch={owner:'claude_owner',worker:'codex_worker',engine:'codex',engineKind:'codex',model:'gpt-6.1-sol',effort:'high',execution:'real',adapter:'codex',maxParallel:2,workspace:h.dir};h.store.put(queued);
  h.child.emit('vendor-error','Rate limit exceeded',classifyVendorError('codex','Rate limit exceeded'));
- handler.pump();await new Promise(resolve=>setImmediate(resolve));
+ handler.pump();await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));
  const block=policy.snapshot().blocks.find(b=>b.engine==='codex');assert.equal(block?.by,'weaver-vendor-limit');assert.match(block?.reason??'',/Rate limit/);assert.ok(block?.release_at);
  assert.notEqual(h.store.get(queued.id).dispatch?.engine,'codex');assert.equal(h.store.get(queued.id).status,'running');
  h.child.emit('close',42,null);
@@ -103,13 +103,13 @@ test('vendor blocks use policy and reroute queued work to another enabled engine
 
 test('quota blocks have no invented reset and are not restored after unblock and restart',async()=>{
  const {CommandHandler}=await import('../src/main/commands');const {PolicyStore}=await import('../src/main/policy/store');
- const h=harness();const policy=new PolicyStore(join(h.dir,'policy.json'));const handler=new CommandHandler(h.manager,policy);let restarted:InstanceType<typeof CommandHandler>|undefined;
+ const h=harness();const policy=new PolicyStore(join(h.dir,'weaver.db'));const handler=new CommandHandler(h.manager,policy);let restarted:InstanceType<typeof CommandHandler>|undefined;
  try{
  const task=h.store.get(h.id);task.dispatch!.engine='codex';h.store.put(task);
- h.child.emit('vendor-error','FreeUsageLimitError',classifyVendorError('opencode','FreeUsageLimitError'));handler.pump();
+ h.child.emit('vendor-error','FreeUsageLimitError',classifyVendorError('opencode','FreeUsageLimitError'));handler.pump();await new Promise(resolve=>setImmediate(resolve));
  const block=policy.snapshot().blocks.find(b=>b.engine==='codex');assert.equal(block?.by,'weaver-vendor-limit');assert.equal(block?.release_at,undefined);
  h.child.emit('close',42,null);handler.draining=true;
  const snapshot=policy.snapshot();policy.save({revision:snapshot.revision,config:snapshot.config,blocks:[]});
- restarted=new CommandHandler(h.manager,policy);restarted.pump();assert.equal(policy.snapshot().blocks.length,0);
+ restarted=new CommandHandler(h.manager,policy);restarted.pump();await new Promise(resolve=>setImmediate(resolve));assert.equal(policy.snapshot().blocks.length,0);
  }finally{handler.draining=true;if(restarted)restarted.draining=true;h.cleanup();}
 });

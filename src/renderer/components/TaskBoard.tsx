@@ -6,18 +6,24 @@ import { ChevronDown, ChevronRight, ChevronUp, Clock, Folder, Loader2, X } from 
 import type { Task } from '../../shared/types';
 import { displayLog } from '../log-view';
 import type { FilterDimension, FilterOption, TaskSelection, TaskTimeRange } from '../task-view';
-import { FILTER_DIMENSIONS, TASK_COLUMNS, TIME_RANGES, applyTaskFilters, columnize, compactTaskTime, dispatchKind, emptySelection, filterLabels, filterOptions, filterSummary, hasFilters, isOpenTask, nonArchived, readEndedExpanded, readFiltersCollapsed, readTaskFilters, resolveSelection, selectedEntries, toggleOption, workspaceGroups, writeEndedExpanded, writeFiltersCollapsed, writeTaskFilters } from '../task-view';
+import { FILTER_DIMENSIONS, TASK_COLUMNS, TIME_RANGES, applyTaskFilters, cardFooter, childSummary, childSummaryLabel, columnize, dispatchKind, emptySelection, facetOptions, filterLabels, filterSummary, hasFilters, isOpenTask, nonArchived, readEndedExpanded, readFiltersCollapsed, readTaskFilters, resolveSelection, selectedEntries, toggleOption, workspaceGroups, writeEndedExpanded, writeFiltersCollapsed, writeTaskFilters } from '../task-view';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../status-colors';
 import type { DisplayStatus } from '../status-colors';
 import { styles } from '../style';
 import { AgentFacts } from './AgentFacts';
 import { EngineIcon } from './EngineIcon';
+import { TimeText } from './TimeText';
 
 /** Every card has a shared status tag; dispatching states also carry a spinner and activity. */
 function cardStatus(task: Task): { label: string; color?: string; spin: boolean } {
   const status = displayStatus(task);
   const tone = DISPLAY_TONES[status];
   return { label: DISPLAY_LABELS[status], color: tone === 'default' ? undefined : tone, spin: status === 'running' || status === 'cancelling' };
+}
+
+/** One time inside the footer sentence: compact text, the full timestamp on hover. */
+function CardTime({ value, now }: { value: string; now: number }) {
+  return <TimeText className={styles.cardTime} value={value} now={now} />;
 }
 
 const spinner = <Icon icon={Loader2} spin size="small" />;
@@ -96,8 +102,8 @@ function optionIcon(dimension: FilterDimension, option: FilterOption, ownerKind?
  * The facet block: 时间 scopes everything, the other rows OR within and AND across.
  * It is persistent content: the 已选 row is always present, so choosing never moves the board.
  */
-export function TaskFacets({ board, selection, collapsed, now, ownerKind, onChange, onCollapse }: { board: Task[]; selection: TaskSelection; collapsed: boolean; now: number; ownerKind?: (ownerId?: string) => string | undefined; onChange: (selection: TaskSelection) => void; onCollapse: (collapsed: boolean) => void }) {
-  const options = Object.fromEntries(FILTER_DIMENSIONS.map(dimension => [dimension, filterOptions(board, dimension, selection, now)])) as Record<FilterDimension, FilterOption[]>;
+export function TaskFacets({ board, all = board, selection, collapsed, now, ownerKind, onChange, onCollapse }: { board: Task[]; all?: Task[]; selection: TaskSelection; collapsed: boolean; now: number; ownerKind?: (ownerId?: string) => string | undefined; onChange: (selection: TaskSelection) => void; onCollapse: (collapsed: boolean) => void }) {
+  const options = Object.fromEntries(FILTER_DIMENSIONS.map(dimension => [dimension, facetOptions(board, dimension, selection, now, all)])) as Record<FilterDimension, FilterOption[]>;
   const entries = selectedEntries(selection, options);
   if (collapsed) return <div className={styles.facets} role="group" aria-label="任务筛选">
     <div className={styles.facetSelected}>
@@ -108,13 +114,13 @@ export function TaskFacets({ board, selection, collapsed, now, ownerKind, onChan
   return <div className={styles.facets} role="group" aria-label="任务筛选">
     <FacetRow label="时间" size={TIME_RANGES.length}>
       {TIME_RANGES.map(range => <FacetChip key={range.value} checked={selection.time === range.value} label={range.label}
-        count={applyTaskFilters(board, { ...selection, time: range.value as TaskTimeRange }, undefined, now).length}
+        count={applyTaskFilters(board, { ...selection, time: range.value as TaskTimeRange }, undefined, now, all).length}
         onClick={() => onChange({ ...selection, time: range.value })} />)}
     </FacetRow>
     {FILTER_DIMENSIONS.map(dimension => <FacetRow key={dimension} label={filterLabels[dimension]} size={options[dimension].length}>
       {options[dimension].map(option => <FacetChip key={option.value} checked={selection[dimension].includes(option.value)} label={option.label} count={option.count}
         tone={dimension === 'status' ? DISPLAY_TONES[option.value as DisplayStatus] : undefined}
-        icon={optionIcon(dimension, option, ownerKind)} title={dimension === 'workspace' ? option.value : undefined}
+        icon={optionIcon(dimension, option, ownerKind)} title={dimension === 'workspace' ? option.value : dimension === 'owner' ? option.title : undefined}
         onClick={() => onChange({ ...selection, [dimension]: toggleOption(selection[dimension], option.value) })} />)}
     </FacetRow>)}
     <div className={styles.facetSelected}>
@@ -145,10 +151,10 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
   if (!tasks.length) return <Empty title="还没有任务" description="从右上角新建第一个任务。" />;
   const selection = resolveSelection(filters ?? stored, tasks, now);
   const board = nonArchived(tasks, now);
-  const visible = applyTaskFilters(board, selection, undefined, now);
+  const visible = applyTaskFilters(board, selection, undefined, now, tasks);
   const columns = columnize(visible);
   const olderOpenWork = !visible.length && selection.time === 'today' &&
-    applyTaskFilters(board, { ...selection, time: 'all' }, undefined, now).some(isOpenTask);
+    applyTaskFilters(board, { ...selection, time: 'all' }, undefined, now, tasks).some(isOpenTask);
   const update = (next: TaskSelection) => {
     setStored(next);
     onFiltersChange?.(next);
@@ -167,23 +173,29 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
   const card = (task: Task) => {
     const tag = cardStatus(task);
     const latest = task.events.at(-1);
+    const children = childSummary(task, tasks);
+    const footer = cardFooter(task);
+    const activity = task.executionRole === 'owner' ? task.ownerHost ? `Herdr · ${task.ownerHost.agentName}` : '正在 Herdr 中启动父 Agent' : displayLog(latest?.message ?? '等待首次调度');
     return <button key={task.id} type="button" className={styles.taskCard} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
       <span className={styles.cardTitle}>
+        {task.executionRole === 'owner' && <Tag className={styles.cardTag} size="small">父 Agent</Tag>}
+        {task.parentTaskId && <Tag className={styles.cardTag} size="small">子任务</Tag>}
         {task.dispatch?.worker && <Tag className={styles.cardTag} title={task.dispatch.worker} size="small" icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
         <strong className={styles.cardTitleText}>{task.title}</strong>
       </span>
       <span className={styles.cardStatus}>
         <Tag size="small" color={tag.color} icon={tag.spin ? spinner : displayStatus(task) === 'scheduled' ? <Icon icon={Clock} size="small" /> : undefined}>{tag.label}</Tag>
-        {tag.spin && <Text type="secondary" className={styles.cardActivity} title={displayLog(latest?.message ?? '等待首次调度')}>{displayLog(latest?.message ?? '等待首次调度')}</Text>}
+        {tag.spin && <Text type="secondary" className={styles.cardActivity} title={activity}>{activity}</Text>}
       </span>
+      {children && <Text type="secondary" className={styles.cardChildren} title={childSummaryLabel(children)}>{childSummaryLabel(children)}</Text>}
       <span className={styles.cardMeta}>
-        <time className={styles.cardTime} dateTime={task.updatedAt} title={new Date(task.updatedAt).toLocaleString('zh-CN')}>{compactTaskTime(task.updatedAt, now)}</time>
-        <AgentFacts compact task={task} ownerKind={ownerKind} />
+        <span className={styles.cardWho}>由 <AgentFacts compact task={task} ownerKind={ownerKind} /> <span className={styles.cardTail}>于 <CardTime value={footer.at} now={now} /> {footer.verb}{footer.tail && <span className={styles.cardSep} aria-hidden="true"> ·</span>}</span></span>
+        {footer.tail && <>{' '}<span className={styles.cardTail}>{footer.tail.label} <CardTime value={footer.tail.at} now={now} /></span></>}
       </span>
     </button>;
   };
   return <section aria-label="任务看板" className={styles.board}>
-    <TaskFacets board={board} selection={selection} collapsed={collapsed} now={now} ownerKind={ownerKind} onChange={update} onCollapse={collapse} />
+    <TaskFacets board={board} all={tasks} selection={selection} collapsed={collapsed} now={now} ownerKind={ownerKind} onChange={update} onCollapse={collapse} />
     {!visible.length && <Empty title="没有匹配的任务" description={olderOpenWork ? '今天没有任务，还有更早的未结束任务。' : undefined} action={<div className={styles.row}>
       <Button size="small" onClick={() => update(emptySelection())}>清除筛选</Button>
       {olderOpenWork && <Button size="small" onClick={() => update({ ...selection, time: 'all' })}>查看全部</Button>}

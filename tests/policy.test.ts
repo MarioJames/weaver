@@ -1,11 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { activeBlocks, availabilityOf, chatgptReviewEnabled, defaultConfig, effectiveWeight, EFFORTS, parseReleaseAt, resolveDispatch, validateConfig, type Config, type Block } from '../src/main/policy/routing';
 import { lintSchema, validate } from '../src/main/policy/json-schema';
 import { PolicyStore } from '../src/main/policy/store';
+import { DatabaseSync } from 'node:sqlite';
+import { engineDisableConflict } from '../src/shared/engines';
 const now=Date.parse('2026-10-18T12:00:00Z');
 const all=()=>{const c=defaultConfig(); for(const e of Object.values(c.engines)) e.enabled=true; for(const w of Object.values(c.workers)) w.enabled=true; return c;};
 const route=(c:Config,blocks:Block[]=[])=>resolveDispatch(c,blocks,{owner:'claude_owner'});
@@ -47,7 +49,7 @@ test('release times accept timezone/relative forms and reject invalid or overflo
  assert.equal(parseReleaseAt('+2h',now),'2026-10-18T14:00:00.000Z');assert.equal(parseReleaseAt('2026-10-18T14:00:00+02:00',now),'2026-10-18T14:00:00+02:00');
  for(const value of ['tomorrow','+0m','2026-10-18T14:00:00','+999999999999999999999999d']) assert.throws(()=>parseReleaseAt(value,now));
 });
-function fixture(fn:(store:PolicyStore,path:string)=>void) {const root=mkdtempSync(join(tmpdir(),'weaver-policy-'));try{const path=join(root,'policy.json');fn(new PolicyStore(path,()=>now),path);}finally{rmSync(root,{recursive:true,force:true});}}
+function fixture(fn:(store:PolicyStore,path:string)=>void) {const root=mkdtempSync(join(tmpdir(),'weaver-policy-'));try{const path=join(root,'weaver.db');fn(new PolicyStore(path,()=>now),path);}finally{rmSync(root,{recursive:true,force:true});}}
 /** The thrown message, so a caller can assert on its exact prefix. */
 function grab(fn:()=>unknown):string {try{fn();}catch(error){return error instanceof Error?error.message:'thrown';}throw new Error('expected a throw');}
 test('app settings roundtrip without reading upstream/home, stale writes fail',()=>fixture((store,path)=>{
@@ -61,10 +63,10 @@ test('block edits persist, expired blocks are ignored at preview time, deletion 
  store.save({revision:1,config:s.config,blocks:blocks.map(b=>({...b,release_at:new Date(now).toISOString()}))});assert.equal(store.snapshot().activeBlocks.length,0);assert.equal(store.preview({owner:'claude_owner'}).worker,'claude_worker');
  store.save({revision:2,config:s.config,blocks:[]});assert.equal(store.snapshot().blocks.length,0);
 }));
-test('invalid quota edits preserve disk and in-memory state',()=>fixture((store,path)=>{
- const s=store.snapshot();store.save({revision:0,config:s.config,blocks:[]}); const before=readFileSync(path,'utf8');
+test('invalid quota edits preserve stored and in-memory state',()=>fixture((store)=>{
+ const s=store.snapshot();store.save({revision:0,config:s.config,blocks:[]}); const before=JSON.stringify(store.history());
  for(const blocks of [[{engine:'unknown',reason:'x',since:new Date(now).toISOString()}],[{engine:'claude',reason:'',since:'bad'}],[{engine:'claude',reason:'x',since:'+1h'}],[{engine:'claude',reason:'x',since:new Date(now).toISOString(),release_at:'+2h'}]]) assert.throws(()=>store.save({revision:1,config:s.config,blocks}));
- assert.equal(readFileSync(path,'utf8'),before);assert.equal(store.snapshot().revision,1);
+ assert.equal(JSON.stringify(store.history()),before,'a refused save leaves no revision row');assert.equal(store.snapshot().revision,1);
 }));
 test('duplicate blocks and unknown IPC fields rejected',()=>fixture((store)=>{
  const s=store.snapshot();const b={engine:'claude',reason:'x',since:new Date(now).toISOString()};assert.throws(()=>store.save({revision:0,config:s.config,blocks:[b,b]}),/Duplicate/);
@@ -75,14 +77,17 @@ test('capacity is hypothetical preview only, never execution permission',()=>fix
  assert.equal(store.preview({owner:'claude_owner',runningCount:3}).capacityAvailable,true);
  assert.throws(()=>store.preview({owner:'claude_owner',runningCount:-1}),/Invalid/);
 }));
-test('corrupt policy file is rejected and retained',()=>fixture((_store,path)=>{
- writeFileSync(path,'{"version":2}');assert.throws(()=>new PolicyStore(path),/Unsupported/);assert.equal(readFileSync(path,'utf8'),'{"version":2}');
+test('importing a damaged or future legacy policy is refused and stores nothing',()=>fixture((store)=>{
+ assert.throws(()=>store.importSnapshot({version:2}),/Unsupported|Unknown/);
+ assert.throws(()=>store.importSnapshot({version:1,revision:1,config:{},blocks:[]}));
+ assert.equal(store.snapshot().revision,0);assert.deepEqual(store.history(),[]);
 }));
-test('a saved policy with a gemini engine fails with the ordinary schema error',()=>fixture((_store,path)=>{
+test('a saved policy with a gemini engine fails with the ordinary schema error',()=>fixture((store)=>{
  const config=defaultConfig() as any; config.engines.gemini={enabled:true,kind:'gemini'};
  assert.deepEqual(validateConfig(config).map(i=>i.path),['$.engines.gemini.kind']);
- writeFileSync(path,JSON.stringify({version:1,revision:0,config,blocks:[]}));
- assert.throws(()=>new PolicyStore(path),/\$\.engines\.gemini\.kind: must be one of/);
+ assert.throws(()=>store.importSnapshot({version:1,revision:0,config,blocks:[]}),/\$\.engines\.gemini\.kind: must be one of/);
+ assert.throws(()=>store.save({revision:0,config,blocks:[]}),/\$\.engines\.gemini\.kind: must be one of/);
+ assert.deepEqual(store.history(),[]);
 }));
 test('disabled pi template validates and stays out of claude routing',()=>{
  const c=defaultConfig(); assert.deepEqual(validateConfig(c),[]);
@@ -116,12 +121,11 @@ test('invalid weights are rejected',()=>{
  const high=defaultConfig(); high.owners.claude_owner.worker_weights={claude_worker:11}; assert.ok(validateConfig(high).some(issue=>issue.message.includes('0 to 10')));
  const fraction=defaultConfig(); fraction.owners.claude_owner.worker_weights={claude_worker:1.5}; assert.ok(validateConfig(fraction).length);
 });
-test('a saved policy with retired tags and engine pins still loads without them',()=>fixture((store,path)=>{
- const s=store.snapshot(); store.save({revision:0,config:s.config,blocks:[]});
- const raw=JSON.parse(readFileSync(path,'utf8')); raw.config.workers.claude_worker.tags=['frontend']; raw.config.owners.claude_owner.only_engine='codex'; writeFileSync(path,JSON.stringify(raw));
- const loaded=new PolicyStore(path,()=>now).snapshot();
- assert.equal('tags' in loaded.config.workers.claude_worker,false); assert.equal('only_engine' in loaded.config.owners.claude_owner,false);
- assert.equal(loaded.revision,1);
+test('a policy with retired tags and engine pins imports without them',()=>fixture((store)=>{
+ const config=JSON.parse(JSON.stringify(defaultConfig())); config.workers.claude_worker.tags=['frontend']; config.owners.claude_owner.only_engine='codex'; config.engines.claude.native_subagents=true;
+ const loaded=store.importSnapshot({version:1,revision:3,weightScale:10,config,blocks:[]});
+ assert.equal('tags' in loaded.config.workers.claude_worker,false); assert.equal('only_engine' in loaded.config.owners.claude_owner,false); assert.equal('native_subagents' in loaded.config.engines.claude,false);
+ assert.equal(loaded.revision,3);
 }));
 test('weights balance load: the lowest (running + 1) / weight wins, ties go to the higher weight then list order',()=>{
  const c=all(); c.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:5,opencode_worker:10,grok_worker:0};
@@ -193,50 +197,88 @@ test('omitted weight is 5 and weights above 10 are rejected',()=>{
  owner.worker_weights={claude_worker:11}; assert.ok(validateConfig(c).some(i=>i.message==='weight must be an integer from 0 to 10'));
  owner.worker_weights={claude_worker:-1}; assert.ok(validateConfig(c).length);
 });
-const legacyStore=(weights:Record<string,Record<string,number>>,run:(path:string,dir:string)=>void,marker=false)=>{
- const root=mkdtempSync(join(tmpdir(),'weaver-weight10-'));
- try{
-  const path=join(root,'policy.v1.json'); const seed=new PolicyStore(path,()=>now); const s=seed.snapshot();
-  seed.save({revision:s.revision,config:s.config,blocks:[]});
-  const raw=JSON.parse(readFileSync(path,'utf8'));
-  for(const o of Object.values<any>(raw.config.owners)) delete o.worker_weights;
-  for(const [owner,w] of Object.entries(weights)) raw.config.owners[owner].worker_weights=w;
-  if(!marker) delete raw.weightScale;
-  writeFileSync(path,JSON.stringify(raw,null,2)); run(path,root);
- } finally {rmSync(root,{recursive:true,force:true});}
+const memory=()=>{const db=new DatabaseSync(':memory:');return new PolicyStore(db,()=>now);};
+/** A legacy policy.v1.json document whose owners carry the given weights, with or without the 0..10 scale marker. */
+const legacyDocument=(weights:Record<string,Record<string,number>>,marker:boolean)=>{
+ const config=defaultConfig() as any;
+ for(const o of Object.values<any>(config.owners)) delete o.worker_weights;
+ for(const [owner,w] of Object.entries(weights)) config.owners[owner].worker_weights=w;
+ return {version:1,revision:4,...(marker?{weightScale:10}:{}),config,blocks:[]};
 };
-const backups=(dir:string)=>readdirSync(dir).filter(f=>f.startsWith('policy.v1.json.pre-weight10-'));
-test('a marker-less 0-100 policy migrates every owner once: values divided, omitted listed workers become 10',()=>legacyStore(
- {claude_owner:{claude_worker:100,qoder_worker:50,opencode_worker:0,grok_worker:4},codex_owner:{codex_worker:7}},(path,dir)=>{
- const before=readFileSync(path,'utf8');
- const loaded=new PolicyStore(path,()=>now).snapshot();
+test('a marker-less 0-100 policy migrates every owner on import: values divided, omitted listed workers become 10',()=>{
+ const store=memory();
+ const loaded=store.importSnapshot(legacyDocument({claude_owner:{claude_worker:100,qoder_worker:50,opencode_worker:0,grok_worker:4},codex_owner:{codex_worker:7}},false));
  assert.deepEqual(loaded.config.owners.claude_owner.worker_weights,{claude_worker:10,qoder_worker:5,opencode_worker:0,grok_worker:1});
  // Small old values are divided too (7/100 -> 1); omitted workers keep the old implicit 100 as an explicit 10.
  for(const [id,o] of Object.entries(loaded.config.owners)) for(const w of o.workers) assert.ok(Object.hasOwn(o.worker_weights??{},w),`${id}/${w}`);
  assert.equal(loaded.config.owners.codex_owner.worker_weights!.codex_worker,1);
- const raw=JSON.parse(readFileSync(path,'utf8')); assert.equal(raw.weightScale,10);
- assert.deepEqual(raw.config.owners.claude_owner.worker_weights,loaded.config.owners.claude_owner.worker_weights);
- const found=backups(dir); assert.equal(found.length,1); assert.equal(readFileSync(join(dir,found[0]),'utf8'),before);
- // Idempotent: reloading changes nothing and writes no second backup.
- const after=readFileSync(path,'utf8'); const again=new PolicyStore(path,()=>now).snapshot();
- assert.equal(readFileSync(path,'utf8'),after); assert.equal(backups(dir).length,1); assert.deepEqual(again.config,loaded.config);
-}));
-test('an explicit 50 next to an omitted worker keeps its 1:2 ratio (5 vs 10)',()=>legacyStore({claude_owner:{claude_worker:50}},(path)=>{
- const o=new PolicyStore(path,()=>now).snapshot().config.owners.claude_owner;
+ assert.equal(loaded.revision,4);assert.deepEqual(store.history().map(item=>[item.revision,item.source]),[[4,'import']]);
+ // Imported weights are stored per owner/worker row on the 0..10 scale.
+ assert.deepEqual(new PolicyStore((store as any).db,()=>now).snapshot().config.owners.claude_owner.worker_weights,loaded.config.owners.claude_owner.worker_weights);
+ assert.throws(()=>store.importSnapshot(legacyDocument({},true)),/already holds a saved policy/,'a second import is refused');
+});
+test('an explicit 50 next to an omitted worker keeps its 1:2 ratio (5 vs 10)',()=>{
+ const o=memory().importSnapshot(legacyDocument({claude_owner:{claude_worker:50}},false)).config.owners.claude_owner;
  assert.equal(o.worker_weights!.claude_worker,5); assert.equal(o.worker_weights!.qoder_worker,10);
-}));
-test('a policy with the weightScale marker is never migrated',()=>legacyStore({claude_owner:{claude_worker:5,qoder_worker:0}},(path,dir)=>{
- const before=readFileSync(path,'utf8'); const loaded=new PolicyStore(path,()=>now).snapshot();
- assert.equal(readFileSync(path,'utf8'),before); assert.equal(backups(dir).length,0);
+});
+test('a policy with the weightScale marker is never migrated',()=>{
+ const loaded=memory().importSnapshot(legacyDocument({claude_owner:{claude_worker:5,qoder_worker:0}},true));
  assert.deepEqual(loaded.config.owners.claude_owner.worker_weights,{claude_worker:5,qoder_worker:0});
  assert.equal(effectiveWeight(loaded.config.owners.claude_owner,'grok_worker'),5);
-},true));
-test('an unknown weightScale is refused and save writes the marker',()=>fixture((store,path)=>{
- const s=store.snapshot(); store.save({revision:s.revision,config:s.config,blocks:[]});
- const raw=JSON.parse(readFileSync(path,'utf8')); assert.equal(raw.weightScale,10);
- raw.weightScale=100; writeFileSync(path,JSON.stringify(raw)); assert.throws(()=>new PolicyStore(path,()=>now),/weight scale/);
+});
+test('an unknown weightScale is refused on import',()=>{
+ const store=memory();const document={...legacyDocument({},true),weightScale:100};
+ assert.throws(()=>store.importSnapshot(document),/weight scale/);assert.equal(store.snapshot().revision,0);assert.deepEqual(store.history(),[]);
+});
+test('policy keeps per-table rows: engines, owners, ordered worker links with weights, workers, settings and blocks',()=>{
+ const db=new DatabaseSync(':memory:');const store=new PolicyStore(db,()=>now);
+ const s=store.snapshot();const config=structuredClone(s.config);config.owners.claude_owner.worker_weights={qoder_worker:3,claude_worker:7};config.display={timezone:'Asia/Shanghai'};
+ const blocks=[{engine:'claude',model:'m',reason:'manual',since:new Date(now).toISOString(),by:'tester'}];
+ store.save({revision:0,config,blocks});
+ const count=(table:string)=>Number((db.prepare(`SELECT count(*) AS n FROM ${table}`).get() as {n:number}).n);
+ assert.equal(count('policy_engines'),Object.keys(config.engines).length);assert.equal(count('policy_owners'),Object.keys(config.owners).length);assert.equal(count('policy_workers'),Object.keys(config.workers).length);
+ assert.equal(count('policy_blocks'),1);assert.equal(count('policy_revisions'),1);
+ const links=db.prepare("SELECT worker_id,position,weight FROM policy_owner_workers WHERE owner_id='claude_owner' ORDER BY position").all() as {worker_id:string;position:number;weight:number|null}[];
+ assert.deepEqual(links.map(row=>row.worker_id),config.owners.claude_owner.workers,'list order is the position column');
+ assert.deepEqual(Object.fromEntries(links.filter(row=>row.weight!==null).map(row=>[row.worker_id,row.weight])),{qoder_worker:3,claude_worker:7});
+ const settings=(db.prepare('SELECT key FROM policy_settings ORDER BY key').all() as {key:string}[]).map(row=>row.key);
+ assert.ok(settings.includes('herdr')&&settings.includes('display'));
+ assert.deepEqual(new PolicyStore(db,()=>now).snapshot().config,store.snapshot().config,'a reopen reads the same document back');
+ assert.deepEqual(new PolicyStore(db,()=>now).snapshot().blocks,blocks);
+});
+test('every save records a revision and rollback restores one as a new revision; conflicts still refuse',()=>{
+ let clock=now;const store=new PolicyStore(new DatabaseSync(':memory:'),()=>clock);
+ const base=store.snapshot();assert.equal(base.revision,0);assert.deepEqual(store.history(),[]);
+ const first=structuredClone(base.config);first.chatgpt_review=false;
+ clock=now+1000;const one=store.save({revision:0,config:first,blocks:[]});
+ const second=structuredClone(one.config);second.herdr.max_wait_minutes=7;
+ clock=now+2000;const two=store.save({revision:1,config:second,blocks:[{engine:'claude',reason:'manual',since:new Date(now).toISOString()}]});
+ assert.deepEqual(store.history(),[{revision:2,savedAt:new Date(now+2000).toISOString(),source:'save'},{revision:1,savedAt:new Date(now+1000).toISOString(),source:'save'}]);
+ assert.throws(()=>store.save({revision:1,config:second,blocks:[]}),/reload/,'a stale revision conflicts');
+ assert.throws(()=>store.rollback(9),/not found/);assert.throws(()=>store.rollback(0),/Invalid/);
+ clock=now+3000;const back=store.rollback(1);
+ assert.equal(back.revision,3);assert.equal(back.config.herdr.max_wait_minutes,one.config.herdr.max_wait_minutes);assert.equal(back.config.chatgpt_review,false);assert.deepEqual(back.blocks,[]);
+ assert.deepEqual(store.history().map(item=>[item.revision,item.source]),[[3,'rollback:1'],[2,'save'],[1,'save']],'the rollback is itself a new revision and nothing was rewritten');
+ assert.equal(two.revision,2);
+});
+test('display.timezone accepts an IANA name or nothing, and a bad name is a field-level error',()=>fixture((store)=>{
+ assert.equal(defaultConfig().display,undefined,'the default is unset: follow the browser');
+ const s=store.snapshot();const config=structuredClone(s.config);
+ config.display={timezone:'Asia/Shanghai'};assert.deepEqual(validateConfig(config),[]);
+ assert.equal(store.save({revision:0,config,blocks:[]}).config.display?.timezone,'Asia/Shanghai');
+ for(const bad of ['Mars/Olympus','not a zone','UTC+8 ']){config.display={timezone:bad};assert.deepEqual(validateConfig(config).map(i=>i.path),['$.display.timezone'],bad);assert.throws(()=>store.save({revision:1,config,blocks:[]}),/\$\.display\.timezone/);}
+ config.display={timezone:7} as any;assert.ok(validateConfig(config).some(i=>i.path==='$.display.timezone'));
+ config.display={timezone:''};assert.deepEqual(validateConfig(config),[],'an empty value follows the browser');
+ config.display={zone:'x'} as any;assert.ok(validateConfig(config).some(i=>i.path==='$.display.zone'));
+ assert.equal(store.snapshot().config.display?.timezone,'Asia/Shanghai','refused saves changed nothing');
 }));
 test('policy save rejects weights above 10',()=>fixture((store)=>{
  const s=store.snapshot(); s.config.owners.claude_owner.worker_weights={claude_worker:100};
  assert.throws(()=>store.save({revision:s.revision,config:s.config,blocks:[]}),/0 to 10/);
 }));
+
+test('the engine disable conflict names 父 Agent and 子 Agent, never 负责人 or 工作代理',()=>{
+ const c=all();const message=engineDisableConflict(c,'claude')!;
+ assert.match(message,/启用的父 Agent claude_owner/);assert.match(message,/启用的子 Agent claude_worker/);
+ assert.doesNotMatch(message,/负责人|工作代理/);
+});

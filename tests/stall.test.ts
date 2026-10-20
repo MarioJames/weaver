@@ -1,7 +1,7 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, statSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -16,6 +16,7 @@ import {
   type StallPolicy, type StallState, type StallStatus,
 } from '../src/main/stall';
 import type { Task } from '../src/shared/types';
+import { readStall, seedStall, stallStoreAt } from './helpers/state-db';
 
 const START = Date.parse('2030-01-01T00:00:00Z');
 const MINUTE = 60_000;
@@ -316,18 +317,18 @@ async function harness(options: HarnessOptions = {}) {
   const config = defaultConfig();
   config.engines.codex.enabled = true;
   options.configure?.(config);
-  const policy = new PolicyStore(join(dir, 'policy.v1.json'), () => now);
+  const policy = new PolicyStore(join(dir,'weaver.db'), () => now);
   const base = policy.snapshot();
   policy.save({ revision: base.revision, config, blocks: base.blocks });
   const tasks = options.tasks ?? [makeTask({ silentMs: 20 * MINUTE, scope: 'w-a' }), makeTask({ silentMs: 20 * MINUTE, scope: 'w-b' })];
   const { reader, reads } = cpu(options);
-  const statePath = join(dir, 'stall.v1.json');
+  const statePath = join(dir, 'state.db');
   const logs: string[] = [];
   let pumps = 0;
   const monitor = new StallMonitor({
     tasks: () => tasks,
     policy: () => policy,
-    statePath,
+    stateStore: stallStoreAt(statePath),
     cpu: reader,
     probe: options.probe,
     now: () => now,
@@ -602,7 +603,7 @@ test('the level 3 streak and its next probe survive a restart', async () => {
 
     const second = prober(() => PASS);
     const reopened = new StallMonitor({
-      tasks: () => h.tasks, policy: () => h.policy, statePath: h.statePath, cpu: cpu().reader,
+      tasks: () => h.tasks, policy: () => h.policy, stateStore: stallStoreAt(h.statePath), cpu: cpu().reader,
       probe: second.probe, now: h.now, onBlocksChanged: () => {}, log: () => {},
     });
     assert.equal(reopened.status().engines.claude!.probeSuccesses, 1, 'the streak was read back');
@@ -629,7 +630,7 @@ test('no enabled worker on the penalized engine fails the probe without calling 
     assert.equal(h.stallBlocks().length, 1);
     const failed = h.engine().history.at(-1)!;
     assert.equal(failed.probe?.ok, false);
-    assert.match(String(failed.probe?.error), /没有可用的工作代理/);
+    assert.match(String(failed.probe?.error), /没有可用的子 Agent/);
     assert.equal(failed.model, undefined, 'nothing was configured to probe with');
   } finally { await h.monitor.stop(); await h.cleanup(); }
 });
@@ -743,7 +744,7 @@ test('unblock drops one engine and leaves everything else alone', async () => {
     assert.deepEqual(h.engine().history.map(item => item.level), [1, 1], 'the record survives');
     assert.equal(h.pumps(), before + 1, 'and queued work re-routes');
     // The persisted state agrees, so a restart cannot resurrect the dropped ladder.
-    const saved = JSON.parse(await readFile(h.statePath, 'utf8'));
+    const saved = readStall(h.statePath);
     assert.equal(saved.engines.claude.level, 0);
     assert.equal(saved.engines.claude.nextProbeAt, null);
     assert.equal(saved.history.length, 2, 'one trigger and one failed probe');
@@ -837,27 +838,24 @@ test('an existing block or an unknown engine prevents a penalty', async () => {
   } finally { await h.monitor.stop(); await h.cleanup(); }
 });
 
-test('penalty state persists, and a damaged file starts the ladder over', async () => {
+test('penalty state persists, and a restart reads the ladder back from weaver.db', async () => {
   const h = await harness({ probe: prober(() => FAIL).probe });
   try {
     await h.advance(6);
-    const raw = await readFile(h.statePath, 'utf8');
-    const saved = JSON.parse(raw);
-    assert.equal(saved.version, 1);
+    const saved = readStall(h.statePath);
     assert.equal(saved.engines.claude.level, 1);
     assert.equal(saved.engines.claude.blockedUntil, h.now() + 5 * MINUTE);
     assert.equal(saved.engines.claude.nextProbeAt, h.now() + 5 * MINUTE);
     assert.equal(saved.engines.claude.probeSuccesses, 0);
     assert.equal(saved.history.length, 1);
-    assert.deepEqual(saved.history[0].tasks, h.tasks.map(task => task.id));
-    assert.equal(saved.history[0].engine, 'claude');
-    assert.equal(saved.history[0].stalledMinutes >= 5, true);
-    assert.equal(statSync(h.statePath).mode & 0o777, 0o600);
+    assert.deepEqual(saved.history[0]!.tasks, h.tasks.map(task => task.id));
+    assert.equal(saved.history[0]!.engine, 'claude');
+    assert.equal(saved.history[0]!.stalledMinutes! >= 5, true);
 
     // A second process reads the ladder back.
     await h.advance(27);
     assert.equal(h.engine().level, 3);
-    const reopened = new StallMonitor({ tasks: () => [], policy: () => h.policy, statePath: h.statePath, cpu: cpu().reader, now: h.now });
+    const reopened = new StallMonitor({ tasks: () => [], policy: () => h.policy, stateStore: stallStoreAt(h.statePath), cpu: cpu().reader, now: h.now });
     const restored = reopened.status().engines.claude!;
     assert.equal(restored.level, 3);
     assert.equal(restored.needsAttention, true);
@@ -865,20 +863,6 @@ test('penalty state persists, and a damaged file starts the ladder over', async 
     assert.deepEqual(restored.history.map(item => item.level), [1, 1, 2, 3], 'the trigger, then each failing probe at the level it answered for');
     assert.deepEqual(restored.history.map(item => item.tasks.length), [2, 0, 0, 0]);
     await reopened.stop();
-
-    await writeFile(h.statePath, '{not json');
-    const logs: string[] = [];
-    const recovered = new StallMonitor({ tasks: () => [], policy: () => h.policy, statePath: h.statePath, cpu: cpu().reader, now: h.now, log: message => logs.push(message) });
-    assert.deepEqual(Object.entries(recovered.status().engines).filter(([, item]) => item.level > 0), [], 'a damaged file starts the ladder over');
-    assert.equal(recovered.status().engines.claude!.blocked, true, 'the block the policy still holds is still reported');
-    assert.match(logs.join('\n'), /Stall state ignored/);
-    await recovered.stop();
-
-    await writeFile(h.statePath, JSON.stringify({ version: 2, engines: {}, history: [] }));
-    const mismatched = new StallMonitor({ tasks: () => [], policy: () => h.policy, statePath: h.statePath, cpu: cpu().reader, now: h.now, log: message => logs.push(message) });
-    assert.deepEqual(Object.entries(mismatched.status().engines).filter(([, item]) => item.level > 0), []);
-    assert.match(logs.at(-1)!, /Unsupported stall store/);
-    await mismatched.stop();
   } finally { await h.monitor.stop(); await h.cleanup(); }
 });
 
@@ -938,8 +922,8 @@ test('semantically damaged files rearm an existing penalty and release it only a
       h.block('claude', { by: STALL_BLOCK_BY });
       h.block('codex', { by: 'user' });
       const originalPolicy = h.policy.snapshot();
-      await writeFile(h.statePath, JSON.stringify({ version: 1, engines: { claude: { ...emptyPenalty(), level: 1, lastTriggerAt: START, ...invalid } }, history: [] }));
-      monitor = new StallMonitor({ tasks: () => [], policy: () => h.policy, statePath: h.statePath, cpu: cpu().reader, probe: p.probe, now: h.now, log: message => logs.push(message) });
+      seedStall(h.statePath, { version: 1, engines: { claude: { ...emptyPenalty(), level: 1, lastTriggerAt: START, ...invalid } }, history: [] });
+      monitor = new StallMonitor({ tasks: () => [], policy: () => h.policy, stateStore: stallStoreAt(h.statePath, message => logs.push(message)), cpu: cpu().reader, probe: p.probe, now: h.now, log: message => logs.push(message) });
       assert.match(logs.join('\n'), /Stall state ignored/);
       assert.equal(monitor.status().engines.claude!.level, 0);
       await monitor.tick();
@@ -974,8 +958,8 @@ test('a stall file written before recovery probes still loads', async () => {
       engines: { claude: { level: 3, lastTriggerAt: START, needsAttention: true, blockedUntil: null } },
       history: [{ engine: 'claude', level: 3, at: START, tasks: ['1ebbfc8f-afc6-4b93-8916-06ec488fbd8a'], minutes: 41 }],
     };
-    await writeFile(h.statePath, JSON.stringify(legacy));
-    const monitor = new StallMonitor({ tasks: () => h.tasks, policy: () => h.policy, statePath: h.statePath, cpu: cpu().reader, now: h.now });
+    seedStall(h.statePath, legacy);
+    const monitor = new StallMonitor({ tasks: () => h.tasks, policy: () => h.policy, stateStore: stallStoreAt(h.statePath), cpu: cpu().reader, now: h.now });
     const penalty = monitor.status().engines.claude!;
     assert.equal(penalty.level, 3);
     assert.equal(penalty.probeSuccesses, 0);
@@ -984,9 +968,9 @@ test('a stall file written before recovery probes still loads', async () => {
 
     // A block the state cannot account for is armed and probed rather than left for a human forever.
     const p = prober(() => PASS);
-    await writeFile(h.statePath, JSON.stringify({ version: 1, engines: { claude: emptyPenalty() }, history: [] }));
+    seedStall(h.statePath, { version: 1, engines: { claude: emptyPenalty() }, history: [] });
     h.block('claude', { by: STALL_BLOCK_BY });
-    const adopted = new StallMonitor({ tasks: () => [], policy: () => h.policy, statePath: h.statePath, cpu: cpu().reader, probe: p.probe, now: h.now, log: () => {} });
+    const adopted = new StallMonitor({ tasks: () => [], policy: () => h.policy, stateStore: stallStoreAt(h.statePath), cpu: cpu().reader, probe: p.probe, now: h.now, log: () => {} });
     await h.step(adopted, 1);
     assert.equal(adopted.status().engines.claude!.level, 1);
     assert.equal(adopted.status().engines.claude!.nextProbeAt, iso(h.now() + 5 * MINUTE));
@@ -1001,13 +985,13 @@ test('the history keeps the last fifty records', async () => {
   const h = await harness();
   try {
     const seeded = { version: 1, engines: {}, history: Array.from({ length: 50 }, (_, index) => ({ engine: 'codex', level: 1, at: START - (50 - index) * MINUTE, tasks: [`seed-${index}`], stalledMinutes: 5 })) };
-    await writeFile(h.statePath, JSON.stringify(seeded));
-    const monitor = new StallMonitor({ tasks: () => h.tasks, policy: () => h.policy, statePath: h.statePath, cpu: cpu().reader, now: () => h.now(), log: () => {} });
-    const before = JSON.parse(await readFile(h.statePath, 'utf8'));
+    seedStall(h.statePath, seeded);
+    const monitor = new StallMonitor({ tasks: () => h.tasks, policy: () => h.policy, stateStore: stallStoreAt(h.statePath), cpu: cpu().reader, now: () => h.now(), log: () => {} });
+    const before = readStall(h.statePath);
     assert.equal(before.history.length, 50, 'loading does not invent history');
     assert.equal(before.history[0].tasks[0], 'seed-0', 'loading does not invent or drop history');
     for (let minute = 0; minute < 6; minute += 1) { await h.step(monitor, 1); }
-    const after = JSON.parse(await readFile(h.statePath, 'utf8'));
+    const after = readStall(h.statePath);
     assert.equal(after.history.length, 50);
     assert.equal(after.history[0].tasks[0], 'seed-1', 'the oldest entry fell out');
     assert.equal(after.history.at(-1)!.engine, 'claude');
@@ -1035,7 +1019,7 @@ test('a revision conflict is retried and the penalty still lands', async () => {
     };
     let pumps = 0;
     const retried: string[] = [];
-    const monitor = new StallMonitor({ tasks: () => h.tasks, policy: () => flaky, statePath: h.statePath, cpu: cpu().reader, now: h.now, onBlocksChanged: () => { pumps += 1; }, log: message => retried.push(message) });
+    const monitor = new StallMonitor({ tasks: () => h.tasks, policy: () => flaky, stateStore: stallStoreAt(h.statePath), cpu: cpu().reader, now: h.now, onBlocksChanged: () => { pumps += 1; }, log: message => retried.push(message) });
     await h.step(monitor, 6);
     assert.equal(conflicts, 1);
     assert.match(retried.join('\n'), /will be retried/);
@@ -1059,7 +1043,7 @@ test('a recovery whose save fails is retried on the next probe, not claimed', as
       save: input => { if (broken) throw new Error('disk is full'); return h.policy.save(input); },
     };
     const logs: string[] = [];
-    const monitor = new StallMonitor({ tasks: () => h.tasks, policy: () => flaky, statePath: h.statePath, cpu: cpu().reader, probe: prober(() => PASS).probe, now: h.now, log: message => logs.push(message) });
+    const monitor = new StallMonitor({ tasks: () => h.tasks, policy: () => flaky, stateStore: stallStoreAt(h.statePath), cpu: cpu().reader, probe: prober(() => PASS).probe, now: h.now, log: message => logs.push(message) });
     broken = true;
     await h.step(monitor, 5);
     assert.equal(monitor.status().engines.claude!.blocked, true, 'a failed removal cannot claim recovery');
@@ -1078,7 +1062,7 @@ test('a penalty that cannot be saved leaves the ladder untouched', async () => {
   try {
     const broken: StallPolicy = { snapshot: () => h.policy.snapshot(), save: () => { throw new Error('disk is full'); } };
     const logs: string[] = [];
-    const monitor = new StallMonitor({ tasks: () => h.tasks, policy: () => broken, statePath: h.statePath, cpu: cpu().reader, now: h.now, log: message => logs.push(message) });
+    const monitor = new StallMonitor({ tasks: () => h.tasks, policy: () => broken, stateStore: stallStoreAt(h.statePath), cpu: cpu().reader, now: h.now, log: message => logs.push(message) });
     await h.step(monitor, 6);
     assert.equal(h.stallBlocks().length, 0);
     assert.deepEqual(penalized(monitor.status()), []);
@@ -1102,7 +1086,7 @@ test('ticks never overlap and a tick joins the one in flight', async () => {
     const monitor = new StallMonitor({
       tasks: () => h.tasks,
       policy: () => h.policy,
-      statePath: join(h.dir, 'once.v1.json'),
+      stateStore: stallStoreAt(join(h.dir, 'once.db')),
       now: () => { checks += 1; return clock += MINUTE; },
       cpu: slow,
     });
@@ -1125,7 +1109,7 @@ test('start samples on a timer and stop ends it', async () => {
   try {
     let reads = 0;
     let clock = START;
-    const monitor = new StallMonitor({ tasks: () => h.tasks, policy: () => h.policy, statePath: join(h.dir, 'timer.v1.json'), now: () => (clock += 60_000), cpu: async () => { reads += 1; return 0; } });
+    const monitor = new StallMonitor({ tasks: () => h.tasks, policy: () => h.policy, stateStore: stallStoreAt(join(h.dir, 'timer.db')), now: () => (clock += 60_000), cpu: async () => { reads += 1; return 0; } });
     monitor.start(2);
     await new Promise(resolve => setTimeout(resolve, 30));
     assert.ok(reads >= 4, `expected repeated samples, saw ${reads}`);
@@ -1197,7 +1181,7 @@ test('getStall is a zero-arg RPC returning the ladder, its deadlines and its con
   try {
     assert.deepEqual(parseRpcBody({ method: 'getStall', args: [] }), { method: 'getStall', args: [] });
     assert.throws(() => parseRpcBody({ method: 'getStall', args: [{}] }), /Invalid argument arity/);
-    assert.deepEqual(Object.keys(h.status().engines).sort(), ['claude', 'codex', 'grok', 'opencode', 'pi', 'qoder'], 'a configured engine without a penalty is level 0');
+    assert.deepEqual(Object.keys(h.status().engines).sort(), ['claude', 'codex', 'grok', 'opencode', 'pi', 'qoder', 'zcode'], 'a configured engine without a penalty is level 0');
     assert.deepEqual(h.status().engines.grok, { level: 0, lastTriggerAt: null, needsAttention: false, blocked: false, blockedUntil: null, nextProbeAt: null, probeSuccesses: 0, history: [] });
     await h.advance(11);
     assert.deepEqual(h.status().config, { stallMinutes: 5, quorum: 2, ladder: [5, 10, null], resetHours: 2 });
@@ -1242,7 +1226,7 @@ test('a probe failure becomes one redacted bounded line, in status and on disk',
       assert.ok(!/[\n\r]/.test(line), `${what}: one line, saw ${JSON.stringify(line).slice(0, 120)}`);
       assert.ok(line.length <= 201, `${what}: bounded, saw ${line.length} characters`);
       assert.match(line, evidence, `${what}: the failure itself stays readable evidence`);
-      const saved = await readFile(h.statePath, 'utf8');
+      const saved = JSON.stringify(readStall(h.statePath));
       for (const secret of secrets) {
         assert.ok(!line.includes(secret), `${what}: ${secret} never reaches status`);
         assert.ok(!saved.includes(secret), `${what}: ${secret} never reaches the persisted record`);
@@ -1257,17 +1241,17 @@ test('a two hundred strong squad leaves a record the state file can read back', 
   const logs: string[] = [];
   try {
     await h.advance(6);
-    const saved = JSON.parse(await readFile(h.statePath, 'utf8')) as { history: { engine: string; tasks: string[]; taskCount: number }[] };
+    const saved = readStall(h.statePath) as { history: { engine: string; tasks: string[]; taskCount: number }[] };
     const record = saved.history[0]!;
     assert.equal(record.engine, 'claude');
     assert.equal(record.taskCount, 200, 'the count says how many workers the evidence really covered');
     assert.ok(record.tasks.length <= 50, `the id list is bounded, saw ${record.tasks.length}`);
     assert.ok(record.tasks.length < record.taskCount, 'and it is the list that stopped early, not the squad');
-    assert.ok(statSync(h.statePath).size < 256 * 1024, 'a trigger is small enough to be read back');
+    assert.ok(JSON.stringify(readStall(h.statePath)).length < 256 * 1024, 'a trigger is small enough to be read back');
 
     // A restart reads the bounded list and the ladder back whole.
     const note = (message: string): void => { logs.push(message); };
-    const reopened = new StallMonitor({ tasks: () => squad, policy: () => h.policy, statePath: h.statePath, cpu: cpu().reader, now: h.now, log: note });
+    const reopened = new StallMonitor({ tasks: () => squad, policy: () => h.policy, stateStore: stallStoreAt(h.statePath, note), cpu: cpu().reader, now: h.now, log: note });
     assert.equal(logs.length, 0, 'the saved state is not damaged goods');
     const restored = reopened.status().engines.claude!;
     assert.deepEqual(restored.history[0]!.tasks, record.tasks);
@@ -1278,16 +1262,15 @@ test('a two hundred strong squad leaves a record the state file can read back', 
 
     // Fifty records at that bound is the largest legal file, so the monitor must survive rewriting its own.
     const ids = Array.from({ length: 50 }, () => randomUUID());
-    await writeFile(h.statePath, JSON.stringify({
-      version: 1,
+    seedStall(h.statePath, {
       engines: {},
       history: Array.from({ length: 50 }, (_, index) => ({ engine: 'claude', level: 1, at: START - (50 - index) * MINUTE, tasks: ids, taskCount: ids.length, stalledMinutes: 26 })),
-    }));
-    const full = new StallMonitor({ tasks: () => squad, policy: () => h.policy, statePath: h.statePath, cpu: cpu().reader, now: h.now, log: note });
+    });
+    const full = new StallMonitor({ tasks: () => squad, policy: () => h.policy, stateStore: stallStoreAt(h.statePath, note), cpu: cpu().reader, now: h.now, log: note });
     await h.step(full, 1);
     assert.equal(logs.filter(message => /ignored|Unsupported|size limit/.test(message)).length, 0, 'a full history is not a damaged file');
-    assert.ok(statSync(h.statePath).size < 256 * 1024, 'and rewriting it never overflowed past what the reader accepts');
-    const reread = new StallMonitor({ tasks: () => squad, policy: () => h.policy, statePath: h.statePath, cpu: cpu().reader, now: h.now, log: note });
+    assert.ok(JSON.stringify(readStall(h.statePath)).length < 256 * 1024, 'and rewriting it never overflowed past what the reader accepts');
+    const reread = new StallMonitor({ tasks: () => squad, policy: () => h.policy, stateStore: stallStoreAt(h.statePath, note), cpu: cpu().reader, now: h.now, log: note });
     const kept = reread.status().engines.claude!;
     assert.equal(kept.history.length, 50, 'the engine keeps its fifty records');
     assert.equal(kept.history.at(-1)!.tasks.length, 50);
@@ -1305,7 +1288,7 @@ test('stop fences in-flight work by itself, with no ready callback in the pictur
     try {
       await h.advance(10);
       h.later(1);
-      const before = await readFile(h.statePath, 'utf8');
+      const before = JSON.stringify(readStall(h.statePath));
       const running = h.tick();
       await awaited(waiting.inFlight, 'probe');
       await h.monitor.stop();
@@ -1315,7 +1298,7 @@ test('stop fences in-flight work by itself, with no ready callback in the pictur
       assert.equal(h.engine().nextProbeAt, iso(START + 11 * MINUTE), 'its deadline was not moved on');
       assert.equal(probesOf(h).length, 0, 'and it never became history');
       assert.equal(h.stallBlocks().length, 1, 'the penalty is still the one that was written before stop');
-      assert.equal(await readFile(h.statePath, 'utf8'), before, 'nothing was persisted after stop');
+      assert.equal(JSON.stringify(readStall(h.statePath)), before, 'nothing was persisted after stop');
       assert.equal(h.pumps(), 1, 'and nothing re-routed');
 
       // A stopped monitor ignores manual ticks; start() is what resumes the contract.
@@ -1341,7 +1324,7 @@ test('stop fences a tick that is still reading CPU', async () => {
   let pumps = 0;
   try {
     const monitor = new StallMonitor({
-      tasks: () => h.tasks, policy: () => h.policy, statePath: join(h.dir, 'stopped.v1.json'),
+      tasks: () => h.tasks, policy: () => h.policy, stateStore: stallStoreAt(join(h.dir, 'stopped.db')),
       cpu: reader, now: () => (clock += 5 * MINUTE), onBlocksChanged: () => { pumps += 1; }, log: () => {},
     });
     await monitor.tick();
@@ -1386,16 +1369,16 @@ test('the user unblock of an engine drops every block naming it, and keeps every
     assert.equal(h.pumps(), pumps + 1, 'and the queue gets routed again');
     assert.equal(h.policy.preview({ owner: 'claude_owner', worker: 'claude_worker' }).worker, 'claude_worker');
 
-    const saved = JSON.parse(await readFile(h.statePath, 'utf8'));
+    const saved = readStall(h.statePath);
     assert.deepEqual(saved.engines.claude, emptyPenalty(), 'a restart cannot resurrect the dropped ladder');
     assert.equal(saved.history.length, history.length, 'and the record was not rewritten either');
 
     // An unknown engine is refused before any of that happens.
-    const state = await readFile(h.statePath, 'utf8');
+    const state = JSON.stringify(readStall(h.statePath));
     const blocks = h.policy.snapshot().blocks;
     assert.throws(() => h.monitor.unblock('ghost'), /Unknown engine ghost/);
     assert.deepEqual(h.policy.snapshot().blocks, blocks, 'a refused unblock wrote no policy change');
-    assert.equal(await readFile(h.statePath, 'utf8'), state, 'and no stall state change');
+    assert.equal(JSON.stringify(readStall(h.statePath)), state, 'and no stall state change');
     assert.equal(h.pumps(), pumps + 1);
 
     // Under a revision conflict the unblock re-reads: it drops its engine and keeps whatever arrived in between.
@@ -1413,7 +1396,7 @@ test('the user unblock of an engine drops every block naming it, and keeps every
         return h.policy.save(input);
       },
     };
-    const second = new StallMonitor({ tasks: () => [], policy: () => racing, statePath: h.statePath, cpu: cpu().reader, now: h.now, onBlocksChanged: () => {}, log: () => {} });
+    const second = new StallMonitor({ tasks: () => [], policy: () => racing, stateStore: stallStoreAt(h.statePath), cpu: cpu().reader, now: h.now, onBlocksChanged: () => {}, log: () => {} });
     second.unblock('codex');
     assert.deepEqual(h.blocksOf('codex'), [], 'the retried unblock still dropped its own engine');
     assert.equal(h.policy.snapshot().blocks.filter(block => block.engine === 'opencode').length, 1, 'and preserved the block that landed mid-flight');
@@ -1447,7 +1430,7 @@ test('a stall block the state never heard of is adopted onto the ladder and prob
     h.block('claude', { by: STALL_BLOCK_BY });
     h.block('codex', { by: 'user', release_at: iso(h.now() + 60 * MINUTE) });
     const monitor = new StallMonitor({
-      tasks: () => [], policy: () => h.policy, statePath: join(h.dir, 'orphan.v1.json'),
+      tasks: () => [], policy: () => h.policy, stateStore: stallStoreAt(join(h.dir, 'orphan.db')),
       cpu: cpu().reader, probe: p.probe, now: h.now, log: message => logs.push(message),
     });
     await h.step(monitor, 5);

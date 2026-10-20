@@ -12,6 +12,8 @@ import { SettingsPage } from './pages/SettingsPage';
 import { TasksPage } from './pages/TasksPage';
 import { styles } from './style';
 import { usePolicyDraft } from './usePolicyDraft';
+import { displayTimeZone } from './policy-edit';
+import { TimeZoneProvider } from './timezone';
 
 const PAGES = ['tasks', 'engines', 'owners', 'workers', 'settings'] as const;
 type Page = typeof PAGES[number];
@@ -64,7 +66,8 @@ export function App() {
   const policy = usePolicyDraft();
   const [page, open] = usePage();
   const ownerKind = ownerKindLookup(policy.config);
-  return <ConsoleShell
+  // The saved policy decides the time zone for the whole page; a draft elsewhere never moves it.
+  return <TimeZoneProvider zone={displayTimeZone(policy.snapshot?.config)}><ConsoleShell
     className={styles.shell}
     storageKey="weaver-nav"
     brand={<ConsoleBrand label="Weaver 任务" logo={<>
@@ -80,5 +83,5 @@ export function App() {
         : page === 'owners' ? <RolesPage key="owners" section="owners" policy={policy} />
           : page === 'workers' ? <RolesPage key="workers" section="workers" policy={policy} />
             : <SettingsPage policy={policy} />}
-  </ConsoleShell>;
+  </ConsoleShell></TimeZoneProvider>;
 }

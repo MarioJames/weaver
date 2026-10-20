@@ -10,6 +10,8 @@ import { CommandHandler } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
 import { workerInstruction } from '../src/main/adapters/instruction';
 import type { WorkerAdapter } from '../src/main/adapters/worker';
+import type { Task } from '../src/shared/types';
+import type { WorkPackage } from '../src/shared/commands';
 
 /** A real (non-mock) adapter that must never be asked to launch a process for native work. */
 const launches: string[] = [];
@@ -18,9 +20,9 @@ const adapter = { id: 'routing', canLaunchReal: () => false, start: (task: { id:
 function setup() {
   launches.length = 0;
   const dir = mkdtempSync(join(tmpdir(), 'weaver-native-'));
-  const store = new TaskStore(join(dir, 'tasks.json'));
+  const store = new TaskStore(join(dir,'weaver.db'));
   const manager = new TaskManager(store, adapter);
-  const policy = new PolicyStore(join(dir, 'policy.json'));
+  const policy = new PolicyStore(join(dir,'weaver.db'));
   const handler = new CommandHandler(manager, policy);
   const raw = (command: string, args: Record<string, unknown> = {}) => handler.handle({ apiVersion: 'weaver.v1', commandId: randomUUID(), command, args });
   const call = (command: string, args: Record<string, unknown> = {}): any => { const r = raw(command, args); assert.equal(r.ok, true, JSON.stringify(r)); return r.data; };
@@ -94,7 +96,7 @@ test('native work holds an owner slot, can be cancelled, and survives a restart'
     assert.equal(b.ownerId, a.ownerId, 'one owner instance holds one slot budget');
     f.call('workers.spawn', { taskId: a.id });
     assert.equal(f.call('workers.spawn', { taskId: b.id }).scheduled, true);
-    const reloaded = new TaskStore(join(f.dir, 'tasks.json')); reloaded.recover();
+    const reloaded = new TaskStore(join(f.dir,'weaver.db')); reloaded.recover();
     assert.equal(reloaded.get(a.id).status, 'running');
     assert.equal(f.call('tasks.cancel', { taskId: a.id }).status, 'cancelled');
     for (let i = 0; i < 50 && f.store.get(b.id).status !== 'running'; i++) await new Promise(resolve => setTimeout(resolve, 10));
@@ -164,4 +166,13 @@ test('two instances of one profile hold separate native slots and a cancellation
     assert.equal(f.store.get(b1.id).run?.execution, 'native');
     assert.deepEqual(launches, []);
   } finally { await f.close(); }
+});
+
+test('the frozen prompt carries only the work package criteria, never the root task criteria', () => {
+  const task = { workspace: '/repo', title: 'Native', instruction: 'edit a file', owner: { profileId: 'claude_owner', model: 'sonnet', effort: 'high' }, acceptanceCriteria: ['', 'shared criterion', 'task-only criterion'], constraints: ['stay minimal'], dispatch: { execution: 'native', worker: 'claude_worker', model: 'sonnet', effort: 'high', workspace: '/repo' }, id: 't-1', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', status: 'running', progress: 0, events: [], artifacts: [] } as unknown as Task;
+  const pkg: WorkPackage = { id: 'pkg-1', taskId: 't-1', revision: 1, instruction: 'edit a file', scope: ['src/**'], acceptanceCriteria: ['shared criterion', 'package criterion'], createdAt: '2026-01-01T00:00:00Z' };
+  const prompt = workerInstruction(task, pkg);
+  const body = JSON.parse(prompt.slice(prompt.indexOf('{'), prompt.lastIndexOf('}') + 1)) as { acceptanceCriteria: string[]; taskId: string; workspace: string | null; scope: string[]; constraints: string[]; goal: string };
+  assert.deepEqual(body, { taskId: 't-1', workspace: '/repo', goal: 'edit a file', scope: ['src/**'], constraints: ['stay minimal'], acceptanceCriteria: ['shared criterion', 'package criterion'] });
+  assert.ok(!prompt.includes('task-only criterion'));
 });

@@ -27,7 +27,7 @@ function deferredLaunch() {
 }
 function fixture(options:{closeFailure?:boolean}={}) {
   const directory=mkdtempSync(join(tmpdir(),'wv-async-command-'));
-  const store=new TaskStore(join(directory,'tasks.json'));const policy=new PolicyStore(join(directory,'policy.json'));
+  const store=new TaskStore(join(directory,'weaver.db'));const policy=new PolicyStore(join(directory,'weaver.db'));
   const manager=new TaskManager(store,new MockWorkerAdapter(process.execPath,resolve('scripts/mock-worker.mjs')));
   const launch=deferredLaunch();const closed:OwnerLaunchResult[]=[];
   const handler=new CommandHandler(manager,policy,blocked,()=>true,undefined,{launcher:launch.launcher,closer:async value=>{closed.push(value);if(options.closeFailure)throw new Error('cleanup fixture failed');}});
@@ -154,7 +154,7 @@ test('real CLI and HTTP launch concurrently beyond 15s while ordinary reads rema
   while(Date.now()<drainUntil){const entries=readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line));if(entries.filter(item=>item.action==='start').length===3)break;await new Promise(resolve=>setTimeout(resolve,10));}
   assert.equal(readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line)).filter(item=>item.action==='start').length,3);
   await runtime.close();await Promise.allSettled([drainingWork]);
-  const loaded=new TaskStore(join(data,'tasks.v1.json'));const drained=loaded.getMetadata().receipts[`local-demo:${drainingRequest.commandId}`].response!;
+  const loaded=new TaskStore(join(data,'weaver.db'));const drained=loaded.getMetadata().receipts[`local-demo:${drainingRequest.commandId}`].response!;
   assert.equal(drained.ok,true);assert.equal((drained.data as any).launch.ok,false);assert.equal((drained.data as any).launch.code,'OWNER_LAUNCH_FAILED');assert.equal(loaded.get(drainingTask.id).ownerHost,undefined);
   assert.deepEqual(loaded.get(httpTask.id).ownerHost,httpResult.data.launch.ownerHost);
   const entries=readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line));const closes=entries.filter(item=>item.action==='close');

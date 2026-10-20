@@ -85,9 +85,10 @@ function claude(body: JsonObject, now: number): Measurement {
     const rawScope = object(limit.scope);
     const model = name(object(rawScope?.model)?.id) ?? name(object(rawScope?.model)?.display_name);
     const duration = kind === 'session' ? 300 : kind === 'weekly_all' || kind === 'weekly_scoped' ? 10080 : null;
-    const modelScoped = rawScope !== undefined && Object.hasOwn(rawScope, 'model');
-    const surfaceScoped = rawScope !== undefined && Object.hasOwn(rawScope, 'surface');
-    const malformedScope = limit.scope !== undefined && rawScope === undefined;
+    // The server sends `scope: null`, or `{ model: null, surface: null }`, for an account-wide meter. A key being present is not a scope; only a value is.
+    const modelScoped = rawScope?.model !== undefined && rawScope.model !== null;
+    const surfaceScoped = rawScope?.surface !== undefined && rawScope.surface !== null;
+    const malformedScope = limit.scope !== undefined && limit.scope !== null && rawScope === undefined;
     const scope = modelScoped || kind === 'weekly_scoped' ? 'model' : surfaceScoped || malformedScope ? 'unknown' : kind === 'session' || kind === 'weekly_all' ? 'account' : 'unknown';
     const kindId = kind === 'session' || kind === 'weekly_all' || kind === 'weekly_scoped' ? kind : 'unknown';
     const scopedModel = scope === 'model' ? model : null;

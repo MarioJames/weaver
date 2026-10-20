@@ -41,13 +41,13 @@ function successProcess(): ManagedProcess {
 
 function setup(launch?: StartCliAgent, mockTestTimeoutMs?: number) {
   const dir = mkdtempSync(join(tmpdir(), 'weaver-dispatch-'));
-  const store = new TaskStore(join(dir, 'tasks.json'));
+  const store = new TaskStore(join(dir,'weaver.db'));
   let mockStarts = 0;
   const mock = { id: 'mock-jsonl', start() { mockStarts += 1; throw new Error('mock fallback'); } };
   const seen: CliAgentInput[] = [];
   const adapter = new RoutingWorkerAdapter(mock, launch ? (input) => { seen.push(input); return launch(input); } : undefined, join(dir, 'agent-state'), id => store.getMetadata().packages.find(pkg => pkg.id === id));
   const manager = new TaskManager(store, adapter, () => {}, mockTestTimeoutMs, error => { throw error; });
-  const policy = new PolicyStore(join(dir, 'policy.json'));
+  const policy = new PolicyStore(join(dir,'weaver.db'));
   const handler = new CommandHandler(manager, policy);
   const raw = (command: string, args: Record<string, unknown> = {}, commandId = randomUUID()): any => handler.handle({ apiVersion: 'weaver.v1', commandId, command, args });
   return { dir, store, handler, policy, raw, seen, mockStarts: () => mockStarts, close: async () => { handler.draining = true; await manager.shutdown(); rmSync(dir, { recursive: true, force: true }); } };
@@ -148,9 +148,9 @@ test('a real run outlives its frozen wait bound and the mock test hook; only the
 
 test('a queued route stays frozen when the saved model changes', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'weaver-freeze-'));
-  const store = new TaskStore(join(dir, 'tasks.json'));
+  const store = new TaskStore(join(dir,'weaver.db'));
   const manager = new TaskManager(store, new MockWorkerAdapter(process.execPath, resolve('scripts/mock-worker.mjs')));
-  const policy = new PolicyStore(join(dir, 'policy.json'));
+  const policy = new PolicyStore(join(dir,'weaver.db'));
   const handler = new CommandHandler(manager, policy);
   try {
     const created = handler.handle({ apiVersion: 'weaver.v1', commandId: randomUUID(), command: 'tasks.create', args: { title: 'Hold', instruction: 'wait', owner } });
@@ -162,7 +162,7 @@ test('a queued route stays frozen when the saved model changes', async () => {
     const snapshot = policy.snapshot();
     snapshot.config.workers.codex_worker.model = 'changed-model';
     policy.save({ revision: snapshot.revision, config: snapshot.config, blocks: [] });
-    handler.pump();
+    handler.pump();await new Promise<void>(resolve=>setImmediate(resolve));
     const held = store.get(task.id);
     assert.equal(held.status, 'queued');
     assert.equal(held.dispatch?.model, 'frozen-model');
@@ -173,9 +173,9 @@ test('a queued route stays frozen when the saved model changes', async () => {
 
 test('a lower max_parallel blocks the next start and does not stop work already running', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'weaver-parallel-'));
-  const store = new TaskStore(join(dir, 'tasks.json'));
+  const store = new TaskStore(join(dir,'weaver.db'));
   const manager = new TaskManager(store, { id: 'mock-jsonl', start: () => hangProcess() });
-  const policy = new PolicyStore(join(dir, 'policy.json'));
+  const policy = new PolicyStore(join(dir,'weaver.db'));
   const handler = new CommandHandler(manager, policy);
   const saveParallel = (value: number) => {
     const snapshot = policy.snapshot();
@@ -197,7 +197,7 @@ test('a lower max_parallel blocks the next start and does not stop work already 
     assert.equal(store.get(secondId).status, 'queued');
     assert.equal(store.get(secondId).queueReason?.code, 'waiting_for_capacity');
     saveParallel(2);
-    handler.pump();
+    handler.pump();await new Promise<void>(resolve=>setImmediate(resolve));
     const started = store.get(secondId);
     assert.equal(started.status, 'running');
     assert.equal(started.queueReason, undefined);
@@ -209,7 +209,7 @@ test('a lower max_parallel blocks the next start and does not stop work already 
     const thirdId = (third.data as { id: string }).id;
     assert.equal(spawn(thirdId).ok, true);
     assert.equal(store.get(thirdId).status, 'queued');
-    handler.pump();
+    handler.pump();await new Promise<void>(resolve=>setImmediate(resolve));
     assert.equal(store.get(firstId).status, 'running');
     assert.equal(store.get(secondId).status, 'running');
     assert.equal(store.get(thirdId).status, 'queued');
@@ -225,11 +225,11 @@ test('a lower max_parallel blocks the next start and does not stop work already 
 
 test('explicit mock provider still runs the mock worker from the real runtime adapter', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'weaver-explicit-mock-'));
-  const store = new TaskStore(join(dir, 'tasks.json'));
+  const store = new TaskStore(join(dir,'weaver.db'));
   let launched = 0;
   const adapter = new RoutingWorkerAdapter(new MockWorkerAdapter(process.execPath, resolve('scripts/mock-worker.mjs')), () => { launched += 1; return successProcess(); }, join(dir, 'agent-state'), id => store.getMetadata().packages.find(pkg => pkg.id === id));
   const manager = new TaskManager(store, adapter);
-  const policy = new PolicyStore(join(dir, 'policy.json'));
+  const policy = new PolicyStore(join(dir,'weaver.db'));
   const handler = new CommandHandler(manager, policy);
   try {
     const created = handler.handle({ apiVersion: 'weaver.v1', commandId: randomUUID(), command: 'tasks.create', args: { title: 'Mock', instruction: 'fixture', owner } });
@@ -284,11 +284,11 @@ function queuedReal(f:ReturnType<typeof setup>) {
 test('queue reasons expose policy and frozen-route blocks without repeated writes or rerouting',async()=>{
  const f=setup(()=>hangProcess());try{
   const task=queuedReal(f);const snapshot=f.policy.snapshot();snapshot.config.owners.codex_owner.worker_weights={codex_worker:0};
-  f.policy.save({revision:snapshot.revision,config:snapshot.config,blocks:[]});f.handler.pump();
+  f.policy.save({revision:snapshot.revision,config:snapshot.config,blocks:[]});f.handler.pump();await new Promise<void>(resolve=>setImmediate(resolve));
   const blocked=f.store.get(task.id);assert.equal(blocked.status,'queued');assert.equal(blocked.queueReason?.code,'policy_blocked');assert.match(blocked.queueReason?.message??'',/weight|excluded|eligible|disabled/i);
-  const revision=f.store.revision;f.handler.pump();assert.equal(f.store.revision,revision);
+  const revision=f.store.revision;f.handler.pump();await new Promise<void>(resolve=>setImmediate(resolve));assert.equal(f.store.revision,revision);
   const restored=f.policy.snapshot();delete restored.config.owners.codex_owner.worker_weights;restored.config.workers.codex_worker.model='changed-model';
-  f.policy.save({revision:restored.revision,config:restored.config,blocks:[]});f.handler.pump();
+  f.policy.save({revision:restored.revision,config:restored.config,blocks:[]});f.handler.pump();await new Promise<void>(resolve=>setImmediate(resolve));
   assert.equal(f.store.get(task.id).queueReason?.code,'frozen_route_changed');assert.equal(f.store.get(task.id).dispatch?.model,'gpt-6.1-sol');assert.equal(f.seen.length,0);
   const trace=f.raw('observability.get',{taskId:task.id}).data;assert.equal(trace.stage,'frozen_route_changed');assert.equal(trace.queueReason.code,'frozen_route_changed');
   const reopened=new TaskStore(f.store.path);assert.deepEqual(reopened.get(task.id).queueReason,f.store.get(task.id).queueReason);
@@ -298,30 +298,30 @@ test('queue reasons expose policy and frozen-route blocks without repeated write
 test('queued engine kind and replaced workspace cannot change frozen execution authority',async()=>{
  const f=setup(()=>hangProcess());try{
   const task=queuedReal(f);const snapshot=f.policy.snapshot();snapshot.config.engines.codex.kind='claude';
-  f.policy.save({revision:snapshot.revision,config:snapshot.config,blocks:[]});f.handler.pump();
+  f.policy.save({revision:snapshot.revision,config:snapshot.config,blocks:[]});f.handler.pump();await new Promise<void>(resolve=>setImmediate(resolve));
   assert.equal(f.store.get(task.id).queueReason?.code,'frozen_route_changed');assert.equal(f.seen.length,0);
   const restored=f.policy.snapshot();restored.config.engines.codex.kind='codex';f.policy.save({revision:restored.revision,config:restored.config,blocks:[]});
   const canonical=join(f.dir,'project');mkdirSync(canonical);
   const current=f.store.get(task.id);current.dispatch!.workspace=realpathSync(canonical);current.dispatch!.workspaceIdentity=workspaceIdentity(canonical);f.store.put(current);
-  renameSync(canonical,canonical+'-old');mkdirSync(canonical);f.handler.pump();
+  renameSync(canonical,canonical+'-old');mkdirSync(canonical);f.handler.pump();await new Promise<void>(resolve=>setImmediate(resolve));
   assert.equal(f.store.get(task.id).queueReason?.code,'workspace_changed');assert.match(f.store.get(task.id).queueReason?.message??'',/changed or was replaced/);assert.equal(f.seen.length,0);
-  rmSync(canonical,{recursive:true});symlinkSync(canonical+'-old',canonical);f.handler.pump();
+  rmSync(canonical,{recursive:true});symlinkSync(canonical+'-old',canonical);f.handler.pump();await new Promise<void>(resolve=>setImmediate(resolve));
   assert.equal(f.store.get(task.id).queueReason?.code,'workspace_changed');assert.equal(f.seen.length,0);
  }finally{await f.close();}
 });
 
 test('pump never makes an attempted worker runnable again after PID persistence fails',async()=>{
  const dir=mkdtempSync(join(tmpdir(),'weaver-pump-failure-'));
- const store=new TaskStore(join(dir,'tasks.json'));let starts=0;
+ const store=new TaskStore(join(dir,'weaver.db'));let starts=0;
  const manager=new TaskManager(store,{id:'mock-jsonl',start:()=>{starts++;return hangProcess();}});
- const policy=new PolicyStore(join(dir,'policy.json'));const handler=new CommandHandler(manager,policy);
+ const policy=new PolicyStore(join(dir,'weaver.db'));const handler=new CommandHandler(manager,policy);
  try{
   const task=manager.create({title:'Persistence failure',instruction:'fixture',owner});
   task.scheduled=true;task.dispatch={owner:'codex_owner',worker:'codex_worker',engine:'codex',model:'gpt-6.1-sol',effort:'high',execution:'mock',adapter:'mock-jsonl',maxParallel:1,maxWaitMinutes:15};store.put(task);
   const put=store.put.bind(store);let failOnce=true;
   store.put=current=>{if(current.run?.pid!==undefined&&failOnce){failOnce=false;throw new Error('PID persistence failed');}put(current);};
-  handler.pump();assert.equal(starts,1);assert.equal(store.get(task.id).status,'failed');assert.equal(store.get(task.id).scheduled,false);
-  handler.pump();assert.equal(starts,1);assert.equal(store.get(task.id).run?.status,'stopped');
+  handler.pump();await new Promise<void>(resolve=>setImmediate(resolve));assert.equal(starts,1);assert.equal(store.get(task.id).status,'failed');assert.equal(store.get(task.id).scheduled,false);
+  handler.pump();await new Promise<void>(resolve=>setImmediate(resolve));assert.equal(starts,1);assert.equal(store.get(task.id).run?.status,'stopped');
  }finally{handler.draining=true;await manager.shutdown();rmSync(dir,{recursive:true,force:true});}
 });
 

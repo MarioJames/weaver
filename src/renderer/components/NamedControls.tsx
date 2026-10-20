@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { Field } from '@base-ui/react/field';
-import { InputNumber, Select, Switch, type InputNumberProps, type SelectProps, type SwitchProps } from '@lobehub/ui/base-ui';
+import { AutoComplete, InputNumber, Select, Switch, type AutoCompleteProps, type InputNumberProps, type SelectProps, type SwitchProps } from '@lobehub/ui/base-ui';
 import { styles } from '../style';
 
 type Named = { 'aria-label': string };
@@ -31,4 +31,11 @@ export function NamedSelect({ 'aria-label': label, id: suppliedId, ...props }: S
     return <Field.Root><Field.Label nativeLabel={false} render={<span />} className={styles.srOnly}>{label}</Field.Label><label><span className={styles.srOnly}>{label}</span><Select {...props} id={id} /></label></Field.Root>;
   }
   return <>{!suppliedId && <label className={styles.srOnly} htmlFor={id}>{label}</label>}<Select {...props} id={id} /></>;
+}
+
+/** A text field with a suggestion list. The id reaches the native input, so the native label names it. */
+export function NamedAutoComplete({ 'aria-label': label, id: suppliedId, ...props }: AutoCompleteProps & Named) {
+  const generatedId = useId();
+  const id = suppliedId ?? generatedId;
+  return <>{!suppliedId && <label className={styles.srOnly} htmlFor={id}>{label}</label>}<AutoComplete {...props} id={id} /></>;
 }

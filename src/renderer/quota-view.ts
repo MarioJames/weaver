@@ -1,6 +1,8 @@
 import type { EngineQuotaRecord, QuotaEngine, QuotaRefreshResult, QuotaWindow } from '../shared/quota';
 import { QUOTA_FRESH_MS } from '../shared/quota';
+import { THIRD_PARTY_DETAIL } from '../main/quota/messages';
 import type { PolicyDraft } from './usePolicyDraft';
+import { compactTime } from './timezone';
 
 export const ENGINE_NAMES: Record<QuotaEngine, string> = { codex: 'Codex', claude: 'Claude Code', grok: 'Grok' };
 export const SOURCE_NAMES: Record<string, string> = {
@@ -57,7 +59,12 @@ export function quotaNextUpdateMs(records: EngineQuotaRecord[], now: number): nu
   }
   return waits.length ? Math.min(2_147_483_647, ...waits) : null;
 }
+/** The engine's CLI is switched to another provider (for example by cc-switch), so there is no native quota to read. */
+export function quotaThirdParty(record: Pick<EngineQuotaRecord, 'status' | 'detail'>): boolean {
+  return record.status === 'unsupported' && record.detail === THIRD_PARTY_DETAIL;
+}
 export function quotaStatusText(record: EngineQuotaRecord, stale = record.stale): string {
+  if (quotaThirdParty(record)) return '第三方供应商';
   const label = STATUS_NAMES[record.status];
   return stale && (record.status === 'available' || record.status === 'exhausted') ? `上次观测：${label}` : label;
 }
@@ -69,16 +76,14 @@ export function acceptQuotaPolicy(policy: Pick<PolicyDraft, 'dirty' | 'snapshot'
   if (!policy.applyServerSnapshot(result.snapshot)) return kept;
   return result.policyChanged ? '额度已刷新，已按额度更新自动限制。' : '额度已刷新。';
 }
-export function dateText(value: string | null): string {
+/** A timestamp as compact project-zone text: HH:mm today, MM-DD HH:mm otherwise. */
+export function dateText(value: string | null, now: number = Date.now(), zone?: string): string {
   if (!value || !Number.isFinite(Date.parse(value))) return '未知';
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(new Date(value));
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(item => item.type === type)?.value;
-  return `${part('year')}-${part('month')}-${part('day')} ${part('hour')}:${part('minute')}`;
+  return compactTime(value, now, zone);
 }
 export function quotaRecoveryText(record: EngineQuotaRecord): string {
   if (record.status === 'unauthenticated') return '请在原生 CLI 中确认登录后手动刷新。Weaver 不会登录、刷新凭据或切换账户。';
+  if (quotaThirdParty(record)) return '用量由供应商统计。切回官方订阅后可再次刷新；Weaver 不会改动 cc-switch 或 CLI 配置。';
   if (record.status === 'unsupported') return '当前已有认证无法用于此额度读取。请核对原生 CLI 的订阅登录方式；Weaver 不会改动认证。';
   if (record.status === 'error') return '接口可能暂不可用。冷却结束后可手动重试；下方旧观测不代表本次查询成功。';
   if (record.status === 'unknown') return '尚不能确认账户额度，未知值不会按 0 处理。';

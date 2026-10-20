@@ -22,11 +22,11 @@ class HeldWorker extends EventEmitter {
 }
 function setup(engines = ['qoder', 'codex', 'opencode']) {
   const dir = mkdtempSync(join(tmpdir(), 'weaver-retry-boundary-'));
-  const path = join(dir, 'tasks.json');
+  const path = join(dir,'weaver.db');
   const store = new TaskStore(path);
   const children: HeldWorker[] = [];
   const manager = new TaskManager(store, { id: 'fixture', canLaunchReal: () => true, start() { const child = new HeldWorker(); children.push(child); return child; } });
-  const policy = new PolicyStore(join(dir, 'policy.json'));
+  const policy = new PolicyStore(join(dir,'weaver.db'));
   const snapshot = policy.snapshot();
   const owner = snapshot.config.owners.codex_owner;
   owner.workers = engines.map(engine => `${engine}_worker`);
@@ -54,7 +54,7 @@ function setup(engines = ['qoder', 'codex', 'opencode']) {
 }
 
 for (const frozen of [true, false]) for (const active of [false, true]) {
-  test(`retry rejects package 1000 before touching a ${frozen ? 'frozen' : 'unfrozen'} ${active ? 'active --cancel' : 'terminal'} attempt`, async () => {
+  test(`retry admits beyond 1000 packages for a ${frozen ? 'frozen' : 'unfrozen'} ${active ? 'active --cancel' : 'terminal'} attempt`, async () => {
     const f = setup();
     try {
       const original = f.create();
@@ -71,24 +71,25 @@ for (const frozen of [true, false]) for (const active of [false, true]) {
       const metadata = f.store.getMetadata();
       while (metadata.packages.length < 1000) metadata.packages.push({ ...pkg, id: randomUUID() });
       f.store.setMetadata(metadata);
-      const before = f.store.list();
-      const persistedBefore = new TaskStore(f.path).list();
-      const packages = f.store.getMetadata().packages;
       const launches = f.children.length;
       const commandId = randomUUID();
       const args = { taskId: original.id, ...(active ? { cancel: true } : {}) };
       const response = f.raw('tasks.retry', args, commandId);
-      assert.equal(response.ok, false, 'full package storage must refuse the retry');
-      assert.equal(response.error?.code, 'RESOURCE_LIMIT');
-      assert.deepEqual(f.store.list(), before, 'status, events, dispatch, artifacts and original package link stay intact');
-      assert.deepEqual(f.store.getMetadata().packages, packages);
-      assert.equal(f.children.length, launches, 'no retry worker launched');
-      assert.ok(f.children.every(child => child.signals.length === 0), 'no original worker cancellation');
-      assert.deepEqual(f.raw('tasks.retry', args, commandId), response, 'the refusal has a replayable receipt');
-      const reopened = new TaskStore(f.path);
-      assert.equal(reopened.getMetadata().packages.length, 1000);
-      assert.deepEqual(reopened.list(), persistedBefore, 'persisted metadata remains valid on restart');
-      assert.deepEqual(reopened.getMetadata().receipts[`local-demo:${commandId}`].response, response);
+      assert.equal(response.ok, true, JSON.stringify(response));
+      const retried=response.data as Task;
+      assert.equal(retried.retryOf,original.id);
+      assert.equal(f.store.listPackages().length,1001);
+      assert.equal(f.children.length,launches+1);
+      assert.deepEqual(f.store.get(original.id).artifacts,task.artifacts,'partial work survives retry');
+      assert.equal(f.store.get(original.id).status,active?'cancelling':'completed');
+      if(frozen)assert.deepEqual(f.store.getPackage(retried.packageId!)!.scope,pkg.scope);
+      assert.deepEqual(f.raw('tasks.retry',args,commandId),response,'successful retry has a replayable receipt');
+      const reopened=new TaskStore(f.path);
+      try {
+       assert.equal(reopened.listPackages().length,1001);
+       assert.deepEqual(reopened.get(retried.id),f.store.get(retried.id));
+       assert.deepEqual(reopened.getReceipt(`local-demo:${commandId}`)!.response,response);
+      }finally{reopened.close();}
     } finally { await f.close(); }
   });
 }

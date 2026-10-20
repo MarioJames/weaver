@@ -44,7 +44,7 @@ test('card title shares its text flow with the sub agent, followed by exactly tw
   assert.match(title, /<title>Claude Code<\/title>[\s\S]*WORKER[\s\S]*<strong[^>]*>CARD_ONE<\/strong>/);
   assert.equal((html.match(/>WORKER</g) ?? []).length, 1);
   const meta = html.slice(html.indexOf(`class="${styles.cardMeta}"`));
-  assert.match(meta, /<time[\s\S]*aria-label="父 Agent：Parent"[\s\S]*Parent/);
+  assert.match(meta, /^[^>]*><span[^>]*>由 <span[^>]*aria-label="父 Agent：Parent"[\s\S]*Parent[\s\S]*于 <time[^>]*>[0-9]{2}:[0-9]{2}<\/time> 创建/);
   assert.doesNotMatch(html, /<dl|<dt|目录|\/projects|\/frozen/);
   assert.doesNotMatch(card({ ...base, dispatch: undefined }), /WORKER|<title>Claude Code/);
 });
@@ -69,10 +69,13 @@ test('inactive execution cards keep the first row status alone and the second ro
     assert.match(row, new RegExp(label));
     assert.doesNotMatch(row, /<time|WORKER|Parent/);
     assert.doesNotMatch(html, /ACTIVITY|secret-value|等待首次调度|lucide-loader-2/);
-    assert.match(html.slice(html.indexOf(`class="${styles.cardMeta}"`)), /<time[^>]*title="[^"]+"[^>]*>[0-9]{2}:[0-9]{2}<\/time>[\s\S]*aria-label="父 Agent：Parent"/);
+    const meta = html.slice(html.indexOf(`class="${styles.cardMeta}"`));
+    assert.match(meta, /由 <span[^>]*aria-label="父 Agent：Parent"[\s\S]*于 <time[^>]*title="[^"]+"[^>]*>[0-9]{2}:[0-9]{2}<\/time> 创建/);
+    assert.equal(/完成于|结束于/.test(meta), status === 'completed' || status === 'failed' || status === 'cancelled');
+    assert.doesNotMatch(meta, /最新上报/);
   }
   const yesterday = new Date(now - 86400000).toISOString();
-  assert.match(card({ ...base, updatedAt: yesterday }), /<time[^>]*>10-17 [0-9]{2}:[0-9]{2}<\/time>/);
+  assert.match(card({ ...base, createdAt: yesterday }), /<time[^>]*>10-17 [0-9]{2}:[0-9]{2}<\/time> 创建/);
 });
 
 test('workspace groups use task workspace, sort by newest task and omit headings for a single group', () => {

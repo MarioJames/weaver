@@ -43,8 +43,8 @@ test('no matching tasks show a single empty state and offer a clear action', () 
 test('cards show compact local time and preserve full timestamp in a tooltip', () => {
   const html = board([task]);
   assert.match(html, /<time[^>]*title="[^"]+"[^>]*>14:25<\/time>/);
-  const yesterday = board([{ ...task, updatedAt: new Date(2026, 9, 18, 14, 25).toISOString() }], { ...emptySelection(), time: 'all' });
-  assert.match(yesterday, />10-18 14:25<\/time>/);
+  const yesterday = board([{ ...task, createdAt: new Date(2026, 9, 18, 14, 25).toISOString() }], { ...emptySelection(), time: 'all' });
+  assert.match(yesterday, />10-18 14:25<\/time> 创建/);
 });
 
 test('queue uses a static clock and the shared tones distinguish stopping and rejection', () => {

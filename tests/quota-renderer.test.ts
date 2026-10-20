@@ -138,8 +138,10 @@ test('an expired token waiting for native renewal shows kept windows or the no-d
   const logout = record({ status: 'unauthenticated', stale: true, windows: [], detail: '原生登录已过期，请在对应工具中重新登录' });
   assert.match(pageText(logout), /登录状态不可用.*请在原生 CLI 中确认登录/);
 });
-test('quota dates use local Chinese calendar order and minute precision', () => {
-  assert.equal(dateText(new Date(2026, 9, 19, 11, 48, 34).toISOString()), '2026-10-19 11:48');
+test('quota dates follow the compact rule: HH:mm today, MM-DD HH:mm on another day', () => {
+  const now = new Date(2026, 9, 19, 15, 0).getTime();
+  assert.equal(dateText(new Date(2026, 9, 19, 11, 48, 34).toISOString(), now), '11:48');
+  assert.equal(dateText(new Date(2026, 9, 20, 11, 48, 34).toISOString(), now), '10-20 11:48');
   assert.equal(dateText(null), '未知');
   assert.equal(dateText('invalid'), '未知');
 });

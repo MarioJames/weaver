@@ -7,6 +7,7 @@ export const ENGINE_CATALOG = [
   { id: 'grok', kind: 'grok', command: 'grok' },
   { id: 'opencode', kind: 'opencode', command: 'opencode' },
   { id: 'pi', kind: 'pi', command: 'pi' },
+  { id: 'zcode', kind: 'zcode', command: 'zcode' },
   { id: 'qoder', kind: 'qodercli', command: 'qodercli' },
 ] as const;
 
@@ -41,7 +42,7 @@ export interface EngineReadiness {
   probe: EngineProbeRecord;
 }
 
-const REAL_ADAPTER_KINDS = new Set(['opencode', 'pi', 'grok', 'codex', 'qodercli']);
+const REAL_ADAPTER_KINDS = new Set(['opencode', 'pi', 'grok', 'codex', 'qodercli', 'zcode']);
 
 function adapterStatusFor(kind: string): EngineReadiness['adapterStatus'] {
   if (kind === 'claude') return 'deferred';
@@ -73,8 +74,8 @@ export function engineDisableConflict(config: Config, id: string): string | unde
   const workers = Object.entries(config.workers).filter(([, worker]) => worker.enabled && worker.engine === id).map(([key]) => key);
   if (!owners.length && !workers.length) return undefined;
   const parts = [
-    owners.length ? `启用的负责人 ${owners.join('、')}` : '',
-    workers.length ? `启用的工作代理 ${workers.join('、')}` : '',
+    owners.length ? `启用的父 Agent ${owners.join('、')}` : '',
+    workers.length ? `启用的子 Agent ${workers.join('、')}` : '',
   ].filter(Boolean);
   return `不能停用引擎 ${id}：仍有${parts.join('，')}。请先单独停用这些角色并保存。引擎记录和角色配置都保留，不会级联停用或删除。`;
 }
@@ -101,7 +102,7 @@ export function readinessFor(probes: EngineProbeRecord[], config: Config): Engin
 }
 
 /** One worker route to greet: an engine id from the saved policy plus the model and effort to call. */
-export interface HelloInput { engine: string; model: string; effort: string }
+export interface HelloInput { proxy?: string; engine: string; model: string; effort: string }
 /** model is what the vendor reported answering, when it says; it can differ from the requested name. */
 export interface HelloResult { ok: boolean; reply?: string; model?: string; error?: string; durationMs: number; checkedAt: string }
 /** A greeting runs longer than one HTTP request may wait, so it is started and then polled. */

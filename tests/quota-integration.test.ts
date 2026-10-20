@@ -5,10 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { DatabaseSync } from 'node:sqlite';
 import { PolicyStore } from '../src/main/policy/store';
 import { applyQuotaSnapshot, parseQuotaRefresh } from '../src/main/policy/quota';
 import type { EngineQuotaRecord, QuotaWindow } from '../src/shared/quota';
-import { QuotaProber } from '../src/main/quota';
+import { QuotaProber, dbQuotaStore } from '../src/main/quota';
+import { migrate } from '../src/main/migrate';
 import { startRuntime, type WeaverRuntime } from '../src/main/runtime';
 
 const now = Date.parse('2030-01-01T00:00:00Z');
@@ -22,7 +24,7 @@ function record(patch: Partial<EngineQuotaRecord> = {}): EngineQuotaRecord {
 }
 async function fixture() {
   const dir = await mkdtemp(join(tmpdir(), 'bq-'));
-  const policy = new PolicyStore(join(dir, 'policy.json'), () => now);
+  const policy = new PolicyStore(join(dir,'weaver.db'), () => now);
   return { dir, policy, close: () => rm(dir, { recursive: true, force: true }) };
 }
 
@@ -92,10 +94,10 @@ test('expired foreign engine blocks report an atomic conflict while active forei
     const manual = { engine: 'codex', reason: 'manual retained', since, release_at: '2029-12-31T23:59:59Z', by: 'operator' };
     f.policy.save({ revision: current.revision, config: current.config, blocks: [manual] });
     const before = f.policy.snapshot();
-    const bytes = await readFile(f.policy.path, 'utf8');
+    const history = f.policy.history();
     assert.throws(() => applyQuotaSnapshot(f.policy, { records: [record({ engine: 'claude' }), record()] }, {}, now), { code: 'QUOTA_POLICY_CONFLICT' });
     assert.deepEqual(f.policy.snapshot(), before);
-    assert.equal(await readFile(f.policy.path, 'utf8'), bytes);
+    assert.deepEqual(f.policy.history(), history, 'a refused merge records no revision');
     const saved = f.policy.save({ revision: before.revision, config: before.config, blocks: [{ ...manual, release_at: reset }] });
     const retained = applyQuotaSnapshot(f.policy, { records: [record()] }, {}, now);
     assert.equal(retained.policyChanged, false);
@@ -219,8 +221,9 @@ test('a completed probe merges into latest saved config and preserves newly adde
     assert.deepEqual(result.json.result.snapshot.blocks[0], manual);
     assert.equal(result.json.result.snapshot.blocks[1].by, 'weaver-quota:codex');
     assert.equal(result.json.result.snapshot.revision, saved.json.result.revision + 1);
-    const persisted = JSON.parse(await readFile(join(f.dir, 'policy.v1.json'), 'utf8'));
+    const persisted = new PolicyStore(join(f.dir, 'weaver.db')).snapshot();
     assert.deepEqual(persisted.blocks, result.json.result.snapshot.blocks);
+    assert.equal(persisted.revision, result.json.result.snapshot.revision, 'the database holds the merged revision');
   } finally { release(); await runtime?.close(); await f.close(); }
 });
 
@@ -243,7 +246,7 @@ test('shutdown aborts a pending native request and prevents late policy writes',
     const response = await refresh;
     assert.equal(response.status, 503);
     assert.equal(response.json.error.code, 'APP_DRAINING');
-    await assert.rejects(readFile(join(f.dir, 'policy.v1.json')), { code: 'ENOENT' });
+    assert.deepEqual(new PolicyStore(join(f.dir, 'weaver.db')).history(), [], 'no policy revision was written after shutdown');
   } finally { await runtime?.close(); await f.close(); }
 });
 
@@ -253,7 +256,9 @@ test('persistence failure is explicit and leaves the in-memory policy unchanged'
   try {
     const env = await nativeFixture(f.dir);
     runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber: new QuotaProber({ env, now: () => new Date(now), fetch: async () => usage(100) }) });
-    await mkdir(join(f.dir, 'policy.v1.json'));
+    const saboteur = new DatabaseSync(join(f.dir, 'weaver.db'));
+    saboteur.exec("CREATE TRIGGER refuse_policy BEFORE INSERT ON policy_revisions BEGIN SELECT RAISE(ABORT, 'disk full'); END");
+    saboteur.close();
     const failed = await rpc(runtime, 'refreshQuota', [{ engine: 'codex' }]);
     assert.equal(failed.status, 500);
     assert.equal(failed.json.error.code, 'PERSISTENCE_ERROR');
@@ -269,10 +274,10 @@ test('expired manual conflict reaches HTTP and CLI without overwriting the manua
   let runtime: WeaverRuntime | undefined;
   try {
     const env = await nativeFixture(f.dir);
-    const policy = new PolicyStore(join(f.dir, 'policy.v1.json'));
+    const policy = new PolicyStore(join(f.dir, 'weaver.db'));
     const current = policy.snapshot();
     const before = policy.save({ revision: current.revision, config: current.config, blocks: [{ engine: 'codex', reason: 'expired manual retained', since: '2020-01-01T00:00:00Z', release_at: '2021-01-01T00:00:00Z' }] });
-    const bytes = await readFile(policy.path, 'utf8');
+    const bytes = JSON.stringify(new PolicyStore(policy.path).snapshot());
     runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber: new QuotaProber({ env, now: () => new Date(now), fetch: async () => usage(100) }) });
     const conflict = await rpc(runtime, 'refreshQuota', [{ engine: 'codex' }]);
     assert.equal(conflict.status, 409);
@@ -281,7 +286,7 @@ test('expired manual conflict reaches HTTP and CLI without overwriting the manua
     assert.equal(fromCli.status, 1);
     assert.equal(JSON.parse(fromCli.stdout).error.code, 'QUOTA_POLICY_CONFLICT');
     assert.deepEqual((await rpc(runtime, 'getPolicy', [])).json.result, before);
-    assert.equal(await readFile(policy.path, 'utf8'), bytes);
+    assert.equal(JSON.stringify(new PolicyStore(policy.path).snapshot()), bytes, 'the stored policy did not change');
   } finally { await runtime?.close(); await f.close(); }
 });
 
@@ -321,7 +326,7 @@ test('refresh blocks the existing queue without cancelling its explicit mock fix
   let runtime: WeaverRuntime | undefined;
   try {
     const env = await nativeFixture(f.dir);
-    const policy = new PolicyStore(join(f.dir, 'policy.v1.json'));
+    const policy = new PolicyStore(join(f.dir, 'weaver.db'));
     const current = policy.snapshot();
     current.config.owners.codex_owner.max_parallel = 1;
     policy.save({ revision: current.revision, config: current.config, blocks: [] });
@@ -403,4 +408,30 @@ test('an expired but renewable native token keeps the last published reading ins
     assert.equal(logout.json.result.records.find((item: EngineQuotaRecord) => item.engine === 'codex').status, 'unauthenticated');
     assert.match(JSON.stringify(logout.json.result.records), /登录/);
   } finally { await runtime?.close(); await f.close(); }
+});
+
+test('the quota snapshot is stored in weaver.db and a restarted prober reads it before probing anything', async () => {
+  const f = await fixture();
+  try {
+    const env = await nativeFixture(f.dir);
+    const db = new DatabaseSync(join(f.dir, 'weaver.db'));
+    migrate(db);
+    let requests = 0;
+    const first = new QuotaProber({ env, now: () => new Date(now), fetch: async () => { requests += 1; return usage(100); }, snapshotStore: dbQuotaStore(db) });
+    const probed = await first.refresh({ engine: 'codex' });
+    await first.close();
+    assert.equal(requests, 1);
+    const live = probed.records.find(item => item.engine === 'codex')!;
+    assert.equal(live.status, 'exhausted');
+    assert.equal(Number((db.prepare('SELECT count(*) AS n FROM quota_records').get() as { n: number }).n) > 0, true, 'one row per observed engine');
+    let afterRestart = 0;
+    const second = new QuotaProber({ env, now: () => new Date(now), fetch: async () => { afterRestart += 1; return usage(0); }, snapshotStore: dbQuotaStore(db) });
+    const restored = second.get().records.find(item => item.engine === 'codex')!;
+    assert.equal(afterRestart, 0, 'reading the stored snapshot costs no request');
+    assert.equal(restored.status, 'exhausted');
+    assert.equal(restored.checkedAt, live.checkedAt);
+    assert.deepEqual(restored.windows, live.windows);
+    await second.close();
+    db.close();
+  } finally { await f.close(); }
 });

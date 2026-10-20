@@ -15,7 +15,7 @@
     "check": "npm run typecheck && npm test && npm run build"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.13.0"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",

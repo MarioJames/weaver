@@ -1,3 +1,4 @@
+import { validateProxy } from '../shared/proxy';
 import { validateContinuationFields } from './continuation';
 import { isRealEngineKind } from './workspace';
 import type { Task, TaskEvent, AgentRun } from '../shared/types';
@@ -36,6 +37,7 @@ export function parseStoredTask(value: unknown): Task {
    const evidence:NonNullable<AgentRun['evidence']>={engine:e.engine as NonNullable<AgentRun['evidence']>['engine'],requestedModel:text(e.requestedModel,'requestedModel',200),requestedEffort:text(e.requestedEffort,'requestedEffort',120),workspace:text(e.workspace,'workspace',2000),terminal:e.terminal as NonNullable<AgentRun['evidence']>['terminal']};
    if(e.role!==undefined){if(e.role!=='worker'&&e.role!=='owner')throw new Error('Invalid evidence role');evidence.role=e.role;}
    for(const key of ['vendorSessionId','vendorModel'] as const)if(e[key]!==undefined)evidence[key]=text(e[key],key,512);
+   for(const key of ['promptPath','sessionDir'] as const)if(e[key]!==undefined)evidence[key]=text(e[key],key,2000);
    if(e.usage!==undefined){const usage=object(e.usage);evidence.usage={};for(const key of ['inputTokens','outputTokens'] as const)if(usage[key]!==undefined){if(!Number.isSafeInteger(usage[key])||Number(usage[key])<0)throw new Error('Invalid provider usage');evidence.usage[key]=Number(usage[key]);}}
    run.evidence=evidence;
   }
@@ -61,7 +63,8 @@ export function parseStoredTask(value: unknown): Task {
  if(raw.revision!==undefined) {if(!Number.isSafeInteger(raw.revision)||Number(raw.revision)<0)throw new Error('Invalid revision');extra.revision=Number(raw.revision);}
  if(raw.queueReason!==undefined){const q=object(raw.queueReason);if(!['waiting_for_capacity','policy_blocked','frozen_route_changed','workspace_changed','launch_blocked'].includes(String(q.code)))throw new Error('Invalid queue reason');extra.queueReason={code:q.code as NonNullable<Task['queueReason']>['code'],message:text(q.message,'queue reason',700)};}
  if(raw.scheduled!==undefined) {if(typeof raw.scheduled!=='boolean')throw new Error('Invalid scheduled flag');extra.scheduled=raw.scheduled;}
- for(const key of ['ownerId','packageId','retryOf'] as const) if(raw[key]!==undefined) extra[key]=parseId(raw[key]);
+ if(raw.executionRole!==undefined){if(raw.executionRole!=='owner')throw new Error('Invalid execution role');extra.executionRole='owner';}
+ for(const key of ['ownerId','packageId','retryOf','parentTaskId'] as const) if(raw[key]!==undefined) extra[key]=parseId(raw[key]);
  if(raw.ownerHost!==undefined) {
   const host=object(raw.ownerHost);
   if(host.kind!=='herdr')throw new Error('Invalid stored owner host');
@@ -72,6 +75,6 @@ export function parseStoredTask(value: unknown): Task {
  if(raw.acknowledged!==undefined) {if(typeof raw.acknowledged!=='boolean')throw new Error('Invalid acknowledgment');extra.acknowledged=raw.acknowledged;}
  if(raw.reviewState!==undefined) {if(!['pending','accepted','rejected'].includes(String(raw.reviewState)))throw new Error('Invalid review');extra.reviewState=raw.reviewState as Task['reviewState'];}
  if(raw.reviewComment!==undefined)extra.reviewComment=text(raw.reviewComment,'review comment',4000,true);
- if(raw.dispatch!==undefined) {const d=object(raw.dispatch);if((d.execution!=='mock'&&d.execution!=='real'&&d.execution!=='native')||!Number.isSafeInteger(d.maxParallel)||Number(d.maxParallel)<1)throw new Error('Invalid dispatch');extra.dispatch={owner:text(d.owner,'owner',120),worker:text(d.worker,'worker',120),engine:text(d.engine,'engine',120),model:text(d.model,'model',200),effort:text(d.effort,'effort',120),execution:d.execution,maxParallel:Number(d.maxParallel)};if(d.maxWaitMinutes!==undefined){if(!Number.isSafeInteger(d.maxWaitMinutes)||Number(d.maxWaitMinutes)<1||Number(d.maxWaitMinutes)>1440)throw new Error('Invalid dispatch');extra.dispatch.maxWaitMinutes=Number(d.maxWaitMinutes);}if(d.adapter!==undefined)extra.dispatch.adapter=text(d.adapter,'adapter',80);if(d.workspace!==undefined)extra.dispatch.workspace=text(d.workspace,'workspace',2000);if(d.engineKind!==undefined)extra.dispatch.engineKind=text(d.engineKind,'engineKind',80);if(d.workspaceIdentity!==undefined)extra.dispatch.workspaceIdentity=text(d.workspaceIdentity,'workspaceIdentity',100);}
+ if(raw.dispatch!==undefined) {const d=object(raw.dispatch);if((d.execution!=='mock'&&d.execution!=='real'&&d.execution!=='native')||!Number.isSafeInteger(d.maxParallel)||Number(d.maxParallel)<1)throw new Error('Invalid dispatch');extra.dispatch={owner:text(d.owner,'owner',120),worker:text(d.worker,'worker',120),engine:text(d.engine,'engine',120),model:text(d.model,'model',200),effort:text(d.effort,'effort',120),execution:d.execution,maxParallel:Number(d.maxParallel)};if(d.maxWaitMinutes!==undefined){if(!Number.isSafeInteger(d.maxWaitMinutes)||Number(d.maxWaitMinutes)<1||Number(d.maxWaitMinutes)>1440)throw new Error('Invalid dispatch');extra.dispatch.maxWaitMinutes=Number(d.maxWaitMinutes);}if(d.proxy!==undefined){validateProxy(d.proxy as string);extra.dispatch.proxy=d.proxy as string;}if(d.adapter!==undefined)extra.dispatch.adapter=text(d.adapter,'adapter',80);if(d.workspace!==undefined)extra.dispatch.workspace=text(d.workspace,'workspace',2000);if(d.engineKind!==undefined)extra.dispatch.engineKind=text(d.engineKind,'engineKind',80);if(d.workspaceIdentity!==undefined)extra.dispatch.workspaceIdentity=text(d.workspaceIdentity,'workspaceIdentity',100);}
  return {...input,...extra,id:parseId(raw.id),createdAt:date(raw.createdAt),updatedAt:date(raw.updatedAt),status:raw.status as Task['status'],progress:raw.progress,events,artifacts,...(run?{run}:{}),...(raw.summary!==undefined?{summary:text(raw.summary,'summary',8000)}:{})};
 }

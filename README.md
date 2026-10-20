@@ -32,7 +32,7 @@ Releases are built by `.github/workflows/release.yml` on a `v*` tag that matches
 
 ## Build from source
 
-Requires Node.js 22.12+ (`engines` in `package.json`). No system toolchain is installed.
+Requires Node.js 22.13+ (`engines` in `package.json`). No system toolchain is installed.
 
 ```sh
 npm ci
@@ -88,7 +88,7 @@ weaver server uninstall
 weaver web              # same service, in this terminal; --no-open skips the browser
 ```
 
-It is the same single writer and supervisor: it binds `127.0.0.1` only (default port 4737; `--port` selects another, `0` picks a free port), prints the URL after the stores and endpoints are ready, and keeps running after the browser closes. When a Weaver service is already running, `weaver web` returns that service's address instead of failing. `--dev` serves the UI with Vite on the same loopback origin. `--data-dir` overrides the state directory, which is also the discoverable endpoint root (`control.v1.json`). A busy port reports `EADDRINUSE` and names `--port`. Stop it with Ctrl+C or SIGTERM: the process drains, stops the workers it started, and exits. Task and policy files are kept, closing the browser tab does not stop tasks, and there is no second daemon behind any of this. Weaver does not read, migrate, or delete `~/.config/weaver-desktop`.
+It is the same single writer and supervisor: it binds `127.0.0.1` only (default port 4737; `--port` selects another, `0` picks a free port), prints the URL after the stores and endpoints are ready, and keeps running after the browser closes. When a Weaver service is already running, `weaver web` returns that service's address instead of failing. `--dev` serves the UI with Vite on the same loopback origin. `--data-dir` overrides the state directory, which is also the discoverable endpoint root (`control.v1.json`). A busy port reports `EADDRINUSE` and names `--port`. Stop it with Ctrl+C or SIGTERM: the process drains, stops the workers it started, and exits. Task and policy data in `weaver.db` is kept, closing the browser tab does not stop tasks, and there is no second daemon behind any of this. Weaver does not read, migrate, or delete `~/.config/weaver-desktop`.
 
 ## Skill entry and preflight
 
@@ -99,7 +99,9 @@ weaver --help --output json    # complete command catalog and exact inputs
 weaver capabilities           # process capabilities, limits, realExecution
 weaver engines scan           # PATH + --version probe of the fixed engine catalog
 weaver policy get             # saved owners, workers, weights, blocks, revision
-weaver quota get              # 只读内存中的 Codex / Claude Code / Grok 额度，不联网
+weaver policy history         # every saved policy revision (number, time, source)
+weaver workers probe-status   # free-channel probe schedule, ladder state and history
+weaver quota get              # 只读 weaver.db 中最近一次 Codex / Claude Code / Grok 额度，不联网
 weaver engines health         # stall penalty summaries; no history
 weaver engines penalty --engine <id>  # retained history for one engine
 ```
@@ -181,6 +183,7 @@ Policy is one validated document saved atomically with a revision check. It hold
 - A disabled worker, a disabled engine, or an active block on the engine/model skips that worker. Pause an engine from its card on the Engines page; exhausted quota adds and removes its own block. Runtime vendor-limit blocks show a short reason, e.g. `限流：Rate limit exceeded…`. Repeated rate limits within 2 h use a 10 → 30 → 60 min release ladder, reset after 2 h quiet; a later vendor retry time wins. Quota errors without a retry time stay blocked until manual unblock. Queued tasks on a vendor-blocked engine reroute to another eligible engine; the failed attempt itself is not automatically retried.
 - Concurrency is per owner **instance**: each instance has its profile's `max_parallel` slots. `owners attach` identifies an instance by `profileId` + `name` + `session`; multiple sessions on one profile have independent capacity. The reported total is the sum of enabled profile limits, a scale hint rather than a global capacity cap. Lowering `max_parallel` leaves running tasks alone.
 - `herdr.max_wait_minutes` (1-1440) is the longest interval between two checks on a worker: wait only with `weaver tasks wait --task-id` — it returns as soon as the task ends, and without `--for` one call waits min(600 s, `herdr.max_wait_minutes` × 60) at most (30 s if policy is unreadable). Never sleep or set a longer timer instead. This setting does not impose an execution deadline; inspect `tasks health` before deciding whether to keep waiting, cancel, or retry.
+- `display.timezone` is an optional IANA time zone name (for example `Asia/Shanghai`) used to render dates in the web UI. Leave it unset or empty to follow the browser. `policy save` rejects a name Intl does not support with a field error on `$.display.timezone`; `policy get` returns it.
 
 ```sh
 weaver policy validate --input config.json   # config.json is the config document itself
@@ -197,7 +200,7 @@ Route preview is non-executing; dispatch separately applies current policy. Edit
 
 ## 原生账户额度
 
-`quota get` 只读内存；`quota refresh` 手动探测 Codex、Claude Code 和 Grok，并同步 Weaver 自建的 `policy.blocks`。运行中的 `weaver web` 还会按设置页的间隔（policy `quota`，缺省每 15 分钟）自动刷新开启了「主动刷新额度」（`engines.*.quota_refresh`）的已启用引擎；额度耗尽时自动阻断该引擎，恢复或到重置时间后自动解除。初次读取或进程重启后显示未知，额度观测不持久缓存；自动阻断仍保留在策略文件中。额度状态不保证模型能够运行，引擎启用、角色、权重与 pin 仍独立配置。
+`quota get` 只读已入库的最近一次观测，不联网；`quota refresh` 手动探测 Codex、Claude Code 和 Grok，并同步 Weaver 自建的 `policy.blocks`。运行中的 `weaver web` 还会按设置页的间隔（policy `quota`，缺省每 15 分钟）自动刷新开启了「主动刷新额度」（`engines.*.quota_refresh`）的已启用引擎；额度耗尽时自动阻断该引擎，恢复或到重置时间后自动解除。最近一次额度观测存入 `weaver.db`，进程重启后 `quota get` 仍可读到（超过保鲜期显示为陈旧）；自动阻断保存在策略 blocks 中。额度状态不保证模型能够运行，引擎启用、角色、权重与 pin 仍独立配置。
 
 ```sh
 weaver quota get --output json
@@ -254,7 +257,7 @@ At least two workers on one engine silent and CPU-idle for 5 minutes trigger a s
 
 ## Data and process boundary
 
-State is one versioned JSON store (`tasks.v1.json`) plus one policy store (`policy.v1.json`) written by the single running process with fsync + rename atomic replacement (intentionally no directory fsync). Caps: 200 tasks, 200 retained owners, 1,000 packages, 5,000 command receipts, 500 events per task, 20 artifacts per task, 32,000-character artifact content, 256 KiB policy document, 32 MiB store, 100 events per page. There is no retention UI yet.
+Tasks and control-plane records are persisted in `weaver.db` with built-in `node:sqlite`, WAL journaling and FULL synchronous commits. Tasks, events, artifact bodies, owners, frozen packages and command receipts are stored separately; command intent is committed before process effects. Everything Weaver persists lives in that one `weaver.db`: tasks and control-plane records, the policy (engines, owners, ordered owner-worker links with weights, workers, settings such as `quota`, `herdr`, `free_channel_probe` and `display`, and blocks, one table each), a `policy_revisions` history that records every save with its number, time, source and full snapshot, the stall penalty ladder and history, the vendor rate-limit ladder, the free-channel probe state and history, and the last quota snapshot. The schema is built by ordered migrations tracked in `PRAGMA user_version`: an empty database climbs from 0, an up-to-date one is left alone. Startup reads only `weaver.db`; it never reads or writes a `*.v1.json` (the only JSON in the data directory is the endpoint/token discovery file `control.v1.json`, plus the private per-run prompts and sessions under `agent-state/`). Read it all through the CLI (`tasks get`, `policy get`, `policy history`, `engines penalty`, `workers probe-status`, `quota get`); do not open the database or any file by hand. Rolling a policy back is `weaver policy rollback --input '{"revision":N}'`, which records a new revision. Data from an older JSON-based install is moved in once, by hand and outside the product, with a separate migration script that never touches the source files. Retained limits: 500 events per task, 20 artifacts per task, 32,000-character artifact content, 256 KiB policy document and 100 events per page. There is no retention UI yet.
 
 The Unix CLI transport uses a random per-instance token in an owned private directory (`control-<instanceId>/`), 1 MiB frames, and a 15-second per-request timeout; token and discovery files are user-restricted and no token is ever placed in argv or output. The credential is **local trusted-user authority**, not per-owner isolation: do not connect untrusted external agents. A stale endpoint left by a crashed server (a discovery file whose socket no longer answers) is removed automatically, so `weaver server start` recovers on its own. Weaver targets Linux/Unix. `weaver web` starts its Unix CLI transport before the loopback HTTP layer and refuses to start on native Windows (`UNSUPPORTED_PLATFORM`, `src/main/local-ipc.ts`); supervised real workers additionally rely on Linux systemd user scopes.
 

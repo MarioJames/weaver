@@ -120,8 +120,8 @@ test('new logical commands are catalogued, parseable in both forms and in help',
   assert.equal(parseCLI([name]).command,name);
   assert.match(CLI_HELP,new RegExp(name.replaceAll('.',' ')));
  }
- assert.match(CLI_HELP,/\[--engine <id>\] \[--cancel\]/);
- assert.match(CLI_HELP,/engine <id> is the engine argument of engines penalty and engines unblock/);
+  assert.match(CLI_HELP,/\[--engine <id>\] \[--worker <id>\] \[--cancel\]/);
+ assert.match(CLI_HELP,/engine <id> is the engine argument of engines penalty, engines unblock and engines models/);
  assert.match(CLI_HELP,/tasks retry returns the linked task already dispatched/);
  // The help says what an owner gets, not which component decides it.
  assert.doesNotMatch(CLI_HELP,/the server decides|the CLI never/);
@@ -160,7 +160,7 @@ test('flags become the frozen logical args and a mutation keeps the shared comma
 
 test('--engine and --cancel are refused on any other command, repeated or without a value',()=>{
  for(const words of [['tasks','health','--task-id','t'],['engines','health'],['tasks','get','--task-id','t'],['tasks','retry','--task-id','t'],['owners','launch','--task-id','t'],['engines','scan'],['engines','set-enabled','--input','{}']]){
-  assert.throws(()=>parseCLI([...words,'--engine','qoder']),/--engine is only valid for engines penalty and engines unblock/);
+  assert.throws(()=>parseCLI([...words,'--engine','qoder']),/--engine is only valid for engines penalty, engines unblock and engines models/);
  }
  for(const words of [['tasks','cancel','--task-id','t'],['tasks','health','--task-id','t'],['engines','unblock','--engine','qoder'],['tasks','list']]){
   assert.throws(()=>parseCLI([...words,'--cancel']),/--cancel is only valid for tasks retry/);

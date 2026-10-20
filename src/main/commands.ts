@@ -1,10 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { API_VERSION, ownerSession, sameOwnerInstance, type CommandResponse, type DispatchNext, type LogicalOwner, type OwnerInstance, type WorkPackage } from '../shared/commands';
 import type { Task } from '../shared/types';
-import { object, parseId, parseTaskInput, parseWorkerRecord, text } from '../shared/validation';
+import { object, parseId, parseTaskInput, parseWorkerRecord, text, PENDING_TASK_TITLE } from '../shared/validation';
 import { TaskManager } from './manager';
 import { event, slotGroupCount, slotGroupFor, slotGroupName } from './store';
-import { ContinuationService, ContinuationError, handoffPrompt, redactContext } from './continuation';
+import { ContinuationService, ContinuationError, handoffPrompt, rootOwnerPrompt, redactContext } from './continuation';
 import { MockOwnerHostAdapter, type OwnerHostEvidence, type OwnerMessage } from './adapters/logical';
 import { launchOwner, launchOwnerAsync, closeOwnerHost, closeOwnerHostAsync, herdrOnPath, OwnerLaunchError, type OwnerLaunchInput, type OwnerLaunchResult } from './owner-host';
 import type { TaskOwnerHost } from '../shared/types';
@@ -13,11 +13,13 @@ import { PolicyStore } from './policy/store';
 import type { RoutePreview } from '../shared/policy';
 import { QUOTA_CAPABILITIES } from './policy/quota';
 import { EXCLUDED_ENGINE_REASON } from './policy/routing';
-import { absoluteExistingWorkspace, assertFrozenWorkspace, workspaceIdentity, isRealEngineKind, REAL_ENGINE_KINDS } from './workspace';
+import { absoluteExistingWorkspace, assertFrozenWorkspace, workspaceIdentity, listWorkspaceDirectories, isRealEngineKind, REAL_ENGINE_KINDS } from './workspace';
 import { vendorBlockReason } from './adapters/cli/vendor-errors';
 import { workerInstruction } from './adapters/instruction';
-export const WRITE_COMMANDS = ['owners.attach','owners.spawn','owners.switch','owners.launch','owners.continuation.configure','tasks.create','tasks.retry','tasks.cancel','packages.create','workers.spawn','workers.complete','results.deliver','results.ack','reviews.submit','engines.unblock'] as const;
-export const READ_COMMANDS = ['capabilities.get','sync.snapshot','sync.status','owners.list','owners.get','owners.continuation.get','tasks.get','tasks.list','tasks.events','tasks.results','tasks.health','artifacts.read','packages.get','operations.get','observability.get','observability.export','engines.health','engines.penalty'] as const;
+/** Vendor rate limit ladder in minutes, level 1..3; shared with the free-channel probe monitor. */
+export const VENDOR_LADDER_MINUTES = [10, 30, 60] as const;
+export const WRITE_COMMANDS = ['owners.attach','owners.spawn','owners.switch','owners.launch','owners.continuation.configure','tasks.create','tasks.start','tasks.complete','tasks.describe','tasks.retry','tasks.cancel','packages.create','workers.spawn','workers.complete','results.deliver','results.ack','reviews.submit','engines.unblock'] as const;
+export const READ_COMMANDS = ['workspaces.list','capabilities.get','sync.snapshot','sync.status','owners.list','owners.get','owners.continuation.get','tasks.get','tasks.list','tasks.events','tasks.results','tasks.health','artifacts.read','packages.get','operations.get','observability.get','observability.export','engines.health','engines.penalty'] as const;
 const writes=new Set<string>(WRITE_COMMANDS);
 /** Running tasks per worker across every owner: the load that weighted dispatch balances. */
 export function workerLoad(tasks: Task[]): Record<string, number> {
@@ -54,10 +56,10 @@ export class CommandHandler {
    private readonly diagnostics?: TaskDiagnostics, private readonly asyncHost:AsyncOwnerHost = {}){
    this.continuation=new ContinuationService(manager.store,this.ownerHost);
    // Historical failures must not recreate a block after an explicit unblock or restart.
-   for(const task of manager.store.list())if(task.failure)this.vendorBlockedAttempts.add(task.run?.id??task.id);
-  manager.listeners.add(()=>queueMicrotask(()=>this.pump()));
-  for(const owner of manager.store.getMetadata().owners) if(owner.host)this.ownerHost.restore(owner.host as OwnerHostEvidence,(owner.messages??[]) as OwnerMessage[]);
-  queueMicrotask(()=>this.pump());
+   for(const task of manager.store.listHeads())if(task.failure)this.vendorBlockedAttempts.add(task.run?.id??task.id);
+  manager.listeners.add(()=>this.pump());
+  for(const owner of manager.store.listOwners()) if(owner.host)this.ownerHost.restore(owner.host as OwnerHostEvidence,(owner.messages??[]) as OwnerMessage[]);
+  this.pump();
  }
  private readonly pending = new Set<Promise<CommandResponse>>();
  private readonly launches = new Set<AbortController>();
@@ -98,7 +100,7 @@ export class CommandHandler {
   return step.value;
  }
  async drain():Promise<void>{
-  this.draining=true;for(const controller of this.launches)controller.abort();
+  this.draining=true;clearImmediate(this.pumpScheduled);this.pumpScheduled=undefined;for(const controller of this.launches)controller.abort();
   await Promise.allSettled([...this.pending]);
  }
  private *handleFlow(value:unknown):CommandFlow<CommandResponse> {
@@ -111,11 +113,10 @@ export class CommandHandler {
    if(this.draining)fail('APP_DRAINING','App is shutting down');
    if(writes.has(command)) {
     if(!commandId)fail('INVALID_REQUEST','Mutation requires commandId');
-    receiptKey=`local-demo:${commandId}`;const hash=digest({command,args});const meta=this.manager.store.getMetadata();const old=meta.receipts[receiptKey];
+    receiptKey=`local-demo:${commandId}`;const hash=digest({command,args});const old=this.manager.store.getReceipt(receiptKey);
     if(old) {if(old.hash!==hash)fail('IDEMPOTENCY_CONFLICT','commandId already used for different arguments');if(old.response)return old.response;fail('COMMAND_INDETERMINATE','Previous command was interrupted. Inspect tasks/owners before issuing a new command; no automatic replay was performed.');}
-    if(Object.keys(meta.receipts).length>=5000)fail('RESOURCE_LIMIT','Command receipt limit reached');
     // Durable intent first: a crash can block a retry, but cannot silently repeat a spawn.
-    meta.receipts[receiptKey]={hash};this.manager.store.setMetadata(meta);
+    this.manager.store.putReceipt(receiptKey,{hash});
    }
    let data=command==='owners.launch'||command==='owners.switch'?yield* this.executeOwner(command,args):this.execute(command,args);
    if((command==='workers.spawn'||command==='tasks.retry') && data && typeof data==='object' && 'id' in data){
@@ -131,18 +132,18 @@ export class CommandHandler {
    const response:CommandResponse={apiVersion:API_VERSION,commandId,ok:false,error:{code:error instanceof CommandError||error instanceof ContinuationError?error.code:'INVALID_REQUEST',message:error instanceof Error?error.message:'Command failed',retryable:false}};
    // Never replace a prior receipt on conflict or overwrite an incomplete durable intent.
    if(receiptKey && !['IDEMPOTENCY_CONFLICT','COMMAND_INDETERMINATE'].includes(response.error!.code)) {
-    const receipt=this.manager.store.getMetadata().receipts[receiptKey];
+    const receipt=this.manager.store.getReceipt(receiptKey);
     if(receipt&&!receipt.response)try{this.finish(receiptKey,response);}catch{return {...response,error:{code:'PERSISTENCE_ERROR',message:'Could not persist receipt; inspect current state before retrying',retryable:false}};}
    }
    return response;
   }
  }
- private finish(key:string,response:CommandResponse){const meta=this.manager.store.getMetadata();meta.receipts[key].response=response;this.manager.store.setMetadata(meta);}
- private owner(id:unknown):LogicalOwner {const owner=this.manager.store.getMetadata().owners.find(o=>o.id===parseId(id));if(!owner)fail('NOT_FOUND','Owner not found');return owner!;}
+ private finish(key:string,response:CommandResponse){const receipt=this.manager.store.getReceipt(key);if(!receipt)throw new Error('Command intent missing');this.manager.store.putReceipt(key,{...receipt,response});}
+ private owner(id:unknown):LogicalOwner {const owner=this.manager.store.getOwner(parseId(id));if(!owner)fail('NOT_FOUND','Owner not found');return owner!;}
  /** Work holding this instance's own slots: running plus cancelling. Queued and terminal tasks hold none. */
- private runningOn(owner:LogicalOwner):number {return slotGroupCount(this.manager.store.list(),slotGroupFor(owner.id,owner.profileId));}
+ private runningOn(owner:LogicalOwner):number {return slotGroupCount(this.manager.store.listHeads(),slotGroupFor(owner.id,owner.profileId));}
  /** Every registered instance, its profile, its caller session label and how much of it is busy. */
- private ownerInstances():OwnerInstance[]{return this.manager.store.getMetadata().owners.map(owner=>({...owner,runningTaskCount:this.runningOn(owner)}));}
+ private ownerInstances():OwnerInstance[]{const tasks=this.manager.store.listHeads();return this.manager.store.listOwners().map(owner=>({...owner,runningTaskCount:slotGroupCount(tasks,slotGroupFor(owner.id,owner.profileId))}));}
  private task(a:Record<string,unknown>):Task {try{return this.manager.store.get(parseId(a.taskId));}catch{ return fail('NOT_FOUND','Task not found');}}
   private revise(task:Task,a:Record<string,unknown>){if(a.expectedRevision!==undefined && a.expectedRevision!==(task.revision??0))fail('REVISION_CONFLICT',`Current revision is ${task.revision??0}`);}
   private put(task:Task){this.manager.update(task);}
@@ -153,13 +154,13 @@ export class CommandHandler {
    if(this.launchingEpochs.has(key))fail('INVALID_STATE','An owner launch is already pending for this task and epoch');
    this.launchingEpochs.add(key);
    let launched:OwnerLaunchResult|undefined;let ownerHost:TaskOwnerHost|undefined;let cleanupAttempted=false;
-   const current=()=>{const fresh=this.manager.store.get(task.id);return !this.draining&&fresh.ownerId===ownerId&&(fresh.ownerEpoch??0)===epoch?fresh:undefined;};
+   const current=()=>{const fresh=this.manager.store.get(task.id);return !this.draining&&!(fresh.executionRole==='owner'&&terminal(fresh))&&fresh.ownerId===ownerId&&(fresh.ownerEpoch??0)===epoch?fresh:undefined;};
    try {
     const workspace=task.dispatch?.workspace??task.workspace;
     if(!workspace)throw new OwnerLaunchError('OWNER_LAUNCH_FAILED','Task has no workspace to launch the owner in');
     const config=this.policy.snapshot().config;const ownerConfig=config.owners[profile];
     if(!ownerConfig)throw new OwnerLaunchError('OWNER_LAUNCH_FAILED',`Owner profile ${profile} is missing from the policy`);
-    launched=(yield {kind:'launch',input:{taskId:task.id,epoch,title:task.title,workspace,engineKind:config.engines[ownerConfig.engine]?.kind??'',model:ownerConfig.model,effort:ownerConfig.effort,prompt}})!;
+    launched=(yield {kind:'launch',input:{taskId:task.id,epoch,title:task.title,workspace,engineKind:config.engines[ownerConfig.engine]?.kind??'',model:ownerConfig.model,effort:ownerConfig.effort,proxy:ownerConfig.proxy,prompt}})!;
     const fresh=current();
     if(!fresh){
      // A newer binding or shutdown owns the task now. Only this attempt's successful host is disposable.
@@ -186,9 +187,73 @@ export class CommandHandler {
     return {failure:{code,message}};
    }finally{this.launchingEpochs.delete(key);}
   }
+ /** Cancellation acknowledges durable task state before attempting external host cleanup. */
+ private closeCancelledRoot(task:Task):void {
+  const host=task.ownerHost!;
+  const controller=new AbortController();this.launches.add(controller);
+  const job=Promise.resolve().then(()=>this.driveAsync(this.closeCancelledHost(task.id,host),controller.signal));
+  this.pending.add(job);const settled=()=>{this.pending.delete(job);this.launches.delete(controller);};job.then(settled,settled);
+ }
+ private *closeCancelledHost(taskId:string,host:TaskOwnerHost):CommandFlow<CommandResponse> {
+  try {
+   yield {kind:'close',host};
+   const fresh=this.manager.store.get(taskId);
+   // Retain a newer host binding if ownership changed while the close was pending.
+   if(fresh.ownerHost&&canonical(fresh.ownerHost)===canonical(host)){
+    delete fresh.ownerHost;event(fresh,'lifecycle','Cancelled parent Agent host closed');this.put(fresh);
+   }
+   return {apiVersion:API_VERSION,ok:true};
+  }catch(error){
+   const fresh=this.manager.store.get(taskId);
+   event(fresh,'error',`Cancelled parent Agent host cleanup failed: ${redactContext(error instanceof Error?error.message:String(error),8000)}`);this.put(fresh);
+   return {apiVersion:API_VERSION,ok:false};
+  }
+ }
+ /** Share native report validation between owner roots and native child workers. */
+ private completeReport(task:Task,a:Record<string,unknown>):unknown {
+    if(task.status!=='running'||task.run?.execution!=='native')fail('INVALID_STATE','Only a running native task accepts workers complete');
+    if(a.outcome!=='completed'&&a.outcome!=='failed')fail('INVALID_REQUEST','outcome must be completed or failed');
+    const summary=text(a.summary,'summary',8000);
+    if(a.artifacts!==undefined&&(!Array.isArray(a.artifacts)||a.artifacts.length>20))fail('INVALID_REQUEST','artifacts must be an array of at most 20 files');
+    const artifacts=((a.artifacts as unknown[]|undefined)??[]).map(item=>{const record=parseWorkerRecord({...object(item),type:'artifact'});if(record.type!=='artifact')throw new CommandError('INVALID_REQUEST','Invalid artifact');return {name:record.name,mediaType:record.mediaType,content:record.content};});
+    if(task.artifacts.length+artifacts.length>20)fail('RESOURCE_LIMIT','Task exceeds 20 artifacts');
+    return this.publicTask(this.manager.completeNative(task.id,{outcome:a.outcome as 'completed'|'failed',summary,artifacts}));
+ }
+ /** A root is supervised by its visible owner, with no worker process and no worker admission slot. */
+ private startRoot(a:Record<string,unknown>):unknown {
+  const task=this.task(a);this.revise(task,a);
+  const restart=task.executionRole==='owner'&&task.status==='failed'&&!task.ownerHost;
+  if((task.status!=='queued'&&!restart)||task.parentTaskId||task.dispatch||task.packageId||task.scheduled)fail('INVALID_STATE','Only an unfrozen queued root task may start its owner');
+  if(!task.ownerId)fail('INVALID_STATE','Root task must be bound to an owner profile');
+  const owner=this.owner(task.ownerId);const snapshot=this.policy.snapshot();const profile=snapshot.config.owners[owner.profileId];
+  if(snapshot.owners[owner.profileId]?.status!=='available'||!profile)fail('POLICY_DENIED','Owner profile is unavailable');
+  const engineKind=snapshot.config.engines[profile.engine]?.kind;
+  if(engineKind!=='claude'&&engineKind!=='codex')fail('OWNER_LAUNCH_UNSUPPORTED','Root owner requires a claude or codex profile');
+  task.workspace=absoluteExistingWorkspace(task.workspace);
+  // A fresh launch uses the full task briefing; the old context pack targets the previous epoch.
+  if(restart){task.ownerEpoch=(task.ownerEpoch??0)+1;delete task.contextPack;}delete task.failure;
+  task.executionRole='owner';task.status='running';task.ownerLastActivityAt=new Date().toISOString();
+  task.run={id:randomUUID(),adapter:'native',execution:'native',status:'running',startedAt:new Date().toISOString(),engine:profile.engine,model:profile.model,effort:profile.effort,workspace:task.workspace};
+  event(task,'lifecycle','Starting root owner in Herdr; the owner will describe, split, dispatch and review child tasks');this.put(task);
+  const controller=new AbortController();this.launches.add(controller);
+  // Defer the external effect until after the command has persisted its immediate receipt.
+  const job=Promise.resolve().then(()=>this.driveAsync(this.launchRoot(task,owner.profileId),controller.signal));
+  this.pending.add(job);const settled=()=>{this.pending.delete(job);this.launches.delete(controller);};job.then(settled,settled);
+  return this.publicTask(task);
+ }
+ private *launchRoot(task:Task,profile:string):CommandFlow<CommandResponse> {
+  if(this.draining||terminal(this.manager.store.get(task.id)))return {apiVersion:API_VERSION,ok:true};
+  const result=yield* this.startOwnerHost(task,profile,rootOwnerPrompt(task));
+  const fresh=this.manager.store.get(task.id);
+  if(result.failure&&!this.draining&&fresh.ownerId===task.ownerId&&(fresh.ownerEpoch??0)===(task.ownerEpoch??0)&&fresh.status==='running'){
+   fresh.status='failed';fresh.failure={kind:'other',message:redactContext(`${result.failure.code}: ${result.failure.message}`,8000)};
+   if(fresh.run){fresh.run.status='stopped';fresh.run.endedAt=new Date().toISOString();}this.put(fresh);
+  }
+  return {apiVersion:API_VERSION,ok:!result.failure,data:result};
+ }
  private readonly vendorBlockedAttempts=new Set<string>();
  private applyVendorBlocks():void {
-  for(const task of this.manager.store.list()){
+  for(const task of this.manager.store.listHeads()){
    const f=task.failure;const engine=task.dispatch?.engine;const key=task.run?.id??task.id;
    if(!engine||!f||!['rate_limit','quota'].includes(f.kind)||this.vendorBlockedAttempts.has(key))continue;
    const snapshot=this.policy.snapshot();
@@ -196,14 +261,12 @@ export class CommandHandler {
    if(existing&&existing.by!=='weaver-vendor-limit'){this.vendorBlockedAttempts.add(key);continue;}
    const now=Date.now();
    // Keep the ladder in the existing durable task metadata, including after explicit block removal.
-   const meta=this.manager.store.getMetadata() as ReturnType<TaskManager['store']['getMetadata']> & {vendorRateLimits?:Record<string,{level:number;lastTriggerAt:number}>};
-   let minutes=10;
-   if(f.kind==='rate_limit'){
-    const previous=meta.vendorRateLimits?.[engine];
-    const level=previous&&now-previous.lastTriggerAt<2*60*60_000?Math.min(previous.level+1,3):1;
-    minutes=[10,30,60][level-1];
-    meta.vendorRateLimits={...meta.vendorRateLimits,[engine]:{level,lastTriggerAt:now}};
-    this.manager.store.setMetadata(meta);
+    let minutes: number = VENDOR_LADDER_MINUTES[0];
+    if(f.kind==='rate_limit'){
+     const previous=this.manager.store.getVendorLimit(engine);
+     const level=previous&&now-previous.lastTriggerAt<2*60*60_000?Math.min(previous.level+1,3):1;
+     minutes=VENDOR_LADDER_MINUTES[level-1]!;
+    this.manager.store.putVendorLimit(engine,{level,lastTriggerAt:now});
    }
    const retryAt=f.retryAt?Date.parse(f.retryAt):NaN;
    const release=f.kind==='rate_limit'?Math.max(now+minutes*60_000,Number.isFinite(retryAt)?retryAt:0):retryAt;
@@ -214,7 +277,10 @@ export class CommandHandler {
   }
  }
  private pumping=false;
- checkIdleOwners():string[] {return this.manager.store.list().filter(task=>task.ownerId&&this.continuation.due(task.id)).map(task=>task.id);}
+ private pumpDirty=false;
+ private pumpScheduled?:NodeJS.Immediate;
+ private delivered=new Map<string,string>();
+ checkIdleOwners():string[] {return this.manager.store.listHeads().filter(task=>task.ownerId&&this.continuation.due(task.id)).map(task=>task.id);}
  private prepareOwnerActivity(command:string,args:Record<string,unknown>):void {
   if(!['workers.spawn','packages.create','results.ack','reviews.submit'].includes(command))return;
   const task=this.task(args);this.revise(task,args);
@@ -232,12 +298,21 @@ export class CommandHandler {
  }
  /** Capacity is per owner instance, so a waiting message names the binding whose slots are held. */
  private capacityWait(profile:string, ownerId:string|undefined, limit:number):string {
-  return `${slotGroupName(this.manager.store.getMetadata().owners,ownerId,profile)} is at its current concurrency limit (${limit}).`;
+  return `${slotGroupName(this.manager.store.listOwners(),ownerId,profile)} is at its current concurrency limit (${limit}).`;
  }
  pump():void {
-  if(this.pumping||this.draining)return;this.pumping=true;
-  try{this.applyVendorBlocks();for(const task of this.manager.store.list().reverse()){
-   if(terminal(task)&&task.ownerId){try{this.execute('results.deliver',{taskId:task.id});}catch{/* Manual owners pull results. */}}
+  if(this.draining)return;
+  this.pumpDirty=true;
+  if(this.pumping||this.pumpScheduled)return;
+  this.pumpScheduled=setImmediate(()=>{this.pumpScheduled=undefined;if(this.draining)return;this.pumpDirty=false;this.runPump();});
+ }
+ private runPump():void {
+  this.pumping=true;
+  try{this.applyVendorBlocks();for(const head of this.manager.store.listHeads().reverse()){
+   const task=head.status==='queued'&&head.scheduled?this.manager.store.get(head.id):head;
+   if(terminal(task)&&task.ownerId&&this.manager.store.getOwner(task.ownerId)?.mode==='mock'&&this.delivered.get(task.id)!==task.updatedAt){
+    try{this.execute('results.deliver',{taskId:task.id});this.delivered.set(task.id,task.updatedAt);}catch{/* An unavailable host may recover on a later notification. */}
+   }
    if(task.status!=='queued'||!task.scheduled||!task.dispatch)continue;
    let phase:NonNullable<Task['queueReason']>['code']='policy_blocked';
    try{
@@ -245,16 +320,16 @@ export class CommandHandler {
     const vendorBlock=this.policy.snapshot().blocks.find(block=>block.engine===frozen.engine&&block.by==='weaver-vendor-limit'&&(!block.release_at||Date.parse(block.release_at)>Date.now()));
     if(vendorBlock){
       if(frozen.execution==='real'){phase='workspace_changed';assertFrozenWorkspace(frozen);phase='policy_blocked';}
-      const reroute=this.routeOf(frozen.owner,slotGroupCount(this.manager.store.list(),slotGroupFor(task.ownerId,frozen.owner)),[frozen.engine]);
-      const decision=this.decideExecution(reroute.engine,undefined,{...task,workspace:frozen.workspace??task.workspace},this.policy.snapshot().config.owners[reroute.owner]?.engine);
-      task.dispatch={...frozen,worker:reroute.worker,engine:reroute.engine,model:reroute.model,effort:reroute.effort,execution:decision.execution,adapter:decision.adapter,engineKind:decision.engineKind,maxParallel:reroute.maxParallel,...(decision.workspace?{workspace:decision.workspace,workspaceIdentity:workspaceIdentity(decision.workspace)}:{})};
-      event(task,'lifecycle',`Vendor limit rerouted queued worker to ${reroute.engine}`);this.put(task);queueMicrotask(()=>this.pump());continue;
+      const reroute=this.routeOf(frozen.owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner)),[frozen.engine]);
+      const decision=this.decideExecution(reroute.engine,undefined,{...task,workspace:frozen.workspace??task.workspace},this.policy.snapshot().config.owners[reroute.owner]?.engine,reroute.proxy,this.policy.snapshot().config.owners[reroute.owner]?.proxy);
+      task.dispatch={...frozen,worker:reroute.worker,engine:reroute.engine,model:reroute.model,effort:reroute.effort,proxy:reroute.proxy,execution:decision.execution,adapter:decision.adapter,engineKind:decision.engineKind,maxParallel:reroute.maxParallel,...(decision.workspace?{workspace:decision.workspace,workspaceIdentity:workspaceIdentity(decision.workspace)}:{})};
+      event(task,'lifecycle',`Vendor limit rerouted queued worker to ${reroute.engine}`);this.put(task);this.pump();continue;
     }
 
-    const running=slotGroupCount(this.manager.store.list(),slotGroupFor(task.ownerId,frozen.owner));
+    const running=slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner));
     const route=this.policy.preview({owner:frozen.owner,worker:frozen.worker,runningCount:running});
     const kind=this.policy.snapshot().config.engines[route.engine]?.kind;
-    if(route.worker!==frozen.worker||route.engine!==frozen.engine||route.model!==frozen.model||route.effort!==frozen.effort||(frozen.engineKind!==undefined&&kind!==frozen.engineKind)){
+    if(route.worker!==frozen.worker||route.engine!==frozen.engine||route.model!==frozen.model||route.effort!==frozen.effort||route.proxy!==frozen.proxy||(frozen.engineKind!==undefined&&kind!==frozen.engineKind)){
      this.queueBlocked(task,'frozen_route_changed','Current worker engine, kind, model or effort no longer matches the frozen dispatch; restore the route or cancel and create a new task.');continue;
     }
     if(!route.capacityAvailable){this.queueBlocked(task,'waiting_for_capacity',this.capacityWait(frozen.owner,task.ownerId,route.maxParallel));continue;}
@@ -266,17 +341,17 @@ export class CommandHandler {
     const current=this.manager.store.get(task.id);
     if(current.status==='queued'&&current.scheduled)this.queueBlocked(current,phase,error instanceof Error?error.message:'Queued dispatch blocked');
    }
-  }}finally{this.pumping=false;}
+  }}finally{this.pumping=false;if(this.pumpDirty)this.pump();}
  }
- private publicTask(task:Task){const {owner,run,...rest}=task;if(!run)return rest;const visible={...run};delete visible.pid;return {...rest,run:visible};}
+ private publicTask<T extends Pick<Task,'owner'|'run'>>(task:T){const {owner,run,...rest}=task;if(!run)return rest;const visible={...run};delete visible.pid;return {...rest,run:visible};}
  private manifest(task:Task){if(!terminal(task))fail('RESULT_NOT_READY','Execution has not reached a terminal state');const manifest={taskId:task.id,attemptId:task.run?.id??null,packageId:task.packageId??null,execution:task.status,summary:task.summary??null,artifacts:task.artifacts.map(a=>({id:a.id,name:a.name,mediaType:a.mediaType,sha256:createHash('sha256').update(a.content).digest('hex')})),exitCode:task.run?.exitCode??null,...(task.failure?{failure:task.failure}:{})};return {...manifest,manifestDigest:digest(manifest),delivery:task.acknowledged?'acknowledged':'pending',acceptance:task.reviewState??'pending'};}
  /** maxWaitMinutes is frozen for the owner and the UI as their polling bound; Weaver never stops a worker with it. */
- private decideExecution(engine:string,provider:unknown,task:Task,ownerEngine?:string):{execution:'real'|'mock'|'native';adapter:string;maxWaitMinutes:number;workspace?:string;engineKind?:string} {
+ private decideExecution(engine:string,provider:unknown,task:Task,ownerEngine?:string,workerProxy?:string,ownerProxy?:string):{execution:'real'|'mock'|'native';adapter:string;maxWaitMinutes:number;workspace?:string;engineKind?:string} {
   const minutes=this.policy.snapshot().config.herdr.max_wait_minutes;
   if(!Number.isSafeInteger(minutes)||minutes<1||minutes>1440)fail('INVALID_REQUEST','Configured max_wait_minutes is invalid');
   if(provider==='mock-jsonl'||this.manager.adapterId==='mock-jsonl') return {execution:'mock',adapter:'mock-jsonl',maxWaitMinutes:minutes};
   // A worker on the owner's own engine runs inside the owner with its built-in subagent tool; Weaver launches nothing.
-  if(ownerEngine!==undefined&&engine===ownerEngine) return {execution:'native',adapter:'native',maxWaitMinutes:minutes,...(task.workspace?{workspace:task.workspace}:{})};
+  if(ownerEngine!==undefined&&engine===ownerEngine&&(workerProxy??'inherit')===(ownerProxy??'inherit')) return {execution:'native',adapter:'native',maxWaitMinutes:minutes,...(task.workspace?{workspace:task.workspace}:{})};
   const kind=this.policy.snapshot().config.engines[engine]?.kind??'';
   if(kind==='claude')fail('CAPABILITY_UNAVAILABLE','Claude Code real execution is deferred. No mock provider was substituted.');
   if(!isRealEngineKind(kind))fail('CAPABILITY_UNAVAILABLE',`Engine ${engine} (${kind||'unknown kind'}) cannot be launched. No mock provider was substituted.`);
@@ -324,7 +399,7 @@ export class CommandHandler {
  /** Route one owner's work under the chain's excluded engines, keeping the refusal in the policy's own words. */
  private routeOf(owner:string,running:number,excluded:string[],worker?:unknown):RoutePreview {
   try {
-   return this.policy.preview({owner,runningCount:running,workerLoad:workerLoad(this.manager.store.list()),...(worker!==undefined?{worker}:{}),...(excluded.length?{excludeEngines:excluded}:{})});
+   return this.policy.preview({owner,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads()),...(worker!==undefined?{worker}:{}),...(excluded.length?{excludeEngines:excluded}:{})});
   } catch(error) {
    const message=error instanceof Error?error.message:String(error);
    if(message.startsWith('NO_ALTERNATIVE_ENGINE'))fail('NO_ALTERNATIVE_ENGINE',message);
@@ -336,9 +411,9 @@ export class CommandHandler {
   const dispatch=task.dispatch;
   if(!dispatch)return undefined;
   if(dispatch.execution!=='native'||task.scheduled)return {action:'wait',command:`weaver tasks wait --task-id ${task.id}`};
-  const pkg=this.manager.store.getMetadata().packages.find(p=>p.id===task.packageId&&p.taskId===task.id);
+  const pkg=this.manager.store.getPackage(task.packageId!);
   // Dispatch freezes the package before a native run starts; without one there is no instruction to hand over.
-  if(!pkg)return undefined;
+  if(!pkg||pkg.taskId!==task.id)return undefined;
   // Identical to the instruction a real worker is launched with, so heterogeneous workers get the same contract.
   return {action:'run_subagent',model:dispatch.model,effort:dispatch.effort,prompt:workerInstruction(task,pkg),then:`weaver workers complete --task-id ${task.id} --input report.json`};
  }
@@ -354,7 +429,8 @@ export class CommandHandler {
   * is still cancelling.
   */
  private dispatchTask(command:string,a:Record<string,unknown>,forcedEngines:string[]=[]):unknown {
-  let task=this.task(a);this.revise(task,a);if(task.status!=='queued')fail('INVALID_STATE','Only queued tasks may dispatch');
+  let task=this.task(a);this.revise(task,a);if(task.parentTaskId&&this.manager.store.get(task.parentTaskId).status!=='running')fail('INVALID_STATE','Parent root is no longer running');if(task.executionRole==='owner')fail('INVALID_STATE','Dispatch child tasks, not the owner root');if(task.status!=='queued')fail('INVALID_STATE','Only queued tasks may dispatch');
+  if(task.title===PENDING_TASK_TITLE)fail('INVALID_STATE','Owner must generate title and acceptance criteria with tasks.describe before dispatch');
   if(a.provider!==undefined&&a.provider!=='mock-jsonl')fail('CAPABILITY_UNAVAILABLE',`Provider ${String(a.provider)} is not available`);
   if(a.packageId!==undefined&&a.packageId!==task.packageId)fail('REVISION_CONFLICT','Package does not belong to task');
   if(task.scheduled)fail('INVALID_STATE','Task already scheduled');
@@ -363,17 +439,17 @@ export class CommandHandler {
   if(logical&&owner!==logical.profileId)fail('POLICY_DENIED','Task owner profile cannot be changed at dispatch');
   const excluded=this.chainEngines(task);
   for(const engine of forcedEngines)if(!excluded.includes(engine))excluded.push(engine);
-  const running=slotGroupCount(this.manager.store.list(),slotGroupFor(task.ownerId,owner));
+  const running=slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,owner));
   const route=this.routeOf(owner,running,excluded,a.worker);
-  const decision=this.decideExecution(route.engine,a.provider,task,this.policy.snapshot().config.owners[route.owner]?.engine);
-  const pendingPackage:WorkPackage=task.packageId?this.manager.store.getMetadata().packages.find(p=>p.id===task.packageId&&p.taskId===task.id)!:{id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:[decision.workspace??task.workspace??'Explicit mock fixture'],acceptanceCriteria:task.acceptanceCriteria?.length?task.acceptanceCriteria:[decision.execution==='mock'?'Mock output returned for owner review':'Provider result returned for owner review'],createdAt:new Date().toISOString()};
-  if(!pendingPackage)fail('INVALID_REQUEST','Frozen work package is missing');
+  const decision=this.decideExecution(route.engine,a.provider,task,this.policy.snapshot().config.owners[route.owner]?.engine,route.proxy,this.policy.snapshot().config.owners[route.owner]?.proxy);
+  const pendingPackage:WorkPackage=task.packageId?this.manager.store.getPackage(task.packageId!)!:{id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:[decision.workspace??task.workspace??'Explicit mock fixture'],acceptanceCriteria:task.acceptanceCriteria?.length?task.acceptanceCriteria:[decision.execution==='mock'?'Mock output returned for owner review':'Provider result returned for owner review'],createdAt:new Date().toISOString()};
+  if(!pendingPackage||pendingPackage.taskId!==task.id)fail('INVALID_REQUEST','Frozen work package is missing');
   // Real launch and native handoff freeze the same instruction, so it must fit before any state changes.
   if(decision.execution!=='mock')workerInstruction({...task,workspace:decision.workspace??task.workspace},pendingPackage);
   this.prepareOwnerActivity(command,a);task=this.task(a);
   if(decision.workspace)task.workspace=decision.workspace;
-  if(!task.packageId){const meta=this.manager.store.getMetadata();if(meta.packages.length>=1000)fail('RESOURCE_LIMIT','Package limit reached');meta.packages.push(pendingPackage);this.manager.store.transaction(()=>{this.manager.store.setMetadata(meta);task.packageId=pendingPackage.id;this.put(task);});}
-  task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,...(decision.execution==='real'?{workspaceIdentity:workspaceIdentity(decision.workspace)}:{})}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
+  if(!task.packageId){this.manager.store.transaction(()=>{this.manager.store.putPackage(pendingPackage);task.packageId=pendingPackage.id;this.put(task);});}
+  task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,proxy:route.proxy,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,...(decision.execution==='real'?{workspaceIdentity:workspaceIdentity(decision.workspace)}:{})}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
   const selected=decision.execution==='real'?`Policy selected ${route.worker}; launching ${decision.engineKind} in ${decision.workspace}`:decision.execution==='native'?`Policy selected ${route.worker} on the owner's engine; the owner runs it with its built-in subagent tool (${route.model}, ${route.effort})`:`Policy selected ${route.worker}; explicit mock-jsonl provider`;
   event(task,'lifecycle',`${selected}${excluded.length?`; engines excluded because they ${EXCLUDED_ENGINE_REASON}: ${excluded.join(', ')}`:''}`);
   if(!route.capacityAvailable){task.scheduled=true;task.queueReason={code:'waiting_for_capacity',message:this.capacityWait(route.owner,task.ownerId,route.maxParallel)};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.put(task);return this.dispatchResponse(task,excluded);}this.put(task);return this.dispatchResponse(this.manager.start(task.id,route.maxParallel),excluded);
@@ -388,23 +464,23 @@ export class CommandHandler {
   if(a.cancel!==undefined&&typeof a.cancel!=='boolean')fail('INVALID_REQUEST','cancel must be a boolean');
   if(a.expectedRevision!==undefined&&!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');
   const original=this.task(a);this.revise(original,a);
+  if(original.executionRole==='owner')fail('INVALID_STATE','Use tasks start to retry a failed owner launch; retry child worker tasks separately');
+  if(original.parentTaskId&&this.manager.store.get(original.parentTaskId).status!=='running')fail('INVALID_STATE','Parent root is no longer running');
   // cancel:false is the caller's claim that nothing is in flight, which a non-terminal task directly refutes.
   const cancel=a.cancel===true;
   if(!terminal(original)&&!cancel)fail('INVALID_STATE','Retry requires terminal execution, or cancel:true to abandon the attempt still in flight');
   const willCancel=cancel&&!terminal(original);
-  const frozen=original.packageId?this.manager.store.getMetadata().packages.find(p=>p.id===original.packageId&&p.taskId===original.id):undefined;
+  const frozen=original.packageId?this.manager.store.getPackage(original.packageId!):undefined;
   if(original.packageId&&!frozen)fail('NOT_FOUND','The original task names a frozen work package this store no longer retains');
   const excluded=this.retryEngines(original,cancel);
   const logical=original.ownerId?this.owner(original.ownerId):undefined;
   const owner=logical?.profileId??Object.keys(this.policy.snapshot().config.owners)[0];
-  const route=this.routeOf(owner,slotGroupCount(this.manager.store.list(),slotGroupFor(original.ownerId,owner)),excluded);
+  const route=this.routeOf(owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(original.ownerId,owner)),excluded);
   // An explicit mock attempt stays a mock; a real one never falls back to a fixture because it failed.
   const provider=original.dispatch?.execution==='mock'?'mock-jsonl':undefined;
-  const decision=this.decideExecution(route.engine,provider,original,this.policy.snapshot().config.owners[route.owner]?.engine);
+  const decision=this.decideExecution(route.engine,provider,original,this.policy.snapshot().config.owners[route.owner]?.engine,route.proxy,this.policy.snapshot().config.owners[route.owner]?.proxy);
   const instruction=`${this.retryNote(original)}\n\n${this.chainRoot(original).instruction}`;
   if(instruction.length>16000)fail('INVALID_REQUEST',`The retried instruction would be ${instruction.length} characters, over the 16000 task limit; shorten the original goal before retrying. Nothing was cancelled or created.`);
-  if(this.manager.store.list().length>=200)fail('RESOURCE_LIMIT','Task limit reached');
-  if(this.manager.store.getMetadata().packages.length>=1000)fail('RESOURCE_LIMIT','Package limit reached');
   // The package is only a value here, so the child is frozen under the original scope and criteria before any write.
   const probeId=randomUUID();
   const pkg:WorkPackage={id:randomUUID(),taskId:probeId,revision:1,instruction,createdAt:new Date().toISOString(),
@@ -415,10 +491,10 @@ export class CommandHandler {
   const created=this.manager.store.transaction(()=>{
    const task=this.manager.create({title:original.title,instruction,owner:original.owner,workspace:original.workspace,acceptanceCriteria:original.acceptanceCriteria,constraints:original.constraints});
    const linked={...pkg,taskId:task.id};
-   const meta=this.manager.store.getMetadata();meta.packages.push(linked);
-   task.ownerId=original.ownerId;task.retryOf=original.id;task.packageId=linked.id;
+   this.manager.store.putPackage(linked);
+   task.ownerId=original.ownerId;if(original.parentTaskId)task.parentTaskId=original.parentTaskId;task.retryOf=original.id;task.packageId=linked.id;
    event(task,'lifecycle',`Linked as a retry of task ${original.id.slice(0,8)} and frozen with its package`);
-   this.manager.store.setMetadata(meta);this.put(task);
+   this.put(task);
    return this.manager.store.get(task.id);
   });
   const linkedFrom=this.manager.store.get(original.id);
@@ -435,9 +511,9 @@ export class CommandHandler {
  }
  private execute(command:string,a:Record<string,unknown>):unknown {
   switch(command){
-   case 'sync.snapshot':return {revision:this.manager.store.revision,tasks:this.manager.store.list().map(t=>({id:t.id,title:t.title,status:t.status,revision:t.revision??0,ownerId:t.ownerId,updatedAt:t.updatedAt,reviewState:t.reviewState??'pending'})),owners:this.manager.store.getMetadata().owners.map(o=>({id:o.id,name:o.name,profileId:o.profileId,session:ownerSession(o),mode:o.mode,state:o.state}))};
+   case 'sync.snapshot':return {revision:this.manager.store.revision,tasks:this.manager.store.listHeads().map(t=>({id:t.id,title:t.title,status:t.status,revision:t.revision??0,ownerId:t.ownerId,updatedAt:t.updatedAt,reviewState:t.reviewState??'pending'})),owners:this.manager.store.listOwners().map(o=>({id:o.id,name:o.name,profileId:o.profileId,session:ownerSession(o),mode:o.mode,state:o.state}))};
    case 'sync.status':return {revision:this.manager.store.revision,changed:a.after!==this.manager.store.revision,recovery:'refresh sync.snapshot; push invalidation is not a durable event stream'};
-   case 'capabilities.get':return {apiVersion:API_VERSION,cliTransport:this.transportStatus,authentication:'ephemeral-local-trusted-user-demo',ownerScopedAuthorization:false,ownerSpawn:this.herdrPresent()?'herdr':'logical-registration',manualAttach:'metadata-only',ownerModelSpawned:false,attachmentVerified:false,authenticated:false,modelUsable:false,workerProviders:this.manager.canLaunchReal?['mock-jsonl',...REAL_ENGINE_KINDS]:['mock-jsonl'],realExecution:this.manager.canLaunchReal,mcp:false,maxParallel:configuredParallel(this.policy),capacity:{unit:'owner-instance',aggregate:'sum of enabled owner profile max_parallel',admission:'Each attached owner instance holds its own profile max_parallel slots, so maxParallel is a scale hint, not a profile-wide or global cap.'},policyAdmission:true,quota:QUOTA_CAPABILITIES,commands:[...READ_COMMANDS,...WRITE_COMMANDS],limits:{tasks:200,owners:200,packages:1000,receipts:5000,eventsPerPage:100},durability:'durable intent before effect; interrupted commands require reconciliation, not automatic replay'};
+   case 'capabilities.get':return {apiVersion:API_VERSION,cliTransport:this.transportStatus,authentication:'ephemeral-local-trusted-user-demo',ownerScopedAuthorization:false,ownerSpawn:this.herdrPresent()?'herdr':'logical-registration',manualAttach:'metadata-only',ownerModelSpawned:false,attachmentVerified:false,authenticated:false,modelUsable:false,workerProviders:this.manager.canLaunchReal?['mock-jsonl',...REAL_ENGINE_KINDS]:['mock-jsonl'],realExecution:this.manager.canLaunchReal,mcp:false,maxParallel:configuredParallel(this.policy),capacity:{unit:'owner-instance',aggregate:'sum of enabled owner profile max_parallel',admission:'Each attached owner instance holds its own profile max_parallel slots, so maxParallel is a scale hint, not a profile-wide or global cap.'},policyAdmission:true,quota:QUOTA_CAPABILITIES,commands:[...READ_COMMANDS,...WRITE_COMMANDS],limits:{eventsPerPage:100},durability:'durable intent before effect; interrupted commands require reconciliation, not automatic replay'};
    case 'owners.continuation.get':return this.continuation.get(parseId(a.taskId));
    case 'owners.continuation.configure':{if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');return this.continuation.configure(parseId(a.taskId),a.expectedRevision as number,a.idleRotationMinutes as number|null);}
    case 'owners.list':return {owners:this.ownerInstances()};
@@ -448,26 +524,42 @@ export class CommandHandler {
     const profileId=text(a.profileId,'profileId',120);const name=text(a.name,'name',120);
     const session=a.session===undefined?'external-cli':text(a.session,'session',120);
     const pane=a.pane===undefined?'unverified':text(a.pane,'pane',120);
-    const meta=this.manager.store.getMetadata();
+    const owners=this.manager.store.listOwners();
     // The profile is the policy role; this caller's profile + name + session is one instance of it. A repeat attach is that same durable registration.
     if(command==='owners.attach'&&mode==='manual'){
-     const attached=meta.owners.find(owner=>sameOwnerInstance(owner,{profileId,name,session}));
+     const attached=owners.find(owner=>sameOwnerInstance(owner,{profileId,name,session}));
      if(attached)return attached;
     }
     // Admission and limits decide whether a new instance may be created; a duplicate has nothing to admit.
     if(this.policy.snapshot().owners[profileId]?.status!=='available')fail('POLICY_DENIED','Owner profile is unavailable');
-    if(meta.owners.length>=200)fail('RESOURCE_LIMIT','Owner limit reached');
     const owner:LogicalOwner={id:randomUUID(),name,profileId,mode,state:mode==='mock'?'ready':'attached',createdAt:new Date().toISOString(),...(mode==='manual'?{session}:{})};
     if(mode==='mock'){if(a.session!==undefined||a.pane!==undefined)fail('INVALID_REQUEST','Logical registration has no session or pane');owner.host=this.ownerHost.spawn({ownerId:owner.id,name:owner.name,profileId});}
     else owner.host=this.ownerHost.attach({ownerId:owner.id,name:owner.name,profileId,session,pane});
-    meta.owners.push(owner);this.manager.store.setMetadata(meta);return owner;
+    this.manager.store.putOwner(owner);return owner;
    }
    case 'tasks.create':return this.manager.store.transaction(()=>{
-    let owner:LogicalOwner|undefined;let input;
-    if(a.ownerProfileId!==undefined){parseTaskInput({...a,instruction:a.instruction??a.goal,owner:{name:'validation',transport:'herdr-visible',session:'unverified',pane:'unverified'}});if(this.manager.store.list().length>=200)fail('RESOURCE_LIMIT','Task limit reached');if(a.ownerId!==undefined)fail('INVALID_REQUEST','Choose ownerId or ownerProfileId');owner=this.execute('owners.spawn',{profileId:a.ownerProfileId,name:a.ownerName??'Task owner',provider:a.ownerProvider}) as LogicalOwner;}
+    let owner:LogicalOwner|undefined;let input;let parent:Task|undefined;
+    if(a.parentTaskId!==undefined){parent=this.manager.store.get(parseId(a.parentTaskId));if(parent.executionRole!=='owner'||parent.status!=='running')fail('INVALID_STATE','Parent must be a running owner root');if(parent.title===PENDING_TASK_TITLE||!parent.acceptanceCriteria?.length)fail('INVALID_STATE','Describe the root before creating children');if(a.ownerProfileId!==undefined||(a.ownerId!==undefined&&a.ownerId!==parent.ownerId))fail('INVALID_REQUEST','Child must use its root owner instance');a={...a,ownerId:parent.ownerId,workspace:a.workspace??parent.workspace,constraints:a.constraints??parent.constraints};}
+    if(a.ownerProfileId!==undefined){parseTaskInput({...a,instruction:a.instruction??a.goal,owner:{name:'validation',transport:'herdr-visible',session:'unverified',pane:'unverified'}});if(a.ownerId!==undefined)fail('INVALID_REQUEST','Choose ownerId or ownerProfileId');owner=this.execute('owners.spawn',{profileId:a.ownerProfileId,name:a.ownerName??'Task owner',provider:a.ownerProvider}) as LogicalOwner;}
     if(a.ownerId!==undefined||owner){owner??=this.owner(a.ownerId);input=parseTaskInput({...a,title:a.title,instruction:a.instruction??a.goal,owner:{name:owner.name,transport:'herdr-visible',session:'unverified',pane:'unverified'}});}else input=parseTaskInput(a);
-    const task=this.manager.create(input);if(owner){task.ownerId=owner.id;task.ownerEpoch=0;task.ownerLastActivityAt=new Date().toISOString();task.continuationPolicy={idleRotationMinutes:60};this.put(task);}return this.publicTask(task);
+    const task=this.manager.create(input);if(parent)task.parentTaskId=parent.id;if(owner){task.ownerId=owner.id;task.ownerEpoch=0;task.ownerLastActivityAt=new Date().toISOString();task.continuationPolicy={idleRotationMinutes:60};this.put(task);}return this.publicTask(task);
    });
+   case 'tasks.start':return this.startRoot(a);
+   case 'tasks.complete':{const task=this.task(a);this.revise(task,a);if(task.executionRole!=='owner')fail('INVALID_STATE','Only an owner root accepts tasks complete');if(a.outcome==='completed'){if(task.title===PENDING_TASK_TITLE||!task.acceptanceCriteria?.length)fail('INVALID_STATE','Describe root title and acceptance criteria before completion');const children=this.manager.store.listHeads().filter(t=>t.parentTaskId===task.id);if(children.length===0)fail('INVALID_STATE','The parent Agent must not implement itself: dispatch at least one subtask before completing the root');const leaves=children.filter(t=>!children.some(retry=>retry.retryOf===t.id));if(leaves.length===0)fail('INVALID_STATE','At least one final subtask is required; retried tasks stay history, completion reads the final leaf');if(leaves.some(t=>t.status!=='completed'||t.reviewState!=='accepted'))fail('INVALID_STATE','Every final child task must complete and pass owner review');}return this.completeReport(task,a);}
+   case 'tasks.describe':{
+    const task=this.task(a);
+    if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');
+    this.revise(task,a);
+    if((task.status!=='queued'&&!(task.executionRole==='owner'&&task.status==='running'))||task.packageId||task.dispatch||task.scheduled)fail('INVALID_STATE','Only an unfrozen queued task or running owner root can be described');
+    if(task.executionRole==='owner'&&this.manager.store.listHeads().some(t=>t.parentTaskId===task.id))fail('INVALID_STATE','Root description is frozen after creating children');
+    const title=text(a.title,'title',160).trim();
+    if(title===PENDING_TASK_TITLE)fail('INVALID_REQUEST','Generate a concrete task title');
+    if(!Array.isArray(a.acceptanceCriteria)||a.acceptanceCriteria.length<1||a.acceptanceCriteria.length>30)fail('INVALID_REQUEST','Provide 1–30 acceptance criteria');
+    const criteria=(a.acceptanceCriteria as unknown[]).map(value=>text(value,'acceptance criterion',1000).trim());
+    task.title=title;task.acceptanceCriteria=criteria;
+    event(task,'lifecycle','Owner generated task title and acceptance criteria');this.put(task);return this.publicTask(task);
+   }
+   case 'workspaces.list':return listWorkspaceDirectories(a.path);
    case 'tasks.retry':return this.retry(a);
    case 'tasks.get':{
     const task=this.task(a);
@@ -477,27 +569,19 @@ export class CommandHandler {
    }
    case 'tasks.list':{
     const offset=a.offset??0;const limit=a.limit??25;if(!Number.isSafeInteger(offset)||Number(offset)<0||!Number.isSafeInteger(limit)||Number(limit)<1||Number(limit)>100)fail('INVALID_REQUEST','Invalid pagination');
-    const all=this.manager.store.list().filter(t=>a.ownerId===undefined||t.ownerId===a.ownerId);const tasks=all.slice(Number(offset),Number(offset)+Number(limit)).map(t=>{const {events,artifacts,...summary}=this.publicTask(t);return {...summary,artifactCount:artifacts.length};});return {tasks,nextOffset:Number(offset)+tasks.length<all.length?Number(offset)+tasks.length:null};
+    if(a.parentTaskId!==undefined)parseId(a.parentTaskId);
+    const all=this.manager.store.listSummaries().filter(t=>(a.ownerId===undefined||t.ownerId===a.ownerId)&&(a.parentTaskId===undefined||t.parentTaskId===a.parentTaskId));const tasks=all.slice(Number(offset),Number(offset)+Number(limit)).map(t=>{const {events,artifacts,...summary}=this.publicTask(t);return {...summary,artifactCount:artifacts.length};});return {tasks,nextOffset:Number(offset)+tasks.length<all.length?Number(offset)+tasks.length:null};
    }
    case 'packages.create':{
-    const task=this.task(a);this.revise(task,a);if(task.status!=='queued')fail('INVALID_STATE','Only queued tasks accept a work package');if(task.packageId)fail('INVALID_STATE','Task already has a frozen package');
+    const task=this.task(a);if(task.executionRole==='owner')fail('INVALID_STATE','Freeze packages on child tasks, not the owner root');if(task.title===PENDING_TASK_TITLE)fail('INVALID_STATE','Owner must describe the task before freezing a package');this.revise(task,a);if(task.status!=='queued')fail('INVALID_STATE','Only queued tasks accept a work package');if(task.packageId)fail('INVALID_STATE','Task already has a frozen package');
     const strings=(v:unknown,label:string)=>{if(!Array.isArray(v)||v.length<1||v.length>30)fail('INVALID_REQUEST',`Provide 1–30 ${label}`);return (v as unknown[]).map(x=>text(x,label,1000));};
-    const pkg:WorkPackage={id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:strings(a.scope,'scope entries'),acceptanceCriteria:strings(a.acceptanceCriteria,'acceptance criteria'),createdAt:new Date().toISOString()};
-    const meta=this.manager.store.getMetadata();if(meta.packages.length>=1000)fail('RESOURCE_LIMIT','Package limit reached');meta.packages.push(pkg);this.manager.store.transaction(()=>{this.manager.store.setMetadata(meta);task.packageId=pkg.id;event(task,'lifecycle','Frozen work package created');this.put(task);});return pkg;
+    const pkg:WorkPackage={id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:strings(a.scope,'scope entries'),acceptanceCriteria:a.acceptanceCriteria===undefined?strings(task.acceptanceCriteria,'acceptance criteria (set on the task, or pass acceptanceCriteria explicitly)'):strings(a.acceptanceCriteria,'acceptance criteria'),createdAt:new Date().toISOString()};
+    this.manager.store.transaction(()=>{this.manager.store.putPackage(pkg);task.packageId=pkg.id;event(task,'lifecycle','Frozen work package created');this.put(task);});return pkg;
    }
-   case 'packages.get':{const pkg=this.manager.store.getMetadata().packages.find(p=>p.id===parseId(a.packageId));if(!pkg)fail('NOT_FOUND','Package not found');return pkg;}
+   case 'packages.get':{const pkg=this.manager.store.getPackage(parseId(a.packageId));if(!pkg)fail('NOT_FOUND','Package not found');return pkg;}
    case 'workers.spawn':return this.dispatchTask(command,a);
-   case 'workers.complete':{
-    const task=this.task(a);this.revise(task,a);
-    if(task.status!=='running'||task.run?.execution!=='native')fail('INVALID_STATE','Only a running native task accepts workers complete');
-    if(a.outcome!=='completed'&&a.outcome!=='failed')fail('INVALID_REQUEST','outcome must be completed or failed');
-    const summary=text(a.summary,'summary',8000);
-    if(a.artifacts!==undefined&&(!Array.isArray(a.artifacts)||a.artifacts.length>20))fail('INVALID_REQUEST','artifacts must be an array of at most 20 files');
-    const artifacts=((a.artifacts as unknown[]|undefined)??[]).map(item=>{const record=parseWorkerRecord({...object(item),type:'artifact'});if(record.type!=='artifact')throw new CommandError('INVALID_REQUEST','Invalid artifact');return {name:record.name,mediaType:record.mediaType,content:record.content};});
-    if(task.artifacts.length+artifacts.length>20)fail('RESOURCE_LIMIT','Task exceeds 20 artifacts');
-    return this.publicTask(this.manager.completeNative(task.id,{outcome:a.outcome as 'completed'|'failed',summary,artifacts}));
-   }
-   case 'tasks.cancel':{const task=this.task(a);this.revise(task,a);if(terminal(task))return {task:this.publicTask(task),alreadyTerminal:true};return this.publicTask(this.manager.cancel(task.id));}
+   case 'workers.complete':{const task=this.task(a);this.revise(task,a);if(task.executionRole==='owner')fail('INVALID_STATE','Report owner roots with tasks complete');return this.completeReport(task,a);}
+   case 'tasks.cancel':{const task=this.task(a);this.revise(task,a);if(terminal(task))return {task:this.publicTask(task),alreadyTerminal:true};if(task.executionRole==='owner')for(const child of this.manager.store.listHeads().filter(t=>t.parentTaskId===task.id&&!terminal(t)))this.manager.cancel(child.id);const cancelled=this.manager.cancel(task.id);if(task.executionRole==='owner'&&cancelled.ownerHost)this.closeCancelledRoot(cancelled);return this.publicTask(cancelled);}
    case 'tasks.events':{
     const task=this.task(a);const limit=a.limit??50;if(!Number.isInteger(limit)||Number(limit)<1||Number(limit)>100)fail('INVALID_REQUEST','Event limit must be 1–100');let start=0;
     if(a.after!==undefined){const i=task.events.findIndex(e=>e.id===a.after);if(i<0)fail('CURSOR_EXPIRED','Cursor not retained; refresh task snapshot');start=i+1;}
@@ -519,7 +603,8 @@ export class CommandHandler {
     const engine=text(a.engine,'engine',120);
     const engines=this.monitor().status().engines;
     if(!Object.hasOwn(engines,engine))fail('NOT_FOUND',`Engine ${engine} is not configured and has no penalty record`);
-    return {engine,...engines[engine]};
+    const vendor=this.manager.store.getVendorLimit(engine);
+    return {engine,...engines[engine],vendorLimit:vendor?{level:vendor.level,lastTriggerAt:new Date(vendor.lastTriggerAt).toISOString()}:null};
    }
    case 'engines.unblock':{
     // The engine table is checked before the monitor is asked, so a typo never reaches a policy write.
@@ -536,15 +621,15 @@ export class CommandHandler {
    case 'results.deliver':{
     const task=this.task(a);const manifest=this.manifest(task);if(!task.ownerId)fail('CAPABILITY_UNAVAILABLE','Task has no logical owner');const owner=this.owner(task.ownerId);if(owner.mode!=='mock')fail('CAPABILITY_UNAVAILABLE','Manual owner delivery is not connected');
     const existing=(owner.messages??[]).find(m=>m.taskId===task.id&&m.manifestDigest===manifest.manifestDigest);if(existing)return existing;
-    const message=this.ownerHost.deliverResult(owner.id,{taskId:task.id,manifestDigest:manifest.manifestDigest});const meta=this.manager.store.getMetadata();const target=meta.owners.find(o=>o.id===owner.id)!;target.messages=[...(target.messages??[]),message];this.manager.store.setMetadata(meta);return message;
+    const message=this.ownerHost.deliverResult(owner.id,{taskId:task.id,manifestDigest:manifest.manifestDigest});owner.messages=[...(owner.messages??[]),message];this.manager.store.putOwner(owner);return message;
    }
    case 'results.ack':case 'reviews.submit':{
     const task=this.task(a);if(a.expectedRevision===undefined)fail('INVALID_REQUEST','expectedRevision is required');this.revise(task,a);const manifest=this.manifest(task);if(a.manifestDigest!==manifest.manifestDigest)fail('MANIFEST_MISMATCH','Review must reference the current result digest');
-    if(command==='results.ack'){if(task.ownerId){const meta=this.manager.store.getMetadata();const owner=meta.owners.find(o=>o.id===task.ownerId)!;const message=owner.messages?.find(m=>m.taskId===task.id&&m.manifestDigest===manifest.manifestDigest);if(message){const ack=this.ownerHost.acknowledge(owner.id,message.id);owner.messages=owner.messages!.map(m=>m.id===ack.id?ack:m);this.manager.store.setMetadata(meta);}}task.acknowledged=true;event(task,'lifecycle','Result receipt acknowledged; acceptance unchanged');}
+    if(command==='results.ack'){if(task.ownerId){const owner=this.manager.store.getOwner(task.ownerId)!;const message=owner.messages?.find(m=>m.taskId===task.id&&m.manifestDigest===manifest.manifestDigest);if(message){const ack=this.ownerHost.acknowledge(owner.id,message.id);owner.messages=owner.messages!.map(m=>m.id===ack.id?ack:m);this.manager.store.putOwner(owner);}}task.acknowledged=true;event(task,'lifecycle','Result receipt acknowledged; acceptance unchanged');}
     else {if(task.status!=='completed')fail('INVALID_STATE','Only successful executions can be reviewed');if(!['accepted','rejected'].includes(String(a.decision)))fail('INVALID_REQUEST','Decision must be accepted or rejected');task.reviewState=a.decision as 'accepted'|'rejected';task.reviewComment=text(a.comment??'','comment',4000,true);event(task,'lifecycle',`Owner review: ${task.reviewState}`);}
     task.ownerLastActivityAt=new Date().toISOString();this.put(task);return this.manifest(task);
    }
-   case 'operations.get':{const id=text(a.commandId,'commandId',120);const receipt=this.manager.store.getMetadata().receipts[`local-demo:${id}`];if(!receipt)fail('NOT_FOUND','Command receipt not found');return {commandId:id,state:receipt!.response?'settled':'indeterminate',response:receipt!.response};}
+   case 'operations.get':{const id=text(a.commandId,'commandId',120);const receipt=this.manager.store.getReceipt(`local-demo:${id}`);if(!receipt)fail('NOT_FOUND','Command receipt not found');return {commandId:id,state:receipt!.response?'settled':'indeterminate',response:receipt!.response};}
    default:return fail('COMMAND_UNKNOWN','Unknown logical command');
   }
  }

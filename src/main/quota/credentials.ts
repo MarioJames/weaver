@@ -22,7 +22,7 @@ export class QuotaRenewalPending extends QuotaFailure {
 }
 export interface NativeCredential { token: string; accountId?: string; fingerprint: string; account: string }
 
-async function readObject(file: string): Promise<JsonObject> {
+export async function readObject(file: string): Promise<JsonObject> {
   let handle;
   try {
     handle = await open(file, constants.O_RDONLY | constants.O_NONBLOCK | (constants.O_NOFOLLOW ?? 0));

@@ -10,7 +10,8 @@ import { MockWorkerAdapter } from '../src/main/adapters/worker';
 import { CommandHandler, type TaskDiagnostics } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
 import { OwnerLaunchError, type OwnerLaunchInput, type OwnerLaunchResult } from '../src/main/owner-host';
-import { STALL_BLOCK_BY, STALL_MS, StallMonitor, parseStallState, saveStallState, type StallState, type StallStatus } from '../src/main/stall';
+import { readStall, stallStoreAt } from './helpers/state-db';
+import { STALL_BLOCK_BY, STALL_MS, StallMonitor, parseStallState, type StallState, type StallStatus } from '../src/main/stall';
 
 /** A fixed clock and a CPU reader that can only ever say "not observed": nothing here is a real process. */
 const NOW = 1_760_000_000_000;
@@ -22,23 +23,23 @@ const summaryOf = (item: StallStatus['engines'][string]) => ({ level: item.level
 /** A penalty as the monitor itself would have left it: armed, waiting, and written into its own record. */
 const armed = (level: number, probeSuccesses: number): StallState['engines'][string] => ({
   level, lastTriggerAt: NOW - 60_000, needsAttention: level === 3, blockedUntil: level === 3 ? null : NOW + 300_000,
-  nextProbeAt: NOW + 300_000, probeSuccesses, head: `${level} 个工作代理超过 5 分钟无响应`,
+  nextProbeAt: NOW + 300_000, probeSuccesses, head: `${level} 个子 Agent 超过 5 分钟无响应`,
 });
 
 interface SetupOptions { penalties?: StallState['engines']; monitor?: boolean }
 function setup(options: SetupOptions = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'weaver-diag-'));
-  const store = new TaskStore(join(dir, 'tasks.json'));
+  const store = new TaskStore(join(dir,'weaver.db'));
   const manager = new TaskManager(store, new MockWorkerAdapter(process.execPath, resolve('scripts/mock-worker.mjs')));
-  const policy = new PolicyStore(join(dir, 'policy.json'));
-  const statePath = join(dir, 'stall.v1.json');
+  const policy = new PolicyStore(join(dir,'weaver.db'));
+  const statePath = join(dir, 'state.db');
   const history = options.penalties ? Object.entries(options.penalties).flatMap(([engine]) => [
     { engine, level: 1, at: NOW - 12 * 60_000, tasks: ['aaaa1111', 'bbbb2222'], stalledMinutes: 6 },
     { engine, level: 3, at: NOW - 60_000, tasks: ['aaaa1111'], taskCount: 2, probe: { ok: false, ms: 4_213, error: 'upstream refused' } },
   ]) : [];
-  if (options.penalties) saveStallState(statePath, { engines: options.penalties, history });
+  if (options.penalties) stallStoreAt(statePath).save({ engines: options.penalties, history });
   const monitor = new StallMonitor({
-    tasks: () => store.list(), policy: () => policy, statePath, now: () => NOW, ready: () => true,
+    tasks: () => store.list(), policy: () => policy, stateStore: stallStoreAt(statePath), now: () => NOW, ready: () => true,
     cpu: async () => null, probe: async () => ({ ok: false, ms: 0 }), log: () => {},
   });
   const calls = { health: 0, unblock: [] as string[] };
@@ -143,7 +144,7 @@ test('engines.penalty returns the exact retained history for one engine only', a
   const f = setup({ penalties: { codex: armed(3, 2), claude: armed(1, 0) } });
   try {
     const penalty = f.call('engines.penalty', { engine: 'codex' });
-    assert.deepEqual(penalty, { engine: 'codex', ...f.monitor.status().engines.codex });
+    assert.deepEqual(penalty, { engine: 'codex', ...f.monitor.status().engines.codex, vendorLimit: null });
     assert.equal(penalty.history.length, 2);
     assert.deepEqual(penalty.history.map(item => item.level), [1, 3]);
     assert.equal(penalty.history[1].taskCount, 2);
@@ -163,14 +164,14 @@ test('engines.penalty rejects inherited names while preserving configured and hi
   let monitor: StallMonitor | undefined;
   try {
     f.silentRealRun();
-    const statePath = join(f.dir, 'stall.v1.json');
-    const state = parseStallState(JSON.parse(readFileSync(statePath, 'utf8')));
+    const statePath = join(f.dir, 'state.db');
+    const state = readStall(statePath);
     state.engines['retired-fixture'] = armed(1, 0);
     state.history.push({ engine: 'retired-fixture', level: 1, at: NOW - 60_000, tasks: ['retained-task'] });
-    saveStallState(statePath, state);
-    monitor = new StallMonitor({ tasks: () => f.store.list(), policy: () => f.policy, statePath, now: () => NOW, cpu: async () => null, log: () => {} });
+    stallStoreAt(statePath).save(state);
+    monitor = new StallMonitor({ tasks: () => f.store.list(), policy: () => f.policy, stateStore: stallStoreAt(statePath), now: () => NOW, cpu: async () => null, log: () => {} });
     const handler = new CommandHandler(f.manager, f.policy, blockedLaunch, () => false, monitor);
-    const before = { tasks: f.store.list(), metadata: f.store.getMetadata(), policy: f.policy.snapshot(), state: readFileSync(statePath, 'utf8') };
+    const before = { tasks: f.store.list(), metadata: f.store.getMetadata(), policy: f.policy.snapshot(), state: JSON.stringify(readStall(statePath)) };
     const status = monitor.status();
     assert.equal(Object.hasOwn(before.policy.config.engines, 'retired-fixture'), false);
     for (const engine of ['toString', 'constructor', '__proto__', 'missing-fixture']) {
@@ -182,9 +183,9 @@ test('engines.penalty rejects inherited names while preserving configured and hi
     for (const engine of ['codex', 'retired-fixture']) {
       const response = handler.handle({ apiVersion: 'weaver.v1', command: 'engines.penalty', args: { engine } });
       assert.equal(response.ok, true, engine);
-      assert.deepEqual(response.data, { engine, ...status.engines[engine] });
+      assert.deepEqual(response.data, { engine, ...status.engines[engine], vendorLimit: null });
     }
-    assert.deepEqual({ tasks: f.store.list(), metadata: f.store.getMetadata(), policy: f.policy.snapshot(), state: readFileSync(statePath, 'utf8') }, before);
+    assert.deepEqual({ tasks: f.store.list(), metadata: f.store.getMetadata(), policy: f.policy.snapshot(), state: JSON.stringify(readStall(statePath)) }, before);
     assert.deepEqual(monitor.status(), status);
   } finally { await monitor?.stop(); await f.close(); }
 });
@@ -209,7 +210,7 @@ test('engines.unblock resets one ladder, keeps its record and every other engine
     // Only the unblocked engine left the policy; the other stall block stays.
     const blocks = f.policy.snapshot().blocks.map(block => block.engine);
     assert.deepEqual(blocks, ['claude']);
-    const persisted = parseStallState(JSON.parse(readFileSync(join(f.dir, 'stall.v1.json'), 'utf8')));
+    const persisted = readStall(join(f.dir, 'state.db'));
     assert.equal(persisted.engines.codex.level, 0);
     assert.equal(persisted.engines.claude.level, 1);
     assert.equal(persisted.history.length, 4, 'the record of both engines is retained');
@@ -219,12 +220,12 @@ test('engines.unblock resets one ladder, keeps its record and every other engine
     assert.equal(f.raw('engines.unblock', { engine: 'claude' }, commandId).error?.code, 'IDEMPOTENCY_CONFLICT');
     assert.deepEqual(f.calls.unblock, ['codex']);
     // An unknown engine is refused before the monitor is asked or any policy write happens.
-    const stateBefore = readFileSync(join(f.dir, 'stall.v1.json'), 'utf8');
+    const stateBefore = JSON.stringify(readStall(join(f.dir, 'state.db')));
     const revision = f.policy.snapshot().revision;
     assert.equal(f.raw('engines.unblock', { engine: 'nope' }).error?.code, 'NOT_FOUND');
     assert.deepEqual(f.calls.unblock, ['codex']);
     assert.equal(f.policy.snapshot().revision, revision);
-    assert.equal(readFileSync(join(f.dir, 'stall.v1.json'), 'utf8'), stateBefore);
+    assert.equal(JSON.stringify(readStall(join(f.dir, 'state.db'))), stateBefore);
   } finally { await f.close(); }
 });
 
@@ -253,5 +254,47 @@ test('diagnostics commands are catalogued as reads and one write, and the write 
     const unblock = f.handler.handle({ apiVersion: 'weaver.v1', command: 'engines.unblock', args: { engine: 'codex' } });
     assert.equal(unblock.error?.code, 'INVALID_REQUEST');
     assert.deepEqual(f.calls.unblock, []);
+  } finally { await f.close(); }
+});
+
+test('the owner root never counts as a stall: the health names the owner host and its children', async () => {
+  const f = setup();
+  try {
+    const created = f.raw('tasks.create', { title: 'Owner root', instruction: 'dispatch sub-agents', owner, workspace: f.dir }).data as { id: string };
+    const root = f.store.get(created.id);
+    root.executionRole = 'owner';
+    root.status = 'running';
+    root.ownerLastActivityAt = iso(NOW - 120_000);
+    f.store.put(root);
+    const makeChild = (title: string, status: 'running' | 'completed') => {
+      const child = f.raw('tasks.create', { title, instruction: 'child fixture', owner, workspace: f.dir }).data as { id: string };
+      const stored = f.store.get(child.id);
+      stored.parentTaskId = root.id;
+      delete stored.executionRole;
+      stored.status = status;
+      if (status === 'running') stored.dispatch = { owner: 'codex_owner', worker: 'codex_worker', engine: 'codex', model: 'gpt-6.1-sol', effort: 'high', execution: 'real', maxParallel: 4, adapter: 'codex', workspace: f.dir };
+      f.store.put(stored);
+      return f.store.get(child.id);
+    };
+    makeChild('first child', 'running');
+    makeChild('second child', 'completed');
+    const health = f.call('tasks.health', { taskId: root.id });
+    assert.deepEqual(health, f.monitor.taskHealth(f.store.get(root.id)), 'the command hands back the monitor reading');
+    assert.equal(health.state, 'owner_starting', 'no owner host yet');
+    assert.equal(health.engine, null, 'an owner root has no engine of its own');
+    assert.equal(health.silenceMs, null);
+    assert.equal(health.cpuActive, null);
+    assert.equal(health.cpuIdleMs, null);
+    assert.equal(health.scopeUnit, null);
+    assert.deepEqual(health.children, { total: 2, running: 1, completed: 1 });
+    assert.equal(health.lastEventAt, iso(NOW - 120_000));
+    // With the owner host live the answer changes without inventing CPU numbers.
+    root.ownerHost = { kind: 'herdr', session: 's1', workspaceId: 'w1', paneId: 'p1', agentName: 'owner', launchedAt: iso(NOW - 60_000) };
+    f.store.put(root);
+    assert.equal(f.monitor.taskHealth(f.store.get(root.id)).state, 'owner_running');
+    // Ended roots stay ended even when children keep running.
+    root.status = 'completed';
+    f.store.put(root);
+    assert.equal(f.monitor.taskHealth(f.store.get(root.id)).state, 'ended');
   } finally { await f.close(); }
 });

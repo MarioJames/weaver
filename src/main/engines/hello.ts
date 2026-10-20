@@ -1,3 +1,4 @@
+import { proxyEnvironment, validateProxy } from '../../shared/proxy';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, rmSync } from 'node:fs';
@@ -96,6 +97,10 @@ function parsePi(stdout: string): Parsed {
  * Worker execution keeps its own adapters; this is a reachability check only.
  */
 export const HELLO_ENGINES: Record<string, { command: string; argv: (model: string, effort: string) => string[]; parse: (stdout: string) => Parsed }> = {
+  // zcode CLI has no --model and no thought-level flag (verified 0.16.9 option schema);
+  // the probe uses the session/provider-config default model. On failure stdout is empty
+  // and the real cause sits on stderr, so an empty stream defers to sayHi's stderr line.
+  zcode: { command: 'zcode', parse: stdout => { try { const result = JSON.parse(stdout); return typeof result.response === 'string' && !result.error ? { reply: result.response } : { error: 'ZCode 没有返回有效回复' }; } catch { return stdout.trim() ? { error: 'ZCode 输出不是有效 JSON' } : {}; } }, argv: model => ['--prompt', PROMPT, '--output-format', 'json', '--mode', 'yolo'] },
   claude: { command: 'claude', parse: parseResultObject, argv: (model, effort) => ['-p', PROMPT, '--model', model, '--effort', effort, '--output-format', 'json', '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--disable-slash-commands', '--system-prompt', SYSTEM, '--no-session-persistence'] },
   codex: { command: 'codex', parse: parseCodex, argv: (model, effort) => ['exec', '--json', '--ephemeral', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '--sandbox', 'read-only', '--model', model, '-c', `model_reasoning_effort="${effort}"`, PROMPT] },
   grok: { command: 'grok', parse: parseResultObject, argv: (model, effort) => ['-p', PROMPT, '-m', model, '--reasoning-effort', effort, '--output-format', 'json', '--max-turns', '1', '--disable-web-search', '--no-subagents', '--system-prompt-override', SYSTEM] },
@@ -112,10 +117,10 @@ export interface HelloProcess {
   kill(signal?: NodeJS.Signals): boolean;
   once(event: string, listener: (...args: any[]) => void): unknown;
 }
-export type SpawnPrint = (command: string, argv: string[], cwd: string) => HelloProcess;
+export type SpawnPrint = (command: string, argv: string[], cwd: string, proxy?: string) => HelloProcess;
 
-const spawnPrint: SpawnPrint = (command, argv, cwd) => {
-  const env = { ...process.env };
+const spawnPrint: SpawnPrint = (command, argv, cwd, proxy) => {
+  const env = proxyEnvironment(process.env, proxy);
   delete env.ELECTRON_RUN_AS_NODE;
   return spawn(command, argv, { cwd, env, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 };
@@ -123,11 +128,12 @@ const spawnPrint: SpawnPrint = (command, argv, cwd) => {
 export function parseHelloInput(value: unknown): HelloInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Probe input must be an object');
   const raw = value as Record<string, unknown>;
-  if (Object.keys(raw).some(key => !['engine', 'model', 'effort'].includes(key))) throw new Error('Unknown probe field');
+  if (Object.keys(raw).some(key => !['engine', 'model', 'effort', 'proxy'].includes(key))) throw new Error('Unknown probe field');
   for (const key of ['engine', 'model', 'effort'] as const) {
     if (typeof raw[key] !== 'string' || !raw[key].trim() || raw[key].length > 200) throw new Error(`Probe ${key} is required`);
   }
-  return { engine: raw.engine as string, model: raw.model as string, effort: raw.effort as string };
+  validateProxy(raw.proxy as string | undefined);
+  return { ...(raw.proxy !== undefined ? { proxy: raw.proxy as string } : {}), engine: raw.engine as string, model: raw.model as string, effort: raw.effort as string };
 }
 
 function clip(text: string): string {
@@ -156,7 +162,7 @@ export function sayHi(route: HelloInput & { kind: string }, deps: { root: string
   let child: HelloProcess;
   try {
     mkdirSync(scratch, { recursive: true, mode: 0o700 });
-    child = (deps.spawn ?? spawnPrint)(engine.command, engine.argv(route.model, route.effort), scratch);
+    child = (deps.spawn ?? spawnPrint)(engine.command, engine.argv(route.model, route.effort), scratch, route.proxy);
   } catch (error) {
     cleanup();
     return Promise.resolve(done({ ok: false, error: error instanceof Error ? error.message : String(error) }));

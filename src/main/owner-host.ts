@@ -1,3 +1,4 @@
+import { proxyEnvironment } from '../shared/proxy';
 import { spawn, spawnSync } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
 import { delimiter, join } from 'node:path';
@@ -42,7 +43,7 @@ export const defaultRunner: Runner = ({ file, args, timeout }) => {
 
 export interface OwnerLaunchInput {
   taskId: string; epoch: number; title: string; workspace: string;
-  engineKind: string; model: string; effort: string; prompt: string;
+  proxy?: string; engineKind: string; model: string; effort: string; prompt: string;
   session?: string; runner?: Runner; pathEnv?: string; herdrPath?: string; claudePath?: string;
 }
 export interface OwnerLaunchResult { session: string; workspaceId: string; paneId: string; agentName: string }
@@ -137,7 +138,10 @@ function* launchProtocol(input: OwnerLaunchInput, signal?: AbortSignal): Protoco
   const run = (step: string, args: string[], timeout: number) => runStep(step, { file: herdrPath, args, timeout });
   let workspaceId: string | undefined;
   try {
-    const createRequest = { file: herdrPath, args: ['--session', session, 'workspace', 'create', '--cwd', input.workspace, '--label', label, '--no-focus'], timeout: 30000 };
+    const proxyEnv = proxyEnvironment({}, input.proxy);
+    const proxyArgs = Object.entries(proxyEnv).flatMap(([key, value]) => ['--env', `${key}=${value}`]);
+    if (input.proxy === 'direct') for (const key of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy', 'NO_PROXY', 'no_proxy']) proxyArgs.push('--env', `${key}=`);
+    const createRequest = { file: herdrPath, args: ['--session', session, 'workspace', 'create', '--cwd', input.workspace, '--label', label, '--no-focus', ...proxyArgs], timeout: 30000 };
     const create = readJson('workspace create', yield* runStep('workspace create', createRequest, result => {
       // A terminated create can already have emitted its exact resource receipt. Preserve that cleanup authority.
       try { workspaceId = asId(dig(JSON.parse(result.stdout), ['result', 'workspace', 'workspace_id'])); } catch { /* No exact receipt, no guessed cleanup. */ }

@@ -8,7 +8,7 @@ import { MockOwnerHostAdapter } from '../src/main/adapters/logical';
 import { ContinuationService, handoffPrompt, idleContinuationDue, redactContext, MAX_HANDOFF_PROMPT_CHARS, MAX_CONTEXT_PACK_BYTES, type ContinuationTask, type ContextPack } from '../src/main/continuation';
 function fixture() {
  const dir = mkdtempSync(join(tmpdir(), 'weaver-continuation-'));
- const store = new TaskStore(join(dir, 'tasks.json'));
+ const store = new TaskStore(join(dir,'weaver.db'));
  const host = new MockOwnerHostAdapter();
  let now = Date.parse('2026-01-01T00:00:00Z');
  const evidence = host.spawn({ownerId:'22222222-2222-4222-8222-222222222222',name:'Owner',profileId:'profile'});
@@ -129,7 +129,7 @@ test('handoffPrompt briefs the incoming owner with ordered sections from the pac
   f.store.put(t);
   const pack={...f.service.rotate(TASK_ID,0,'manual').contextPack!,pendingApprovals:['Completed result awaits owner acceptance review']} as ContextPack;
   const prompt=handoffPrompt(t,pack);
-  assert.equal(prompt.split('\n')[0],'你将作为负责人接手 Weaver 任务「Payment retry」（'+TASK_ID+'）。先读取 agents-weaver 技能（没有安装时运行 `weaver --skill`），按其中的流程继续。');
+  assert.equal(prompt.split('\n')[0],'你将作为父 Agent 接手 Weaver 任务「Payment retry」（'+TASK_ID+'）。先读取 agents-weaver 技能（没有安装时运行 `weaver --skill`），按其中的流程继续。');
   const found=['工作目录：','目标：','约束：','验收标准：','当前状态：','已有产物：','最近进展：','待批准：','下一步：'].map(label=>prompt.indexOf(label));
   assert.ok(found.every(index=>index>=0),prompt);
   assert.deepEqual(found,[...found].sort((a,b)=>a-b));
