@@ -6,9 +6,9 @@
 
 [品牌素材与使用规范](docs/assets/brand/README.md)
 
-Weaver is a local Node control plane for owner-led agent work. It ships as one public skill (`skills/agents-weaver`, skill name `agents-weaver`), one `weaver` CLI, and one Weaver service — running in the background with `weaver server start`, or in the foreground as `weaver web` for development and debugging. The browser UI and the CLI call the same `CommandHandler`: the web serves loopback HTTP on `127.0.0.1`, the CLI connects through an authenticated Unix-socket transport, and both speak `weaver.v1`. There is no second daemon — the service is that one process — no MCP service, no remote API, and no database: state is a versioned JSON store owned by the running service.
+Weaver is a local Node control plane for owner-led agent work. It ships as one public skill (`skills/agents-weaver`, skill name `agents-weaver`), one `weaver` CLI, and one Weaver service — running in the background with `weaver server start`, or in the foreground as `weaver web` for development and debugging. The browser UI and the CLI call the same `CommandHandler`: the web serves loopback HTTP on `127.0.0.1`, the CLI connects through an authenticated Unix-socket transport, and both speak `weaver.v1`. There is no second daemon — the service is that one process — no MCP service, and no remote API: state is a single `weaver.db` SQLite store owned by the running service.
 
-The owner is the real agent that hosts the skill. It registers logical ownership in Weaver through the CLI and dispatches workers from there. Registration is metadata only; explicitly requesting `owners switch` with `launch:true`, or `owners launch`, makes Weaver prepare the continuation prompt, start the new owner in Herdr and deliver that prompt (Claude Code and Codex hosts). These commands return the final launch result; a failed launch leaves the ownership switch in place. Saved routes launch real OpenCode, Pi, Grok, Codex, and Qoder (`qodercli`) launchers through fixed argument adapters. `mock-jsonl` runs only when explicitly requested. A failed or unloaded real engine fails the dispatch; real execution never falls back to mock. An explicit `tasks retry` can dispatch a continuation on another eligible engine. Claude Code real execution is deferred. Engine scan checks `PATH` and `--version` only.
+The owner is the real agent that hosts the skill. It registers logical ownership in Weaver through the CLI and dispatches workers from there. Registration is metadata only; explicitly requesting `owners switch` with `launch:true`, or `owners launch`, makes Weaver prepare the continuation prompt, start the new owner in Herdr and deliver that prompt (Claude Code and Codex hosts). These commands return the final launch result; a failed launch leaves the ownership switch in place. Saved routes launch real OpenCode, Pi, Grok, Codex, Zcode, and Qoder (`qodercli`) launchers through fixed argument adapters. `mock-jsonl` runs only when explicitly requested. A failed or unloaded real engine fails the dispatch; real execution never falls back to mock. An explicit `tasks retry` can dispatch a continuation on another eligible engine. Claude Code real execution is deferred. Engine scan checks `PATH` and `--version` only.
 
 ## Install
 
@@ -159,7 +159,7 @@ task.json
 
 package.json
 {
-  "scope": ["tests/cli-timeout.test.ts"],
+  "scope": ["tests/cli/cli-timeout.test.ts"],
   "acceptanceCriteria": ["test suite stable locally", "minimal diff"]
 }
 

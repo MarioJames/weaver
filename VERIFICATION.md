@@ -1,6 +1,8 @@
 # Weaver 验收记录与项目门禁
 
-本记录针对技能 `skills/weaver`、CLI 与普通网页 `weaver web`。Electron 预览是失败历史，不属于新架构通过证据。浏览器、CLI、真实供应商与真实外部 Owner 分开判定，编译和单测不替代实机。
+> **历史性质说明**：本文记录的是针对被测版本 冻结 060（runtime/UI 构建 055）的历史验证结果，文中的测试数量（如 185/185）、SHA256、PASS/FAIL 与实机结论都只对各自被测版本成立，**不是当前代码的成绩**，不要把它们当作当前 HEAD 的验证状态。当前代码的验证方式见仓库根 `package.json`：`npm test`（测试套件）、`npm run check`（typecheck + 测试 + build）；文档与实现的事实核对以 `docs/` 与 `src/` 当前内容为准。
+
+本记录针对技能 `skills/weaver`（该技能现已改名为 `skills/agents-weaver`，见提交 283a3f2）、CLI 与普通网页 `weaver web`。Electron 预览是失败历史，不属于新架构通过证据。浏览器、CLI、真实供应商与真实外部 Owner 分开判定，编译和单测不替代实机。
 
 ## 被测版本
 
@@ -24,7 +26,7 @@ ACC 使用真实外部 Codex CLI、每轮 staged `.agents/skills/weaver`，不�
 
 055 第二轮 `round_d724e4a216` 整体 FAIL：Pi 硬 pin 首包 completed 后被 Owner 独立 rejected，补强包 Connection error/failed 未 accepted。QA 的 10/10 与原测试 bytes 保留不替代成功终态。negative 只读任务实际仅 rg/cat，前后文件 hash 与任务状态不变。旧 FAIL、拒绝、partial 都保留。[第二轮](docs/verification/redesign/final/acc-round2-finalize.json)、[映射](docs/verification/redesign/final/acc-affected-revalidation-map.json)。
 
-第三轮 round_9008d64020 明确新隔离场景硬 pin Codex，未改历史 Pi，不是隐式 fallback。真实业务链成功：vendor terminal success、ack/accepted、QA 10/10、原测试 bytes 和 README 保留，只有 importer/test 改变。但 Owner 曾用绝对 `/tmp/recovery-import-owner-XXXXXX` 创建任务根外 scratch（结束已自行删除），严格临时隔离未通过，本轮如实 CONDITIONAL finalize/cleanup，见 [隔离偏差](docs/verification/redesign/final/acc-round3-isolation-finding.json)。业务成功不掩盖边界失败；058/059 已只修技能临时根 canonical 说明；060 新 staged 真实 Owner 只读复验 `round_cc3314b9a6` 已 PASS/cleanup。实际输入、响应、baseline 只在 supplied `.tmp` 下唯一私有目录；QA 独立 policy/全部9任务/fixture/hostconfig指纹前后一致，无新 worker。旧 FAIL/CONDITIONAL 不改；按文档化 scoped-evidence reuse 明确复用三阶梯四成功包、Codex恢复及negative，不重跑业务模型。见 [新边界](docs/verification/redesign/final/acc-boundary060-independent.json)、[复用映射](docs/verification/redesign/final/acc-boundary060-evidence-reuse.json)、[合法PASS/清理](docs/verification/redesign/final/acc-boundary060-finalize.json)。规则只维护在 [Task scratch root](skills/weaver/references/handoff.md#task-scratch-root)，此处记录验证结果而不复制规则。外部 Owner 第二/三轮及最后只读边界轮实测 GPT-6.1-Sol high，逻辑 codex_owner 的 xhigh 不冒充外部宿主 effort；QA observer 为 medium，worker 的 requested/observed 分列。
+第三轮 round_9008d64020 明确新隔离场景硬 pin Codex，未改历史 Pi，不是隐式 fallback。真实业务链成功：vendor terminal success、ack/accepted、QA 10/10、原测试 bytes 和 README 保留，只有 importer/test 改变。但 Owner 曾用绝对 `/tmp/recovery-import-owner-XXXXXX` 创建任务根外 scratch（结束已自行删除），严格临时隔离未通过，本轮如实 CONDITIONAL finalize/cleanup，见 [隔离偏差](docs/verification/redesign/final/acc-round3-isolation-finding.json)。业务成功不掩盖边界失败；058/059 已只修技能临时根 canonical 说明；060 新 staged 真实 Owner 只读复验 `round_cc3314b9a6` 已 PASS/cleanup。实际输入、响应、baseline 只在 supplied `.tmp` 下唯一私有目录；QA 独立 policy/全部9任务/fixture/hostconfig指纹前后一致，无新 worker。旧 FAIL/CONDITIONAL 不改；按文档化 scoped-evidence reuse 明确复用三阶梯四成功包、Codex恢复及negative，不重跑业务模型。见 [新边界](docs/verification/redesign/final/acc-boundary060-independent.json)、[复用映射](docs/verification/redesign/final/acc-boundary060-evidence-reuse.json)、[合法PASS/清理](docs/verification/redesign/final/acc-boundary060-finalize.json)。规则只维护在 [Task scratch root](skills/agents-weaver/references/handoff.md#task-scratch-root)（当时路径为 `skills/weaver/references/handoff.md`），此处记录验证结果而不复制规则。外部 Owner 第二/三轮及最后只读边界轮实测 GPT-6.1-Sol high，逻辑 codex_owner 的 xhigh 不冒充外部宿主 effort；QA observer 为 medium，worker 的 requested/observed 分列。
 
 ## 满屏、表单与网络门禁
 
@@ -50,6 +52,6 @@ ACC 使用真实外部 Codex CLI、每轮 staged `.agents/skills/weaver`，不�
 
 本轮新增额度功能的实际验收结果以 [额度验收报告](docs/verification/quota/REPORT.html) 为准；上文的源码冻结、测试数量、PASS/FAIL 与真实供应商结果属于各自历史版本，不作为本轮通过证明。
 
-- 模型范围、未确认全账户的 surface 不得因 `session`、`weekly_all` 等窗口名被提升为账户级封禁；非空 authoritative limits 不得因信息不完整反向取 legacy 窗口制造可用。见 [provider 行为测试](tests/quota-providers.test.ts)。
-- 独立账户消费限制不得借套餐窗口 reset 标记为已过期或设定释放期限；主进程、持久阻断和页面本地 aging 使用同一 `statusBasis` 语义，5 分钟 TTL 与失败状态仍有效。见 [集成测试](tests/quota-integration.test.ts) 与 [展示状态测试](tests/quota-renderer.test.ts)。
+- 模型范围、未确认全账户的 surface 不得因 `session`、`weekly_all` 等窗口名被提升为账户级封禁；非空 authoritative limits 不得因信息不完整反向取 legacy 窗口制造可用。见 [provider 行为测试](tests/main/quota-providers.test.ts)。
+- 独立账户消费限制不得借套餐窗口 reset 标记为已过期或设定释放期限；主进程、持久阻断和页面本地 aging 使用同一 `statusBasis` 语义，5 分钟 TTL 与失败状态仍有效。见 [集成测试](tests/main/quota-integration.test.ts) 与 [展示状态测试](tests/renderer/quota-renderer.test.ts)。
 - missing/null/非法额度值保持未知，不补 0；自动阻断只维护本功能 source，保留人工及其他来源。过期 foreign 条目妨碍正确阻断时，整次合并明确冲突且策略原子不变。HTTP 429 是探测限流，不能当作订阅耗尽。对应契约与验证入口见 [额度接口](docs/agent-interface.md#31-原生账户额度) 及上述三组测试。
