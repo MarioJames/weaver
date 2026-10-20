@@ -1,7 +1,7 @@
 import { proxyEnvironment } from '../shared/proxy';
 import { spawn, spawnSync } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
-import { delimiter, join } from 'node:path';
+import { basename, delimiter, join } from 'node:path';
 
 export type RunnerResult = { code: number; stdout: string; stderr: string };
 export type RunnerInput = { file: string; args: string[]; timeout: number };
@@ -133,7 +133,8 @@ function* launchProtocol(input: OwnerLaunchInput, signal?: AbortSignal): Protoco
   const herdrPath = input.herdrPath ?? findExecutable('herdr', input.pathEnv ?? process.env.PATH ?? '');
   if (!herdrPath) throw new OwnerLaunchError('OWNER_LAUNCH_UNAVAILABLE', 'herdr was not found on PATH; install Herdr before launching a visible owner host');
   const agentName = ownerAgentName(input.taskId, input.epoch);
-  const label = truncateChars(input.title, 40);
+  // Match Herdr's own default (cwd directory name) so page-launched workspaces look like hand-opened ones.
+  const label = basename(input.workspace.trim().replace(/\/+$/, '')) || truncateChars(input.title, 40);
 
   const run = (step: string, args: string[], timeout: number) => runStep(step, { file: herdrPath, args, timeout });
   let workspaceId: string | undefined;
@@ -161,7 +162,11 @@ function* launchProtocol(input: OwnerLaunchInput, signal?: AbortSignal): Protoco
     checkAbort(signal);
     yield* run('agent start', ['--session', session, 'agent', 'start', agentName, '--kind', kind, '--pane', paneId, '--timeout', String(OWNER_AGENT_START_TIMEOUT_MS), '--', ...args], 70000);
     checkAbort(signal);
-    yield* run('agent prompt', ['--session', session, 'agent', 'prompt', agentName, input.prompt], 60000);
+    // Start needs a NAME; afterwards the pane id addresses the agent, so the name can be cleared.
+    yield* run('agent prompt', ['--session', session, 'agent', 'prompt', paneId, input.prompt], 60000);
+    checkAbort(signal);
+    // Cosmetic only: a cleared name makes the sidebar show the engine type. Never fail the launch over it.
+    try { yield { file: herdrPath, args: ['--session', session, 'agent', 'rename', paneId, '--clear'], timeout: 15000 }; } catch { /* appearance only */ }
     checkAbort(signal);
     return { session, workspaceId, paneId, agentName };
   } catch (error) {

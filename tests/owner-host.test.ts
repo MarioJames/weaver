@@ -8,17 +8,17 @@ const HERDR='/opt/fake-herdr/herdr';
 const CLAUDE='/opt/fake-claude/claude';
 const START_TIMEOUT=String(OWNER_AGENT_START_TIMEOUT_MS);
 type Step={stdout?:string;stderr?:string;code?:number};
-type Script={create?:Step;claudeHelp?:string|null;start?:Step;prompt?:Step;close?:Step};
+type Script={create?:Step;claudeHelp?:string|null;start?:Step;prompt?:Step;rename?:Step;close?:Step};
 function fakeRunner(script:Script={},calls:RunnerInput[]=[]):Runner {
  let unexpected=0;
  return input=>{
   calls.push(input);
   if(input.file===CLAUDE){const help=script.claudeHelp;if(help===undefined)return {code:1,stdout:'',stderr:'unexpected claude probe'};if(help===null)return {code:1,stdout:'',stderr:'claude --help exited non-zero'};return {code:0,stdout:help,stderr:''};}
   const group=input.args[2],action=input.args[3];
-  const known=(group==='workspace'&&['create','close'].includes(String(action)))||(group==='agent'&&['start','prompt'].includes(String(action)));
+  const known=(group==='workspace'&&['create','close'].includes(String(action)))||(group==='agent'&&['start','prompt','rename'].includes(String(action)));
   // An unknown command group or action is a launcher bug, never a silent success.
   if(!known){unexpected++;return {code:1,stdout:'',stderr:`unexpected herdr call #${unexpected}`};}
-  const step=group==='workspace'?(action==='create'?script.create:script.close):(action==='start'?script.start:script.prompt);
+  const step=group==='workspace'?(action==='create'?script.create:script.close):(action==='start'?script.start:action==='rename'?script.rename:script.prompt);
   return {code:step?.code??0,stdout:step?.stdout??'',stderr:step?.stderr??''};
  };
 }
@@ -31,11 +31,12 @@ test('claude launch drives herdr through argv arrays, detects the effort flag an
  const runner=fakeRunner({create:{stdout:createOk},claudeHelp:'--effort <level>   Effort level for the current session'},calls);
  const result=launch({claudePath:CLAUDE},runner);
  assert.deepEqual(result,{session:'default',workspaceId:'w7',paneId:'w7:p1',agentName:'owner-11111111-1'});
- assert.deepEqual(calls[0],{file:HERDR,args:['--session','default','workspace','create','--cwd','/srv/proj','--label','Fixture title','--no-focus'],timeout:30000});
+ assert.deepEqual(calls[0],{file:HERDR,args:['--session','default','workspace','create','--cwd','/srv/proj','--label','proj','--no-focus'],timeout:30000});
  assert.deepEqual(calls[1],{file:CLAUDE,args:['--help'],timeout:15000});
  assert.deepEqual(calls[2],{file:HERDR,args:['--session','default','agent','start','owner-11111111-1','--kind','claude','--pane','w7:p1','--timeout',START_TIMEOUT,'--','--model','claude-opus-5-5','--effort','high'],timeout:70000});
- assert.deepEqual(calls[3],{file:HERDR,args:['--session','default','agent','prompt','owner-11111111-1','continue the fixture work now'],timeout:60000});
- assert.equal(calls.length,4);
+ assert.deepEqual(calls[3],{file:HERDR,args:['--session','default','agent','prompt','w7:p1','continue the fixture work now'],timeout:60000});
+ assert.deepEqual(calls[4],{file:HERDR,args:['--session','default','agent','rename','w7:p1','--clear'],timeout:15000});
+ assert.equal(calls.length,5);
  assert.match(result.agentName,/^[a-z][a-z0-9_-]{0,31}$/);
 });
 test('codex launch skips the help probe and passes the effort config as one argv element',()=>{
@@ -43,28 +44,61 @@ test('codex launch skips the help probe and passes the effort config as one argv
  const runner=fakeRunner({create:{stdout:JSON.stringify({result:{workspace:{workspace_id:'w7'},root_pane:{pane_id:'w7:p2'}}})}},calls);
  const result=launch({engineKind:'codex',model:'gpt-6-astra',session:'work'},runner);
  assert.equal(result.session,'work');assert.equal(result.workspaceId,'w7');assert.equal(result.paneId,'w7:p2');
- assert.equal(calls.length,3);
+ assert.equal(calls.length,4);
  assert.deepEqual(calls[1].args,['--session','work','agent','start','owner-11111111-1','--kind','codex','--pane','w7:p2','--timeout',START_TIMEOUT,'--','-m','gpt-6-astra','-c','model_reasoning_effort="high"']);
  assert.ok(!calls.some(call=>call.file===CLAUDE));
  const promptCall=calls[2];
+ assert.equal(promptCall.args[4],'w7:p2');
  assert.equal(promptCall.args[5],'continue the fixture work now');
  assert.equal(promptCall.args.length,6);
+ assert.deepEqual(calls[3].args,['--session','work','agent','rename','w7:p2','--clear']);
 });
-test('long task titles are truncated to 40 characters in the workspace label',()=>{
+test('the workspace label is the workspace directory name, with or without a trailing slash, never the task title',()=>{
+ for(const workspace of ['/srv/proj','/srv/proj/','/srv/proj//']){
+  const calls:RunnerInput[]=[];
+  launch({workspace,title:'等待父 Agent 生成标题'},fakeRunner({create:{stdout:createOk}},calls));
+  const create=calls[0];
+  assert.equal(create.args[6],'--label');
+  assert.equal(create.args[7],'proj');
+  assert.ok(!create.args.includes('等待父 Agent 生成标题'));
+ }
+});
+test('an empty directory name falls back to the title truncated to 40 characters',()=>{
  const calls:RunnerInput[]=[];
- const runner=fakeRunner({create:{stdout:createOk}},calls);
- launch({title:'T'.repeat(64)},runner);
+ launch({workspace:'/',title:'T'.repeat(64)},fakeRunner({create:{stdout:createOk}},calls));
  const create=calls[0];
  assert.equal(create.args[6],'--label');
  assert.equal(create.args[7]!.length,40);
  assert.ok(create.args[7]!.startsWith('TTT'));assert.ok(!create.args[7]!.includes('…'));
+});
+test('prompt addresses the pane id, then the agent name is cleared; the launch result keeps the original name',()=>{
+ const calls:RunnerInput[]=[];
+ const result=launch({},fakeRunner({create:{stdout:createOk}},calls));
+ assert.equal(result.agentName,'owner-11111111-1');
+ assert.deepEqual(calls.map(call=>[call.args[2],call.args[3],call.args[4]]),[['workspace','create','--cwd'],['agent','start','owner-11111111-1'],['agent','prompt','w7:p1'],['agent','rename','w7:p1']]);
+ assert.equal(calls[3]!.args[5],'--clear');
+});
+test('a failing or throwing rename --clear is cosmetic: the launch succeeds and nothing is closed',()=>{
+ for(const mode of ['exit','envelope','throw'] as const){
+  const calls:RunnerInput[]=[];
+  const base=fakeRunner({create:{stdout:createOk},rename:mode==='exit'?{code:1,stderr:'rename refused'}:mode==='envelope'?{stdout:JSON.stringify({error:{code:'agent_not_found',message:'gone'}})}:undefined},calls);
+  const runner:Runner=input=>{if(mode==='throw'&&input.args[3]==='rename'){calls.push(input);throw new Error('rename exploded');}return base(input);};
+  assert.deepEqual(launch({},runner),{session:'default',workspaceId:'w7',paneId:'w7:p1',agentName:'owner-11111111-1'});
+  assert.equal(calls.at(-1)!.args[3],'rename');
+  assert.ok(!calls.some(call=>call.args.includes('close')));
+ }
+});
+test('a failed prompt never reaches rename',()=>{
+ const calls:RunnerInput[]=[];
+ assert.throws(()=>launch({},fakeRunner({create:{stdout:createOk},prompt:{code:1,stderr:'agent_blocked'}},calls)),()=>true);
+ assert.ok(!calls.some(call=>call.args[3]==='rename'));
 });
 test('claude help without an effort flag, or failing, keeps only --model',()=>{
  for(const help of [null,'usage: claude [options]','--effort'.split('').reverse().join('')+' <level>'] as const){
   const calls:RunnerInput[]=[];
   const runner=fakeRunner({create:{stdout:createOk},claudeHelp:help as string|null},calls);
   launch({claudePath:CLAUDE},runner);
-  assert.equal(calls.length,4);
+  assert.equal(calls.length,5);
   assert.ok(!calls[2]!.args.includes('--effort'));
   assert.deepEqual(calls[2]!.args.slice(-2),['--model','claude-opus-5-5']);
  }
@@ -73,7 +107,7 @@ test('no claude on PATH means no probe at all',()=>{
  const calls:RunnerInput[]=[];
  const runner=fakeRunner({create:{stdout:createOk}},calls);
  launch({},runner);
- assert.equal(calls.length,3);
+ assert.equal(calls.length,4);
  assert.ok(!calls[1]!.args.includes('--effort'));
 });
 test('unsupported engine kinds fail before any herdr call',()=>{
@@ -226,7 +260,7 @@ test('documented success envelopes are not mistaken for failures',()=>{
   const calls:RunnerInput[]=[];
   const runner=fakeRunner({create:{stdout:createOk},start:{stdout:started},prompt:{stdout:prompt}},calls);
   assert.deepEqual(launch({},runner),{session:'default',workspaceId:'w7',paneId:'w7:p1',agentName:'owner-11111111-1'});
-  assert.equal(calls.length,3);
+  assert.equal(calls.length,4);
  }
 });
 test('a cleanup that throws is appended to the launch failure it recovers from',()=>{
