@@ -119,3 +119,31 @@ JSON
     assert.equal(requests[4].args.summary, '中文 "引号"\n第二行，字面量 \\n');
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
+
+test('engines models merges --engine and --refresh into the RPC body without --input and rejects a conflicting --input', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'weaver-cli-models-'));
+  await writeFile(`${root}/same.json`, JSON.stringify({ engine: 'codex' }));
+  await writeFile(`${root}/other.json`, JSON.stringify({ engine: 'claude' }));
+  const original = process.stdout.write;
+  let output = '';
+  const sent: unknown[] = [];
+  const runtime = { request: async (_dir: string, request: unknown) => { sent.push(request); return { apiVersion: 'weaver.v1', ok: true, data: { models: [] } }; } };
+  try {
+    process.stdout.write = ((chunk: unknown) => { output += String(chunk); return true; }) as typeof process.stdout.write;
+    assert.equal(await runCLI(['engines', 'models', '--engine', 'codex'], runtime), 0);
+    assert.equal(await runCLI(['engines', 'models', '--engine', 'codex', '--refresh'], runtime), 0);
+    assert.equal(await runCLI(['engines', 'models', '--engine', 'codex', '--input', `${root}/same.json`], runtime), 0);
+    assert.deepEqual(sent, [
+      { method: 'listEngineModels', args: [{ engine: 'codex' }] },
+      { method: 'listEngineModels', args: [{ engine: 'codex', refresh: true }] },
+      { method: 'listEngineModels', args: [{ engine: 'codex' }] },
+    ]);
+    output = '';
+    assert.equal(await runCLI(['engines', 'models', '--engine', 'codex', '--input', `${root}/other.json`], runtime), 1);
+    assert.match(JSON.parse(output).error.message, /Input engine does not match CLI engine/);
+    output = '';
+    assert.equal(await runCLI(['engines', 'models'], runtime), 1);
+    assert.match(JSON.parse(output).error.message, /requires --input/);
+    assert.equal(sent.length, 3);
+  } finally { process.stdout.write = original; await rm(root, { recursive: true, force: true }); }
+});

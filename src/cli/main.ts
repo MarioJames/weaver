@@ -684,15 +684,17 @@ export async function runCLI(argv: string[], pollRuntime: Partial<PollRuntime> =
     if (rpc) {
       if (options.commandId || options.taskId) throw new LocalIPCError('INVALID_ARGUMENT', 'Policy, engine, quota, and probe commands do not take command or task IDs');
       if (rpc.arity === 1) {
-        if (!options.input && item.command !== 'quota.refresh' && item.command !== 'workers.probe') throw new LocalIPCError('INVALID_ARGUMENT', 'This command requires --input');
+        if (!options.input && item.command !== 'quota.refresh' && item.command !== 'workers.probe' && !(item.command === 'engines.models' && options.engine !== undefined)) throw new LocalIPCError('INVALID_ARGUMENT', 'This command requires --input');
         const body = options.input ? await readInput(options.input) : {};
-        if (options.worker !== undefined) {
+        if (options.worker !== undefined || options.engine !== undefined || options.refresh) {
           if (!body || typeof body !== 'object' || Array.isArray(body)) throw new LocalIPCError('INVALID_ARGUMENT', 'Input must be a JSON object');
-          const record = body as Record<string, unknown>;
-          if (record.worker !== undefined && record.worker !== options.worker) throw new LocalIPCError('INVALID_ARGUMENT', 'Input worker does not match CLI worker');
-          record.worker = options.worker;
-        }
-        request = { method: rpc.method, args: [body] };
+          // Same merge and conflict rule as makeRequest: a flag never overwrites a different --input value.
+          const holder: Record<string, unknown> = { args: body };
+          if (options.worker !== undefined) mergeArg(holder, 'worker', options.worker, 'worker');
+          if (options.engine !== undefined) mergeArg(holder, 'engine', options.engine, 'engine');
+          if (options.refresh) mergeArg(holder, 'refresh', true, 'refresh');
+          request = { method: rpc.method, args: [holder.args] };
+        } else request = { method: rpc.method, args: [body] };
       } else if (options.input) throw new LocalIPCError('INVALID_ARGUMENT', 'This command does not take --input');
       else request = { method: rpc.method, args: [] };
     } else {
