@@ -6,7 +6,7 @@ import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Config } from '../src/shared/policy';
 import type { Task } from '../src/shared/types';
-import { ARCHIVE_AFTER_MS, ENDED_EXPANDED_KEY, TASK_FILTERS_KEY, UNASSIGNED_OWNER, applyTaskFilters, archiveRows, archivedTasks, columnize, dispatchKind, emptySelection, filterByTime, filterOptions, filterTasks, hasFilters, isArchived, isOpenTask, nonArchived, ownerKindLookup, ownerLabel, projectLabel, readEndedExpanded, readTaskFilters, resolveSelection, taskColumn, taskOwnerId, taskOption, toggleOption, writeEndedExpanded, writeTaskFilters, withOwnerProfiles } from '../src/renderer/task-view';
+import { ARCHIVE_AFTER_MS, ENDED_EXPANDED_KEY, TASK_FILTERS_KEY, UNASSIGNED_OWNER, applyTaskFilters, archiveRows, archivedTasks, columnize, dispatchKind, emptySelection, filterByTime, filterOptions, hasFilters, isArchived, isOpenTask, nonArchived, ownerKindLookup, ownerLabel, projectLabel, readEndedExpanded, readTaskFilters, resolveSelection, taskColumn, taskOwnerId, taskOption, toggleOption, writeEndedExpanded, writeTaskFilters, withOwnerProfiles } from '../src/renderer/task-view';
 import type { FilterDimension, TaskSelection } from '../src/renderer/task-view';
 import { EngineIcon, AgentLabel } from '../src/renderer/components/EngineIcon';
 import { ArchiveList, archiveColumns, archiveRowProps } from '../src/renderer/components/ArchiveDrawer';

@@ -9,7 +9,7 @@ import type { EngineQuotaRecord, QuotaEngine, QuotaWindow } from '../../shared/q
 import { QUOTA_KINDS, quotaRefreshEnabled, type Block, type Engine } from '../../main/policy/routing';
 import { acceptQuotaPolicy, dateText, quotaPercentText, quotaProgressPercent, quotaRecordStale, quotaRecoveryText, quotaRetryMs, quotaStatusText, quotaNextUpdateMs, quotaCountText, quotaVisibleWindows, quotaThirdParty } from '../quota-view';
 import type { PolicyDraft, PolicyUpdate } from '../usePolicyDraft';
-import type { RendererAPI, StallEngineState, StallHistoryEntry, StallSnapshot } from '../client';
+import type { StallEngineState, StallHistoryEntry, StallSnapshot } from '../client';
 import { styles } from '../style';
 import { TimeText } from '../components/TimeText';
 import { compactTime } from '../timezone';
@@ -98,16 +98,14 @@ function useQuota(policy: PolicyDraft, onTick?: () => void) {
   return { records, busy, feedback, now, refresh, load };
 }
 
-/** The stall RPC is an optional capability: an older control plane has no `getStall`, and then nothing is shown. */
+/** The penalty ladder snapshot; when the read fails nothing is shown. */
 function useStall() {
   const [snapshot, setSnapshot] = useState<StallSnapshot>();
   const [now, setNow] = useState(Date.now);
   const mounted = useRef(true);
   const load = useCallback(async () => {
-    const getStall = (window.weaver as Partial<RendererAPI> | undefined)?.getStall;
-    if (!getStall) return;
     try {
-      const result = await getStall();
+      const result = await window.weaver.getStall();
       if (mounted.current) { setSnapshot(result); setNow(Date.now()); }
     } catch { if (mounted.current) setSnapshot(undefined); }
   }, []);

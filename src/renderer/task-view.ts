@@ -1,11 +1,10 @@
 import type { OwnerInstance } from '../shared/commands';
 import type { Config } from '../shared/policy';
-import type { Task, TaskStatus } from '../shared/types';
+import type { Task } from '../shared/types';
 import { DISPLAY_LABELS, DISPLAY_STATUSES, displayStatus } from './status-colors';
 import type { DisplayStatus } from './status-colors';
 import { compactTime, projectTimeZone, startOfZonedDay } from './timezone';
 export type TaskFilter = 'all' | 'active' | 'review' | 'closed';
-export const statusLabels: Record<TaskStatus, string> = { queued: '待执行', running: '执行中', cancelling: '停止中', completed: '执行完成', failed: '执行失败', cancelled: '已取消' };
 export function isActive(task: Task): boolean { return ['queued', 'running', 'cancelling'].includes(task.status); }
 export const UNASSIGNED_OWNER = '未指定父 Agent';
 /** Placeholder assigned to per-task throwaway instances. */

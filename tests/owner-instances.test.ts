@@ -14,6 +14,7 @@ import { PolicyStore } from '../src/main/policy/store';
 import { OwnerLaunchError, type OwnerLaunchInput, type OwnerLaunchResult } from '../src/main/owner-host';
 import type { LogicalOwner } from '../src/shared/commands';
 import type { Task, TaskInput } from '../src/shared/types';
+import { metadataOf, setMetadataOf } from './helpers/store-metadata';
 
 /** A worker that stays alive until Weaver stops it: these tests measure who holds a slot, not what a process prints. */
 function heldProcess(): ManagedProcess {
@@ -52,7 +53,7 @@ function setup(dir = mkdtempSync(join(tmpdir(), 'weaver-owner-instance-'))) {
   };
   return {
     dir, store, manager, policy, handler, raw, call, attach, parallel, taskOn, legacyTask, dispatch, waitFor,
-    owners: () => store.getMetadata().owners as LogicalOwner[],
+    owners: () => metadataOf(store).owners as LogicalOwner[],
     instances: () => call('owners.list').owners as (LogicalOwner & { runningTaskCount: number; host: { ownerId: string; session?: string } })[],
     close: async (purge = true) => { handler.draining = true; await manager.shutdown(); if (purge) rmSync(dir, { recursive: true, force: true }); },
   };
@@ -96,9 +97,9 @@ test('an old manual instance keeps its stored session and binds work to itself a
   try {
     const stored = f.attach('Legacy pane', 'session-old');
     // A record written before the label was a durable field carries it only in its own host evidence.
-    const meta = f.store.getMetadata();
+    const meta = metadataOf(f.store);
     meta.owners = meta.owners.map(owner => ({ ...owner, session: undefined }));
-    f.store.setMetadata(meta);
+    setMetadataOf(f.store, meta);
     boundTo = f.call('tasks.create', { title: 'Bound', instruction: 'fixture', ownerId: stored.id }).id;
     assert.equal(f.store.get(boundTo).ownerId, stored.id);
   } finally { await f.close(false); }
@@ -138,9 +139,9 @@ test('a changed session, name or profile is a different instance, while implicit
 test('attach deduplicates existing instances and admits new ones beyond the former JSON limit', async () => {
   const f = setup();
   try {
-    const meta = f.store.getMetadata();
+    const meta = metadataOf(f.store);
     for (let i = 0; i < 199; i++) meta.owners.push({ id: randomUUID(), name: `seed ${i}`, profileId: 'codex_owner', mode: 'manual', state: 'attached', createdAt: new Date().toISOString(), session: `seed-${i}` });
-    f.store.setMetadata(meta);
+    setMetadataOf(f.store, meta);
     const last = f.attach('Full house', 'pane-last');
     assert.equal(f.owners().length, 200);
     assert.deepEqual(f.attach('Full house', 'pane-last'), last, 'a duplicate consumes no room in the registry');

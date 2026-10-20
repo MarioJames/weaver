@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Check } from 'lucide-react';
 import { PageHeader } from '@lobehub/ui/dashboard';
 import { Icon } from '@lobehub/ui';
-import { Button, Skeleton, Spin, Text } from '@lobehub/ui/base-ui';
+import { Skeleton, Spin, Text } from '@lobehub/ui/base-ui';
 import type { QuotaSchedule } from '../../shared/quota';
 import { FREE_CHANNEL_INTERVAL_RANGE, QUOTA_INTERVAL_RANGE, chatgptReviewEnabled, freeChannelProbeSettings, quotaSettings, type Config } from '../../main/policy/routing';
 import { useFreeProbe } from '../hooks/useFreeProbe';

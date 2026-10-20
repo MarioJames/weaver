@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { object } from '../../shared/validation';
 import type { PolicySnapshot, RoutePreview } from '../../shared/policy';
-import { WEIGHT_MAX, activeBlocks, availabilityOf, chatgptReviewEnabled, defaultConfig, parseReleaseAt, resolveDispatch, validateConfig, type Config, type Block, type Engine, type Owner, type RouteOptions, type Worker } from './routing';
+import { activeBlocks, availabilityOf, chatgptReviewEnabled, defaultConfig, parseReleaseAt, resolveDispatch, validateConfig, type Config, type Block, type Engine, type Owner, type RouteOptions, type Worker } from './routing';
 import { migrate } from '../migrate';
 const LIMIT=256*1024;
 function bounded(value: unknown): void { if (Buffer.byteLength(JSON.stringify(value))>LIMIT) throw new Error('Policy exceeds 256 KiB'); }
@@ -32,26 +32,13 @@ function blocksOf(value: unknown, config: Config): Block[] {
   return block;
  }).filter((block):block is Block=>block!==undefined);
 }
-/** Task classes, worker tags, owner engine pins and the engine native-subagent flag were removed; imported policies keep loading without them. */
+/** Task classes, worker tags, owner engine pins and the engine native-subagent flag were removed; revision snapshots already stored in the database may still carry them, so a rollback drops them. */
 function dropRetiredFields(value: unknown): unknown {
  const config=object(value);
  for(const owner of Object.values(object(config.owners))) if(owner&&typeof owner==='object') delete (owner as Record<string,unknown>).only_engine;
  for(const worker of Object.values(object(config.workers))) if(worker&&typeof worker==='object') delete (worker as Record<string,unknown>).tags;
  for(const engine of Object.values(object(config.engines))) if(engine&&typeof engine==='object') delete (engine as Record<string,unknown>).native_subagents;
  return config;
-}
-/** Import marker: weights in this file are on the 0..10 scale. */
-const WEIGHT_SCALE=10;
-/** Pre-marker files used 0..100 with an omitted weight meaning 100: convert every owner once, omitted listed workers become an explicit 10. */
-function migrateWeights(value: unknown): void {
- for(const owner of Object.values(object(object(value).owners))){
-  if(!owner||typeof owner!=='object') continue;
-  const o=owner as Record<string,unknown>;
-  const map: Record<string,unknown>=o.worker_weights&&typeof o.worker_weights==='object'?o.worker_weights as Record<string,unknown>:{};
-  for(const [k,w] of Object.entries(map)) if(typeof w==='number') map[k]=w===0?0:Math.min(WEIGHT_MAX,Math.max(1,Math.round(w/10)));
-  if(Array.isArray(o.workers)) for(const id of o.workers) if(typeof id==='string'&&!Object.hasOwn(map,id)) map[id]=WEIGHT_MAX;
-  if(Object.keys(map).length) o.worker_weights=map;
- }
 }
 /** Top-level config sections kept as one settings row each (engines, owners and workers have their own tables). */
 const SETTING_KEYS=['$schema','chatgpt_review','quota','free_channel_probe','display'];
@@ -204,18 +191,6 @@ export class PolicyStore {
   if(data.version!==1) throw new Error('Unsupported policy snapshot');
   const parsed=this.parse(dropRetiredFields(data.config),data.blocks);
   this.commit(parsed.config,parsed.blocks,this.revision+1,`rollback:${revision}`);
-  return this.snapshot();
- }
- /** One-time import of a legacy policy.v1.json: used by the out-of-repo migration script, never by product startup. */
- importSnapshot(value:unknown): PolicySnapshot {
-  const data=object(value); exact(data,['version','revision','weightScale','config','blocks']);
-  if(data.version!==1||!Number.isSafeInteger(data.revision)||Number(data.revision)<0) throw new Error('Unsupported policy store');
-  if(data.weightScale!==undefined&&data.weightScale!==WEIGHT_SCALE) throw new Error('Unsupported policy weight scale');
-  if(data.weightScale===undefined) migrateWeights(data.config);
-  const parsed=this.parse(dropRetiredFields(data.config),data.blocks);
-  const occupied=['policy_engines','policy_owners','policy_workers','policy_settings','policy_blocks'].some(table=>Number((this.db.prepare(`SELECT count(*) AS n FROM ${table}`).get() as {n:number}).n)>0);
-  if(occupied) throw new Error('Policy store already holds a saved policy');
-  this.commit(parsed.config,parsed.blocks,Number(data.revision),'import');
   return this.snapshot();
  }
  preview(value: unknown): RoutePreview {

@@ -1,15 +1,9 @@
-import type { EngineQuotaRecord, QuotaEngine, QuotaRefreshResult, QuotaWindow } from '../shared/quota';
+import type { EngineQuotaRecord, QuotaRefreshResult, QuotaWindow } from '../shared/quota';
 import { QUOTA_FRESH_MS } from '../shared/quota';
 import { THIRD_PARTY_DETAIL } from '../main/quota/messages';
 import type { PolicyDraft } from './usePolicyDraft';
 import { compactTime } from './timezone';
 
-export const ENGINE_NAMES: Record<QuotaEngine, string> = { codex: 'Codex', claude: 'Claude Code', grok: 'Grok' };
-export const SOURCE_NAMES: Record<string, string> = {
-  codex_usage: 'Codex 订阅用量',
-  claude_oauth_usage: 'Claude Code 订阅用量',
-  grok_cli_billing: 'Grok CLI 订阅账期',
-};
 export const STATUS_NAMES: Record<EngineQuotaRecord['status'], string> = {
   available: '观测到可用额度', exhausted: '账户额度耗尽', unknown: '额度未知',
   unauthenticated: '登录状态不可用', unsupported: '当前认证方式不支持', error: '额度查询失败',

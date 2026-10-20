@@ -11,6 +11,7 @@ import { TaskManager } from '../src/main/manager';
 import { CommandHandler } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
 import type { Task, TaskDispatch } from '../src/shared/types';
+import { metadataOf, setMetadataOf } from './helpers/store-metadata';
 
 /** In-memory worker: cancellation holds its slot until this fixture emits close. No OS process exists. */
 class HeldWorker extends EventEmitter {
@@ -68,9 +69,9 @@ for (const frozen of [true, false]) for (const active of [false, true]) {
       const task = f.store.get(original.id);
       task.artifacts.push({ id: randomUUID(), name: 'partial.md', mediaType: 'text/markdown', content: 'Retain partial work', createdAt: new Date().toISOString() });
       f.store.put(task);
-      const metadata = f.store.getMetadata();
+      const metadata = metadataOf(f.store);
       while (metadata.packages.length < 1000) metadata.packages.push({ ...pkg, id: randomUUID() });
-      f.store.setMetadata(metadata);
+      setMetadataOf(f.store, metadata);
       const launches = f.children.length;
       const commandId = randomUUID();
       const args = { taskId: original.id, ...(active ? { cancel: true } : {}) };
@@ -78,7 +79,7 @@ for (const frozen of [true, false]) for (const active of [false, true]) {
       assert.equal(response.ok, true, JSON.stringify(response));
       const retried=response.data as Task;
       assert.equal(retried.retryOf,original.id);
-      assert.equal(f.store.listPackages().length,1001);
+      assert.equal(metadataOf(f.store).packages.length,1001);
       assert.equal(f.children.length,launches+1);
       assert.deepEqual(f.store.get(original.id).artifacts,task.artifacts,'partial work survives retry');
       assert.equal(f.store.get(original.id).status,active?'cancelling':'completed');
@@ -86,7 +87,7 @@ for (const frozen of [true, false]) for (const active of [false, true]) {
       assert.deepEqual(f.raw('tasks.retry',args,commandId),response,'successful retry has a replayable receipt');
       const reopened=new TaskStore(f.path);
       try {
-       assert.equal(reopened.listPackages().length,1001);
+       assert.equal(metadataOf(reopened).packages.length,1001);
        assert.deepEqual(reopened.get(retried.id),f.store.get(retried.id));
        assert.deepEqual(reopened.getReceipt(`local-demo:${commandId}`)!.response,response);
       }finally{reopened.close();}
@@ -121,14 +122,14 @@ test('no remaining engine refuses a later --cancel retry before touching its act
     const middle = f.attempt('opencode', 'failed', ancestor.id);
     const original = f.attempt('opencode', 'running', middle.id);
     const before = f.store.list();
-    const packages = f.store.getMetadata().packages;
+    const packages = metadataOf(f.store).packages;
     const launches = f.children.length;
     const signals = f.children.map(child => [...child.signals]);
     const response = f.raw('tasks.retry', { taskId: original.id, cancel: true });
     assert.equal(response.ok, false);
     assert.equal(response.error?.code, 'NO_ALTERNATIVE_ENGINE');
     assert.deepEqual(f.store.list(), before);
-    assert.deepEqual(f.store.getMetadata().packages, packages);
+    assert.deepEqual(metadataOf(f.store).packages, packages);
     assert.equal(f.children.length, launches);
     assert.deepEqual(f.children.map(child => child.signals), signals, 'the current attempt is never cancelled');
     assert.equal(f.manager.runningCount, 2, 'both original fixture slots are still held');

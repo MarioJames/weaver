@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FreeChannelStatus } from '../../main/free-channel';
-import type { FreeProbeAPI } from '../client';
 import { notifyError } from '../notify';
 
 const POLL_MS = 30_000;
-const api = () => window.weaver as Partial<FreeProbeAPI> | undefined;
 
 export interface FreeProbe {
   status?: FreeChannelStatus;
@@ -31,21 +29,18 @@ export function useFreeProbe(revision?: number): FreeProbe {
     return () => { mounted.current = false; };
   }, []);
   useEffect(() => {
-    const read = api()?.workerProbeStatus;
-    if (!read) { setUnavailable(true); return; }
     let current = true;
-    const load = () => { void read().then(next => { if (current) { setStatus(next); setUnavailable(false); } }).catch(() => { if (current) setUnavailable(true); }); };
+    const load = () => { void window.weaver.workerProbeStatus().then(next => { if (current) { setStatus(next); setUnavailable(false); } }).catch(() => { if (current) setUnavailable(true); }); };
     load();
     const timer = setInterval(load, POLL_MS);
     return () => { current = false; clearInterval(timer); };
   }, [revision]);
   const probeNow = useCallback(async (worker: string) => {
-    const run = api()?.workerProbe;
-    if (!run || running.current.has(worker)) return;
+    if (running.current.has(worker)) return;
     running.current.add(worker);
     setProbing(new Set(running.current));
     try {
-      const next = await run({ worker });
+      const next = await window.weaver.workerProbe({ worker });
       if (mounted.current) { setStatus(next); setUnavailable(false); }
     } catch (error) {
       notifyError(error, '探测失败');

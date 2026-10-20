@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { ENGINE_CATALOG, catalogEntry } from '../../shared/engines';
+import { catalogEntry } from '../../shared/engines';
 import { proxyEnvironment, validateProxy } from '../../shared/proxy';
 import { findExecutable, runCapture, type CaptureResult } from './probe';
 
@@ -205,6 +205,3 @@ export class EngineModelLister {
     return { ...base, status: 'ok', source: lister.source, models };
   }
 }
-
-/** Engines whose CLI can list models, for tests and for the page to know which have a command. */
-export const MODEL_LIST_ENGINES: readonly string[] = ENGINE_CATALOG.filter(entry => entry.kind === 'claude' || entry.kind in LISTERS).map(entry => entry.id);

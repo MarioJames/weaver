@@ -37,9 +37,6 @@ export function setProjectTimeZone(zone: string | undefined | null): void {
 /** The zone every timestamp is shown in right now. */
 export function projectTimeZone(): string { return configuredZone ?? browserTimeZone(); }
 
-/** Whether the zone in force is the project's own choice rather than the browser's. */
-export function hasProjectTimeZone(): boolean { return configuredZone !== undefined; }
-
 const TimeZoneContext = createContext<string | undefined>(undefined);
 
 /** Applies the zone for the render below it. The module value is set during render so the first paint is already right. */

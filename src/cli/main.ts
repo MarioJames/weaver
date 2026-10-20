@@ -6,7 +6,7 @@ import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { failure, LocalIPCError, MAX_FRAME_BYTES, readDiscovery, TRANSPORT_TIMEOUT_MS, requestTimeoutMs } from '../main/local-ipc';
+import { failure, LocalIPCError, MAX_FRAME_BYTES, readDiscovery, requestTimeoutMs } from '../main/local-ipc';
 import { openBrowser, startRuntime } from '../main/runtime';
 import { VERSION } from '../shared/version';
 import { installSkill, SKILL_AGENTS, SKILL_NAME, sourceSkill, type SkillAgent } from './skills';
@@ -525,7 +525,7 @@ async function pollTask(options: CLIOptions, mode: 'wait' | 'watch', runtime: Pa
         const response = await request('tasks.health', {}) as { ok: boolean; data?: Record<string, unknown>; error?: { code?: string; message?: string } };
         if (!response.ok) {
           const code = response.error?.code;
-          if (code === 'COMMAND_UNKNOWN' || code === 'UNKNOWN_METHOD' || code === 'METHOD_NOT_FOUND' ||
+          if (code === 'COMMAND_UNKNOWN' ||
             (code === 'INVALID_REQUEST' && /^unknown method\b/i.test(response.error?.message ?? ''))) healthSupported = false;
           else { writeEnvelope(options.output, response); return 1; }
         } else {

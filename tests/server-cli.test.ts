@@ -324,34 +324,18 @@ test('stop maps a failed signal to SERVER_STOP_FAILED', async () => {
   assert.match(result.error?.message ?? '', /Operation not permitted/);
 });
 
-// ---------------------------------------------------------------- legacy and error probes
+// ---------------------------------------------------------------- error probes
 
-test('status reports a legacy server as running with a hint', async () => {
-  const { env } = fake({ probes: [legacyEnvelope] });
-  const result = await serverStatus(env, argsOf({ action: 'status' }));
-  assert.equal(result.ok, true, JSON.stringify(result.error));
-  assert.equal(data(result).status, 'running');
-  assert.equal(data(result).legacy, true);
-  assert.equal(data(result).hint, 'This service predates weaver server; stop it the way it was started, then run weaver server start');
-  assert.deepEqual(data(result).service, { installed: false, manager: 'systemd', path: unitPath(env) });
+test('status reports any envelope error from the probe as an error, an old server included', async () => {
+  const old = await serverStatus(fake({ probes: [legacyEnvelope] }).env, argsOf({ action: 'status' }));
+  assert.equal(old.ok, false);
+  assert.equal(old.error?.code, 'INVALID_REQUEST');
+  assert.equal(old.error?.message, 'Unknown method');
 
   const failed = await serverStatus(fake({ probes: [otherErrorEnvelope] }).env, argsOf({ action: 'status' }));
   assert.equal(failed.ok, false);
   assert.equal(failed.error?.code, 'INVALID_REQUEST');
-  assert.equal(failed.error?.message, 'Invalid argument arity', 'non-legacy envelope errors stay errors');
-});
-
-test('start on a legacy server reports already running without starting anything', async () => {
-  let spawned = 0;
-  const { env, runs, killed } = fake({ probes: [legacyEnvelope], spawn: () => { spawned++; return new Promise(() => {}); } });
-  const result = await serverStart(env, argsOf({ action: 'start' }));
-  assert.equal(result.ok, true, JSON.stringify(result.error));
-  assert.equal(data(result).status, 'running');
-  assert.equal(data(result).alreadyRunning, true);
-  assert.equal(data(result).legacy, true);
-  assert.equal(runs.length, 0, 'no systemctl start');
-  assert.equal(spawned, 0, 'no spawn');
-  assert.equal(killed.length, 0, 'no kill');
+  assert.equal(failed.error?.message, 'Invalid argument arity', 'other envelope errors stay errors');
 });
 
 test('start fails with a probe error and never spawns a doomed second process', async () => {
@@ -362,36 +346,6 @@ test('start fails with a probe error and never spawns a doomed second process', 
   assert.equal(result.error?.code, 'INVALID_REQUEST');
   assert.equal(result.error?.message, 'Invalid argument arity');
   assert.equal(spawned, 0);
-});
-
-test('stop on a legacy server refuses with SERVER_LEGACY and signals nothing', async () => {
-  const { env, runs, killed } = fake({ probes: [legacyEnvelope] });
-  const result = await serverStop(env, argsOf({ action: 'stop' }));
-  assert.equal(result.ok, false);
-  assert.equal(result.error?.code, 'SERVER_LEGACY');
-  assert.equal(result.error?.message, 'This service predates weaver server; stop it the way it was started, then run weaver server start');
-  assert.equal(killed.length, 0);
-  assert.equal(runs.length, 0);
-});
-
-test('install on a legacy server skips starting and reports unmanaged with the legacy hint', async () => {
-  const { env, runs, killed } = fake({ probes: [legacyEnvelope] });
-  const result = await serverInstall(env, argsOf({ action: 'install' }));
-  assert.equal(result.ok, true, JSON.stringify(result.error));
-  assert.equal(data(result).running, 'unmanaged');
-  assert.equal(data(result).hint, 'This service predates weaver server; stop it the way it was started, then run weaver server start');
-  assert.deepEqual(runs, [['systemctl', '--user', 'daemon-reload'], ['systemctl', '--user', 'enable', SERVICE_NAME]], 'written and enabled but not started');
-  assert.equal(existsSync(unitPath(env)), true);
-  assert.equal(killed.length, 0);
-});
-
-test('install with a macOS legacy server never bootstraps', async () => {
-  const { env, runs } = fake({ platform: 'darwin', probes: [legacyEnvelope] });
-  const result = await serverInstall(env, argsOf({ action: 'install' }));
-  assert.equal(result.ok, true, JSON.stringify(result.error));
-  assert.equal(data(result).running, 'unmanaged');
-  assert.equal(runs.length, 0, 'no launchctl bootstrap');
-  assert.equal(existsSync(plistPath(env)), true);
 });
 
 test('install treats a probe error as an unknown running state without starting', async () => {
@@ -466,7 +420,7 @@ test('install keeps a foreign unit unless --force and rewrites its own', async (
 });
 
 test('install reports a service manager failure without a temp file left behind', async () => {
-  const { env } = fake({ run: (file, args) => args.includes('enable') ? { code: 1, stdout: '', stderr: 'unit file is bad' } : { code: 0, stdout: '', stderr: '' } });
+  const { env } = fake({ run: (_file, args) => args.includes('enable') ? { code: 1, stdout: '', stderr: 'unit file is bad' } : { code: 0, stdout: '', stderr: '' } });
   const result = await serverInstall(env, argsOf({ action: 'install' }));
   assert.equal(result.error?.code, 'SERVER_INSTALL_FAILED');
   assert.match(result.error?.message ?? '', /systemctl --user enable weaver.service failed/);

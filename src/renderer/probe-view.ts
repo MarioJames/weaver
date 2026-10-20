@@ -1,5 +1,5 @@
 import type { FreeChannelStatus, FreeWorkerStatus } from '../main/free-channel';
-import { activeBlocks, coveringBlock, type Block, type Config, type Owner, type Worker } from '../main/policy/routing';
+import { activeBlocks, coveringBlock, type Block, type Owner, type Worker } from '../main/policy/routing';
 import { dateText } from './quota-view';
 import type { StatusTone } from './status-colors';
 
@@ -22,7 +22,7 @@ export function pauseOfBlock(block: Pick<Block, 'by'> | undefined): { label: str
 }
 
 /** The active block that keeps one worker or owner out, found the way the router finds it. Pass the worker's policy key for a worker: a worker-scoped block reaches only the worker it names, never an owner or a sibling. */
-export function blockOf(config: Config, blocks: Block[], entity: Owner | Worker, now: number = Date.now(), workerId?: string): Block | undefined {
+export function blockOf(blocks: Block[], entity: Owner | Worker, now: number = Date.now(), workerId?: string): Block | undefined {
   return coveringBlock(activeBlocks({ version: 1, blocks }, now), entity, workerId);
 }
 

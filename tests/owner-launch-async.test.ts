@@ -16,6 +16,7 @@ import { OwnerLaunchError, type OwnerLaunchInput, type OwnerLaunchResult, type l
 import { startLocalIPC, readDiscovery } from '../src/main/local-ipc';
 import { sendRequest } from '../src/cli/main';
 import { startRuntime } from '../src/main/runtime';
+import { metadataOf } from './helpers/store-metadata';
 
 const envelope = (command:string,args:Record<string,unknown>={},commandId:string=randomUUID()) => ({apiVersion:'weaver.v1',command,args,commandId});
 const blocked = ():never => {throw new Error('No real host in fixture');};
@@ -46,10 +47,10 @@ test('pending launch receipts, same epoch exclusion, fresh state and final resta
   assert.equal(duplicate.error?.code,'INVALID_STATE');assert.equal(f.launch.pending.length,1);
   const fresh=f.store.get(f.task.id);event(fresh,'log','concurrent worker event');fresh.summary='concurrent summary';fresh.artifacts.push({id:randomUUID(),createdAt:new Date().toISOString(),name:'concurrent.txt',mediaType:'text/plain',content:'preserved'});f.manager.update(fresh);
   f.call('owners.attach',{name:'concurrent owner',profileId:'codex_owner'});
-  const count=f.store.getMetadata().owners.length;
+  const count=metadataOf(f.store).owners.length;
   f.launch.pending[0].resolve(host(f.launch.pending[0].input));
   const response=await result;assert.equal(response.ok,true);assert.equal((response.data as any).launch.ok,true);
-  const final=f.store.get(f.task.id);assert.equal(final.summary,'concurrent summary');assert.equal(final.artifacts[0].content,'preserved');assert.ok(final.events.some(item=>item.message==='concurrent worker event'));assert.equal(f.store.getMetadata().owners.length,count);
+  const final=f.store.get(f.task.id);assert.equal(final.summary,'concurrent summary');assert.equal(final.artifacts[0].content,'preserved');assert.ok(final.events.some(item=>item.message==='concurrent worker event'));assert.equal(metadataOf(f.store).owners.length,count);
   assert.deepEqual(await f.handler.handleAsync(request),response);
   const loaded=new TaskStore(f.store.path);const manager=new TaskManager(loaded,new MockWorkerAdapter(process.execPath,resolve('scripts/mock-worker.mjs')));const reopened=new CommandHandler(manager,f.policy,blocked,()=>false);
   try{assert.deepEqual(await reopened.handleAsync(request),response);}finally{await reopened.drain();await manager.shutdown();}
@@ -154,7 +155,7 @@ test('real CLI and HTTP launch concurrently beyond 15s while ordinary reads rema
   while(Date.now()<drainUntil){const entries=readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line));if(entries.filter(item=>item.action==='start').length===3)break;await new Promise(resolve=>setTimeout(resolve,10));}
   assert.equal(readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line)).filter(item=>item.action==='start').length,3);
   await runtime.close();await Promise.allSettled([drainingWork]);
-  const loaded=new TaskStore(join(data,'weaver.db'));const drained=loaded.getMetadata().receipts[`local-demo:${drainingRequest.commandId}`].response!;
+  const loaded=new TaskStore(join(data,'weaver.db'));const drained=metadataOf(loaded).receipts[`local-demo:${drainingRequest.commandId}`].response!;
   assert.equal(drained.ok,true);assert.equal((drained.data as any).launch.ok,false);assert.equal((drained.data as any).launch.code,'OWNER_LAUNCH_FAILED');assert.equal(loaded.get(drainingTask.id).ownerHost,undefined);
   assert.deepEqual(loaded.get(httpTask.id).ownerHost,httpResult.data.launch.ownerHost);
   const entries=readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line));const closes=entries.filter(item=>item.action==='close');

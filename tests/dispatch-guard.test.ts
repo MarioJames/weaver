@@ -14,6 +14,7 @@ import type { CliAgentInput, StartCliAgent } from '../src/main/adapters/launch';
 import { CommandHandler } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
 import { workspaceIdentity } from '../src/main/workspace';
+import { metadataOf } from './helpers/store-metadata';
 
 function hangProcess(): ManagedProcess {
   const stdout = new Readable({ read() {} });
@@ -45,7 +46,7 @@ function setup(launch?: StartCliAgent, mockTestTimeoutMs?: number) {
   let mockStarts = 0;
   const mock = { id: 'mock-jsonl', start() { mockStarts += 1; throw new Error('mock fallback'); } };
   const seen: CliAgentInput[] = [];
-  const adapter = new RoutingWorkerAdapter(mock, launch ? (input) => { seen.push(input); return launch(input); } : undefined, join(dir, 'agent-state'), id => store.getMetadata().packages.find(pkg => pkg.id === id));
+  const adapter = new RoutingWorkerAdapter(mock, launch ? (input) => { seen.push(input); return launch(input); } : undefined, join(dir, 'agent-state'), id => metadataOf(store).packages.find(pkg => pkg.id === id));
   const manager = new TaskManager(store, adapter, () => {}, mockTestTimeoutMs, error => { throw error; });
   const policy = new PolicyStore(join(dir,'weaver.db'));
   const handler = new CommandHandler(manager, policy);
@@ -227,7 +228,7 @@ test('explicit mock provider still runs the mock worker from the real runtime ad
   const dir = mkdtempSync(join(tmpdir(), 'weaver-explicit-mock-'));
   const store = new TaskStore(join(dir,'weaver.db'));
   let launched = 0;
-  const adapter = new RoutingWorkerAdapter(new MockWorkerAdapter(process.execPath, resolve('scripts/mock-worker.mjs')), () => { launched += 1; return successProcess(); }, join(dir, 'agent-state'), id => store.getMetadata().packages.find(pkg => pkg.id === id));
+  const adapter = new RoutingWorkerAdapter(new MockWorkerAdapter(process.execPath, resolve('scripts/mock-worker.mjs')), () => { launched += 1; return successProcess(); }, join(dir, 'agent-state'), id => metadataOf(store).packages.find(pkg => pkg.id === id));
   const manager = new TaskManager(store, adapter);
   const policy = new PolicyStore(join(dir,'weaver.db'));
   const handler = new CommandHandler(manager, policy);
@@ -244,7 +245,7 @@ test('explicit mock provider still runs the mock worker from the real runtime ad
     while (!['completed', 'failed', 'cancelled'].includes(done.status) && Date.now() < deadline) { await new Promise(r => setTimeout(r, 15)); done = store.get(createdId); }
     assert.equal(done.status, 'completed');
     assert.equal(done.run?.adapter, 'mock-jsonl');
-    assert.equal(done.run?.timeoutMs, undefined);
+    assert.equal('timeoutMs' in done.run!, false);
   } finally { handler.draining = true; await manager.shutdown(); rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -255,7 +256,7 @@ test('oversized complete instructions fail before package admission or launch',a
   assert.equal(created.ok,true);
   const dispatched=f.raw('workers.spawn',{taskId:created.data.id,owner:'claude_owner',worker:'codex_worker'});
   assert.equal(dispatched.ok,false);assert.match(dispatched.error.message,/exceeds 16000/);
-  const task=f.store.get(created.data.id);assert.equal(task.status,'queued');assert.equal(task.packageId,undefined);assert.equal(task.dispatch,undefined);assert.equal(f.seen.length,0);assert.equal(f.store.getMetadata().packages.length,0);
+  const task=f.store.get(created.data.id);assert.equal(task.status,'queued');assert.equal(task.packageId,undefined);assert.equal(task.dispatch,undefined);assert.equal(f.seen.length,0);assert.equal(metadataOf(f.store).packages.length,0);
  }finally{await f.close();}
 });
 

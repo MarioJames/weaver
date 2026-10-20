@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -11,7 +11,8 @@ import { CommandHandler, type TaskDiagnostics } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
 import { OwnerLaunchError, type OwnerLaunchInput, type OwnerLaunchResult } from '../src/main/owner-host';
 import { readStall, stallStoreAt } from './helpers/state-db';
-import { STALL_BLOCK_BY, STALL_MS, StallMonitor, parseStallState, type StallState, type StallStatus } from '../src/main/stall';
+import { STALL_BLOCK_BY, STALL_MS, StallMonitor, type StallState, type StallStatus } from '../src/main/stall';
+import { metadataOf } from './helpers/store-metadata';
 
 /** A fixed clock and a CPU reader that can only ever say "not observed": nothing here is a real process. */
 const NOW = 1_760_000_000_000;
@@ -171,7 +172,7 @@ test('engines.penalty rejects inherited names while preserving configured and hi
     stallStoreAt(statePath).save(state);
     monitor = new StallMonitor({ tasks: () => f.store.list(), policy: () => f.policy, stateStore: stallStoreAt(statePath), now: () => NOW, cpu: async () => null, log: () => {} });
     const handler = new CommandHandler(f.manager, f.policy, blockedLaunch, () => false, monitor);
-    const before = { tasks: f.store.list(), metadata: f.store.getMetadata(), policy: f.policy.snapshot(), state: JSON.stringify(readStall(statePath)) };
+    const before = { tasks: f.store.list(), metadata: metadataOf(f.store), policy: f.policy.snapshot(), state: JSON.stringify(readStall(statePath)) };
     const status = monitor.status();
     assert.equal(Object.hasOwn(before.policy.config.engines, 'retired-fixture'), false);
     for (const engine of ['toString', 'constructor', '__proto__', 'missing-fixture']) {
@@ -185,7 +186,7 @@ test('engines.penalty rejects inherited names while preserving configured and hi
       assert.equal(response.ok, true, engine);
       assert.deepEqual(response.data, { engine, ...status.engines[engine], vendorLimit: null });
     }
-    assert.deepEqual({ tasks: f.store.list(), metadata: f.store.getMetadata(), policy: f.policy.snapshot(), state: JSON.stringify(readStall(statePath)) }, before);
+    assert.deepEqual({ tasks: f.store.list(), metadata: metadataOf(f.store), policy: f.policy.snapshot(), state: JSON.stringify(readStall(statePath)) }, before);
     assert.deepEqual(monitor.status(), status);
   } finally { await monitor?.stop(); await f.close(); }
 });

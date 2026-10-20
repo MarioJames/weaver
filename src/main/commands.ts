@@ -292,7 +292,6 @@ export class CommandHandler {
  private pumpDirty=false;
  private pumpScheduled?:NodeJS.Immediate;
  private delivered=new Map<string,string>();
- checkIdleOwners():string[] {return this.manager.store.listHeads().filter(task=>task.ownerId&&this.continuation.due(task.id)).map(task=>task.id);}
  private prepareOwnerActivity(command:string,args:Record<string,unknown>):void {
   if(!['workers.spawn','packages.create','results.ack','reviews.submit'].includes(command))return;
   const task=this.task(args);this.revise(task,args);

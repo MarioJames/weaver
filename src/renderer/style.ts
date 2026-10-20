@@ -62,23 +62,6 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
       position: static;
     }
   `,
-  /** Every row takes the tallest card's height, so all engine cards line up. */
-  cards: css`
-    display: grid;
-    grid-auto-rows: 1fr;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 16px;
-    min-inline-size: 0;
-  `,
-  card: css`
-    display: flex;
-    flex-direction: column;
-    block-size: 100%;
-
-    & > :last-child {
-      flex: 1;
-    }
-  `,
   cardBody: css`
     display: flex;
     flex-direction: column;
@@ -94,37 +77,6 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     margin-block-start: auto;
     padding-block-start: 12px;
     border-block-start: 1px solid ${cssVar.colorBorderSecondary};
-  `,
-  /** Settings groups stacked with hairlines between them, full width. */
-  settings: css`
-    container-type: inline-size;
-    display: flex;
-    flex-direction: column;
-  `,
-  /** The group column takes a third (bounded) so long group descriptions wrap to a few lines. */
-  settingsGroup: css`
-    display: grid;
-    grid-template-columns: minmax(280px, 36%) minmax(0, 1fr);
-    gap: 8px 48px;
-    padding-block: 20px;
-
-    & + & {
-      border-block-start: 1px solid ${cssVar.colorBorderSecondary};
-    }
-
-    /* Collapse on the content width, not the viewport: the sidebar already takes part of the screen. */
-    @container (max-width: 860px) {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  `,
-  settingsRows: css`
-    display: flex;
-    flex-direction: column;
-    min-inline-size: 0;
-
-    & > :first-child {
-      padding-block-start: 0;
-    }
   `,
   stack: css`
     display: flex;
@@ -639,29 +591,6 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     align-items: center;
     min-inline-size: 0;
   `,
-  /** Setting label and description on the left, the control on the right. */
-  setting: css`
-    display: flex;
-    gap: 16px;
-    align-items: center;
-    justify-content: space-between;
-    min-inline-size: 0;
-    padding-block: 12px;
-
-    /* The text wraps; the control keeps its size and stays at the right edge. */
-    & > :first-child {
-      flex: 1 1 0;
-      min-inline-size: 0;
-    }
-
-    & > :last-child {
-      flex: none;
-    }
-
-    & + & {
-      border-block-start: 1px solid ${cssVar.colorBorderSecondary};
-    }
-  `,
   /** Rows of a short editable list: one fixed height, hairline separators, no outer frame. */
   listRows: css`
     display: flex;
@@ -697,23 +626,9 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     overflow-wrap: anywhere;
     min-inline-size: 0;
   `,
-  clip: css`
-    overflow: auto;
-    max-block-size: 280px;
-    margin: 0;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  `,
   meta: css`
     font-size: 12px;
     color: ${cssVar.colorTextSecondary};
-  `,
-  /** Engine icon and name share one baseline-aligned inline row. */
-  agentLabel: css`
-    display: inline-flex;
-    gap: 4px;
-    align-items: center;
-    min-inline-size: 0;
   `,
   /** Owner and worker side by side in one archive row cell. */
   agentPair: css`
@@ -807,27 +722,8 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   `,
-  replyError: css`
-    font-size: 13px;
-    color: ${cssVar.colorErrorText};
-  `,
   warn: css`
     color: ${cssVar.colorWarningText};
-  `,
-  tab: css`
-    margin: 0;
-    padding: 4px 8px;
-    border: 0;
-    border-radius: ${cssVar.borderRadiusSM};
-    background: transparent;
-    color: ${cssVar.colorTextSecondary};
-    font: inherit;
-    cursor: pointer;
-
-    &[aria-selected='true'] {
-      background: ${cssVar.colorFillSecondary};
-      color: ${cssVar.colorText};
-    }
   `,
   /** Stall penalty history: a collapsed list under the penalty line, kept smaller than the card body. */
   stallHistory: css`

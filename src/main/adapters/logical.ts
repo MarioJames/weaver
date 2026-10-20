@@ -1,34 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import type { Task } from '../../shared/types';
-import type { ManagedProcess, WorkerAdapter } from './worker';
 
 export interface LogicalAdapter {
  readonly id: string;
  readonly available: boolean;
  readonly capabilities: readonly string[];
-}
-
-/** Explicit registration is the only way to enable a provider. No fallback to a real CLI. */
-export class AdapterRegistry<T extends LogicalAdapter> {
- private readonly adapters = new Map<string, T>();
- register(adapter: T): this {
-  if (!adapter.id.trim()) throw new Error('Adapter ID is required');
-  if (this.adapters.has(adapter.id)) throw new Error(`Adapter already registered: ${adapter.id}`);
-  this.adapters.set(adapter.id, adapter);
-  return this;
- }
- resolve(id: string, requiredCapabilities: readonly string[] = []): T {
-  const adapter = this.adapters.get(id);
-  if (!adapter) throw new Error(`Adapter is not registered: ${id}`);
-  if (!adapter.available) throw new Error(`Adapter is unavailable: ${id}`);
-  for (const capability of requiredCapabilities) {
-   if (!adapter.capabilities.includes(capability)) throw new Error(`Adapter ${id} lacks capability: ${capability}`);
-  }
-  return adapter;
- }
- list(): Array<{id:string;available:boolean;capabilities:string[]}> {
-  return [...this.adapters.values()].map(adapter => ({id:adapter.id,available:adapter.available,capabilities:[...adapter.capabilities]}));
- }
 }
 
 export interface OwnerHostInput { ownerId: string; name: string; profileId: string }
@@ -168,18 +143,4 @@ export class MockOwnerHostAdapter implements OwnerHostAdapter {
   this.messages.get(ownerId)!.push(message);
   return {...message};
  }
-}
-
-export interface WorkerProviderAdapter extends LogicalAdapter {
- start(task: Task): ManagedProcess;
-}
-/** Reuses the bounded JSONL process adapter; does not implement a second process launcher. */
-export class MockWorkerProviderAdapter implements WorkerProviderAdapter, WorkerAdapter {
- readonly id = 'mock-jsonl' as const;
- readonly available = true;
- readonly capabilities = Object.freeze(['start', 'mock', 'jsonl']);
- constructor(private readonly worker: WorkerAdapter) {
-  if (worker.id !== 'mock-jsonl') throw new Error('Only the mock-jsonl worker can be bridged');
- }
- start(task: Task): ManagedProcess { return this.worker.start(task); }
 }

@@ -12,9 +12,9 @@ export interface StallSnapshot {
   engines: Record<string, StallEngineState>;
   config: { stallMinutes: number; quorum: number; ladder: (number | null)[]; resetHours: number };
 }
-/** `getStall` is an optional capability: a control plane older than the penalty ladder simply does not expose it. */
+/** What `window.weaver` exposes: the shared task/policy API plus the stall, free-probe and model-list reads the web control plane serves. */
 export type RendererAPI = Omit<WeaverAPI, 'getStall'> & FreeProbeAPI & { getStall: () => Promise<StallSnapshot>; listEngineModels: (input: import('../main/engines/models').EngineModelListInput) => Promise<import('../main/engines/models').EngineModelList> };
-/** Free-channel probing is optional the same way: `workerProbeStatus` reads, `workerProbe` runs one real greeting per named worker. */
+/** Free-channel probing: `workerProbeStatus` reads, `workerProbe` runs one real greeting per named worker. */
 export interface FreeProbeAPI {
   workerProbeStatus: () => Promise<FreeChannelStatus>;
   workerProbe: (input: { worker?: string }) => Promise<FreeChannelStatus>;

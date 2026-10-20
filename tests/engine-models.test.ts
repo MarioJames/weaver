@@ -253,14 +253,10 @@ test('the picker line separates a list, a missing list command and a failed comm
   assert.equal(NO_LIST_TEXT, NO_LIST_MESSAGE);
 });
 
-test('a control plane without the list capability falls back to manual entry instead of failing', async () => {
+test('the model list request goes straight to the control plane client', async () => {
   const globals = globalThis as unknown as { window?: unknown };
   const saved = globals.window;
   try {
-    globals.window = { weaver: {} };
-    const list = await requestEngineModels({ engine: 'pi' });
-    assert.equal(list.status, 'unsupported');
-    assert.match(list.message ?? '', /请手动填写/);
     const seen: unknown[] = [];
     globals.window = { weaver: { listEngineModels: async (input: unknown) => { seen.push(input); return listOf({ models: [{ id: 'a/b' }] }); } } };
     assert.equal((await requestEngineModels({ engine: 'pi', proxy: 'direct' })).models.length, 1);

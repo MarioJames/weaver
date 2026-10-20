@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { TaskStore, engineLadderKey, event } from '../src/main/store';
+import { TaskStore, event } from '../src/main/store';
 import { SCHEMA_VERSION, migrate } from '../src/main/migrate';
 import { TaskManager } from '../src/main/manager';
 import { CommandHandler } from '../src/main/commands';
@@ -36,40 +36,6 @@ test('empty database uses WAL, split rows, isolated narrow reads and rollback ac
    const body=JSON.parse(String(db.prepare('SELECT body FROM tasks').get()!.body));assert.equal('events' in body,false);assert.equal('artifacts' in body,false);
    assert.equal(db.prepare('SELECT content FROM artifacts').get()!.content,'body');assert.equal(db.prepare('SELECT count(*) n FROM task_events').get()!.n,1);
   }finally{db.close();}
- }finally{store.close();rmSync(dir,{recursive:true,force:true});}
-});
-
-test('startup never reads a legacy tasks.v1.json; the explicit import (used by the migration script) loads tasks, receipts, sequence and vendor limits',async()=>{
- const dir=mkdtempSync(join(tmpdir(),'weaver-import-'));const source=new TaskStore(join(dir,'source.db'));
- const manager=new TaskManager(source,adapter);const handler=new CommandHandler(manager,new PolicyStore(source.db));
- try {
-  const request={apiVersion:'weaver.v1',commandId:'import-replay',command:'tasks.create',args:input};const response=handler.handle(request);assert.equal(response.ok,true);
-  const task=source.list()[0];event(task,'log','history');task.artifacts=[{id:randomUUID(),name:'result.txt',mediaType:'text/plain',content:'imported content',createdAt:task.createdAt}];source.put(task);
-  const owner:LogicalOwner={id:randomUUID(),name:'registered',mode:'manual',profileId:'codex_owner',state:'attached',session:'test',createdAt:task.createdAt};source.putOwner(owner);
-  const pkg:WorkPackage={id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:['local'],acceptanceCriteria:['pass'],createdAt:task.createdAt};source.putPackage(pkg);
-  const content=JSON.stringify({version:1,sequence:41,tasks:source.list(),metadata:{...source.getMetadata(),vendorRateLimits:{codex:{level:2,lastTriggerAt:123}}}});const legacy=join(dir,'tasks.v1.json');writeFileSync(legacy,content);
-  const first=new TaskStore(join(dir,'weaver.db'));
-  assert.equal(first.list().length,0,'opening the store ignores tasks.v1.json');assert.equal(first.revision,0);assert.equal(readFileSync(legacy,'utf8'),content);
-  first.importTasksJson(legacy);
-  assert.equal(first.revision,41);assert.deepEqual(first.get(task.id),task);assert.deepEqual(first.getOwner(owner.id),owner);assert.deepEqual(first.getPackage(pkg.id),pkg);assert.deepEqual(first.getVendorLimit(engineLadderKey('codex')),{level:2,lastTriggerAt:123});
-  assert.equal(first.getValue('legacyImport'),undefined,'no import marker is kept');assert.equal(first.getValue('vendorRateLimits'),undefined,'the ladder lives in its own table');
-  const imported=new CommandHandler(new TaskManager(first,adapter),new PolicyStore(first.db));
-  assert.deepEqual(imported.handle(request),response);assert.equal(first.list().length,1);
-  await imported.drain();first.close();
-  const second=new TaskStore(join(dir,'weaver.db'));try{assert.equal(second.revision,41);assert.deepEqual(second.get(task.id),task);assert.equal(second.list().length,1);assert.deepEqual(second.listVendorLimits(),{[engineLadderKey('codex')]:{level:2,lastTriggerAt:123}});}finally{second.close();}
-  assert.equal(readFileSync(legacy,'utf8'),content);
- }finally{await handler.drain();source.close();rmSync(dir,{recursive:true,force:true});}
-});
-
-test('an import error rolls back every row and keeps the JSON intact',()=>{
- const dir=mkdtempSync(join(tmpdir(),'weaver-import-failure-'));const path=join(dir,'tasks.v1.json');const task=fixture();
- const content=JSON.stringify({version:1,tasks:[task,{}]});writeFileSync(path,content);
- const store=new TaskStore(join(dir,'weaver.db'));
- try{
-  assert.throws(()=>store.importTasksJson(path));
-  assert.equal(readFileSync(path,'utf8'),content);
-  for(const table of ['tasks','task_events','artifacts','owners','packages','receipts','kv','vendor_worker_limits'])assert.equal(store.db.prepare(`SELECT count(*) n FROM ${table}`).get()!.n,0);
-  writeFileSync(path,JSON.stringify({version:1,tasks:[task]}));store.importTasksJson(path);assert.equal(store.get(task.id).id,task.id);
  }finally{store.close();rmSync(dir,{recursive:true,force:true});}
 });
 

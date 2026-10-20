@@ -21,7 +21,7 @@ export interface TaskDispatch {
 }
 export interface AgentRun {
   id: string; adapter: string; execution?: 'real' | 'mock' | 'native'; status: AgentStatus;
-  engine?: string; model?: string; effort?: string; workspace?: string; timeoutMs?: number;
+  engine?: string; model?: string; effort?: string; workspace?: string;
   scopeUnit?: string; evidence?: import('../main/adapters/cli/types').CliAgentEvidence;
   pid?: number; firstOutputAt?: string; startedAt?: string; endedAt?: string; exitCode?: number | null;
 }

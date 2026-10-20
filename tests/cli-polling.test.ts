@@ -90,9 +90,9 @@ test('the omitted --for is min(600, max_wait_minutes×60) with 30 as the fallbac
   assert.equal(await defaultForSeconds(directory),240);
   assert.equal(await defaultForSeconds(justDataDir()),30,'an unreachable endpoint falls back to 30');
   await app.close();
-  const big=await startLocalIPC(directory,(request:any)=>ok({config:{herdr:{max_wait_minutes:11}}}));
+  const big=await startLocalIPC(directory,()=>ok({config:{herdr:{max_wait_minutes:11}}}));
   try{assert.equal(await defaultForSeconds(directory),600,'the 10-minute cap binds');}finally{await big.close();}
-  const err=await startLocalIPC(directory,(request:any)=>({apiVersion:'weaver.v1',ok:false,error:{code:'PERSISTENCE_ERROR',message:'Policy',retryable:false}}));
+  const err=await startLocalIPC(directory,()=>({apiVersion:'weaver.v1',ok:false,error:{code:'PERSISTENCE_ERROR',message:'Policy',retryable:false}}));
   try{assert.equal(await defaultForSeconds(directory),30);}finally{await err.close();}
  }finally{await rm(directory,{recursive:true,force:true});}
 });

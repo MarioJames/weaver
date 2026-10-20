@@ -1,12 +1,12 @@
 import test from 'node:test';
 import { freeStoreAt, readFree } from './helpers/state-db';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { activeBlocks, defaultConfig, availabilityOf } from '../src/main/policy/routing';
 import { PolicyStore } from '../src/main/policy/store';
-import { FREE_PROBE_BLOCK_BY, FreeChannelProbeMonitor, parseFreeProbeState, parseFreeProbeInput, type FreeProbeState } from '../src/main/free-channel';
+import { FREE_PROBE_BLOCK_BY, FreeChannelProbeMonitor, parseFreeProbeState, parseFreeProbeInput } from '../src/main/free-channel';
 import { STALL_BLOCK_BY } from '../src/main/stall';
 import { classifyVendorError } from '../src/main/adapters/cli/vendor-errors';
 
@@ -92,7 +92,6 @@ async function harness(options: HarnessOptions = {}) {
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };
 }
-type Harness = Awaited<ReturnType<typeof harness>>;
 
 test('the vendor classifier keeps the documented failure kinds and retry times', () => {
   const quota = classifyVendorError('opencode', 'error.error="FreeUsageLimitError: usage limit reached, retry after 30m"', START);
@@ -318,7 +317,7 @@ test('probeNow validates its target, runs the named probe, and stop fences anyth
     assert.deepEqual(h.calls.map((call: ProbeCall) => call.worker), ['qoder_worker'], 'the named worker probed alone');
     assert.equal(h.probesOf('opencode_worker').length, 0);
     // Draining: a probe can only answer after being aborted; that answer writes nothing at all.
-    const slow: Probe = (route, signal) => new Promise(resolve => signal.addEventListener('abort', () => resolve({ ok: false, ms: 10, error: 'aborted probe' })));
+    const slow: Probe = (_route, signal) => new Promise(resolve => signal.addEventListener('abort', () => resolve({ ok: false, ms: 10, error: 'aborted probe' })));
     const fenced = new FreeChannelProbeMonitor({
       policy: () => h.policy, stateStore: freeStoreAt(join(h.dir, 'other-probes.db')), probe: slow, now: h.now, ready: () => true, log: () => {},
     });

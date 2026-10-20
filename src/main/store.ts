@@ -1,12 +1,10 @@
-import { mkdirSync, readFileSync, chmodSync } from 'node:fs';
+import { mkdirSync, chmodSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { ownerSession, type LogicalOwner, type WorkPackage, type CommandReceipt } from '../shared/commands';
 import type { Task, TaskEvent, TaskSummary } from '../shared/types';
-import { object } from '../shared/validation';
 import { migrate } from './migrate';
-import { parseStoredTask } from './stored-task';
 export const active = (task: Task) => task.status === 'running' || task.status === 'cancelling';
 /** Slots belong to the exact owner instance a task is bound to; unbound work shares only its own profile group. */
 const instanceGroup = (ownerId: string) => `instance:${ownerId}`;
@@ -26,7 +24,6 @@ export function event(task: Task, kind: TaskEvent['kind'], message: string): voi
  task.events.push({id:randomUUID(), at, kind, message});
  if (task.events.length > 500) task.events.splice(0, task.events.length - 500);
 }
-type Metadata = {owners:LogicalOwner[];packages:WorkPackage[];receipts:Record<string,CommandReceipt>};
 export type VendorLimit={level:number;lastTriggerAt:number};
 /** Ladder key for a dispatch that names no worker: the legacy per-engine ladder. */
 export const engineLadderKey=(engine:string):string=>`@engine:${engine}`;
@@ -51,28 +48,6 @@ export class TaskStore {
    this.sequence=this.getValue<number>('sequence')??0;
   } catch(error){this.db.close();throw new Error(`Could not initialize Weaver SQLite store: ${error instanceof Error?error.message:String(error)}`,{cause:error});}
  }
- /** One-time import of a legacy tasks.v1.json: used by the out-of-repo migration script, never by product startup. */
- importTasksJson(path:string):void {
-  const content=readFileSync(path,'utf8');const data=object(JSON.parse(content));
-  if(data.version!==1||!Array.isArray(data.tasks))throw new Error('Unsupported or damaged Weaver store');
-  const sequence=data.sequence??0;if(!Number.isSafeInteger(sequence)||Number(sequence)<0)throw new Error('Invalid store sequence');
-  const meta=data.metadata===undefined?{owners:[],packages:[],receipts:{}}:object(data.metadata);
-  if(!Array.isArray(meta.owners)||!Array.isArray(meta.packages))throw new Error('Invalid control-plane metadata');
-  const receipts=object(meta.receipts);
-  this.db.exec('BEGIN IMMEDIATE');
-  try {
-   const ids=new Set<string>();
-   for(const raw of data.tasks){const task=parseStoredTask(raw);if(ids.has(task.id))throw new Error('Duplicate task ID in store');ids.add(task.id);this.writeTask(task);}
-   for(const raw of meta.owners){const owner=object(raw) as unknown as LogicalOwner;const session=ownerSession(owner);this.writeRecord('owners',owner.id,{...owner,...(session?{session}:{})});}
-   for(const raw of meta.packages){const pkg=object(raw) as unknown as WorkPackage;this.writeRecord('packages',pkg.id,pkg);}
-   for(const [key,receipt] of Object.entries(receipts))this.writeRecord('receipts',key,receipt);
-   if(meta.vendorRateLimits!==undefined)for(const [engine,raw] of Object.entries(object(meta.vendorRateLimits))){const limit=object(raw);if(!Number.isSafeInteger(limit.level)||!Number.isSafeInteger(limit.lastTriggerAt))throw new Error('Invalid vendor rate limit');this.db.prepare('INSERT INTO vendor_worker_limits(worker,level,last_trigger_at) VALUES (?,?,?)').run(engineLadderKey(engine),Number(limit.level),Number(limit.lastTriggerAt));}
-   for(const [key,value] of Object.entries(meta))if(!['owners','packages','receipts','vendorRateLimits'].includes(key))this.writeRecord('kv',key,value);
-   this.writeRecord('kv','sequence',sequence);
-   this.db.exec('COMMIT');
-   this.sequence=Number(sequence);
-  }catch(error){try{this.db.exec('ROLLBACK');}catch{/* SQLite may already have rolled back an I/O failure. */}throw error;}
- }
  private readRecord<T>(table:string,key:string):T|undefined {const row=this.db.prepare(`SELECT body FROM ${table} WHERE ${table==='kv'||table==='receipts'?'key':'id'}=?`).get(key);return row?JSON.parse(String(row.body)) as T:undefined;}
  private readRecords<T>(table:string):T[]{return this.db.prepare(`SELECT body FROM ${table} ORDER BY rowid`).all().map(row=>JSON.parse(String(row.body)) as T);}
  private writeRecord(table:string,key:string,value:unknown):void {this.db.prepare(`INSERT INTO ${table} (${table==='kv'||table==='receipts'?'key':'id'},body) VALUES (?,?) ON CONFLICT DO UPDATE SET body=excluded.body`).run(key,JSON.stringify(value));}
@@ -81,20 +56,11 @@ export class TaskStore {
  listOwners():LogicalOwner[]{return this.readRecords<LogicalOwner>('owners').map(owner=>this.normalizeOwner(owner));}
  putOwner(owner:LogicalOwner):void{this.transaction(()=>this.writeRecord('owners',owner.id,owner));}
  getPackage(id:string|undefined):WorkPackage|undefined{return id?this.readRecord('packages',id):undefined;}
- listPackages():WorkPackage[]{return this.readRecords('packages');}
  putPackage(pkg:WorkPackage):void{this.transaction(()=>this.writeRecord('packages',pkg.id,pkg));}
  getReceipt(key:string):CommandReceipt|undefined{return this.readRecord('receipts',key);}
  putReceipt(key:string,value:CommandReceipt):void{this.transaction(()=>this.writeRecord('receipts',key,value));}
  getValue<T>(key:string):T|undefined{return this.readRecord('kv',key);}
  putValue(key:string,value:unknown):void{this.transaction(()=>this.writeRecord('kv',key,value));}
- /** Compatibility for cold callers; hot command paths use record-level reads/writes. */
- getMetadata():Metadata {return {owners:this.listOwners(),packages:this.listPackages(),receipts:Object.fromEntries(this.db.prepare('SELECT key,body FROM receipts').all().map(row=>[String(row.key),JSON.parse(String(row.body))]))};}
- setMetadata(meta:Metadata):void{this.transaction(()=>{
-  for(const table of ['owners','packages','receipts'])this.db.exec(`DELETE FROM ${table}`);
-  for(const owner of meta.owners)this.writeRecord('owners',owner.id,owner);
-  for(const pkg of meta.packages)this.writeRecord('packages',pkg.id,pkg);
-  for(const [key,value] of Object.entries(meta.receipts))this.writeRecord('receipts',key,value);
- });}
  /** The vendor rate-limit ladder: one row per worker (an engine-only dispatch uses its own key), kept across restarts and explicit block removal. */
  getVendorLimit(worker:string):VendorLimit|undefined{const row=this.db.prepare('SELECT level,last_trigger_at FROM vendor_worker_limits WHERE worker=?').get(worker);return row?{level:Number(row.level),lastTriggerAt:Number(row.last_trigger_at)}:undefined;}
  listVendorLimits():Record<string,VendorLimit>{return Object.fromEntries(this.db.prepare('SELECT worker,level,last_trigger_at FROM vendor_worker_limits ORDER BY worker').all().map(row=>[String(row.worker),{level:Number(row.level),lastTriggerAt:Number(row.last_trigger_at)}]));}

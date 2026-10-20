@@ -76,15 +76,9 @@ test('capacity is hypothetical preview only, never execution permission',()=>fix
  assert.equal(store.preview({owner:'claude_owner',runningCount:3}).capacityAvailable,true);
  assert.throws(()=>store.preview({owner:'claude_owner',runningCount:-1}),/Invalid/);
 }));
-test('importing a damaged or future legacy policy is refused and stores nothing',()=>fixture((store)=>{
- assert.throws(()=>store.importSnapshot({version:2}),/Unsupported|Unknown/);
- assert.throws(()=>store.importSnapshot({version:1,revision:1,config:{},blocks:[]}));
- assert.equal(store.snapshot().revision,0);assert.deepEqual(store.history(),[]);
-}));
 test('a saved policy with a gemini engine fails with the ordinary schema error',()=>fixture((store)=>{
  const config=defaultConfig() as any; config.engines.gemini={enabled:true,kind:'gemini'};
  assert.deepEqual(validateConfig(config).map(i=>i.path),['$.engines.gemini.kind']);
- assert.throws(()=>store.importSnapshot({version:1,revision:0,config,blocks:[]}),/\$\.engines\.gemini\.kind: must be one of/);
  assert.throws(()=>store.save({revision:0,config,blocks:[]}),/\$\.engines\.gemini\.kind: must be one of/);
  assert.deepEqual(store.history(),[]);
 }));
@@ -120,11 +114,15 @@ test('invalid weights are rejected',()=>{
  const high=defaultConfig(); high.owners.claude_owner.worker_weights={claude_worker:11}; assert.ok(validateConfig(high).some(issue=>issue.message.includes('0 to 10')));
  const fraction=defaultConfig(); fraction.owners.claude_owner.worker_weights={claude_worker:1.5}; assert.ok(validateConfig(fraction).length);
 });
-test('a policy with retired tags and engine pins imports without them',()=>fixture((store)=>{
- const config=JSON.parse(JSON.stringify(defaultConfig())); config.workers.claude_worker.tags=['frontend']; config.owners.claude_owner.only_engine='codex'; config.engines.claude.native_subagents=true;
- const loaded=store.importSnapshot({version:1,revision:3,weightScale:10,config,blocks:[]});
+test('rolling back to a stored revision that still carries retired tags and engine pins drops them',()=>fixture((store)=>{
+ const saved=store.save({revision:0,config:defaultConfig(),blocks:[]});assert.equal(saved.revision,1);
+ // Revision bodies written by older versions are database content: put the retired fields back into the stored snapshot.
+ const row=(store as any).db.prepare('SELECT body FROM policy_revisions WHERE revision=1').get() as {body:string};
+ const body=JSON.parse(row.body); body.config.workers.claude_worker.tags=['frontend']; body.config.owners.claude_owner.only_engine='codex'; body.config.engines.claude.native_subagents=true;
+ (store as any).db.prepare('UPDATE policy_revisions SET body=? WHERE revision=1').run(JSON.stringify(body));
+ const loaded=store.rollback(1);
  assert.equal('tags' in loaded.config.workers.claude_worker,false); assert.equal('only_engine' in loaded.config.owners.claude_owner,false); assert.equal('native_subagents' in loaded.config.engines.claude,false);
- assert.equal(loaded.revision,3);
+ assert.equal(loaded.revision,2);
 }));
 test('weights balance load: the lowest (running + 1) / weight wins, ties go to the higher weight then list order',()=>{
  const c=all(); c.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:5,opencode_worker:10,grok_worker:0};
@@ -195,39 +193,6 @@ test('omitted weight is 5 and weights above 10 are rejected',()=>{
  owner.worker_weights={claude_worker:10}; assert.deepEqual(validateConfig(c),[]);
  owner.worker_weights={claude_worker:11}; assert.ok(validateConfig(c).some(i=>i.message==='weight must be an integer from 0 to 10'));
  owner.worker_weights={claude_worker:-1}; assert.ok(validateConfig(c).length);
-});
-const memory=()=>{const db=new DatabaseSync(':memory:');return new PolicyStore(db,()=>now);};
-/** A legacy policy.v1.json document whose owners carry the given weights, with or without the 0..10 scale marker. */
-const legacyDocument=(weights:Record<string,Record<string,number>>,marker:boolean)=>{
- const config=defaultConfig() as any;
- for(const o of Object.values<any>(config.owners)) delete o.worker_weights;
- for(const [owner,w] of Object.entries(weights)) config.owners[owner].worker_weights=w;
- return {version:1,revision:4,...(marker?{weightScale:10}:{}),config,blocks:[]};
-};
-test('a marker-less 0-100 policy migrates every owner on import: values divided, omitted listed workers become 10',()=>{
- const store=memory();
- const loaded=store.importSnapshot(legacyDocument({claude_owner:{claude_worker:100,qoder_worker:50,opencode_worker:0,grok_worker:4},codex_owner:{codex_worker:7}},false));
- assert.deepEqual(loaded.config.owners.claude_owner.worker_weights,{claude_worker:10,qoder_worker:5,opencode_worker:0,grok_worker:1});
- // Small old values are divided too (7/100 -> 1); omitted workers keep the old implicit 100 as an explicit 10.
- for(const [id,o] of Object.entries(loaded.config.owners)) for(const w of o.workers) assert.ok(Object.hasOwn(o.worker_weights??{},w),`${id}/${w}`);
- assert.equal(loaded.config.owners.codex_owner.worker_weights!.codex_worker,1);
- assert.equal(loaded.revision,4);assert.deepEqual(store.history().map(item=>[item.revision,item.source]),[[4,'import']]);
- // Imported weights are stored per owner/worker row on the 0..10 scale.
- assert.deepEqual(new PolicyStore((store as any).db,()=>now).snapshot().config.owners.claude_owner.worker_weights,loaded.config.owners.claude_owner.worker_weights);
- assert.throws(()=>store.importSnapshot(legacyDocument({},true)),/already holds a saved policy/,'a second import is refused');
-});
-test('an explicit 50 next to an omitted worker keeps its 1:2 ratio (5 vs 10)',()=>{
- const o=memory().importSnapshot(legacyDocument({claude_owner:{claude_worker:50}},false)).config.owners.claude_owner;
- assert.equal(o.worker_weights!.claude_worker,5); assert.equal(o.worker_weights!.qoder_worker,10);
-});
-test('a policy with the weightScale marker is never migrated',()=>{
- const loaded=memory().importSnapshot(legacyDocument({claude_owner:{claude_worker:5,qoder_worker:0}},true));
- assert.deepEqual(loaded.config.owners.claude_owner.worker_weights,{claude_worker:5,qoder_worker:0});
- assert.equal(effectiveWeight(loaded.config.owners.claude_owner,'grok_worker'),5);
-});
-test('an unknown weightScale is refused on import',()=>{
- const store=memory();const document={...legacyDocument({},true),weightScale:100};
- assert.throws(()=>store.importSnapshot(document),/weight scale/);assert.equal(store.snapshot().revision,0);assert.deepEqual(store.history(),[]);
 });
 test('policy keeps per-table rows: engines, owners, ordered worker links with weights, workers, settings and blocks',()=>{
  const db=new DatabaseSync(':memory:');const store=new PolicyStore(db,()=>now);

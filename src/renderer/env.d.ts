@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
-import type { WeaverAPI } from '../shared/types';
+import type { RendererAPI } from './client';
 
 declare global {
   interface Window {
-    weaver: WeaverAPI;
+    weaver: RendererAPI;
   }
 }
 

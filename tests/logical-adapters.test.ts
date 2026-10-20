@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { ChildProcessWithoutNullStreams } from 'node:child_process';
-import { AdapterRegistry, MockOwnerHostAdapter, MockWorkerProviderAdapter, type LogicalAdapter } from '../src/main/adapters/logical';
-import type { Task } from '../src/shared/types';
+import { MockOwnerHostAdapter } from '../src/main/adapters/logical';
 const input = {ownerId:'owner-1',name:'Demo owner',profileId:'demo'};
 
 test('mock owner lifecycle exposes truthful identity and acknowledgment ownership', () => {
@@ -48,31 +46,6 @@ test('owner state is isolated and validation fails before mutation', () => {
  const snapshot=adapter.inspect(input.ownerId);snapshot.messages[0].message='modified';snapshot.messages.length=0;
  assert.equal(adapter.inspect(input.ownerId).messages[0].message,'original');
  assert.equal(adapter.inspect(input.ownerId).messages[0].status,'delivered');
-});
-
-test('registry rejects unknown, unavailable, duplicate and incapable adapters', () => {
- const registry=new AdapterRegistry<LogicalAdapter>();
- const adapter=new MockOwnerHostAdapter();registry.register(adapter);
- assert.equal(registry.resolve('mock-owner',['spawn','result-delivery']),adapter);
- assert.throws(()=>registry.resolve('herdr'),/not registered/);
- assert.throws(()=>registry.resolve('mock-owner',['real-ai']),/lacks capability/);
- assert.throws(()=>registry.register(adapter),/already registered/);
- registry.register({id:'real-cli',available:false,capabilities:['start']});
- assert.throws(()=>registry.resolve('real-cli',['start']),/unavailable/);
- const list=registry.list();list[0].capabilities.push('real-ai');
- assert.throws(()=>registry.resolve('mock-owner',['real-ai']),/lacks capability/);
-});
-
-test('worker bridge forwards the exact task to the existing launcher once', () => {
- let calls=0;
- const task={id:'fixture-task'} as Task;
- const process={} as ChildProcessWithoutNullStreams;
- const bridge=new MockWorkerProviderAdapter({id:'mock-jsonl',start:received=>{calls++;assert.equal(received,task);return process;}});
- const registry=new AdapterRegistry<MockWorkerProviderAdapter>().register(bridge);
- assert.equal(registry.resolve('mock-jsonl',['start','mock']).start(task),process);
- assert.equal(calls,1);
- assert.throws(()=>registry.resolve('codex'),/not registered/);
- assert.throws(()=>new MockWorkerProviderAdapter({id:'codex' as 'mock-jsonl',start:()=>process}),/Only the mock/);
 });
 
 test('restored host and inbox preserve acknowledgment and have no aliases', () => {

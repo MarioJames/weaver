@@ -82,7 +82,7 @@ function pendingProbe(options: { rejectOnAbort?: boolean } = {}): { probe: Recov
   const inFlight = new Promise<void>(resolve => { begin = resolve; });
   const signals: AbortSignal[] = [];
   let calls = 0;
-  const probe: RecoveryProbe = (route, signal) => new Promise<ProbeOutcome>((resolve, refuse) => {
+  const probe: RecoveryProbe = (_route, signal) => new Promise<ProbeOutcome>((resolve, refuse) => {
     calls += 1;
     signals.push(signal);
     answer = resolve;

@@ -12,6 +12,7 @@ import { workerInstruction } from '../src/main/adapters/instruction';
 import type { WorkerAdapter } from '../src/main/adapters/worker';
 import type { Task } from '../src/shared/types';
 import type { WorkPackage } from '../src/shared/commands';
+import { metadataOf } from './helpers/store-metadata';
 
 /** A real (non-mock) adapter that must never be asked to launch a process for native work. */
 const launches: string[] = [];
@@ -113,7 +114,7 @@ test('a native dispatch hands the owner the same instruction a real worker would
     const started = f.call('workers.spawn', { taskId: t.id });
     assert.equal(started.dispatch.execution, 'native');
     const stored = f.store.get(t.id);
-    const pkg = f.store.getMetadata().packages.find(p => p.id === stored.packageId)!;
+    const pkg = metadataOf(f.store).packages.find(p => p.id === stored.packageId)!;
     assert.equal(started.next.action, 'run_subagent');
     assert.equal(started.next.model, 'sonnet');
     assert.equal(started.next.effort, 'high');

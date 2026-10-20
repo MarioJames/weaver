@@ -154,7 +154,7 @@ test('parent schedule rows tell a temporary pause from exhausted free quota, wit
   // Other sources keep the plain label; a worker the block does not name is untouched.
   assert.equal(workerStatusTag(config, [blockFor('qoder_worker', 'manual')], 'qoder_worker', 5)!.label, '已限制');
   assert.equal(workerStatusTag(config, [blockFor('qoder_worker', FREE_PROBE_BLOCK_BY)], 'opencode_worker', 5), undefined);
-  assert.equal(blockOf(config, [blockFor('qoder_worker', STALL_BLOCK_BY)], config.workers.opencode_worker), undefined);
+  assert.equal(blockOf([blockFor('qoder_worker', STALL_BLOCK_BY)], config.workers.opencode_worker), undefined);
 });
 
 test('list notes carry the pause kind as a tag only for probe and penalty blocks', () => {

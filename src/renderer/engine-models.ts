@@ -5,18 +5,10 @@ import { notifyError } from './notify';
 
 export type { EngineModelList } from '../main/engines/models';
 export const NO_LIST_TEXT = '该引擎不提供模型列表，请手动填写';
-const OLD_CONTROL_PLANE_TEXT = '当前控制面不支持模型列表，请手动填写';
 
-type ListModels = (input: EngineModelListInput) => Promise<EngineModelList>;
-
-/**
- * `listEngineModels` is an optional control-plane capability: a control plane without it answers
- * with the manual-entry fallback instead of failing, the same way `getStall` degrades.
- */
+/** Asks the control plane for the engine CLI's model list. */
 export async function requestEngineModels(input: EngineModelListInput): Promise<EngineModelList> {
-  const list = (window.weaver as unknown as { listEngineModels?: ListModels } | undefined)?.listEngineModels;
-  if (!list) return { engine: input.engine, status: 'unsupported', source: '', models: [], message: OLD_CONTROL_PLANE_TEXT, fetchedAt: new Date().toISOString() };
-  return list(input);
+  return window.weaver.listEngineModels(input);
 }
 
 /** A proxy the form has not finished typing cannot be sent; the list then goes out without it. */

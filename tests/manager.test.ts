@@ -7,7 +7,6 @@ import { spawn } from 'node:child_process';
 import { TaskStore } from '../src/main/store';
 import { executionTimeoutMs, TaskManager } from '../src/main/manager';
 import { MockWorkerAdapter, type WorkerAdapter } from '../src/main/adapters/worker';
-import { HerdrOwnerAdapter } from '../src/main/adapters/owner-herdr';
 import type { TaskInput } from '../src/shared/types';
 const input: TaskInput={title:'Demo',instruction:'Safe local fixture only',owner:{name:'owner',transport:'herdr-visible',session:'main',pane:'1'}};
 const fixture=(code: string): WorkerAdapter => ({id:'mock-jsonl',start:() => {const child=spawn(process.execPath,['-e',code],{stdio:['pipe','pipe','pipe'],shell:false});child.stdin.end();return child;}});
@@ -43,7 +42,7 @@ test('configured owner concurrency replaces the old global cap of two',async () 
   for (const task of tasks) { task.dispatch={owner:'owner',worker:'worker',engine:'codex',model:'m',effort:'high',execution:'mock',maxParallel:2}; manager.update(task); }
   manager.start(tasks[0].id);manager.start(tasks[1].id);assert.throws(()=>manager.start(tasks[2].id),/configured concurrency limit \(2\)/);assert.equal(store.get(tasks[2].id).status,'queued');
   const done=await terminal(store,tasks[0].id);assert.equal(done.status,'failed');assert.match(done.events.at(-1)!.message,/test timeout/);
-  assert.equal(done.run?.timeoutMs,undefined);
+  assert.equal('timeoutMs' in done.run!,false);
  },100);
 });
 test('only a mock run may take the test-hook timer; real and native never do',() => {
@@ -56,9 +55,6 @@ test('only a mock run may take the test-hook timer; real and native never do',()
 });
 test('shutdown terminates active workers and persists cancelled states',async () => {
  await harness(fixture('setInterval(()=>{},1000)'),async(manager,store)=>{const task=manager.create(input);manager.start(task.id);await manager.shutdown();assert.equal(store.get(task.id).status,'cancelled');});
-});
-test('automatic Herdr transport stays unavailable',async () => {
- const owner=new HerdrOwnerAdapter();assert.equal(owner.available,false);await assert.rejects(owner.send(input.owner,'hello'),/not implemented/);
 });
 test('result without exit is still running, then timeout fails it',async () => {
  await harness(fixture("console.log(JSON.stringify({type:'result',summary:'not finished'}));setInterval(()=>{},1000)"),async(manager,store)=>{

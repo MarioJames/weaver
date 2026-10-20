@@ -12,6 +12,7 @@ import { CommandHandler } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
 import { API_VERSION } from '../src/shared/commands';
 import type { Task } from '../src/shared/types';
+import { metadataOf, setMetadataOf } from './helpers/store-metadata';
 
 const input = { title: 'Stream fixture', instruction: 'Local test', owner: { name: 'owner', transport: 'herdr-visible' as const, session: 'main', pane: '1' } };
 function fixture(): Task {
@@ -85,7 +86,7 @@ test('command receipts synchronously persist pending streams, and failed transac
     const disk = new TaskStore(f.path);
     assert.equal(disk.get(task.id).title, input.title);
     assert.equal(disk.get(task.id).events.at(-1)?.message, 'pending');
-    assert.deepEqual(disk.getMetadata().receipts['local-demo:durable-create'].response, response);
+    assert.deepEqual(metadataOf(disk).receipts['local-demo:durable-create'].response, response);
     const count = f.writes(); t.mock.timers.tick(1000); assert.equal(f.writes(), count);
     event(task, 'log', 'drain'); f.store.put(task, 'stream');
     handler.draining=true;f.store.close(); assert.equal(new TaskStore(f.path).get(task.id).events.at(-1)?.message, 'drain');
@@ -139,7 +140,7 @@ test('streams from multiple tasks share a fixed window and metadata writes flush
     assert.equal(saved.get(first.id).events.at(-1)?.message, 'first');
     assert.equal(saved.get(second.id).events.at(-1)?.message, 'second');
     event(second, 'log', 'metadata checkpoint'); f.store.put(second, 'stream');
-    f.store.setMetadata(f.store.getMetadata());
+    setMetadataOf(f.store, metadataOf(f.store));
     assert.equal(f.writes() - before, 2);
     assert.equal(new TaskStore(f.path).get(second.id).events.at(-1)?.message, 'metadata checkpoint');
     t.mock.timers.tick(1000); assert.equal(f.writes() - before, 2);
