@@ -7,7 +7,7 @@ import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../src/shared/contracts/tasks';
 import { boardRows, workspaceGroups } from '../src/renderer/features/tasks/task-columns';
-import { ARCHIVE_TABLE_HEADER, ARCHIVE_TABLE_MIN_BODY, archiveScrollY } from '../src/renderer/features/tasks/task-archive';
+import { ARCHIVE_PAGINATION_BAR, ARCHIVE_TABLE_HEADER, ARCHIVE_TABLE_MIN_BODY, archiveScrollY } from '../src/renderer/features/tasks/task-archive';
 import { ArchiveList } from '../src/renderer/features/tasks/ArchiveDrawer';
 import { SSR_ROWS, VirtualLane } from '../src/renderer/features/tasks/VirtualLane';
 
@@ -67,12 +67,13 @@ test('the archive table is virtual with a numeric body height, so 300 archived t
   assert.match(source, /scroll=\{\{[^}]*y: archiveScrollY\(/);
 });
 
-test('the archive body height follows the room the drawer leaves, never collapsing below a usable minimum', () => {
-  assert.equal(archiveScrollY(900), 900 - ARCHIVE_TABLE_HEADER);
-  assert.equal(archiveScrollY(435.7), 395);
-  assert.equal(archiveScrollY(undefined), ARCHIVE_TABLE_MIN_BODY);
-  assert.equal(archiveScrollY(0), ARCHIVE_TABLE_MIN_BODY);
-  assert.equal(archiveScrollY(120), ARCHIVE_TABLE_MIN_BODY);
+test('the archive body height follows the room the drawer leaves, once the header and the pager are paid for', () => {
+  assert.equal(archiveScrollY(900, ARCHIVE_PAGINATION_BAR), 900 - ARCHIVE_TABLE_HEADER - ARCHIVE_PAGINATION_BAR);
+  assert.equal(archiveScrollY(435.7, ARCHIVE_PAGINATION_BAR), 355);
+  assert.equal(archiveScrollY(900, ARCHIVE_PAGINATION_BAR * 2), 900 - ARCHIVE_TABLE_HEADER - ARCHIVE_PAGINATION_BAR * 2);
+  assert.equal(archiveScrollY(undefined, ARCHIVE_PAGINATION_BAR), ARCHIVE_TABLE_MIN_BODY);
+  assert.equal(archiveScrollY(0, ARCHIVE_PAGINATION_BAR), ARCHIVE_TABLE_MIN_BODY);
+  assert.equal(archiveScrollY(120, ARCHIVE_PAGINATION_BAR), ARCHIVE_TABLE_MIN_BODY);
 });
 
 test('the board columns render through the virtual lane and keep the selected card mounted', () => {

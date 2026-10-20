@@ -453,6 +453,18 @@ export const taskStyles = createStaticStyles(({ css, cssVar }) => ({
     min-block-size: 280px;
     min-inline-size: 0;
     overflow: hidden;
+
+    /** The pager row's margin is not in the height we measure to size the body by, so it pays as padding instead. */
+    .lobe-table-pagination-wrapper {
+      margin-block: 0;
+      padding-block: ${cssVar.marginXS};
+    }
+  `,
+  /** A narrow drawer wraps the pager onto a second right-aligned line rather than letting it overflow the table. */
+  archivePager: css`
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    min-inline-size: 0;
   `,
   /** Virtual rows keep one fixed height: long values end in an ellipsis and carry the full text as a tooltip. */
   archiveCell: css`
