@@ -1,0 +1,27 @@
+[
+  {
+    "aria": null,
+    "tag": "BUTTON",
+    "text": "确认收到"
+  },
+  {
+    "aria": null,
+    "tag": "BUTTON",
+    "text": "要求修改"
+  },
+  {
+    "aria": null,
+    "tag": "BUTTON",
+    "text": "验收通过"
+  },
+  {
+    "aria": null,
+    "tag": "SPAN",
+    "text": ""
+  },
+  {
+    "aria": "验收说明（可选）",
+    "tag": "TEXTAREA",
+    "text": ""
+  }
+]

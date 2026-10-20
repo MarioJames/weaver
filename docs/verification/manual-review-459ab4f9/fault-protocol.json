@@ -1,0 +1,8 @@
+{
+  "browser": "agent-browser / owned Chrome task profile",
+  "session": "manual-review-459ab4f9",
+  "submit_failure": "window.fetch wrapper rejects only reviews.submit with TypeError; no success response or state is fabricated. Restore original fetch, delay actual retry by 1500ms, then dblclick submit; inspect disabled buttons/input and actual backend result.",
+  "read_network_failure": "Only tasks.results fetch rejects with TypeError. Existing Reconnector retries indefinitely and shows 正在重新连接; this does not reach panel failure branch.",
+  "read_protocol_failure": "Only tasks.results actual fetch is sent as GET /api/rpc; real server responds 405 METHOD_NOT_ALLOWED. Restore POST and click 重新读取, then submit actual accepted review.",
+  "source": "@lobehub/ui 5.64.4 es/base-ui/Tooltip/TooltipStandalone.mjs reads children.ref; observed on running task detail before any review flow."
+}

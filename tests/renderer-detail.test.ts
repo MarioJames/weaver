@@ -102,3 +102,18 @@ test('root overview shows its Herdr host and only its own child agents', () => {
   assert.match(render({ ...root, ownerHost: undefined }), /正在 Herdr 中启动/);
   assert.match(render({ ...root, status: 'completed' }), /Herdr 启动记录/);
 });
+
+
+test('only completed pending tasks offer the direct manual review action in the header', () => {
+  for (const reviewState of [undefined, 'pending'] as const) {
+    assert.match(header(render({ ...task, status: 'completed', reviewState })), /<button[^>]*>[\s\S]*?手动验收<\/button>/);
+  }
+  for (const status of ['queued', 'running', 'cancelling', 'failed', 'cancelled'] as const) {
+    assert.doesNotMatch(header(render({ ...task, status, reviewState: 'pending' })), /手动验收/);
+  }
+  for (const reviewState of ['accepted', 'rejected'] as const) {
+    assert.doesNotMatch(header(render({ ...task, status: 'completed', reviewState })), /手动验收/);
+  }
+  const html = markup(React.createElement(TaskDetail, { ...props, busy: true, task: { ...task, status: 'completed' } }));
+  assert.match(header(html), /<button[^>]*disabled=""[^>]*>[\s\S]*?手动验收<\/button>/);
+});

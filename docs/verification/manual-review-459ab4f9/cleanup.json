@@ -1,0 +1,17 @@
+{
+  "unit": "dev-weaver-manual-review-459ab4f9-browser.scope",
+  "unit_state": "inactive",
+  "port": 34579,
+  "port_closed": true,
+  "browser_session": "manual-review-459ab4f9",
+  "browser_close": "agent-browser close succeeded",
+  "profile": "/tmp/weaver-manual-review-459ab4f9-jodtqug8/browser/browser-profile",
+  "profile_deleted": true,
+  "data_dir_actual": "/tmp/weaver-manual-review-459ab4f9-jodtqug8/browser/data/d",
+  "temporary_browser_root_deleted": true,
+  "short_alias": "/tmp/wmr459ab4f9",
+  "alias_target": "/tmp/weaver-manual-review-459ab4f9-jodtqug8/browser/data",
+  "alias_unlinked": true,
+  "source_hashes_unchanged_after_acceptance": true,
+  "preserved": "docs/verification/manual-review-459ab4f9 only; shared 4737 service and persistent real data untouched"
+}

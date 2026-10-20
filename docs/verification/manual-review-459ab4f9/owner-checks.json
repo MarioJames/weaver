@@ -1,0 +1,21 @@
+{
+  "typecheck": "passed",
+  "relatedRendererTests": {
+    "files": 5,
+    "pass": 81,
+    "fail": 0
+  },
+  "build": "passed",
+  "featureAcceptanceScan": "no findings; manual review required",
+  "diffCheck": "passed",
+  "files": {
+    "src/renderer/components/ReviewPanel.tsx": "5f950a05f7bb8899107872822bd6d2b94533c88c5578c7d89a303848c8581c52",
+    "src/renderer/components/TaskDetail.tsx": "194f0bbed637e182ea52299e52dc117a1a229a49249814e03055a2511983b422",
+    "tests/renderer-detail.test.ts": "93d36ec0eb13ca6b2c90c24a1d36640061765a4d8e8698e2ba5405f19982ab84",
+    "tests/renderer-review.test.ts": "ae52d2782022fdbd12362813fb31c99050631c735f8b8b79958128ecd6206b25"
+  },
+  "warnings": [
+    "existing React 19 element.ref warning in SSR tests",
+    "third-party use client bundle warnings"
+  ]
+}

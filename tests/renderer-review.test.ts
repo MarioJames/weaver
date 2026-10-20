@@ -83,3 +83,69 @@ test('the panel itself reads the manifest after mount and shows a status line fi
   const html = markup(React.createElement(ReviewPanel, { task, busy: false, action: async () => true }));
   assert.match(html, /正在读取结果清单/);
 });
+
+
+function footerButtons(node: React.ReactNode): React.ReactElement<{ children: string; disabled?: boolean; onClick: () => void }>[] {
+  if (!React.isValidElement(node)) return [];
+  const props = node.props as { children?: React.ReactNode; onClick?: () => void };
+  if (props.onClick && typeof props.children === 'string') return [node as React.ReactElement<{ children: string; disabled?: boolean; onClick: () => void }>];
+  return React.Children.toArray(props.children).flatMap(footerButtons);
+}
+
+test('manual decisions submit trimmed optional notes while acknowledging only confirms delivery', () => {
+  const calls: [string, Record<string, unknown>][] = [];
+  const modal = findModal(ReviewView({ ...base, open: true, comment: '  检查说明  ', manifest: pending, onSubmit: (name, extra) => calls.push([name, extra]) }));
+  for (const button of footerButtons(modal?.props.footer)) button.props.onClick();
+  assert.deepEqual(calls, [
+    ['results.ack', {}],
+    ['reviews.submit', { decision: 'rejected', comment: '检查说明' }],
+    ['reviews.submit', { decision: 'accepted', comment: '检查说明' }],
+  ]);
+  calls.length = 0;
+  const blank = findModal(ReviewView({ ...base, comment: '   ', manifest: pending, onSubmit: (name, extra) => calls.push([name, extra]) }));
+  footerButtons(blank?.props.footer).find(button => button.props.children === '验收通过')!.props.onClick();
+  assert.deepEqual(calls, [['reviews.submit', { decision: 'accepted' }]]);
+});
+
+test('reading, missing manifests and active submissions disable all modal mutations', () => {
+  for (const state of [{ busy: true, manifest: pending }, { ready: false, manifest: pending }, { manifest: undefined }]) {
+    const modal = findModal(ReviewView({ ...base, ...state, open: true }));
+    const buttons = footerButtons(modal?.props.footer);
+    assert.equal(buttons.length, 3);
+    assert.ok(buttons.every(button => button.props.disabled));
+  }
+});
+
+test('a loading review still opens its modal with a single loading note and disabled decisions', () => {
+  const view = ReviewView({ ...base, open: true, ready: false, loading: true, manifest: pending });
+  const modal = findModal(view);
+  assert.equal(modal?.props.open, true);
+  const body = markup(modal?.props.children);
+  assert.equal(body.match(/正在读取结果清单/g)?.length, 1);
+  assert.match(body, /验收说明（可选）/);
+  assert.ok(footerButtons(modal?.props.footer).every(button => button.props.disabled));
+});
+
+test('a failed read adds no error text or retry button to the page or the modal; decisions stay disabled', () => {
+  const failed = { ...base, ready: false, loading: false, manifest: undefined };
+  for (const open of [false, true]) {
+    const view = ReviewView({ ...failed, open });
+    const modal = findModal(view);
+    const text = markup(view) + markup(modal?.props.children);
+    assert.doesNotMatch(text, /结果读取失败|重新读取|正在读取结果清单/);
+    const buttons = footerButtons(modal?.props.footer);
+    assert.equal(buttons.length, 3);
+    assert.ok(buttons.every(button => button.props.disabled));
+  }
+});
+
+test('the panel renders the loading note once while closed and never an error row', () => {
+  const html = markup(React.createElement(ReviewPanel, { task, busy: false, action: async () => true, open: false }));
+  assert.equal(html.match(/正在读取结果清单/g)?.length, 1);
+  assert.doesNotMatch(html, /结果读取失败|重新读取/);
+});
+
+test('with the modal open the panel shows no loading note in the page flow', () => {
+  const html = markup(React.createElement(ReviewPanel, { task, busy: false, action: async () => true, open: true }));
+  assert.doesNotMatch(html, /正在读取结果清单|结果读取失败|重新读取/);
+});

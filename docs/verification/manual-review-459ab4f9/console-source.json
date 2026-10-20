@@ -1,0 +1,8 @@
+[
+  {
+    "args": [
+      "Accessing element.ref was removed in React 19. ref is now a regular prop. It will be removed from the JSX Element type in a future release."
+    ],
+    "stack": "Error\n    at console.error (<anonymous>:1:141)\n    at Object.elementRefGetterWithDeprecationWarning (http://127.0.0.1:34579/@fs/tmp/wmr459ab4f9/d/vite/deps/jsx-runtime-ZFUOmDkn.js?v=ce7ef1fe:101:98)\n    at render (http://127.0.0.1:34579/@fs/tmp/wmr459ab4f9/d/vite/deps/Tag-CBm9XrGi.js?v=ce7ef1fe:6811:16)\n    at evaluateRenderProp (http://127.0.0.1:34579/@fs/tmp/wmr459ab4f9/d/vite/deps/createBaseUIEventDetails-B24qt8--.js?v=ce7ef1fe:644:11)\n    at useRenderElement (http://127.0.0.1:34579/@fs/tmp/wmr459ab4f9/d/vite/deps/createBaseUIEventDetails-B24qt8--.js?v=ce7ef1fe:601:9)\n    at TooltipTrigger (http://127.0.0.1:34579/@fs/tmp/wmr459ab4f9/d/vite/deps/Tag-CBm9XrGi.js?v=ce7ef1fe:4972:9)\n    at FastComponent (http://127.0.0.1:34579/@fs/tmp/wmr459ab4f9/d/vite/deps/useButton-BnWHCbvn.js?v=ce7ef1fe:965:13)\n    at Object.react_stack_bottom_frame (http://127.0.0.1:34579/@fs/tmp/wmr459ab4f9/d/vite/deps/client-Cvqgj8g0.js?v=ce7ef1fe:14142:12)\n    at renderWithHooks (http://127.0.0.1:34579/@fs/tmp/wmr459ab4f9/d/vite/deps/client-Cvqgj8g0.js?v=ce7ef1fe:4400:19)\n    at updateForwardRef (http://127.0.0.1:34579/@fs/tmp/wmr459ab4f9/d/vite/deps/client-Cvqgj8g0.js?v=ce7ef1fe:5597:16)"
+  }
+]

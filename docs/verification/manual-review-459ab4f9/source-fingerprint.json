@@ -1,0 +1,6 @@
+{
+  "src/renderer/components/TaskDetail.tsx": "194f0bbed637e182ea52299e52dc117a1a229a49249814e03055a2511983b422",
+  "src/renderer/components/ReviewPanel.tsx": "5f950a05f7bb8899107872822bd6d2b94533c88c5578c7d89a303848c8581c52",
+  "src/renderer/main.tsx": "7d5f19e36c6d4929eed5f54200d4cb193e4648d2ede619200be96edfadb22cb6",
+  "git_head": "e3672bb144c515bdec716f69f4b9139e64c99733"
+}

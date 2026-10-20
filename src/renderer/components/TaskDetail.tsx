@@ -21,6 +21,8 @@ const queueLabels = { waiting_for_capacity: '等待执行槽位', policy_blocked
 export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, ownerKind, tasks = [], onSelect }: { tasks?: Task[]; onSelect?: (id: string) => void; task?: Task; busy: boolean; onStart: (id: string) => void; onCancel: (id: string) => void; action: (fn: () => Promise<unknown>) => Promise<boolean>; onRetry?: (id: string) => void; ownerKind?: (ownerId?: string) => string | undefined }) {
   const [tab, setTab] = useState('overview');
   const [askCancel, setAskCancel] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  useEffect(() => { setReviewOpen(false); }, [task?.id]);
   const panel = useRef<HTMLElement>(null);
   useEffect(() => { const frame = requestAnimationFrame(() => panel.current?.closest('[role="dialog"]') && panel.current.focus({ preventScroll: true })); return () => cancelAnimationFrame(frame); }, []);
   useEffect(() => {
@@ -60,6 +62,7 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
         </div>
       </div>
       <div className={detailStyles.actions}>
+        {task.status === 'completed' && (!task.reviewState || task.reviewState === 'pending') && <Button type="primary" disabled={busy} onClick={() => { setTab('review'); setReviewOpen(true); }}>手动验收</Button>}
         {canStart && <Button type="primary" disabled={busy} onClick={() => onStart(task.id)}>{retryLaunch ? '重试启动父 Agent' : '开始执行'}</Button>}
         {isActive(task) && <Button disabled={busy || task.status === 'cancelling'} onClick={() => cancelNotice ? setAskCancel(true) : onCancel(task.id)}>{task.status === 'cancelling' ? '正在停止…' : '取消任务'}</Button>}
         {task.executionRole !== 'owner' && !isActive(task) && task.reviewState !== 'accepted' && onRetry && <Button disabled={busy} onClick={() => onRetry(task.id)}>新建重试任务</Button>}
@@ -87,7 +90,7 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
         </div> },
         { key: 'events', label: '时间线 ' + task.events.length, children: <EventsPanel events={task.events} taskId={task.id} active={timelineActive(task.status)} failure={task.failure} /> },
         { key: 'artifacts', label: '产物 ' + artifacts.length, children: <ArtifactsPanel artifacts={artifacts} status={task.status} /> },
-        { key: 'review', label: '验收', children: task.status === 'completed' ? <ReviewPanel task={task} busy={busy} action={action} ownerKind={ownerKind} /> : <Empty title="执行成功后进入验收" description="执行结果、收到确认和验收结论各自独立。" /> },
+        { key: 'review', label: '验收', children: task.status === 'completed' ? <ReviewPanel key={task.id} task={task} busy={busy} action={action} ownerKind={ownerKind} open={reviewOpen} onOpenChange={setReviewOpen} /> : <Empty title="执行成功后进入验收" description="执行结果、收到确认和验收结论各自独立。" /> },
         { key: 'continuation', label: '接续', children: <OwnerInspector task={task} busy={busy} action={action} /> },
       ]} />
     </div>
