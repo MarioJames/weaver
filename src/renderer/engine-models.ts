@@ -55,31 +55,70 @@ export function matchModel(options: ReadonlyArray<{ value: string; label?: unkno
   return item.value.toLowerCase().includes(text) || (typeof item.label === 'string' && item.label.toLowerCase().includes(text));
 }
 
+type Request = (input: EngineModelListInput) => Promise<EngineModelList>;
+
+/** What a session reports back to its owner; the hook maps these onto React state. */
+export interface ModelListSink {
+  list(list: EngineModelList | undefined): void;
+  loading(loading: boolean): void;
+  failed(message: unknown, title: string): void;
+}
+
 /**
- * Loads one engine's model list on demand (the first time the picker opens, or when asked to refresh).
+ * One model field's loading state, free of React so the rules can be tested directly.
+ * `sync` is called whenever the field's engine or proxy may have changed: it fetches once per distinct engine + proxy,
+ * drops the previous engine's list when the engine changes, and fetches nothing without an engine.
+ * `load(true)` is the explicit refresh. Only the newest request of a session may write its result (the generation counter).
+ */
+export class ModelListSession {
+  private generation = 0;
+  private engine = '';
+  private proxy: string | undefined;
+  private key = '';
+
+  constructor(private readonly sink: ModelListSink, private readonly request: Request = requestEngineModels) {}
+
+  sync(engine: string, proxy?: string): void {
+    const engineChanged = engine !== this.engine;
+    // A proxy address still being typed is not sent; the list stays as it is until the address is complete.
+    if (!engineChanged && proxy && usableProxy(proxy) === undefined) return;
+    this.engine = engine;
+    this.proxy = proxy;
+    const key = engine ? `${engine}\n${usableProxy(proxy) ?? ''}` : '';
+    if (key === this.key && !engineChanged) return;
+    this.key = key;
+    if (engineChanged) { this.generation += 1; this.sink.list(undefined); this.sink.loading(false); }
+    if (engine) void this.load();
+  }
+
+  async load(refresh = false): Promise<void> {
+    const engine = this.engine;
+    if (!engine) return;
+    const mine = ++this.generation;
+    this.sink.loading(true);
+    try {
+      const proxyValue = usableProxy(this.proxy);
+      const result = await this.request({ engine, ...(proxyValue ? { proxy: proxyValue } : {}), ...(refresh ? { refresh: true } : {}) });
+      if (this.generation !== mine) return;
+      this.sink.list(result);
+      if (result.status === 'failed') this.sink.failed(result.message ?? '未获取到模型列表', '模型列表获取失败');
+    } catch (error) {
+      if (this.generation === mine) this.sink.failed(error, '模型列表获取失败');
+    } finally { if (this.generation === mine) this.sink.loading(false); }
+  }
+}
+
+/**
+ * Loads one engine's model list as soon as the field mounts, and again whenever its engine or proxy changes; `load(true)` forces a refresh.
  * A failure is reported as a notification; the manual field stays usable whatever happens.
  */
 export function useEngineModels(engine: string, proxy?: string) {
   const [list, setList] = useState<EngineModelList>();
   const [loading, setLoading] = useState(false);
-  const generation = useRef(0);
-  const proxyRef = useRef(proxy);
-  proxyRef.current = proxy;
-  useEffect(() => { generation.current += 1; setList(undefined); setLoading(false); }, [engine]);
-  const load = useCallback(async (refresh = false) => {
-    if (!engine) return;
-    const mine = ++generation.current;
-    setLoading(true);
-    try {
-      const proxyValue = usableProxy(proxyRef.current);
-      const result = await requestEngineModels({ engine, ...(proxyValue ? { proxy: proxyValue } : {}), ...(refresh ? { refresh: true } : {}) });
-      if (generation.current !== mine) return;
-      setList(result);
-      if (result.status === 'failed') notifyError(result.message ?? '未获取到模型列表', '模型列表获取失败');
-    } catch (error) {
-      if (generation.current === mine) notifyError(error, '模型列表获取失败');
-    } finally { if (generation.current === mine) setLoading(false); }
-  }, [engine]);
+  const session = useRef<ModelListSession>(undefined);
+  session.current ??= new ModelListSession({ list: setList, loading: setLoading, failed: notifyError });
+  useEffect(() => { session.current?.sync(engine, proxy); }, [engine, proxy]);
+  const load = useCallback((refresh = false) => session.current!.load(refresh), []);
   return { list, loading, load };
 }
 

@@ -62,9 +62,10 @@ export function isValidTimezone(value: string): boolean {
 export function chatgptReviewEnabled(config: { chatgpt_review?: unknown }): boolean {
   return config.chatgpt_review !== false;
 }
-export interface Block { engine: string; model?: string; reason: string; since: string; release_at?: string; by?: string }
+/** A block with `worker` keeps only that worker out; without it the block covers the whole engine (or one model of it). */
+export interface Block { engine: string; model?: string; worker?: string; reason: string; since: string; release_at?: string; by?: string }
 export interface State { version: 1; blocks: Block[] }
-export interface Availability { status: "available" | "disabled" | "engine_disabled" | "blocked"; engine?: string; model?: string; reason?: string; release_at?: string }
+export interface Availability { status: "available" | "disabled" | "engine_disabled" | "blocked"; engine?: string; model?: string; worker?: string; reason?: string; release_at?: string }
 
 // ---- config validation ----
 export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA): Issue[] {
@@ -97,12 +98,11 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
       }
     }
     if (!owner.enabled) continue;
-    if (engine && !engine.enabled) bad(`${at}.engine`, `engine ${owner.engine} is disabled`);
     const other = owned.get(owner.engine);
     if (other) bad(at, `engine ${owner.engine} already has enabled owner ${other}`);
     else owned.set(owner.engine, id);
-    const hasWorker = owner.workers.some(workerId => { const worker = c.workers[workerId]; return worker?.enabled && c.engines[worker.engine]?.enabled; });
-    if (!hasWorker) bad(`${at}.workers`, "enabled owner needs at least one enabled worker on an enabled engine");
+    const hasWorker = owner.workers.some(workerId => c.workers[workerId]?.enabled);
+    if (!hasWorker) bad(`${at}.workers`, "enabled owner needs at least one enabled worker");
   }
   for (const [id, engine] of Object.entries(c.engines)) {
     if (engine.quota_refresh === true && !hasQuotaProbe(engine.kind)) bad(`$.engines.${id}.quota_refresh`, `kind ${engine.kind} has no quota probe`);
@@ -117,7 +117,6 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
     const kind = Object.hasOwn(c.engines, worker.engine) ? c.engines[worker.engine]?.kind : undefined;
     if (!kind) { bad(`${at}.engine`, `unknown engine ${worker.engine}`); continue; }
     checkEffort(at, worker.engine, worker.effort);
-    if (worker.enabled && !c.engines[worker.engine]?.enabled) bad(`${at}.engine`, `engine ${worker.engine} is disabled`);
     if (!SUPPORTED_POLICY_KINDS.includes(kind)) bad(`${at}.engine`, `kind ${kind} has no migrated routing policy`);
   }
   return issues;
@@ -128,15 +127,55 @@ const stamp = (value: string) => Date.parse(value);
 export function activeBlocks(state: State, now: number): Block[] {
   return state.blocks.filter(b => !b.release_at || stamp(b.release_at) > now);
 }
-export function availabilityOf(config: Config, blocks: Block[], entity: Owner | Worker): Availability {
+/** The block that keeps a role out, if any. A worker-scoped block reaches only the worker it names, never an owner or a sibling. */
+export function coveringBlock(blocks: Block[], entity: Owner | Worker, workerId?: string): Block | undefined {
+  return blocks.find(b => b.engine === entity.engine
+    && (b.worker === undefined || b.worker === workerId)
+    && (b.model === undefined || b.model === entity.model)
+    && !("free_channel" in entity && entity.free_channel === true && b.by?.startsWith("weaver-quota:")));
+}
+/** workerId is the policy key of a worker; omit it for owners, which no worker-scoped block can reach. */
+export function availabilityOf(config: Config, blocks: Block[], entity: Owner | Worker, workerId?: string): Availability {
   if (!entity.enabled) return { status: "disabled" };
   if (!config.engines[entity.engine]?.enabled) return { status: "engine_disabled" };
-  const hit = blocks.find(b => b.engine === entity.engine && (b.model === undefined || b.model === entity.model) && !("free_channel" in entity && entity.free_channel === true && b.by?.startsWith("weaver-quota:")));
-  if (hit) return { status: "blocked", engine: hit.engine, ...(hit.model ? { model: hit.model } : {}), reason: hit.reason, ...(hit.release_at ? { release_at: hit.release_at } : {}) };
+  const hit = coveringBlock(blocks, entity, workerId);
+  if (hit) return { status: "blocked", engine: hit.engine, ...(hit.model ? { model: hit.model } : {}), ...(hit.worker ? { worker: hit.worker } : {}), reason: hit.reason, ...(hit.release_at ? { release_at: hit.release_at } : {}) };
   return { status: "available" };
 }
+/** Written by vendor rate-limit / quota failures; the only source the engine-level escalation may rewrite. */
+export const VENDOR_BLOCK_SOURCE = "weaver-vendor-limit";
+export const ENGINE_ALL_BLOCKED_REASON = "该引擎全部子 Agent 均被限流/额度耗尽";
+/**
+ * When every enabled worker of an engine is kept out by an active block, the engine itself is out: add one
+ * whole-engine vendor block released at the earliest release_at among the blocks that cover those workers.
+ * A whole-engine vendor block written earlier is refreshed in place; one from any other source already says so
+ * and stays untouched; an expired one is replaced so the engine never holds two. Returns the same array when
+ * nothing changes.
+ */
+export function escalateEngineBlock(config: Config, blocks: Block[], engine: string, now: number): Block[] {
+  if (!config.engines[engine]?.enabled) return blocks;
+  const live = (b: Block) => !b.release_at || stamp(b.release_at) > now;
+  const wholeEngine = (b: Block) => b.engine === engine && b.model === undefined && b.worker === undefined;
+  if (blocks.some(b => wholeEngine(b) && live(b) && b.by !== VENDOR_BLOCK_SOURCE)) return blocks;
+  const own = blocks.find(b => wholeEngine(b) && live(b));
+  const pool = blocks.filter(b => live(b) && b !== own);
+  const workers = Object.entries(config.workers).filter(([, w]) => w.engine === engine && w.enabled);
+  if (!workers.length) return blocks;
+  const covering: Block[] = [];
+  for (const [id, worker] of workers) {
+    const hit = coveringBlock(pool, worker, id);
+    if (!hit) return blocks;
+    covering.push(hit);
+  }
+  const releases = covering.flatMap(b => b.release_at ? [stamp(b.release_at)] : []);
+  const release_at = releases.length ? new Date(Math.min(...releases)).toISOString() : undefined;
+  const block: Block = { engine, reason: ENGINE_ALL_BLOCKED_REASON, since: own?.since ?? new Date(now).toISOString(), by: VENDOR_BLOCK_SOURCE, ...(release_at ? { release_at } : {}) };
+  if (own) return own.release_at === release_at && own.reason === block.reason ? blocks : blocks.map(b => b === own ? block : b);
+  const stale = blocks.find(wholeEngine);
+  return [...blocks.filter(b => b !== stale), block];
+}
 const describeUnavailable = (a: Availability) =>
-  a.status === "blocked" ? `blocked (${a.model ? `${a.engine}/${a.model}` : a.engine}: ${a.reason}${a.release_at ? `, release_at ${a.release_at}` : ""})` : a.status;
+  a.status === "blocked" ? `blocked (${a.model ? `${a.engine}/${a.model}` : a.worker ? `${a.engine} worker ${a.worker}` : a.engine}: ${a.reason}${a.release_at ? `, release_at ${a.release_at}` : ""})` : a.status;
 /** --release-at: an ISO 8601 timestamp with timezone (returned as given), or +<n>m|h|d counted from now (n >= 1). */
 export function parseReleaseAt(value: string, now: number): string {
   const relative = /^\+([1-9][0-9]*)([mhd])$/.exec(value);
@@ -175,7 +214,7 @@ function requireOwner(config: Config, blocks: Block[], id: string, what = "owner
   if (a.status !== "available") throw new PolicyError(`${what} ${id} unavailable: ${describeUnavailable(a)}`);
   return owner;
 }
-export interface RouteOptions { owner: string; worker?: string; /** Running tasks per worker, across all owners. */ workerLoad?: Record<string, number>; /** Engines whose attempt already failed or was cancelled earlier in this task's retry chain. */ excludeEngines?: string[] }
+export interface RouteOptions { owner: string; worker?: string; /** Running tasks per worker, across all owners. */ workerLoad?: Record<string, number>; /** Engines whose attempt already failed or was cancelled earlier in this task's retry chain. */ excludeEngines?: string[]; /** Workers that must not be chosen, for example the one a queued task was frozen to before it was blocked. */ excludeWorkers?: string[] }
 /** Why an engine never comes back for this task: the owner's earlier attempt on it did not succeed. */
 export const EXCLUDED_ENGINE_REASON = "failed earlier in this retry chain";
 /**
@@ -187,11 +226,13 @@ export const EXCLUDED_ENGINE_REASON = "failed earlier in this retry chain";
 export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOptions): Dispatch {
   const owner = requireOwner(config, blocks, opts.owner);
   const excluded = new Set(opts.excludeEngines ?? []);
+  const excludedWorkers = new Set(opts.excludeWorkers ?? []);
   if (opts.worker) {
     const worker = Object.hasOwn(config.workers,opts.worker) ? config.workers[opts.worker] : undefined;
     if (!worker) throw new PolicyError(`unknown worker ${opts.worker}`);
     if (excluded.has(worker.engine)) throw new PolicyError(`NO_ALTERNATIVE_ENGINE: worker ${opts.worker} runs on engine ${worker.engine}, which ${EXCLUDED_ENGINE_REASON} (excluded: ${[...excluded].join(", ")})`, [{ path: `$.owners.${opts.owner}.workers`, message: `${opts.worker}: ${EXCLUDED_ENGINE_REASON}` }]);
-    const a = availabilityOf(config, blocks, worker);
+    if (excludedWorkers.has(opts.worker)) throw new PolicyError(`worker ${opts.worker} unavailable: excluded for this dispatch`);
+    const a = availabilityOf(config, blocks, worker, opts.worker);
     if (a.status !== "available") throw new PolicyError(`worker ${opts.worker} unavailable: ${describeUnavailable(a)}`);
     if (effectiveWeight(owner, opts.worker) === 0) throw new PolicyError(`worker ${opts.worker} unavailable: priority weight 0`);
     const warnings = owner.workers.includes(opts.worker) ? [] : [`worker ${opts.worker} 不在 owner ${opts.owner} 的 workers 列表中`];
@@ -199,9 +240,9 @@ export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOpti
   }
   const load = (id: string) => opts.workerLoad?.[id] ?? 0;
   const candidates = owner.workers
-    .map((id, index) => ({ id, index, engine: config.workers[id]!.engine, weight: effectiveWeight(owner, id), running: load(id), availability: availabilityOf(config, blocks, config.workers[id]!) }));
-  const reason = (c: (typeof candidates)[number]) => c.weight === 0 ? "priority weight 0" : c.availability.status !== "available" ? describeUnavailable(c.availability) : excluded.has(c.engine) ? EXCLUDED_ENGINE_REASON : "available";
-  const usable = candidates.filter(c => c.weight > 0 && c.availability.status === "available");
+    .map((id, index) => ({ id, index, engine: config.workers[id]!.engine, weight: effectiveWeight(owner, id), running: load(id), availability: availabilityOf(config, blocks, config.workers[id]!, id) }));
+  const reason = (c: (typeof candidates)[number]) => c.weight === 0 ? "priority weight 0" : excludedWorkers.has(c.id) ? "excluded for this dispatch" : c.availability.status !== "available" ? describeUnavailable(c.availability) : excluded.has(c.engine) ? EXCLUDED_ENGINE_REASON : "available";
+  const usable = candidates.filter(c => c.weight > 0 && c.availability.status === "available" && !excludedWorkers.has(c.id));
   // (a+1)/wa < (b+1)/wb, compared without division.
   const eligible = usable.filter(c => !excluded.has(c.engine))
     .sort((a, b) => (a.running + 1) * b.weight - (b.running + 1) * a.weight || b.weight - a.weight || a.index - b.index);

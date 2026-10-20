@@ -1,12 +1,10 @@
-import { HelloCheck } from './RolesPage';
 import { notifyError, useNotifyError } from '../notify';
 import { NamedSwitch } from '../components/NamedControls';
-import { ModelPicker } from '../components/ModelPicker';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, RefreshCw, ScanSearch } from 'lucide-react';
 import { PageHeader, Surface } from '@lobehub/ui/dashboard';
-import { ActionIcon, Button, Input, Progress, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
-import { ENGINE_CATALOG, catalogEntry, engineDisableConflict, type EngineProbeRecord } from '../../shared/engines';
+import { ActionIcon, Button, Progress, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
+import { ENGINE_CATALOG, catalogEntry, type EngineProbeRecord } from '../../shared/engines';
 import type { EngineQuotaRecord, QuotaEngine, QuotaWindow } from '../../shared/quota';
 import { QUOTA_KINDS, quotaRefreshEnabled, type Block, type Engine } from '../../main/policy/routing';
 import { acceptQuotaPolicy, dateText, quotaPercentText, quotaProgressPercent, quotaRecordStale, quotaRecoveryText, quotaRetryMs, quotaStatusText, quotaNextUpdateMs, quotaCountText, quotaVisibleWindows, quotaThirdParty } from '../quota-view';
@@ -199,10 +197,8 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
         const status = probe?.status ?? (scanning ? 'loading' : 'unknown');
         const kindMismatch = Boolean(record && record.kind !== entry.kind);
         const enabled = record?.enabled === true;
-        const conflict = engineDisableConflict(saved, entry.id);
-        const blocked = busyId !== '' || (enabled ? Boolean(conflict) : probe?.status !== 'installed' || kindMismatch);
-        const roles = [Object.values(saved.owners).some(owner => owner.enabled && owner.engine === entry.id) ? '父 Agent' : '', Object.values(saved.workers).some(worker => worker.enabled && worker.engine === entry.id) ? '子 Agent' : ''].filter(Boolean);
-        const reason = enabled && conflict ? `仍启用的${roles.join(' / ')}，请先停用。` : !enabled && probe?.status !== 'installed' ? '未在本机找到这个命令' : kindMismatch ? '已保存的类型与目录不一致' : '';
+        const blocked = busyId !== '' || (!enabled && (probe?.status !== 'installed' || kindMismatch));
+        const reason = !enabled && probe?.status !== 'installed' ? '未在本机找到这个命令' : kindMismatch ? '已保存的类型与目录不一致' : '';
         const kind = record?.kind ?? entry.kind;
         const engineBlocks = savedBlocks.filter(block => block.engine === entry.id);
         return <Surface key={entry.id} aria-label={entry.id} title={entry.id} description={<span className={styles.row} style={{ gap: 6, flexWrap: 'nowrap' }}><Tag size="small" color={PROBE[status]?.color}>{PROBE[status]?.label ?? status}</Tag><Tooltip title={probe?.version || entry.command}><Text type="secondary" className={engineStyles.version}>{engineVersionText(probe?.version || entry.command)}</Text></Tooltip></span>}
@@ -211,8 +207,7 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
             <StallNotice state={stall.snapshot?.engines[entry.id]} now={stall.now} />
             {isQuotaKind(kind) ? <QuotaSummary engine={kind} record={quota.records.find(item => item.engine === kind)} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === kind ? quota.feedback : undefined} onRefresh={() => void quota.refresh(kind)} />
               : <Text type="secondary" className={styles.meta}>未提供原生额度接口。</Text>}
-            {(record || status === 'installed') && <EngineModelProbe id={entry.id} />}
-            <BlockList blocks={engineBlocks} state={stall.snapshot?.engines[entry.id]} now={stall.now} disabled={busyId !== '' || !record} onRemove={block => void change(entry.id, doc => ({ ...doc, blocks: doc.blocks.filter(item => !(item.engine === block.engine && item.model === block.model)) }))} />
+            <BlockList blocks={engineBlocks} state={stall.snapshot?.engines[entry.id]} now={stall.now} disabled={busyId !== '' || !record} onRemove={block => void change(entry.id, doc => ({ ...doc, blocks: removeBlock(doc.blocks, block) }))} />
             <div className={styles.cardFoot}>
               <div className={styles.spread}>
                 <Text>主动刷新额度</Text>
@@ -252,15 +247,20 @@ export function engineBlockText(block: Block, now: number, state?: EngineBlockSt
   return { category, reason, fullReason, release, tone };
 }
 
+/** Resume dispatch removes exactly one block: the one with the same engine, model and worker. Whole-engine, model and worker blocks of one engine are separate bans. */
+export function removeBlock(blocks: Block[], target: Block): Block[] {
+  return blocks.filter(item => !(item.engine === target.engine && item.model === target.model && item.worker === target.worker));
+}
+
 export function BlockList({ blocks, disabled, onRemove, now = Date.now(), state }: { blocks: Block[]; disabled: boolean; onRemove: (block: Block) => void; now?: number; state?: EngineBlockState }) {
   const active = blocks.filter(block => block.by === STALL_BY || !block.release_at || Date.parse(block.release_at) > now);
   if (!active.length) return null;
   return <section aria-label="派发限制" className={styles.tight}>
     {active.map(block => {
       const text = engineBlockText(block, now, state);
-      return <div key={`${block.engine}:${block.model ?? ''}`} data-engine-block={block.engine} className={blockStyles.row}>
+      return <div key={`${block.engine}:${block.model ?? ''}:${block.worker ?? ''}`} data-engine-block={block.engine} className={blockStyles.row}>
         <Tag size="small" color={text.tone}>{text.category}</Tag>
-        <Tooltip title={text.fullReason}><span data-block-reason className={blockStyles.reason}>{block.model ? `${block.model} · ` : ''}{text.reason}</span></Tooltip>
+        <Tooltip title={text.fullReason}><span data-block-reason className={blockStyles.reason}>{block.worker ? `${block.worker} · ` : ''}{block.model ? `${block.model} · ` : ''}{text.reason}</span></Tooltip>
         <span>{text.release}</span>
         <Tooltip title="恢复派发"><ActionIcon size="small" icon={Play} aria-label="恢复派发" disabled={disabled} onClick={() => onRemove(block)} /></Tooltip>
       </div>;
@@ -300,14 +300,4 @@ function QuotaWindowRow({ window }: { window: QuotaWindow }) {
     {percent !== null && <Progress size="small" percent={percent} showInfo={false} status={percent >= 100 ? 'exception' : undefined} aria-label={`${window.label} 已用比例`} />}
     {window.resetsAt && <Text type="secondary" className={styles.meta}><TimeText value={window.resetsAt} /> 重置</Text>}
   </div>;
-}
-
-function EngineModelProbe({ id }: { id: string }) {
-  const [model, setModel] = useState('');
-  const [effort, setEffort] = useState(id === 'zcode' ? 'auto' : 'high');
-  return <details><summary>模型探测</summary><div className={styles.tight}>
-    <ModelPicker engine={id} value={model} label={`${id} 探测模型`} onChange={setModel} placeholder="例如：provider/model" />
-    <Input aria-label={`${id} 探测强度`} value={effort} placeholder="例如：high" onChange={event => setEffort(event.target.value)} />
-    <HelloCheck id={`engine:${id}`} record={{ engine: id, model, effort }} />
-  </div></details>;
 }

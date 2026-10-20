@@ -4,7 +4,7 @@ import { object } from '../shared/validation';
 import type { TaskFailure } from '../shared/types';
 import type { PolicySnapshot } from '../shared/policy';
 import { redactContext } from './continuation';
-import { activeBlocks, freeChannelProbeSettings, type Block, type Config } from './policy/routing';
+import { activeBlocks, escalateEngineBlock, freeChannelProbeSettings, type Block, type Config } from './policy/routing';
 import { classifyVendorError, vendorBlockReason } from './adapters/cli/vendor-errors';
 import { boundedProbeError, LADDER_RESET_MS, STALL_BLOCK_BY, STALL_LADDER, PROBE_MS, PROBE_SUCCESSES, type ProbeOutcome, type ProbeRoute } from './stall';
 import { VENDOR_LADDER_MINUTES } from './commands';
@@ -129,12 +129,20 @@ function probeRouteOf(config: Config, worker: string): FreeProbeRoute | undefine
   return { engine: profile.engine, kind: engine.kind, worker, model: profile.model, effort: profile.effort, ...(profile.proxy ? { proxy: profile.proxy } : {}) };
 }
 
+/** Does this block reach the route's worker? A worker-level block names exactly one worker. */
+function reaches(block: Block, route: FreeProbeRoute): boolean {
+  return block.engine === route.engine && (block.worker === undefined || block.worker === route.worker) && (block.model === undefined || block.model === route.model);
+}
+
+/** A block this monitor wrote for the route: its worker, its model and one of its markers. A pre-worker block (no worker field) on the same model is still recognised as ours. */
+function owned(block: Block, route: FreeProbeRoute, by?: string): boolean {
+  return block.engine === route.engine && block.model === route.model && (block.worker === route.worker || block.worker === undefined) &&
+    (by !== undefined ? block.by === by : block.by === STALL_BLOCK_BY || block.by === VENDOR_BLOCK_BY || block.by === FREE_PROBE_BLOCK_BY);
+}
+
 /** Is this route currently kept out by a block that this monitor did not write? */
 function foreignBlock(blocks: Block[], route: FreeProbeRoute): Block | undefined {
-  const ours = (block: Block): boolean =>
-    block.engine === route.engine && block.model === route.model &&
-    (block.by === STALL_BLOCK_BY || block.by === VENDOR_BLOCK_BY || block.by === FREE_PROBE_BLOCK_BY);
-  return blocks.find(block => block.engine === route.engine && (block.model === undefined || block.model === route.model) && !ours(block));
+  return blocks.find(block => reaches(block, route) && !owned(block, route));
 }
 
 function timestampOrDefault(value: unknown, name: string): number {
@@ -314,7 +322,7 @@ export class FreeChannelProbeMonitor {
     const describe = (worker: string, item: WorkerProbe, eligible: boolean): FreeWorkerStatus => {
       const profile = config.workers[worker]!;
       const route = probeRouteOf(config, worker);
-      const availability = route && eligible ? activeBlocks({ version: 1, blocks: snapshot.blocks }, now).find(block => block.engine === route.engine && (block.model === undefined || block.model === route.model) && !block.by?.startsWith('weaver-quota:')) : undefined;
+      const availability = route && eligible ? activeBlocks({ version: 1, blocks: snapshot.blocks }, now).find(block => reaches(block, route) && !block.by?.startsWith('weaver-quota:')) : undefined;
       return {
         worker, engine: profile.engine, model: profile.model, probed: eligible,
         level: item.level, mode: item.mode, needsAttention: item.needsAttention,
@@ -446,7 +454,7 @@ export class FreeChannelProbeMonitor {
       const route = probeRouteOf(config, worker);
       if (!route) continue;
       const by = modeBlockBy(item.mode);
-      const own = active.find(block => block.engine === route.engine && block.model === route.model && block.by === by);
+      const own = active.find(block => owned(block, route, by));
       if (own) continue;
       // Removing the block by hand is an explicit unblock: the whole question resets, the record stays.
       this.state.workers[worker] = item.lastTriggerAt !== null && now - item.lastTriggerAt < LADDER_RESET_MS
@@ -460,7 +468,7 @@ export class FreeChannelProbeMonitor {
       if (block.by !== FREE_PROBE_BLOCK_BY || block.model === undefined) continue;
       const worker = Object.keys(config.workers).find(id => {
         const profile = config.workers[id]!;
-        return freeProbeEligible(config, id) && profile.engine === block.engine && profile.model === block.model;
+        return freeProbeEligible(config, id) && (block.worker === undefined || block.worker === id) && profile.engine === block.engine && profile.model === block.model;
       });
       if (!worker) continue;
       const item = this.state.workers[worker];
@@ -537,7 +545,7 @@ export class FreeChannelProbeMonitor {
     const snapshot = this.options.policy().snapshot();
     const now = this.clock();
     const by = item.mode ? modeBlockBy(item.mode) : undefined;
-    const own = by ? activeBlocks({ version: 1, blocks: snapshot.blocks }, now).find(block => block.engine === route.engine && block.model === route.model && block.by === by) : undefined;
+    const own = by ? activeBlocks({ version: 1, blocks: snapshot.blocks }, now).find(block => owned(block, route, by)) : undefined;
     if (!own) {
       // Healthy at the moment the probe fired, or someone else now holds the route: nothing is ours to lift.
       this.state.workers[route.worker] = item.mode && item.blockSince ? emptyWorkerProbe() : { ...emptyWorkerProbe(), level: item.level, lastTriggerAt: item.lastTriggerAt, head: item.head };
@@ -599,7 +607,7 @@ export class FreeChannelProbeMonitor {
     const retryAt = failure.retryAt ? Date.parse(failure.retryAt) : NaN;
     const release = Number.isFinite(retryAt) ? Math.max(retryAt, now + minutes * 60_000) : now + minutes * 60_000;
     const reason = vendorBlockReason({ kind: 'rate_limit', message: failure.message });
-    const written = this.writeBlock(route, VENDOR_BLOCK_BY, reason, new Date(release).toISOString(), now);
+    const written = this.writeBlock(route, VENDOR_BLOCK_BY, reason, new Date(release).toISOString(), now, true);
     if (!written) {
       record.message = '已有其他来源的阻断，未写入限流阻断';
       this.push(record);
@@ -657,24 +665,27 @@ export class FreeChannelProbeMonitor {
   }
 
   /**
-   * Writes one model-scoped block for this worker, replacing only what this monitor owned on that route.
+   * Writes one worker-level block (also scoped to its model) for this worker, replacing only what this monitor owned on that route.
    * A foreign block (manual, or another monitor's whole-engine statement) means the route is already kept
    * out; no second block is stacked onto the same key. A replaced block keeps its original `since`.
    */
-  private writeBlock(route: FreeProbeRoute, by: string, reason: string, release_at: string | undefined, now: number): Block | undefined {
+  private writeBlock(route: FreeProbeRoute, by: string, reason: string, release_at: string | undefined, now: number, escalate = false): Block | undefined {
     let final: Block | undefined;
     const ok = this.saveWithRetry(blocks => {
+      final = undefined;
       if (foreignBlock(blocks, route)) return blocks;
-      const previous = blocks.find(block => block.engine === route.engine && block.model === route.model && (block.by === STALL_BLOCK_BY || block.by === VENDOR_BLOCK_BY || block.by === FREE_PROBE_BLOCK_BY));
-      final = { engine: route.engine, model: route.model, reason, since: previous?.since ?? new Date(now).toISOString(), by, ...(release_at ? { release_at } : {}) };
-      return [...blocks.filter(block => !(block.engine === route.engine && block.model === route.model && (block.by === STALL_BLOCK_BY || block.by === VENDOR_BLOCK_BY || block.by === FREE_PROBE_BLOCK_BY))), final];
+      const previous = blocks.find(block => owned(block, route));
+      final = { engine: route.engine, model: route.model, worker: route.worker, reason, since: previous?.since ?? new Date(now).toISOString(), by, ...(release_at ? { release_at } : {}) };
+      const written = [...blocks.filter(block => !owned(block, route)), final];
+      // A rate limit that leaves no enabled worker on the engine usable takes the engine out as well.
+      return escalate ? escalateEngineBlock(this.options.policy().snapshot().config, written, route.engine, now) : written;
     });
     return ok && final ? final : undefined;
   }
 
   /** Removes only the block this monitor wrote with this marker on this route; anything else stays. */
   private removeBlock(route: FreeProbeRoute, by: string): boolean {
-    return this.saveWithRetry(blocks => blocks.filter(block => !(block.engine === route.engine && block.model === route.model && block.by === by)));
+    return this.saveWithRetry(blocks => blocks.filter(block => !owned(block, route, by)));
   }
 
   private push(record: ProbeRecord): void {

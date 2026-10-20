@@ -1,5 +1,5 @@
 import type { PolicySnapshot } from '../../shared/policy';
-import { catalogEntry, engineDisableConflict, type EngineProbeRecord } from '../../shared/engines';
+import { catalogEntry, type EngineProbeRecord } from '../../shared/engines';
 import { object } from '../../shared/validation';
 import type { PolicyStore } from '../policy/store';
 import type { EngineProber } from './probe';
@@ -39,8 +39,6 @@ export async function applyEngineEnabled(store: PolicyStore, prober: EngineProbe
   } else {
     const existing = config.engines[entry.id];
     if (!existing) throw new EngineControlError('Engine has no saved record to disable');
-    const conflict = engineDisableConflict(config, entry.id);
-    if (conflict) throw new EngineControlError(conflict);
     config.engines[entry.id] = { ...existing, enabled: false };
   }
   if (JSON.stringify(config.owners) !== JSON.stringify(owners) || JSON.stringify(config.workers) !== JSON.stringify(workers)) {

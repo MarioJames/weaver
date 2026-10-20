@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID, createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { TaskStore, event } from '../src/main/store';
+import { TaskStore, engineLadderKey, event } from '../src/main/store';
 import { SCHEMA_VERSION, migrate } from '../src/main/migrate';
 import { TaskManager } from '../src/main/manager';
 import { CommandHandler } from '../src/main/commands';
@@ -51,12 +51,12 @@ test('startup never reads a legacy tasks.v1.json; the explicit import (used by t
   const first=new TaskStore(join(dir,'weaver.db'));
   assert.equal(first.list().length,0,'opening the store ignores tasks.v1.json');assert.equal(first.revision,0);assert.equal(readFileSync(legacy,'utf8'),content);
   first.importTasksJson(legacy);
-  assert.equal(first.revision,41);assert.deepEqual(first.get(task.id),task);assert.deepEqual(first.getOwner(owner.id),owner);assert.deepEqual(first.getPackage(pkg.id),pkg);assert.deepEqual(first.getVendorLimit('codex'),{level:2,lastTriggerAt:123});
+  assert.equal(first.revision,41);assert.deepEqual(first.get(task.id),task);assert.deepEqual(first.getOwner(owner.id),owner);assert.deepEqual(first.getPackage(pkg.id),pkg);assert.deepEqual(first.getVendorLimit(engineLadderKey('codex')),{level:2,lastTriggerAt:123});
   assert.equal(first.getValue('legacyImport'),undefined,'no import marker is kept');assert.equal(first.getValue('vendorRateLimits'),undefined,'the ladder lives in its own table');
   const imported=new CommandHandler(new TaskManager(first,adapter),new PolicyStore(first.db));
   assert.deepEqual(imported.handle(request),response);assert.equal(first.list().length,1);
   await imported.drain();first.close();
-  const second=new TaskStore(join(dir,'weaver.db'));try{assert.equal(second.revision,41);assert.deepEqual(second.get(task.id),task);assert.equal(second.list().length,1);assert.deepEqual(second.listVendorLimits(),{codex:{level:2,lastTriggerAt:123}});}finally{second.close();}
+  const second=new TaskStore(join(dir,'weaver.db'));try{assert.equal(second.revision,41);assert.deepEqual(second.get(task.id),task);assert.equal(second.list().length,1);assert.deepEqual(second.listVendorLimits(),{[engineLadderKey('codex')]:{level:2,lastTriggerAt:123}});}finally{second.close();}
   assert.equal(readFileSync(legacy,'utf8'),content);
  }finally{await handler.drain();source.close();rmSync(dir,{recursive:true,force:true});}
 });
@@ -68,7 +68,7 @@ test('an import error rolls back every row and keeps the JSON intact',()=>{
  try{
   assert.throws(()=>store.importTasksJson(path));
   assert.equal(readFileSync(path,'utf8'),content);
-  for(const table of ['tasks','task_events','artifacts','owners','packages','receipts','kv','vendor_limits'])assert.equal(store.db.prepare(`SELECT count(*) n FROM ${table}`).get()!.n,0);
+  for(const table of ['tasks','task_events','artifacts','owners','packages','receipts','kv','vendor_worker_limits'])assert.equal(store.db.prepare(`SELECT count(*) n FROM ${table}`).get()!.n,0);
   writeFileSync(path,JSON.stringify({version:1,tasks:[task]}));store.importTasksJson(path);assert.equal(store.get(task.id).id,task.id);
  }finally{store.close();rmSync(dir,{recursive:true,force:true});}
 });
@@ -80,7 +80,7 @@ test('schema changes are versioned steps: an empty database climbs from 0, a cur
   assert.equal(Number(raw.prepare('PRAGMA user_version').get()!.user_version),0);
   migrate(raw);assert.equal(Number(raw.prepare('PRAGMA user_version').get()!.user_version),SCHEMA_VERSION);
   const tables=(raw.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as {name:string}[]).map(row=>row.name);
-  for(const name of ['tasks','policy_engines','policy_owners','policy_owner_workers','policy_workers','policy_settings','policy_blocks','policy_revisions','stall_penalties','stall_history','free_probe_workers','free_probe_history','quota_records','quota_state','vendor_limits'])assert.ok(tables.includes(name),name);
+  for(const name of ['tasks','policy_engines','policy_owners','policy_owner_workers','policy_workers','policy_settings','policy_blocks','policy_revisions','stall_penalties','stall_history','free_probe_workers','free_probe_history','quota_records','quota_state','vendor_worker_limits'])assert.ok(tables.includes(name),name);
   raw.prepare("INSERT INTO kv(key,body) VALUES ('sequence','7')").run();migrate(raw);assert.equal(raw.prepare('SELECT body FROM kv').get()!.body,'7','running again changes nothing');raw.close();
   // A database stopped at an older version gets only the missing steps and keeps its rows.
   const old=new DatabaseSync(join(dir,'old.db'));
@@ -126,4 +126,32 @@ test('durable command intent and running state are visible to a second connectio
   const result=handler.handle({apiVersion:'weaver.v1',commandId:'spawn-proof',command:'workers.spawn',args:{taskId:task.id,provider:'mock-jsonl'}});
   assert.equal(result.ok,true,JSON.stringify(result));assert.equal(inspected,true);assert.equal(store.get(task.id).status,'failed');assert.deepEqual(store.getReceipt('local-demo:spawn-proof')?.response,JSON.parse(JSON.stringify(result)));
  }finally{await handler.drain();store.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('upgrading a version 6 database keeps its blocks, adds the worker column and the per-worker ladder, and repeats cleanly',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'weaver-migrate7-'));const path=join(dir,'weaver.db');
+ try{
+  // Build the shape step 6 left behind: no worker column, the per-engine ladder table.
+  const seeded=new PolicyStore(path);
+  const base=seeded.snapshot();
+  seeded.save({revision:base.revision,config:base.config,blocks:[{engine:'codex',reason:'manual hold',since:'2026-10-19T00:00:00.000Z',by:'manual'},{engine:'qoder',model:'m1',reason:'model hold',since:'2026-10-19T00:00:00.000Z',release_at:'2030-01-01T00:00:00.000Z',by:'weaver-free-probe'}]});
+  const before=seeded.snapshot().blocks;
+  const raw=new DatabaseSync(path);
+  raw.exec('ALTER TABLE policy_blocks DROP COLUMN worker; DROP TABLE vendor_worker_limits; CREATE TABLE vendor_limits(engine TEXT PRIMARY KEY, level INTEGER NOT NULL, last_trigger_at INTEGER NOT NULL); INSERT INTO vendor_limits VALUES (\'codex\',2,123); PRAGMA user_version=6');
+  assert.deepEqual((raw.prepare('PRAGMA table_info(policy_blocks)').all() as {name:string}[]).map(column=>column.name).includes('worker'),false);
+  raw.close();
+  for(let round=0;round<3;round++){
+   const upgraded=new DatabaseSync(path);migrate(upgraded);
+   assert.equal(Number(upgraded.prepare('PRAGMA user_version').get()!.user_version),SCHEMA_VERSION);
+   const columns=(upgraded.prepare('PRAGMA table_info(policy_blocks)').all() as {name:string}[]).map(column=>column.name);
+   assert.ok(columns.includes('worker'));
+   const tables=(upgraded.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as {name:string}[]).map(row=>row.name);
+   assert.ok(tables.includes('vendor_worker_limits'));assert.ok(!tables.includes('vendor_limits'));
+   upgraded.close();
+   const reopened=new PolicyStore(path);assert.deepEqual(reopened.snapshot().blocks,before,`round ${round}: existing blocks survive the upgrade`);
+  }
+  const store=new PolicyStore(path);const snapshot=store.snapshot();
+  store.save({revision:snapshot.revision,config:snapshot.config,blocks:[...snapshot.blocks,{engine:'codex',worker:'codex_worker',reason:'worker hold',since:'2026-10-19T00:00:00.000Z',by:'weaver-vendor-limit'}]});
+  assert.equal(new PolicyStore(path).snapshot().blocks.at(-1)?.worker,'codex_worker','the worker field round-trips through policy_blocks');
+ }finally{rmSync(dir,{recursive:true,force:true});}
 });

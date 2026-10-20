@@ -3,7 +3,7 @@ import { API_VERSION, ownerSession, sameOwnerInstance, type CommandResponse, typ
 import type { Task } from '../shared/types';
 import { object, parseId, parseTaskInput, parseWorkerRecord, text, PENDING_TASK_TITLE } from '../shared/validation';
 import { TaskManager } from './manager';
-import { event, slotGroupCount, slotGroupFor, slotGroupName } from './store';
+import { engineLadderKey, event, slotGroupCount, slotGroupFor, slotGroupName } from './store';
 import { ContinuationService, ContinuationError, handoffPrompt, rootOwnerPrompt, redactContext } from './continuation';
 import { MockOwnerHostAdapter, type OwnerHostEvidence, type OwnerMessage } from './adapters/logical';
 import { launchOwner, launchOwnerAsync, closeOwnerHost, closeOwnerHostAsync, herdrOnPath, OwnerLaunchError, type OwnerLaunchInput, type OwnerLaunchResult } from './owner-host';
@@ -12,7 +12,7 @@ import type { StallMonitor, StallStatus } from './stall';
 import { PolicyStore } from './policy/store';
 import type { RoutePreview } from '../shared/policy';
 import { QUOTA_CAPABILITIES } from './policy/quota';
-import { EXCLUDED_ENGINE_REASON } from './policy/routing';
+import { EXCLUDED_ENGINE_REASON, VENDOR_BLOCK_SOURCE, escalateEngineBlock, type Block } from './policy/routing';
 import { absoluteExistingWorkspace, assertFrozenWorkspace, workspaceIdentity, listWorkspaceDirectories, isRealEngineKind, REAL_ENGINE_KINDS } from './workspace';
 import { vendorBlockReason } from './adapters/cli/vendor-errors';
 import { workerInstruction } from './adapters/instruction';
@@ -41,6 +41,8 @@ const engineSummary=(item: StallStatus['engines'][string]) => ({level:item.level
 function canonical(value:unknown):string {if(Array.isArray(value))return `[${value.map(canonical).join(',')}]`;if(value&&typeof value==='object')return `{${Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`;return JSON.stringify(value);}
 const digest=(value:unknown)=>createHash('sha256').update(canonical(value)).digest('hex');
 const terminal=(t:Task)=>['completed','failed','cancelled'].includes(t.status);
+/** The attempt ended on a vendor rate limit or exhausted quota. */
+const vendorLimited=(t:Task)=>t.status==='failed'&&(t.failure?.kind==='rate_limit'||t.failure?.kind==='quota');
 /** A single app-owned handler shared by the loopback UI and CLI. The local principal is deliberately
  * trusted-local-machine scope, not an OS-user login or a real-agent grant. */
 type OwnerEffect = { kind:'launch'; input:OwnerLaunchInput } | { kind:'close'; host:OwnerLaunchResult } | {kind:'first-output';taskId:string};
@@ -252,27 +254,37 @@ export class CommandHandler {
   return {apiVersion:API_VERSION,ok:!result.failure,data:result};
  }
  private readonly vendorBlockedAttempts=new Set<string>();
+ /**
+  * A rate limit or exhausted quota blocks the dispatched worker first (ladder per worker). Once every enabled worker
+  * of its engine is out, the engine is blocked too. A dispatch that names no known worker blocks the whole engine.
+  */
  private applyVendorBlocks():void {
   for(const task of this.manager.store.listHeads()){
    const f=task.failure;const engine=task.dispatch?.engine;const key=task.run?.id??task.id;
    if(!engine||!f||!['rate_limit','quota'].includes(f.kind)||this.vendorBlockedAttempts.has(key))continue;
    const snapshot=this.policy.snapshot();
-   const existing=snapshot.blocks.find(block=>block.engine===engine&&block.model===undefined);
-   if(existing&&existing.by!=='weaver-vendor-limit'){this.vendorBlockedAttempts.add(key);continue;}
    const now=Date.now();
+   const dispatched=task.dispatch?.worker;
+   const worker=dispatched&&Object.hasOwn(snapshot.config.workers,dispatched)&&snapshot.config.workers[dispatched]!.engine===engine?dispatched:undefined;
+   const existing=snapshot.blocks.find(block=>block.engine===engine&&block.model===undefined&&block.worker===worker);
+   if(existing&&existing.by!==VENDOR_BLOCK_SOURCE){this.vendorBlockedAttempts.add(key);continue;}
+   // Another source already keeps the whole engine out of routing; a worker block would only stack on it.
+   if(worker&&snapshot.blocks.some(block=>block.engine===engine&&block.model===undefined&&block.worker===undefined&&block.by!==VENDOR_BLOCK_SOURCE&&(!block.release_at||Date.parse(block.release_at)>now))){this.vendorBlockedAttempts.add(key);continue;}
    // Keep the ladder in the existing durable task metadata, including after explicit block removal.
-    let minutes: number = VENDOR_LADDER_MINUTES[0];
-    if(f.kind==='rate_limit'){
-     const previous=this.manager.store.getVendorLimit(engine);
-     const level=previous&&now-previous.lastTriggerAt<2*60*60_000?Math.min(previous.level+1,3):1;
-     minutes=VENDOR_LADDER_MINUTES[level-1]!;
-    this.manager.store.putVendorLimit(engine,{level,lastTriggerAt:now});
+   let minutes: number = VENDOR_LADDER_MINUTES[0];
+   if(f.kind==='rate_limit'){
+    const ladder=worker??engineLadderKey(engine);
+    const previous=this.manager.store.getVendorLimit(ladder);
+    const level=previous&&now-previous.lastTriggerAt<2*60*60_000?Math.min(previous.level+1,3):1;
+    minutes=VENDOR_LADDER_MINUTES[level-1]!;
+    this.manager.store.putVendorLimit(ladder,{level,lastTriggerAt:now});
    }
    const retryAt=f.retryAt?Date.parse(f.retryAt):NaN;
    const release=f.kind==='rate_limit'?Math.max(now+minutes*60_000,Number.isFinite(retryAt)?retryAt:0):retryAt;
    const release_at=Number.isFinite(release)&&release>now?new Date(release).toISOString():undefined;
-   const block={engine,reason:vendorBlockReason(f),since:new Date(now).toISOString(),by:'weaver-vendor-limit',...(release_at?{release_at}:{})};
-   this.policy.save({revision:snapshot.revision,config:snapshot.config,blocks:[...snapshot.blocks.filter(item=>item!==existing),block]});
+   const block:Block={engine,...(worker?{worker}:{}),reason:vendorBlockReason(f),since:new Date(now).toISOString(),by:VENDOR_BLOCK_SOURCE,...(release_at?{release_at}:{})};
+   const written=existing?snapshot.blocks.map(item=>item===existing?block:item):[...snapshot.blocks,block];
+   this.policy.save({revision:snapshot.revision,config:snapshot.config,blocks:worker?escalateEngineBlock(snapshot.config,written,engine,now):written});
    this.vendorBlockedAttempts.add(key);
   }
  }
@@ -317,13 +329,16 @@ export class CommandHandler {
    let phase:NonNullable<Task['queueReason']>['code']='policy_blocked';
    try{
     const frozen=task.dispatch;
-    const vendorBlock=this.policy.snapshot().blocks.find(block=>block.engine===frozen.engine&&block.by==='weaver-vendor-limit'&&(!block.release_at||Date.parse(block.release_at)>Date.now()));
-    if(vendorBlock){
+    // A whole-engine vendor block sends the task to another engine; a worker-level one only takes that worker out.
+    const vendorBlocks=this.policy.snapshot().blocks.filter(block=>block.engine===frozen.engine&&block.by===VENDOR_BLOCK_SOURCE&&(!block.release_at||Date.parse(block.release_at)>Date.now()));
+    const engineBlocked=vendorBlocks.some(block=>block.worker===undefined);
+    const workerBlocked=!engineBlocked&&vendorBlocks.some(block=>block.worker===frozen.worker);
+    if(engineBlocked||workerBlocked){
       if(frozen.execution==='real'){phase='workspace_changed';assertFrozenWorkspace(frozen);phase='policy_blocked';}
-      const reroute=this.routeOf(frozen.owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner)),[frozen.engine]);
+      const reroute=this.routeOf(frozen.owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner)),engineBlocked?[frozen.engine]:[],undefined,workerBlocked?[frozen.worker]:[]);
       const decision=this.decideExecution(reroute.engine,undefined,{...task,workspace:frozen.workspace??task.workspace},this.policy.snapshot().config.owners[reroute.owner]?.engine,reroute.proxy,this.policy.snapshot().config.owners[reroute.owner]?.proxy);
       task.dispatch={...frozen,worker:reroute.worker,engine:reroute.engine,model:reroute.model,effort:reroute.effort,proxy:reroute.proxy,execution:decision.execution,adapter:decision.adapter,engineKind:decision.engineKind,maxParallel:reroute.maxParallel,...(decision.workspace?{workspace:decision.workspace,workspaceIdentity:workspaceIdentity(decision.workspace)}:{})};
-      event(task,'lifecycle',`Vendor limit rerouted queued worker to ${reroute.engine}`);this.put(task);this.pump();continue;
+      event(task,'lifecycle',`Vendor limit rerouted queued worker to ${reroute.engine} (${reroute.worker})`);this.put(task);this.pump();continue;
     }
 
     const running=slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner));
@@ -366,7 +381,8 @@ export class CommandHandler {
    let previous:Task;
    try{previous=this.manager.store.get(id);}catch{break;}
    const engine=previous.dispatch?.engine;
-   if(engine&&(previous.status==='failed'||previous.status==='cancelled'||previous.status==='cancelling')&&!engines.includes(engine))engines.push(engine);
+   // A rate-limited attempt is already out through its worker's block; only the other failures put the engine in doubt.
+   if(engine&&!vendorLimited(previous)&&(previous.status==='failed'||previous.status==='cancelled'||previous.status==='cancelling')&&!engines.includes(engine))engines.push(engine);
    id=previous.retryOf;
   }
   return engines;
@@ -376,7 +392,7 @@ export class CommandHandler {
  private retryEngines(original:Task,cancel:boolean):string[] {
   const excluded=this.chainEngines(original);
   const engine=original.dispatch?.engine;
-  const abandoned=(cancel&&!terminal(original))||original.status==='failed'||original.status==='cancelled';
+  const abandoned=(cancel&&!terminal(original))||(!vendorLimited(original)&&(original.status==='failed'||original.status==='cancelled'));
   if(engine&&abandoned&&!excluded.includes(engine))excluded.push(engine);
   return excluded;
  }
@@ -397,9 +413,9 @@ export class CommandHandler {
   return `[Weaver retry] The previous attempt (task ${previous.id.slice(0,8)}) ran on ${previous.dispatch?.engine??'no engine'} and ended ${previous.status}. Before changing anything, inspect the current git diff and any partial output already in the workspace, then continue from what is there rather than repeating finished work. The goal below is the original instruction, unchanged.`;
  }
  /** Route one owner's work under the chain's excluded engines, keeping the refusal in the policy's own words. */
- private routeOf(owner:string,running:number,excluded:string[],worker?:unknown):RoutePreview {
+ private routeOf(owner:string,running:number,excluded:string[],worker?:unknown,excludedWorkers:string[]=[]):RoutePreview {
   try {
-   return this.policy.preview({owner,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads()),...(worker!==undefined?{worker}:{}),...(excluded.length?{excludeEngines:excluded}:{})});
+   return this.policy.preview({owner,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads()),...(worker!==undefined?{worker}:{}),...(excluded.length?{excludeEngines:excluded}:{}),...(excludedWorkers.length?{excludeWorkers:excludedWorkers}:{})});
   } catch(error) {
    const message=error instanceof Error?error.message:String(error);
    if(message.startsWith('NO_ALTERNATIVE_ENGINE'))fail('NO_ALTERNATIVE_ENGINE',message);
@@ -472,6 +488,8 @@ export class CommandHandler {
   const willCancel=cancel&&!terminal(original);
   const frozen=original.packageId?this.manager.store.getPackage(original.packageId!):undefined;
   if(original.packageId&&!frozen)fail('NOT_FOUND','The original task names a frozen work package this store no longer retains');
+  // The failure that ended the original may not have been turned into its worker block yet; the route must see it.
+  this.applyVendorBlocks();
   const excluded=this.retryEngines(original,cancel);
   const logical=original.ownerId?this.owner(original.ownerId):undefined;
   const owner=logical?.profileId??Object.keys(this.policy.snapshot().config.owners)[0];
@@ -603,8 +621,11 @@ export class CommandHandler {
     const engine=text(a.engine,'engine',120);
     const engines=this.monitor().status().engines;
     if(!Object.hasOwn(engines,engine))fail('NOT_FOUND',`Engine ${engine} is not configured and has no penalty record`);
-    const vendor=this.manager.store.getVendorLimit(engine);
-    return {engine,...engines[engine],vendorLimit:vendor?{level:vendor.level,lastTriggerAt:new Date(vendor.lastTriggerAt).toISOString()}:null};
+    // The ladder is per worker; the engine view reports the most recently triggered step among its workers.
+    const config=this.policy.snapshot().config;const ladders=this.manager.store.listVendorLimits();
+    const keys=[...Object.keys(config.workers).filter(id=>config.workers[id]!.engine===engine),engineLadderKey(engine)].filter(key=>ladders[key]);
+    const latest=keys.sort((a,b)=>ladders[b]!.lastTriggerAt-ladders[a]!.lastTriggerAt)[0];
+    return {engine,...engines[engine],vendorLimit:latest?{level:ladders[latest]!.level,lastTriggerAt:new Date(ladders[latest]!.lastTriggerAt).toISOString()}:null};
    }
    case 'engines.unblock':{
     // The engine table is checked before the monitor is asked, so a typo never reaches a policy write.

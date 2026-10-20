@@ -25,10 +25,10 @@ export function workerStatusTag(config: Config, blocks: Block[], workerId: strin
   const lock = workerWeightLock(config, workerId);
   if (lock) return lock;
   if (weight === 0) return { label: '不派发' };
-  const availability = availabilityOf(config, activeBlocks({ version: 1, blocks }, Date.now()), worker);
+  const availability = availabilityOf(config, activeBlocks({ version: 1, blocks }, Date.now()), worker, workerId);
   if (availability.status !== 'blocked') return undefined;
   // A pause written by the penalty ladders or the free probe says what kind it is; any other block stays a plain restriction.
-  const hit = blockOf(config, blocks, worker);
+  const hit = blockOf(config, blocks, worker, Date.now(), workerId);
   const pause = pauseOfBlock(hit);
   const reason = hit ? blockText(hit) : availability.reason;
   return { label: pause?.label ?? '已限制', color: pause?.tone ?? 'warning', hint: reason, reason };

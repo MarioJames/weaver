@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { defaultConfig, availabilityOf, resolveDispatch, validateConfig, type Block } from '../src/main/policy/routing';
 import { proxyEnvironment, validateProxy } from '../src/shared/proxy';
 import { PolicyStore } from '../src/main/policy/store';
@@ -52,7 +53,7 @@ test('proxy modes isolate role environments and reject credentials and malformed
 });
 
 test('role proxy and free channel roundtrip; route preview freezes the selected proxy', () => {
-  const root = mkdtempSync(join(process.cwd(), '.build/engine-options-'));
+  const root = mkdtempSync(join(tmpdir(), 'engine-options-'));
   try {
     const file = join(root,'weaver.db');
     const store = new PolicyStore(file);

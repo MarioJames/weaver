@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 /** Every schema change lands here as one ordered step; PRAGMA user_version tracks what ran. */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 const STEPS: string[][] = [
   // 1: the task store tables.
@@ -47,6 +47,12 @@ const STEPS: string[][] = [
   // 6: the vendor rate-limit ladder per engine (was a kv blob).
   [
     `CREATE TABLE IF NOT EXISTS vendor_limits(engine TEXT PRIMARY KEY, level INTEGER NOT NULL, last_trigger_at INTEGER NOT NULL)`,
+  ],
+  // 7: blocks can name one worker, and the vendor rate-limit ladder is kept per worker (the per-engine rows are dropped).
+  [
+    `ALTER TABLE policy_blocks ADD COLUMN worker TEXT`,
+    `DROP TABLE IF EXISTS vendor_limits`,
+    `CREATE TABLE IF NOT EXISTS vendor_worker_limits(worker TEXT PRIMARY KEY, level INTEGER NOT NULL, last_trigger_at INTEGER NOT NULL)`,
   ],
 ];
 

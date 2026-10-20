@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
-import { ENGINE_KINDS, defaultConfig, validateConfig } from '../src/main/policy/routing';
+import { ENGINE_KINDS, availabilityOf, defaultConfig, validateConfig } from '../src/main/policy/routing';
 import { PolicyStore } from '../src/main/policy/store';
 import { ENGINE_CATALOG } from '../src/shared/engines';
 import { EngineProber } from '../src/main/engines/probe';
@@ -109,7 +109,7 @@ test('enabling an installed engine does not create or enable roles and preserves
   }
 });
 
-test('failed probe, stale revision and enabled roles block enablement without writing', async () => {
+test('failed probe and stale revision block enablement without writing, while an engine with enabled roles can always be disabled', async () => {
   const root = mkdtempSync(join(tmpdir(), 'weaver-policy-'));
   const absent = mkdtempSync(join(tmpdir(), 'weaver-cli-'));
   try {
@@ -118,14 +118,17 @@ test('failed probe, stale revision and enabled roles block enablement without wr
     await assert.rejects(() => applyEngineEnabled(store, prober, { id: 'opencode', enabled: true, revision: 0 }), /not installed|missing|Version/);
     assert.equal(store.snapshot().revision, 0);
     assert.equal(store.snapshot().config.engines.opencode.enabled, false);
-    await assert.rejects(() => applyEngineEnabled(store, prober, { id: 'claude', enabled: false, revision: 0 }), /不能停用|已保留/);
+    // Disabling never asks the roles on the engine to be disabled first; they stay enabled and just stop being scheduled.
+    const off = await applyEngineEnabled(store, prober, { id: 'claude', enabled: false, revision: 0 });
+    assert.equal(off.snapshot.revision, 1);
     assert.equal(store.snapshot().config.owners.claude_owner.enabled, true);
     assert.equal(store.snapshot().config.workers.claude_worker.enabled, true);
-    assert.equal(store.snapshot().config.engines.claude.enabled, true);
-    assert.equal(store.snapshot().revision, 0);
-    store.save({ revision: 0, config: store.snapshot().config, blocks: [] });
-    await assert.rejects(() => applyEngineEnabled(store, prober, { id: 'grok', enabled: false, revision: 0 }), /reload/);
-    assert.equal(store.snapshot().revision, 1);
+    assert.equal(store.snapshot().config.engines.claude.enabled, false);
+    assert.equal(store.snapshot().owners.claude_owner.status, 'engine_disabled');
+    assert.equal(store.snapshot().workers.claude_worker.status, 'engine_disabled');
+    store.save({ revision: 1, config: store.snapshot().config, blocks: [] });
+    await assert.rejects(() => applyEngineEnabled(store, prober, { id: 'grok', enabled: false, revision: 1 }), /reload/);
+    assert.equal(store.snapshot().revision, 2);
     assert.equal(store.snapshot().config.engines.grok.enabled, false);
     assert.throws(() => parseEngineToggle({ id: 'grok', enabled: true, revision: 1, argv: ['grok'] }), /Unknown/);
   } finally {
@@ -134,10 +137,14 @@ test('failed probe, stale revision and enabled roles block enablement without wr
   }
 });
 
-test('an enabled role requires its engine to be enabled', () => {
+test('an enabled role on a disabled engine is valid: it is simply not scheduled', () => {
   const config = defaultConfig();
   config.workers.grok_worker.enabled = true;
-  assert.ok(validateConfig(config).some(issue => issue.path.includes('grok_worker') && issue.message.includes('disabled')));
+  assert.deepEqual(validateConfig(config), []);
+  config.engines.claude.enabled = false;
+  assert.deepEqual(validateConfig(config), []);
+  assert.equal(availabilityOf(config, [], config.owners.claude_owner).status, 'engine_disabled');
+  assert.equal(availabilityOf(config, [], config.workers.claude_worker, 'claude_worker').status, 'engine_disabled');
 });
 
 test('version probe stops descendants that keep the pipes open', async () => {
@@ -196,13 +203,14 @@ test('policy save cannot enable an engine, and a mismatched kind is not probed o
     assert.equal(store.snapshot().revision, 0);
     const blocked = structuredClone(store.snapshot().config);
     blocked.engines.claude.enabled = false;
-    assert.throws(() => store.save({ revision: 0, config: blocked, blocks: [] }), /disabled/);
-    assert.equal(store.snapshot().config.engines.claude.enabled, true);
+    // Policy save may disable an engine whose roles are still enabled; only enabling stays behind the probe toggle.
+    store.save({ revision: 0, config: blocked, blocks: [] });
+    assert.equal(store.snapshot().config.engines.claude.enabled, false);
     assert.equal(store.snapshot().config.owners.claude_owner.enabled, true);
     const preserved = structuredClone(store.snapshot().config);
     preserved.engines.pi = { enabled: false, kind: 'pi' };
     preserved.engines.grok.kind = 'claude';
-    const saved = store.save({ revision: 0, config: preserved, blocks: [] });
+    const saved = store.save({ revision: 1, config: preserved, blocks: [] });
     await assert.rejects(() => applyEngineEnabled(store, new EngineProber({ pathEnv: trap.pathEnv, timeoutMs: 1000 }), { id: 'grok', enabled: true, revision: saved.revision }), /does not match|not probed/);
     assert.equal(existsSync(marker), false);
     assert.equal(store.snapshot().config.engines.grok.kind, 'claude');

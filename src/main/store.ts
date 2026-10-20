@@ -28,6 +28,8 @@ export function event(task: Task, kind: TaskEvent['kind'], message: string): voi
 }
 type Metadata = {owners:LogicalOwner[];packages:WorkPackage[];receipts:Record<string,CommandReceipt>};
 export type VendorLimit={level:number;lastTriggerAt:number};
+/** Ladder key for a dispatch that names no worker: the legacy per-engine ladder. */
+export const engineLadderKey=(engine:string):string=>`@engine:${engine}`;
 /** SQLite is the durable authority. Only uncheckpointed stream records live in memory. */
 export class TaskStore {
  readonly path:string;
@@ -64,7 +66,7 @@ export class TaskStore {
    for(const raw of meta.owners){const owner=object(raw) as unknown as LogicalOwner;const session=ownerSession(owner);this.writeRecord('owners',owner.id,{...owner,...(session?{session}:{})});}
    for(const raw of meta.packages){const pkg=object(raw) as unknown as WorkPackage;this.writeRecord('packages',pkg.id,pkg);}
    for(const [key,receipt] of Object.entries(receipts))this.writeRecord('receipts',key,receipt);
-   if(meta.vendorRateLimits!==undefined)for(const [engine,raw] of Object.entries(object(meta.vendorRateLimits))){const limit=object(raw);if(!Number.isSafeInteger(limit.level)||!Number.isSafeInteger(limit.lastTriggerAt))throw new Error('Invalid vendor rate limit');this.db.prepare('INSERT INTO vendor_limits(engine,level,last_trigger_at) VALUES (?,?,?)').run(engine,Number(limit.level),Number(limit.lastTriggerAt));}
+   if(meta.vendorRateLimits!==undefined)for(const [engine,raw] of Object.entries(object(meta.vendorRateLimits))){const limit=object(raw);if(!Number.isSafeInteger(limit.level)||!Number.isSafeInteger(limit.lastTriggerAt))throw new Error('Invalid vendor rate limit');this.db.prepare('INSERT INTO vendor_worker_limits(worker,level,last_trigger_at) VALUES (?,?,?)').run(engineLadderKey(engine),Number(limit.level),Number(limit.lastTriggerAt));}
    for(const [key,value] of Object.entries(meta))if(!['owners','packages','receipts','vendorRateLimits'].includes(key))this.writeRecord('kv',key,value);
    this.writeRecord('kv','sequence',sequence);
    this.db.exec('COMMIT');
@@ -93,10 +95,10 @@ export class TaskStore {
   for(const pkg of meta.packages)this.writeRecord('packages',pkg.id,pkg);
   for(const [key,value] of Object.entries(meta.receipts))this.writeRecord('receipts',key,value);
  });}
- /** The vendor rate-limit ladder: one row per engine, kept across restarts and explicit block removal. */
- getVendorLimit(engine:string):VendorLimit|undefined{const row=this.db.prepare('SELECT level,last_trigger_at FROM vendor_limits WHERE engine=?').get(engine);return row?{level:Number(row.level),lastTriggerAt:Number(row.last_trigger_at)}:undefined;}
- listVendorLimits():Record<string,VendorLimit>{return Object.fromEntries(this.db.prepare('SELECT engine,level,last_trigger_at FROM vendor_limits ORDER BY engine').all().map(row=>[String(row.engine),{level:Number(row.level),lastTriggerAt:Number(row.last_trigger_at)}]));}
- putVendorLimit(engine:string,limit:VendorLimit):void{this.transaction(()=>{this.db.prepare('INSERT INTO vendor_limits(engine,level,last_trigger_at) VALUES (?,?,?) ON CONFLICT(engine) DO UPDATE SET level=excluded.level,last_trigger_at=excluded.last_trigger_at').run(engine,limit.level,limit.lastTriggerAt);});}
+ /** The vendor rate-limit ladder: one row per worker (an engine-only dispatch uses its own key), kept across restarts and explicit block removal. */
+ getVendorLimit(worker:string):VendorLimit|undefined{const row=this.db.prepare('SELECT level,last_trigger_at FROM vendor_worker_limits WHERE worker=?').get(worker);return row?{level:Number(row.level),lastTriggerAt:Number(row.last_trigger_at)}:undefined;}
+ listVendorLimits():Record<string,VendorLimit>{return Object.fromEntries(this.db.prepare('SELECT worker,level,last_trigger_at FROM vendor_worker_limits ORDER BY worker').all().map(row=>[String(row.worker),{level:Number(row.level),lastTriggerAt:Number(row.last_trigger_at)}]));}
+ putVendorLimit(worker:string,limit:VendorLimit):void{this.transaction(()=>{this.db.prepare('INSERT INTO vendor_worker_limits(worker,level,last_trigger_at) VALUES (?,?,?) ON CONFLICT(worker) DO UPDATE SET level=excluded.level,last_trigger_at=excluded.last_trigger_at').run(worker,limit.level,limit.lastTriggerAt);});}
  transaction<T>(fn:()=>T):T {
   if(this.inTransaction)return fn();
   const pending=new Map(this.pending),sequence=this.sequence;

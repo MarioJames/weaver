@@ -137,7 +137,7 @@ export function boundedProbeError(value: string): string {
 }
 
 /** Weaver's own penalty for an engine as a whole; a model-level block is somebody else's business. */
-const isStallBlock = (block: Block, engine: string): boolean => block.engine === engine && block.model === undefined && block.by === STALL_BLOCK_BY;
+const isStallBlock = (block: Block, engine: string): boolean => block.engine === engine && block.model === undefined && block.worker === undefined && block.by === STALL_BLOCK_BY;
 
 /** Silence measured from the last event, falling back to when the run started. */
 export function silenceMs(task: Task, now: number): number | null {
@@ -545,7 +545,7 @@ export class StallMonitor {
       if (held.has(group.engine)) continue;
       if (!Object.hasOwn(snapshot.config.engines, group.engine)) continue;
       // Another block already keeps this engine out of routing; stacking a penalty on top of it would collide.
-      if (activeBlocks({ version: 1, blocks: snapshot.blocks }, at).some(block => block.engine === group.engine && block.model === undefined && block.by !== STALL_BLOCK_BY)) continue;
+      if (activeBlocks({ version: 1, blocks: snapshot.blocks }, at).some(block => block.engine === group.engine && block.model === undefined && block.worker === undefined && block.by !== STALL_BLOCK_BY)) continue;
       const penalty = nextPenalty(this.state, group.engine, at, group.tasks);
       if (!penalty || !this.writeBlock(policy, penalty.block)) continue;
       this.trigger(group, penalty, at);
@@ -589,7 +589,7 @@ export class StallMonitor {
     // A penalty the policy still holds but the state never heard of (a missing or damaged file) would otherwise
     // sit there unrecoverable and unprobed forever, so it is adopted onto the ladder's first rung.
     for (const block of blocks) {
-      if (block.model !== undefined || block.by !== STALL_BLOCK_BY || this.state.engines[block.engine]) continue;
+      if (block.model !== undefined || block.worker !== undefined || block.by !== STALL_BLOCK_BY || this.state.engines[block.engine]) continue;
       this.state.engines[block.engine] = { ...emptyPenalty(), level: 1, ...arm(1, now) };
       this.dirty = true;
       this.log(`Adopted the stall penalty for ${block.engine} that the state file did not account for`);

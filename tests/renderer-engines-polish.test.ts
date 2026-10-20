@@ -27,16 +27,21 @@ test('unknown quota hides contradictory measured windows; known and failed queri
 });
 
 for (const [parent, child, label] of [[true, false, '父 Agent'], [false, true, '子 Agent'], [true, true, '父 Agent / 子 Agent']] as const) {
-  test(`disabled engine visibly explains enabled ${label} dependencies`, () => {
+  test(`an enabled engine switch stays usable while enabled ${label} still use it`, () => {
     const config = defaultConfig();
     for (const owner of Object.values(config.owners)) owner.enabled = false;
     for (const worker of Object.values(config.workers)) worker.enabled = false;
+    config.engines.claude!.enabled = true;
     config.owners.claude_owner!.enabled = parent;
     config.workers.claude_worker!.enabled = child;
     const policy = { snapshot: { revision: 1, config, blocks: [] }, config, loading: false, loadError: '' } as unknown as PolicyDraft;
     const html = renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children:
       React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: React.createElement(EnginesPage, { policy }) }) }));
-    assert.ok(html.includes(`仍启用的${label}，请先停用。`), 'dependency reason is rendered without hovering');
+    assert.ok(!html.includes('请先停用'), 'no disable-conflict text is rendered');
+    const switchId = html.match(/<label\b[^>]*for="([^"]+)"[^>]*>启用 claude<\/label>/)?.[1];
+    const claudeSwitch = switchId ? html.match(new RegExp(`<button\\b[^>]*id="${switchId}"[^>]*>`))?.[0] : undefined;
+    assert.ok(claudeSwitch?.includes('role="switch"') && claudeSwitch.includes('aria-checked="true"'), 'the enabled claude switch is rendered on');
+    assert.ok(!/\bdisabled\b/.test(claudeSwitch ?? ''), 'the enabled engine switch is not disabled');
     assert.ok(!/负责人|工作代理/.test(html), 'rendered text uses parent and child terminology');
   });
 }

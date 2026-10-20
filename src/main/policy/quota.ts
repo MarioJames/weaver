@@ -57,7 +57,7 @@ export function applyQuotaSnapshot(store: PolicyStore, quota: QuotaSnapshot, inp
     for (const [id, engine] of Object.entries(current.config.engines)) {
       // An engine whose quota is not tracked would never get a fresh observation to release the block.
       if (engine.kind !== record.engine || !quotaRefreshEnabled(engine)) continue;
-      const existing = blocks.find(block => block.engine === id && block.model === undefined);
+      const existing = blocks.find(block => block.engine === id && block.model === undefined && block.worker === undefined);
       if (existing && existing.by !== source) {
         if (record.status === 'exhausted' && existing.release_at && Date.parse(existing.release_at) <= now) throw new QuotaPolicyConflict();
         continue;
@@ -76,7 +76,7 @@ export function applyQuotaSnapshot(store: PolicyStore, quota: QuotaSnapshot, inp
       else blocks = [...blocks, block];
     }
   }
-  const fields: (keyof Block)[] = ['engine', 'model', 'reason', 'since', 'release_at', 'by'];
+  const fields: (keyof Block)[] = ['engine', 'model', 'worker', 'reason', 'since', 'release_at', 'by'];
   const policyChanged = blocks.length !== current.blocks.length || blocks.some((block, index) => fields.some(field => block[field] !== current.blocks[index]?.[field]));
   const snapshot = policyChanged ? store.save({ revision: current.revision, config: current.config, blocks }) : current;
   return { ...quota, snapshot, policyChanged };

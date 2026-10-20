@@ -12,7 +12,7 @@ const pickerStyles = createStaticStyles(({ css, cssVar }) => ({
 }));
 
 /**
- * A model name is typed or picked in one field. Its suggestions are what the engine itself reports (loaded the first time the field opens),
+ * A model name is typed or picked in one field. Its suggestions are what the engine itself reports (fetched when the field appears and whenever its engine or proxy changes),
  * the refresh button sits inside the field, and an engine with no list leaves a plain text field.
  */
 export function ModelPicker({ engine, proxy, value, onChange, id, placeholder = '例如：gpt-6.1-sol 或 provider/model', label = '模型' }: {
@@ -22,7 +22,7 @@ export function ModelPicker({ engine, proxy, value, onChange, id, placeholder = 
   const [open, setOpen] = useState(false);
   const options = modelSelectOptions(models.list);
   const view = modelListView(models.list, models.loading);
-  const text = view.kind === 'idle' ? `点开输入框可获取 ${engine || '该引擎'} 的可用模型，也可以直接填写。`
+  const text = view.kind === 'idle' ? (engine ? `正在获取 ${engine} 的可用模型…` : '选择引擎后自动获取可用模型，也可以直接填写。')
     : view.kind === 'loading' ? '正在获取模型列表…'
       : view.kind === 'ready' ? `${view.count} 个模型 · 来源：${view.source}。也可以直接填写。`
         : view.text;
@@ -33,7 +33,7 @@ export function ModelPicker({ engine, proxy, value, onChange, id, placeholder = 
       open={open && (options.length > 0 || Boolean(empty))}
       filter={(item, query) => matchModel(options, query, item as { value: string; label?: unknown })}
       onChange={onChange}
-      onOpenChange={next => { setOpen(next); if (next && engine && !models.list && !models.loading) void models.load(); }}
+      onOpenChange={setOpen}
       suffix={view.kind !== 'manual' && <Tooltip title="重新获取模型列表">
         <ActionIcon size="small" icon={RefreshCw} aria-label={`刷新 ${engine} 模型列表`} loading={models.loading} disabled={!engine || models.loading} onClick={() => void models.load(true)} />
       </Tooltip>} />

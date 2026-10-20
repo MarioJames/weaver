@@ -13,19 +13,24 @@ function blocksOf(value: unknown, config: Config): Block[] {
  if(!Array.isArray(value)||value.length>500) throw new Error('Invalid quota blocks');
  const keys=new Set<string>();
  return value.map(raw=>{
-  const b=object(raw); exact(b,['engine','model','reason','since','release_at','by']);
+  const b=object(raw); exact(b,['engine','model','worker','reason','since','release_at','by']);
   const engine=text(b.engine,'engine'); if(!Object.hasOwn(config.engines,engine)) throw new Error(`Unknown engine ${engine}`);
   const block: Block={engine,reason:text(b.reason,'reason'),since:parseReleaseAt(text(b.since,'since'),0)};
   if (String(b.since).startsWith('+')) throw new Error('since must be an absolute timestamp');
   if(b.model!==undefined) block.model=text(b.model,'model');
+  if(b.worker!==undefined){
+   block.worker=text(b.worker,'worker');
+   // A worker that left the config takes its blocks with it; otherwise they could never be saved away.
+   if(!Object.hasOwn(config.workers,block.worker)) return undefined;
+  }
   if(b.by!==undefined) block.by=text(b.by,'by');
   if(b.release_at!==undefined) {
    if(String(b.release_at).startsWith('+')) throw new Error('Stored release_at must be an absolute timestamp');
    block.release_at=parseReleaseAt(text(b.release_at,'release_at'),0);
   }
-  const key=JSON.stringify([engine,block.model??null]); if(keys.has(key)) throw new Error('Duplicate engine/model quota block'); keys.add(key);
+  const key=JSON.stringify([engine,block.model??null,block.worker??null]); if(keys.has(key)) throw new Error('Duplicate engine/model/worker quota block'); keys.add(key);
   return block;
- });
+ }).filter((block):block is Block=>block!==undefined);
 }
 /** Task classes, worker tags, owner engine pins and the engine native-subagent flag were removed; imported policies keep loading without them. */
 function dropRetiredFields(value: unknown): unknown {
@@ -117,6 +122,7 @@ export class PolicyStore {
   const blocks=(this.db.prepare('SELECT * FROM policy_blocks ORDER BY position').all() as Record<string,unknown>[]).map(row=>{
    const block:Block={engine:String(row.engine),reason:String(row.reason),since:String(row.since)};
    if(row.model!==null&&row.model!==undefined)block.model=String(row.model);
+   if(row.worker!==null&&row.worker!==undefined)block.worker=String(row.worker);
    if(row.release_at!==null&&row.release_at!==undefined)block.release_at=String(row.release_at);
    if(row.by!==null&&row.by!==undefined)block.by=String(row.by);
    return block;
@@ -127,8 +133,8 @@ export class PolicyStore {
  }
  private writeAll(config:Config,blocks:Block[]):void {
   this.db.exec('DELETE FROM policy_blocks');
-  const insertBlock=this.db.prepare('INSERT INTO policy_blocks(position,engine,model,reason,since,release_at,by) VALUES (?,?,?,?,?,?,?)');
-  blocks.forEach((block,index)=>insertBlock.run(index,block.engine,optionalText(block.model),block.reason,block.since,optionalText(block.release_at),optionalText(block.by)));
+  const insertBlock=this.db.prepare('INSERT INTO policy_blocks(position,engine,model,worker,reason,since,release_at,by) VALUES (?,?,?,?,?,?,?,?)');
+  blocks.forEach((block,index)=>insertBlock.run(index,block.engine,optionalText(block.model),optionalText(block.worker),block.reason,block.since,optionalText(block.release_at),optionalText(block.by)));
   this.db.exec('DELETE FROM policy_engines');
   const insertEngine=this.db.prepare('INSERT INTO policy_engines(id,position,enabled,kind,quota_refresh) VALUES (?,?,?,?,?)');
   Object.entries(config.engines).forEach(([id,engine],index)=>insertEngine.run(id,index,bit(engine.enabled),engine.kind,engine.quota_refresh===undefined?null:bit(engine.quota_refresh)));
@@ -170,7 +176,7 @@ export class PolicyStore {
   const blocks=activeBlocks({version:1,blocks:this.blocks},this.now());
   return structuredClone({revision:this.revision,config:this.config,blocks:this.blocks,activeBlocks:blocks,
    owners:Object.fromEntries(Object.entries(this.config.owners).map(([id,e])=>[id,availabilityOf(this.config,blocks,e)])),
-   workers:Object.fromEntries(Object.entries(this.config.workers).map(([id,e])=>[id,availabilityOf(this.config,blocks,e)])),execution:'disabled'});
+   workers:Object.fromEntries(Object.entries(this.config.workers).map(([id,e])=>[id,availabilityOf(this.config,blocks,e,id)])),execution:'disabled'});
  }
  save(value: unknown, options?: { allowEngineEnable?: boolean }): PolicySnapshot {
   const input=object(value); exact(input,['revision','config','blocks']);
@@ -213,12 +219,16 @@ export class PolicyStore {
   return this.snapshot();
  }
  preview(value: unknown): RoutePreview {
-  const input=object(value); exact(input,['owner','worker','runningCount','workerLoad','excludeEngines']);
+  const input=object(value); exact(input,['owner','worker','runningCount','workerLoad','excludeEngines','excludeWorkers']);
   const opts: RouteOptions={owner:text(input.owner,'owner')};
   if(input.worker!==undefined) opts.worker=text(input.worker,'worker');
   if(input.excludeEngines!==undefined){
    if(!Array.isArray(input.excludeEngines)||input.excludeEngines.length>50) throw new Error('Invalid excluded engines');
    opts.excludeEngines=input.excludeEngines.map(engine=>text(engine,'excluded engine'));
+  }
+  if(input.excludeWorkers!==undefined){
+   if(!Array.isArray(input.excludeWorkers)||input.excludeWorkers.length>200) throw new Error('Invalid excluded workers');
+   opts.excludeWorkers=input.excludeWorkers.map(worker=>text(worker,'excluded worker'));
   }
   if(input.workerLoad!==undefined){
    const load=object(input.workerLoad);

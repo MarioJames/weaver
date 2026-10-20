@@ -68,18 +68,6 @@ export function catalogEntry(id: string): CatalogEngine | undefined {
   return ENGINE_CATALOG.find(entry => entry.id === id);
 }
 
-/** Enabled owners or workers block disable. Records stay; nothing is cascaded. */
-export function engineDisableConflict(config: Config, id: string): string | undefined {
-  const owners = Object.entries(config.owners).filter(([, owner]) => owner.enabled && owner.engine === id).map(([key]) => key);
-  const workers = Object.entries(config.workers).filter(([, worker]) => worker.enabled && worker.engine === id).map(([key]) => key);
-  if (!owners.length && !workers.length) return undefined;
-  const parts = [
-    owners.length ? `启用的父 Agent ${owners.join('、')}` : '',
-    workers.length ? `启用的子 Agent ${workers.join('、')}` : '',
-  ].filter(Boolean);
-  return `不能停用引擎 ${id}：仍有${parts.join('，')}。请先单独停用这些角色并保存。引擎记录和角色配置都保留，不会级联停用或删除。`;
-}
-
 export function engineReadiness(probe: EngineProbeRecord, config: Config): EngineReadiness {
   const stored = Object.hasOwn(config.engines, probe.id) ? config.engines[probe.id] : undefined;
   const kind = stored?.kind ?? probe.kind;

@@ -1,5 +1,5 @@
 import type { FreeChannelStatus, FreeWorkerStatus } from '../main/free-channel';
-import { activeBlocks, type Block, type Config, type Owner, type Worker } from '../main/policy/routing';
+import { activeBlocks, coveringBlock, type Block, type Config, type Owner, type Worker } from '../main/policy/routing';
 import { dateText } from './quota-view';
 import type { StatusTone } from './status-colors';
 
@@ -21,10 +21,9 @@ export function pauseOfBlock(block: Pick<Block, 'by'> | undefined): { label: str
   return undefined;
 }
 
-/** The active block that keeps one worker or owner out, found the way the router finds it. */
-export function blockOf(config: Config, blocks: Block[], entity: Owner | Worker, now: number = Date.now()): Block | undefined {
-  const free = 'free_channel' in entity && entity.free_channel === true;
-  return activeBlocks({ version: 1, blocks }, now).find(block => block.engine === entity.engine && (block.model === undefined || block.model === entity.model) && !(free && block.by?.startsWith('weaver-quota:')));
+/** The active block that keeps one worker or owner out, found the way the router finds it. Pass the worker's policy key for a worker: a worker-scoped block reaches only the worker it names, never an owner or a sibling. */
+export function blockOf(config: Config, blocks: Block[], entity: Owner | Worker, now: number = Date.now(), workerId?: string): Block | undefined {
+  return coveringBlock(activeBlocks({ version: 1, blocks }, now), entity, workerId);
 }
 
 /** Reason plus the recovery time when the block names one: the same line in tag hints and list notes. */

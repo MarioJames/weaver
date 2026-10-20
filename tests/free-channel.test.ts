@@ -145,8 +145,9 @@ test('vendor quota exhaustion bans the marked engine+model with the given reset 
     await h.step(10);
     assert.deepEqual(h.calls.map((call: ProbeCall) => call.worker), ['qoder_worker', 'opencode_worker'], 'all marked workers are probed');
     const block = h.byBlock(FREE_PROBE_BLOCK_BY, 'qoder')!;
-    assert.deepEqual(Object.keys(block).filter(key => key !== 'reason').sort(), ['by', 'engine', 'model', 'release_at', 'since']);
+    assert.deepEqual(Object.keys(block).filter(key => key !== 'reason').sort(), ['by', 'engine', 'model', 'release_at', 'since', 'worker']);
     assert.equal(block.model, 'Qwen3.8-Flash');
+    assert.equal(block.worker, 'qoder_worker', 'the ban is a worker-level block');
     assert.equal(block.release_at, iso(START + 40 * MINUTE), 'the vendor named the reset time');
     assert.match(block.reason, /额度耗尽/);
     assert.ok(block.reason.length <= 120);
@@ -166,9 +167,9 @@ test('vendor quota exhaustion bans the marked engine+model with the given reset 
     assert.ok(h.pumps() >= 1, 'routing learns about the ban');
     // Routing itself: the free worker is out, the paid worker on the same engine stays usable.
     const config = h.policy.snapshot().config;
-    assert.equal(availabilityOf(config, h.active(), config.workers.qoder_worker).status, 'blocked');
-    assert.equal(availabilityOf(config, h.active(), config.workers.qoder_paid_worker).status, 'available');
-    assert.equal(availabilityOf(config, h.active(), config.workers.opencode_worker).status, 'available', 'the other marked worker answers on its own engine');
+    assert.equal(availabilityOf(config, h.active(), config.workers.qoder_worker, 'qoder_worker').status, 'blocked');
+    assert.equal(availabilityOf(config, h.active(), config.workers.qoder_paid_worker, 'qoder_paid_worker').status, 'available');
+    assert.equal(availabilityOf(config, h.active(), config.workers.opencode_worker, 'opencode_worker').status, 'available', 'the other marked worker answers on its own engine');
     // Rounds keep probing the other marked worker but skip the held one.
     await h.step(20);
     assert.equal(h.probesOf('qoder_worker').length, 1, 'the held worker is not probed again');
@@ -178,7 +179,7 @@ test('vendor quota exhaustion bans the marked engine+model with the given reset 
     await h.step(21);
     assert.equal(h.worker('qoder_worker').mode, null, 'a reset time releases the ban without a probe');
     assert.equal(h.byBlock(FREE_PROBE_BLOCK_BY, 'qoder')!.release_at, iso(START + 40 * MINUTE), 'the stale row stays until it is replaced');
-    assert.equal(availabilityOf(h.policy.snapshot().config, h.active(), h.policy.snapshot().config.workers.qoder_worker).status, 'available', 'the expired release no longer blocks routing');
+    assert.equal(availabilityOf(h.policy.snapshot().config, h.active(), h.policy.snapshot().config.workers.qoder_worker, 'qoder_worker').status, 'available', 'the expired release no longer blocks routing');
     assert.ok(h.logs.some(item => item.includes('阻断不再由本进程持有')));
     assert.equal(h.state()!.history.length <= 50, true);
   } finally { await h.monitor.stop(); h.cleanup(); }
@@ -218,6 +219,7 @@ test('rate limits walk the vendor ladder on the marked route, 10 then 30 minutes
     await h.step(10);
     const vendor = h.byBlock('weaver-vendor-limit', 'qoder')!;
     assert.equal(vendor.model, 'Qwen3.8-Flash');
+    assert.equal(vendor.worker, 'qoder_worker');
     assert.equal(vendor.release_at, iso(START + 20 * MINUTE), 'level 1 waits 10 minutes');
     assert.equal(h.worker('qoder_worker').mode, 'rate_limit');
     assert.equal(h.worker('qoder_worker').level, 1);
@@ -227,7 +229,7 @@ test('rate limits walk the vendor ladder on the marked route, 10 then 30 minutes
     await h.step(10);
     assert.equal(h.worker('qoder_worker').mode, null);
     assert.equal(h.byBlock('weaver-vendor-limit', 'qoder')!.release_at, iso(START + 20 * MINUTE), 'the stale row is not removed proactively');
-    assert.deepEqual(availabilityOf(h.policy.snapshot().config, h.active(), h.policy.snapshot().config.workers.qoder_worker).status, 'available', 'an expired release no longer blocks routing');
+    assert.deepEqual(availabilityOf(h.policy.snapshot().config, h.active(), h.policy.snapshot().config.workers.qoder_worker, 'qoder_worker').status, 'available', 'an expired release no longer blocks routing');
     await h.step(10);
     assert.equal(h.byBlock('weaver-vendor-limit', 'qoder')!.release_at, iso(START + 60 * MINUTE), 'level 2 waits 30 minutes');
     assert.equal(h.worker('qoder_worker').level, 2);
@@ -240,6 +242,7 @@ test('other failures walk the stall ladder on the marked route; level 3 needs th
     await h.step(10);
     const stall = h.byBlock(STALL_BLOCK_BY, 'qoder')!;
     assert.equal(stall.model, 'Qwen3.8-Flash');
+    assert.equal(stall.worker, 'qoder_worker');
     assert.equal(stall.release_at, undefined, 'a stall penalty is not on a timer');
     assert.equal(h.worker('qoder_worker').mode, 'stall');
     assert.equal(h.worker('qoder_worker').blockedUntil, iso(START + 15 * MINUTE), 'level 1 probes after five minutes');
@@ -372,5 +375,42 @@ test('without a loaded prober failures are recorded but nothing is ever banned',
     await h.step(10);
     assert.equal(h.blocks().length, 0, 'no prober means no penalty');
     assert.ok(h.state()!.history.some(item => item.message === '未装载探测执行器，仅记录失败'));
+  } finally { await h.monitor.stop(); h.cleanup(); }
+});
+
+test('probe blocks are worker-level: only the probed worker is out, and a pass removes exactly that block', async () => {
+  const h = await harness({ scripts: { qoder_worker: ['quota_plain', 'pass'] } });
+  try {
+    await h.step(10);
+    const written = h.blocks().filter(block => block.worker !== undefined);
+    assert.deepEqual(written.map(block => [block.worker, block.by]), [['qoder_worker', FREE_PROBE_BLOCK_BY]]);
+    const config = h.policy.snapshot().config;
+    assert.equal(h.policy.snapshot().workers.qoder_worker!.status, 'blocked');
+    assert.equal(h.policy.snapshot().workers.qoder_worker!.worker, 'qoder_worker');
+    assert.equal(h.policy.snapshot().workers.qoder_paid_worker!.status, 'available');
+    // A same-model sibling is not covered by another worker's block.
+    config.workers.qoder_twin = { ...config.workers.qoder_worker!, enabled: true };
+    assert.equal(availabilityOf(config, h.active(), config.workers.qoder_twin, 'qoder_twin').status, 'available');
+    assert.equal(h.byBlock('weaver-vendor-limit', 'qoder'), undefined, 'one blocked worker does not take the engine out');
+    await h.step(10);
+    assert.deepEqual(h.blocks(), [], 'the passing probe removed its own worker-level block');
+    assert.equal(h.policy.snapshot().workers.qoder_worker!.status, 'available');
+  } finally { await h.monitor.stop(); h.cleanup(); }
+});
+
+test('a rate-limit probe that leaves no enabled worker on the engine usable blocks the engine too, released with the earliest worker block', async () => {
+  const h = await harness({ scripts: { qoder_worker: ['rate_limit'] } });
+  try {
+    const snapshot = h.policy.snapshot();
+    snapshot.config.workers.qoder_paid_worker!.enabled = false;
+    h.policy.save({ revision: snapshot.revision, config: snapshot.config, blocks: snapshot.blocks });
+    await h.step(10);
+    const worker = h.blocks().find(block => block.worker === 'qoder_worker')!;
+    const engine = h.blocks().find(block => block.engine === 'qoder' && block.worker === undefined)!;
+    assert.equal(engine.by, 'weaver-vendor-limit');
+    assert.equal(engine.model, undefined);
+    assert.match(engine.reason, /全部子 Agent/);
+    assert.equal(engine.release_at, worker.release_at);
+    assert.equal(h.policy.snapshot().owners.claude_owner!.status, 'available', 'an owner on another engine is unaffected');
   } finally { await h.monitor.stop(); h.cleanup(); }
 });

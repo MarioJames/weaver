@@ -109,7 +109,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           const item = config[section][id]!;
           const engineOn = config.engines[item.engine]?.enabled === true;
           const saved = policy.snapshot?.config[section][id];
-          const note = roleNote(policy.snapshot?.[section][id], false, policy.snapshot && saved ? blockOf(policy.snapshot.config, policy.snapshot.blocks, saved) : undefined);
+          const note = roleNote(policy.snapshot?.[section][id], false, policy.snapshot && saved ? blockOf(policy.snapshot.config, policy.snapshot.blocks, saved, Date.now(), section === 'workers' ? id : undefined) : undefined);
           return <div key={id} className={styles.roleItem} aria-current={id === current ? 'true' : undefined}>
             <NamedSwitch size="small" aria-label={`启用 ${id}`} checked={item.enabled} loading={toggling === id} disabled={!engineOn || !!toggling} title={engineOn ? undefined : `引擎 ${item.engine || '未选择'} 未启用，先在引擎页打开它`} onChange={checked => void toggle(id, checked)} />
             <button type="button" className={styles.roleButton} style={{ font: 'inherit' }} onClick={() => { acceptId(); setSelected(id); setPendingId(id); setIdError(''); scrollToEditor(); }}>

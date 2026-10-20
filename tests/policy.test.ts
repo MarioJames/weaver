@@ -7,7 +7,6 @@ import { activeBlocks, availabilityOf, chatgptReviewEnabled, defaultConfig, effe
 import { lintSchema, validate } from '../src/main/policy/json-schema';
 import { PolicyStore } from '../src/main/policy/store';
 import { DatabaseSync } from 'node:sqlite';
-import { engineDisableConflict } from '../src/shared/engines';
 const now=Date.parse('2026-10-18T12:00:00Z');
 const all=()=>{const c=defaultConfig(); for(const e of Object.values(c.engines)) e.enabled=true; for(const w of Object.values(c.workers)) w.enabled=true; return c;};
 const route=(c:Config,blocks:Block[]=[])=>resolveDispatch(c,blocks,{owner:'claude_owner'});
@@ -277,8 +276,3 @@ test('policy save rejects weights above 10',()=>fixture((store)=>{
  assert.throws(()=>store.save({revision:s.revision,config:s.config,blocks:[]}),/0 to 10/);
 }));
 
-test('the engine disable conflict names 父 Agent and 子 Agent, never 负责人 or 工作代理',()=>{
- const c=all();const message=engineDisableConflict(c,'claude')!;
- assert.match(message,/启用的父 Agent claude_owner/);assert.match(message,/启用的子 Agent claude_worker/);
- assert.doesNotMatch(message,/负责人|工作代理/);
-});
