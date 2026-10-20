@@ -8,7 +8,8 @@ import { PassThrough } from 'node:stream';
 import type { WorkerRecord } from '../../../shared/contracts/tasks';
 import { buildLaunchSpec } from './argv';
 import { createNormalizer } from './normalize';
-import { clip, createRedactedLineBuffer, redact } from './redact';
+import { redactSecrets } from '../../../shared/redact';
+import { clip, createRedactedLineBuffer } from './redact';
 import { decodeLines, startOwnedScope, type LineOverflow, type OwnedScope } from './scope';
 import type { CliAgentInput, ManagedAgentProcess } from './types';
 import type { CliAgentEvidence, RealEngineKind } from '../../../shared/contracts/tasks';
@@ -144,7 +145,7 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
       if(records.length && !this.firstOutput){this.firstOutput=true;this.emit('first-output',new Date().toISOString());}
       let value: Record<string,unknown>|undefined;try{value=JSON.parse(line);}catch{}
       if(value && (/error|fail/i.test(String(value.type)) || value.error || value.is_error || (value.type==='result'&&value.subtype!=='success') || (value.message && typeof value.message==='object' && ['error','aborted'].includes(String((value.message as Record<string,unknown>).stopReason))))) {
-        const safe=redact(line);const message=safe.slice(0,2048);this.lastVendorError=message;this.emit('vendor-error',message,classifyVendorError(this.engine,safe));
+        const safe=redactSecrets(line);const message=safe.slice(0,2048);this.lastVendorError=message;this.emit('vendor-error',message,classifyVendorError(this.engine,safe));
       }
       this.emitRecords(records);
     }, detail => this.logOversizedLine(detail));
@@ -231,10 +232,10 @@ function permissionNote(engine: RealEngineKind): string {
 }
 
 function redactRecord(record: WorkerRecord): WorkerRecord {
-  if (record.type === 'log') return { type: 'log', message: clip(redact(record.message), 8000) };
-  if (record.type === 'progress') return { type: 'progress', percent: record.percent, message: clip(redact(record.message), 8000) };
-  if (record.type === 'artifact') return { ...record, content: clip(redact(record.content), 32000) };
-  return { type: 'result', summary: clip(redact(record.summary), 8000) };
+  if (record.type === 'log') return { type: 'log', message: clip(redactSecrets(record.message), 8000) };
+  if (record.type === 'progress') return { type: 'progress', percent: record.percent, message: clip(redactSecrets(record.message), 8000) };
+  if (record.type === 'artifact') return { ...record, content: clip(redactSecrets(record.content), 32000) };
+  return { type: 'result', summary: clip(redactSecrets(record.summary), 8000) };
 }
 
 /** Start one real CLI in its own systemd user scope. Rejects invalid input before launch. */

@@ -1,7 +1,5 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
-import { constants } from 'node:fs';
-import { access, lstat, realpath } from 'node:fs/promises';
-import path from 'node:path';
+import { findExecutable } from '../system/executables';
 import { ENGINE_CATALOG, catalogEntry, type EngineProbeRecord, type ProbeStatus } from '../../shared/engines';
 
 const DEFAULT_TIMEOUT_MS = 4_000;
@@ -24,26 +22,9 @@ function probeEnv(pathEnv: string, source: NodeJS.ProcessEnv): NodeJS.ProcessEnv
 }
 
 /** Locate a catalog command on PATH. Never consults the shell. */
-export async function findExecutable(command: string, pathEnv: string): Promise<string | undefined> {
+export async function findEngineExecutable(command: string, pathEnv: string): Promise<string | undefined> {
   if (!ENGINE_CATALOG.some(entry => entry.command === command)) throw new Error('Command is outside the probe allowlist');
-  if (command.includes('/') || command.includes('\\') || command.includes('..')) throw new Error('Command is outside the probe allowlist');
-  const extensions = process.platform === 'win32' ? (process.env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';').filter(Boolean) : [''];
-  for (const dir of pathEnv.split(path.delimiter)) {
-    if (!dir) continue;
-    for (const extension of extensions) {
-      const candidate = path.join(dir, command + extension);
-      try {
-        await access(candidate, constants.X_OK);
-        const info = await lstat(candidate);
-        if (!info.isFile() && !info.isSymbolicLink()) continue;
-        const resolved = await realpath(candidate);
-        const resolvedInfo = await lstat(resolved);
-        if (!resolvedInfo.isFile()) continue;
-        return resolved;
-      } catch { /* try the next directory */ }
-    }
-  }
-  return undefined;
+  return findExecutable(command, pathEnv);
 }
 
 function clip(value: string): string {
@@ -154,7 +135,7 @@ export class EngineProber {
     const probedAt = (this.options.now ?? (() => new Date()))().toISOString();
     if (!entry) return { id, kind: 'unknown', command: id, status: 'probe_failed', probedAt, detail: 'Engine is outside the probe allowlist', authenticated: false, modelUsable: false };
     const pathEnv = this.options.pathEnv ?? process.env.PATH ?? '';
-    const executable = await findExecutable(entry.command, pathEnv);
+    const executable = await findEngineExecutable(entry.command, pathEnv);
     if (!executable) return record(entry, 'missing', probedAt);
     const result = await runVersion(executable, this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS, this.options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT, probeEnv(pathEnv, this.options.env ?? process.env));
     if (result.error) return record(entry, 'probe_failed', probedAt, { path: executable, detail: result.error });

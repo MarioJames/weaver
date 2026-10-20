@@ -2,7 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { catalogEntry, type EngineModel, type EngineModelList, type EngineModelListInput } from '../../shared/engines';
-import { findExecutable, runCapture, type CaptureResult } from './probe';
+import { findEngineExecutable, runCapture, type CaptureResult } from './probe';
 
 export const NO_LIST_MESSAGE = '该引擎不提供模型列表，请手动填写';
 const MAX_MODELS = 500;
@@ -169,7 +169,7 @@ export class EngineModelLister {
     const lister = LISTERS[entry.kind];
     if (!lister) return { ...base, status: 'unsupported', source: '', message: NO_LIST_MESSAGE };
     const pathEnv = this.options.pathEnv ?? process.env.PATH ?? '';
-    const executable = await (this.options.find ?? findExecutable)(entry.command, pathEnv);
+    const executable = await (this.options.find ?? findEngineExecutable)(entry.command, pathEnv);
     if (!executable) return { ...base, status: 'unavailable', source: lister.source, message: `未在本机找到 ${entry.command}，请手动填写` };
     env.PATH = pathEnv;
     const result = await (this.options.run ?? runCapture)(executable, lister.args, lister.timeoutMs, lister.maxBytes, env);

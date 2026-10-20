@@ -6,7 +6,7 @@ import { JsonlParser } from './protocol';
 import { event, slotGroupCount, slotGroupName, slotGroupOf } from './domain/tasks';
 import type { TaskStore } from './store';
 import { classifyVendorError } from './adapters/cli/vendor-errors';
-import { redact } from './adapters/cli/redact';
+import { redactSecrets } from '../shared/redact';
 import { redactContext } from './redact-context';
 
 interface Running { child: ManagedProcess; timeout?: NodeJS.Timeout; killTimer?: NodeJS.Timeout; error?: string; result?: string; cancelled: boolean; stderrBytes: number; stderrTail: string; adapterTail?: boolean; vendorError?: string; firstTimer?: NodeJS.Timeout }
@@ -70,7 +70,7 @@ export class TaskManager {
     this.persist(task);
     let child: ManagedProcess;
     try { child = this.adapter.start(task); } catch (error) {
-      task.failure={kind:'early_exit',message:redact(error instanceof Error?error.message:String(error)).slice(-4000)}; task.status = 'failed'; task.run.status = 'stopped'; task.run.endedAt = new Date().toISOString(); event(task, 'error', task.failure.message); this.persist(task); return task;
+      task.failure={kind:'early_exit',message:redactSecrets(error instanceof Error?error.message:String(error)).slice(-4000)}; task.status = 'failed'; task.run.status = 'stopped'; task.run.endedAt = new Date().toISOString(); event(task, 'error', task.failure.message); this.persist(task); return task;
     }
     const run: Running = { child, cancelled: false, stderrBytes: 0, stderrTail: '', ...(timeoutMs === undefined ? {} : { timeout: setTimeout(() => this.stop(id, 'Mock worker exceeded its test timeout'), timeoutMs) }) };
     this.running.set(id, run);
@@ -78,7 +78,7 @@ export class TaskManager {
       run.firstTimer=setTimeout(()=>this.failAttempt(id,{kind:'no_output',message:'Worker produced no valid vendor output within 120 seconds'}),120000);
       child.on('first-output',(at:string)=>{const current=this.store.get(id);if(run.error||run.cancelled||current.run?.firstOutputAt)return;clearTimeout(run.firstTimer);if(current.run)current.run.firstOutputAt=at;this.persist(current,'stream');});
       child.on('stderr-tail',(tail:string)=>{run.adapterTail=true;run.stderrTail=tail;});
-      child.on('vendor-error',(message:string,failure?:TaskFailure)=>{run.vendorError=redact(message).slice(-2048);if(failure)this.failAttempt(id,{...failure,vendorError:run.vendorError});});
+      child.on('vendor-error',(message:string,failure?:TaskFailure)=>{run.vendorError=redactSecrets(message).slice(-2048);if(failure)this.failAttempt(id,{...failure,vendorError:run.vendorError});});
     }
 
     const parser = new JsonlParser(record => this.record(id, record));
@@ -88,7 +88,7 @@ export class TaskManager {
     });
     child.stderr.on('data', (chunk: Buffer) => {
       if (run.error || run.cancelled) return;
-      const safe=redact(chunk.toString('utf8'));
+      const safe=redactSecrets(chunk.toString('utf8'));
       if(!run.adapterTail)run.stderrTail=(run.stderrTail+safe).slice(-2048);
       if(execution==='real'){
         const failure=classifyVendorError(task.dispatch?.engineKind??task.run?.adapter??'',run.stderrTail);
@@ -98,7 +98,7 @@ export class TaskManager {
       if (execution!=='real' && run.stderrBytes > 32768) { this.stop(id, 'Worker stderr exceeds 32 KiB limit'); return; }
       try { const current = this.store.get(id); event(current, 'log', `stderr: ${safe}`); this.persist(current, 'stream'); } catch (error) { this.stop(id, 'Unable to persist stderr'); this.fatal(error); }
     });
-    child.on('error', (error: Error) => { this.failAttempt(id,{kind:task.run?.firstOutputAt?'other':'early_exit',message:redact(error.message).slice(-4000)}); });
+    child.on('error', (error: Error) => { this.failAttempt(id,{kind:task.run?.firstOutputAt?'other':'early_exit',message:redactSecrets(error.message).slice(-4000)}); });
     child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
       clearTimeout(run.timeout); clearTimeout(run.killTimer); clearTimeout(run.firstTimer);
       if (!run.error && !run.cancelled) { try { parser.finish(); } catch (error) { run.error = `Invalid worker output: ${String(error)}`; } }

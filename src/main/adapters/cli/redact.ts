@@ -1,15 +1,9 @@
 import { StringDecoder } from 'node:string_decoder';
+import { redactSecrets } from '../../../shared/redact';
 
-const SECRET = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----|\b(?:sk|rk)-[A-Za-z0-9_-]{8,}|\b(?:ghp|gho|github_pat)_[A-Za-z0-9_]{8,}|\b(?:xai|pplx|r8)-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._~+/=-]{8,}|(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|secret|password|authorization|credential)\s*[=:]\s*\S+/gi;
 const LINE_MAX = 8192;
 const BLOCK_MAX = 65536;
 const TRUNCATED = '[stderr line truncated]\n';
-
-/** Strip credential-shaped text before a record or diagnostic is forwarded. */
-export function redact(value: string): string {
-  SECRET.lastIndex = 0;
-  return value.replace(SECRET, match => match.includes(' ') && /^bearer\s/i.test(match) ? 'Bearer [REDACTED]' : '[REDACTED]');
-}
 
 export function clip(value: string, max: number): string {
   if (value.length <= max) return value;
@@ -24,7 +18,7 @@ export function createRedactedLineBuffer(emit: (text: string) => void): { write(
   let skipPem = false;
   let pem = '';
   const emitSafe = (text: string) => {
-    const cleaned = redact(text);
+    const cleaned = redactSecrets(text);
     if (cleaned) emit(cleaned);
   };
   const isPemEnd = (line: string) => line.includes('-----END ') && line.includes('PRIVATE KEY-----');

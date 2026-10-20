@@ -1,5 +1,5 @@
 import type { TaskFailure } from '../../../shared/contracts/tasks';
-import { redact } from './redact';
+import { redactSecrets } from '../../../shared/redact';
 
 const LIMITS = [
  {kind:'quota', pattern:/FreeUsageLimitError|GoUsageLimitError|insufficient[_ ](?:balance|quota)|\b402\b|(?:usage|spending|credit|quota)[_ ]limit|quota.{0,30}(?:exceeded|exhausted)|(?:out of|insufficient|zero|no) (?:credits|balance)|balance.{0,20}(?:exhausted|insufficient)/i},
@@ -17,7 +17,7 @@ export function vendorMessage(message:string):string {
  const quoted=message.match(/\berror\.error=("(?:\\.|[^"\\])*")/);
  let value=message;
  if(quoted)try{value=JSON.parse(quoted[1]);}catch{ /* Malformed logs still have a bounded readable fallback. */ }
- return redact(value).replace(/^(?:(?:AI_APICallError|AI_RetryError):\s*)+/i,'').replace(/\s+/g,' ').trim();
+ return redactSecrets(value).replace(/^(?:(?:AI_APICallError|AI_RetryError):\s*)+/i,'').replace(/\s+/g,' ').trim();
 }
 
 export function vendorBlockReason(failure:Pick<TaskFailure,'kind'|'message'>):string {

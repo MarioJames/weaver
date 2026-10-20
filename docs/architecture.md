@@ -40,7 +40,7 @@ Weaver 是本地任务控制面，交付三件套：
           ├─ owner-host.ts（Herdr 可见 owner 宿主，仅 owners.switch launch / owners.launch 显式调用）
           ├─ quota/（原生凭据只读 + 固定 HTTPS GET，进程内额度观测）
           ├─ policy/quota.ts（新鲜账户观测 → 自有 policy.blocks 原子合并）
-          └─ ContinuationService（src/main/continuation.ts，owner 手动上下文；接手/根任务提示词在 src/main/owners/prompts.ts，脱敏在 src/main/redact-context.ts）
+          └─ ContinuationService（src/main/continuation.ts，owner 手动上下文；接手/根任务提示词在 src/main/owners/prompts.ts，脱敏规则在 src/shared/redact.ts，上下文截断封装在 src/main/redact-context.ts）
 ```
 
 进程语义：服务单实例。前台 `weaver web` 跑在当前终端；后台 `weaver server start` 以分离进程启动并等到能应答才返回，已有运行实例时不再起第二个、直接返回它的信息，同一 port + data dir 装了登录自启服务时由该服务启动。端口被占返回 `EADDRINUSE`；`--data-dir` 决定默认 endpoint/state 目录。崩溃服务遗留的 stale endpoint（discovery 文件还在、socket 已不应答）在启动时自动清除。停止两种模式走同一条关停路径——`weaver web` 用 Ctrl+C，后台用 `weaver server stop`（有 running worker 时默认拒绝 `SERVER_BUSY`，因为停止会取消它们，`--force` 才强制）——随后 draining（`ready=false`，命令面报 `APP_DRAINING`，同时开始 `commands.drain()` 中止在途 owner launch）→ 停额度定时器 → 停 StallMonitor（中止在途恢复探测，并等当前那次 tick 收束）→ 中止在途额度探测与引擎 hello → 等待 owner launch/精确清理与其余未响应请求完成 → `manager.shutdown()` 逐个取消本进程拥有的 running 任务并等待子进程退出 → 关闭 HTTP/socket → 退出。draining 后完成的额度请求不再保存策略；采样与探测都是 await 过的，回到写状态前会再确认一次仍在 ready 窗口内，所以关停之后不会补写 block 或惩罚状态。任务、策略与惩罚文件保留。关闭浏览器页不停任务。客户端断开不取消已提交的工作。服务是整机共享的：owner agent 不把停服务当作任务收尾，也不杀它的进程或 systemd scope，只有用户停。登录自启由 `weaver server install` / `uninstall` 管理：Linux 写 systemd user unit `weaver.service`，macOS 写 launchd agent `dev.weaver.server`，只从安装后的独立可执行文件可用，install 捕获当前 `PATH` 让 worker 仍找得到引擎 CLI，对未被该服务管理的运行实例只给提示不动它。
@@ -129,7 +129,7 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 
 ## 8. 引擎目录与探测
 
-固定 catalog（`src/shared/engines.ts`）：claude/codex/grok/opencode/pi/qoder 六个 id，kind 分别 claude/codex/grok/opencode/pi/qodercli。探测只做 PATH 可执行文件 + 带超时 `--version`（shell:false、ANSI 去除、4s 超时、进程组收尾）；结果永远 `authenticated:false`、`modelUsable:false`。启用权威是 PolicyStore `engines[id].enabled`（`engines set-enabled` 需 installed 探测 + revision）；启用引擎不会创建任何角色。adapter 状态按 kind 判：`real` = opencode/pi/grok/codex/qodercli（`REAL_ADAPTER_KINDS`），`deferred` = claude，其余 kind 才是 `not_implemented`；`realExecution` = 该引擎 adapter 为 real 且已启用且有启用的 worker 使用它，探测≠可用。`EXECUTION_BOUNDARY.realAdapter` 也从同一份真实 adapter 清单生成，包含 qodercli。
+固定 catalog（`src/shared/engines.ts`）：claude/codex/grok/opencode/pi/qoder 六个 id，kind 分别 claude/codex/grok/opencode/pi/qodercli。探测只做 PATH 可执行文件（与 owner-host 查 herdr/claude 共用 src/main/system/executables.ts：跳过空 PATH 段、检查 X_OK、只接受解析后的普通文件、返回 realpath）+ 带超时 `--version`（shell:false、ANSI 去除、4s 超时、进程组收尾）；结果永远 `authenticated:false`、`modelUsable:false`。启用权威是 PolicyStore `engines[id].enabled`（`engines set-enabled` 需 installed 探测 + revision）；启用引擎不会创建任何角色。adapter 状态按 kind 判：`real` = opencode/pi/grok/codex/qodercli（`REAL_ADAPTER_KINDS`），`deferred` = claude，其余 kind 才是 `not_implemented`；`realExecution` = 该引擎 adapter 为 real 且已启用且有启用的 worker 使用它，探测≠可用。`EXECUTION_BOUNDARY.realAdapter` 也从同一份真实 adapter 清单生成，包含 qodercli。
 
 真实执行适配（`src/main/adapters/cli/argv.ts` + `normalize.ts`）覆盖 opencode、pi、grok、codex、qodercli。qodercli 以 `-p -o stream-json` 从 stdin 读任务，`--permission-mode bypass_permissions`（CLI 策略，不是 OS 隔离），`--setting-sources ""` 与 `--strict-mcp-config` 跳过用户级 hooks、插件与 MCP，`--no-session-persistence` 不落会话；输出按 Claude Code 风格的 system/assistant/result 事件归一化。claude 仍无执行适配。
 

@@ -1,9 +1,10 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,chmodSync,writeFileSync,rmSync} from 'node:fs';
+import {mkdtempSync,chmodSync,writeFileSync,rmSync,realpathSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,delimiter} from 'node:path';
-import {launchOwner, ownerAgentName, herdrOnPath, findExecutable, defaultRunner, OWNER_AGENT_START_TIMEOUT_MS, OwnerLaunchError, type Runner, type RunnerInput} from '../src/main/owner-host';
+import {launchOwner, ownerAgentName, herdrOnPath, defaultRunner, OWNER_AGENT_START_TIMEOUT_MS, OwnerLaunchError, type Runner, type RunnerInput} from '../src/main/owner-host';
+import {findExecutableSync} from '../src/main/system/executables';
 const HERDR='/opt/fake-herdr/herdr';
 const CLAUDE='/opt/fake-claude/claude';
 const START_TIMEOUT=String(OWNER_AGENT_START_TIMEOUT_MS);
@@ -308,10 +309,11 @@ test('executable discovery scans the injected PATH and honors the executable bit
  try{
   writeFileSync(join(base,'herdr'),'#!/bin/sh\nexit 0\n');chmodSync(join(base,'herdr'),0o755);
   writeFileSync(join(base,'noexec'),'#!/bin/sh\n');chmodSync(join(base,'noexec'),0o644);
-  assert.equal(findExecutable('herdr',''),null);
-  assert.equal(findExecutable('herdr',base),join(base,'herdr'));
-  assert.equal(findExecutable('herdr',`${base}${delimiter}${join(base,'nowhere')}`),join(base,'herdr'));
-  assert.equal(findExecutable('noexec',base),null);
+  const real=realpathSync(base);
+  assert.equal(findExecutableSync('herdr',''),undefined);
+  assert.equal(findExecutableSync('herdr',base),join(real,'herdr'));
+  assert.equal(findExecutableSync('herdr',`${base}${delimiter}${join(base,'nowhere')}`),join(real,'herdr'));
+  assert.equal(findExecutableSync('noexec',base),undefined);
   assert.equal(herdrOnPath(base),true);
   assert.equal(herdrOnPath(''),false);
  }finally{rmSync(base,{recursive:true,force:true});}
@@ -324,7 +326,7 @@ test('the launcher resolves herdr from the injected PATH instead of a fixed loca
   const runner=fakeRunner({create:{stdout:createOk}},calls);
   const result=launchOwner({taskId:'11111111-1111-4111-8111-111111111111',epoch:1,title:'Fixture title',workspace:'/srv/proj',engineKind:'codex',model:'gpt-6-astra',effort:'high',prompt:'continue the fixture work now',runner,pathEnv:base});
   assert.equal(result.workspaceId,'w7');
-  assert.ok(calls.every(call=>call.file===join(base,'herdr')));
+  assert.ok(calls.every(call=>call.file===join(realpathSync(base),'herdr')));
  }finally{rmSync(base,{recursive:true,force:true});}
 });
 test('defaultRunner captures stdout, stderr, exit codes and timeouts without a shell',()=>{

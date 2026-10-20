@@ -1,6 +1,7 @@
 import type { WorkerRecord } from '../../../shared/contracts/tasks';
 import type { RealEngineKind } from '../../../shared/contracts/tasks';
-import { clip, redact } from './redact';
+import { redactSecrets } from '../../../shared/redact';
+import { clip } from './redact';
 
 const LOG_MAX = 4000;
 const ARTIFACT_MAX = 30000;
@@ -32,7 +33,7 @@ interface MutableEvidence extends NormalizerEvidence {
 }
 
 function record(type: 'log' | 'progress', message: string, percent?: number): WorkerRecord {
-  const text = clip(redact(message), LOG_MAX);
+  const text = clip(redactSecrets(message), LOG_MAX);
   return type === 'progress' ? { type: 'progress', percent: percent ?? 0, message: text } : { type: 'log', message: text };
 }
 
@@ -69,7 +70,7 @@ function noteFailure(state: MutableEvidence, detail: string): void {
   const text = detail.trim();
   if (!text || state.failureDetail) return;
   noteClipped(state, 'failure_detail', text.length, LOG_MAX);
-  state.failureDetail = clip(redact(text), LOG_MAX);
+  state.failureDetail = clip(redactSecrets(text), LOG_MAX);
 }
 
 function noteClipped(state: MutableEvidence, field: RetainedField, length: number, limit: number): void {
@@ -91,7 +92,7 @@ function stopReason(state: MutableEvidence, value: string): string {
 function rememberAssistant(state: MutableEvidence, text: string, append = false): void {
   // Redact the complete completed message before selecting a window; slicing a
   // raw credential at the window boundary would leave an unrecognizable tail.
-  const safe = redact(text);
+  const safe = redactSecrets(text);
   const separator = append && state.assistantText ? '\n' : '';
   const length = (append ? state.assistantText.length : 0) + separator.length + safe.length;
   noteClipped(state, 'assistant_text', length, ARTIFACT_MAX);
@@ -146,7 +147,7 @@ export function createNormalizer(engine: RealEngineKind): {
       state.assistantText = text;
       if (terminal === 'success') {
         const marker = state.assistantClipped ? '[Earlier assistant text omitted; retained bounded final text]\n' : '';
-        const safeText = redact(text);
+        const safeText = redactSecrets(text);
         const body = `${marker}${marker ? safeText.slice(-(ARTIFACT_MAX - marker.length)) : clip(safeText, ARTIFACT_MAX)}`;
         records.push({ type: 'artifact', name: 'result.md', mediaType: 'text/markdown', content: body });
         records.push({ type: 'result', summary: clip(body, SUMMARY_MAX) });

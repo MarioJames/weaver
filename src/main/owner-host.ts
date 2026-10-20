@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { accessSync, constants } from 'node:fs';
-import { basename, delimiter, join } from 'node:path';
+import { basename } from 'node:path';
+import { findExecutableSync } from './system/executables';
 
 export type RunnerResult = { code: number; stdout: string; stderr: string };
 export type RunnerInput = { file: string; args: string[]; timeout: number };
@@ -16,13 +16,7 @@ export class OwnerLaunchError extends Error {
   constructor(readonly code: 'OWNER_LAUNCH_FAILED' | 'OWNER_LAUNCH_UNAVAILABLE' | 'OWNER_LAUNCH_UNSUPPORTED', message: string) { super(message); }
 }
 
-export function findExecutable(name: string, pathEnv: string = process.env.PATH ?? ''): string | null {
-  for (const dir of pathEnv.split(delimiter)) {
-    try { accessSync(join(dir, name), constants.X_OK); return join(dir, name); } catch { continue; }
-  }
-  return null;
-}
-export function herdrOnPath(pathEnv: string = process.env.PATH ?? ''): boolean { return findExecutable('herdr', pathEnv) !== null; }
+export function herdrOnPath(pathEnv: string = process.env.PATH ?? ''): boolean { return findExecutableSync('herdr', pathEnv) !== undefined; }
 
 export function ownerAgentName(taskId: string, epoch: number): string {
   if (!Number.isSafeInteger(epoch) || epoch < 0) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'Owner epoch must be a non-negative integer');
@@ -129,7 +123,7 @@ function* launchProtocol(input: OwnerLaunchInput, signal?: AbortSignal): Protoco
   }
   required('workspace', input.workspace); required('model', input.model); required('effort', input.effort); required('prompt', input.prompt);
   const session = bounded(input.session ?? 'default', 120) || 'default';
-  const herdrPath = input.herdrPath ?? findExecutable('herdr', input.pathEnv ?? process.env.PATH ?? '');
+  const herdrPath = input.herdrPath ?? findExecutableSync('herdr', input.pathEnv ?? process.env.PATH ?? '');
   if (!herdrPath) throw new OwnerLaunchError('OWNER_LAUNCH_UNAVAILABLE', 'herdr was not found on PATH; install Herdr before launching a visible owner host');
   const agentName = ownerAgentName(input.taskId, input.epoch);
   // Match Herdr's own default (cwd directory name) so page-launched workspaces look like hand-opened ones.
@@ -148,7 +142,7 @@ function* launchProtocol(input: OwnerLaunchInput, signal?: AbortSignal): Protoco
     if (!paneId) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'herdr workspace create returned no root pane id');
     checkAbort(signal);
     const args = kind === 'codex' ? ['-m', input.model, '-c', `model_reasoning_effort="${input.effort}"`] : ['--model', input.model];
-    const claudePath = kind === 'claude' ? input.claudePath ?? findExecutable('claude', input.pathEnv ?? process.env.PATH ?? '') : null;
+    const claudePath = kind === 'claude' ? input.claudePath ?? findExecutableSync('claude', input.pathEnv ?? process.env.PATH ?? '') : null;
     if (claudePath) {
       try {
         const help = yield { file: claudePath, args: ['--help'], timeout: 15000 };
@@ -207,7 +201,7 @@ function* closeHostProtocol(host: OwnerLaunchResult, options: CloseHostOptions):
   if (!asId(host.session) || host.session !== host.session.trim() || !asId(host.workspaceId) || host.workspaceId !== host.workspaceId.trim()) {
     throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'Exact owner session and workspace id are required for cleanup');
   }
-  const file = options.herdrPath ?? findExecutable('herdr', options.pathEnv ?? process.env.PATH ?? '');
+  const file = options.herdrPath ?? findExecutableSync('herdr', options.pathEnv ?? process.env.PATH ?? '');
   if (!file) throw new OwnerLaunchError('OWNER_LAUNCH_UNAVAILABLE', 'herdr was not found on PATH');
   const failure = yield* closeWorkspace(file, host.session, host.workspaceId);
   if (failure) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', failure);

@@ -1,11 +1,8 @@
 import type { TaskEvent, TaskStatus } from '../../../shared/contracts/tasks';
+import { redactSecrets } from '../../../shared/redact';
 import { DISPLAY_LABELS, DISPLAY_TONES, type DisplayStatus, type StatusTone } from '../../format/status-colors';
-/** Best-effort display redaction. Never claim this catches every secret. */
-export function redactLog(value: string): string {
- return value.replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?(?:-----END [^-]*PRIVATE KEY-----|$)/gi,'[REDACTED PRIVATE KEY]').replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/gi,'$1[REDACTED]@').replace(/\b(Bearer\s+)[^\s"'<>]+/gi,'$1[REDACTED]')
-  .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|password|secret|authorization)\s*[=:]\s*["']?)[^\s,"';&]+/gi,'$1[REDACTED]')
-  .replace(/\b(?:sk-|gh[pousr]_|github_pat_)[A-Za-z0-9_-]{8,}\b/g,'[REDACTED]');
-}
+/** Best-effort display redaction with the one shared rule set. Never claim this catches every secret. */
+export function redactLog(value: string): string { return redactSecrets(value); }
 export function selectEvents(events: TaskEvent[], kind: string, query: string): TaskEvent[] {
  const needle=query.trim().toLocaleLowerCase();
  return events.filter(event=>(kind==='all'||event.kind===kind)&&(!needle||redactLog(event.message).toLocaleLowerCase().includes(needle)));
