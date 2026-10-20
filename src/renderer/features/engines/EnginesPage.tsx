@@ -7,6 +7,7 @@ import { ActionIcon, Button, Progress, Skeleton, Tag, Text, Tooltip } from '@lob
 import { ENGINE_CATALOG, catalogEntry, type EngineProbeRecord } from '../../../shared/engines';
 import type { EngineQuotaRecord, QuotaEngine, QuotaWindow } from '../../../shared/contracts/quota';
 import { QUOTA_KINDS, quotaRefreshEnabled } from '../../../shared/policy/settings';
+import { STALL_BLOCK_BY, VENDOR_BLOCK_BY, isQuotaBlockBy } from '../../../shared/policy/blocks';
 import { type Block, type Engine } from '../../../shared/contracts/policy';
 import { acceptQuotaPolicy, dateText, quotaPercentText, quotaProgressPercent, quotaRecordStale, quotaRecoveryText, quotaRetryMs, quotaStatusText, quotaNextUpdateMs, quotaCountText, quotaVisibleWindows, quotaThirdParty } from '../quota/quota-view';
 import type { PolicyDraft, PolicyUpdate } from '../../policy/usePolicyDraft';
@@ -45,7 +46,6 @@ const isQuotaKind = (kind: string): kind is QuotaEngine => (QUOTA_KINDS as reado
 
 /** Penalty blocks are ordinary policy blocks; this `by` value is what tells them apart from a quota or manual pause. */
 type EngineBlockState = StallEngineState & Partial<Pick<EngineStallStatus, 'blockedUntil'>>;
-const STALL_BY = 'weaver-stall';
 const STALL_HISTORY = 5;
 const STALL_TASK_ID = 8;
 
@@ -223,10 +223,10 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
 
 /** One category, one bounded reason and one explicit recovery condition for every pause. */
 export function engineBlockText(block: Block, now: number, state?: EngineBlockState) {
-  const stall = block.by === STALL_BY;
+  const stall = block.by === STALL_BLOCK_BY;
   const category = stall ? `卡住惩罚${state?.level ? ` 第 ${state.level} 级` : ''}`
-    : block.by?.startsWith('weaver-quota:') ? '额度耗尽'
-    : block.by === 'weaver-vendor-limit' ? /^(?:额度耗尽|quota)|FreeUsageLimitError|GoUsageLimitError/i.test(block.reason) ? '额度耗尽' : '限流'
+    : isQuotaBlockBy(block.by) ? '额度耗尽'
+    : block.by === VENDOR_BLOCK_BY ? /^(?:额度耗尽|quota)|FreeUsageLimitError|GoUsageLimitError/i.test(block.reason) ? '额度耗尽' : '限流'
     : '手动暂停';
   const fullReason = block.reason.replace(/\s+/g, ' ').trim();
   const plain = fullReason.replace(/^(?:限流|额度耗尽)：\s*/, '');
@@ -247,7 +247,7 @@ export function removeBlock(blocks: Block[], target: Block): Block[] {
 }
 
 export function BlockList({ blocks, disabled, onRemove, now = Date.now(), state }: { blocks: Block[]; disabled: boolean; onRemove: (block: Block) => void; now?: number; state?: EngineBlockState }) {
-  const active = blocks.filter(block => block.by === STALL_BY || !block.release_at || Date.parse(block.release_at) > now);
+  const active = blocks.filter(block => block.by === STALL_BLOCK_BY || !block.release_at || Date.parse(block.release_at) > now);
   if (!active.length) return null;
   return <section aria-label="派发限制" className={styles.tight}>
     {active.map(block => {

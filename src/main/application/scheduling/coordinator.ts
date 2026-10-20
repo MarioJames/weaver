@@ -1,7 +1,7 @@
 import type { Task } from '../../../shared/contracts/tasks';
 import { event, slotGroupCount, slotGroupFor } from '../../domain/tasks';
 import type { TaskManager } from '../../manager';
-import { VENDOR_BLOCK_SOURCE } from '../../policy/routing';
+import { VENDOR_BLOCK_BY } from '../../../shared/policy/blocks';
 import { previewRoute } from '../../policy/preview';
 import type { PolicyStore } from '../../policy/store';
 import { redactContext } from '../../redact-context';
@@ -43,7 +43,7 @@ export class Coordinator {
    try{
     const frozen=task.dispatch;
     // A whole-engine vendor block sends the task to another engine; a worker-level one only takes that worker out.
-    const vendorBlocks=this.policy.snapshot().blocks.filter(block=>block.engine===frozen.engine&&block.by===VENDOR_BLOCK_SOURCE&&(!block.release_at||Date.parse(block.release_at)>Date.now()));
+    const vendorBlocks=this.policy.snapshot().blocks.filter(block=>block.engine===frozen.engine&&block.by===VENDOR_BLOCK_BY&&(!block.release_at||Date.parse(block.release_at)>Date.now()));
     const engineBlocked=vendorBlocks.some(block=>block.worker===undefined);
     const workerBlocked=!engineBlocked&&vendorBlocks.some(block=>block.worker===frozen.worker);
     if(engineBlocked||workerBlocked){

@@ -102,3 +102,31 @@ test('a failed engine refresh does not stop the remaining targets', async () => 
   assert.deepEqual(calls, ['codex', 'claude']);
   assert.equal(errors.length, 1);
 });
+
+test('after stop() the scheduler refreshes nothing: a manual tick is a no-op and a run in flight skips its remaining targets', async () => {
+  const config = defaultConfig();
+  let clock = now;
+  const calls: string[] = [];
+  let release: () => void = () => {};
+  const hold = new Promise<void>(resolve => { release = resolve; });
+  let started: () => void = () => {};
+  const refreshing = new Promise<void>(resolve => { started = resolve; });
+  const scheduler = new QuotaScheduler({ config: () => config, now: () => clock, refresh: async engine => { calls.push(engine); started(); await hold; } });
+  // Stopped while the first target is still refreshing: stop() waits for it, the second target is never started.
+  const running = scheduler.tick();
+  await refreshing;
+  const stopping = scheduler.stop();
+  release();
+  await Promise.all([running, stopping]);
+  assert.deepEqual(calls, ['codex'], 'the remaining targets are skipped once the scheduler is stopped');
+  // A manual tick after the stop, with the interval long over, still refreshes nothing.
+  clock += 60 * 60_000;
+  await scheduler.tick();
+  await scheduler.tick();
+  assert.deepEqual(calls, ['codex']);
+  // start() is what brings it back.
+  scheduler.start(60_000);
+  await scheduler.tick();
+  assert.deepEqual(calls, ['codex', 'codex', 'claude']);
+  await scheduler.stop();
+});

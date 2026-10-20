@@ -9,10 +9,13 @@ import { embeddedApp } from './embedded';
 import { RoutingWorkerAdapter } from './adapters/routing';
 import { MockWorkerAdapter } from './adapters/worker';
 import type { AsyncOwnerHost } from './application/commands/types';
+import { unblockEngine } from './application/engines/unblock';
+import type { TaskDiagnostics } from './application/tasks/queries';
 import { CommandHandler } from './commands';
 import { SECURITY_HEADERS, startHttpServer, type HttpRuntime } from './http';
 import { failure, startLocalIPC } from './local-ipc';
 import { TaskManager } from './manager';
+import { PolicyBlockService } from './policy/blocks';
 import { PolicyStore } from './policy/store';
 import { applyQuotaSnapshot, QuotaPolicyConflict } from './policy/quota';
 import type { QuotaRefreshInput } from '../shared/contracts/quota';
@@ -26,6 +29,7 @@ import { TaskStore } from './store';
 import { dbFreeProbeStore } from './storage/free-probe-state';
 import { dbQuotaStore } from './storage/quota-snapshot';
 import { dbStallStore } from './storage/stall-state';
+import { dbVendorLadder } from './storage/vendor-limits';
 import { recoverInterruptedTasks } from './application/tasks/recovery';
 
 export interface RuntimeOptions {
@@ -211,6 +215,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     freeProbe = new FreeChannelProbeMonitor({
       policy: () => policy!,
       stateStore: dbFreeProbeStore(store.db),
+      vendorLadder: dbVendorLadder(store.db),
       ready: () => ready && !draining,
       // The same light greeting the penalty recovery uses.
       probe: (route, signal) => track(sayHi({ ...route, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal })
@@ -223,7 +228,14 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       console.error(error instanceof Error ? error.message : 'Task history could not be saved');
     });
     // Health and penalties are this monitor's own answers, so the command face reads them from it rather than inventing them.
-    commands = new CommandHandler(manager, policy, undefined, undefined, stall, options.ownerHost);
+    // The user's engine unblock clears the blocks through the policy service and then resets both monitors' state.
+    const unblockBlocks = new PolicyBlockService(() => policy!, { log: message => console.error(`Stall monitor: ${message}`), onChanged: () => commands?.pump() });
+    const diagnostics: TaskDiagnostics = {
+      taskHealth: task => stall!.taskHealth(task),
+      status: () => stall!.status(),
+      unblock: engine => unblockEngine({ blocks: unblockBlocks, stall: stall!, freeProbe: freeProbe! }, engine),
+    };
+    commands = new CommandHandler(manager, policy, undefined, undefined, diagnostics, options.ownerHost);
     commands.transportStatus = 'ready';
     ready = true;
     scheduler.start();

@@ -7,9 +7,8 @@ import { type WorkPackage } from '../shared/contracts/tasks';
 import { type CommandReceipt } from '../shared/contracts/commands';
 import type { Task, TaskSummary } from '../shared/contracts/tasks';
 import { migrate } from './migrate';
-export type VendorLimit={level:number;lastTriggerAt:number};
-/** Ladder key for a dispatch that names no worker: the legacy per-engine ladder. */
-export const engineLadderKey=(engine:string):string=>`@engine:${engine}`;
+import { transact } from './storage/transaction';
+import { dbVendorLadder, type VendorLimit } from './storage/vendor-limits';
 /** SQLite is the durable authority. Only uncheckpointed stream records live in memory. */
 export class TaskStore {
  readonly path:string;
@@ -44,23 +43,26 @@ export class TaskStore {
  putReceipt(key:string,value:CommandReceipt):void{this.transaction(()=>this.writeRecord('receipts',key,value));}
  getValue<T>(key:string):T|undefined{return this.readRecord('kv',key);}
  putValue(key:string,value:unknown):void{this.transaction(()=>this.writeRecord('kv',key,value));}
- /** The vendor rate-limit ladder: one row per worker (an engine-only dispatch uses its own key), kept across restarts and explicit block removal. */
- getVendorLimit(worker:string):VendorLimit|undefined{const row=this.db.prepare('SELECT level,last_trigger_at FROM vendor_worker_limits WHERE worker=?').get(worker);return row?{level:Number(row.level),lastTriggerAt:Number(row.last_trigger_at)}:undefined;}
- listVendorLimits():Record<string,VendorLimit>{return Object.fromEntries(this.db.prepare('SELECT worker,level,last_trigger_at FROM vendor_worker_limits ORDER BY worker').all().map(row=>[String(row.worker),{level:Number(row.level),lastTriggerAt:Number(row.last_trigger_at)}]));}
- putVendorLimit(worker:string,limit:VendorLimit):void{this.transaction(()=>{this.db.prepare('INSERT INTO vendor_worker_limits(worker,level,last_trigger_at) VALUES (?,?,?) ON CONFLICT(worker) DO UPDATE SET level=excluded.level,last_trigger_at=excluded.last_trigger_at').run(worker,limit.level,limit.lastTriggerAt);});}
+ /** The vendor rate-limit ladder (read side): one row per worker, written by the dispatch-failure path and the free-channel probe through the ladder store. */
+ getVendorLimit(worker:string):VendorLimit|undefined{return dbVendorLadder(this.db).get(worker);}
+ listVendorLimits():Record<string,VendorLimit>{return dbVendorLadder(this.db).list();}
  transaction<T>(fn:()=>T):T {
   if(this.inTransaction)return fn();
   const pending=new Map(this.pending),sequence=this.sequence;
-  this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
-  try {
-   const result=fn();
-   for(const task of this.pending.values())this.writeTask(task);
-   this.writeRecord('kv','sequence',this.sequence+1);
-   this.checkpoint?.();this.db.exec('COMMIT');
-   this.sequence++;this.pending.clear();clearTimeout(this.flushTimer);this.flushTimer=undefined;
-   return result;
-  }catch(error){try{this.db.exec('ROLLBACK');}catch{/* Preserve the original commit failure. */}this.pending=pending;this.sequence=sequence;throw error;}
-  finally{this.inTransaction=false;}
+  // The stream records and the sequence are memory: they come back if this transaction fails, or if one it ran inside of does.
+  const restore=()=>{this.pending=pending;this.sequence=sequence;};
+  const result=transact(this.db,()=>{
+   this.inTransaction=true;
+   try {
+    const value=fn();
+    for(const task of this.pending.values())this.writeTask(task);
+    this.writeRecord('kv','sequence',this.sequence+1);
+    this.checkpoint?.();
+    return value;
+   }finally{this.inTransaction=false;}
+  },restore);
+  this.sequence++;this.pending.clear();clearTimeout(this.flushTimer);this.flushTimer=undefined;
+  return result;
  }
  private writeTask(task:Task):void {
   const {events,artifacts,...body}=task;

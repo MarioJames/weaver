@@ -1,11 +1,15 @@
-import type { Config, Block, PolicySnapshot } from '../shared/contracts/policy';
+import type { Config, Block } from '../shared/contracts/policy';
 import type { ProbeOutcome, StallStatus } from '../shared/contracts/monitoring';
 import type { Task } from '../shared/contracts/tasks';
 import { activeBlocks } from '../shared/policy/availability';
+import { STALL_BLOCK_BY, isEngineBlock, isStallEngineBlock } from '../shared/policy/blocks';
 import { LADDER_RESET_MS, PROBE_MS, PROBE_SUCCESSES, STALL_LADDER } from './domain/penalties';
 import { systemdCpuUsage, type CpuReader, type CpuSample } from './monitors/cpu';
+import { armStall, ladderQuiet } from './monitors/ladder';
+import { MonitorLifecycle } from './monitors/lifecycle';
+import { PolicyBlockService, type BlockPolicy } from './policy/blocks';
 import { boundedProbeError } from './redact-context';
-import { HISTORY_LIMIT, RECORD_TASKS_MAX, emptyState, type EnginePenalty, type StallRecord, type StallState, type StallStateStore } from './storage/stall-state';
+import { HISTORY_LIMIT, RECORD_TASKS_MAX, type EnginePenalty, type StallRecord, type StallState, type StallStateStore } from './storage/stall-state';
 
 /** Silence plus an idle scope for this long is a stall. */
 export const STALL_MS = 5 * 60_000;
@@ -14,7 +18,6 @@ export const CPU_IDLE_SHARE = 0.05;
 /** Stalled tasks from one engine needed before the engine itself is considered unhealthy. */
 export const STALL_QUORUM = 2;
 export const STALL_TICK_MS = 60_000;
-export const STALL_BLOCK_BY = 'weaver-stall';
 /** What the retained record says when level 3 recovered without a human. */
 export const STALL_RECOVERY = '自动恢复，请留意';
 const NO_WORKER = '这台引擎没有可用的子 Agent，无法探测。';
@@ -45,31 +48,17 @@ export interface TaskHealth {
 }
 
 /** The main-process policy writer, narrowed to what a penalty needs. */
-export interface StallPolicy {
-  snapshot(): PolicySnapshot;
-  save(input: unknown): PolicySnapshot;
-}
+export type StallPolicy = BlockPolicy;
 
 export const emptyPenalty = (): EnginePenalty => ({ level: 0, lastTriggerAt: null, needsAttention: false, blockedUntil: null, nextProbeAt: null, probeSuccesses: 0, head: '' });
 
 /** A penalty is in force while its block is out and something still has to happen: a probe, or the user. */
 const pending = (penalty: EnginePenalty): boolean => penalty.needsAttention || penalty.nextProbeAt !== null;
 
-/** Nominal deadline and first probe time for a penalty of this level. */
-function arm(level: number, now: number): Pick<EnginePenalty, 'blockedUntil' | 'nextProbeAt'> {
-  const minutes = STALL_LADDER[level - 1];
-  if (minutes === null) return { blockedUntil: null, nextProbeAt: now + PROBE_MS };
-  const at = now + minutes * 60_000;
-  return { blockedUntil: at, nextProbeAt: at };
-}
-
 function reasonFor(head: string): string {
   // Recovery timing and task evidence have their own status fields and history.
   return head.replace(/（task .*$/, '').slice(0, 120);
 }
-
-/** Weaver's own penalty for an engine as a whole; a model-level block is somebody else's business. */
-const isStallBlock = (block: Block, engine: string): boolean => block.engine === engine && block.model === undefined && block.worker === undefined && block.by === STALL_BLOCK_BY;
 
 /** Silence measured from the last event, falling back to when the run started. */
 export function silenceMs(task: Task, now: number): number | null {
@@ -126,7 +115,7 @@ export function unhealthyEngines(tasks: Task[], now: number, samples: CpuSamples
 export function nextPenalty(state: StallState, engine: string, now: number, stalled: Task[]): { level: number; head: string; block: Block } | null {
   const penalty = state.engines[engine] ?? emptyPenalty();
   if (pending(penalty)) return null;
-  const level = Math.min((penalty.lastTriggerAt !== null && now - penalty.lastTriggerAt >= LADDER_RESET_MS ? 0 : penalty.level) + 1, STALL_LADDER.length);
+  const level = Math.min((ladderQuiet(penalty.lastTriggerAt, now) ? 0 : penalty.level) + 1, STALL_LADDER.length);
   const ids = stalled.slice(0, 4).map(task => task.id.slice(0, 8));
   const head = `${stalled.length} 个子 Agent 超过 ${STALL_MS / 60_000} 分钟无响应（task ${ids.join('、')}）`;
   // No release_at: only a passing probe or the user lifts this block.
@@ -187,26 +176,23 @@ export class StallMonitor {
   private readonly log: (message: string) => void;
   private state: StallState;
   private samples = new Map<string, CpuSample[]>();
-  private running: Promise<void> | undefined;
-  private timer: NodeJS.Timeout | undefined;
   private dirty = false;
   /** A block change this tick made the routing care about. */
   private changed = false;
-  /** Probes in flight, so stop() can abort them. Ticks never overlap, so one engine has at most one. */
-  private readonly aborts = new Set<AbortController>();
   /** Engines this tick must not punish again: the user just unblocked them, or a probe just recovered them. */
   private held = new Set<string>();
-  /** False once stop() ran: a stopped monitor only resumes when start() is called again. */
-  private stopped = false;
-  /** Bumped by stop(). Work that awaited past it sees a different value and writes nothing at all. */
-  private fence = 0;
   private readonly store: StallStateStore;
+  /** Tick coalescing, the probes stop() can abort, and the stop fence; stop() ends the contract whether or not the app gave a ready callback. */
+  private readonly lifecycle: MonitorLifecycle;
+  private readonly blocks: PolicyBlockService;
 
   constructor(private readonly options: StallMonitorOptions) {
     this.clock = options.now ?? Date.now;
     this.readCpu = options.cpu ?? systemdCpuUsage;
     this.log = options.log ?? (message => console.error(message));
     this.store = options.stateStore;
+    this.lifecycle = new MonitorLifecycle(options.ready);
+    this.blocks = new PolicyBlockService(options.policy, { log: this.log, onChanged: options.onBlocksChanged });
     this.state = this.store.load();
   }
 
@@ -218,7 +204,7 @@ export class StallMonitor {
         level: penalty.level,
         lastTriggerAt: penalty.lastTriggerAt === null ? null : new Date(penalty.lastTriggerAt).toISOString(),
         needsAttention: penalty.needsAttention,
-        blocked: snapshot.blocks.some(block => isStallBlock(block, engine)),
+        blocked: snapshot.blocks.some(block => isStallEngineBlock(block, engine)),
         blockedUntil: penalty.blockedUntil === null ? null : new Date(penalty.blockedUntil).toISOString(),
         nextProbeAt: penalty.nextProbeAt === null ? null : new Date(penalty.nextProbeAt).toISOString(),
         probeSuccesses: penalty.probeSuccesses,
@@ -277,68 +263,37 @@ export class StallMonitor {
   }
 
   /**
-   * The user's 「恢复派发」 for exactly one engine: everything keeping that engine out of routing goes, its ladder
-   * and streak start over and the record stays. Other engines and the whole config are preserved, and an unknown
-   * engine is rejected before anything is written. Only this manual path clears blocks it did not write; a
-   * passing recovery probe still lifts nothing but Weaver's own penalty.
+   * The state half of the user's 「恢复派发」 (the blocks go through the unblock operation): this engine's ladder and
+   * streak start over, the record stays, and this tick cannot punish it again. Other engines are preserved.
    */
-  unblock(engine: string): void {
-    const policy = this.options.policy();
-    const snapshot = policy.snapshot();
-    if (!Object.hasOwn(snapshot.config.engines, engine)) throw new Error(`Unknown engine ${engine}`);
-    const owned = snapshot.blocks.filter(block => block.engine === engine);
-    if (owned.length > 0 && !this.saveWithRetry(policy, blocks => blocks.filter(block => block.engine !== engine))) {
-      throw new Error(`Blocks for ${engine} could not be removed`);
-    }
+  resetEngine(engine: string): void {
     const penalty = this.state.engines[engine];
     if (penalty) this.state.engines[engine] = emptyPenalty();
     this.held.add(engine);
     this.store.save(this.state);
-    if (owned.length > 0) this.options.onBlocksChanged?.();
   }
 
   /** Concurrent ticks collapse into the one in flight; after stop() nothing ticks again until start(). */
   tick(): Promise<void> {
-    if (this.stopped) return Promise.resolve();
-    if (this.running) return this.running;
-    this.running = this.check().finally(() => { this.running = undefined; });
-    return this.running;
+    if (this.lifecycle.stopped) return Promise.resolve();
+    return this.lifecycle.coalesce(() => this.check());
   }
 
   start(everyMs = STALL_TICK_MS): void {
-    this.stopped = false;
-    void this.tick().catch(error => this.log(`Stall tick failed: ${error instanceof Error ? error.message : 'unknown error'}`));
-    this.timer = setInterval(() => {
-      void this.tick().catch(error => this.log(`Stall tick failed: ${error instanceof Error ? error.message : 'unknown error'}`));
-    }, everyMs);
-    this.timer.unref();
+    this.lifecycle.start(everyMs, () => this.tick(), error => this.log(`Stall tick failed: ${error instanceof Error ? error.message : 'unknown error'}`), true);
   }
 
   /**
    * Ends the monitoring contract on its own: whatever this monitor was about to write, from a CPU read or a
    * greeting still in flight, is fenced here whether or not the app gave it a ready callback.
    */
-  async stop(): Promise<void> {
-    this.stopped = true;
-    this.fence += 1;
-    clearInterval(this.timer);
-    this.timer = undefined;
-    for (const controller of this.aborts) controller.abort();
-    await this.running;
-  }
-
-  private active(): boolean {
-    return !this.options.ready || this.options.ready();
-  }
-
-  /** May this work still write? Its own stop() counts as much as the app draining. */
-  private writable(fence: number): boolean {
-    return !this.stopped && fence === this.fence && this.active();
+  stop(): Promise<void> {
+    return this.lifecycle.stop();
   }
 
   private async check(): Promise<void> {
-    if (!this.active()) return;
-    const fence = this.fence;
+    if (!this.lifecycle.active()) return;
+    const fence = this.lifecycle.generation;
     const tasks = this.options.tasks();
     const candidates = tasks.filter(task => task.status === 'running' && task.dispatch?.execution === 'real' && task.run?.scopeUnit);
     // Prune first: a task that left the running set can never be judged again.
@@ -355,7 +310,7 @@ export class StallMonitor {
 
     const policy = this.options.policy();
     // Sampling awaited on systemd, so the write gate is re-checked before anything is written.
-    if (!this.writable(fence)) return;
+    if (!this.lifecycle.writable(fence)) return;
     const held = this.held;
     this.held = new Set();
     this.changed = false;
@@ -363,7 +318,7 @@ export class StallMonitor {
     // Awaited: a due penalty is only escalated, lifted or waited on after its own probe answered.
     await this.probeDue(policy, at, held, fence);
     // The greeting awaited on a model; nothing from here on may land after a stop.
-    if (!this.writable(fence)) return;
+    if (!this.lifecycle.writable(fence)) return;
 
     let penalized = false;
     const snapshot = policy.snapshot();
@@ -373,24 +328,30 @@ export class StallMonitor {
       if (held.has(group.engine)) continue;
       if (!Object.hasOwn(snapshot.config.engines, group.engine)) continue;
       // Another block already keeps this engine out of routing; stacking a penalty on top of it would collide.
-      if (activeBlocks({ version: 1, blocks: snapshot.blocks }, at).some(block => block.engine === group.engine && block.model === undefined && block.worker === undefined && block.by !== STALL_BLOCK_BY)) continue;
+      if (activeBlocks({ version: 1, blocks: snapshot.blocks }, at).some(block => isEngineBlock(block, group.engine) && block.by !== STALL_BLOCK_BY)) continue;
       const penalty = nextPenalty(this.state, group.engine, at, group.tasks);
-      if (!penalty || !this.writeBlock(policy, penalty.block)) continue;
-      this.trigger(group, penalty, at);
+      if (!penalty) continue;
+      // The block and the ladder it starts are one commit: a failure between them leaves neither behind.
+      const written = this.commit(() => {
+        if (!this.writeBlock(penalty.block)) return false;
+        this.trigger(group, penalty, at);
+        return true;
+      });
+      if (!written) continue;
       penalized = true;
     }
     if (this.dirty) {
       this.store.save(this.state);
       this.dirty = false;
     }
-    if (penalized || this.changed) this.options.onBlocksChanged?.();
+    if (penalized || this.changed) this.blocks.notifyChanged();
   }
 
   /** The live policy is the authority on whether a penalty is still in force, so user edits are picked up here. */
   private reconcile(policy: StallPolicy, now: number, held: Set<string>): void {
     const blocks = activeBlocks({ version: 1, blocks: policy.snapshot().blocks }, now);
     for (const [engine, penalty] of Object.entries(this.state.engines)) {
-      if (!blocks.some(block => isStallBlock(block, engine))) {
+      if (!blocks.some(block => isStallEngineBlock(block, engine))) {
         // Removing the block by hand is an explicit unblock: the ladder starts over, the record stays.
         if (pending(penalty)) {
           this.state.engines[engine] = emptyPenalty();
@@ -399,7 +360,7 @@ export class StallMonitor {
           continue;
         }
         // Nothing is in force and the ladder has been quiet past its reset window, so the level is history now.
-        if (penalty.level > 0 && penalty.lastTriggerAt !== null && now - penalty.lastTriggerAt >= LADDER_RESET_MS) {
+        if (penalty.level > 0 && ladderQuiet(penalty.lastTriggerAt, now)) {
           this.state.engines[engine] = emptyPenalty();
           this.dirty = true;
         }
@@ -407,7 +368,7 @@ export class StallMonitor {
       }
       // A block that is out always has a probe to run, even if the state lost its ladder to an older or damaged file.
       const level = Math.max(penalty.level, 1);
-      const armed = pending(penalty) && penalty.nextProbeAt !== null ? {} : arm(level, now);
+      const armed = pending(penalty) && penalty.nextProbeAt !== null ? {} : armStall(level, now);
       const wanted: EnginePenalty = { ...penalty, ...armed, level, needsAttention: penalty.needsAttention || level >= STALL_LADDER.length };
       if (JSON.stringify(wanted) !== JSON.stringify(penalty)) {
         this.state.engines[engine] = wanted;
@@ -418,7 +379,7 @@ export class StallMonitor {
     // sit there unrecoverable and unprobed forever, so it is adopted onto the ladder's first rung.
     for (const block of blocks) {
       if (block.model !== undefined || block.worker !== undefined || block.by !== STALL_BLOCK_BY || this.state.engines[block.engine]) continue;
-      this.state.engines[block.engine] = { ...emptyPenalty(), level: 1, ...arm(1, now) };
+      this.state.engines[block.engine] = { ...emptyPenalty(), level: 1, ...armStall(1, now) };
       this.dirty = true;
       this.log(`Adopted the stall penalty for ${block.engine} that the state file did not account for`);
     }
@@ -436,64 +397,63 @@ export class StallMonitor {
 
   private async probeEngine(policy: StallPolicy, engine: string, now: number, probe: RecoveryProbe, held: Set<string>, fence: number): Promise<void> {
     const penalty = this.state.engines[engine]!;
-    const ours = (blocks: Block[]) => blocks.find(block => isStallBlock(block, engine));
+    const ours = (blocks: Block[]) => blocks.find(block => isStallEngineBlock(block, engine));
     const route = probeRoute(policy.snapshot().config, engine);
     /** Which penalty this probe is answering: a replacement block is not ours to act on. */
     const tested = ours(activeBlocks({ version: 1, blocks: policy.snapshot().blocks }, now))?.since;
-    const controller = new AbortController();
-    this.aborts.add(controller);
-    let outcome: ProbeOutcome;
-    try {
-      outcome = route ? await probe(route, controller.signal) : { ok: false, ms: 0, error: NO_WORKER };
-    } catch (error) {
-      outcome = { ok: false, ms: 0, error: error instanceof Error ? error.message : 'unknown error' };
-    } finally {
-      this.aborts.delete(controller);
-    }
+    const { value: outcome } = await this.lifecycle.abortable<ProbeOutcome>(
+      signal => route ? probe(route, signal) : Promise.resolve({ ok: false, ms: 0, error: NO_WORKER }),
+      error => ({ ok: false, ms: 0, error: error instanceof Error ? error.message : 'unknown error' }),
+    );
     // The probe awaited on a model: nothing may be written after draining began or the monitor was stopped.
-    if (!this.writable(fence)) return;
+    if (!this.lifecycle.writable(fence)) return;
     const live = this.state.engines[engine];
     const current = ours(activeBlocks({ version: 1, blocks: policy.snapshot().blocks }, now));
     // The user unblocked or another process replaced this penalty while the probe was running: not our answer.
     if (!live || !current || tested === undefined || current.since !== tested) return;
     if (live.level !== penalty.level || live.lastTriggerAt !== penalty.lastTriggerAt) return;
-    this.push({
-      engine, level: live.level, at: now, tasks: [],
-      probe: { ok: outcome.ok, ms: outcome.ms, ...(outcome.error ? { error: boundedProbeError(outcome.error) } : {}) },
-      ...(route ? { model: route.model, effort: route.effort } : {}),
-    });
-    if (!outcome.ok) {
-      this.escalate(policy, engine, live, now);
-      return;
-    }
-    if (live.level >= STALL_LADDER.length) {
-      if (live.probeSuccesses + 1 < PROBE_SUCCESSES) {
-        this.state.engines[engine] = { ...live, probeSuccesses: live.probeSuccesses + 1, nextProbeAt: now + PROBE_MS };
-        this.dirty = true;
-        return;
+    // The answer, the ladder it moves and the block it rewrites or removes are one commit.
+    const lifted = this.commit(() => {
+      this.push({
+        engine, level: live.level, at: now, tasks: [],
+        probe: { ok: outcome.ok, ms: outcome.ms, ...(outcome.error ? { error: boundedProbeError(outcome.error) } : {}) },
+        ...(route ? { model: route.model, effort: route.effort } : {}),
+      });
+      if (!outcome.ok) {
+        this.escalate(engine, live, now);
+        return false;
       }
+      if (live.level >= STALL_LADDER.length) {
+        if (live.probeSuccesses + 1 < PROBE_SUCCESSES) {
+          this.state.engines[engine] = { ...live, probeSuccesses: live.probeSuccesses + 1, nextProbeAt: now + PROBE_MS };
+          this.dirty = true;
+          return false;
+        }
+      }
+      // A failed removal leaves the penalty armed exactly as it was, so the next tick probes and lifts again.
+      return this.lift(engine, live, now);
+    });
+    if (lifted) {
+      this.changed = true;
+      held.add(engine);
     }
-    // A failed removal leaves the penalty armed exactly as it was, so the next tick probes and lifts again.
-    this.lift(policy, engine, live, now, held);
   }
 
   /** Recovery removes only Weaver's own block; the level and its trigger time stay, so the next one escalates. */
-  private lift(policy: StallPolicy, engine: string, penalty: EnginePenalty, now: number, held: Set<string>): boolean {
-    if (!this.saveBlocks(policy, engine, blocks => blocks)) return false;
+  private lift(engine: string, penalty: EnginePenalty, now: number): boolean {
+    if (!this.saveBlocks(engine, blocks => blocks)) return false;
     this.state.engines[engine] = { ...emptyPenalty(), level: penalty.level, lastTriggerAt: penalty.lastTriggerAt, head: penalty.head };
     if (penalty.level >= STALL_LADDER.length) this.push({ engine, level: penalty.level, at: now, tasks: [], message: STALL_RECOVERY });
     this.dirty = true;
-    this.changed = true;
-    held.add(engine);
     return true;
   }
 
   /** A probe that did not pass is evidence the engine is still unhealthy: one level up, right now. */
-  private escalate(policy: StallPolicy, engine: string, penalty: EnginePenalty, now: number): void {
+  private escalate(engine: string, penalty: EnginePenalty, now: number): void {
     const level = Math.min(penalty.level + 1, STALL_LADDER.length);
-    this.state.engines[engine] = { level, lastTriggerAt: penalty.lastTriggerAt, needsAttention: level >= STALL_LADDER.length, probeSuccesses: 0, head: penalty.head, ...arm(level, now) };
+    this.state.engines[engine] = { level, lastTriggerAt: penalty.lastTriggerAt, needsAttention: level >= STALL_LADDER.length, probeSuccesses: 0, head: penalty.head, ...armStall(level, now) };
     // The block is still what keeps the engine out of routing, so no pump: only its reason has to stay honest.
-    this.writeBlock(policy, { engine, reason: reasonFor(penalty.head || NO_HEAD), since: new Date(now).toISOString(), by: STALL_BLOCK_BY });
+    this.writeBlock({ engine, reason: reasonFor(penalty.head || NO_HEAD), since: new Date(now).toISOString(), by: STALL_BLOCK_BY });
     this.dirty = true;
   }
 
@@ -505,7 +465,7 @@ export class StallMonitor {
       needsAttention: penalty.level >= STALL_LADDER.length,
       probeSuccesses: 0,
       head: penalty.head,
-      ...arm(penalty.level, now),
+      ...armStall(penalty.level, now),
     };
     this.push({
       engine: group.engine, level: penalty.level, at: now,
@@ -517,32 +477,42 @@ export class StallMonitor {
   }
 
   /**
-   * One retry with a freshly read revision. A concurrent save must lose this monitor's intent, never anything
-   * another writer added in between.
+   * Rewrites only this engine's own penalty; every other block in the policy is kept as it was found. One retry with
+   * a freshly read revision: a concurrent save must lose this monitor's intent, never anything another writer added.
    */
-  private saveWithRetry(policy: StallPolicy, mutate: (blocks: Block[]) => Block[]): boolean {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const snapshot = policy.snapshot();
-      try {
-        policy.save({ revision: snapshot.revision, config: snapshot.config, blocks: mutate(snapshot.blocks) });
-        return true;
-      } catch (error) {
-        this.log(`Stall policy change ${attempt === 0 ? 'will be retried' : 'was not saved'}: ${error instanceof Error ? error.message : 'unknown error'}`);
-      }
+  private saveBlocks(engine: string, build: (blocks: Block[], previous: Block | undefined) => Block[]): boolean {
+    return this.blocks.update(snapshot => {
+      const previous = snapshot.blocks.find(block => isStallEngineBlock(block, engine));
+      return build(snapshot.blocks.filter(block => !isStallEngineBlock(block, engine)), previous);
+    }, { attempts: 2, failureLabel: 'Stall policy change' }).ok;
+  }
+
+  private writeBlock(block: Block): boolean {
+    return this.saveBlocks(block.engine, (blocks, previous) => [...blocks, { ...block, since: previous?.since ?? block.since }]);
+  }
+
+  /**
+   * One change of blocks together with the ladder state that goes with it. The work and the state write run as a single
+   * transaction when the policy and the state tables share a connection; if anything throws, neither the database nor
+   * this monitor's memory moves, so the same evidence is handled again as if it had just arrived, and only once.
+   */
+  private commit<T>(work: () => T): T {
+    const state = structuredClone(this.state);
+    const dirty = this.dirty;
+    try {
+      return this.blocks.atomic(() => {
+        const result = work();
+        if (this.dirty) {
+          this.store.save(this.state);
+          this.dirty = false;
+        }
+        return result;
+      }, this.store);
+    } catch (error) {
+      this.state = state;
+      this.dirty = dirty;
+      throw error;
     }
-    return false;
-  }
-
-  /** Rewrites only this engine's own penalty; every other block in the policy is kept as it was found. */
-  private saveBlocks(policy: StallPolicy, engine: string, build: (blocks: Block[], previous: Block | undefined) => Block[]): boolean {
-    return this.saveWithRetry(policy, blocks => {
-      const previous = blocks.find(block => isStallBlock(block, engine));
-      return build(blocks.filter(block => !isStallBlock(block, engine)), previous);
-    });
-  }
-
-  private writeBlock(policy: StallPolicy, block: Block): boolean {
-    return this.saveBlocks(policy, block.engine, (blocks, previous) => [...blocks, { ...block, since: previous?.since ?? block.since }]);
   }
 
   private push(record: StallRecord): void {

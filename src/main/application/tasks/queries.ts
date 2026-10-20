@@ -7,7 +7,7 @@ import type { TaskManager } from '../../manager';
 import { QUOTA_CAPABILITIES } from '../../policy/quota';
 import type { PolicyStore } from '../../policy/store';
 import { redactContext } from '../../redact-context';
-import { engineLadderKey } from '../../store';
+import { engineLadderKey } from '../../storage/vendor-limits';
 import type { StallMonitor } from '../../stall';
 import { REAL_ENGINE_KINDS, listWorkspaceDirectories } from '../../workspace';
 import { fail } from '../commands/errors';
@@ -19,8 +19,9 @@ export function configuredParallel(policy: PolicyStore): number {
  return Object.values(policy.snapshot().config.owners).filter(owner => owner.enabled).reduce((sum, owner) => sum + owner.max_parallel, 0);
 }
 /** The stall monitor is the only judge of silence, idle CPU and penalties, so the command face reads it
- * through the narrowest view that answers: one task's health, the engine status, one explicit unblock. */
-export type TaskDiagnostics = Pick<StallMonitor, 'taskHealth' | 'status' | 'unblock'>;
+ * through the narrowest view that answers: one task's health and the engine status. The one explicit unblock is the
+ * application operation that clears the blocks and resets the monitors, not a monitor method. */
+export type TaskDiagnostics = Pick<StallMonitor, 'taskHealth' | 'status'> & { unblock(engine: string): void };
 /** What an owner sees per engine without the retained history: the same numbers the monitor armed its penalty with. */
 const engineSummary=(item: StallStatus['engines'][string]) => ({level:item.level,lastTriggerAt:item.lastTriggerAt,needsAttention:item.needsAttention,blocked:item.blocked,blockedUntil:item.blockedUntil,nextProbeAt:item.nextProbeAt,probeSuccesses:item.probeSuccesses});
 /** What the control plane can read without changing it: snapshots, task pages, traces, capabilities and the stall monitor's answers. */

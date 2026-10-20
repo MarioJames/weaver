@@ -4,27 +4,26 @@ import { object } from '../shared/validation';
 import type { Block, Config, PolicySnapshot } from '../shared/contracts/policy';
 import type { FreeChannelStatus, FreeWorkerStatus, ProbeOutcome } from '../shared/contracts/monitoring';
 import { activeBlocks } from '../shared/policy/availability';
+import { FREE_PROBE_BLOCK_BY, STALL_BLOCK_BY, VENDOR_BLOCK_BY, foreignBlockOn, isQuotaBlockBy, ownedOnRoute, reaches } from '../shared/policy/blocks';
 import { freeChannelProbeSettings } from '../shared/policy/settings';
 import { escalateEngineBlock } from './policy/routing';
 import { classifyVendorError, vendorBlockReason } from './adapters/cli/vendor-errors';
-import { LADDER_RESET_MS, PROBE_MS, PROBE_SUCCESSES, STALL_LADDER, VENDOR_LADDER_MINUTES } from './domain/penalties';
+import { PROBE_MS, PROBE_SUCCESSES, STALL_LADDER } from './domain/penalties';
+import { armStall, ladderLive, ladderQuiet, nextLevel, nextVendorStep } from './monitors/ladder';
+import { MonitorLifecycle } from './monitors/lifecycle';
+import { PolicyBlockService, type BlockPolicy } from './policy/blocks';
 import { boundedProbeError, boundedReason } from './redact-context';
-import { STALL_BLOCK_BY, type ProbeRoute } from './stall';
+import type { ProbeRoute } from './stall';
 import { HISTORY_LIMIT, type FreeProbeState, type FreeProbeStore, type ProbeRecord, type WorkerProbe } from './storage/free-probe-state';
+import type { VendorLadderStore } from './storage/vendor-limits';
 
-/** Quota bans written by this monitor. It releases only what it wrote; manual blocks stay. */
-export const FREE_PROBE_BLOCK_BY = 'weaver-free-probe';
-export const VENDOR_BLOCK_BY = 'weaver-vendor-limit';
 const NO_PROBER = '本进程没有装载探测执行器，无法探测。';
 const PROBE_TICK_MS = 60_000;
 
 export type FreeRecoveryProbe = (route: ProbeRoute, signal: AbortSignal) => Promise<ProbeOutcome>;
 
 /** The main-process policy writer, narrowed to what a penalty needs. */
-export interface FreeProbePolicy {
-  snapshot(): PolicySnapshot;
-  save(input: unknown): PolicySnapshot;
-}
+export type FreeProbePolicy = BlockPolicy;
 
 export const emptyWorkerProbe = (): WorkerProbe => ({ level: 0, lastTriggerAt: null, mode: null, needsAttention: false, blockedUntil: null, nextProbeAt: null, probeSuccesses: 0, head: '' });
 
@@ -45,42 +44,12 @@ export function freeProbeEligible(config: Config, id: string): boolean {
   return config.engines[worker.engine]?.enabled === true;
 }
 
-/** Rate-limit escalation: quiet for LADDER_RESET_MS restarts the ladder, the trigger time stays. */
-function nextLevel(item: WorkerProbe, now: number, cap: number): number {
-  const base = item.lastTriggerAt !== null && now - item.lastTriggerAt < LADDER_RESET_MS ? item.level : 0;
-  return Math.min(base + 1, cap);
-}
-
-/** Deadline and first recovery probe for one ladder stage; level null waits on pass alone. */
-function armStall(level: number, now: number): Pick<WorkerProbe, 'blockedUntil' | 'nextProbeAt'> {
-  const minutes = STALL_LADDER[level - 1];
-  if (minutes === null) return { blockedUntil: null, nextProbeAt: now + PROBE_MS };
-  const at = now + minutes * 60_000;
-  return { blockedUntil: at, nextProbeAt: at };
-}
-
 /** The saved route of one free_channel worker. */
 function probeRouteOf(config: Config, worker: string): ProbeRoute | undefined {
   const profile = config.workers[worker];
   const engine = profile ? config.engines[profile.engine] : undefined;
   if (!profile || !engine) return undefined;
   return { engine: profile.engine, kind: engine.kind, worker, model: profile.model, effort: profile.effort };
-}
-
-/** Does this block reach the route's worker? A worker-level block names exactly one worker. */
-function reaches(block: Block, route: ProbeRoute): boolean {
-  return block.engine === route.engine && (block.worker === undefined || block.worker === route.worker) && (block.model === undefined || block.model === route.model);
-}
-
-/** A block this monitor wrote for the route: its worker, its model and one of its markers. A pre-worker block (no worker field) on the same model is still recognised as ours. */
-function owned(block: Block, route: ProbeRoute, by?: string): boolean {
-  return block.engine === route.engine && block.model === route.model && (block.worker === route.worker || block.worker === undefined) &&
-    (by !== undefined ? block.by === by : block.by === STALL_BLOCK_BY || block.by === VENDOR_BLOCK_BY || block.by === FREE_PROBE_BLOCK_BY);
-}
-
-/** Is this route currently kept out by a block that this monitor did not write? */
-function foreignBlock(blocks: Block[], route: ProbeRoute): Block | undefined {
-  return blocks.find(block => reaches(block, route) && !owned(block, route));
 }
 
 export interface FreeProbeInput { worker?: string }
@@ -101,6 +70,8 @@ export interface FreeChannelProbeOptions {
   policy: () => FreeProbePolicy;
   /** weaver.db-backed state, so restarts keep the ladder and history. */
   stateStore: FreeProbeStore;
+  /** The one vendor rate-limit ladder per worker. Dispatch failures step the same rows, so the two paths see each other. */
+  vendorLadder: VendorLadderStore;
   /** The worker's own light greeting. Without it failures are recorded but no block is ever written. */
   probe?: FreeRecoveryProbe;
   now?: () => number;
@@ -113,7 +84,7 @@ export interface FreeChannelProbeOptions {
 
 /**
  * Probes every marked free_channel worker on a fixed cadence and per ladder deadline. One answer classifies
- * the route: vendor quota exhaustion bans this worker's engine+model via `weaver-free-probe` (with the vendor's
+ * the route: vendor quota exhaustion bans this worker's engine+model with the free-probe marker (with the vendor's
  * own reset time when it gives one, held open by probes otherwise), vendor rate limits walk the vendor ladder,
  * any other failure walks the stall ladder, all model-scoped so the same engine's other models are untouched.
  * A passing probe lifts only blocks this monitor wrote; manual blocks are never lifted by a probe.
@@ -122,25 +93,23 @@ export class FreeChannelProbeMonitor {
   private readonly clock: () => number;
   private readonly log: (message: string) => void;
   private state: FreeProbeState;
-  private running: Promise<void> | undefined;
-  private timer: NodeJS.Timeout | undefined;
   private dirty = false;
   private changed = false;
   /** One probe per worker at any time; rounds and manual probes share it. */
   private readonly jobs = new Map<string, Promise<void>>();
-  /** Probes in flight, so stop() can abort them. */
-  private readonly aborts = new Set<AbortController>();
-  /** Bumped by stop(); work that awaited past it writes nothing at all. */
-  private fence = 0;
-  private stopped = false;
   private startedAt = 0;
   private lastRoundAt: number | null = null;
   private readonly store: FreeProbeStore;
+  /** Tick coalescing, the probes stop() can abort, and the stop fence; work that awaited past a stop writes nothing at all. */
+  private readonly lifecycle: MonitorLifecycle;
+  private readonly blocks: PolicyBlockService;
 
   constructor(private readonly options: FreeChannelProbeOptions) {
     this.clock = options.now ?? Date.now;
     this.log = options.log ?? (message => console.error(message));
     this.store = options.stateStore;
+    this.lifecycle = new MonitorLifecycle(options.ready);
+    this.blocks = new PolicyBlockService(options.policy, { log: this.log, onChanged: options.onBlocksChanged });
     this.state = this.store.load();
   }
 
@@ -154,11 +123,12 @@ export class FreeChannelProbeMonitor {
     const describe = (worker: string, item: WorkerProbe, eligible: boolean): FreeWorkerStatus => {
       const profile = config.workers[worker]!;
       const route = probeRouteOf(config, worker);
-      const availability = route && eligible ? activeBlocks({ version: 1, blocks: snapshot.blocks }, now).find(block => reaches(block, route) && !block.by?.startsWith('weaver-quota:')) : undefined;
+      const standing = this.standing(worker, item);
+      const availability = route && eligible ? activeBlocks({ version: 1, blocks: snapshot.blocks }, now).find(block => reaches(block, route) && !isQuotaBlockBy(block.by)) : undefined;
       return {
         worker, engine: profile.engine, model: profile.model, probed: eligible,
-        level: item.level, mode: item.mode, needsAttention: item.needsAttention,
-        lastTriggerAt: item.lastTriggerAt === null ? null : new Date(item.lastTriggerAt).toISOString(),
+        level: standing.level, mode: item.mode, needsAttention: item.needsAttention,
+        lastTriggerAt: standing.lastTriggerAt === null ? null : new Date(standing.lastTriggerAt).toISOString(),
         blockedUntil: item.blockedUntil === null ? null : new Date(item.blockedUntil).toISOString(),
         nextProbeAt: item.nextProbeAt === null ? null : new Date(item.nextProbeAt).toISOString(),
         probeSuccesses: item.probeSuccesses,
@@ -186,28 +156,19 @@ export class FreeChannelProbeMonitor {
 
   /** Concurrent ticks collapse into the one in flight; after stop() nothing ticks again until start(). */
   tick(): Promise<void> {
-    if (this.running) return this.running;
-    this.running = this.check().finally(() => { this.running = undefined; });
-    return this.running;
+    if (this.lifecycle.stopped) return Promise.resolve();
+    return this.lifecycle.coalesce(() => this.check());
   }
 
   start(everyMs = PROBE_TICK_MS): void {
-    this.stopped = false;
     this.startedAt = this.clock();
     this.lastRoundAt = null;
-    this.timer = setInterval(() => {
-      void this.tick().catch(error => this.log(`Free probe tick failed: ${error instanceof Error ? error.message : 'unknown error'}`));
-    }, everyMs);
-    this.timer.unref();
+    this.lifecycle.start(everyMs, () => this.tick(), error => this.log(`Free probe tick failed: ${error instanceof Error ? error.message : 'unknown error'}`));
   }
 
   /** Ends the probing contract on its own: probes in flight abort and write nothing after the fence. */
-  async stop(): Promise<void> {
-    this.stopped = true;
-    this.fence += 1;
-    if (this.timer) { clearInterval(this.timer); this.timer = undefined; }
-    for (const controller of this.aborts) controller.abort();
-    await this.running;
+  stop(): Promise<void> {
+    return this.lifecycle.stop();
   }
 
   /**
@@ -215,11 +176,12 @@ export class FreeChannelProbeMonitor {
    * Eligibility is checked here, not per dispatch: unknown or unmarked workers are refused outright.
    */
   async probeNow(worker?: string): Promise<FreeChannelStatus> {
-    if (this.running) await this.running;
-    if (!this.active()) throw new Error('Weaver 正在停止，探测已停止');
+    const inFlight = this.lifecycle.inFlight;
+    if (inFlight) await inFlight;
+    if (this.lifecycle.stopped || !this.lifecycle.active()) throw new Error('Weaver 正在停止，探测已停止');
     const snapshot = this.options.policy().snapshot();
     const config = snapshot.config;
-    const fence = this.fence;
+    const fence = this.lifecycle.generation;
     const targets = worker === undefined
       ? Object.keys(config.workers).filter(id => freeProbeEligible(config, id))
       : (verify(config, worker), [worker]);
@@ -228,25 +190,16 @@ export class FreeChannelProbeMonitor {
       const route = probeRouteOf(config, id);
       if (!route || this.jobs.has(id)) continue;
       await this.probeOne(route, fence);
-      if (!this.writable(fence)) break;
+      if (!this.lifecycle.writable(fence)) break;
     }
     if (this.dirty) this.flushState();
-    if (this.changed && this.writable(fence)) { this.changed = false; this.options.onBlocksChanged?.(); }
+    if (this.changed && this.lifecycle.writable(fence)) { this.changed = false; this.blocks.notifyChanged(); }
     return this.status();
   }
 
-  private active(): boolean {
-    return !this.options.ready || this.options.ready();
-  }
-
-  /** May this work still write? Its own stop() counts as much as the app draining. */
-  private writable(fence: number): boolean {
-    return !this.stopped && fence === this.fence && this.active();
-  }
-
   private async check(): Promise<void> {
-    if (!this.active()) return;
-    const fence = this.fence;
+    if (!this.lifecycle.active()) return;
+    const fence = this.lifecycle.generation;
     const snapshot = this.options.policy().snapshot();
     const config = snapshot.config;
     const settings = freeChannelProbeSettings(config);
@@ -270,32 +223,49 @@ export class FreeChannelProbeMonitor {
       if (!route || this.jobs.has(worker)) continue;
       await this.probeOne(route, fence);
       // A greeting awaited on a model: nothing from here on may land after a drain.
-      if (!this.writable(fence)) return;
+      if (!this.lifecycle.writable(fence)) return;
     }
     if (this.dirty) this.flushState();
-    if (this.changed && this.writable(fence)) { this.changed = false; this.options.onBlocksChanged?.(); }
+    if (this.changed && this.lifecycle.writable(fence)) { this.changed = false; this.blocks.notifyChanged(); }
+  }
+
+  /**
+   * The state half of the user's 「恢复派发」 (the blocks go through the unblock operation): every question of this
+   * engine's workers whose block is gone resets now, exactly as the next tick's reconcile would do it.
+   */
+  resetEngine(engine: string): void {
+    const snapshot = this.options.policy().snapshot();
+    this.closeOrphanedQuestions(snapshot, this.clock(), engine);
+    if (this.dirty) this.flushState();
+  }
+
+  /** Removing the block by hand is an explicit unblock: the whole question resets, the record stays. */
+  private closeOrphanedQuestions(snapshot: PolicySnapshot, now: number, engine?: string): void {
+    const active = activeBlocks({ version: 1, blocks: snapshot.blocks }, now);
+    const config = snapshot.config;
+    for (const [worker, item] of Object.entries(this.state.workers)) {
+      if (!item.mode || !item.blockSince) continue;
+      if (!freeProbeEligible(config, worker)) continue;
+      if (engine !== undefined && config.workers[worker]?.engine !== engine) continue;
+      const route = probeRouteOf(config, worker);
+      if (!route) continue;
+      const by = modeBlockBy(item.mode);
+      const own = active.find(block => ownedOnRoute(block, route, by));
+      if (own) continue;
+      this.state.workers[worker] = ladderLive(item.lastTriggerAt, now)
+        ? { ...emptyWorkerProbe(), level: item.level, lastTriggerAt: item.lastTriggerAt, head: item.head }
+        : emptyWorkerProbe();
+      this.dirty = true;
+      this.log(`已移除 ${worker} 的探测处理（阻断不再由本进程持有），恢复为健康`);
+    }
   }
 
   /** The live policy is the authority on whether a question is still open, so user edits are picked up here. */
   private reconcile(snapshot: PolicySnapshot, now: number): void {
     const active = activeBlocks({ version: 1, blocks: snapshot.blocks }, now);
     const config = snapshot.config;
-    for (const [worker, item] of Object.entries(this.state.workers)) {
-      if (!item.mode || !item.blockSince) continue;
-      if (!freeProbeEligible(config, worker)) continue;
-      const route = probeRouteOf(config, worker);
-      if (!route) continue;
-      const by = modeBlockBy(item.mode);
-      const own = active.find(block => owned(block, route, by));
-      if (own) continue;
-      // Removing the block by hand is an explicit unblock: the whole question resets, the record stays.
-      this.state.workers[worker] = item.lastTriggerAt !== null && now - item.lastTriggerAt < LADDER_RESET_MS
-        ? { ...emptyWorkerProbe(), level: item.level, lastTriggerAt: item.lastTriggerAt, head: item.head }
-        : emptyWorkerProbe();
-      this.dirty = true;
-      this.log(`已移除 ${worker} 的探测处理（阻断不再由本进程持有），恢复为健康`);
-    }
-    // Abuse-resilience: a weaver-free-probe block the policy holds but this state file never recorded is adopted.
+    this.closeOrphanedQuestions(snapshot, now);
+    // Abuse-resilience: a free-probe block the policy holds but this state file never recorded is adopted.
     for (const block of active) {
       if (block.by !== FREE_PROBE_BLOCK_BY || block.model === undefined) continue;
       const worker = Object.keys(config.workers).find(id => {
@@ -318,11 +288,18 @@ export class FreeChannelProbeMonitor {
     }
     // A ladder that has been quiet past its reset window starts over.
     for (const [worker, item] of Object.entries(this.state.workers)) {
-      if (item.mode === null && item.level > 0 && item.lastTriggerAt !== null && now - item.lastTriggerAt >= LADDER_RESET_MS) {
+      if (item.mode === null && item.level > 0 && ladderQuiet(item.lastTriggerAt, now)) {
         this.state.workers[worker] = emptyWorkerProbe();
         this.dirty = true;
       }
     }
+  }
+
+  /** The ladder standing of one worker: a rate-limit question reads the shared vendor ladder, every other mode its own row. */
+  private standing(worker: string, item: WorkerProbe): { level: number; lastTriggerAt: number | null } {
+    if (item.mode !== 'rate_limit') return item;
+    const ladder = this.options.vendorLadder.get(worker);
+    return { level: ladder?.level ?? 0, lastTriggerAt: ladder?.lastTriggerAt ?? null };
   }
 
   /** One probe at a time per worker; a manual probe during a round returns the job already running. */
@@ -335,28 +312,49 @@ export class FreeChannelProbeMonitor {
   }
 
   private async runProbe(route: ProbeRoute, fence: number): Promise<void> {
-    const controller = new AbortController();
-    this.aborts.add(controller);
-    let outcome: ProbeOutcome;
-    try {
-      outcome = this.options.probe ? await this.options.probe(route, controller.signal) : { ok: false, ms: 0, error: NO_PROBER };
-    } catch (error) {
-      outcome = { ok: false, ms: 0, error: error instanceof Error ? error.message : 'unknown error' };
-    } finally {
-      this.aborts.delete(controller);
-    }
+    const probe = this.options.probe;
+    const { value: outcome, aborted } = await this.lifecycle.abortable<ProbeOutcome>(
+      signal => probe ? probe(route, signal) : Promise.resolve({ ok: false, ms: 0, error: NO_PROBER }),
+      error => ({ ok: false, ms: 0, error: error instanceof Error ? error.message : 'unknown error' }),
+    );
     // A greeting that only exists because the abort fired is not evidence either way.
-    if (controller.signal.aborted) return;
-    if (!this.writable(fence)) return;
+    if (aborted) return;
+    if (!this.lifecycle.writable(fence)) return;
     this.apply(route, outcome);
   }
 
+  /**
+   * One answer: the block it writes or lifts, the vendor ladder step, this worker's question and the history line are
+   * a single commit when the policy and the state tables share a connection. A throw leaves neither the database nor
+   * this monitor's memory moved, so the next probe starts from where the answer found things.
+   */
   private apply(route: ProbeRoute, outcome: ProbeOutcome): void {
+    this.commit(() => this.judge(route, outcome));
+  }
+
+  private commit<T>(work: () => T): T {
+    const state = structuredClone(this.state);
+    const { dirty, changed } = this;
+    try {
+      return this.blocks.atomic(() => {
+        const result = work();
+        if (this.dirty) this.flushState();
+        return result;
+      }, this.store, this.options.vendorLadder);
+    } catch (error) {
+      this.state = state;
+      this.dirty = dirty;
+      this.changed = changed;
+      throw error;
+    }
+  }
+
+  private judge(route: ProbeRoute, outcome: ProbeOutcome): void {
     const now = this.clock();
     const failure = outcome.ok ? undefined : classifyVendorError(route.kind, outcome.error ?? '', now);
     const item = this.state.workers[route.worker] ?? emptyWorkerProbe();
     const record: ProbeRecord = {
-      worker: route.worker, engine: route.engine, level: item.level, at: now,
+      worker: route.worker, engine: route.engine, level: this.standing(route.worker, item).level, at: now,
       probe: { ok: outcome.ok, ms: outcome.ms, ...(outcome.error ? { error: boundedProbeError(outcome.error) } : {}) },
       ...(failure ? { classification: failure.kind } : {}),
     };
@@ -377,7 +375,7 @@ export class FreeChannelProbeMonitor {
     const snapshot = this.options.policy().snapshot();
     const now = this.clock();
     const by = item.mode ? modeBlockBy(item.mode) : undefined;
-    const own = by ? activeBlocks({ version: 1, blocks: snapshot.blocks }, now).find(block => owned(block, route, by)) : undefined;
+    const own = by ? activeBlocks({ version: 1, blocks: snapshot.blocks }, now).find(block => ownedOnRoute(block, route, by)) : undefined;
     if (!own) {
       // Healthy at the moment the probe fired, or someone else now holds the route: nothing is ours to lift.
       this.state.workers[route.worker] = item.mode && item.blockSince ? emptyWorkerProbe() : { ...emptyWorkerProbe(), level: item.level, lastTriggerAt: item.lastTriggerAt, head: item.head };
@@ -434,8 +432,7 @@ export class FreeChannelProbeMonitor {
 
   /** Rate limiting: the vendor ladder dispatch failures already use, model-scoped to this worker. */
   private vendorLimit(route: ProbeRoute, item: WorkerProbe, record: ProbeRecord, failure: NonNullable<ReturnType<typeof classifyVendorError>>, now: number): void {
-    const level = nextLevel(item, now, VENDOR_LADDER_MINUTES.length);
-    const minutes = VENDOR_LADDER_MINUTES[level - 1]!;
+    const { level, minutes } = nextVendorStep(this.options.vendorLadder.get(route.worker), now);
     const retryAt = failure.retryAt ? Date.parse(failure.retryAt) : NaN;
     const release = Number.isFinite(retryAt) ? Math.max(retryAt, now + minutes * 60_000) : now + minutes * 60_000;
     const reason = vendorBlockReason({ kind: 'rate_limit', message: failure.message });
@@ -446,8 +443,10 @@ export class FreeChannelProbeMonitor {
       this.dirty = true;
       return;
     }
+    // The level and the trigger time live in the shared vendor ladder; this row only keeps the probe schedule.
+    this.options.vendorLadder.put(route.worker, { level, lastTriggerAt: now });
     this.state.workers[route.worker] = {
-      ...emptyWorkerProbe(), level, lastTriggerAt: now, mode: 'rate_limit',
+      ...emptyWorkerProbe(), mode: 'rate_limit',
       head: record.probe.error ?? '', blockSince: written.since,
       blockedUntil: release, nextProbeAt: release,
     };
@@ -460,7 +459,7 @@ export class FreeChannelProbeMonitor {
 
   /** Every other failure: the stall ladder on this worker's engine+model, never on a policy deadline. */
   private stallPenalty(route: ProbeRoute, item: WorkerProbe, record: ProbeRecord, message: string, now: number): void {
-    const level = nextLevel(item, now, STALL_LADDER.length);
+    const level = nextLevel(item.level, item.lastTriggerAt, now, STALL_LADDER.length);
     const armed = armStall(level, now);
     const reason = boundedReason(message);
     const written = this.writeBlock(route, STALL_BLOCK_BY, reason, undefined, now);
@@ -482,20 +481,6 @@ export class FreeChannelProbeMonitor {
     this.push(record);
   }
 
-  /** One retry with a freshly read revision; a concurrent save must lose this monitor's intent. */
-  private saveWithRetry(mutate: (blocks: Block[]) => Block[]): boolean {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const snapshot = this.options.policy().snapshot();
-      try {
-        this.options.policy().save({ revision: snapshot.revision, config: snapshot.config, blocks: mutate(snapshot.blocks) });
-        return true;
-      } catch (error) {
-        this.log(`Free probe policy change ${attempt === 0 ? 'will be retried' : 'was not saved'}: ${error instanceof Error ? error.message : 'unknown error'}`);
-      }
-    }
-    return false;
-  }
-
   /**
    * Writes one worker-level block (also scoped to its model) for this worker, replacing only what this monitor owned on that route.
    * A foreign block (manual, or another monitor's whole-engine statement) means the route is already kept
@@ -503,21 +488,22 @@ export class FreeChannelProbeMonitor {
    */
   private writeBlock(route: ProbeRoute, by: string, reason: string, release_at: string | undefined, now: number, escalate = false): Block | undefined {
     let final: Block | undefined;
-    const ok = this.saveWithRetry(blocks => {
+    const { ok } = this.blocks.update(snapshot => {
       final = undefined;
-      if (foreignBlock(blocks, route)) return blocks;
-      const previous = blocks.find(block => owned(block, route));
+      const blocks = snapshot.blocks;
+      if (foreignBlockOn(blocks, route)) return blocks;
+      const previous = blocks.find(block => ownedOnRoute(block, route));
       final = { engine: route.engine, model: route.model, worker: route.worker, reason, since: previous?.since ?? new Date(now).toISOString(), by, ...(release_at ? { release_at } : {}) };
-      const written = [...blocks.filter(block => !owned(block, route)), final];
+      const written = [...blocks.filter(block => !ownedOnRoute(block, route)), final];
       // A rate limit that leaves no enabled worker on the engine usable takes the engine out as well.
-      return escalate ? escalateEngineBlock(this.options.policy().snapshot().config, written, route.engine, now) : written;
-    });
+      return escalate ? escalateEngineBlock(snapshot.config, written, route.engine, now) : written;
+    }, { attempts: 2, failureLabel: 'Free probe policy change' });
     return ok && final ? final : undefined;
   }
 
   /** Removes only the block this monitor wrote with this marker on this route; anything else stays. */
   private removeBlock(route: ProbeRoute, by: string): boolean {
-    return this.saveWithRetry(blocks => blocks.filter(block => !owned(block, route, by)));
+    return this.blocks.update(snapshot => snapshot.blocks.filter(block => !ownedOnRoute(block, route, by)), { attempts: 2, failureLabel: 'Free probe policy change' }).ok;
   }
 
   private push(record: ProbeRecord): void {

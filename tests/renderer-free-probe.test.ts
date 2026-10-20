@@ -13,8 +13,9 @@ import type { FreeProbe } from '../src/renderer/features/probes/useFreeProbe';
 import { RolesPage, roleNote } from '../src/renderer/features/roles/RolesPage';
 import { SettingsPage } from '../src/renderer/features/settings/SettingsPage';
 import { minutesError } from '../src/renderer/policy/policy-edit';
-import { FREE_PROBE_BLOCK_BY, STALL_BLOCK_BY, VENDOR_BLOCK_BY, blockOf, blockText, lastProbeOf, nextProbeText, pauseOfBlock, probeDurationText, probeNoteText, probeScheduleText, probeStateView, recentProbes } from '../src/renderer/features/probes/probe-view';
+import { blockOf, blockText, lastProbeOf, nextProbeText, pauseOfBlock, probeDurationText, probeNoteText, probeScheduleText, probeStateView, recentProbes } from '../src/renderer/features/probes/probe-view';
 import { createBrowserClient } from '../src/renderer/api/client';
+import { FREE_PROBE_BLOCK_BY, STALL_BLOCK_BY, VENDOR_BLOCK_BY } from '../src/shared/policy/blocks';
 import type { PolicyDraft } from '../src/renderer/policy/usePolicyDraft';
 
 function markup(node: React.ReactNode) {

@@ -12,7 +12,9 @@ import type { TaskDiagnostics } from '../src/main/application/tasks/queries';
 import { PolicyStore } from '../src/main/policy/store';
 import { OwnerLaunchError, type OwnerLaunchInput, type OwnerLaunchResult } from '../src/main/owner-host';
 import { readStall, stallStoreAt } from './helpers/state-db';
-import { STALL_BLOCK_BY, STALL_MS, StallMonitor } from '../src/main/stall';
+import { STALL_MS, StallMonitor } from '../src/main/stall';
+import { STALL_BLOCK_BY } from '../src/shared/policy/blocks';
+import { engineDiagnostics } from './helpers/diagnostics';
 import type { StallState } from '../src/main/storage/stall-state';
 import { type StallStatus } from '../src/shared/contracts/monitoring';
 import { metadataOf } from './helpers/store-metadata';
@@ -50,7 +52,7 @@ function setup(options: SetupOptions = {}) {
   const diagnostics: TaskDiagnostics = {
     taskHealth: task => { calls.health++; return monitor.taskHealth(task); },
     status: () => monitor.status(),
-    unblock: engine => { calls.unblock.push(engine); monitor.unblock(engine); },
+    unblock: engine => { calls.unblock.push(engine); engineDiagnostics(policy, monitor).unblock(engine); },
   };
   // The stall block each penalty was armed with, so the policy is the same authority the runtime uses.
   if (options.penalties) {
@@ -174,7 +176,7 @@ test('engines.penalty rejects inherited names while preserving configured and hi
     state.history.push({ engine: 'retired-fixture', level: 1, at: NOW - 60_000, tasks: ['retained-task'] });
     stallStoreAt(statePath).save(state);
     monitor = new StallMonitor({ tasks: () => f.store.list(), policy: () => f.policy, stateStore: stallStoreAt(statePath), now: () => NOW, cpu: async () => null, log: () => {} });
-    const handler = new CommandHandler(f.manager, f.policy, blockedLaunch, () => false, monitor);
+    const handler = new CommandHandler(f.manager, f.policy, blockedLaunch, () => false, engineDiagnostics(f.policy, monitor));
     const before = { tasks: f.store.list(), metadata: metadataOf(f.store), policy: f.policy.snapshot(), state: JSON.stringify(readStall(statePath)) };
     const status = monitor.status();
     assert.equal(Object.hasOwn(before.policy.config.engines, 'retired-fixture'), false);

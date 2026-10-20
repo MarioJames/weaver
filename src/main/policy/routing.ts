@@ -2,6 +2,7 @@
 // Weaver adaptation: pure policy only; no CLI, sessions, launch flags, or host reads.
 import type { Availability, Block, Config, Dispatch, Issue, Owner, RouteOptions } from '../../shared/contracts/policy';
 import { availabilityOf, coveringBlock, isBlockActive } from '../../shared/policy/availability';
+import { VENDOR_BLOCK_BY, isEngineBlock } from '../../shared/policy/blocks';
 import { EFFORTS, FREE_CHANNEL_INTERVAL_RANGE, QUOTA_INTERVAL_RANGE, hasQuotaProbe, isValidTimezone } from '../../shared/policy/settings';
 import { WEIGHT_MAX, effectiveWeight } from '../../shared/policy/weights';
 import { type Schema, lintSchema, validate } from "./json-schema";
@@ -67,8 +68,6 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
 
 // ---- escalation ----
 const stamp = (value: string) => Date.parse(value);
-/** Written by vendor rate-limit / quota failures; the only source the engine-level escalation may rewrite. */
-export const VENDOR_BLOCK_SOURCE = "weaver-vendor-limit";
 export const ENGINE_ALL_BLOCKED_REASON = "该引擎全部子 Agent 均被限流/额度耗尽";
 /**
  * When every enabled worker of an engine is kept out by an active block, the engine itself is out: add one
@@ -80,8 +79,8 @@ export const ENGINE_ALL_BLOCKED_REASON = "该引擎全部子 Agent 均被限流/
 export function escalateEngineBlock(config: Config, blocks: Block[], engine: string, now: number): Block[] {
   if (!config.engines[engine]?.enabled) return blocks;
   const live = (b: Block) => isBlockActive(b, now);
-  const wholeEngine = (b: Block) => b.engine === engine && b.model === undefined && b.worker === undefined;
-  if (blocks.some(b => wholeEngine(b) && live(b) && b.by !== VENDOR_BLOCK_SOURCE)) return blocks;
+  const wholeEngine = (b: Block) => isEngineBlock(b, engine);
+  if (blocks.some(b => wholeEngine(b) && live(b) && b.by !== VENDOR_BLOCK_BY)) return blocks;
   const own = blocks.find(b => wholeEngine(b) && live(b));
   const pool = blocks.filter(b => live(b) && b !== own);
   const workers = Object.entries(config.workers).filter(([, w]) => w.engine === engine && w.enabled);
@@ -94,7 +93,7 @@ export function escalateEngineBlock(config: Config, blocks: Block[], engine: str
   }
   const releases = covering.flatMap(b => b.release_at ? [stamp(b.release_at)] : []);
   const release_at = releases.length ? new Date(Math.min(...releases)).toISOString() : undefined;
-  const block: Block = { engine, reason: ENGINE_ALL_BLOCKED_REASON, since: own?.since ?? new Date(now).toISOString(), by: VENDOR_BLOCK_SOURCE, ...(release_at ? { release_at } : {}) };
+  const block: Block = { engine, reason: ENGINE_ALL_BLOCKED_REASON, since: own?.since ?? new Date(now).toISOString(), by: VENDOR_BLOCK_BY, ...(release_at ? { release_at } : {}) };
   if (own) return own.release_at === release_at && own.reason === block.reason ? blocks : blocks.map(b => b === own ? block : b);
   const stale = blocks.find(wholeEngine);
   return [...blocks.filter(b => b !== stale), block];

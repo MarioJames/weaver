@@ -2,6 +2,7 @@ import type { QuotaEngine, QuotaSchedule } from '../../shared/contracts/quota';
 import { quotaRefreshTargets } from '../policy/quota';
 import { quotaSettings } from '../../shared/policy/settings';
 import { type Config } from '../../shared/contracts/policy';
+import { MonitorLifecycle } from '../monitors/lifecycle';
 
 export interface QuotaSchedulerOptions {
   config: () => Config;
@@ -15,8 +16,7 @@ export interface QuotaSchedulerOptions {
 export class QuotaScheduler {
   private lastRunAt: number | null = null;
   private firstRunAt: number | null = null;
-  private running: Promise<void> | undefined;
-  private timer: NodeJS.Timeout | undefined;
+  private readonly lifecycle = new MonitorLifecycle();
   private readonly clock: () => number;
 
   constructor(private readonly options: QuotaSchedulerOptions) {
@@ -35,30 +35,32 @@ export class QuotaScheduler {
   }
 
   tick(): Promise<void> {
-    if (this.running) return this.running;
+    if (this.lifecycle.stopped) return Promise.resolve();
+    const running = this.lifecycle.inFlight;
+    if (running) return running;
     const config = this.options.config();
     const settings = quotaSettings(config);
     const now = this.clock();
     if (!settings.auto_refresh || this.lastRunAt !== null && now - this.lastRunAt < settings.interval_minutes * 60_000) return Promise.resolve();
     this.lastRunAt = now;
-    this.running = (async () => {
+    const fence = this.lifecycle.generation;
+    return this.lifecycle.coalesce(async () => {
       for (const engine of quotaRefreshTargets(config)) {
+        // A stop that landed during an earlier target ends the run: stop() waits for the refresh in flight, never starts another.
+        if (!this.lifecycle.writable(fence)) return;
         try { await this.options.refresh(engine); }
         catch (error) { (this.options.log ?? console.error)(error); }
       }
-    })().finally(() => { this.running = undefined; });
-    return this.running;
+    });
   }
 
   /** The first run waits one period so a just-started process does not probe providers immediately. */
   start(everyMs = 60_000): void {
     this.firstRunAt = this.clock() + everyMs;
-    this.timer = setInterval(() => { void this.tick(); }, everyMs);
-    this.timer.unref();
+    this.lifecycle.start(everyMs, () => this.tick(), error => (this.options.log ?? console.error)(error));
   }
 
-  async stop(): Promise<void> {
-    clearInterval(this.timer);
-    await this.running;
+  stop(): Promise<void> {
+    return this.lifecycle.stop();
   }
 }

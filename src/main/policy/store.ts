@@ -8,6 +8,7 @@ import { defaultConfig, parseReleaseAt, validateConfig } from './routing';
 import { exact, text } from './input';
 import { type Config, type Block, type Engine, type Owner, type Worker } from '../../shared/contracts/policy';
 import { migrate } from '../migrate';
+import { onRollback, transact } from '../storage/transaction';
 const LIMIT=256*1024;
 function bounded(value: unknown): void { if (Buffer.byteLength(JSON.stringify(value))>LIMIT) throw new Error('Policy exceeds 256 KiB'); }
 function blocksOf(value: unknown, config: Config): Block[] {
@@ -145,14 +146,19 @@ export class PolicyStore {
  private commit(config:Config,blocks:Block[],revision:number,source:string):void {
   const savedAt=new Date(this.now()).toISOString();
   const body=JSON.stringify({version:1,revision,config,blocks});
-  this.db.exec('BEGIN IMMEDIATE');
-  try{
+  const previous={config:this.config,blocks:this.blocks,revision:this.revision};
+  transact(this.db,()=>{
    this.writeAll(config,blocks);
    this.db.prepare('INSERT INTO policy_revisions(revision,saved_at,source,body) VALUES (?,?,?,?)').run(revision,savedAt,source,body);
-   this.db.exec('COMMIT');
-  }catch(error){try{this.db.exec('ROLLBACK');}catch{/* SQLite may already have rolled back an I/O failure. */}throw error;}
+  });
   this.config=config;this.blocks=blocks;this.revision=revision;
+  // Inside a caller's unit of work the snapshot only stands if that unit commits.
+  onRollback(this.db,()=>{this.config=previous.config;this.blocks=previous.blocks;this.revision=previous.revision;});
  }
+ /** Which SQLite connection the policy lives on; a unit of work is atomic across stores only when they share it. */
+ get connection():unknown{return this.db;}
+ /** Runs the work, and every policy save inside it, in one transaction that commits or rolls back together with the other stores on this connection. */
+ transaction<T>(work:()=>T):T {return transact(this.db,work);}
  private parse(config: unknown, blocks: unknown): {config:Config;blocks:Block[]} {
   bounded({config,blocks}); const issues=validateConfig(config);
   if(issues.length) throw new Error(issues.map(i=>`${i.path}: ${i.message}`).join('\n'));

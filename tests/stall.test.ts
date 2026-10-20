@@ -6,9 +6,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { defaultConfig } from '../src/main/policy/routing';
+import { unblockEngine } from '../src/main/application/engines/unblock';
+import { PolicyBlockService } from '../src/main/policy/blocks';
+import { STALL_BLOCK_BY } from '../src/shared/policy/blocks';
 import { PolicyStore } from '../src/main/policy/store';
 import { parseRpcBody } from '../src/main/rpc';
-import { CPU_IDLE_SHARE, STALL_BLOCK_BY, STALL_MS, STALL_QUORUM, STALL_RECOVERY, StallMonitor, emptyPenalty, idleSince, isStalled, nextPenalty, silenceMs, stalledTasks, unhealthyEngines, type ProbeRoute, type RecoveryProbe, type StallPolicy } from '../src/main/stall';
+import { CPU_IDLE_SHARE, STALL_MS, STALL_QUORUM, STALL_RECOVERY, StallMonitor, emptyPenalty, idleSince, isStalled, nextPenalty, silenceMs, stalledTasks, unhealthyEngines, type ProbeRoute, type RecoveryProbe, type StallPolicy } from '../src/main/stall';
 import { LADDER_RESET_MS, PROBE_MS, PROBE_SUCCESSES, STALL_LADDER } from '../src/main/domain/penalties';
 import { systemdCpuUsage, type CpuReader, type CpuSample } from '../src/main/monitors/cpu';
 import { parseStallState, type EnginePenalty, type StallState } from '../src/main/storage/stall-state';
@@ -365,6 +368,8 @@ async function harness(options: HarnessOptions = {}) {
     stallBlocks: () => policy.snapshot().blocks.filter(block => block.by === STALL_BLOCK_BY),
     blocksOf: (engine: string) => policy.snapshot().blocks.filter(block => block.engine === engine),
     pumps: () => pumps,
+    /** The user's engine unblock: the policy service clears the blocks and the monitor resets its ladder. */
+    unblock: (engine: string) => unblockEngine({ blocks: new PolicyBlockService(() => policy, { log: message => logs.push(message), onChanged: () => { pumps += 1; } }), stall: monitor }, engine),
     status: () => monitor.status(),
     engine: (which = 'claude') => monitor.status().engines[which]!,
     cleanup: async () => { tempDirs.delete(dir); await rm(dir, { recursive: true, force: true }); },
@@ -732,7 +737,7 @@ test('unblock drops one engine and leaves everything else alone', async () => {
     assert.equal(h.engine().level, 2);
     h.block('codex', { by: 'user' });
     const before = h.pumps();
-    h.monitor.unblock('claude');
+    h.unblock('claude');
     assert.equal(h.stallBlocks().length, 0, 'its own block is gone');
     assert.equal(h.policy.snapshot().blocks.filter(block => block.engine === 'codex').length, 1, 'another engine keeps its block');
     assert.equal(h.engine().level, 0);
@@ -748,7 +753,7 @@ test('unblock drops one engine and leaves everything else alone', async () => {
     assert.equal(saved.engines.claude.nextProbeAt, null);
     assert.equal(saved.history.length, 2, 'one trigger and one failed probe');
     // An unknown engine is rejected before anything is written.
-    assert.throws(() => h.monitor.unblock('ghost'), /Unknown engine ghost/);
+    assert.throws(() => h.unblock('ghost'), /Unknown engine ghost/);
     assert.equal(h.policy.snapshot().blocks.filter(block => block.engine === 'codex').length, 1);
   } finally { await h.monitor.stop(); await h.cleanup(); }
 });
@@ -756,7 +761,7 @@ test('unblock drops one engine and leaves everything else alone', async () => {
 test('unblocking an engine with nothing to unblock changes no blocks', async () => {
   const h = await harness();
   try {
-    h.monitor.unblock('claude');
+    h.unblock('claude');
     assert.equal(h.stallBlocks().length, 0);
     assert.equal(h.pumps(), 0);
     assert.equal(h.engine().level, 0);
@@ -1314,6 +1319,54 @@ test('stop fences in-flight work by itself, with no ready callback in the pictur
   }
 });
 
+test('after stop() a manual tick reads no CPU and writes nothing, with or without a ready callback', async () => {
+  for (const ready of [true, false]) {
+    const h = await harness({ ready, probe: prober(() => PASS).probe });
+    try {
+      await h.advance(6);
+      assert.equal(h.engine().level, 1);
+      await h.monitor.stop();
+      // The penalty is lifted by hand after the stop: reconciling it is exactly what would write state, and a due probe would write history.
+      h.released();
+      const state = JSON.stringify(readStall(h.statePath));
+      const revision = h.policy.snapshot().revision;
+      const pumps = h.pumps();
+      const reads = h.reads.length;
+      h.later(30);
+      await h.tick();
+      await h.tick();
+      assert.equal(JSON.stringify(readStall(h.statePath)), state, `a stopped monitor writes no state (ready callback: ${ready})`);
+      assert.equal(h.policy.snapshot().revision, revision, 'nor policy');
+      assert.equal(h.pumps(), pumps, 'nor announces anything');
+      assert.equal(h.reads.length, reads, 'and samples nothing');
+    } finally { await h.monitor.stop(); await h.cleanup(); }
+  }
+});
+
+test('a greeting that answers only after stop() writes nothing, with or without a ready callback', async () => {
+  for (const ready of [true, false]) {
+    // The greeting ignores the abort signal, like a process that is already past the point of being killed.
+    let answer: (outcome: ProbeOutcome) => void = () => {};
+    let begin: () => void = () => {};
+    const started = new Promise<void>(resolve => { begin = resolve; });
+    const h = await harness({ ready, probe: () => new Promise<ProbeOutcome>(resolve => { answer = resolve; begin(); }) });
+    try {
+      await h.advance(10);
+      h.later(1);
+      const running = h.tick();
+      await awaited(started, 'probe');
+      const state = JSON.stringify(readStall(h.statePath));
+      const revision = h.policy.snapshot().revision;
+      const stopping = h.monitor.stop();
+      answer(PASS);
+      await Promise.all([running, stopping]);
+      assert.equal(h.stallBlocks().length, 1, 'the late pass lifted nothing');
+      assert.equal(h.policy.snapshot().revision, revision);
+      assert.equal(JSON.stringify(readStall(h.statePath)), state, 'and recorded nothing');
+    } finally { await h.monitor.stop(); await h.cleanup(); }
+  }
+});
+
 test('stop fences a tick that is still reading CPU', async () => {
   const h = await harness();
   const hold = slowCpu();
@@ -1354,7 +1407,7 @@ test('the user unblock of an engine drops every block naming it, and keeps every
     const history = h.engine().history;
     const pumps = h.pumps();
 
-    h.monitor.unblock('claude');
+    h.unblock('claude');
     assert.deepEqual(h.blocksOf('claude'), [], 'the penalty, the manual pause and the model pause all go');
     assert.equal(h.blocksOf('codex').length, 2, 'another engine keeps every block it was given');
     assert.deepEqual(h.policy.snapshot().config, config, 'the unblock is about blocks, not about the config');
@@ -1375,7 +1428,7 @@ test('the user unblock of an engine drops every block naming it, and keeps every
     // An unknown engine is refused before any of that happens.
     const state = JSON.stringify(readStall(h.statePath));
     const blocks = h.policy.snapshot().blocks;
-    assert.throws(() => h.monitor.unblock('ghost'), /Unknown engine ghost/);
+    assert.throws(() => h.unblock('ghost'), /Unknown engine ghost/);
     assert.deepEqual(h.policy.snapshot().blocks, blocks, 'a refused unblock wrote no policy change');
     assert.equal(JSON.stringify(readStall(h.statePath)), state, 'and no stall state change');
     assert.equal(h.pumps(), pumps + 1);
@@ -1396,7 +1449,7 @@ test('the user unblock of an engine drops every block naming it, and keeps every
       },
     };
     const second = new StallMonitor({ tasks: () => [], policy: () => racing, stateStore: stallStoreAt(h.statePath), cpu: cpu().reader, now: h.now, onBlocksChanged: () => {}, log: () => {} });
-    second.unblock('codex');
+    unblockEngine({ blocks: new PolicyBlockService(() => racing), stall: second }, 'codex');
     assert.deepEqual(h.blocksOf('codex'), [], 'the retried unblock still dropped its own engine');
     assert.equal(h.policy.snapshot().blocks.filter(block => block.engine === 'opencode').length, 1, 'and preserved the block that landed mid-flight');
     assert.deepEqual(h.blocksOf('claude'), [], 'the engine the user already recovered stays recovered');

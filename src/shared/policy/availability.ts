@@ -1,4 +1,5 @@
 import type { Availability, Block, Config, Owner, State, Worker } from '../contracts/policy';
+import { isQuotaBlockBy } from './blocks';
 
 /** True while the block has no release time or its release time is still ahead. */
 export const isBlockActive = (block: Block, now: number): boolean => !block.release_at || Date.parse(block.release_at) > now;
@@ -10,7 +11,7 @@ export function coveringBlock(blocks: Block[], entity: Owner | Worker, workerId?
   return blocks.find(b => b.engine === entity.engine
     && (b.worker === undefined || b.worker === workerId)
     && (b.model === undefined || b.model === entity.model)
-    && !("free_channel" in entity && entity.free_channel === true && b.by?.startsWith("weaver-quota:")));
+    && !("free_channel" in entity && entity.free_channel === true && isQuotaBlockBy(b.by)));
 }
 /** workerId is the policy key of a worker; omit it for owners, which no worker-scoped block can reach. */
 export function availabilityOf(config: Config, blocks: Block[], entity: Owner | Worker, workerId?: string): Availability {

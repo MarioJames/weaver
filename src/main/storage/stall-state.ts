@@ -3,6 +3,7 @@ import { object } from '../../shared/validation';
 import type { StallHistoryRecord } from '../../shared/contracts/monitoring';
 import { PROBE_SUCCESSES, STALL_LADDER } from '../domain/penalties';
 import { boundedProbeError } from '../redact-context';
+import { transact, type Transactional } from './transaction';
 
 export const HISTORY_LIMIT = 50;
 /** How many of a trigger's task ids the record keeps: the count stays whole, the ids are bounded. */
@@ -89,11 +90,12 @@ export function parseStallState(value: unknown): StallState {
 }
 
 /** Where the monitor keeps its ladder and history: the weaver.db tables. */
-export interface StallStateStore { load(): StallState; save(state: StallState): void }
+export interface StallStateStore extends Transactional { load(): StallState; save(state: StallState): void }
 
 /** Same rows the migration script fills: penalties per engine, history bounded like the file kept it. */
 export function dbStallStore(db: DatabaseSync, log: (message: string) => void = message => console.error(message)): StallStateStore {
   return {
+    connection: db,
     load(): StallState {
       const engines: Record<string, EnginePenalty> = {};
       for (const row of db.prepare('SELECT * FROM stall_penalties').all() as Record<string, unknown>[]) {
@@ -116,8 +118,7 @@ export function dbStallStore(db: DatabaseSync, log: (message: string) => void = 
       }
     },
     save(state: StallState): void {
-      db.exec('BEGIN IMMEDIATE');
-      try {
+      transact(db, () => {
         db.exec('DELETE FROM stall_penalties');
         const insertPenalty = db.prepare('INSERT INTO stall_penalties(engine,level,last_trigger_at,needs_attention,blocked_until,next_probe_at,probe_successes,head) VALUES (?,?,?,?,?,?,?,?)');
         for (const [engine, penalty] of Object.entries(state.engines)) {
@@ -126,8 +127,7 @@ export function dbStallStore(db: DatabaseSync, log: (message: string) => void = 
         db.exec('DELETE FROM stall_history');
         const insertRecord = db.prepare('INSERT INTO stall_history(engine,level,at,body) VALUES (?,?,?,?)');
         for (const record of state.history) insertRecord.run(record.engine, record.level, record.at, JSON.stringify(record));
-        db.exec('COMMIT');
-      } catch (error) { try { db.exec('ROLLBACK'); } catch { /* SQLite may already have rolled back. */ } throw error; }
+      });
     },
   };
 }

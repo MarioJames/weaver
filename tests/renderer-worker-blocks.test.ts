@@ -10,7 +10,8 @@ import { type Block } from '../src/shared/contracts/policy';
 import { workerStatusTag } from '../src/renderer/features/roles/OwnerSchedule';
 import { BlockList, removeBlock } from '../src/renderer/features/engines/EnginesPage';
 import { roleNote } from '../src/renderer/features/roles/RolesPage';
-import { VENDOR_BLOCK_BY, blockOf } from '../src/renderer/features/probes/probe-view';
+import { blockOf } from '../src/renderer/features/probes/probe-view';
+import { VENDOR_BLOCK_BY } from '../src/shared/policy/blocks';
 
 const FUTURE = '2999-01-01T00:00:00.000Z';
 const NOW = Date.now();

@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { EngineQuotaRecord, QuotaEngine } from '../../shared/contracts/quota';
 import { QUOTA_ENGINES as ENGINES } from '../domain/quota-engines';
+import { transact } from './transaction';
 
 /** What the prober keeps across restarts: the last observation per engine plus its credential and pacing state. */
 export interface QuotaPersistence {
@@ -31,16 +32,14 @@ export function dbQuotaStore(db: DatabaseSync): QuotaSnapshotStore {
       return state;
     },
     save(snapshot: QuotaPersistence): void {
-      db.exec('BEGIN IMMEDIATE');
-      try {
+      transact(db, () => {
         db.exec('DELETE FROM quota_records');
         const insertRecord = db.prepare('INSERT INTO quota_records(engine,body) VALUES (?,?)');
         for (const [engine, record] of Object.entries(snapshot.records)) if (record) insertRecord.run(engine, JSON.stringify(record));
         db.exec('DELETE FROM quota_state');
         const insertState = db.prepare('INSERT INTO quota_state(key,body) VALUES (?,?)');
         for (const key of ['fingerprints', 'lastAccounts', 'nextRequests'] as const) insertState.run(key, JSON.stringify(snapshot[key]));
-        db.exec('COMMIT');
-      } catch (error) { try { db.exec('ROLLBACK'); } catch { /* SQLite may already have rolled back. */ } throw error; }
+      });
     },
   };
 }

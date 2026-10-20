@@ -1,5 +1,5 @@
 import test from 'node:test';
-import { freeStoreAt, readFree } from './helpers/state-db';
+import { freeStoreAt, readFree, stallStoreAt, vendorLadderAt } from './helpers/state-db';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,9 +7,12 @@ import { join } from 'node:path';
 import { activeBlocks, availabilityOf } from '../src/shared/policy/availability';
 import { defaultConfig } from '../src/main/policy/routing';
 import { PolicyStore } from '../src/main/policy/store';
-import { FREE_PROBE_BLOCK_BY, FreeChannelProbeMonitor, parseFreeProbeInput } from '../src/main/free-channel';
+import { FreeChannelProbeMonitor, parseFreeProbeInput } from '../src/main/free-channel';
+import { unblockEngine } from '../src/main/application/engines/unblock';
+import { PolicyBlockService } from '../src/main/policy/blocks';
+import { StallMonitor } from '../src/main/stall';
+import { FREE_PROBE_BLOCK_BY, STALL_BLOCK_BY } from '../src/shared/policy/blocks';
 import { parseFreeProbeState } from '../src/main/storage/free-probe-state';
-import { STALL_BLOCK_BY } from '../src/main/stall';
 import { classifyVendorError } from '../src/main/adapters/cli/vendor-errors';
 
 const START = Date.parse('2026-10-19T08:00:00Z');
@@ -57,6 +60,7 @@ async function harness(options: HarnessOptions = {}) {
   const monitor = new FreeChannelProbeMonitor({
     policy: () => policy,
     stateStore: freeStoreAt(statePath),
+    vendorLadder: vendorLadderAt(statePath),
     ...(options.noProber
       ? {}
       : {
@@ -309,6 +313,28 @@ test('a foreign block on the same route suppresses free-channel writes; the manu
   } finally { await h.monitor.stop(); h.cleanup(); }
 });
 
+test('the user unblock of an engine clears its probe blocks and resets its workers\' open questions at once, leaving other engines and the record alone', async () => {
+  const h = await harness({ scripts: { qoder_worker: ['quota_plain'], opencode_worker: ['auth'] } });
+  try {
+    await h.step(10);
+    assert.equal(h.worker('qoder_worker').mode, 'quota');
+    assert.equal(h.worker('opencode_worker').mode, 'stall');
+    const history = h.state()!.history.length;
+    const stall = new StallMonitor({ tasks: () => [], policy: () => h.policy, stateStore: stallStoreAt(join(h.dir, 'unblock-stall.db')), cpu: async () => null, now: h.now, log: () => {} });
+    let pumps = h.pumps();
+    unblockEngine({ blocks: new PolicyBlockService(() => h.policy, { onChanged: () => { pumps += 1; } }), stall, freeProbe: h.monitor }, 'qoder');
+    assert.deepEqual(h.blocks().map(block => block.engine), ['opencode'], 'every qoder block is gone, opencode keeps its own');
+    assert.equal(h.worker('qoder_worker').mode, null, 'the question reset without waiting for the next tick');
+    assert.equal(h.worker('qoder_worker').nextProbeAt, null);
+    assert.equal(h.worker('opencode_worker').mode, 'stall', 'another engine\'s question is untouched');
+    assert.equal(h.state()!.history.length, history, 'the record survives');
+    assert.equal(readFree(h.statePath).workers.qoder_worker!.mode, null, 'and the reset is persisted');
+    assert.equal(pumps, h.pumps() + 1, 'queued work is announced once');
+    assert.throws(() => unblockEngine({ blocks: new PolicyBlockService(() => h.policy), stall, freeProbe: h.monitor }, 'ghost'), /Unknown engine ghost/);
+    await stall.stop();
+  } finally { await h.monitor.stop(); h.cleanup(); }
+});
+
 test('probeNow validates its target, runs the named probe, and stop fences anything in flight', async () => {
   const h = await harness({ scripts: { qoder_worker: [] } });
   try {
@@ -321,7 +347,7 @@ test('probeNow validates its target, runs the named probe, and stop fences anyth
     // Draining: a probe can only answer after being aborted; that answer writes nothing at all.
     const slow: Probe = (_route, signal) => new Promise(resolve => signal.addEventListener('abort', () => resolve({ ok: false, ms: 10, error: 'aborted probe' })));
     const fenced = new FreeChannelProbeMonitor({
-      policy: () => h.policy, stateStore: freeStoreAt(join(h.dir, 'other-probes.db')), probe: slow, now: h.now, ready: () => true, log: () => {},
+      policy: () => h.policy, stateStore: freeStoreAt(join(h.dir, 'other-probes.db')), vendorLadder: vendorLadderAt(join(h.dir, 'other-probes.db')), probe: slow, now: h.now, ready: () => true, log: () => {},
     });
     fenced.start();
     const inFlight = fenced.probeNow('qoder_worker');
@@ -333,6 +359,91 @@ test('probeNow validates its target, runs the named probe, and stop fences anyth
     await assert.rejects(() => h.monitor.probeNow(), /Weaver 正在停止/);
     h.setReady(true);
   } finally { await h.monitor.stop(); h.cleanup(); }
+});
+
+/** A monitor with its own policy and state tables, on a clock the test moves; `withReady: false` gives it no ready callback, so only its own stop() can fence it. */
+function lonelyMonitor(withReady: boolean, probe: Probe) {
+  const dir = mkdtempSync(join(tmpdir(), 'wv-free-stop-'));
+  let now = START;
+  const config = defaultConfig();
+  config.engines.qoder.enabled = true;
+  config.workers.qoder_worker.enabled = true;
+  const policy = new PolicyStore(join(dir, 'weaver.db'), () => now);
+  const base = policy.snapshot();
+  policy.save({ revision: base.revision, config, blocks: [] }, { allowEngineEnable: true });
+  const statePath = join(dir, 'state.db');
+  const calls: string[] = [];
+  let pumps = 0;
+  const monitor = new FreeChannelProbeMonitor({
+    policy: () => policy, stateStore: freeStoreAt(statePath), vendorLadder: vendorLadderAt(statePath),
+    probe: (route, signal) => { calls.push(route.worker); return probe(route, signal); },
+    now: () => now, ...(withReady ? { ready: () => true } : {}), onBlocksChanged: () => { pumps += 1; }, log: () => {},
+  });
+  return {
+    dir, policy, monitor, statePath, calls,
+    pumps: () => pumps,
+    advance: (minutes: number) => { now += minutes * MINUTE; },
+    now: () => now,
+    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+  };
+}
+
+test('after stop() a manual tick writes nothing and starts nothing, with or without a ready callback', async () => {
+  for (const withReady of [true, false]) {
+    const l = lonelyMonitor(withReady, () => Promise.resolve({ ok: false, ms: 5, error: '401 authentication failed' }));
+    try {
+      // Somebody else's held free-probe ban: the monitor adopts it as an open question and persists that.
+      const base = l.policy.snapshot();
+      l.policy.save({ revision: base.revision, config: base.config, blocks: [{ engine: 'qoder', model: 'Qwen3.8-Flash', worker: 'qoder_worker', reason: '额度耗尽：免费额度已用完', since: iso(l.now()), by: FREE_PROBE_BLOCK_BY }] });
+      l.monitor.start();
+      l.advance(1);
+      await l.monitor.tick();
+      assert.equal(readFree(l.statePath).workers.qoder_worker!.mode, 'quota', 'the question is open and persisted before the stop');
+      await l.monitor.stop();
+      // The ban is lifted by hand after the stop: reconciling the question is exactly what would write state now.
+      const snapshot = l.policy.snapshot();
+      l.policy.save({ revision: snapshot.revision, config: snapshot.config, blocks: [] });
+      const rows = JSON.stringify(readFree(l.statePath));
+      const revision = l.policy.snapshot().revision;
+      const probes = l.calls.length;
+      l.advance(30);
+      await l.monitor.tick();
+      await l.monitor.tick();
+      assert.equal(JSON.stringify(readFree(l.statePath)), rows, `a stopped monitor writes no state (ready callback: ${withReady})`);
+      assert.equal(l.policy.snapshot().revision, revision, 'nor policy');
+      assert.equal(l.calls.length, probes, 'and starts no probe');
+      assert.equal(l.pumps(), 0, 'nor announces anything');
+      await assert.rejects(() => l.monitor.probeNow('qoder_worker'), /正在停止/, 'a manual probe after the stop is refused as well');
+      // start() is what brings it back.
+      l.monitor.start();
+      await l.monitor.tick();
+      assert.equal(readFree(l.statePath).workers.qoder_worker!.mode, null, 'a restarted monitor reconciles again');
+      await l.monitor.stop();
+    } finally { await l.monitor.stop(); l.cleanup(); }
+  }
+});
+
+test('a greeting that answers only after stop() becomes neither a block nor a row, with or without a ready callback', async () => {
+  for (const withReady of [true, false]) {
+    let late: (outcome: ProbeOutcomeLike) => void = () => {};
+    // The greeting ignores the abort signal, like a process that is already past the point of being killed.
+    const l = lonelyMonitor(withReady, () => new Promise(resolve => { late = resolve; }));
+    try {
+      l.monitor.start();
+      l.advance(10);
+      const flying = l.monitor.tick();
+      await new Promise<void>(resolve => setImmediate(resolve));
+      assert.deepEqual(l.calls, ['qoder_worker'], 'the greeting is in flight');
+      const revision = l.policy.snapshot().revision;
+      const stopping = l.monitor.stop();
+      late({ ok: false, ms: 5, error: 'FreeUsageLimitError: free quota used up' });
+      await Promise.all([flying, stopping]);
+      assert.deepEqual(l.policy.snapshot().blocks, [], 'the late answer wrote no block');
+      assert.equal(l.policy.snapshot().revision, revision);
+      assert.deepEqual(readFree(l.statePath), { version: 1, workers: {}, history: [] }, 'and no row or history');
+      assert.equal(l.pumps(), 0);
+    } finally { await l.monitor.stop(); l.cleanup(); }
+  }
 });
 
 test('probe state is parsed, persisted in weaver.db and reloaded; an empty database adopts its own held block', async () => {
@@ -356,7 +467,7 @@ test('probe state is parsed, persisted in weaver.db and reloaded; an empty datab
       // A fresh monitor over the same policy but with empty probe tables adopts only its own marker.
       const adoptionLogs: string[] = [];
       const revived = new FreeChannelProbeMonitor({
-        policy: () => h.policy, stateStore: freeStoreAt(join(h.dir, 'empty.db')), probe: () => Promise.resolve({ ok: true, ms: 5 }), now: h.now, ready: () => true, log: message => adoptionLogs.push(message),
+        policy: () => h.policy, stateStore: freeStoreAt(join(h.dir, 'empty.db')), vendorLadder: vendorLadderAt(join(h.dir, 'empty.db')), probe: () => Promise.resolve({ ok: true, ms: 5 }), now: h.now, ready: () => true, log: message => adoptionLogs.push(message),
       });
       try {
         revived.start();

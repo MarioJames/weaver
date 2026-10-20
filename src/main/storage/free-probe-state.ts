@@ -4,6 +4,7 @@ import type { TaskFailure } from '../../shared/contracts/tasks';
 import type { FreeProbeHistoryRecord, FreeProbeMode } from '../../shared/contracts/monitoring';
 import { STALL_LADDER } from '../domain/penalties';
 import { boundedProbeError, boundedReason } from '../redact-context';
+import { transact, type Transactional } from './transaction';
 
 export const HISTORY_LIMIT = 50;
 
@@ -91,11 +92,12 @@ export function parseFreeProbeState(value: unknown): FreeProbeState {
 }
 
 /** Where the probe monitor keeps its per-worker questions and history: the weaver.db tables. */
-export interface FreeProbeStore { load(): FreeProbeState; save(state: FreeProbeState): void }
+export interface FreeProbeStore extends Transactional { load(): FreeProbeState; save(state: FreeProbeState): void }
 
 /** Same rows the migration script fills: one question per worker, history bounded like the file kept it. */
 export function dbFreeProbeStore(db: DatabaseSync, log: (message: string) => void = message => console.error(message)): FreeProbeStore {
   return {
+    connection: db,
     load(): FreeProbeState {
       const workers: Record<string, WorkerProbe> = {};
       for (const row of db.prepare('SELECT * FROM free_probe_workers').all() as Record<string, unknown>[]) {
@@ -121,8 +123,7 @@ export function dbFreeProbeStore(db: DatabaseSync, log: (message: string) => voi
       }
     },
     save(state: FreeProbeState): void {
-      db.exec('BEGIN IMMEDIATE');
-      try {
+      transact(db, () => {
         db.exec('DELETE FROM free_probe_workers');
         const insertWorker = db.prepare('INSERT INTO free_probe_workers(worker,level,mode,last_trigger_at,needs_attention,blocked_until,next_probe_at,probe_successes,head,block_since) VALUES (?,?,?,?,?,?,?,?,?,?)');
         for (const [worker, item] of Object.entries(state.workers)) {
@@ -131,8 +132,7 @@ export function dbFreeProbeStore(db: DatabaseSync, log: (message: string) => voi
         db.exec('DELETE FROM free_probe_history');
         const insertRecord = db.prepare('INSERT INTO free_probe_history(worker,engine,level,at,body) VALUES (?,?,?,?,?)');
         for (const record of state.history) insertRecord.run(record.worker, record.engine, record.level, record.at, JSON.stringify(record));
-        db.exec('COMMIT');
-      } catch (error) { try { db.exec('ROLLBACK'); } catch { /* SQLite may already have rolled back. */ } throw error; }
+      });
     },
   };
 }

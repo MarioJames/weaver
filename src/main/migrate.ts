@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 /** Every schema change lands here as one ordered step; PRAGMA user_version tracks what ran. */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 const STEPS: string[][] = [
   // 1: the task store tables.
@@ -61,6 +61,24 @@ const STEPS: string[][] = [
     `ALTER TABLE policy_workers DROP COLUMN proxy`,
     `UPDATE policy_revisions SET body=json_patch(body, json_object('config', json_object('owners', json((SELECT json_group_object(key, json_object('proxy', json('null'))) FROM json_each(body, '$.config.owners') WHERE type='object'))))) WHERE CASE WHEN json_valid(body) THEN json_type(body, '$.config.owners')='object' AND EXISTS (SELECT 1 FROM json_each(body, '$.config.owners') WHERE type='object') ELSE 0 END`,
     `UPDATE policy_revisions SET body=json_patch(body, json_object('config', json_object('workers', json((SELECT json_group_object(key, json_object('proxy', json('null'))) FROM json_each(body, '$.config.workers') WHERE type='object'))))) WHERE CASE WHEN json_valid(body) THEN json_type(body, '$.config.workers')='object' AND EXISTS (SELECT 1 FROM json_each(body, '$.config.workers') WHERE type='object') ELSE 0 END`,
+  ],
+  // 9: one vendor rate-limit ladder per worker. The free-channel probe used to keep its own rate-limit level in
+  // free_probe_workers (level, last_trigger_at of rows with mode 'rate_limit'); those rows merge into vendor_worker_limits
+  // and the probe table keeps only the probe schedule for them. Merge rule per worker present in both tables:
+  // last_trigger_at is the newer of the two; the level is the higher one when the two triggers are less than 7200000 ms
+  // (LADDER_RESET_MS, the 2 hour reset window) apart, otherwise the level of the newer trigger. A worker in only one
+  // table keeps its row. Rows with no trigger time or no level carry no ladder and are not merged. Idempotent.
+  [
+    `INSERT INTO vendor_worker_limits(worker, level, last_trigger_at)
+     SELECT worker, level, last_trigger_at FROM free_probe_workers WHERE mode = 'rate_limit' AND last_trigger_at IS NOT NULL AND level > 0
+     ON CONFLICT(worker) DO UPDATE SET
+       level = CASE
+         WHEN abs(excluded.last_trigger_at - vendor_worker_limits.last_trigger_at) < 7200000 THEN max(excluded.level, vendor_worker_limits.level)
+         WHEN excluded.last_trigger_at > vendor_worker_limits.last_trigger_at THEN excluded.level
+         ELSE vendor_worker_limits.level
+       END,
+       last_trigger_at = max(excluded.last_trigger_at, vendor_worker_limits.last_trigger_at)`,
+    `UPDATE free_probe_workers SET level = 0, last_trigger_at = NULL WHERE mode = 'rate_limit'`,
   ],
 ];
 

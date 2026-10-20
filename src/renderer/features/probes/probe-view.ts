@@ -1,13 +1,10 @@
 import type { FreeChannelStatus, FreeWorkerStatus } from '../../../shared/contracts/monitoring';
 import { activeBlocks, coveringBlock } from '../../../shared/policy/availability';
+import { FREE_PROBE_BLOCK_BY, STALL_BLOCK_BY, VENDOR_BLOCK_BY } from '../../../shared/policy/blocks';
 import { type Block, type Owner, type Worker } from '../../../shared/contracts/policy';
 import { dateText } from '../quota/quota-view';
 import type { StatusTone } from '../../format/status-colors';
 
-/** Block markers the free-channel probe and the penalty ladders write. The main module is not importable here (it reads the filesystem). */
-export const STALL_BLOCK_BY = 'weaver-stall';
-export const VENDOR_BLOCK_BY = 'weaver-vendor-limit';
-export const FREE_PROBE_BLOCK_BY = 'weaver-free-probe';
 /** Consecutive passing probes that lift a top-level stall penalty (same value as the monitor). */
 export const PROBE_PASSES_NEEDED = 3;
 /** How many probes the panel lists, newest first. */

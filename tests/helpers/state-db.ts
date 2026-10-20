@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { migrate } from '../../src/main/migrate';
 import { dbStallStore, type StallState, type StallStateStore } from '../../src/main/storage/stall-state';
 import { dbFreeProbeStore, type FreeProbeState, type FreeProbeStore } from '../../src/main/storage/free-probe-state';
+import { dbVendorLadder, type VendorLadderStore } from '../../src/main/storage/vendor-limits';
 
 /** One connection per database file for the whole test process, migrated to the current schema. */
 const open = new Map<string, DatabaseSync>();
@@ -19,6 +20,8 @@ export function stateDb(path: string): DatabaseSync {
 export const stallStoreAt = (path: string, log?: (message: string) => void): StallStateStore => dbStallStore(stateDb(path), log);
 export const freeStoreAt = (path: string, log?: (message: string) => void): FreeProbeStore => dbFreeProbeStore(stateDb(path), log);
 /** What the monitor persisted, read back through the same tables a restart reads. */
+/** The vendor rate-limit ladder rows of the same database file the probe state lives in. */
+export const vendorLadderAt = (path: string): VendorLadderStore => dbVendorLadder(stateDb(path));
 export const readStall = (path: string): StallState => stallStoreAt(path).load();
 export const readFree = (path: string): FreeProbeState => freeStoreAt(path).load();
 

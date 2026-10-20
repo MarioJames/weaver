@@ -17,6 +17,7 @@ import { validateConfig } from '../src/main/policy/routing';
 import { type Block } from '../src/shared/contracts/policy';
 import type { Task, TaskDispatch, TaskFailure } from '../src/shared/contracts/tasks';
 import { stallStoreAt } from './helpers/state-db';
+import { engineDiagnostics } from './helpers/diagnostics';
 import { previewOn } from './helpers/policy-preview';
 
 class HeldWorker extends EventEmitter {
@@ -46,7 +47,7 @@ function setup() {
   config.owners.claude_owner!.max_parallel = 10;
   policy.save({ revision: snapshot.revision, config, blocks: [] }, { allowEngineEnable: true });
   const monitor = new StallMonitor({ tasks: () => store.list(), policy: () => policy, stateStore: stallStoreAt(join(dir, 'state.db')), cpu: async () => null, log: () => {} });
-  const handler = new CommandHandler(manager, policy, () => { throw new Error('No owner launch in fixture'); }, () => false, monitor);
+  const handler = new CommandHandler(manager, policy, () => { throw new Error('No owner launch in fixture'); }, () => false, engineDiagnostics(policy, monitor));
   const raw = (command: string, args: Record<string, unknown> = {}) => handler.handle({ apiVersion: 'weaver.v1', commandId: randomUUID(), command, args });
   const call = (command: string, args: Record<string, unknown> = {}): any => { const response = raw(command, args); assert.equal(response.ok, true, JSON.stringify(response)); return response.data; };
   const create = (): Task => store.get(call('tasks.create', { title: 'Worker block', instruction: 'Inspect the fixture', ownerProfileId: 'claude_owner', workspace: dir }).id);
