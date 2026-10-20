@@ -435,11 +435,17 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
       outline-offset: 1px;
     }
   `,
-  workspaceGroup: css`
-    display: flex;
-    flex-direction: column;
+  /** A virtualized column body: rows carry their own spacing (items are measured, so no margins), the trailing gap is handed back. */
+  lane: css`
     min-inline-size: 0;
-    gap: 8px;
+    margin-block-end: calc(-1 * ${cssVar.marginXS});
+    overflow-anchor: none;
+  `,
+  laneRow: css`
+    min-inline-size: 0;
+    padding-block-end: ${cssVar.marginXS};
+
+    &[data-row='heading'] { padding-block: 4px 12px; }
   `,
   workspaceHeading: css`
     display: flex;
@@ -715,16 +721,38 @@ export const styles = createStaticStyles(({ css, cssVar, responsive }) => ({
     gap: 6px;
     align-items: center;
     min-inline-size: 0;
+    max-inline-size: 100%;
+    overflow: hidden;
+    white-space: nowrap;
   `,
   /** Archive drawer: filters above the table. */
   archiveBody: css`
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
+    min-block-size: 0;
     gap: 12px;
     min-inline-size: 0;
   `,
+  /** The archive table takes the room the drawer leaves under the filters; its virtual body scrolls inside. */
+  archiveTable: css`
+    flex: 1 1 auto;
+    min-block-size: 280px;
+    min-inline-size: 0;
+    overflow: hidden;
+  `,
+  /** Virtual rows keep one fixed height: long values end in an ellipsis and carry the full text as a tooltip. */
+  archiveCell: css`
+    display: block;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  `,
   archiveDirectory: css`
     display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
     overflow-wrap: normal;
     word-break: normal;

@@ -334,6 +334,25 @@ export function workspaceGroups(tasks: Task[]): { workspace: string; label: stri
   }
   return [...groups].map(([workspace, tasks]) => ({ workspace, label: workspaceLabel(workspace), tasks }));
 }
+/** One line of a column once its workspace groups are flattened: a group heading or a card. Only the lines near the viewport are mounted. */
+export type BoardRow = { key: string; kind: 'heading'; label: string; title: string; count: number } | { key: string; kind: 'card'; task: Task };
+/** Groups flattened into one row sequence; a single group needs no heading, exactly as before. */
+export function boardRows(groups: { workspace: string; label: string; tasks: Task[] }[]): BoardRow[] {
+  const headings = groups.length > 1;
+  return groups.flatMap(group => [
+    ...(headings ? [{ key: `group:${group.workspace}`, kind: 'heading' as const, label: group.label, title: group.workspace || group.label, count: group.tasks.length }] : []),
+    ...group.tasks.map(task => ({ key: task.id, kind: 'card' as const, task })),
+  ]);
+}
+/** The archive table header sits above its scrolling body; its rows are virtual, so the body needs a numeric height. */
+export const ARCHIVE_TABLE_HEADER = 40;
+export const ARCHIVE_TABLE_MIN_BODY = 240;
+/** Virtual rows are one line tall, so every column has a fixed width; narrower drawers scroll sideways. */
+export const ARCHIVE_TABLE_WIDTH = 780;
+/** The body height for the drawer space left to the table; unmeasured space falls back to the minimum so the table never collapses. */
+export function archiveScrollY(available: number | undefined): number {
+  return Math.max(ARCHIVE_TABLE_MIN_BODY, Math.floor((available ?? 0) - ARCHIVE_TABLE_HEADER));
+}
 /** The directories earlier tasks already work in, newest first: what a new task most likely wants to pick again. Only absolute paths count. */
 export function recentWorkspaces(tasks: Task[], limit = 8): string[] {
   const seen = new Set<string>();

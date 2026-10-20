@@ -6,7 +6,7 @@ const source = readFileSync(new URL('../src/renderer/style.ts', import.meta.url)
 const block = (key: string, next: string) => source.slice(source.indexOf(`  ${key}: css\``), source.indexOf(`  ${next}: css\``));
 
 test('lane styles use theme tokens rather than literal colors and carry no accent bar or header border', () => {
-  const lanes = source.slice(source.indexOf('  columns: css`'), source.indexOf('  workspaceGroup: css`'));
+  const lanes = source.slice(source.indexOf('  columns: css`'), source.indexOf('  workspaceHeading: css`'));
   assert.ok(lanes.length > 0);
   assert.doesNotMatch(lanes, /#[\da-f]{3,8}\b|\brgba?\s*\(|\bhsla?\s*\(|\bhsla?\s*\(/i);
   assert.doesNotMatch(lanes, /border-block-start|border-top|border-bottom|border-block-end|--column-accent/);

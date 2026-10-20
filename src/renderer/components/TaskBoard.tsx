@@ -6,13 +6,14 @@ import { ChevronDown, ChevronRight, ChevronUp, Clock, Folder, Loader2, X } from 
 import type { Task } from '../../shared/types';
 import { displayLog } from '../log-view';
 import type { FilterDimension, FilterOption, TaskSelection, TaskTimeRange } from '../task-view';
-import { FILTER_DIMENSIONS, TASK_COLUMNS, TIME_RANGES, applyTaskFilters, cardFooter, childSummary, childSummaryLabel, columnize, dispatchKind, emptySelection, facetOptions, filterLabels, filterSummary, hasFilters, isOpenTask, nonArchived, readEndedExpanded, readFiltersCollapsed, readTaskFilters, resolveSelection, selectedEntries, toggleOption, workspaceGroups, writeEndedExpanded, writeFiltersCollapsed, writeTaskFilters } from '../task-view';
+import { FILTER_DIMENSIONS, TASK_COLUMNS, boardRows, TIME_RANGES, applyTaskFilters, cardFooter, childSummary, childSummaryLabel, columnize, dispatchKind, emptySelection, facetOptions, filterLabels, filterSummary, hasFilters, isOpenTask, nonArchived, readEndedExpanded, readFiltersCollapsed, readTaskFilters, resolveSelection, selectedEntries, toggleOption, workspaceGroups, writeEndedExpanded, writeFiltersCollapsed, writeTaskFilters } from '../task-view';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../status-colors';
 import type { DisplayStatus } from '../status-colors';
 import { styles } from '../style';
 import { AgentFacts } from './AgentFacts';
 import { EngineIcon } from './EngineIcon';
 import { TimeText } from './TimeText';
+import { VirtualLane } from './VirtualLane';
 
 /** Every card has a shared status tag; dispatching states also carry a spinner and activity. */
 function cardStatus(task: Task): { label: string; color?: string; spin: boolean } {
@@ -176,7 +177,7 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
     const children = childSummary(task, tasks);
     const footer = cardFooter(task);
     const activity = task.executionRole === 'owner' ? task.ownerHost ? `Herdr · ${task.ownerHost.agentName}` : '正在 Herdr 中启动父 Agent' : displayLog(latest?.message ?? '等待首次调度');
-    return <button key={task.id} type="button" className={styles.taskCard} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
+    return <button type="button" className={styles.taskCard} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
       <span className={styles.cardTitle}>
         {task.executionRole === 'owner' && <Tag className={styles.cardTag} size="small">父 Agent</Tag>}
         {task.parentTaskId && <Tag className={styles.cardTag} size="small">子任务</Tag>}
@@ -206,7 +207,7 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
       {TASK_COLUMNS.map((column, index) => {
         const items = columns[index];
         const expanded = expandedLanes.includes(column.key);
-        const groups = workspaceGroups(expanded ? items : items.slice(0, 20));
+        const rows = boardRows(workspaceGroups(expanded ? items : items.slice(0, 20)));
         /** Only 已结束 folds; the columns with live work are always in view. */
         const foldable = column.key === 'closed';
         const shown = !foldable || ended || !items.length;
@@ -222,14 +223,13 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
             </button> : count}
           </header>
           {shown && <>
-            {groups.map(group => <div key={group.workspace} className={styles.workspaceGroup}>
-              {groups.length > 1 && <h3 className={styles.workspaceHeading} title={group.workspace || group.label}>
+            {items.length > 0 && <VirtualLane rows={rows} rowKey={row => row.key} rowKind={row => row.kind} pinned={rows.flatMap((row, at) => row.kind === 'card' && row.task.id === selected ? [at] : [])}>
+              {row => row.kind === 'heading' ? <h3 className={styles.workspaceHeading} title={row.title}>
                 <Icon icon={Folder} size="small" />
-                <span className={styles.workspaceName}>{group.label}</span>
-                <span className={styles.numbers}>{group.tasks.length}</span>
-              </h3>}
-              {group.tasks.map(task => card(task))}
-            </div>)}
+                <span className={styles.workspaceName}>{row.label}</span>
+                <span className={styles.numbers}>{row.count}</span>
+              </h3> : card(row.task)}
+            </VirtualLane>}
             {!items.length && <Text type="secondary" className={styles.meta}>暂无任务</Text>}
             {items.length > 20 && <Button size="small" type="text" aria-expanded={expanded} onClick={() => setExpandedLanes(current => expanded ? current.filter(key => key !== column.key) : [...current, column.key])}>
               {expanded ? '收起' : `查看全部 ${items.length}`}
