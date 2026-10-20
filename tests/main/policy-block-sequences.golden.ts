@@ -56,22 +56,23 @@ export const QUOTA_SEQUENCE: Row[] = [
   ["available-again changed=false",4,null,"claude///user/"],
 ];
 
+// Escalations whose block text is unchanged write no policy revision, and an unchanged block keeps its place in the list.
 export const STALL_FAIL_LADDER: Row[] = [
   ["t1",1,0,""],
   ["t6",2,1,"claude///stall/"],
-  ["t11",3,1,"claude///stall/"],
-  ["manual blocks",4,1,"claude///stall/|codex///user/|claude//sonnet/user/"],
-  ["t21",5,1,"codex///user/|claude//sonnet/user/|claude///stall/"],
-  ["t31",6,1,"codex///user/|claude//sonnet/user/|claude///stall/"],
-  ["t41",7,1,"codex///user/|claude//sonnet/user/|claude///stall/"],
-  ["t51",7,1,"codex///user/|claude//sonnet/user/|claude///stall/"],
-  ["t61",7,1,"codex///user/|claude//sonnet/user/|claude///stall/"],
-  ["after unblock",8,2,"codex///user/"],
-  ["t72",9,3,"codex///user/|claude///stall/"],
-  ["t77",10,4,"codex///user/"],
-  ["t78",11,5,"codex///user/|claude///stall/"],
-  ["t88",12,6,"codex///user/"],
-  ["t89",13,7,"codex///user/|claude///stall/"],
+  ["t11",2,1,"claude///stall/"],
+  ["manual blocks",3,1,"claude///stall/|codex///user/|claude//sonnet/user/"],
+  ["t21",3,1,"claude///stall/|codex///user/|claude//sonnet/user/"],
+  ["t31",3,1,"claude///stall/|codex///user/|claude//sonnet/user/"],
+  ["t41",3,1,"claude///stall/|codex///user/|claude//sonnet/user/"],
+  ["t51",3,1,"claude///stall/|codex///user/|claude//sonnet/user/"],
+  ["t61",3,1,"claude///stall/|codex///user/|claude//sonnet/user/"],
+  ["after unblock",4,2,"codex///user/"],
+  ["t72",5,3,"codex///user/|claude///stall/"],
+  ["t77",6,4,"codex///user/"],
+  ["t78",7,5,"codex///user/|claude///stall/"],
+  ["t88",8,6,"codex///user/"],
+  ["t89",9,7,"codex///user/|claude///stall/"],
 ];
 
 export const STALL_PASS_LIFT: Row[] = [

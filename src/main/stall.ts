@@ -265,12 +265,16 @@ export class StallMonitor {
   /**
    * The state half of the user's 「恢复派发」 (the blocks go through the unblock operation): this engine's ladder and
    * streak start over, the record stays, and this tick cannot punish it again. Other engines are preserved.
+   * The blocks are already gone when this runs, so a failed save must not leave the memory ahead of the database
+   * unnoticed: the state stays dirty and the next tick writes it.
    */
   resetEngine(engine: string): void {
     const penalty = this.state.engines[engine];
     if (penalty) this.state.engines[engine] = emptyPenalty();
     this.held.add(engine);
+    this.dirty = true;
     this.store.save(this.state);
+    this.dirty = false;
   }
 
   /** Concurrent ticks collapse into the one in flight; after stop() nothing ticks again until start(). */
@@ -448,12 +452,18 @@ export class StallMonitor {
     return true;
   }
 
-  /** A probe that did not pass is evidence the engine is still unhealthy: one level up, right now. */
+  /**
+   * A probe that did not pass is evidence the engine is still unhealthy: one level up, right now. Runs inside commit():
+   * when the block has to change and cannot be saved this throws, so the ladder, the record and the block stay as they
+   * were and the same overdue probe is answered again.
+   */
   private escalate(engine: string, penalty: EnginePenalty, now: number): void {
     const level = Math.min(penalty.level + 1, STALL_LADDER.length);
-    this.state.engines[engine] = { level, lastTriggerAt: penalty.lastTriggerAt, needsAttention: level >= STALL_LADDER.length, probeSuccesses: 0, head: penalty.head, ...armStall(level, now) };
     // The block is still what keeps the engine out of routing, so no pump: only its reason has to stay honest.
-    this.writeBlock({ engine, reason: reasonFor(penalty.head || NO_HEAD), since: new Date(now).toISOString(), by: STALL_BLOCK_BY });
+    const block: Block = { engine, reason: reasonFor(penalty.head || NO_HEAD), since: new Date(now).toISOString(), by: STALL_BLOCK_BY };
+    const saved = this.saveBlocks(engine, (blocks, previous) => previous?.reason === block.reason ? undefined : [...blocks, { ...block, since: previous?.since ?? block.since }]);
+    if (!saved) throw new Error(`Stall escalation for ${engine} was not saved`);
+    this.state.engines[engine] = { level, lastTriggerAt: penalty.lastTriggerAt, needsAttention: level >= STALL_LADDER.length, probeSuccesses: 0, head: penalty.head, ...armStall(level, now) };
     this.dirty = true;
   }
 
@@ -479,8 +489,9 @@ export class StallMonitor {
   /**
    * Rewrites only this engine's own penalty; every other block in the policy is kept as it was found. One retry with
    * a freshly read revision: a concurrent save must lose this monitor's intent, never anything another writer added.
+   * A build that returns undefined means the policy already says what is wanted: nothing is saved.
    */
-  private saveBlocks(engine: string, build: (blocks: Block[], previous: Block | undefined) => Block[]): boolean {
+  private saveBlocks(engine: string, build: (blocks: Block[], previous: Block | undefined) => Block[] | undefined): boolean {
     return this.blocks.update(snapshot => {
       const previous = snapshot.blocks.find(block => isStallEngineBlock(block, engine));
       return build(snapshot.blocks.filter(block => !isStallEngineBlock(block, engine)), previous);
