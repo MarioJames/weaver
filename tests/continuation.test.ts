@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TaskStore } from '../src/main/store';
 import { MockOwnerHostAdapter } from '../src/main/adapters/logical';
-import { ContinuationService, handoffPrompt, idleContinuationDue, redactContext, MAX_HANDOFF_PROMPT_CHARS, MAX_CONTEXT_PACK_BYTES, type ContinuationTask } from '../src/main/continuation';
+import { ContinuationService, idleContinuationDue, MAX_CONTEXT_PACK_BYTES, type ContinuationTask } from '../src/main/continuation';
+import { handoffPrompt, MAX_HANDOFF_PROMPT_CHARS } from '../src/main/owners/prompts';
+import { redactContext } from '../src/main/redact-context';
 import type { ContextPack } from '../src/shared/contracts/continuation';
 import { metadataOf, setMetadataOf } from './helpers/store-metadata';
 function fixture() {

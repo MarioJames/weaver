@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { TaskStore } from '../src/main/store';
+import { recoverInterruptedTasks } from '../src/main/application/tasks/recovery';
 import { TaskManager } from '../src/main/manager';
 import { CommandHandler } from '../src/main/commands';
 import { PolicyStore } from '../src/main/policy/store';
@@ -97,7 +98,7 @@ test('native work holds an owner slot, can be cancelled, and survives a restart'
     assert.equal(b.ownerId, a.ownerId, 'one owner instance holds one slot budget');
     f.call('workers.spawn', { taskId: a.id });
     assert.equal(f.call('workers.spawn', { taskId: b.id }).scheduled, true);
-    const reloaded = new TaskStore(join(f.dir,'weaver.db')); reloaded.recover();
+    const reloaded = new TaskStore(join(f.dir,'weaver.db')); recoverInterruptedTasks(reloaded);
     assert.equal(reloaded.get(a.id).status, 'running');
     assert.equal(f.call('tasks.cancel', { taskId: a.id }).status, 'cancelled');
     for (let i = 0; i < 50 && f.store.get(b.id).status !== 'running'; i++) await new Promise(resolve => setTimeout(resolve, 10));

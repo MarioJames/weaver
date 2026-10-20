@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { Task, WorkPackage } from '../../../shared/contracts/tasks';
 import { workerInstruction } from '../../adapters/instruction';
+import { event, slotGroupCount, slotGroupFor } from '../../domain/tasks';
 import type { TaskManager } from '../../manager';
 import type { PolicyStore } from '../../policy/store';
-import { event, slotGroupCount, slotGroupFor } from '../../store';
 import { fail } from '../commands/errors';
 import { terminal, vendorLimited, type TaskRecords } from '../tasks/records';
 import type { Dispatcher } from './dispatch';

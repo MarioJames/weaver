@@ -3,10 +3,11 @@ import type { Artifact, Task, TaskInput, TaskFailure, WorkerRecord } from '../sh
 import { parseTaskInput } from '../shared/validation';
 import type { ManagedProcess, WorkerAdapter } from './adapters/worker';
 import { JsonlParser } from './protocol';
-import { TaskStore, event, slotGroupCount, slotGroupName, slotGroupOf } from './store';
+import { event, slotGroupCount, slotGroupName, slotGroupOf } from './domain/tasks';
+import type { TaskStore } from './store';
 import { classifyVendorError } from './adapters/cli/vendor-errors';
 import { redact } from './adapters/cli/redact';
-import { redactContext } from './continuation';
+import { redactContext } from './redact-context';
 
 interface Running { child: ManagedProcess; timeout?: NodeJS.Timeout; killTimer?: NodeJS.Timeout; error?: string; result?: string; cancelled: boolean; stderrBytes: number; stderrTail: string; adapterTail?: boolean; vendorError?: string; firstTimer?: NodeJS.Timeout }
 

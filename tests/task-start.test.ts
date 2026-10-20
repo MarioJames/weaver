@@ -12,7 +12,9 @@ import { applyCallerWorkspace } from '../src/cli/input';
 import { QuotaProber } from '../src/main/quota';
 import { CommandHandler } from '../src/main/commands';
 import { TaskManager } from '../src/main/manager';
-import { TaskStore, slotGroupCount, slotGroupFor } from '../src/main/store';
+import { TaskStore } from '../src/main/store';
+import { slotGroupCount, slotGroupFor } from '../src/main/domain/tasks';
+import { recoverInterruptedTasks } from '../src/main/application/tasks/recovery';
 import { PolicyStore } from '../src/main/policy/store';
 import type { OwnerLaunchInput, OwnerLaunchResult } from '../src/main/owner-host';
 
@@ -41,7 +43,7 @@ test('root start returns promptly, replays once, preserves full owner goal and l
   const prompt=f.launches[0].input.prompt;assert.ok(prompt.includes(f.task.instruction));assert.match(prompt,/tasks describe/);assert.match(prompt,/parentTaskId/);assert.match(prompt,/tasks complete/);assert.match(prompt,/不可拆/);assert.equal(f.launches[0].input.engineKind,'codex');
   f.call('tasks.describe',{taskId:f.task.id,expectedRevision:f.store.get(f.task.id).revision,title:'完成拆分任务',acceptanceCriteria:['已核验全部结果']});
   await f.launch();assert.equal(f.store.get(f.task.id).ownerHost?.workspaceId,'fake-workspace');
-  const loaded=new TaskStore(f.store.path);loaded.recover();assert.equal(loaded.get(f.task.id).executionRole,'owner');assert.equal(loaded.get(f.task.id).status,'running');
+  const loaded=new TaskStore(f.store.path);recoverInterruptedTasks(loaded);assert.equal(loaded.get(f.task.id).executionRole,'owner');assert.equal(loaded.get(f.task.id).status,'running');
  }finally{await f.close();}
 });
 
@@ -71,7 +73,7 @@ test('failed launch is visible, drain aborts pending launches, and cancellation 
   const f=fixture();try{
    f.call('tasks.start',{taskId:f.task.id});await f.settle();assert.equal(f.launches.length,1);
    if(mode==='failure'){f.launches[0].reject(new Error('fixture launch rejected'));await f.settle();assert.equal(f.store.get(f.task.id).status,'failed');assert.match(f.store.get(f.task.id).failure!.message,/fixture launch rejected/);}
-   if(mode==='drain'){const before=f.store.get(f.task.id);await f.handler.drain();assert.equal(f.launches[0].input.signal?.aborted,true);assert.deepEqual(f.store.get(f.task.id),before);const loaded=new TaskStore(f.store.path);loaded.recover();assert.equal(loaded.get(f.task.id).status,'failed');}
+   if(mode==='drain'){const before=f.store.get(f.task.id);await f.handler.drain();assert.equal(f.launches[0].input.signal?.aborted,true);assert.deepEqual(f.store.get(f.task.id),before);const loaded=new TaskStore(f.store.path);recoverInterruptedTasks(loaded);assert.equal(loaded.get(f.task.id).status,'failed');}
    if(mode==='cancel'){f.call('tasks.cancel',{taskId:f.task.id});await f.launch();assert.equal(f.store.get(f.task.id).status,'cancelled');assert.equal(f.store.get(f.task.id).ownerHost,undefined);assert.equal(f.closed.length,1);}
   }finally{await f.close();}
  }

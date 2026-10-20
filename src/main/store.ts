@@ -1,32 +1,12 @@
 import { mkdirSync, chmodSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { dirname } from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { ownerSession } from '../shared/policy/owner-instance';
 import { type LogicalOwner } from '../shared/contracts/owners';
 import { type WorkPackage } from '../shared/contracts/tasks';
 import { type CommandReceipt } from '../shared/contracts/commands';
-import type { Task, TaskEvent, TaskSummary } from '../shared/contracts/tasks';
+import type { Task, TaskSummary } from '../shared/contracts/tasks';
 import { migrate } from './migrate';
-export const active = (task: Task) => task.status === 'running' || task.status === 'cancelling';
-/** Slots belong to the exact owner instance a task is bound to; unbound work shares only its own profile group. */
-const instanceGroup = (ownerId: string) => `instance:${ownerId}`;
-const profileGroup = (profile: string) => `profile:${profile}`;
-export const slotGroupOf = (task: Pick<Task, 'ownerId' | 'dispatch'>): string | undefined => task.ownerId ? instanceGroup(task.ownerId) : task.dispatch ? profileGroup(task.dispatch.owner) : undefined;
-/** The group new work competes in: its own instance when bound, otherwise the profile group of unbound work. */
-export const slotGroupFor = (ownerId: string | undefined, profile: string) => ownerId ? instanceGroup(ownerId) : profileGroup(profile);
-/** Running and cancelling tasks already holding a slot of the same owner instance. */
-export const slotGroupCount = (tasks: Task[], group: string | undefined): number => group === undefined ? 0 : tasks.reduce((held, task) => held + (active(task) && task.executionRole!=='owner' && slotGroupOf(task) === group ? 1 : 0), 0);
-/** Whose slots these are, in the words an owner reads when a dispatch has to wait. */
-export const slotGroupName = (owners: LogicalOwner[], ownerId: string | undefined, profile: string): string => {
- const instance = ownerId ? owners.find(owner => owner.id === ownerId) : undefined;
- return instance ? `Owner instance ${instance.name} of profile ${profile}` : `Owner ${profile}`;
-};
-export function event(task: Task, kind: TaskEvent['kind'], message: string): void {
- const at = new Date().toISOString(); task.updatedAt = at;
- task.events.push({id:randomUUID(), at, kind, message});
- if (task.events.length > 500) task.events.splice(0, task.events.length - 500);
-}
 export type VendorLimit={level:number;lastTriggerAt:number};
 /** Ladder key for a dispatch that names no worker: the legacy per-engine ladder. */
 export const engineLadderKey=(engine:string):string=>`@engine:${engine}`;
@@ -118,10 +98,6 @@ export class TaskStore {
   if(durability==='stream'&&!this.inTransaction){this.pending.set(task.id,value);this.sequence++;this.scheduleFlush(onError);return;}
   this.transaction(()=>{this.pending.delete(task.id);this.writeTask(value);});
  }
- recover():void{this.transaction(()=>{for(const head of this.listHeads())if(active(head)&&(head.run?.execution!=='native'||(head.executionRole==='owner'&&!head.ownerHost))){
-  const task=this.get(head.id);task.status='failed';if(task.run){task.run.status='stopped';task.run.endedAt=new Date().toISOString();delete task.run.pid;}
-  event(task,'error',task.executionRole==='owner'?'Owner launch interrupted by app exit; inspect Herdr before retrying tasks start.':'Interrupted by app exit. No worker was resumed; create a new task to retry.');this.put(task);
- }});}
  flush():void{if(this.pending.size)this.transaction(()=>{});}
  close():void{if(this.closed)return;this.flush();clearTimeout(this.flushTimer);this.db.close();this.closed=true;}
  private scheduleFlush(onError:(error:unknown)=>void):void{

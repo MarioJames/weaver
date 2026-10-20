@@ -121,3 +121,31 @@ test('only the runtime and transport entry points import the command handler mod
   const importers = scan().edges.filter(edge => edge.to === 'main/commands').map(edge => edge.from.replace(/\.ts$/, '')).sort();
   assert.deepEqual(importers, ['main/runtime', 'main/transport/handlers']);
 });
+
+// Monitors observe and decide; storage owns SQL. Neither reaches into the use-case layer or the entry points.
+const MONITOR_FILES = new Set(['main/stall', 'main/free-channel', 'main/quota/index']);
+const isMonitor = (module: string): boolean => MONITOR_FILES.has(module) || module.startsWith('main/monitors/');
+const isApplicationOrEntry = (module: string): boolean =>
+  module.startsWith('main/application/') || module.startsWith('main/transport/') || APPLICATION_FORBIDDEN.has(module);
+
+test('main/storage does not import monitors, the application layer, transport or the entry points', () => {
+  const edges = scan().edges.filter(edge => edge.from.startsWith('main/storage/'));
+  assert.ok(edges.length > 0, 'storage modules must be scanned');
+  const bad = edges.filter(edge => isMonitor(edge.to) || edge.to.startsWith('main/quota/') || isApplicationOrEntry(edge.to)).map(edge => `${edge.from} -> ${edge.to}`);
+  assert.deepEqual(bad, []);
+});
+
+test('monitors do not import the application layer, the command handler or the owner continuation service', () => {
+  const edges = scan().edges.filter(edge => isMonitor(edge.from.replace(/\.tsx?$/, '')));
+  assert.ok(edges.length > 0, 'monitor modules must be scanned');
+  const bad = edges.filter(edge => isApplicationOrEntry(edge.to) || edge.to === 'main/continuation').map(edge => `${edge.from} -> ${edge.to}`);
+  assert.deepEqual(bad, []);
+  assert.deepEqual(scan().edges.filter(edge => edge.from === 'main/manager.ts' && edge.to === 'main/continuation'), []);
+});
+
+test('monitors keep SQL and the SQLite handle in main/storage', () => {
+  for (const module of ['stall', 'free-channel', 'quota/index']) {
+    const code = stripComments(readFileSync(join(SRC, 'main', `${module}.ts`), 'utf8'));
+    assert.doesNotMatch(code, /\b(?:SELECT|INSERT|DELETE FROM|BEGIN IMMEDIATE)\b|DatabaseSync|node:sqlite/, `${module} must not hold SQL`);
+  }
+});

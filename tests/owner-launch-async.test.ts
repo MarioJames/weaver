@@ -8,7 +8,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { CommandHandler } from '../src/main/commands';
-import { TaskStore, event } from '../src/main/store';
+import { TaskStore } from '../src/main/store';
+import { event } from '../src/main/domain/tasks';
 import { TaskManager } from '../src/main/manager';
 import { PolicyStore } from '../src/main/policy/store';
 import { MockWorkerAdapter } from '../src/main/adapters/worker';

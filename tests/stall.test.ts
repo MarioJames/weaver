@@ -8,10 +8,14 @@ import { randomUUID } from 'node:crypto';
 import { defaultConfig } from '../src/main/policy/routing';
 import { PolicyStore } from '../src/main/policy/store';
 import { parseRpcBody } from '../src/main/rpc';
-import { CPU_IDLE_SHARE, LADDER_RESET_MS, PROBE_MS, PROBE_SUCCESSES, STALL_BLOCK_BY, STALL_LADDER, STALL_MS, STALL_QUORUM, STALL_RECOVERY, StallMonitor, emptyPenalty, idleSince, isStalled, nextPenalty, silenceMs, parseStallState, stalledTasks, systemdCpuUsage, unhealthyEngines, type CpuReader, type CpuSample, type EnginePenalty, type ProbeRoute, type RecoveryProbe, type StallPolicy, type StallState } from '../src/main/stall';
+import { CPU_IDLE_SHARE, STALL_BLOCK_BY, STALL_MS, STALL_QUORUM, STALL_RECOVERY, StallMonitor, emptyPenalty, idleSince, isStalled, nextPenalty, silenceMs, stalledTasks, unhealthyEngines, type ProbeRoute, type RecoveryProbe, type StallPolicy } from '../src/main/stall';
+import { LADDER_RESET_MS, PROBE_MS, PROBE_SUCCESSES, STALL_LADDER } from '../src/main/domain/penalties';
+import { systemdCpuUsage, type CpuReader, type CpuSample } from '../src/main/monitors/cpu';
+import { parseStallState, type EnginePenalty, type StallState } from '../src/main/storage/stall-state';
 import { type ProbeOutcome, type StallStatus } from '../src/shared/contracts/monitoring';
 import type { Task } from '../src/shared/contracts/tasks';
 import { readStall, seedStall, stallStoreAt } from './helpers/state-db';
+import { previewOn } from './helpers/policy-preview';
 
 const START = Date.parse('2030-01-01T00:00:00Z');
 const MINUTE = 60_000;
@@ -391,7 +395,7 @@ test('the monitor pauses an engine after two stalls, pumps once per penalty and 
     assert.deepEqual(h.tasks.map(task => task.events.length), [1, 1], 'no lifecycle events were added to the stalled tasks');
     // Blocked is the existing routing state that keeps new dispatch away.
     assert.equal(h.policy.snapshot().workers.claude_worker!.status, 'blocked');
-    assert.equal(h.policy.preview({ owner: 'codex_owner', worker: 'codex_worker' }).worker, 'codex_worker');
+    assert.equal(previewOn(h.policy, { owner: 'codex_owner', worker: 'codex_worker' }, h.now()).worker, 'codex_worker');
     await h.advance(4);
     assert.equal(h.stallBlocks().length, 1, 'no stacking while blocked');
     assert.equal(h.pumps(), 1);
@@ -1362,7 +1366,7 @@ test('the user unblock of an engine drops every block naming it, and keeps every
     assert.equal(h.engine().needsAttention, false);
     assert.deepEqual(h.engine().history, history, 'the evidence survives the recovery the user asked for');
     assert.equal(h.pumps(), pumps + 1, 'and the queue gets routed again');
-    assert.equal(h.policy.preview({ owner: 'claude_owner', worker: 'claude_worker' }).worker, 'claude_worker');
+    assert.equal(previewOn(h.policy, { owner: 'claude_owner', worker: 'claude_worker' }, h.now()).worker, 'claude_worker');
 
     const saved = readStall(h.statePath);
     assert.deepEqual(saved.engines.claude, emptyPenalty(), 'a restart cannot resurrect the dropped ladder');

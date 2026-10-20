@@ -7,7 +7,8 @@ import { join } from 'node:path';
 import { activeBlocks, availabilityOf } from '../src/shared/policy/availability';
 import { defaultConfig } from '../src/main/policy/routing';
 import { PolicyStore } from '../src/main/policy/store';
-import { FREE_PROBE_BLOCK_BY, FreeChannelProbeMonitor, parseFreeProbeState, parseFreeProbeInput } from '../src/main/free-channel';
+import { FREE_PROBE_BLOCK_BY, FreeChannelProbeMonitor, parseFreeProbeInput } from '../src/main/free-channel';
+import { parseFreeProbeState } from '../src/main/storage/free-probe-state';
 import { STALL_BLOCK_BY } from '../src/main/stall';
 import { classifyVendorError } from '../src/main/adapters/cli/vendor-errors';
 

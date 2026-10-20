@@ -15,6 +15,7 @@ import { EngineProber } from '../engines/probe';
 import { FreeChannelProbeMonitor, parseFreeProbeInput } from '../free-channel';
 import type { TaskManager } from '../manager';
 import { QUOTA_CAPABILITIES, parseQuotaRefresh } from '../policy/quota';
+import { previewRoute } from '../policy/preview';
 import { validateConfig } from '../policy/routing';
 import type { PolicyStore } from '../policy/store';
 import type { QuotaProber } from '../quota';
@@ -79,7 +80,8 @@ function policyHandlers(): Handlers<'getPolicy' | 'policyHistory' | 'policyRollb
     previewRoute: (active, args) => {
       // The route shown is the route a dispatch would take now, so the server supplies the live load.
       const input = args[0] && typeof args[0] === 'object' && !Array.isArray(args[0]) ? args[0] as Record<string, unknown> : {};
-      return active.policy.preview({ ...input, workerLoad: workerLoad(active.store.listHeads()) });
+      const live = active.policy.snapshot();
+      return previewRoute(live.config, live.blocks, Date.now(), { ...input, workerLoad: workerLoad(active.store.listHeads()) });
     },
   };
 }

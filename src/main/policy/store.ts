@@ -2,16 +2,14 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { object } from '../../shared/validation';
-import type { PolicySnapshot, RoutePreview } from '../../shared/contracts/policy';
+import type { PolicySnapshot } from '../../shared/contracts/policy';
 import { activeBlocks, availabilityOf } from '../../shared/policy/availability';
-import { chatgptReviewEnabled } from '../../shared/policy/settings';
-import { defaultConfig, parseReleaseAt, resolveDispatch, validateConfig } from './routing';
-import { type Config, type Block, type Engine, type Owner, type RouteOptions, type Worker } from '../../shared/contracts/policy';
+import { defaultConfig, parseReleaseAt, validateConfig } from './routing';
+import { exact, text } from './input';
+import { type Config, type Block, type Engine, type Owner, type Worker } from '../../shared/contracts/policy';
 import { migrate } from '../migrate';
 const LIMIT=256*1024;
 function bounded(value: unknown): void { if (Buffer.byteLength(JSON.stringify(value))>LIMIT) throw new Error('Policy exceeds 256 KiB'); }
-function exact(value: Record<string, unknown>, keys: string[]): void { if (Object.keys(value).some(key=>!keys.includes(key))) throw new Error('Unknown policy field'); }
-function text(value: unknown, label: string): string { if(typeof value!=='string'||!value.trim()||value.length>2000) throw new Error(`Invalid ${label}`); return value; }
 function blocksOf(value: unknown, config: Config): Block[] {
  if(!Array.isArray(value)||value.length>500) throw new Error('Invalid quota blocks');
  const keys=new Set<string>();
@@ -193,27 +191,5 @@ export class PolicyStore {
   const parsed=this.parse(dropRetiredFields(data.config),data.blocks);
   this.commit(parsed.config,parsed.blocks,this.revision+1,`rollback:${revision}`);
   return this.snapshot();
- }
- preview(value: unknown): RoutePreview {
-  const input=object(value); exact(input,['owner','worker','runningCount','workerLoad','excludeEngines','excludeWorkers']);
-  const opts: RouteOptions={owner:text(input.owner,'owner')};
-  if(input.worker!==undefined) opts.worker=text(input.worker,'worker');
-  if(input.excludeEngines!==undefined){
-   if(!Array.isArray(input.excludeEngines)||input.excludeEngines.length>50) throw new Error('Invalid excluded engines');
-   opts.excludeEngines=input.excludeEngines.map(engine=>text(engine,'excluded engine'));
-  }
-  if(input.excludeWorkers!==undefined){
-   if(!Array.isArray(input.excludeWorkers)||input.excludeWorkers.length>200) throw new Error('Invalid excluded workers');
-   opts.excludeWorkers=input.excludeWorkers.map(worker=>text(worker,'excluded worker'));
-  }
-  if(input.workerLoad!==undefined){
-   const load=object(input.workerLoad);
-   for(const n of Object.values(load)) if(!Number.isSafeInteger(n)||Number(n)<0) throw new Error('Invalid worker load');
-   opts.workerLoad=load as Record<string,number>;
-  }
-  const count=input.runningCount??0; if(!Number.isSafeInteger(count)||Number(count)<0) throw new Error('Invalid running count');
-  const route=resolveDispatch(this.config,activeBlocks({version:1,blocks:this.blocks},this.now()),opts);
-  const maxParallel=this.config.owners[opts.owner].max_parallel;
-  return {...route,maxParallel,capacityAvailable:Number(count)<maxParallel,chatgptReview:chatgptReviewEnabled(this.config)};
  }
 }

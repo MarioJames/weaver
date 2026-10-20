@@ -1,11 +1,10 @@
 import type { Block } from '../../../shared/contracts/policy';
 import { vendorBlockReason } from '../../adapters/cli/vendor-errors';
+import { VENDOR_LADDER_MINUTES } from '../../domain/penalties';
 import type { TaskManager } from '../../manager';
 import { VENDOR_BLOCK_SOURCE, escalateEngineBlock } from '../../policy/routing';
 import type { PolicyStore } from '../../policy/store';
 import { engineLadderKey } from '../../store';
-/** Vendor rate limit ladder in minutes, level 1..3; shared with the free-channel probe monitor. */
-export const VENDOR_LADDER_MINUTES = [10, 30, 60] as const;
 export class VendorLimits {
  private readonly vendorBlockedAttempts=new Set<string>();
  constructor(private readonly manager:TaskManager,private readonly policy:PolicyStore){

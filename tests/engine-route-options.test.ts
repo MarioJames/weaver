@@ -9,6 +9,7 @@ import { type Block } from '../src/shared/contracts/policy';
 import { PolicyStore } from '../src/main/policy/store';
 import { createNormalizer } from '../src/main/adapters/cli/normalize';
 import { HELLO_ENGINES } from '../src/main/engines/hello';
+import { previewOn } from './helpers/policy-preview';
 
 const quota: Block = { engine: 'codex', reason: 'exhausted', since: '2026-10-19T00:00:00Z', by: 'weaver-quota:codex' };
 test('free channels share an engine with paid models, keep independent weights, and bypass only native quota blocks', () => {
@@ -50,7 +51,7 @@ test('free channel roundtrips, and a role carrying a proxy field is refused by t
     store.save({ revision: snapshot.revision, config: snapshot.config, blocks: snapshot.blocks });
     const reloaded = new PolicyStore(file);
     assert.equal(reloaded.snapshot().config.workers.codex_worker!.free_channel, true);
-    assert.equal('proxy' in reloaded.preview({ owner: 'claude_owner', worker: 'codex_worker' }), false);
+    assert.equal('proxy' in previewOn(reloaded, { owner: 'claude_owner', worker: 'codex_worker' }), false);
     const withProxy = structuredClone(snapshot.config) as unknown as { owners: Record<string, Record<string, unknown>>; workers: Record<string, Record<string, unknown>> };
     withProxy.owners.claude_owner!.proxy = 'direct';
     withProxy.workers.codex_worker!.proxy = 'http://127.0.0.1:7890';

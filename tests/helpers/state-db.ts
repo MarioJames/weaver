@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { migrate } from '../../src/main/migrate';
-import { dbStallStore, type StallState, type StallStateStore } from '../../src/main/stall';
-import { dbFreeProbeStore, type FreeProbeState, type FreeProbeStore } from '../../src/main/free-channel';
+import { dbStallStore, type StallState, type StallStateStore } from '../../src/main/storage/stall-state';
+import { dbFreeProbeStore, type FreeProbeState, type FreeProbeStore } from '../../src/main/storage/free-probe-state';
 
 /** One connection per database file for the whole test process, migrated to the current schema. */
 const open = new Map<string, DatabaseSync>();

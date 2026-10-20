@@ -32,15 +32,15 @@ Weaver 是本地任务控制面，交付三件套：
           ├─ TaskManager ─ worker 子进程监督（SIGTERM→1.5s SIGKILL）
           │    ├─ MockWorkerAdapter（显式 mock-jsonl，bundled scripts/mock-worker.mjs）
           │    └─ RoutingWorkerAdapter → startCliAgent（src/main/adapters/cli）真实引擎（含 qodercli）
-          ├─ PolicyStore（weaver.db 的 policy_* 表）+ 纯路由 policy/routing.ts
-          ├─ TaskStore（weaver.db，SQLite 事务）
-          ├─ StallMonitor（src/main/stall.ts → weaver.db 的 stall_* 表，60 秒一次采样/惩罚/恢复探测）
+          ├─ PolicyStore（weaver.db 的 policy_* 表）+ 纯路由 policy/routing.ts、路由预览 policy/preview.ts
+          ├─ TaskStore（weaver.db，SQLite 事务）；槽位/事件规则 domain/tasks.ts，启动恢复 application/tasks/recovery.ts
+          ├─ StallMonitor（src/main/stall.ts，60 秒一次采样/惩罚/恢复探测；CPU 读取 monitors/cpu.ts；状态经 storage/stall-state.ts 落 weaver.db 的 stall_* 表，free-channel 与额度观测的 SQLite 适配同在 src/main/storage/）
           ├─ engines/{probe,control}.ts（PATH+--version 只读探测）
           ├─ engines/hello.ts（sayHi 最轻一次性调用：页面探测与惩罚恢复探测共用）
           ├─ owner-host.ts（Herdr 可见 owner 宿主，仅 owners.switch launch / owners.launch 显式调用）
           ├─ quota/（原生凭据只读 + 固定 HTTPS GET，进程内额度观测）
           ├─ policy/quota.ts（新鲜账户观测 → 自有 policy.blocks 原子合并）
-          └─ ContinuationService（src/main/continuation.ts，owner 手动上下文）
+          └─ ContinuationService（src/main/continuation.ts，owner 手动上下文；接手/根任务提示词在 src/main/owners/prompts.ts，脱敏在 src/main/redact-context.ts）
 ```
 
 进程语义：服务单实例。前台 `weaver web` 跑在当前终端；后台 `weaver server start` 以分离进程启动并等到能应答才返回，已有运行实例时不再起第二个、直接返回它的信息，同一 port + data dir 装了登录自启服务时由该服务启动。端口被占返回 `EADDRINUSE`；`--data-dir` 决定默认 endpoint/state 目录。崩溃服务遗留的 stale endpoint（discovery 文件还在、socket 已不应答）在启动时自动清除。停止两种模式走同一条关停路径——`weaver web` 用 Ctrl+C，后台用 `weaver server stop`（有 running worker 时默认拒绝 `SERVER_BUSY`，因为停止会取消它们，`--force` 才强制）——随后 draining（`ready=false`，命令面报 `APP_DRAINING`，同时开始 `commands.drain()` 中止在途 owner launch）→ 停额度定时器 → 停 StallMonitor（中止在途恢复探测，并等当前那次 tick 收束）→ 中止在途额度探测与引擎 hello → 等待 owner launch/精确清理与其余未响应请求完成 → `manager.shutdown()` 逐个取消本进程拥有的 running 任务并等待子进程退出 → 关闭 HTTP/socket → 退出。draining 后完成的额度请求不再保存策略；采样与探测都是 await 过的，回到写状态前会再确认一次仍在 ready 窗口内，所以关停之后不会补写 block 或惩罚状态。任务、策略与惩罚文件保留。关闭浏览器页不停任务。客户端断开不取消已提交的工作。服务是整机共享的：owner agent 不把停服务当作任务收尾，也不杀它的进程或 systemd scope，只有用户停。登录自启由 `weaver server install` / `uninstall` 管理：Linux 写 systemd user unit `weaver.service`，macOS 写 launchd agent `dev.weaver.server`，只从安装后的独立可执行文件可用，install 捕获当前 `PATH` 让 worker 仍找得到引擎 CLI，对未被该服务管理的运行实例只给提示不动它。
@@ -80,7 +80,7 @@ Weaver 是本地任务控制面，交付三件套：
 队列与冻结：
 
 - `workers.spawn` 通过预检后把当时选出的 owner/worker/engine/kind/model/effort/execution/adapter/workspace 冻结进 `task.dispatch`；排队槽只是等待容量。
-- worker 与 owner 同引擎时 `execution:"native"`、adapter `native`：不启动进程，任务进入 running 并占用 owner 实例的槽位，由 owner 用宿主内置子代理工具执行后调用 `workers.complete` 回报；取消直接转 cancelled，重启恢复时保持 running（`recover()` 只把非 native 的在途任务判失败）。
+- worker 与 owner 同引擎时 `execution:"native"`、adapter `native`：不启动进程，任务进入 running 并占用 owner 实例的槽位，由 owner 用宿主内置子代理工具执行后调用 `workers.complete` 回报；取消直接转 cancelled，重启恢复时保持 running（`recoverInterruptedTasks()` 只把非 native 的在途任务判失败）。
 - 派发响应除任务快照外还带 `next`——父 Agent 照它做一步即可，不需要理解引擎：非 native（real/mock）和还没拿到容量的排队任务是 `{action:'wait', command:'weaver tasks wait --task-id <id>'}`；已 running 的 native 任务是 `{action:'run_subagent', model, effort, prompt, then}`，`prompt` 与真实 worker 拿到的角色指令逐字相同（`workerInstruction`），`then` 是回报命令 `weaver workers complete --task-id <id> --input report.json`。`tasks.get` 对 running 的 native 任务同样给出 `next`，所以 spawn 回复丢了也能找回那份指令。
 - pump 复核当前资格/容量/配额/pin/workspace：route 改变（含 kind 不符）、容量不足、workspace 失效或 launch 失败都会给 `task.queueReason`（有界 message，仅变化落盘），代码取 `waiting_for_capacity/policy_blocked/frozen_route_changed/workspace_changed/launch_blocked`。除供应商限流/额度阻断外，冻结路由不会被默默改派或跨引擎替换；`by:"weaver-vendor-limit"` 的生效阻断会让排队任务重新选择其他可用引擎，已失败尝试仍需显式重试。
 - 取消：queued 直接转 cancelled；running 先 `cancelling` 再等待本进程拥有的 worker 子进程退出（SIGTERM → 1.5s SIGKILL）。取消/文件损坏不删除已有 history 与事件。

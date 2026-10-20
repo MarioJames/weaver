@@ -17,6 +17,7 @@ import { validateConfig } from '../src/main/policy/routing';
 import { type Block } from '../src/shared/contracts/policy';
 import type { Task, TaskDispatch, TaskFailure } from '../src/shared/contracts/tasks';
 import { stallStoreAt } from './helpers/state-db';
+import { previewOn } from './helpers/policy-preview';
 
 class HeldWorker extends EventEmitter {
   stdout = new PassThrough();
@@ -82,9 +83,9 @@ test('a rate-limited worker is blocked alone: its sibling stays routable and own
     assert.equal(snapshot.workers.codexb_worker!.status, 'available');
     assert.equal(snapshot.owners.codex_owner!.status, 'available', 'a worker block never reaches an owner on the same engine');
     assert.equal(snapshot.owners.claude_owner!.status, 'available');
-    assert.equal(f.policy.preview({ owner: 'claude_owner' }).worker, 'codexb_worker');
-    assert.equal(f.policy.preview({ owner: 'claude_owner', worker: 'codexb_worker' }).worker, 'codexb_worker');
-    assert.throws(() => f.policy.preview({ owner: 'claude_owner', worker: 'codex_worker' }), /unavailable: blocked \(codex worker codex_worker/);
+    assert.equal(previewOn(f.policy, { owner: 'claude_owner' }).worker, 'codexb_worker');
+    assert.equal(previewOn(f.policy, { owner: 'claude_owner', worker: 'codexb_worker' }).worker, 'codexb_worker');
+    assert.throws(() => previewOn(f.policy, { owner: 'claude_owner', worker: 'codex_worker' }), /unavailable: blocked \(codex worker codex_worker/);
   } finally { await f.close(); }
 });
 
@@ -264,14 +265,14 @@ test('disabling an engine that still has enabled owners and workers succeeds; th
     assert.equal(snapshot.workers.codex_worker!.status, 'engine_disabled');
     assert.equal(snapshot.workers.codexb_worker!.status, 'engine_disabled');
     assert.equal(snapshot.owners.codex_owner!.status, 'engine_disabled');
-    assert.equal(f.policy.preview({ owner: 'claude_owner' }).worker, 'opencode_worker', 'only workers on live engines are scheduled');
-    assert.throws(() => f.policy.preview({ owner: 'claude_owner', worker: 'codex_worker' }), /engine_disabled/);
-    assert.throws(() => f.policy.preview({ owner: 'codex_owner' }), /owner codex_owner unavailable: engine_disabled/);
+    assert.equal(previewOn(f.policy, { owner: 'claude_owner' }).worker, 'opencode_worker', 'only workers on live engines are scheduled');
+    assert.throws(() => previewOn(f.policy, { owner: 'claude_owner', worker: 'codex_worker' }), /engine_disabled/);
+    assert.throws(() => previewOn(f.policy, { owner: 'codex_owner' }), /owner codex_owner unavailable: engine_disabled/);
     // A save that disables an owner's last worker engine is valid too; enabling stays behind the probe toggle.
     const after = f.policy.snapshot();
     after.config.engines.opencode!.enabled = false;
     f.policy.save({ revision: after.revision, config: after.config, blocks: [] });
-    assert.throws(() => f.policy.preview({ owner: 'claude_owner' }), /no available worker/);
+    assert.throws(() => previewOn(f.policy, { owner: 'claude_owner' }), /no available worker/);
     const again = f.policy.snapshot();
     again.config.engines.opencode!.enabled = true;
     assert.throws(() => f.policy.save({ revision: again.revision, config: again.config, blocks: [] }), /probe toggle/);

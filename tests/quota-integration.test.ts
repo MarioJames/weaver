@@ -9,9 +9,11 @@ import { DatabaseSync } from 'node:sqlite';
 import { PolicyStore } from '../src/main/policy/store';
 import { applyQuotaSnapshot, parseQuotaRefresh } from '../src/main/policy/quota';
 import type { EngineQuotaRecord, QuotaWindow } from '../src/shared/contracts/quota';
-import { QuotaProber, dbQuotaStore } from '../src/main/quota';
+import { QuotaProber } from '../src/main/quota';
+import { dbQuotaStore } from '../src/main/storage/quota-snapshot';
 import { migrate } from '../src/main/migrate';
 import { startRuntime, type WeaverRuntime } from '../src/main/runtime';
+import { previewOn } from './helpers/policy-preview';
 
 const now = Date.parse('2030-01-01T00:00:00Z');
 const since = '2029-12-31T00:00:00Z';
@@ -82,8 +84,8 @@ test('release waits for latest exhausted account window, and any unknown reset r
     assert.equal(result.snapshot.blocks[0].since, firstSince);
     assert.equal(applyQuotaSnapshot(f.policy, { records: [record({ windows: [] })] }, {}, now).policyChanged, false);
     assert.equal(result.snapshot.owners.codex_owner.status, 'blocked');
-    assert.throws(() => f.policy.preview({ owner: 'claude_owner', worker: 'codex_worker' }), /blocked/);
-    assert.throws(() => f.policy.preview({ owner: 'claude_owner' }), /no available worker/);
+    assert.throws(() => previewOn(f.policy, { owner: 'claude_owner', worker: 'codex_worker' }, now), /blocked/);
+    assert.throws(() => previewOn(f.policy, { owner: 'claude_owner' }, now), /no available worker/);
   } finally { await f.close(); }
 });
 

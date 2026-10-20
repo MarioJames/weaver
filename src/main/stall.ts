@@ -1,12 +1,11 @@
-import { execFile } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { object } from '../shared/validation';
 import type { Config, Block, PolicySnapshot } from '../shared/contracts/policy';
-import type { ProbeOutcome, StallHistoryRecord, StallStatus } from '../shared/contracts/monitoring';
+import type { ProbeOutcome, StallStatus } from '../shared/contracts/monitoring';
 import type { Task } from '../shared/contracts/tasks';
 import { activeBlocks } from '../shared/policy/availability';
-import { redactContext } from './continuation';
+import { LADDER_RESET_MS, PROBE_MS, PROBE_SUCCESSES, STALL_LADDER } from './domain/penalties';
+import { systemdCpuUsage, type CpuReader, type CpuSample } from './monitors/cpu';
+import { boundedProbeError } from './redact-context';
+import { HISTORY_LIMIT, RECORD_TASKS_MAX, emptyState, type EnginePenalty, type StallRecord, type StallState, type StallStateStore } from './storage/stall-state';
 
 /** Silence plus an idle scope for this long is a stall. */
 export const STALL_MS = 5 * 60_000;
@@ -14,53 +13,21 @@ export const STALL_MS = 5 * 60_000;
 export const CPU_IDLE_SHARE = 0.05;
 /** Stalled tasks from one engine needed before the engine itself is considered unhealthy. */
 export const STALL_QUORUM = 2;
-/** Minutes a level 1 or 2 penalty waits before its recovery probe; null is level 3. */
-export const STALL_LADDER: (number | null)[] = [5, 10, null];
-/** Level 3 is probed on this cadence and never expires just because time passed. */
-export const PROBE_MS = 10 * 60_000;
-/** Consecutive passing probes needed before a level 3 penalty lifts on its own. */
-export const PROBE_SUCCESSES = 3;
-export const LADDER_RESET_MS = 2 * 60 * 60_000;
 export const STALL_TICK_MS = 60_000;
 export const STALL_BLOCK_BY = 'weaver-stall';
 /** What the retained record says when level 3 recovered without a human. */
 export const STALL_RECOVERY = '自动恢复，请留意';
-const HISTORY_LIMIT = 50;
-/** How many of a trigger's task ids the record keeps: the count stays whole, the ids are bounded. */
-const RECORD_TASKS_MAX = 50;
-const PROBE_ERROR_MAX = 200;
 const NO_WORKER = '这台引擎没有可用的子 Agent，无法探测。';
 const NO_HEAD = `${STALL_QUORUM} 个子 Agent 超过 ${STALL_MS / 60_000} 分钟无响应`;
 /** 60s samples, enough to cover the stall window and the ladder's shortest penalty. */
 const SAMPLE_LIMIT = 12;
 const NS_PER_MS = 1_000_000;
 
-export interface CpuSample { at: number; cpu: number | null }
-/** Cumulative CPU of one worker scope in nanoseconds, or null when it cannot be read. */
-export type CpuReader = (scopeUnit: string) => Promise<number | null>;
 export type CpuSamples = Record<string, CpuSample[]>;
 
 /** The light call a penalty is lifted with: one enabled worker's own route on the penalized engine. */
 export interface ProbeRoute { engine: string; kind: string; worker: string; model: string; effort: string }
 export type RecoveryProbe = (route: ProbeRoute, signal: AbortSignal) => Promise<ProbeOutcome>;
-
-/** One line of the record: a trigger carries tasks, a probe carries its route and outcome, a recovery carries a message. */
-export type StallRecord = Omit<StallHistoryRecord, 'at'> & { at: number };
-
-export interface EnginePenalty {
-  level: number;
-  lastTriggerAt: number | null;
-  needsAttention: boolean;
-  /** Nominal deadline of the current penalty. It is not a policy release time: no stall block ever expires on its own. */
-  blockedUntil: number | null;
-  nextProbeAt: number | null;
-  /** Consecutive passing probes at level 3; any failure or escalation resets it. */
-  probeSuccesses: number;
-  /** The evidence the penalty was triggered with, so an escalation can restate the block honestly. */
-  head: string;
-}
-
-export interface StallState { engines: Record<string, EnginePenalty>; history: StallRecord[] }
 
 /** What a running worker looks like from the outside: the monitor's own samples, no second classifier. */
 export interface TaskHealth {
@@ -84,7 +51,6 @@ export interface StallPolicy {
 }
 
 export const emptyPenalty = (): EnginePenalty => ({ level: 0, lastTriggerAt: null, needsAttention: false, blockedUntil: null, nextProbeAt: null, probeSuccesses: 0, head: '' });
-export const emptyState = (): StallState => ({ engines: {}, history: [] });
 
 /** A penalty is in force while its block is out and something still has to happen: a probe, or the user. */
 const pending = (penalty: EnginePenalty): boolean => penalty.needsAttention || penalty.nextProbeAt !== null;
@@ -100,12 +66,6 @@ function arm(level: number, now: number): Pick<EnginePenalty, 'blockedUntil' | '
 function reasonFor(head: string): string {
   // Recovery timing and task evidence have their own status fields and history.
   return head.replace(/（task .*$/, '').slice(0, 120);
-}
-
-/** A vendor message is evidence, not a log file: credentials are stripped, then one bounded line, never the argv. */
-export function boundedProbeError(value: string): string {
-  const line = redactContext(value).replace(/\s+/g, ' ').trim();
-  return line.length > PROBE_ERROR_MAX ? `${line.slice(0, PROBE_ERROR_MAX)}…` : line;
 }
 
 /** Weaver's own penalty for an engine as a whole; a model-level block is somebody else's business. */
@@ -198,110 +158,6 @@ function idleRunMs(samples: CpuSample[] | undefined): number | null {
   if (active) return 0;
   const from = idleSince(samples);
   return from === null ? null : samples![samples!.length - 1]!.at - from;
-}
-
-function numberOr(value: unknown, name: string): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`Invalid stall ${name}`);
-  return value;
-}
-
-function integerOr(value: unknown, name: string, max: number): number {
-  const number = numberOr(value, name);
-  if (!Number.isInteger(number) || number < 0 || number > max) throw new Error(`Invalid stall ${name}`);
-  return number;
-}
-
-function timestampOr(value: unknown, name: string): number {
-  const number = numberOr(value, name);
-  if (!Number.isFinite(new Date(number).getTime())) throw new Error(`Invalid stall ${name}`);
-  return number;
-}
-
-/** A stall record is either a trigger, a probe or a recovery; each keeps engine, level, time and task ids. */
-function parseRecord(raw: unknown): StallRecord {
-  const item = object(raw);
-  if (typeof item.engine !== 'string' || !item.engine) throw new Error('Invalid stall history engine');
-  if (!Array.isArray(item.tasks) || item.tasks.length > RECORD_TASKS_MAX || item.tasks.some(id => typeof id !== 'string')) throw new Error('Invalid stall history tasks');
-  const record: StallRecord = { engine: item.engine, level: integerOr(item.level, 'history level', STALL_LADDER.length), at: timestampOr(item.at, 'history at'), tasks: item.tasks as string[] };
-  // The count is what the evidence covered; an unbounded id list would be a file that cannot be read back.
-  if (item.taskCount !== undefined) {
-    if (!Number.isSafeInteger(item.taskCount) || (item.taskCount as number) < item.tasks.length) throw new Error('Invalid stall history taskCount');
-    record.taskCount = item.taskCount as number;
-  }
-  // `minutes` is what this field was called before probes were recorded.
-  const minutes = item.stalledMinutes ?? item.minutes;
-  if (minutes !== undefined) record.stalledMinutes = numberOr(minutes, 'history minutes');
-  if (item.probe !== undefined) {
-    const probe = object(item.probe);
-    record.probe = { ok: probe.ok === true, ms: numberOr(probe.ms, 'probe ms'), ...(typeof probe.error === 'string' ? { error: boundedProbeError(probe.error) } : {}) };
-  }
-  for (const key of ['model', 'effort', 'message'] as const) if (typeof item[key] === 'string') record[key] = item[key] as string;
-  return record;
-}
-
-export function parseStallState(value: unknown): StallState {
-  const data = object(value);
-  if (data.version !== 1 || !data.engines || typeof data.engines !== 'object' || Array.isArray(data.engines)) throw new Error('Unsupported stall store');
-  const engines: Record<string, EnginePenalty> = {};
-  for (const [engine, raw] of Object.entries(object(data.engines))) {
-    const item = object(raw);
-    const penalty: EnginePenalty = {
-      level: integerOr(item.level, 'level', STALL_LADDER.length),
-      lastTriggerAt: item.lastTriggerAt === null ? null : timestampOr(item.lastTriggerAt, 'lastTriggerAt'),
-      needsAttention: item.needsAttention === true,
-      blockedUntil: item.blockedUntil === null ? null : timestampOr(item.blockedUntil, 'blockedUntil'),
-      nextProbeAt: item.nextProbeAt === undefined || item.nextProbeAt === null ? null : timestampOr(item.nextProbeAt, 'nextProbeAt'),
-      probeSuccesses: item.probeSuccesses === undefined ? 0 : integerOr(item.probeSuccesses, 'probeSuccesses', PROBE_SUCCESSES - 1),
-      head: typeof item.head === 'string' ? item.head : '',
-    };
-    engines[engine] = penalty;
-  }
-  if (!Array.isArray(data.history) || data.history.length > HISTORY_LIMIT) throw new Error('Invalid stall history');
-  return { engines, history: data.history.map(parseRecord) };
-}
-
-/** Where the monitor keeps its ladder and history: the weaver.db tables. */
-export interface StallStateStore { load(): StallState; save(state: StallState): void }
-
-/** Same rows the migration script fills: penalties per engine, history bounded like the file kept it. */
-export function dbStallStore(db: import('node:sqlite').DatabaseSync, log: (message: string) => void = message => console.error(message)): StallStateStore {
-  return {
-    load(): StallState {
-      const engines: Record<string, EnginePenalty> = {};
-      for (const row of db.prepare('SELECT * FROM stall_penalties').all() as Record<string, unknown>[]) {
-        engines[String(row.engine)] = {
-          level: Number(row.level),
-          lastTriggerAt: row.last_trigger_at === null || row.last_trigger_at === undefined ? null : Number(row.last_trigger_at),
-          needsAttention: Number(row.needs_attention) === 1,
-          blockedUntil: row.blocked_until === null || row.blocked_until === undefined ? null : Number(row.blocked_until),
-          nextProbeAt: row.next_probe_at === null || row.next_probe_at === undefined ? null : Number(row.next_probe_at),
-          probeSuccesses: Number(row.probe_successes),
-          head: String(row.head ?? ''),
-        };
-      }
-      const history = (db.prepare('SELECT body FROM stall_history ORDER BY id').all() as Record<string, unknown>[])
-        .map(row => JSON.parse(String(row.body)) as StallRecord);
-      try { return parseStallState({ version: 1, engines, history }); }
-      catch (error) {
-        log(`Stall state ignored: ${error instanceof Error ? error.message : 'unreadable'}`);
-        return emptyState();
-      }
-    },
-    save(state: StallState): void {
-      db.exec('BEGIN IMMEDIATE');
-      try {
-        db.exec('DELETE FROM stall_penalties');
-        const insertPenalty = db.prepare('INSERT INTO stall_penalties(engine,level,last_trigger_at,needs_attention,blocked_until,next_probe_at,probe_successes,head) VALUES (?,?,?,?,?,?,?,?)');
-        for (const [engine, penalty] of Object.entries(state.engines)) {
-          insertPenalty.run(engine, penalty.level, penalty.lastTriggerAt, penalty.needsAttention ? 1 : 0, penalty.blockedUntil, penalty.nextProbeAt, penalty.probeSuccesses, penalty.head);
-        }
-        db.exec('DELETE FROM stall_history');
-        const insertRecord = db.prepare('INSERT INTO stall_history(engine,level,at,body) VALUES (?,?,?,?)');
-        for (const record of state.history) insertRecord.run(record.engine, record.level, record.at, JSON.stringify(record));
-        db.exec('COMMIT');
-      } catch (error) { try { db.exec('ROLLBACK'); } catch { /* SQLite may already have rolled back. */ } throw error; }
-    },
-  };
 }
 
 export interface StallMonitorOptions {
@@ -695,31 +551,3 @@ export class StallMonitor {
     this.dirty = true;
   }
 }
-
-function runSystemctl(args: string[]): Promise<{ code: number; stdout: string }> {
-  return new Promise(resolve => {
-    execFile('systemctl', ['--user', ...args], { timeout: 4000, windowsHide: true }, (error, stdout) => {
-      const code = error && typeof error.code === 'number' ? error.code : error ? 1 : 0;
-      resolve({ code, stdout: stdout ?? '' });
-    });
-  });
-}
-
-function cgroupUsage(controlGroup: string): number | null {
-  if (!controlGroup.startsWith('/') || controlGroup.includes('..')) return null;
-  let text: string;
-  try { text = readFileSync(join('/sys/fs/cgroup', controlGroup, 'cpu.stat'), 'utf8'); } catch { return null; }
-  const usage = /^usage_usec (\d+)$/m.exec(text);
-  return usage ? Number(usage[1]) * 1000 : null;
-}
-
-/** Cumulative scope CPU via systemd, falling back to the cgroup's own counter. */
-export const systemdCpuUsage: CpuReader = async scopeUnit => {
-  const unit = scopeUnit.endsWith('.scope') ? scopeUnit : `${scopeUnit}.scope`;
-  const direct = await runSystemctl(['show', unit, '-p', 'CPUUsageNSec', '--value']);
-  const value = direct.stdout.trim();
-  if (direct.code === 0 && /^\d+$/.test(value)) return Number(value);
-  const group = await runSystemctl(['show', unit, '-p', 'ControlGroup', '--value']);
-  if (group.code !== 0) return null;
-  return cgroupUsage(group.stdout.trim());
-};

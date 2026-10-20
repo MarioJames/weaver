@@ -5,10 +5,11 @@ import type { Task, WorkPackage } from '../../../shared/contracts/tasks';
 import { PENDING_TASK_TITLE, text } from '../../../shared/validation';
 import { workerInstruction } from '../../adapters/instruction';
 import type { ContinuationService } from '../../continuation';
+import { event, slotGroupCount, slotGroupFor, slotGroupName } from '../../domain/tasks';
 import type { TaskManager } from '../../manager';
 import { EXCLUDED_ENGINE_REASON } from '../../policy/routing';
+import { previewRoute } from '../../policy/preview';
 import type { PolicyStore } from '../../policy/store';
-import { event, slotGroupCount, slotGroupFor, slotGroupName } from '../../store';
 import { absoluteExistingWorkspace, isRealEngineKind, workspaceIdentity } from '../../workspace';
 import { fail } from '../commands/errors';
 import { publicTask, type TaskRecords } from '../tasks/records';
@@ -53,7 +54,8 @@ export class Dispatcher {
  /** Route one owner's work under the chain's excluded engines, keeping the refusal in the policy's own words. */
  routeOf(owner:string,running:number,excluded:string[],worker?:unknown,excludedWorkers:string[]=[]):RoutePreview {
   try {
-   return this.policy.preview({owner,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads()),...(worker!==undefined?{worker}:{}),...(excluded.length?{excludeEngines:excluded}:{}),...(excludedWorkers.length?{excludeWorkers:excludedWorkers}:{})});
+   const live=this.policy.snapshot();
+   return previewRoute(live.config,live.blocks,Date.now(),{owner,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads()),...(worker!==undefined?{worker}:{}),...(excluded.length?{excludeEngines:excluded}:{}),...(excludedWorkers.length?{excludeWorkers:excludedWorkers}:{})});
   } catch(error) {
    const message=error instanceof Error?error.message:String(error);
    if(message.startsWith('NO_ALTERNATIVE_ENGINE'))fail('NO_ALTERNATIVE_ENGINE',message);

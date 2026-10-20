@@ -11,7 +11,9 @@ import { type Config, type Block } from '../src/shared/contracts/policy';
 import { lintSchema, validate } from '../src/main/policy/json-schema';
 import { PolicyStore } from '../src/main/policy/store';
 import { DatabaseSync } from 'node:sqlite';
+import { previewOn } from './helpers/policy-preview';
 const now=Date.parse('2026-10-18T12:00:00Z');
+const preview=(store:PolicyStore,value:unknown)=>previewOn(store,value,now);
 const all=()=>{const c=defaultConfig(); for(const e of Object.values(c.engines)) e.enabled=true; for(const w of Object.values(c.workers)) w.enabled=true; return c;};
 const route=(c:Config,blocks:Block[]=[])=>resolveDispatch(c,blocks,{owner:'claude_owner'});
 test('migrated defaults validate, clone, and default review stays true',()=>{
@@ -57,13 +59,13 @@ function fixture(fn:(store:PolicyStore,path:string)=>void) {const root=mkdtempSy
 function grab(fn:()=>unknown):string {try{fn();}catch(error){return error instanceof Error?error.message:'thrown';}throw new Error('expected a throw');}
 test('app settings roundtrip without reading upstream/home, stale writes fail',()=>fixture((store,path)=>{
  const s=store.snapshot();s.config.chatgpt_review=false; const next=store.save({revision:s.revision,config:s.config,blocks:[]});assert.equal(next.revision,1);
- assert.deepEqual(new PolicyStore(path,()=>now).snapshot(),next);assert.equal(store.preview({owner:'claude_owner'}).chatgptReview,false);
+ assert.deepEqual(new PolicyStore(path,()=>now).snapshot(),next);assert.equal(preview(store,{owner:'claude_owner'}).chatgptReview,false);
  assert.throws(()=>store.save({revision:0,config:s.config,blocks:[]}),/reload/);assert.equal(store.snapshot().revision,1);
 }));
 test('block edits persist, expired blocks are ignored at preview time, deletion unblocks',()=>fixture((store)=>{
  const s=store.snapshot();const blocks=[{engine:'claude',reason:'manual',since:new Date(now).toISOString()}];
- store.save({revision:0,config:s.config,blocks});assert.throws(()=>store.preview({owner:'claude_owner'}),/unavailable/);
- store.save({revision:1,config:s.config,blocks:blocks.map(b=>({...b,release_at:new Date(now).toISOString()}))});assert.equal(store.snapshot().activeBlocks.length,0);assert.equal(store.preview({owner:'claude_owner'}).worker,'claude_worker');
+ store.save({revision:0,config:s.config,blocks});assert.throws(()=>preview(store,{owner:'claude_owner'}),/unavailable/);
+ store.save({revision:1,config:s.config,blocks:blocks.map(b=>({...b,release_at:new Date(now).toISOString()}))});assert.equal(store.snapshot().activeBlocks.length,0);assert.equal(preview(store,{owner:'claude_owner'}).worker,'claude_worker');
  store.save({revision:2,config:s.config,blocks:[]});assert.equal(store.snapshot().blocks.length,0);
 }));
 test('invalid quota edits preserve stored and in-memory state',()=>fixture((store)=>{
@@ -73,12 +75,12 @@ test('invalid quota edits preserve stored and in-memory state',()=>fixture((stor
 }));
 test('duplicate blocks and unknown IPC fields rejected',()=>fixture((store)=>{
  const s=store.snapshot();const b={engine:'claude',reason:'x',since:new Date(now).toISOString()};assert.throws(()=>store.save({revision:0,config:s.config,blocks:[b,b]}),/Duplicate/);
- assert.throws(()=>store.preview({owner:'claude_owner',argv:['unsafe']}),/Unknown/);
+ assert.throws(()=>preview(store,{owner:'claude_owner',argv:['unsafe']}),/Unknown/);
 }));
 test('capacity is hypothetical preview only, never execution permission',()=>fixture((store)=>{
- const r=store.preview({owner:'claude_owner',runningCount:4});assert.equal(r.capacityAvailable,false);assert.equal(r.execution,'disabled');
- assert.equal(store.preview({owner:'claude_owner',runningCount:3}).capacityAvailable,true);
- assert.throws(()=>store.preview({owner:'claude_owner',runningCount:-1}),/Invalid/);
+ const r=preview(store,{owner:'claude_owner',runningCount:4});assert.equal(r.capacityAvailable,false);assert.equal(r.execution,'disabled');
+ assert.equal(preview(store,{owner:'claude_owner',runningCount:3}).capacityAvailable,true);
+ assert.throws(()=>preview(store,{owner:'claude_owner',runningCount:-1}),/Invalid/);
 }));
 test('a saved policy with a gemini engine fails with the ordinary schema error',()=>fixture((store)=>{
  const config=defaultConfig() as any; config.engines.gemini={enabled:true,kind:'gemini'};
@@ -184,12 +186,12 @@ test('an explicit worker on an excluded engine and an exhausted chain both refus
 test('preview takes excluded engines and rejects a malformed list',()=>fixture((store)=>{
  const s=store.snapshot(); s.config.engines.opencode.enabled=true; s.config.workers.opencode_worker.enabled=true;
  store.save({revision:s.revision,config:s.config,blocks:[]},{allowEngineEnable:true});
- assert.equal(store.preview({owner:'claude_owner'}).worker,'claude_worker');
- assert.equal(store.preview({owner:'claude_owner',excludeEngines:['claude']}).worker,'opencode_worker');
- assert.ok(grab(()=>store.preview({owner:'claude_owner',excludeEngines:['claude','opencode']})).startsWith('NO_ALTERNATIVE_ENGINE'));
- for(const bad of ['claude',[1],Array(51).fill('claude'),['']]) assert.throws(()=>store.preview({owner:'claude_owner',excludeEngines:bad}),/excluded engine/);
- assert.equal(store.preview({owner:'claude_owner',excludeEngines:[]}).worker,'claude_worker');
- assert.throws(()=>store.preview({owner:'claude_owner',excludeEngines:['claude'],argv:['unsafe']}),/Unknown/);
+ assert.equal(preview(store,{owner:'claude_owner'}).worker,'claude_worker');
+ assert.equal(preview(store,{owner:'claude_owner',excludeEngines:['claude']}).worker,'opencode_worker');
+ assert.ok(grab(()=>preview(store,{owner:'claude_owner',excludeEngines:['claude','opencode']})).startsWith('NO_ALTERNATIVE_ENGINE'));
+ for(const bad of ['claude',[1],Array(51).fill('claude'),['']]) assert.throws(()=>preview(store,{owner:'claude_owner',excludeEngines:bad}),/excluded engine/);
+ assert.equal(preview(store,{owner:'claude_owner',excludeEngines:[]}).worker,'claude_worker');
+ assert.throws(()=>preview(store,{owner:'claude_owner',excludeEngines:['claude'],argv:['unsafe']}),/Unknown/);
 }));
 test('omitted weight is 5 and weights above 10 are rejected',()=>{
  const c=all(); const owner=c.owners.claude_owner; owner.worker_weights={claude_worker:0};

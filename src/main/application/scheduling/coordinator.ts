@@ -1,9 +1,10 @@
 import type { Task } from '../../../shared/contracts/tasks';
-import { redactContext } from '../../continuation';
+import { event, slotGroupCount, slotGroupFor } from '../../domain/tasks';
 import type { TaskManager } from '../../manager';
 import { VENDOR_BLOCK_SOURCE } from '../../policy/routing';
+import { previewRoute } from '../../policy/preview';
 import type { PolicyStore } from '../../policy/store';
-import { event, slotGroupCount, slotGroupFor } from '../../store';
+import { redactContext } from '../../redact-context';
 import { assertFrozenWorkspace, workspaceIdentity } from '../../workspace';
 import { terminal, type TaskRecords } from '../tasks/records';
 import type { Dispatcher } from './dispatch';
@@ -54,8 +55,9 @@ export class Coordinator {
     }
 
     const running=slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner));
-    const route=this.policy.preview({owner:frozen.owner,worker:frozen.worker,runningCount:running});
-    const kind=this.policy.snapshot().config.engines[route.engine]?.kind;
+    const live=this.policy.snapshot();
+    const route=previewRoute(live.config,live.blocks,Date.now(),{owner:frozen.owner,worker:frozen.worker,runningCount:running});
+    const kind=live.config.engines[route.engine]?.kind;
     if(route.worker!==frozen.worker||route.engine!==frozen.engine||route.model!==frozen.model||route.effort!==frozen.effort||(frozen.engineKind!==undefined&&kind!==frozen.engineKind)){
      this.queueBlocked(task,'frozen_route_changed','Current worker engine, kind, model or effort no longer matches the frozen dispatch; restore the route or cancel and create a new task.');continue;
     }

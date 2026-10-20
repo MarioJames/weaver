@@ -12,7 +12,8 @@ import type { TaskDiagnostics } from '../src/main/application/tasks/queries';
 import { PolicyStore } from '../src/main/policy/store';
 import { OwnerLaunchError, type OwnerLaunchInput, type OwnerLaunchResult } from '../src/main/owner-host';
 import { readStall, stallStoreAt } from './helpers/state-db';
-import { STALL_BLOCK_BY, STALL_MS, StallMonitor, type StallState } from '../src/main/stall';
+import { STALL_BLOCK_BY, STALL_MS, StallMonitor } from '../src/main/stall';
+import type { StallState } from '../src/main/storage/stall-state';
 import { type StallStatus } from '../src/shared/contracts/monitoring';
 import { metadataOf } from './helpers/store-metadata';
 

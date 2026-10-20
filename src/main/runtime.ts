@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { API_VERSION } from '../shared/contracts/commands';
 import { startCliAgent } from './adapters/cli/index';
 import { HelloJobs, sayHi } from './engines/hello';
-import { FreeChannelProbeMonitor, dbFreeProbeStore } from './free-channel';
+import { FreeChannelProbeMonitor } from './free-channel';
 import { embeddedApp } from './embedded';
 import { RoutingWorkerAdapter } from './adapters/routing';
 import { MockWorkerAdapter } from './adapters/worker';
@@ -16,13 +16,17 @@ import { TaskManager } from './manager';
 import { PolicyStore } from './policy/store';
 import { applyQuotaSnapshot, QuotaPolicyConflict } from './policy/quota';
 import type { QuotaRefreshInput } from '../shared/contracts/quota';
-import { QuotaProber, dbQuotaStore } from './quota';
+import { QuotaProber } from './quota';
 import { QuotaScheduler } from './quota/scheduler';
-import { StallMonitor, dbStallStore } from './stall';
+import { StallMonitor } from './stall';
 import { RpcError, parseRpcBody } from './rpc';
 import { createRpcHandlers } from './transport/handlers';
 import type { RpcMethod } from '../shared/contracts/rpc';
 import { TaskStore } from './store';
+import { dbFreeProbeStore } from './storage/free-probe-state';
+import { dbQuotaStore } from './storage/quota-snapshot';
+import { dbStallStore } from './storage/stall-state';
+import { recoverInterruptedTasks } from './application/tasks/recovery';
 
 export interface RuntimeOptions {
   dataDir: string;
@@ -189,7 +193,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       call,
     });
     store = new TaskStore(join(dataDir, 'weaver.db'));
-    store.recover();
+    recoverInterruptedTasks(store);
     policy = new PolicyStore(store.db);
     quotaProber = options.quotaProber ?? new QuotaProber({ snapshotStore: dbQuotaStore(store.db) });
     // Ladders and probe answers live in the same weaver.db, so a restart keeps its penalties and history.

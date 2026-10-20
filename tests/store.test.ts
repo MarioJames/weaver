@@ -5,7 +5,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { TaskStore, event } from '../src/main/store';
+import { TaskStore } from '../src/main/store';
+import { event } from '../src/main/domain/tasks';
+import { recoverInterruptedTasks } from '../src/main/application/tasks/recovery';
 import { SCHEMA_VERSION } from '../src/main/migrate';
 import { REAL_ENGINE_KINDS } from '../src/main/workspace';
 import type { Task } from '../src/shared/contracts/tasks';
@@ -14,7 +16,7 @@ test('persists, returns isolated copies, and recovers interrupted task without P
  const dir=mkdtempSync(join(tmpdir(),'weaver-store-')); try {
   const path=join(dir,'weaver.db'); const store=new TaskStore(path); const task=fixture(); store.put(task); task.title='changed';
   assert.equal(store.get(task.id).title,'test'); const copy=store.list(); copy[0].title='also changed'; assert.equal(store.get(task.id).title,'test');
-  const reloaded=new TaskStore(path); reloaded.recover(); const recovered=reloaded.get(task.id); assert.equal(recovered.status,'failed'); assert.equal(recovered.run?.pid,undefined); assert.equal(recovered.run?.status,'stopped');
+  const reloaded=new TaskStore(path); recoverInterruptedTasks(reloaded); const recovered=reloaded.get(task.id); assert.equal(recovered.status,'failed'); assert.equal(recovered.run?.pid,undefined); assert.equal(recovered.run?.status,'stopped');
   assert.equal(new TaskStore(path).get(task.id).status,'failed');
  } finally {rmSync(dir,{recursive:true,force:true});}
 });
