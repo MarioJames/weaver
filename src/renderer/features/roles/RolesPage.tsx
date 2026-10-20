@@ -137,7 +137,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           </div>
           <div className={rolesStyles.pair} style={{ alignItems: 'start' }}>
             <Form.Field label="模型" required><ModelPicker engine={record.engine} id={`${fieldId}-model`} value={record.model} onChange={model => update({ ...record, model })} /></Form.Field>
-            <Form.Field label="推理强度" required desc={efforts?.length ? undefined : '填写该模型接受的 variant。'}>{efforts?.length ? <NamedSelect id={`${fieldId}-effort`} aria-label="推理强度" value={record.effort} options={efforts.map(value => ({ value, label: value }))} onChange={value => { if (typeof value === 'string') update({ ...record, effort: value }); }} /> : <Input id={`${fieldId}-effort`} aria-label="推理强度" value={record.effort} placeholder="例如：max" onChange={event => update({ ...record, effort: event.target.value })} />}</Form.Field>
+            <Form.Field label="推理强度" required><EffortPicker id={`${fieldId}-effort`} efforts={efforts} value={record.effort} onChange={effort => update({ ...record, effort })} /></Form.Field>
           </div>
           {section === 'owners' && <HelloCheck id={`owners:${current}`} record={record} />}
           {section === 'workers' ? <WorkerFields key={current} id={current} record={record as Worker} probe={freeProbe} update={next => update(next)} /> : <OwnerFields key={current} savedRecord={policy.snapshot?.config.owners[current]} config={config} blocks={policy.blocks} record={record as Owner} update={next => update(next)} />}
@@ -148,6 +148,16 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
       </Surface></div>
     </div>
   </>;
+}
+
+/** The effort control with its hint below the input, mirroring the model field's hint placement so paired columns keep their inputs top aligned. */
+function EffortPicker({ efforts, id, value, onChange }: { efforts?: string[]; id: string; value: string; onChange: (effort: string) => void }) {
+  return <div className={styles.tight}>
+    {efforts?.length
+      ? <NamedSelect id={id} aria-label="推理强度" value={value} options={efforts.map(option => ({ value: option, label: option }))} onChange={option => { if (typeof option === 'string') onChange(option); }} />
+      : <Input id={id} aria-label="推理强度" value={value} placeholder="例如：max" onChange={event => onChange(event.target.value)} />}
+    {!efforts?.length && <Text type="secondary" className={styles.meta}>填写该模型接受的 variant。</Text>}
+  </div>;
 }
 
 function WorkerFields({ id, record, probe, update }: { id: string; record: Worker; probe: ReturnType<typeof useFreeProbe>; update: (next: Worker) => void }) {

@@ -9,7 +9,7 @@ import type { FilterDimension, TaskSelection } from './task-filters';
 import { dispatchKind, ownerLabel, projectLabel, taskOwnerId } from './task-view';
 import { ARCHIVE_PAGE_SIZES, ARCHIVE_PAGE_SIZE, ARCHIVE_PAGINATION_BAR, ARCHIVE_SIZE_CHANGER_LABEL, ARCHIVE_TABLE_WIDTH, applyArchivePage, archivePageSizeOptions, archiveScrollY, archiveTotalLabel, archivedTasks, clampArchivePage, resetArchivePage } from './task-archive';
 import type { ArchivePager } from './task-archive';
-import { TIME_RANGES, archiveRows, facetOptions, filterLabels } from './task-filters';
+import { TIME_RANGES, archiveRows, facetOptions, filterAriaLabel, filterLabels, foldedTriggerValue } from './task-filters';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../../format/status-colors';
 import { taskStyles } from './task-style';
 import { AgentLabel } from '../../ui/EngineIcon';
@@ -108,11 +108,24 @@ export function ArchiveList({ tasks, selected, onSelect, ownerKind, now = Date.n
   useEffect(() => { if (page !== pager.page) setPager(current => ({ ...current, page })); }, [page, pager.page]);
   const archived = archivedTasks(tasks, now);
   /** Only values with archived work in the chosen range are offered, so a select never leads to an empty table. */
-  const filterClassNames = { trigger: taskStyles.archiveFilterTrigger, value: taskStyles.archiveFilterValue };
-  const multi = (dimension: FilterDimension) => <NamedSelect classNames={filterClassNames} key={dimension} mode="multiple" allowClear prefix={`${filterLabels[dimension]}：`} aria-label={`按${filterLabels[dimension]} 筛选归档任务`} placeholder="全部" value={selection[dimension]}
-    labelRender={option => <span className={taskStyles.archiveFilterLabel} title={String(option.label)}>{option.label}</span>}
-    options={facetOptions(archived, dimension, selection, now, tasks).map(option => ({ value: option.value, label: `${option.label} ${option.count}` }))}
-    onChange={value => choose({ ...selection, [dimension]: Array.isArray(value) ? value.map(String) : [] })} />;
+  const filterClassNames = { trigger: taskStyles.archiveFilterTrigger, value: taskStyles.archiveFilterValue, prefix: taskStyles.archiveFilterPrefix, clear: taskStyles.archiveFilterClear };
+  const multi = (dimension: FilterDimension) => {
+    const chosen = selection[dimension];
+    const options = facetOptions(archived, dimension, selection, now, tasks);
+    const labelOf = (value: string) => options.find(option => option.value === value)?.label ?? value;
+    return <NamedSelect classNames={filterClassNames} key={dimension} mode="multiple" allowClear prefix={`${filterLabels[dimension]}：`} aria-label={filterAriaLabel(filterLabels[dimension])} placeholder="全部" value={chosen}
+      labelRender={option => {
+        const view = foldedTriggerValue(chosen, String(option.value), labelOf);
+        if (view.hidden) return null;
+        const text = String(option.label);
+        return <>
+          <span className={taskStyles.archiveFilterLabel} title={text}>{text}</span>
+          {view.extra > 0 && <span className={taskStyles.archiveFilterMore} title={view.extraTitle}>+{view.extra}</span>}
+        </>;
+      }}
+      options={options.map(option => ({ value: option.value, label: `${option.label} ${option.count}` }))}
+      onChange={value => choose({ ...selection, [dimension]: Array.isArray(value) ? value.map(String) : [] })} />;
+  };
   return <div className={taskStyles.archiveBody}>
     <div className={taskStyles.archiveFilters}>
       <NamedSelect classNames={filterClassNames} aria-label="按时间筛选归档任务" placeholder="时间" value={selection.time} options={TIME_RANGES.map(range => ({ value: range.value, label: `时间：${range.label}` }))}

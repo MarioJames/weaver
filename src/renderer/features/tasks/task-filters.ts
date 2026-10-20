@@ -9,6 +9,20 @@ import { dispatchKind, logicalOwnerName, ownerLabel, taskOwnerId } from './task-
 export type FilterDimension = 'status' | 'owner' | 'worker' | 'workspace';
 export const FILTER_DIMENSIONS: readonly FilterDimension[] = ['status', 'owner', 'worker', 'workspace'];
 export const filterLabels: Record<FilterDimension, string> = { status: '状态', owner: '父 Agent', worker: '子 Agent', workspace: '工作目录' };
+/** 读屏标签：标签以拉丁字母或数字结尾（父 Agent、子 Agent）时，两侧的中文连接词之间补一个空格。 */
+export function filterAriaLabel(label: string): string {
+  return /[A-Za-z0-9]$/.test(label) ? `按${label} 筛选归档任务` : `按${label}筛选归档任务`;
+}
+/**
+ * 多选触发器里的值折叠：只完整显示第一个选中值，其余折成 +N（徽标悬停时列出被折叠的名字）。
+ * 折进徽标之外的值由触发器渲染成空标签，再由样式隐藏。
+ */
+export function foldedTriggerValue(chosen: readonly string[], value: string, labelOf: (value: string) => string): { hidden: boolean; extra: number; extraTitle: string } {
+  const index = chosen.indexOf(value);
+  if (index > 0) return { hidden: true, extra: 0, extraTitle: '' };
+  const rest = chosen.slice(index + 1).map(labelOf);
+  return { hidden: false, extra: rest.length, extraTitle: rest.length ? `其余 ${rest.length} 项：${rest.join('、')}` : '' };
+}
 export const TIME_RANGES = [
   { value: 'today', label: '今天' },
   { value: '1h', label: '近 1 小时' },

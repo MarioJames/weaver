@@ -9,7 +9,7 @@ import type { Task } from '../../src/shared/contracts/tasks';
 import { UNASSIGNED_OWNER, dispatchKind, ownerKindLookup, ownerLabel, projectLabel, taskOwnerId, withOwnerProfiles } from '../../src/renderer/features/tasks/task-view';
 import { columnize, isOpenTask, taskColumn } from '../../src/renderer/features/tasks/task-columns';
 import { ARCHIVE_AFTER_MS, archivedTasks, isArchived, nonArchived } from '../../src/renderer/features/tasks/task-archive';
-import { applyTaskFilters, archiveRows, emptySelection, filterByTime, filterOptions, hasFilters, resolveSelection, taskOption, toggleOption } from '../../src/renderer/features/tasks/task-filters';
+import { applyTaskFilters, archiveRows, emptySelection, filterAriaLabel, filterByTime, filterLabels, filterOptions, foldedTriggerValue, hasFilters, resolveSelection, taskOption, toggleOption } from '../../src/renderer/features/tasks/task-filters';
 import { ENDED_EXPANDED_KEY, TASK_FILTERS_KEY, readEndedExpanded, readTaskFilters, writeEndedExpanded, writeTaskFilters } from '../../src/renderer/features/tasks/task-persistence';
 import type { FilterDimension, TaskSelection } from '../../src/renderer/features/tasks/task-filters';
 import { EngineIcon, AgentLabel } from '../../src/renderer/ui/EngineIcon';
@@ -341,7 +341,30 @@ test('the archive list is quiet when nothing has aged out yet', () => {
   assert.match(html, /还没有归档任务/);
   assert.doesNotMatch(html, /搜索/);
   assert.match(html, /按父 Agent 筛选归档任务/);
+  assert.doesNotMatch(html, /按父 Agent筛选归档任务/);
   assert.doesNotMatch(html, /重排任务面板/);
+});
+
+test('archive screen-reader labels join Chinese connectives without a space unless the label ends in Latin', () => {
+  assert.equal(filterAriaLabel('状态'), '按状态筛选归档任务');
+  assert.equal(filterAriaLabel('时间'), '按时间筛选归档任务');
+  assert.equal(filterAriaLabel('工作目录'), '按工作目录筛选归档任务');
+  assert.equal(filterAriaLabel('父 Agent'), '按父 Agent 筛选归档任务');
+  assert.equal(filterAriaLabel('子 Agent'), '按子 Agent 筛选归档任务');
+  const html = markup(React.createElement(ArchiveList, { tasks: items, onSelect: () => {}, now }));
+  for (const label of ['按时间筛选归档任务', '按状态筛选归档任务', '按父 Agent 筛选归档任务', '按子 Agent 筛选归档任务']) assert.match(html, new RegExp(label));
+  assert.doesNotMatch(html, /按父 Agent筛选|按子 Agent筛选/);
+});
+
+test('multi-value archive selects fold to the first value plus +N', () => {
+  const labelOf = (value: string) => ({ failed: '失败 16', cancelled: '已取消 39' })[value] ?? value;
+  const first = foldedTriggerValue(['failed', 'cancelled'], 'failed', labelOf);
+  assert.deepEqual(first, { hidden: false, extra: 1, extraTitle: '其余 1 项：已取消 39' });
+  assert.deepEqual(foldedTriggerValue(['failed', 'cancelled'], 'cancelled', labelOf), { hidden: true, extra: 0, extraTitle: '' });
+  assert.deepEqual(foldedTriggerValue(['failed'], 'failed', labelOf), { hidden: false, extra: 0, extraTitle: '' });
+  assert.deepEqual(foldedTriggerValue(['failed', 'cancelled', 'o1'], 'failed', value => labelOf(value) === value ? '未知' : labelOf(value)), { hidden: false, extra: 2, extraTitle: '其余 2 项：已取消 39、未知' });
+  /** The archive renders the labels the selects read, so a folded trigger still names the whole choice. */
+  assert.equal(filterLabels.owner, '父 Agent');
 });
 
 test('only active execution cards spin and scheduled cards use a static clock', () => {

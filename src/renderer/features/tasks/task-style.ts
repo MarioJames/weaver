@@ -158,15 +158,15 @@ export const taskStyles = createStaticStyles(({ css, cssVar }) => ({
     text-overflow: ellipsis;
     white-space: nowrap;
   `,
-  /** Archive drawer: every filter on one row. */
+  /** Archive drawer: filters above the table. A narrow drawer wraps them onto a second row instead of squeezing four into one; wide drawers keep the single row. */
   archiveFilters: css`
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: ${cssVar.marginXS};
     align-items: center;
     min-inline-size: 0;
 
-    > * { flex: 1 1 0; min-inline-size: 0; }
+    > * { flex: 1 1 0; min-inline-size: 150px; }
   `,
   archiveFilterTrigger: css`
     justify-content: flex-start;
@@ -176,6 +176,24 @@ export const taskStyles = createStaticStyles(({ css, cssVar }) => ({
     max-block-size: 32px;
     white-space: nowrap;
     > * { min-inline-size: 0; }
+    /* The arrow closes the trigger: it never yields space to the prefix or value. */
+    > :last-child { flex: none; }
+    /* The clear × only exists while a value is chosen; it steps in for the arrow on hover instead of
+       reserving width beside it, so the value keeps every pixel between the prefix and the arrow. */
+    &:hover [data-role='lobe-select-clear'] { display: inline-flex; }
+    &:hover:has([data-role='lobe-select-clear']) > :last-child > :last-child { display: none; }
+  `,
+  /** Hidden while the trigger rests: reserving its width would squeeze the value into an ellipsis even when room is left. */
+  archiveFilterClear: css`
+    display: none;
+  `,
+  /** The label before the value stays whole (it is short) and the value yields with an ellipsis instead of running into the arrow. */
+  archiveFilterPrefix: css`
+    display: block;
+    flex: none;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   `,
   archiveFilterValue: css`
     && {
@@ -188,6 +206,15 @@ export const taskStyles = createStaticStyles(({ css, cssVar }) => ({
     }
     > * { flex-wrap: nowrap; overflow: hidden; }
     [data-role='lobe-select-tag'] { min-inline-size: 0; flex-shrink: 0; }
+    /* Folded-away values render as empty tags; they stay out of sight until the fold hides them. */
+    [data-role='lobe-select-tag']:empty { display: none; }
+  `,
+  /** The +N badge after the whole first value: it stays readable while the value itself truncates. */
+  archiveFilterMore: css`
+    flex: none;
+    margin-inline-start: 2px;
+    color: ${cssVar.colorTextTertiary};
+    font-variant-numeric: tabular-nums;
   `,
   archiveFilterLabel: css`
     display: block;
