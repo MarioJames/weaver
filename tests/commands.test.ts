@@ -180,3 +180,32 @@ test('workspace browser lists only visible directories and rejects a missing or 
   assert.equal(f.raw('workspaces.list',{path:join(f.dir,'file.txt')}).ok,false);
  }finally{await f.close();}
 });
+test('ID validation errors name the field instead of reporting task ID',async()=>{const f=setup();try{
+ const emptyOwner=f.raw('tasks.create',{title:'T',instruction:'x',ownerId:''});
+ assert.equal(emptyOwner.error?.code,'INVALID_REQUEST');
+ assert.match(emptyOwner.error?.message??'',/owner ID/);
+ assert.doesNotMatch(emptyOwner.error?.message??'',/task ID|maximum 36 characters/);
+ const missingOwner=f.raw('tasks.create',{title:'T',instruction:'x'});
+ assert.equal(missingOwner.error?.code,'INVALID_REQUEST');
+ assert.match(missingOwner.error?.message??'',/owner ID/);
+ assert.doesNotMatch(missingOwner.error?.message??'',/task ID|maximum 36 characters/);
+ assert.match(f.raw('tasks.create',{title:'T',instruction:'x',ownerId:'nope'}).error?.message??'',/^Invalid owner ID: expected a UUID$/);
+ assert.match(f.raw('tasks.create',{title:'T',instruction:'x',parentTaskId:''}).error?.message??'',/^Missing parent task ID$/);
+ assert.match(f.raw('tasks.create',{title:'T',instruction:'x',parentTaskId:'zzz'}).error?.message??'',/^Invalid parent task ID: expected a UUID$/);
+ assert.match(f.raw('packages.get',{packageId:''}).error?.message??'',/^Missing package ID$/);
+ assert.match(f.raw('packages.get',{packageId:'zzz'}).error?.message??'',/^Invalid package ID: expected a UUID$/);
+ assert.match(f.raw('tasks.list',{parentTaskId:'zzz'}).error?.message??'',/^Invalid parent task ID: expected a UUID$/);
+ assert.match(f.raw('owners.continuation.get',{taskId:''}).error?.message??'',/^Missing task ID$/);
+ // records.task keeps its existing NOT_FOUND wrapping; the ID error never leaks through tasks.get.
+ assert.equal(f.raw('tasks.get',{taskId:'zzz'}).error?.code,'NOT_FOUND');
+ assert.equal(f.raw('tasks.get',{taskId:''}).error?.code,'NOT_FOUND');
+ // owner:null must be rejected as a missing owner reference, not crash reading owner.transport.
+ const nullOwner=f.raw('tasks.create',{title:'T',instruction:'x',owner:null});
+ assert.equal(nullOwner.error?.code,'INVALID_REQUEST');
+ assert.match(nullOwner.error?.message??'',/^Missing owner ID: pass ownerId, ownerProfileId, parentTaskId, or an owner object$/);
+ const task=f.call('tasks.create',legacy);
+ // artifactId is validated before the artifact lookup, so an artifact-free task still reports the field error.
+ assert.match(f.raw('artifacts.read',{taskId:task.id,artifactId:''}).error?.message??'',/^Missing artifact ID$/);
+ assert.match(f.raw('artifacts.read',{taskId:task.id,artifactId:'zzz'}).error?.message??'',/^Invalid artifact ID: expected a UUID$/);
+ assert.equal(f.raw('artifacts.read',{taskId:task.id,artifactId:randomUUID()}).error?.code,'NOT_FOUND');
+}finally{await f.close();}});

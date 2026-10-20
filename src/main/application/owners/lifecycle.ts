@@ -30,8 +30,8 @@ export class OwnerLifecycle {
  ownerInstances():OwnerInstance[]{const tasks=this.manager.store.listHeads();return this.manager.store.listOwners().map(owner=>({...owner,runningTaskCount:slotGroupCount(tasks,slotGroupFor(owner.id,owner.profileId))}));}
  list(a:CommandArgs):unknown{return {owners:this.ownerInstances()};}
  get(a:CommandArgs):unknown{const owner=this.records.owner(a.ownerId);return {...owner,runningTaskCount:this.runningOn(owner)};}
- continuationGet(a:CommandArgs):unknown{return this.continuation.get(parseId(a.taskId));}
- continuationConfigure(a:CommandArgs):unknown{if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');return this.continuation.configure(parseId(a.taskId),a.expectedRevision as number,a.idleRotationMinutes as number|null);}
+ continuationGet(a:CommandArgs):unknown{return this.continuation.get(parseId(a.taskId,'task ID'));}
+ continuationConfigure(a:CommandArgs):unknown{if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');return this.continuation.configure(parseId(a.taskId,'task ID'),a.expectedRevision as number,a.idleRotationMinutes as number|null);}
  register(command:'owners.attach'|'owners.spawn',a:CommandArgs):LogicalOwner{
     const mode=command==='owners.spawn'&&a.provider==='mock'?'mock':'manual';if(a.provider!==undefined&&a.provider!=='mock')fail('CAPABILITY_UNAVAILABLE','This process does not spawn an owner model');
     // Inputs are validated before the registry is read, so a malformed request can never reach an existing instance.

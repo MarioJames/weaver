@@ -25,3 +25,24 @@ test('validates inputs and task IDs at boundary',() => {
  assert.throws(() => parseId('../../anything'));
  assert.throws(() => parseTaskInput({title:'x',instruction:'y',owner:{name:'x',session:'main',pane:'1',transport:'hidden'}}));
 });
+test('ID validation errors name the field: missing IDs and non-UUIDs are reported per field',() => {
+ assert.throws(() => parseId(undefined),/Missing task ID/);
+ assert.throws(() => parseId(''),/Missing task ID/);
+ assert.throws(() => parseId('   '),/Missing task ID/);
+ assert.throws(() => parseId('../../anything'),/^Error: Invalid task ID: expected a UUID$/);
+ assert.throws(() => parseId('a'.repeat(40)),/Invalid task ID: expected a UUID/);
+ assert.throws(() => parseId(123),/Invalid task ID: expected a UUID/);
+ assert.throws(() => parseId(undefined,'owner ID'),/Missing owner ID/);
+ assert.throws(() => parseId('','owner ID'),/Missing owner ID/);
+ assert.throws(() => parseId('nope','owner ID'),/^Error: Invalid owner ID: expected a UUID$/);
+ assert.throws(() => parseId(undefined,'package ID'),/Missing package ID/);
+ assert.throws(() => parseId('zzz','package ID'),/^Error: Invalid package ID: expected a UUID$/);
+ assert.throws(() => parseId(undefined,'artifact ID'),/Missing artifact ID/);
+ assert.throws(() => parseId('zzz','artifact ID'),/Invalid artifact ID: expected a UUID/);
+ assert.throws(() => parseId(undefined,'parent task ID'),/Missing parent task ID/);
+ assert.throws(() => parseId('zzz','parent task ID'),/Invalid parent task ID: expected a UUID/);
+ // A missing owner reference in tasks.create input names the owner field instead of a generic object error,
+ // and owner:null (typeof null === 'object') is a missing reference too, never a TypeError.
+ assert.throws(() => parseTaskInput({title:'x',instruction:'y'}),/Missing owner ID/);
+ assert.throws(() => parseTaskInput({title:'x',instruction:'y',owner:null}),/^Error: Missing owner ID: pass ownerId, ownerProfileId, parentTaskId, or an owner object$/);
+});

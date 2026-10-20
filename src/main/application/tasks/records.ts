@@ -13,8 +13,8 @@ export function publicTask<T extends Pick<Task,'owner'|'run'>>(task:T){const {ow
 /** Looks tasks and owners up for the command units that share one manager; every miss is the same NOT_FOUND answer. */
 export class TaskRecords {
  constructor(readonly manager:TaskManager){}
- owner(id:unknown):LogicalOwner {const owner=this.manager.store.getOwner(parseId(id));if(!owner)fail('NOT_FOUND','Owner not found');return owner!;}
- task(a:Record<string,unknown>):Task {try{return this.manager.store.get(parseId(a.taskId));}catch{ return fail('NOT_FOUND','Task not found');}}
+ owner(id:unknown):LogicalOwner {const owner=this.manager.store.getOwner(parseId(id,'owner ID'));if(!owner)fail('NOT_FOUND','Owner not found');return owner!;}
+ task(a:Record<string,unknown>):Task {try{return this.manager.store.get(parseId(a.taskId,'task ID'));}catch{ return fail('NOT_FOUND','Task not found');}}
   revise(task:Task,a:Record<string,unknown>){if(a.expectedRevision!==undefined && a.expectedRevision!==(task.revision??0))fail('REVISION_CONFLICT',`Current revision is ${task.revision??0}`);}
   put(task:Task){this.manager.update(task);}
 }

@@ -9,7 +9,8 @@ export function text(value: unknown, name: string, max: number, allowEmpty = fal
 }
 export const PENDING_TASK_TITLE = '等待父 Agent 命名';
 export function parseTaskInput(value: unknown): TaskInput & { title: string } {
- const input = object(value); const owner = object(input.owner);
+ const input = object(value); if (input.owner === undefined || input.owner === null || typeof input.owner !== 'object' || Array.isArray(input.owner)) throw new Error('Missing owner ID: pass ownerId, ownerProfileId, parentTaskId, or an owner object');
+ const owner = input.owner as Record<string, unknown>;
  if (owner.transport !== 'herdr-visible') throw new Error('Owner transport must be herdr-visible');
  const extra: Pick<TaskInput,'workspace'|'acceptanceCriteria'|'constraints'>={};
  if(input.workspace!==undefined) extra.workspace=text(input.workspace,'workspace',2000);
@@ -18,10 +19,10 @@ export function parseTaskInput(value: unknown): TaskInput & { title: string } {
  name: text(owner.name, 'owner name', 120), transport: 'herdr-visible', session: text(owner.session, 'session', 120), pane: text(owner.pane, 'pane', 120)
  }};
 }
-export function parseId(value: unknown): string {
- const id = text(value, 'task ID', 36);
- if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(id)) throw new Error('Invalid task ID');
- return id;
+export function parseId(value: unknown, name = 'task ID'): string {
+ if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) throw new Error(`Missing ${name}`);
+ if (typeof value !== 'string' || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(value)) throw new Error(`Invalid ${name}: expected a UUID`);
+ return value;
 }
 export function parseWorkerRecord(value: unknown): WorkerRecord {
  const record = object(value);

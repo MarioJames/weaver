@@ -44,10 +44,10 @@ export class Queries {
    }
  taskList(a:CommandArgs):unknown{
     const offset=a.offset??0;const limit=a.limit??25;if(!Number.isSafeInteger(offset)||Number(offset)<0||!Number.isSafeInteger(limit)||Number(limit)<1||Number(limit)>100)fail('INVALID_REQUEST','Invalid pagination');
-    if(a.parentTaskId!==undefined)parseId(a.parentTaskId);
+    if(a.parentTaskId!==undefined)parseId(a.parentTaskId,'parent task ID');
     const all=this.manager.store.listSummaries().filter(t=>(a.ownerId===undefined||t.ownerId===a.ownerId)&&(a.parentTaskId===undefined||t.parentTaskId===a.parentTaskId));const tasks=all.slice(Number(offset),Number(offset)+Number(limit)).map(t=>{const {events,artifacts,...summary}=publicTask(t);return {...summary,artifactCount:artifacts.length};});return {tasks,nextOffset:Number(offset)+tasks.length<all.length?Number(offset)+tasks.length:null};
    }
- packageGet(a:CommandArgs):unknown{const pkg=this.manager.store.getPackage(parseId(a.packageId));if(!pkg)fail('NOT_FOUND','Package not found');return pkg;}
+ packageGet(a:CommandArgs):unknown{const pkg=this.manager.store.getPackage(parseId(a.packageId,'package ID'));if(!pkg)fail('NOT_FOUND','Package not found');return pkg;}
  taskEvents(a:CommandArgs):unknown{
     const task=this.records.task(a);const limit=a.limit??50;if(!Number.isInteger(limit)||Number(limit)<1||Number(limit)>100)fail('INVALID_REQUEST','Event limit must be 1–100');let start=0;
     if(a.after!==undefined){const i=task.events.findIndex(e=>e.id===a.after);if(i<0)fail('CURSOR_EXPIRED','Cursor not retained; refresh task snapshot');start=i+1;}
@@ -85,6 +85,6 @@ export class Queries {
     const after=status.engines[engine]!;
     return {engine,wasBlocked,cleared:engineSummary(after),retainedHistory:after.history,otherEngines:Object.fromEntries(Object.entries(status.engines).filter(([name])=>name!==engine).map(([name,item])=>[name,engineSummary(item)]))};
    }
- artifactRead(a:CommandArgs):unknown{const task=this.records.task(a);const artifact=task.artifacts.find(v=>v.id===parseId(a.artifactId));if(!artifact)fail('NOT_FOUND','Artifact not found');return artifact;}
+ artifactRead(a:CommandArgs):unknown{const task=this.records.task(a);const artifactId=parseId(a.artifactId,'artifact ID');const artifact=task.artifacts.find(v=>v.id===artifactId);if(!artifact)fail('NOT_FOUND','Artifact not found');return artifact;}
  operationGet(a:CommandArgs):unknown{const id=text(a.commandId,'commandId',120);const receipt=this.manager.store.getReceipt(`local-demo:${id}`);if(!receipt)fail('NOT_FOUND','Command receipt not found');return {commandId:id,state:receipt!.response?'settled':'indeterminate',response:receipt!.response};}
 }

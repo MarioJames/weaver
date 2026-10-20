@@ -148,7 +148,7 @@ function taskHandlers(): Handlers<'command' | 'listTasks' | 'getTask' | 'createT
   return {
     command: (active, args) => active.commands.handleAsync(args[0]),
     listTasks: active => active.store.listSummaries(),
-    getTask: (active, args) => active.store.get(parseId(args[0])),
+    getTask: (active, args) => active.store.get(parseId(args[0],'task ID')),
     createTask: (active, args) => {
       const input = parseTaskInput(args[0]);
       const response = active.commands.handle({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'tasks.create', args: input as unknown as Record<string, unknown> });
@@ -156,13 +156,13 @@ function taskHandlers(): Handlers<'command' | 'listTasks' | 'getTask' | 'createT
       return active.store.get((response.data as { id: string }).id);
     },
     startTask: async (active, args) => {
-      const id = parseId(args[0]);
+      const id = parseId(args[0],'task ID');
       const response = await active.commands.handleAsync({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'tasks.start', args: { taskId: id } });
       if (!response.ok) throw new RpcError(response.error?.code ?? 'COMMAND_FAILED', response.error?.message ?? 'Command failed');
       return active.store.get(id);
     },
     cancelTask: (active, args) => {
-      const id = parseId(args[0]);
+      const id = parseId(args[0],'task ID');
       const response = active.commands.handle({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'tasks.cancel', args: { taskId: id } });
       if (!response.ok) throw new RpcError(response.error?.code ?? 'COMMAND_FAILED', response.error?.message ?? 'Command failed');
       return active.store.get(id);
