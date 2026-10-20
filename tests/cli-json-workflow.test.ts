@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { makeRequest, parseCLI, runCLI } from '../src/cli/main';
+import { makeRequest } from '../src/cli/input';
+import { parseCLI } from '../src/cli/parse';
+import { runCLI } from '../src/cli/run';
 
 
 test('revision, digest and review flags merge without constructing JSON and reject conflicts', () => {
@@ -89,7 +91,7 @@ test('real zsh captures scalar fields and sends quoted-heredoc JSON and literal 
   const comment = '中文 "引号"\n实际换行 / 字面量\\n';
   await writeFile(`${directory}/review.txt`, comment);
   await writeFile(`${directory}/cli.mjs`, `
-    import { runCLI } from ${JSON.stringify(pathToFileURL(`${process.cwd()}/src/cli/main.ts`).href)};
+    import { runCLI } from ${JSON.stringify(pathToFileURL(`${process.cwd()}/src/cli/run.ts`).href)};
     import { appendFile } from 'node:fs/promises';
     process.exitCode = await runCLI(process.argv.slice(2), { request: async (_dir, request) => {
       await appendFile(${JSON.stringify(`${directory}/requests.jsonl`)}, JSON.stringify(request)+'\\n');

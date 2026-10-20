@@ -6,7 +6,9 @@ import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { startLocalIPC } from '../src/main/local-ipc';
-import { runCLI, parseCLI, defaultForSeconds } from '../src/cli/main';
+import { runCLI } from '../src/cli/run';
+import { parseCLI } from '../src/cli/parse';
+import { defaultForSeconds } from '../src/cli/poll-task';
 
 const exec = promisify(execFile);
 const ok = (data: unknown) => ({apiVersion:'weaver.v1',ok:true,data});

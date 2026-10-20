@@ -1,31 +1,4 @@
-/** Browser and Unix method calls share this allowlist. There is no reflective dispatch. */
-const ARITY: Record<string, number> = Object.create(null);
-Object.assign(ARITY, {
-  command: 1,
-  getPolicy: 0,
- policyHistory: 0,
- policyRollback: 1,
-  validatePolicy: 1,
-  savePolicy: 1,
-  previewRoute: 1,
- scanEngines: 0,
- listEngineModels: 1,
- getQuota: 0,
-  refreshQuota: 1,
-  getStall: 0,
-  workerProbe: 1,
-  workerProbeStatus: 0,
-  sayHi: 1,
-  sayHiResult: 1,
-  setEngineEnabled: 1,
-  listTasks: 0,
-  getTask: 1,
-  createTask: 1,
-  startTask: 1,
-  cancelTask: 1,
-  capabilities: 0,
-  serverInfo: 0,
-});
+import { RPC_METHODS, type RpcMethod } from '../shared/contracts/rpc';
 
 export class RpcError extends Error {
   constructor(readonly code: string, message: string) {
@@ -34,6 +7,7 @@ export class RpcError extends Error {
   }
 }
 
+/** Browser and Unix method calls share one allowlist, the RPC contract table. There is no reflective dispatch. */
 export function parseRpcBody(value: unknown): { method: string; args: unknown[] } {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new RpcError('INVALID_REQUEST', 'Request must be a JSON object');
   const record = value as Record<string, unknown>;
@@ -43,8 +17,8 @@ export function parseRpcBody(value: unknown): { method: string; args: unknown[] 
   }
   const method = record.method;
   const args = record.args;
-  if (typeof method !== 'string' || !Object.hasOwn(ARITY, method)) throw new RpcError('INVALID_REQUEST', 'Unknown method');
-  if (!Array.isArray(args) || args.length !== ARITY[method]) throw new RpcError('INVALID_REQUEST', 'Invalid argument arity');
+  if (typeof method !== 'string' || !Object.hasOwn(RPC_METHODS, method)) throw new RpcError('INVALID_REQUEST', 'Unknown method');
+  if (!Array.isArray(args) || args.length !== RPC_METHODS[method as RpcMethod].arity) throw new RpcError('INVALID_REQUEST', 'Invalid argument arity');
   return { method, args };
 }
 

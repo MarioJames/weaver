@@ -1,33 +1,27 @@
 import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_VERSION } from '../shared/contracts/commands';
-import { EXECUTION_BOUNDARY, ENGINE_CATALOG, readinessFor, type EngineProbeRecord } from '../shared/engines';
-import { parseId, parseTaskInput } from '../shared/validation';
 import { startCliAgent } from './adapters/cli/index';
-import { HelloJobs, parseHelloInput, sayHi } from './engines/hello';
-import { EngineModelLister, parseModelListInput } from './engines/models';
-import { FreeChannelProbeMonitor, dbFreeProbeStore, parseFreeProbeInput } from './free-channel';
+import { HelloJobs, sayHi } from './engines/hello';
+import { FreeChannelProbeMonitor, dbFreeProbeStore } from './free-channel';
 import { embeddedApp } from './embedded';
 import { RoutingWorkerAdapter } from './adapters/routing';
 import { MockWorkerAdapter } from './adapters/worker';
-import { CommandHandler, configuredParallel, workerLoad, type AsyncOwnerHost } from './commands';
-import { applyEngineEnabled, parseEngineToggle } from './engines/control';
-import { EngineProber } from './engines/probe';
+import { CommandHandler, type AsyncOwnerHost } from './commands';
 import { SECURITY_HEADERS, startHttpServer, type HttpRuntime } from './http';
 import { failure, startLocalIPC } from './local-ipc';
 import { TaskManager } from './manager';
-import { validateConfig } from './policy/routing';
 import { PolicyStore } from './policy/store';
-import { applyQuotaSnapshot, parseQuotaRefresh, QuotaPolicyConflict, QUOTA_CAPABILITIES } from './policy/quota';
+import { applyQuotaSnapshot, QuotaPolicyConflict } from './policy/quota';
 import type { QuotaRefreshInput } from '../shared/contracts/quota';
 import { QuotaProber, dbQuotaStore } from './quota';
 import { QuotaScheduler } from './quota/scheduler';
 import { StallMonitor, dbStallStore } from './stall';
 import { RpcError, parseRpcBody } from './rpc';
+import { createRpcHandlers } from './transport/handlers';
+import type { RpcMethod } from '../shared/contracts/rpc';
 import { TaskStore } from './store';
-import { VERSION } from '../shared/version';
 
 export interface RuntimeOptions {
   dataDir: string;
@@ -105,15 +99,6 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     const engine = policy?.snapshot().config.engines[route.engine];
     return track(sayHi({ ...route, kind: engine?.kind ?? route.engine }, { root: join(dataDir, 'agent-state'), signal: greetings.signal }));
   });
-  const prober = new EngineProber();
-  const modelLister = new EngineModelLister();
-  let probes: EngineProbeRecord[] | null = null;
-  const remember = (probe: EngineProbeRecord | null) => {
-    if (!probe) return probes;
-    const next = [...(probes ?? []).filter(item => item.id !== probe.id), probe];
-    probes = ENGINE_CATALOG.map(entry => next.find(item => item.id === entry.id)).filter((item): item is EngineProbeRecord => Boolean(item));
-    return probes;
-  };
   const track = <T>(job: Promise<T>): Promise<T> => {
     inflight.add(job);
     job.then(() => { inflight.delete(job); }, () => { inflight.delete(job); });
@@ -145,115 +130,19 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     refresh: async engine => { if (ready && !draining) await refreshQuota({ engine }); },
     log: error => console.error(`Scheduled quota refresh failed: ${error instanceof Error ? error.message : 'unknown error'}`),
   });
+  const handlers = createRpcHandlers({
+    track,
+    refreshQuota,
+    quotaSchedule: () => scheduler.status(),
+    stall: () => stall!,
+    freeProbe: () => freeProbe!,
+    hellos,
+    server: () => ({ url: runtime.url, port: runtime.port, dataDir, startedAt, managedBy: managedBy() }),
+  });
   async function dispatch(method: string, args: unknown[]): Promise<unknown> {
     const active = requireReady();
-    switch (method) {
-      case 'command': return active.commands.handleAsync(args[0]);
-      case 'getPolicy': return active.policy.snapshot();
-      case 'policyHistory': return { revisions: active.policy.history() };
-      case 'policyRollback': {
-        if (!args[0] || typeof args[0] !== 'object' || Array.isArray(args[0])) throw new RpcError('INVALID_REQUEST', 'Rollback input must be an object');
-        const revision = (args[0] as Record<string, unknown>).revision;
-        if (!Number.isSafeInteger(revision) || Number(revision) < 1) throw new RpcError('INVALID_REQUEST', 'revision must be a positive integer');
-        return active.policy.rollback(Number(revision));
-      }
-      case 'getQuota': return { ...active.prober.get(), schedule: scheduler.status() };
-      case 'getStall': return stall!.status();
-      case 'workerProbeStatus': return freeProbe!.status();
-      case 'workerProbe': return freeProbe!.probeNow(parseFreeProbeInput(args[0]).worker);
-      case 'listEngineModels': {
-        let input;
-        try { input = parseModelListInput(args[0]); } catch (error) { throw new RpcError('INVALID_REQUEST', error instanceof Error ? error.message : String(error)); }
-        return track(modelLister.list(input));
-      }
-      case 'refreshQuota': return refreshQuota(parseQuotaRefresh(args[0]));
-      case 'validatePolicy': {
-        let encoded = '';
-        try { encoded = JSON.stringify(args[0]); } catch { throw new RpcError('INVALID_REQUEST', 'Policy must be JSON'); }
-        if (Buffer.byteLength(encoded) > 256 * 1024) throw new RpcError('INVALID_REQUEST', 'Policy exceeds 256 KiB');
-        return validateConfig(args[0]);
-      }
-      case 'savePolicy': {
-        let snapshot;
-        try { snapshot = active.policy.save(args[0]); }
-        catch (error) {
-          // A stale revision is a conflict the caller resolves by reloading, not a malformed request.
-          if (error instanceof Error && error.message.startsWith('Settings changed')) throw new RpcError('REVISION_CONFLICT', error.message);
-          throw error;
-        }
-        active.commands.pump();
-        return snapshot;
-      }
-      case 'sayHi': {
-        const input = parseHelloInput(args[0]);
-        if (!active.policy.snapshot().config.engines[input.engine]) throw new RpcError('INVALID_REQUEST', `Engine ${input.engine} is not configured`);
-        try { return hellos.start(input); } catch (error) { throw new RpcError('CAPACITY_EXCEEDED', error instanceof Error ? error.message : String(error)); }
-      }
-      case 'sayHiResult': {
-        const id = args[0];
-        if (typeof id !== 'string' || !/^[0-9a-f]{16}$/.test(id)) throw new RpcError('INVALID_REQUEST', 'Invalid probe id');
-        const job = hellos.get(id);
-        if (!job) throw new RpcError('NOT_FOUND', 'Probe not found or expired');
-        return job;
-      }
-      case 'previewRoute': {
-        // The route shown is the route a dispatch would take now, so the server supplies the live load.
-        const input = args[0] && typeof args[0] === 'object' && !Array.isArray(args[0]) ? args[0] as Record<string, unknown> : {};
-        return active.policy.preview({ ...input, workerLoad: workerLoad(active.store.listHeads()) });
-      }
-      case 'scanEngines': {
-        const found = await track(prober.scan());
-        probes = found;
-        const snapshot = active.policy.snapshot();
-        return { probedAt: new Date().toISOString(), probes: found, readiness: readinessFor(found, snapshot.config), boundary: EXECUTION_BOUNDARY };
-      }
-      case 'setEngineEnabled': {
-        const result = await track(applyEngineEnabled(active.policy, prober, parseEngineToggle(args[0])));
-        active.commands.pump();
-        const known = remember(result.probe) ?? [];
-        return { snapshot: result.snapshot, probe: result.probe, readiness: readinessFor(known, result.snapshot.config) };
-      }
-      case 'listTasks': return active.store.listSummaries();
-      case 'getTask': return active.store.get(parseId(args[0]));
-      case 'createTask': {
-        const input = parseTaskInput(args[0]);
-        const response = active.commands.handle({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'tasks.create', args: input as unknown as Record<string, unknown> });
-        if (!response.ok) throw new RpcError(response.error?.code ?? 'COMMAND_FAILED', response.error?.message ?? 'Command failed');
-        return active.store.get((response.data as { id: string }).id);
-      }
-      case 'startTask': {
-        const id = parseId(args[0]);
-        const response = await active.commands.handleAsync({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'tasks.start', args: { taskId: id } });
-        if (!response.ok) throw new RpcError(response.error?.code ?? 'COMMAND_FAILED', response.error?.message ?? 'Command failed');
-        return active.store.get(id);
-      }
-      case 'cancelTask': {
-        const id = parseId(args[0]);
-        const response = active.commands.handle({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'tasks.cancel', args: { taskId: id } });
-        if (!response.ok) throw new RpcError(response.error?.code ?? 'COMMAND_FAILED', response.error?.message ?? 'Command failed');
-        return active.store.get(id);
-      }
-      case 'capabilities': return {
-        worker: active.manager.canLaunchReal
-          ? 'Saved opencode, pi, grok, codex, and qodercli routes launch that engine. mock-jsonl runs only when requested. Failures do not fall back.'
-          : 'mock-jsonl is the explicit test provider. A real route fails until the engine launcher is loaded and does not fall back to mock.',
-        owner: 'Attachment is metadata only. owners.switch with launch and owners.launch start a visible Herdr owner on a claude or codex profile; a Herdr executable on PATH is neither a model run nor a login proof.',
-        maxParallel: configuredParallel(active.policy),
-        storePath: active.store.path,
-        quota: QUOTA_CAPABILITIES,
-      };
-      case 'serverInfo': return {
-        pid: process.pid,
-        url: runtime.url,
-        port: runtime.port,
-        dataDir,
-        version: VERSION,
-        startedAt,
-        runningWorkers: active.manager.runningCount,
-        managedBy: managedBy(),
-      };
-      default: throw new RpcError('INVALID_REQUEST', 'Unknown method');
-    }
+    if (!Object.hasOwn(handlers, method)) throw new RpcError('INVALID_REQUEST', 'Unknown method');
+    return await handlers[method as RpcMethod](active, args);
   }
   async function call(method: string, args: unknown[]): Promise<unknown> {
     try { return await dispatch(method, args); }

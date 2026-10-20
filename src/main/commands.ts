@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { API_VERSION, type CommandResponse, type DispatchNext } from '../shared/contracts/commands';
+import { API_VERSION, READ_COMMANDS, WRITE_COMMANDS, isWriteCommand, type CommandResponse, type DispatchNext } from '../shared/contracts/commands';
 import { ownerSession, sameOwnerInstance } from '../shared/policy/owner-instance';
 import { type LogicalOwner, type OwnerInstance } from '../shared/contracts/owners';
 import { type WorkPackage } from '../shared/contracts/tasks';
@@ -24,9 +24,6 @@ import { vendorBlockReason } from './adapters/cli/vendor-errors';
 import { workerInstruction } from './adapters/instruction';
 /** Vendor rate limit ladder in minutes, level 1..3; shared with the free-channel probe monitor. */
 export const VENDOR_LADDER_MINUTES = [10, 30, 60] as const;
-export const WRITE_COMMANDS = ['owners.attach','owners.spawn','owners.switch','owners.launch','owners.continuation.configure','tasks.create','tasks.start','tasks.complete','tasks.describe','tasks.retry','tasks.cancel','packages.create','workers.spawn','workers.complete','results.deliver','results.ack','reviews.submit','engines.unblock'] as const;
-export const READ_COMMANDS = ['workspaces.list','capabilities.get','sync.snapshot','sync.status','owners.list','owners.get','owners.continuation.get','tasks.get','tasks.list','tasks.events','tasks.results','tasks.health','artifacts.read','packages.get','operations.get','observability.get','observability.export','engines.health','engines.penalty'] as const;
-const writes=new Set<string>(WRITE_COMMANDS);
 /** Running tasks per worker across every owner: the load that weighted dispatch balances. */
 export function workerLoad(tasks: Task[]): Record<string, number> {
  const load: Record<string, number> = {};
@@ -119,7 +116,7 @@ export class CommandHandler {
    const command=text(r.command,'command',80); const args=structuredClone(object(r.args??{}));
    if(r.commandId!==undefined)commandId=text(r.commandId,'commandId',120);
    if(this.draining)fail('APP_DRAINING','App is shutting down');
-   if(writes.has(command)) {
+   if(isWriteCommand(command)) {
     if(!commandId)fail('INVALID_REQUEST','Mutation requires commandId');
     receiptKey=`local-demo:${commandId}`;const hash=digest({command,args});const old=this.manager.store.getReceipt(receiptKey);
     if(old) {if(old.hash!==hash)fail('IDEMPOTENCY_CONFLICT','commandId already used for different arguments');if(old.response)return old.response;fail('COMMAND_INDETERMINATE','Previous command was interrupted. Inspect tasks/owners before issuing a new command; no automatic replay was performed.');}
@@ -134,7 +131,7 @@ export class CommandHandler {
     }
    }
    const response:CommandResponse={apiVersion:API_VERSION,commandId,ok:true,data};
-   effected=true;if(writes.has(command))this.manager.notify();if(receiptKey)this.finish(receiptKey,response);return response;
+   effected=true;if(isWriteCommand(command))this.manager.notify();if(receiptKey)this.finish(receiptKey,response);return response;
   }catch(error){
    if(effected)return {apiVersion:API_VERSION,commandId,ok:false,error:{code:'COMMAND_INDETERMINATE',message:'Command applied but receipt persistence failed; inspect current state before retrying',retryable:false}};
    const response:CommandResponse={apiVersion:API_VERSION,commandId,ok:false,error:{code:error instanceof CommandError||error instanceof ContinuationError?error.code:'INVALID_REQUEST',message:error instanceof Error?error.message:'Command failed',retryable:false}};

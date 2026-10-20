@@ -4,7 +4,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startLocalIPC } from '../src/main/local-ipc';
-import { CLI_CATALOG, CLI_HELP, runCLI } from '../src/cli/main';
+import { CLI_CATALOG, CLI_HELP } from '../src/cli/catalog';
+import { runCLI } from '../src/cli/run';
 
 const ok = (data: unknown) => ({ apiVersion: 'weaver.v1', ok: true, data });
 const task = { id: 'task', title: 'Fixture', status: 'running', revision: 3 };

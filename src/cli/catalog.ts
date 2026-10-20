@@ -1,0 +1,132 @@
+import { POLL_COMMANDS, isWriteCommand, type LogicalCommand } from '../shared/contracts/commands';
+import { findRpcForCommand, type RpcCliCommand } from '../shared/contracts/rpc';
+
+export interface CatalogCommand {
+  command: string;
+  mutation: boolean;
+  usage: string;
+  inputFields?: { required: Record<string,string>; optional?: Record<string,string>; notes?: string };
+  rpc?: { method: string; arity: 0 | 1 };
+  local?: 'wait' | 'watch';
+}
+
+type CatalogName = LogicalCommand | RpcCliCommand | typeof POLL_COMMANDS[number];
+
+/** A catalog row: command name, mutation flag and direct-RPC mapping come from the shared contracts; only the text is written here. */
+function cmd(command: CatalogName, spec: { inputFields?: CatalogCommand['inputFields']; local?: CatalogCommand['local']; usage: string }): CatalogCommand {
+  const rpc = findRpcForCommand(command);
+  return {
+    command,
+    ...(spec.inputFields ? { inputFields: spec.inputFields } : {}),
+    mutation: rpc ? rpc.mutation : isWriteCommand(command),
+    ...(rpc ? { rpc: { method: rpc.method, arity: rpc.arity } } : {}),
+    ...(spec.local ? { local: spec.local } : {}),
+    usage: spec.usage,
+  };
+}
+
+/** One known catalog. Words join with dots; `engines set-enabled` stays hyphenated. */
+export const CLI_CATALOG: CatalogCommand[] = [
+  cmd('capabilities.get', { usage: 'capabilities | capabilities get' }),
+  cmd('sync.snapshot', { usage: 'sync snapshot' }),
+  cmd('sync.status', { inputFields: {"required": {}, "optional": {"after": "integer"}}, usage: 'sync status [--input <json>]' }),
+  cmd('owners.list', { usage: 'owners list' }),
+  cmd('owners.get', { inputFields: {"required": {"ownerId": "UUID"}, "optional": {}}, usage: 'owners get --input <json>' }),
+  cmd('owners.continuation.get', { inputFields: {"required": {"taskId": "UUID"}, "optional": {}}, usage: 'owners continuation get --task-id <id>' }),
+  cmd('owners.attach', { inputFields: {"required": {"name": "string (1–120)", "profileId": "available owner profile ID"}, "optional": {"session": "unverified reference string", "pane": "unverified reference string"}}, usage: 'owners attach --input <json> --command-id <id>    json: name, profileId, optional session, optional pane. Metadata only; verified stays false.' }),
+  cmd('owners.spawn', { inputFields: {"required": {"name": "string (1–120)", "profileId": "available owner profile ID"}, "optional": {"provider": "mock (explicit fixture only); omitted registers manual external owner", "session": "unverified reference string (manual only)", "pane": "unverified reference string (manual only)"}}, usage: 'owners spawn --input <json> --command-id <id>    json: name, profileId. Logical registration; no owner model and no session.' }),
+  cmd('owners.switch', { inputFields: {"required": {"taskId": "UUID", "expectedRevision": "integer"}, "optional": {"expectedEpoch": "integer", "reason": "manual | idle", "profileId": "available owner profile ID", "launch": "boolean (also start the Herdr owner for the new profile; a failed start is reported in launch, the switch stays)"}}, usage: 'owners switch --task-id <id> --input <json> --command-id <id>' }),
+  cmd('owners.launch', { inputFields: {"required": {"taskId": "UUID", "expectedRevision": "integer (JSON body or --expected-revision)"}, "optional": {}}, usage: 'owners launch --task-id <id> --input <json> --command-id <id>    json: expectedRevision. Starts the owner host from the task context pack and returns the handoff prompt.' }),
+  cmd('owners.continuation.configure', { inputFields: {"required": {"taskId": "UUID", "expectedRevision": "integer", "idleRotationMinutes": "integer 1–10080 | null"}, "optional": {}}, usage: 'owners continuation configure --task-id <id> --input <json> --command-id <id>' }),
+  cmd('tasks.create', { inputFields: {"required": {"instruction | goal": "string (1–16000)", "ownerId | ownerProfileId | owner | parentTaskId": "one existing logical owner UUID, profile ID, legacy OwnerRef, or running owner root UUID"}, "optional": {"title": "agent-generated string (1–160); omitted waits for owner naming", "workspace": "nonempty path; omitted uses caller cwd", "ownerName": "string (1–120)", "ownerProvider": "mock only when intentionally using mock Owner", "acceptanceCriteria": "string[] (≤30; each ≤1000)", "constraints": "string[] (≤30; each ≤1000)", "parentTaskId": "running owner root UUID; inherits ownerId, workspace and constraints"}}, usage: 'tasks create --input <json> --command-id <id>' }),
+  cmd('tasks.start', { inputFields: {required: {taskId: 'UUID'}, optional: {expectedRevision: 'integer'}, notes: 'Starts the root owner asynchronously in Herdr using its claude/codex profile. Returns a running owner root immediately; tasks get/events report host success or launch failure. A failed launch without a host can be retried with a new command ID.'}, usage: 'tasks start --task-id <id> [--input <json>] --command-id <id>' }),
+  cmd('tasks.complete', { inputFields: {required: {taskId: 'UUID', outcome: 'completed | failed', summary: 'string (1–8000)'}, optional: {expectedRevision: 'integer', artifacts: '≤20 plain text/markdown/JSON files'}, notes: 'Owner root only. Success requires a described root and at least one final subtask, all final subtasks completed and accepted through reviews submit; the parent Agent does not implement itself, indivisible goals still dispatch to one sub-Agent, and superseded retries remain history.'}, usage: 'tasks complete --task-id <id> --input <report.json> --command-id <id>' }),
+  cmd('tasks.describe', { inputFields: {required: {taskId: 'UUID', expectedRevision: 'integer', title: 'agent-generated string (1–160)', acceptanceCriteria: 'string[1–30] (each ≤1000)'}, optional: {}}, usage: 'tasks describe --task-id <id> --input <json> --command-id <id>    Owner fills title and acceptance criteria before freezing or dispatching; running owner roots allow this until their first child is created.' }),
+  cmd('workspaces.list', { inputFields: {required: {}, optional: {path: 'absolute existing directory; omitted starts at server cwd'}}, usage: 'workspaces list [--input <json>]' }),
+  cmd('tasks.retry', { inputFields: {"required": {"taskId": "UUID"}, "optional": {"cancel": "boolean (set by --cancel)", "expectedRevision": "integer"}}, usage: 'tasks retry --task-id <id> [--cancel] --command-id <id>    The server cancels first when cancel is true, copies the frozen package into the linked task, prepends the continuation instructions, dispatches and returns next.' }),
+  cmd('tasks.cancel', { inputFields: {"required": {"taskId": "UUID"}, "optional": {"expectedRevision": "integer"}}, usage: 'tasks cancel --task-id <id> --command-id <id>' }),
+  cmd('tasks.health', { inputFields: {"required": {"taskId": "UUID"}, "optional": {}}, usage: 'tasks health --task-id <id>' }),
+  cmd('tasks.get', { inputFields: {"required": {"taskId": "UUID"}, "optional": {}}, usage: 'tasks get --task-id <id> [--field data.revision]' }),
+  cmd('tasks.list', { inputFields: {"required": {}, "optional": {"offset": "integer ≥0 (default 0)", "limit": "integer 1–100 (default 25)", "ownerId": "UUID", "parentTaskId": "UUID (filters child tasks, including retry history)"}}, usage: 'tasks list [--input <json>]' }),
+  cmd('tasks.events', { inputFields: {"required": {"taskId": "UUID"}, "optional": {"after": "event cursor UUID", "limit": "integer 1–100 (default 50)"}}, usage: 'tasks events --task-id <id> [--input <json>]' }),
+  cmd('tasks.results', { inputFields: {"required": {"taskId": "UUID"}, "optional": {}}, usage: 'tasks results --task-id <id> [--field data.manifestDigest]' }),
+  cmd('tasks.wait', { inputFields: {"required": {"--task-id": "UUID"}, "optional": {"--for": "seconds 1–600 (default min(600, herdr.max_wait_minutes×60), else 30)"}}, local: 'wait', usage: 'tasks wait --task-id <id> [--for <seconds>]    Returns on terminal state, timeout, or stalled worker; includes reason and stalled health with a retry/cancel hint.' }),
+  cmd('tasks.watch', { inputFields: {"required": {"--task-id": "UUID"}, "optional": {"--for": "seconds 1–600 (default min(600, herdr.max_wait_minutes×60), else 30)"}}, local: 'watch', usage: 'tasks watch --task-id <id> [--for <seconds>]    Reports stalled transitions in text/jsonl and continues watching.' }),
+  cmd('packages.create', { inputFields: {"required": {"taskId": "UUID", "scope": "string[1–30] (each ≤1000)"}, "optional": {"acceptanceCriteria": "string[1–30] (each ≤1000); omitted = this child task's own acceptanceCriteria; explicit values win and never overwrite the task", "expectedRevision": "integer"}, "notes": "The package is the only source of the sub-agent's goal and acceptance criteria. The root task is a meta task: do not point at it; write the scope, interface contracts, forbidden areas and concrete criteria into the package."}, usage: 'packages create --task-id <id> --input <json> --command-id <id>' }),
+  cmd('packages.get', { inputFields: {"required": {"packageId": "UUID"}, "optional": {}}, usage: 'packages get --input <json>' }),
+  cmd('workers.spawn', { inputFields: {"required": {"taskId": "UUID"}, "optional": {"expectedRevision": "integer", "packageId": "frozen package UUID", "owner": "profile ID (must match task owner)", "worker": "explicit worker ID (omitted picks the owner's least-loaded worker relative to its weight 0-10, default 5, 0 = never: lowest (running+1)/weight wins, ties go to higher weight, then list order)", "provider": "mock-jsonl only for explicit fixture execution"}}, usage: 'workers spawn --task-id <id> [--input <json>] --command-id <id>' }),
+  cmd('workers.complete', { inputFields: {"required": {"taskId": "UUID", "outcome": "completed | failed", "summary": "result or failure reason (≤8000 chars)"}, "optional": {"expectedRevision": "integer", "artifacts": "≤20 of {name, mediaType: text/plain|text/markdown|application/json, content ≤32000 chars}"}, "notes": "Only for a running task whose dispatch.execution is native: the owner ran that same-engine worker with its built-in subagent tool and reports the outcome here."}, usage: 'workers complete --input <report.json> --command-id <id>' }),
+  cmd('workers.probe', { inputFields: {"required": {}, "optional": {"worker": "worker ID (set by --worker); omitted probes every eligible free_channel worker"}, notes: 'Probes free_channel workers immediately: one light greeting each, serially. Vendor quota exhaustion writes a weaver-free-probe ban on that engine+model (with the vendor reset time when given); rate limits walk the vendor ladder and other failures the stall ladder. Does not probe paid channels and does not accept commandId or taskId.'}, usage: 'workers probe [--worker <id>] [--input <json>]' }),
+  cmd('workers.probe-status', { usage: 'workers probe-status    Probe schedule and per free_channel worker ladder state, block info and recent probe history.' }),
+  cmd('results.deliver', { inputFields: {"required": {"taskId": "UUID"}, "optional": {}}, usage: 'results deliver --task-id <id> --command-id <id>' }),
+  cmd('results.ack', { inputFields: {"required": {"taskId": "UUID", "expectedRevision": "integer", "manifestDigest": "current manifest SHA-256"}, "optional": {}}, usage: 'results ack --task-id <id> --expected-revision <integer> --manifest-digest <digest> --command-id <id>    --input <json> also supported.' }),
+  cmd('reviews.submit', { inputFields: {"required": {"taskId": "UUID", "expectedRevision": "integer", "manifestDigest": "current manifest SHA-256", "decision": "accepted | rejected"}, "optional": {"comment": "string (≤4000)"}}, usage: 'reviews submit --task-id <id> --expected-revision <integer> --manifest-digest <digest> --decision accepted|rejected [--comment <text> | --comment-file <path>] --command-id <id>    --input <json> also supported.' }),
+  cmd('artifacts.read', { inputFields: {"required": {"taskId": "UUID", "artifactId": "UUID"}, "optional": {}}, usage: 'artifacts read --task-id <id> --input <json>' }),
+  cmd('operations.get', { inputFields: {"required": {"commandId": "stable mutation command ID"}, "optional": {}}, usage: 'operations get --command-id <id>' }),
+  cmd('observability.get', { inputFields: {"required": {"taskId": "UUID"}, "optional": {"kind": "event kind"}}, usage: 'observability get --task-id <id>' }),
+  cmd('observability.export', { inputFields: {"required": {"taskId": "UUID"}, "optional": {"kind": "event kind"}}, usage: 'observability export --task-id <id>' }),
+  cmd('policy.get', { inputFields: {"required": {}, "optional": {}, "notes": "Policy is stored in weaver.db. Returns revision, config (including the optional display.timezone IANA name), blocks and per-role availability."}, usage: 'policy get' }),
+  cmd('policy.validate', { inputFields: {"required": {"engines": "engine map", "owners": "owner profile map", "workers": "worker profile map", "herdr": "runtime wait settings"}, "optional": {}, "notes": "Body is the full policy config; inspect policy get and src/main/policy/config.schema.json for exact schema."}, usage: 'policy validate --input <config.json>' }),
+  cmd('policy.save', { inputFields: {"required": {"revision": "current policy revision integer", "config": "full policy config", "blocks": "block array (≤500); a block with worker affects only that worker"}, "optional": {}}, usage: 'policy save --input <save.json>' }),
+  cmd('policy.preview', { inputFields: {"required": {"owner": "owner profile ID"}, "optional": {"worker": "explicit worker ID", "runningCount": "integer ≥0"}}, usage: 'policy preview --input <preview.json>' }),
+  cmd('policy.history', { inputFields: {"required": {}, "optional": {}, "notes": "Every saved policy revision, newest first: revision, savedAt, source (save, import or rollback:<n>). Each holds a full snapshot that policy rollback can restore."}, usage: 'policy history' }),
+  cmd('policy.rollback', { inputFields: {"required": {"revision": "already-saved policy revision integer to restore"}, "optional": {}, "notes": "Restores the stored snapshot of that revision as a NEW revision (history is never rewritten). Needs the user's consent."}, usage: 'policy rollback --input <rollback.json>' }),
+  cmd('engines.scan', { usage: 'engines scan' }),
+  cmd('engines.models', { inputFields: {"required": {"engine": "engine ID (set by --engine)"}, "optional": {"refresh": "boolean, bypass the cache"}, "notes": "Lists the model IDs the engine CLI accepts; unknown until the CLI answers. Cache is per engine+refresh combination."}, usage: 'engines models --engine <id> [--refresh]' }),
+  cmd('engines.health', { inputFields: {"required": {}, "optional": {}}, usage: 'engines health' }),
+  cmd('engines.penalty', { inputFields: {"required": {"engine": "engine ID (set by --engine)"}, "optional": {}, "notes": "Stall ladder state and retained history from weaver.db, plus vendorLimit ({level,lastTriggerAt} of the vendor rate-limit ladder, null when none)."}, usage: 'engines penalty --engine <id>' }),
+  cmd('engines.unblock', { inputFields: {"required": {"engine": "engine ID (set by --engine)"}, "optional": {}}, usage: 'engines unblock --engine <id> --command-id <id>' }),
+  cmd('quota.get', { usage: 'quota get' }),
+  cmd('quota.refresh', { inputFields: { required: {}, optional: { engine: 'codex | claude | grok (omitted refreshes all three)' }, notes: 'Refreshes native account quota without inference and synchronizes Weaver-owned policy blocks. Manual blocks are retained. Does not accept commandId, taskId, --command-id, or --task-id.' }, usage: 'quota refresh [--input <refresh.json>]' }),
+  cmd('engines.set-enabled', { inputFields: {"required": {"id": "engine ID", "enabled": "boolean", "revision": "current policy revision integer"}, "optional": {}}, usage: 'engines set-enabled --input <toggle.json>' }),
+];
+
+for (const item of CLI_CATALOG) item.inputFields ??= { required: {} };
+
+export function catalogCommand(words: string[]): CatalogCommand | undefined {
+  if (words.length === 1 && words[0] === 'capabilities') return CLI_CATALOG.find(item => item.command === 'capabilities.get');
+  const joined = words.join('.');
+  return CLI_CATALOG.find(item => item.command === joined || (words.length === 1 && item.command === words[0]));
+}
+
+export const CLI_VALUE_OPTIONS = {
+  '--field': 'Scalar response path; non-streaming read commands only; exclusive with --output/--json',
+  '--expected-revision': 'Nonnegative safe integer; only commands with expectedRevision input',
+  '--manifest-digest': 'Result digest; results ack and reviews submit',
+  '--decision': 'accepted | rejected; reviews submit',
+  '--comment': 'Literal text; reviews submit',
+  '--comment-file': 'UTF-8 text file, up to 4000 characters; reviews submit; exclusive with --comment',
+};
+
+const catalogHelp = CLI_CATALOG.map(item => `  ${item.usage}`).join('\n');
+export const CLI_HELP = `Weaver
+
+  weaver web [--port <0-65535>] [--data-dir <path>] [--no-open] [--dev] [--output json|jsonl|text]
+  weaver <command> [--data-dir <path>] [--output json|jsonl|text] [--input <file|->] [--command-id <id>] [--task-id <id>] [--for <seconds>] [--engine <id>] [--worker <id>] [--cancel]
+  weaver skills install [--agent claude-code,codex] [--dir <skills-root>] [--link] [--force] [--output json|text]
+  weaver server <status|start|stop|install|uninstall> [--port <0-65535>] [--data-dir <path>] [--output json|text] [--force] [--timeout <seconds>]
+  weaver --skill prints the bundled agents-weaver SKILL.md
+
+weaver web runs the Weaver service in the foreground: loopback HTTP on 127.0.0.1 and the authenticated Unix CLI socket. Closing a browser does not stop tasks. Ctrl+C stops new work and cancels workers this process started. Task and policy data in weaver.db is kept. Default data directory: $XDG_DATA_HOME/weaver or ~/.local/share/weaver.
+
+If a client command reports APP_NOT_RUNNING, start: weaver server start
+
+--field <response.path> reads one scalar from a successful non-streaming read response, e.g. tasks get --field data.revision or tasks results --field data.manifestDigest. Strings are written literally; numbers, booleans and null use JSON spelling, followed by one newline. Missing or non-scalar fields fail. It cannot be combined with --output/--json. Failed commands keep the error envelope and nonzero exit code. Always check exit status before using a captured field.
+
+--expected-revision <integer>, --manifest-digest <digest>, --decision accepted|rejected and --comment <text> fill the same-named input fields on commands that support them. --comment-file <path> reads review text literally (UTF-8, up to 4000 characters); it cannot be combined with --comment. Conflicting --input fields are rejected. Read a fresh revision after results ack; these flags do not fetch state or weaken revision/digest checks.
+
+--input accepts a JSON file, - for stdin, or an inline JSON object. Prefer a file or a quoted heredoc with --input - for Chinese text, newlines and quotes. Never pipe captured JSON through echo: zsh echo can expand backslash escapes. Use printf '%s\\n' "$response" if you need to forward existing JSON.
+
+--output json writes one weaver.v1 envelope and is the default. jsonl writes one JSON object per line. text writes a short status line. --json is an alias of --output json. --json together with --output is rejected. Errors use the same format. The command does not write extra stdout.
+
+tasks create: an omitted workspace becomes this CLI process's working directory before the request is sent. An explicit path wins. A relative explicit path is resolved against that same caller directory. The server does not fill a workspace from its own directory. Real dispatch still requires the directory to exist.
+
+tasks wait and tasks watch poll tasks get and tasks events. They check tasks health initially, every 30 seconds, and just before timeout; older servers without tasks health keep polling silently. tasks wait returns early with exit code 0 when health is stalled, including health and a retry/cancel hint. Snapshot data includes reason: terminal, timeout, or stalled. Timeout keeps exit code 1 and TIMEOUT. tasks watch reports each transition to stalled in text/jsonl and continues. --for is 1 through 600 seconds; omitted, it defaults to min(600, herdr.max_wait_minutes × 60) from the policy, or 30 seconds when the policy cannot be read. They do not start a second scheduler.
+
+--engine <id> is the engine argument of engines penalty, engines unblock and engines models. --worker <id> is the optional worker argument of workers probe. --cancel is a valueless flag that sets cancel on tasks retry. --refresh is a valueless flag that bypasses the model-list cache on engines models. All of these are rejected on any other command, repeated, missing their value, or when the --input body already carries a different one. tasks retry returns the linked task already dispatched, together with the one thing to do next.
+
+Mutations need --command-id, except policy save, policy rollback, engines set-enabled, quota refresh, and workers probe, which send the JSON body shown in their usage. quota refresh defaults to {} and synchronizes Weaver-owned policy blocks without inference; workers probe defaults to {} and probes every eligible free_channel worker; neither accepts command or task IDs. operations get reads that same --command-id. owners attach stores a name and profile plus optional caller labels. It does not contact a host. owners spawn does not start an owner model. capabilities.realExecution means the worker launcher is loaded, not that a model ran or a login was proven. mock-jsonl is an explicit provider. A real route does not fall back to mock.
+
+${catalogHelp}
+
+Engine scan is PATH plus --version. It does not call a model.`;

@@ -5,8 +5,12 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startLocalIPC } from '../src/main/local-ipc';
-import { CLI_CATALOG, CLI_HELP, applyCallerWorkspace, makeRequest, parseCLI, renderEnvelope, runCLI } from '../src/cli/main';
-import { READ_COMMANDS, WRITE_COMMANDS } from '../src/main/commands';
+import { CLI_CATALOG, CLI_HELP } from '../src/cli/catalog';
+import { applyCallerWorkspace, makeRequest } from '../src/cli/input';
+import { parseCLI } from '../src/cli/parse';
+import { renderEnvelope } from '../src/cli/output';
+import { runCLI } from '../src/cli/run';
+import { READ_COMMANDS, WRITE_COMMANDS } from '../src/shared/contracts/commands';
 
 const serverCommands = [...READ_COMMANDS, ...WRITE_COMMANDS];
 const rpcCommands = ['policy.get', 'policy.validate', 'policy.save', 'policy.preview', 'engines.scan', 'engines.set-enabled', 'quota.get', 'quota.refresh'];

@@ -5,7 +5,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { connect } from 'node:net';
 import { startLocalIPC, readDiscovery, MAX_FRAME_BYTES } from '../src/main/local-ipc';
-import { makeRequest, parseCLI, sendRequest } from '../src/cli/main';
+import { makeRequest } from '../src/cli/input';
+import { parseCLI } from '../src/cli/parse';
+import { sendRequest } from '../src/cli/client';
 async function startOrSkip(t: TestContext, directory: string, handler: (input: any) => unknown) {
   try { return await startLocalIPC(directory, handler); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'EPERM') { t.skip('Sandbox denies Unix socket listen (EPERM); no bypass attempted'); return; } throw error; }

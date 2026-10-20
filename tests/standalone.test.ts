@@ -44,7 +44,7 @@ test('weaver --version prints the package version', async () => {
   const { readFileSync } = await import('node:fs');
   const { VERSION } = await import('../src/shared/version');
   assert.equal(VERSION, JSON.parse(readFileSync('package.json', 'utf8')).version);
-  const { runCLI } = await import('../src/cli/main');
+  const { runCLI } = await import('../src/cli/run');
   const written: string[] = [];
   const write = process.stdout.write.bind(process.stdout);
   (process.stdout as any).write = (chunk: string) => { written.push(String(chunk)); return true; };
@@ -61,7 +61,7 @@ test('--skill prints the bundled SKILL.md frontmatter to stdout', () => {
 });
 
 test('--input takes a file, stdin, or the JSON object inline, and names a missing file', async () => {
-  const { readInput } = await import('../src/cli/main');
+  const { readInput } = await import('../src/cli/input');
   assert.deepEqual(await readInput('{"owner":"codex_owner"}'), { owner: 'codex_owner' });
   assert.deepEqual(await readInput('  {"a":[1]}'), { a: [1] });
   await assert.rejects(readInput('{"owner":'), /Inline --input must be valid JSON/);

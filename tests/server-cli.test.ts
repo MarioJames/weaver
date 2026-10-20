@@ -9,12 +9,11 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { startLocalIPC, LocalIPCError, type Discovery } from '../src/main/local-ipc';
 import { startRuntime } from '../src/main/runtime';
-import {
-  LAUNCHD_LABEL, SERVER_HELP, SERVICE_NAME, UNIT_MARKER,
-  launchdPlist, parseServer, plistProgramArguments, selfCommand, serverEnv, serverInstall, serverStart,
-  serverStatus, serverStop, serverUninstall, systemdQuote, systemdTokens, systemdUnit, webArgs,
-  type Envelope, type RunResult, type ServerArgs, type ServerEnv, type ServerInfo,
-} from '../src/cli/server';
+import { SERVER_HELP, parseServer } from '../src/cli/server/commands';
+import { serverEnv, UNIT_MARKER, type Envelope, type RunResult, type ServerArgs, type ServerEnv, type ServerInfo } from '../src/cli/server/env';
+import { LAUNCHD_LABEL, launchdPlist, plistProgramArguments } from '../src/cli/server/launchd';
+import { selfCommand, serverInstall, serverStart, serverStatus, serverStop, serverUninstall, webArgs } from '../src/cli/server/lifecycle';
+import { SERVICE_NAME, systemdQuote, systemdTokens, systemdUnit } from '../src/cli/server/systemd';
 
 const exec = promisify(execFile);
 

@@ -14,7 +14,7 @@ import { PolicyStore } from '../src/main/policy/store';
 import { MockWorkerAdapter } from '../src/main/adapters/worker';
 import { OwnerLaunchError, type OwnerLaunchInput, type OwnerLaunchResult, type launchOwnerAsync } from '../src/main/owner-host';
 import { startLocalIPC, readDiscovery } from '../src/main/local-ipc';
-import { sendRequest } from '../src/cli/main';
+import { sendRequest } from '../src/cli/client';
 import { startRuntime } from '../src/main/runtime';
 import { metadataOf } from './helpers/store-metadata';
 

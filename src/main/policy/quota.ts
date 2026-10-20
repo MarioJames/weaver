@@ -3,13 +3,14 @@ import { quotaRefreshEnabled } from '../../shared/policy/settings';
 import { type Block, type Config } from '../../shared/contracts/policy';
 import type { PolicyStore } from './store';
 import { object } from '../../shared/validation';
+import { rpcForCommand } from '../../shared/contracts/rpc';
 
 const ENGINES: QuotaEngine[] = ['codex', 'claude', 'grok'];
 const LABELS: Record<QuotaEngine, string> = { codex: 'Codex', claude: 'Claude Code', grok: 'Grok' };
 export const QUOTA_CAPABILITIES = {
   engines: ENGINES,
-  get: { command: 'quota.get', rpc: 'getQuota', network: false },
-  refresh: { command: 'quota.refresh', rpc: 'refreshQuota', updatesPolicyBlocks: true, inference: false },
+  get: { command: 'quota.get', rpc: rpcForCommand('quota.get').method, network: false },
+  refresh: { command: 'quota.refresh', rpc: rpcForCommand('quota.refresh').method, updatesPolicyBlocks: true, inference: false },
 };
 
 /** Distinct quota kinds of enabled engines that opted into scheduled refresh. */

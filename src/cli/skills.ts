@@ -1,18 +1,23 @@
 import { lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative, sep } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { embeddedApp } from '../main/embedded';
-import { modulePaths } from '../main/runtime';
 
 export const SKILL_NAME = 'agents-weaver';
 export type SkillAgent = 'claude-code' | 'codex';
 export const SKILL_AGENTS: readonly SkillAgent[] = ['claude-code', 'codex'];
 const MARKER = '.weaver-skill.json';
 
+/** The checkout root: this file sits in src/cli, and the bundle in dist/cli, so two levels up either way. */
+function repoRoot(): string {
+  return resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+}
+
 /** The skill this build carries: embedded in a standalone executable, the repository copy otherwise. */
 export function sourceSkill(): { files: ReadonlyMap<string, Uint8Array>; dir?: string } {
   const embedded = embeddedApp()?.skill;
   if (embedded) return { files: embedded };
-  const dir = join(modulePaths().repo, 'skills', SKILL_NAME);
+  const dir = join(repoRoot(), 'skills', SKILL_NAME);
   const files = new Map<string, Uint8Array>();
   const walk = (current: string) => {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
