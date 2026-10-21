@@ -12,7 +12,7 @@ const promptTruncate = (value: string, max: number): string => {
 };
 /** Initial roots receive the complete goal, rather than the bounded continuation summary. */
 export function rootOwnerPrompt(task:Task):string {
- return `你是 Weaver 根任务的父 Agent（owner），不是执行单个工作包的 worker。先读取 agents-weaver 技能（未安装时运行 \`weaver --skill\`）。
+ return `你是 Weaver 根任务的父 Agent（owner），不是执行单个工作包的 worker。在遵循全局与项目指令的前提下，读取 agents-weaver 技能（未安装时运行 \`weaver --skill\`）并按以下流程执行。
 根任务 ID：${task.id}；ownerId：${task.ownerId}。复用此 ownerId，不要重新注册父 Agent。
 先运行 \`weaver tasks get --task-id ${task.id}\` 读取完整原始目标。根据目标生成简短标题与可验证验收标准，用 \`weaver tasks describe --task-id ${task.id} --input <json> --command-id <stable-id>\` 回填 title、acceptanceCriteria、expectedRevision。
 按目标的自然边界拆分子任务（至少 1 个）；父 Agent 不亲自实现，不可拆分的小目标也交给一个子 Agent。需要分发时，每个子任务通过 \`weaver tasks create --input <json> --command-id <stable-id>\` 创建；JSON 包含 parentTaskId: "${task.id}"、goal、title、acceptanceCriteria，ownerId 和 workspace 默认继承根任务。每个子任务分别冻结 packages create 并 workers spawn；禁止把整条根任务当作单一 worker 工作包。遵守 policy 路由与 native 的 next 指令，不另建调度器。
@@ -23,7 +23,7 @@ ${JSON.stringify({taskId:task.id,workspace:task.workspace,goal:task.instruction,
 }
 /** Plain-text briefing for the incoming owner host; every free-text value is redacted here or in the pack. */
 export function handoffPrompt(task: ContinuationTask, pack: ContextPack): string {
- const head = `你将作为父 Agent 接手 Weaver 任务「${redactContext(task.title, 160)}」（${pack.taskId}）。先读取 agents-weaver 技能（没有安装时运行 \`weaver --skill\`），按其中的流程继续。`;
+ const head = `你将作为父 Agent 接手 Weaver 任务「${redactContext(task.title, 160)}」（${pack.taskId}）。在遵循全局与项目指令的前提下，读取 agents-weaver 技能（没有安装时运行 \`weaver --skill\`），按其中的流程继续。`;
  const preparation = task.title === PENDING_TASK_TITLE ? `接单后先根据完整目标生成简短任务标题与 1–30 项可验证的验收标准，再运行 \`weaver tasks describe --task-id ${pack.taskId} --input <json> --command-id <id>\` 回填（JSON 包含 title、acceptanceCriteria 和 tasks get 返回的 expectedRevision）。完成后才冻结工作包和派发。` : '';
  const rootStep = task.executionRole==='owner' ? `这是根任务：复用 ownerId ${task.ownerId}，用 parentTaskId ${task.id} 按自然边界创建子任务（至少 1 个）；父 Agent 不亲自实现，不可拆目标也交给一个子 Agent；需要分发时分别 packages create / workers spawn；逐项 reviews submit 后用 tasks complete 完成根任务，不要派发根任务。` : '';
  const nextStep = `${rootStep}${preparation}先运行 \`weaver owners continuation get --task-id ${pack.taskId}\` 和 \`weaver tasks get --task-id ${pack.taskId}\` / \`weaver tasks results --task-id ${pack.taskId}\` 核对现状，然后继续派发、等待、审查并验收；不要重复已完成的工作。`;

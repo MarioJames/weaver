@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { TaskStore } from '../../src/main/store';
 import { MockOwnerHostAdapter } from '../../src/main/adapters/logical';
 import { ContinuationService, idleContinuationDue, MAX_CONTEXT_PACK_BYTES, type ContinuationTask } from '../../src/main/continuation';
-import { handoffPrompt, MAX_HANDOFF_PROMPT_CHARS } from '../../src/main/owners/prompts';
+import { handoffPrompt, rootOwnerPrompt, MAX_HANDOFF_PROMPT_CHARS } from '../../src/main/owners/prompts';
 import { redactContext } from '../../src/main/redact-context';
 import type { ContextPack } from '../../src/shared/contracts/continuation';
 import { metadataOf, setMetadataOf } from '../helpers/store-metadata';
@@ -128,7 +128,8 @@ test('handoffPrompt briefs the incoming owner with ordered sections from the pac
   f.store.put(t);
   const pack={...f.service.rotate(TASK_ID,0,'manual').contextPack!,pendingApprovals:['Completed result awaits owner acceptance review']} as ContextPack;
   const prompt=handoffPrompt(t,pack);
-  assert.equal(prompt.split('\n')[0],'你将作为父 Agent 接手 Weaver 任务「Payment retry」（'+TASK_ID+'）。先读取 agents-weaver 技能（没有安装时运行 `weaver --skill`），按其中的流程继续。');
+  assert.equal(prompt.split('\n')[0],'你将作为父 Agent 接手 Weaver 任务「Payment retry」（'+TASK_ID+'）。在遵循全局与项目指令的前提下，读取 agents-weaver 技能（没有安装时运行 `weaver --skill`），按其中的流程继续。');
+ assert.ok(!prompt.includes('先读取 agents-weaver'));
   const found=['工作目录：','目标：','约束：','验收标准：','当前状态：','已有产物：','最近进展：','待批准：','下一步：'].map(label=>prompt.indexOf(label));
   assert.ok(found.every(index=>index>=0),prompt);
   assert.deepEqual(found,[...found].sort((a,b)=>a-b));
@@ -146,6 +147,13 @@ test('handoffPrompt briefs the incoming owner with ordered sections from the pac
   assert.match(prompt,/先运行 `weaver owners continuation get --task-id 11111111[\s\S]*` 和 `weaver tasks get --task-id 11111111[\s\S]*` \/ `weaver tasks results --task-id 11111111[\s\S]*` 核对现状/);
   assert.ok(prompt.trimEnd().endsWith('不要重复已完成的工作。'));
  }finally{f.close();}
+});
+test('rootOwnerPrompt leads with the host-instruction preamble on its first line',()=>{
+ const task={id:TASK_ID,ownerId:'owner-root',instruction:'Ship the thing',constraints:['Stay scoped'],acceptanceCriteria:['Done']};
+ const prompt=rootOwnerPrompt(task as Parameters<typeof rootOwnerPrompt>[0]);
+ assert.equal(prompt.split('\n')[0],'你是 Weaver 根任务的父 Agent（owner），不是执行单个工作包的 worker。在遵循全局与项目指令的前提下，读取 agents-weaver 技能（未安装时运行 `weaver --skill`）并按以下流程执行。');
+ assert.ok(!prompt.includes('先读取 agents-weaver'));
+ assert.ok(!prompt.includes('herdr'));
 });
 test('handoffPrompt omits every section the pack and the task leave empty',()=>{
  const f=fixture();try {
