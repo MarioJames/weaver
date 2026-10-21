@@ -2,7 +2,7 @@ import type { TaskFailure } from '../../../shared/contracts/tasks';
 import { redactSecrets } from '../../../shared/redact';
 
 const LIMITS = [
- {kind:'quota', pattern:/FreeUsageLimitError|GoUsageLimitError|insufficient[_ ](?:balance|quota)|\b402\b|(?:usage|spending|credit|quota)[_ ]limit|quota.{0,30}(?:exceeded|exhausted)|(?:out of|insufficient|zero|no) (?:credits|balance)|balance.{0,20}(?:exhausted|insufficient)/i},
+ {kind:'quota', pattern:/FreeUsageLimitError|GoUsageLimitError|insufficient[_ ](?:balance|quota)|\b402\b|(?:usage|spending|credit|quota)[_ ]limit|(?:quota|(?:free|go)[_ ]usage).{0,30}(?:exceeded|exhausted)|(?:out of|insufficient|zero|no) (?:credits|balance)|balance.{0,20}(?:exhausted|insufficient)/i},
  {kind:'rate_limit', pattern:/rate[_ -]?limit|too many requests|\b429\b/i},
  {kind:'auth', pattern:/authentication[_ ](?:failed|error)|invalid[_ ]api[_ ]key|unauthorized|\b401\b/i},
 ] as const;
@@ -41,18 +41,115 @@ export function piErrorText(event: Record<string, unknown>): string {
 
 /** Classifies one structured vendor line. Pi events are judged on their error text only; other engines keep whole-line matching. */
 export function classifyVendorEvent(engine: string, event: Record<string, unknown>, line: string, now = Date.now()): TaskFailure | undefined {
-  return classifyVendorError(engine, engine === 'pi' ? piErrorText(event) : line, now);
+  const failure = classifyVendorError(engine, engine === 'pi' ? piErrorText(event) : line, now);
+  const retryAt = engine === 'pi' ? undefined : structuredRetryAt(event, now);
+  return failure && retryAt ? { ...failure, retryAt } : failure;
+}
+
+/** Only a finite future timestamp is evidence; invalid vendor hints leave the existing fallback intact. */
+function futureIso(target: number, now: number): string | undefined {
+  return Number.isSafeInteger(target) && target > now && Number.isFinite(new Date(target).getTime())
+    ? new Date(target).toISOString() : undefined;
+}
+
+function relativeIso(value: string, now: number, defaultUnit: 'ms' | 's' = 's'): string | undefined {
+  const source = value.trim();
+  if (!source || source.length > 200) return;
+  if (/^\d+(?:\.\d+)?$/.test(source)) {
+    return futureIso(now + Math.ceil(Number(source) * (defaultUnit === 'ms' ? 1 : 1000)), now);
+  }
+  const units: Record<string, number> = { h: 3600000, hour: 3600000, hours: 3600000, m: 60000, minute: 60000, minutes: 60000, s: 1000, second: 1000, seconds: 1000, ms: 1, millisecond: 1, milliseconds: 1 };
+  const token = /(\d+(?:\.\d+)?)\s*(milliseconds?|ms|seconds?|s|minutes?|m|hours?|h)/igy;
+  let index = 0;
+  let total = 0;
+  let previousUnit = Infinity;
+  while (index < source.length) {
+    token.lastIndex = index;
+    const match = token.exec(source);
+    if (!match) return;
+    const amount = Number(match[1]);
+    const unit = units[match[2].toLowerCase()]!;
+    if (unit >= previousUnit || (previousUnit !== Infinity && amount * unit >= previousUnit)) return;
+    total += amount * unit;
+    index = token.lastIndex;
+    while (/\s/.test(source[index] ?? '') && index < source.length) index += 1;
+    if (index < source.length && !Number.isInteger(amount)) return;
+    previousUnit = unit;
+  }
+  return futureIso(now + Math.ceil(total), now);
+}
+
+function absoluteIso(value: unknown, now: number): string | undefined {
+  if (typeof value !== 'string') return;
+  const source = value.trim();
+  // Avoid Date.parse's permissive interpretation of numbers, partial dates and prose.
+  const target = Date.parse(source);
+  if (!Number.isFinite(target)) return;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/i.test(source)) {
+    const calendar = new Date(`${source.slice(0, 10)}T00:00:00Z`);
+    if (!Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, 10) !== source.slice(0, 10)
+        || Number(source.slice(11, 13)) > 23 || Number(source.slice(14, 16)) > 59 || Number(source.slice(17, 19)) > 59) return;
+  } else if (new Date(target).toUTCString() !== source) return;
+  return futureIso(target, now);
+}
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+}
+
+/** OpenCode APIError retains responseHeaders in error.data; retry status.next is epoch milliseconds. */
+function structuredRetryAt(value: unknown, now: number, depth = 0): string | undefined {
+  const item = record(value);
+  if (!item || depth > 4) return;
+  const headers = record(item.responseHeaders);
+  if (headers) {
+    const normalized = Object.fromEntries(Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value]));
+    const ms = normalized['retry-after-ms'];
+    if (typeof ms === 'string' && /^\d+(?:\.\d+)?$/.test(ms.trim())) {
+      const result = relativeIso(ms, now, 'ms');
+      if (result) return result;
+    }
+    const seconds = normalized['retry-after'];
+    if (typeof seconds === 'string') {
+      const result = /^\d+(?:\.\d+)?$/.test(seconds.trim()) ? relativeIso(seconds, now) : absoluteIso(seconds, now);
+      if (result) return result;
+    }
+  }
+  for (const key of ['retryAt', 'retry_at', 'reset_at', 'resetAt']) {
+    const result = absoluteIso(item[key], now);
+    if (result) return result;
+  }
+  if (item.type === 'retry' && typeof item.next === 'number') {
+    const result = futureIso(item.next, now);
+    if (result) return result;
+  }
+  for (const key of ['error', 'data', 'properties', 'status']) {
+    const result = structuredRetryAt(item[key], now, depth + 1);
+    if (result) return result;
+  }
+}
+
+function textRetryAt(message: string, now: number): string | undefined {
+  const hint = /\b(retry[-_ ]?after(?:[-_ ](?:milliseconds|ms))?|retrying\s+in|reset[_ ]?at)["'\s:=]+([^"'\r\n}\]]+)/ig;
+  for (const match of message.matchAll(hint)) {
+    // The attempt counter is UI metadata, never part of the duration.
+    const value = match[2].replace(/\s+attempt\b.*$/i, '').trim();
+    const absolute = absoluteIso(value, now);
+    if (absolute) return absolute;
+    if (/^reset/i.test(match[1])) continue;
+    const duration = value.split(/[,;)]|\.(?=\s|$)/, 1)[0].trim();
+    if (/^retrying/i.test(match[1]) && /^\d+(?:\.\d+)?$/.test(duration)) continue;
+    const result = relativeIso(duration, now, /(?:ms|milliseconds)$/i.test(match[1]) ? 'ms' : 's');
+    if (result) return result;
+  }
 }
 
 export function classifyVendorError(engine:string,message:string,now=Date.now()):TaskFailure|undefined {
  let kind:TaskFailure['kind']|undefined=LIMITS.find(rule=>rule.pattern.test(message))?.kind;
  if(!kind&&ENGINE_PATTERNS[engine]?.test(message))kind='quota';
  if(!kind)return;
- const delay=message.match(/retry[-_ ]?after["'\s:=]+(\d+(?:\.\d+)?)\s*(ms|milliseconds|s|seconds|m|minutes)?/i);
- const absolute=message.match(/(?:retry[-_ ]?after|reset[_ ]?at)["'\s:=]+([^\r\n"}]+)/i)?.[1];
- const absoluteTime=absolute?Date.parse(absolute):NaN;
- const delayTime=delay?now+Number(delay[1])*(/^ms|millisecond/i.test(delay[2]??'')?1:/^m/i.test(delay[2]??'')?60000:1000):NaN;
- const target=Number.isFinite(absoluteTime)&&absoluteTime>now?absoluteTime:delayTime;
- const retryAt=Number.isFinite(new Date(target).getTime())?new Date(target).toISOString():undefined;
+ let event: unknown;
+ try { event = JSON.parse(message); } catch { /* Plain CLI logs still carry retry hints. */ }
+ const retryAt=structuredRetryAt(event,now) ?? textRetryAt(vendorMessage(message),now) ?? textRetryAt(message,now);
  return {kind,message:vendorMessage(message).slice(0,1900),...(retryAt?{retryAt}:{} )};
 }

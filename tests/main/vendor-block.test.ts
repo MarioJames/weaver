@@ -60,3 +60,17 @@ for(const command of ['workers.spawn','tasks.retry'])test(`${command} subtracts 
  t.mock.timers.tick(1);await new Promise(resolve=>setImmediate(resolve));assert.ok(result,'response settled within the 8 second budget');const final:any=await response;assert.equal(final.ok,true,JSON.stringify(final));assert.equal(final.data.started,false);assert.equal(final.data.status,'running');assert.equal(final.data.next.action,'wait');
  }finally{f.close();t.mock.timers.reset();}
 });
+
+test('OpenCode free usage retrying in 14h41m persists its deadline without an early ladder release', async t => {
+ const now=Date.parse('2030-01-01T00:00:00Z');t.mock.timers.enable({apis:['Date'],now});const f=fixture();
+ try {
+  const raw='429 Free usage exceeded, subscribe to Go [retrying in 14h 41m attempt #4]';
+  const task=f.create();task.status='failed';task.dispatch={engine:'opencode',owner:'x',worker:'x',model:'x',effort:'high',maxParallel:2,execution:'real'};
+  task.failure=classifyVendorError('opencode',raw);f.store.put(task);f.handler.pump();await new Promise<void>(resolve=>setImmediate(resolve));
+  const deadline=new Date(now+52860_000).toISOString();
+  assert.equal(f.policy.snapshot().blocks.find(block=>block.engine==='opencode')?.release_at,deadline);
+  assert.equal(f.store.get(task.id).failure?.kind,'quota');
+  f.restart();t.mock.timers.tick(60*60_000);
+  assert.equal(f.policy.snapshot().blocks.find(block=>block.engine==='opencode')?.release_at,deadline,'sqlite reopen and a one-hour advance retain the vendor deadline');
+ } finally {f.close();t.mock.timers.reset();}
+});

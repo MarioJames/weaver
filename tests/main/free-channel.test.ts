@@ -13,7 +13,7 @@ import { PolicyBlockService } from '../../src/main/policy/blocks';
 import { StallMonitor } from '../../src/main/stall';
 import { FREE_PROBE_BLOCK_BY, STALL_BLOCK_BY } from '../../src/shared/policy/blocks';
 import { parseFreeProbeState, type FreeProbeState, type FreeProbeStore } from '../../src/main/storage/free-probe-state';
-import { classifyVendorError } from '../../src/main/adapters/cli/vendor-errors';
+import { classifyVendorError, classifyVendorEvent } from '../../src/main/adapters/cli/vendor-errors';
 
 const START = Date.parse('2026-10-19T08:00:00Z');
 const MINUTE = 60_000;
@@ -106,6 +106,49 @@ test('the vendor classifier keeps the documented failure kinds and retry times',
   assert.equal(classifyVendorError('opencode', '429 too many requests', START)?.kind, 'rate_limit');
   assert.equal(classifyVendorError('opencode', '401 authentication failed', START)?.kind, 'auth');
   assert.equal(classifyVendorError('opencode', 'just noise', START), undefined);
+});
+
+test('OpenCode quota retry text preserves the full vendor delay instead of a rate-limit step', () => {
+  for (const duration of ['14h 41m', '14h41m', '52860s']) {
+    const failure = classifyVendorError('opencode', `429 Free usage exceeded, subscribe to Go [retrying in ${duration} attempt #3]`, START);
+    assert.equal(failure?.kind, 'quota');
+    assert.equal(failure.retryAt, iso(START + 52860_000));
+  }
+  assert.equal(classifyVendorError('opencode', 'Free usage exceeded, subscribe to Go', START)?.retryAt, undefined);
+});
+
+test('vendor retry metadata prefers structured headers and preserves supported units and absolute dates', () => {
+  const event = { type: 'error', error: { name: 'APIError', data: { message: '429 FreeUsageLimitError retrying in 1s', responseHeaders: { 'retry-after-ms': '52860000', 'retry-after': '1' } } } };
+  assert.equal(classifyVendorEvent('opencode', event, JSON.stringify(event), START)?.retryAt, iso(START + 52860_000));
+  for (const [header, delay] of [['52860', 52860_000], ['Mon, 19 Oct 2026 22:41:00 GMT', 52860_000]] as const) {
+    const structured = { type: 'error', error: { data: { message: '429', responseHeaders: { 'Retry-After': header } } } };
+    assert.equal(classifyVendorEvent('opencode', structured, JSON.stringify(structured), START)?.retryAt, iso(START + delay));
+  }
+  const status = { type: 'session.status', properties: { status: { type: 'retry', message: 'Free usage exceeded', next: START + 52860_000 } } };
+  assert.equal(classifyVendorEvent('opencode', status, JSON.stringify(status), START)?.retryAt, iso(START + 52860_000));
+  const ordinaryNext = { type: 'error', message: '429', next: START + 52860_000 };
+  assert.equal(classifyVendorEvent('opencode', ordinaryNext, JSON.stringify(ordinaryNext), START)?.retryAt, undefined);
+  for (const [suffix, delay] of [
+    ['Retry-After-ms: 1500', 1500], ['retry_after=2 milliseconds', 2],
+    ['retry after 1.5 seconds', 1500], ['Retry-After: 52860', 52860_000],
+    ['retry after 2 seconds. Please retry later.', 2000],
+    ['retry after 14h 41m', 52860_000], ['retry after 30m', 30 * MINUTE],
+    ['Retry-After: Mon, 19 Oct 2026 22:41:00 GMT', 52860_000],
+    ['reset_at="2026-10-19T22:41:00Z"', 52860_000],
+  ] as const) {
+    assert.equal(classifyVendorError('opencode', `429 ${suffix}`, START)?.retryAt, iso(START + delay), suffix);
+  }
+});
+
+test('retry extraction rejects malformed or expired values rather than guessing a prefix', () => {
+  for (const suffix of [
+    'retrying in 14h 41', 'retrying in 52860', 'retry after 1e3s', 'retrying in 14hors', 'retrying in 14h41months',
+    'retry after 2secondsXYZ', 'retry after -10s', 'retry after 0',
+    'retry after 99999999999999999999999999999999999999h',
+    'retrying in 1h -2m', 'retrying in 1h 90m',
+    'Retry-After: Mon, 19 Oct 2026 07:00:00 GMT', 'reset_at="not a date"', 'reset_at="2027-02-30T22:41:00Z"', 'reset_at="2027-10-19T24:00:00Z"',
+    'attempt #52860', 'ordinary 14h41m text',
+  ]) assert.equal(classifyVendorError('opencode', `429 ${suffix}`, START)?.retryAt, undefined, suffix);
 });
 
 test('free_channel markers are probed on the settings cadence and a pass writes nothing', async () => {
