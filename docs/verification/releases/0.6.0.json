@@ -1,0 +1,313 @@
+{
+  "acceptance": {
+    "botShots": {
+      "claim": "固定前端画面证明（非全套手机/六引擎真模型通过）",
+      "cleanNoAnnotate": true,
+      "noHorizontalOverflow1280": true,
+      "noHorizontalOverflow390": true,
+      "residualRedOverlay": false,
+      "scope": "顶部状态及模型/力度/工作空间/保存相关段"
+    },
+    "consoleNetwork": {
+      "artifactErrors": [],
+      "classification": "任务页交互后采证：console 仅 debug/info，无 error/warning；XHR 170，0 个 4xx/5xx",
+      "consoleEntries": [
+        {
+          "count": 2,
+          "type": "debug"
+        },
+        {
+          "count": 1,
+          "type": "info"
+        }
+      ],
+      "evidenceDirSnapshotOnly": "snapshot/.browser-harness/evidence/20261021T124200（随快照回收，未进发布附件）",
+      "networkErrors": 0,
+      "xhr": 170
+    },
+    "reportSelfCheck": {
+      "fileOpen": "file:///home/mocha/opensource/weaver/docs/verification/releases/0.6.0.html",
+      "imagesTotal": 8,
+      "imagesBroken": 0,
+      "narrow390": {
+        "horizontalOverflow": false,
+        "imagesBroken": 0
+      },
+      "print": "实际验证：file:// 经 Chrome 打印生成 13 页 PDF（1.35MB，8 图嵌入），核心结论与图片在打印路径可读；details 仅次要明细",
+      "wide1280": {
+        "h1Visible": true,
+        "horizontalOverflow": false,
+        "imagesBroken": 0
+      }
+    }
+  },
+  "aliases": {
+    "aliasListViaDiscoveryId": {
+      "engine": "opencode",
+      "for": "ocode",
+      "status": 200,
+      "statusText": "3 个模型 · 来源：opencode models"
+    },
+    "backendContractUnchanged": "直接 listEngineModels {engine: ocode} 仍 400 INVALID_REQUEST（契约未改，见 bot-selector-fix 正证；本次未重复跑）",
+    "keyboardSubmit": {
+      "note": "f635 已验：去掉引擎 Select showSearch 后键盘可提交；本次截图为鼠标/种子态，不重复键盘路径"
+    },
+    "pageModelState": "ocode / opencode/synth-flash / 3 个模型 · 来源：opencode models"
+  },
+  "artifacts": {
+    "candidateFiles": 325,
+    "cleanup": {
+      "hostUnitsAbsent": true,
+      "ownProcessesAbsent": true,
+      "ownTabsClosed": true,
+      "temporaryDataRemoved": true
+    },
+    "lateCloseExit": {
+      "bun": 0,
+      "node": 0
+    },
+    "nodeAndBun": true,
+    "nodeBundleSha256": "b25bb6eba778156b85ed20ed4a002b3acad6fb6846246a15d78cc5c84d16c961",
+    "ownerVerifiedAllHashes": true,
+    "proofRowsAreNotTestCounts": "各 proof-*.jsonl 行数为 fakeCLI 合成用例行数，不等于测试数；不作“70 项测试”表述",
+    "proofs": {
+      "proof-fault-bun.jsonl": {
+        "bad": 0,
+        "cases": [
+          "opencode/auth-turn",
+          "opencode/kill-host",
+          "pi/engine-exit"
+        ],
+        "rows": 9
+      },
+      "proof-fault-node.jsonl": {
+        "bad": 0,
+        "cases": [
+          "opencode/auth-turn",
+          "opencode/kill-host",
+          "pi/engine-exit"
+        ],
+        "rows": 9
+      },
+      "proof-six-bun.jsonl": {
+        "bad": 0,
+        "cases": [
+          "claude",
+          "codex",
+          "grok",
+          "opencode",
+          "pi",
+          "qodercli"
+        ],
+        "rows": 60
+      },
+      "proof-six-node.jsonl": {
+        "bad": 0,
+        "cases": [
+          "claude",
+          "codex",
+          "grok",
+          "opencode",
+          "pi",
+          "qodercli"
+        ],
+        "rows": 60
+      },
+      "proof-special-bun.jsonl": {
+        "bad": 0,
+        "cases": [
+          "opencode/bootstrap",
+          "opencode/buffered-private",
+          "opencode/reasoning-stream",
+          "opencode/synthetic-text",
+          "pi/ack-first",
+          "pi/retry-exhausted",
+          "pi/retry-success",
+          "qodercli/auth-code",
+          "qodercli/auth-success-error"
+        ],
+        "rows": 70
+      },
+      "proof-special-node.jsonl": {
+        "bad": 0,
+        "cases": [
+          "opencode/bootstrap",
+          "opencode/buffered-private",
+          "opencode/reasoning-stream",
+          "opencode/synthetic-text",
+          "pi/ack-first",
+          "pi/retry-exhausted",
+          "pi/retry-success",
+          "qodercli/auth-code",
+          "qodercli/auth-success-error"
+        ],
+        "rows": 70
+      }
+    },
+    "sensitiveMatchCount": 0,
+    "smokeChecks": 68,
+    "smokeFailed": 0,
+    "standaloneHashes": {
+      "weaver-darwin-arm64": "e6542d2e691c4f6f3508e31ef0c9316e3001098dc233a69b339310980d201140",
+      "weaver-linux-arm64": "f42b02d17f083cced97da71eb1dbd7ca89c267efc7c7845b31b9ed99ca064c6c",
+      "weaver-linux-x64": "ab8c1d9651af2375b9227feeec70385b7ba280078d668cbbee8a3ea12c5072a2"
+    }
+  },
+  "assets": [
+    {
+      "file": "0.6.0-assets/bot-1280-top.png",
+      "sha256": "6fd90e87f422f0fe68beffaa3746b09d7baecc595f0bbb3ca4af70e5e48bf0fb",
+      "shows": "1280 顶部：连接状态已连接 / Agent 待命 / 启用 / App ID / Secret 占位 / open_id / 引擎 ocode / 模型与 3 个模型来源",
+      "viewport": "1280x900"
+    },
+    {
+      "file": "0.6.0-assets/bot-1280-save.png",
+      "sha256": "1d50462b739da17c64e55d5a64e3c05977ee118d97883eba93d2a6a14911f041",
+      "shows": "1280 保存段：引擎 ocode / 模型 / 思考力度 medium / 工作空间 / 空闲 30 / 保存修改（干净态 disabled）",
+      "viewport": "1280x900"
+    },
+    {
+      "file": "0.6.0-assets/bot-390-top.png",
+      "sha256": "132fe0e686ae91336a9de82551ed63561e7d8d1121b13874217228a307c37a0c",
+      "shows": "390 顶部状态：Bot 标题 / 连接状态已连接 / Agent 待命 / 启用 / App ID",
+      "viewport": "390x844"
+    },
+    {
+      "file": "0.6.0-assets/bot-390-engine.png",
+      "sha256": "3cc79e5926d919bae0a83dfc8220a26374c34928c95dd092b47e6783e73cf13b",
+      "shows": "390 引擎段：App ID / Secret 占位 / open_id / 引擎 ocode / 模型",
+      "viewport": "390x844"
+    },
+    {
+      "file": "0.6.0-assets/bot-390-save.png",
+      "sha256": "44a988f23f96731dbb1f81f3bcd0db237e5810069fd9512b411eaf9d7e84a871",
+      "shows": "390 保存段：模型与 3 个模型来源 / 思考力度 / 工作空间 / 空闲超时 / 保存修改",
+      "viewport": "390x844"
+    },
+    {
+      "file": "0.6.0-assets/cards-1280-3col.png",
+      "sha256": "d166ae49567e787ec84f21f17c7ba68b87cc35730484da8d4c475596b4014426",
+      "shows": "定时任务 1280 三列卡片（复用 cards-browser 干净截图，数据全 synthetic）",
+      "viewport": "1280x800"
+    },
+    {
+      "file": "0.6.0-assets/cards-768-2col.png",
+      "sha256": "53e5cb137cac43f29e6cea574a436cfdaccbd1c986d7c0460a08d586e3a672e1",
+      "shows": "定时任务 768 两列卡片（复用，同上）",
+      "viewport": "768?"
+    },
+    {
+      "file": "0.6.0-assets/cards-390-1col.png",
+      "sha256": "47dc22e49389c2ac3f820a5f2dcbbf8556a0d8216ce5e8f05cd9d59d1e7b5120",
+      "shows": "定时任务 390 单列卡片（复用，同上）",
+      "viewport": "390?"
+    }
+  ],
+  "botPage": {
+    "effort": "medium",
+    "enabled": true,
+    "engine": "ocode（别名，kind opencode）",
+    "idleTimeoutMinutes": 30,
+    "model": "opencode/synth-flash",
+    "savedRevision": 1,
+    "workspaces": [
+      "合成种子工作空间（截图用隔离合成路径，非用户真实工作区）"
+    ]
+  },
+  "browser": {
+    "aliasCanonicalDiscoveryAndSavedAlias": true,
+    "botFocusFilesMatchFinal": true,
+    "earlierBroadMatrix": "PARTIAL 后经 f635 修复，最终 focus 通过",
+    "keyboardCommitAndEscape": true,
+    "listFailureManualRetry": true,
+    "noHorizontalOverflow": [
+      1280,
+      390
+    ],
+    "screenshotsSynthetic": true,
+    "selectorOwnerTestsPass": 50
+  },
+  "evidenceReuse": {
+    "cards": {
+      "note": "仅复用无红框干净截图 3 张；原证明位于 console-expansion/cards-browser，原数据全 synthetic",
+      "source": "console-expansion/cards-browser/evidence/shots/{1280-expanded,768,390}.png"
+    },
+    "notCopied": [
+      "quota-native-verification.json（真实额度/时间）",
+      "私有备份",
+      "raw HAR / request body",
+      "任务状态长日志"
+    ],
+    "roles": {
+      "images": "未复制（现存 roles-quota-browser 截图均带红框 ref 覆盖）；本报告角色节为文字结论，不配图",
+      "source": "console-expansion/roles-quota-browser/result.md"
+    }
+  },
+  "finalFacts": {
+    "file": "/tmp/weaver-feishu-sqivf643/console-expansion/final-report/final-facts.json",
+    "present": true,
+    "ready": true,
+    "sha256": "b41dfe9e1e09637cd11780330058d61878c595d3792831e2ad7ce7fb343868d4"
+  },
+  "fixedSource": {
+    "commit": "b4dae9ceee18c270201749be64d21ea4dd12cdda",
+    "note": "截图采自 480d899 隔离快照，前端 focus 8 文件哈希与最终 b4 一致（owner 已核）；完整 check / 产物 / Pro 均按 b4 计",
+    "tree": "51a5343c05d0ca90eb72d5d549521587e2505c14"
+  },
+  "fullcheck": {
+    "buildCompleted": true,
+    "command": "taskset -c 18,19,20,21 npm run check",
+    "counts": {
+      "cancelled": 0,
+      "fail": 0,
+      "pass": 1562,
+      "skipped": 10,
+      "tests": 1572
+    },
+    "logSha256": "14c77193461a5f1aa678f4bb8ad6802c11d0e48ea5c3b99b8babeb20a9516739",
+    "skipNote": "10 skip 为 opt-in 真实 Herdr 用例；已单独用 compiled Node/Bun + fakeCLI 跑 6 种正常 + 新 OC/Pi 7 场景 + 代表 fault + late/close"
+  },
+  "isolation": {
+    "browserProfile": "final-report/browser-profile（0700，bh 标记；截图/采证后删除）",
+    "browserSession": "weaver-final-report-01a15cad（截图包会话；本包用 weaver-report-finalize-01a15cad 复核报告）",
+    "dataDir": "合成 DB/im-settings/markers/fakebin/fakehome/workspaces（截图用，已回收）",
+    "realUntouched": "真实 4737 / 凭据 / DB / policy / proxy 只读不碰；未发真飞书/模型"
+  },
+  "limits": [
+    "手机卡片/菜单/跨root真实工具调度未做本轮手机实测",
+    "Qoder真实模型握手后90秒无delta原因未定",
+    "Pi禁用/Grok402跳过真实模型，不等同适配器测试失败",
+    "arm64仅编译和hash，未运行；三平台中仅 linux-x64 运行",
+    "Pro为源码只读复审，非执行测试"
+  ],
+  "migration": {
+    "direction": "只向前应用，无 DB 自动回滚",
+    "schema10": "仅 policy_workers 新增可选 max_parallel 列（ALTER TABLE policy_workers ADD COLUMN max_parallel；owner 表 max_parallel 早已存在，非本次新增）",
+    "schema11": "zcode 清理（kind zcode 引擎行/相关 worker/owner/blocks/额度行删除；tasks 历史保留，不拒绝旧 zcode 记录；含历史策略快照同类引用清理）",
+    "schemaFromTo": "9→11"
+  },
+  "platforms": {
+    "linux-x64": "运行",
+    "others": "arm64（linux/darwin）仅编译和 hash，未运行"
+  },
+  "pro": {
+    "archiveGaps": [],
+    "archiveStatus": "stored",
+    "buildsAndTests": false,
+    "explicitPass": true,
+    "note": "源码只读复审，非执行测试；与本地执行证据分开记录",
+    "reviewSha256": "03200c1a94a352004176682f7ad1653de36a15aaa8815a0bcd41c17f649624ce",
+    "runId": "98975464-3d35-448c-ba54-1653f0809964",
+    "sourceCommit": "b4dae9ceee18c270201749be64d21ea4dd12cdda"
+  },
+  "release": {
+    "localUpgradeDone": false,
+    "note": "本报告为发布前验收；发布与本地升级另由 owner 交付确认，本报告不伪称已上线",
+    "published": false,
+    "tag": "v0.6.0",
+    "url": "https://github.com/MarioJames/weaver/releases/tag/v0.6.0"
+  },
+  "report": "docs/verification/releases/0.6.0.html",
+  "title": "Weaver 0.6.0 发布验证报告（发布前验收通过）",
+  "verifiedBy": "worker 32135694-83f9-40af-b30b-fc025c38354a（不委派/commit/push/联系用户）"
+}

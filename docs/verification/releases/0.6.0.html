@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weaver 0.6.0 发布验证报告（发布前验收通过）</title>
+<style>
+:root{color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0 auto;max-width:56rem;padding:1rem 1rem 3rem;font:16px/1.65 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:#111;background:#fff}
+h1{font-size:1.4rem;line-height:1.3;margin:.5rem 0}
+h2{font-size:1.1rem;margin:1.6rem 0 .5rem;border-top:1px solid #ddd;padding-top:.8rem}
+h3{font-size:1rem;margin:1.1rem 0 .3rem}
+p,li{overflow-wrap:anywhere}
+.meta{color:#444;font-size:.9rem}
+.banner{border:2px solid #166534;background:#f0fdf4;padding:.7rem .9rem;border-radius:.5rem;margin:.8rem 0}
+.banner b{color:#166534}
+.pass{color:#166534;font-weight:700}
+.pend{color:#92400e;font-weight:700}
+.fail{color:#991b1b;font-weight:700}
+table{border-collapse:collapse;width:100%;font-size:.85rem;display:block;overflow-x:auto}
+th,td{border:1px solid #ccc;padding:.35rem .5rem;text-align:left;vertical-align:top}
+th{background:#f3f4f6}
+img{max-width:100%;height:auto;border:1px solid #ddd;border-radius:.4rem;margin:.4rem 0}
+figure{margin:.8rem 0}
+figcaption{font-size:.85rem;color:#444}
+details{margin:.5rem 0;border:1px solid #ddd;border-radius:.4rem;padding:.4rem .7rem}
+summary{cursor:pointer;font-weight:600}
+code{font-size:.85em;background:#f3f4f6;padding:.05rem .3rem;border-radius:.25rem;overflow-wrap:anywhere}
+@media print{.banner{border-color:#000}details{border:none}details>summary{list-style:none}body{max-width:none}}
+</style>
+</head>
+<body>
+<h1>Weaver 0.6.0 发布验证报告 <span class="pass">发布前验收通过</span></h1>
+<p class="meta">日期（Asia/Shanghai）：2026-10-22 · 被测代码：<code>b4dae9c</code>（tree <code>51a5343</code>）· 门禁事实 <code>final-facts.json</code> ready=true（sha256 <code>b41dfe9e…4368d4</code>，只消费现值、不改写）。</p>
+<div class="banner"><b>最终结论：发布前验收通过。</b>完整 check 1572 项（1562 通过 / 0 失败 / 10 跳过，均为 opt-in 真实 Herdr 用例）、产物 325 文件哈希 owner 全验、68 项 smoke（Node+Bun 双栈，0 失败）、ChatGPT Pro 源码复审明确通过（run <code>98975464</code>，archive stored、gaps 0）。截图为 480d899 隔离快照实拍，前端 focus 8 文件哈希与最终 b4 一致（owner 已核），可作为固定画面证据沿用。</div>
+
+<h2>1. 实际结论</h2>
+<ul>
+<li><span class="pass">通过：</span>完整 <code>npm run check</code>（<code>taskset -c 18,19,20,21</code>，b4）：1572 tests / 1562 pass / 0 fail / 10 skip / 0 cancelled，build 完成（log sha256 <code>14c77193…951673</code>）。10 项跳过为 opt-in 真实 Herdr 用例，已单独用 compiled Node/Bun + fakeCLI 跑 6 种正常场景、新 OC/Pi 7 场景、代表性 fault 与 late/close（exit 均为 0）。proof-*.jsonl 行数是合成用例行数，不等于测试数。</li>
+<li><span class="pass">通过：</span>产物与 smoke：候选 325 文件，node bundle sha256 <code>b25bb6eb…84d16c961</code>；三独立包哈希 owner 已全验（linux-x64 <code>ab8c1d96…5072a2</code> 等），敏感命中 0；68 项 smoke（Node+Bun 双栈）0 失败；原生模型未启用（nativeModels=false）。三平台中仅 linux-x64 运行，arm64（linux/darwin）仅编译和 hash、未运行。</li>
+<li><span class="pass">通过：</span>ChatGPT Pro 源码只读复审明确通过：run <code>98975464-3d35-448c-ba54-1653f0809964</code>（sourceCommit=b4），archive stored、gaps 0，review sha256 <code>03200c1a…624ce</code>；buildsAndTests=false，即复审不含执行测试，与本地执行证据分开记录。</li>
+<li><span class="pass">通过（固定画面范围）：</span>隔离快照的 Bot 页在 1280 与 390 视口真实渲染：顶部状态（已连接 / 待命）、别名引擎 <code>ocode</code>、模型 <code>opencode/synth-flash</code>（3 个模型 · 来源 opencode models）、力度 medium、工作空间、空闲 30、保存干净态；双视口无横向溢出；截图为干净无 ref 红框实拍，未做图像后处理。</li>
+<li><span class="pass">通过：</span>别名目录检查 <code>listEngineModels {engine: opencode}</code> 返回 200（3 模型），即页面给别名用的 discovery id 真实可列；console 3 条（debug/info，无 error/warning），XHR 170，0 个 4xx/5xx，artifact_errors 为空。</li>
+<li><span class="pass">通过：</span>浏览器 focus：owner selector 50 项测试通过，别名 canonical discovery + 已存别名、键盘提交/Esc、列表失败手填重试；无横滚 1280/390；截图数据全 synthetic。</li>
+</ul>
+
+<h2>2. 验证范围与边界</h2>
+<ul>
+<li>本次只证明“固定当前前端画面”（Bot 顶部/保存段 + 卡片 3/2/1 列复用干净图），<b>不</b>重复六轮保存 / 32 目录 / 全部故障矩阵（f127 已验大矩阵；f635 修复已由 owner 做 Node 50+ 真实 HTTP 别名 200、键盘提交、失败手填重试），<b>不</b>称完整手机 / 6 引擎真模型通过（390 为视口模拟，非实机触屏）。</li>
+<li>fake 仅限外部边界：Feishu channel、native parent、5 个模型目录 CLI（合成 PATH）、合成 HOME 的 Claude settings.json、合成凭据（截图 Secret 仅占位不回显）；真实链路为 HTTP/Vite/RPC/Store/CAS/SQLite。fake 测试结论不当作真实模型结论。</li>
+<li>未验 / 不宣称（final-facts limits 现值）：手机卡片/菜单/跨 root 真实工具调度未做本轮手机实测；Qoder 真实模型握手后 90 秒无 delta、原因未定；Pi 禁用 / Grok 402 跳过真实模型，不等同适配器测试失败；arm64 仅编译和 hash、未运行；Pro 为源码只读复审、非执行测试。</li>
+<li>真实 4737 / 凭据 / DB / policy / proxy / CDP 9222 只读不碰；未发真实飞书与模型；未接触其他 owner 正在写的 Pi/OpenCode 主树源码作结论。quota-native-verification、私有备份、HAR/request body 等敏感证据未复制进报告。</li>
+</ul>
+
+<h2>3. 本次真实画面证据</h2>
+<h3>3.1 Bot 页 1280（无 ref 红框实拍）</h3>
+<figure><img src="0.6.0-assets/bot-1280-top.png" alt="1280 顶部：连接已连接、Agent 待命、引擎 ocode、模型与 3 个模型来源"><figcaption>1280 顶部：连接状态已连接 / Agent 待命 / 启用 / App ID / Secret 占位 / open_id / 引擎 ocode / 模型 3 个来源。</figcaption></figure>
+<figure><img src="0.6.0-assets/bot-1280-save.png" alt="1280 保存段：力度、工作空间、空闲超时、保存修改"><figcaption>1280 保存段：思考力度 medium / 工作空间 / 空闲 30 / 保存修改（干净态）。</figcaption></figure>
+<h3>3.2 Bot 页 390（无 ref 红框实拍，无横滚 390=390）</h3>
+<figure><img src="0.6.0-assets/bot-390-top.png" alt="390 顶部状态：连接已连接、Agent 待命"><figcaption>390 顶部：连接状态已连接 / Agent 待命 / 启用 / App ID。</figcaption></figure>
+<figure><img src="0.6.0-assets/bot-390-engine.png" alt="390 引擎段：引擎 ocode、模型"><figcaption>390 引擎段：引擎 ocode / 模型 opencode/synth-flash。</figcaption></figure>
+<figure><img src="0.6.0-assets/bot-390-save.png" alt="390 保存段：模型来源、力度、工作空间、保存"><figcaption>390 保存段：模型与 3 个模型来源 / 力度 / 工作空间 / 空闲超时 / 保存修改。</figcaption></figure>
+<details><summary>采集参数与分类（次要明细）</summary>
+<p>截图包会话 <code>weaver-final-report-01a15cad</code> + bh task-profile（0700）；每条 agent-browser 命令带同一 profile，未用 CDP/default；screenshot 均不带 <code>--annotate/--fullpage</code>；先确认无高亮覆盖再采集。collect-evidence（reuse-page）计数：console 3（2 debug + 1 info，无 error/warning）、XHR 170、network-errors 0、artifact_errors []。证据目录在隔离快照内，随快照回收，不进发布附件。</p>
+</details>
+
+<h2>4. 功能结论（已验 / 未验分开）</h2>
+<h3>已验（此前真实验收，本报告引用结论不重复跑全套）</h3>
+<ul>
+<li>Bot 独立页 / 多 workspace（添加/重复/重命名/移除/保存后 reload）/ 六引擎选择（含别名 ocode、pi_alt、qoder_alias，disabled/unsupported 真实解释不可选）——见 bot6-browser 与 bot-selector-fix 正证。</li>
+<li>Herdr 常驻待命：父进程常驻，空闲超时 1–1440 分钟可调（默认 30）；真正路由变化（引擎/模型/力度/工作空间/启停/显式重连）轮换重建（channel.close → parent.close → connect → parent.start），同配健康保存与仅 idle 调整保留上下文（无新增 marker）。</li>
+<li>别名模型列表修复：kind→canonical discovery 映射（ocode→opencode 等），保存仍用原别名 ID；失败收束为 failed 态（可手填重试），键盘可提交引擎 Select（去掉非必要 showSearch）。</li>
+<li>角色拖拽排序（父/子，鼠标 + 键盘，含 Esc 取消，CAS 冲突保留草稿）与配置 ID 免后缀（改名后引用一起更新）；本报告未配图（现存 roles 截图均带红框覆盖，不复制）。</li>
+<li>OpenCode 当前 Console Go 三窗口（5 小时/周/月）只读显示已用百分比与服务端重置时间，不自动增删阻断。</li>
+<li>定时卡片 3/2/1 列（桌面三列、768 两列、手机单列），下图为复用 cards-browser 干净截图（数据全 synthetic）：</li>
+</ul>
+<figure><img src="0.6.0-assets/cards-1280-3col.png" alt="定时任务桌面三列卡片"><figcaption>桌面三列。</figcaption></figure>
+<figure><img src="0.6.0-assets/cards-768-2col.png" alt="定时任务 768 两列卡片"><figcaption>768 两列。</figcaption></figure>
+<figure><img src="0.6.0-assets/cards-390-1col.png" alt="定时任务手机单列卡片"><figcaption>手机单列。</figcaption></figure>
+<ul>
+<li>OpenCode 适配：prompt_async 经 <code>system</code> 传入原生 instructions；reasoning/private delta 经 part metadata 过滤，仅公开文本进正文。</li>
+<li>Pi retry：原生 <code>auto_retry_end(success:true)</code> 按最终成功结算（清 errorText、同一进程/context 继续），耗尽/真实失败仍 reject 原分类，取消路径不受影响。</li>
+</ul>
+<h3>未验 / 不宣称</h3>
+<ul>
+<li>终态原生协议（opencode/qoder/pi/grok parent terminal）未由本浏览器验证，fake parent 只合成回复；未发真实飞书消息/卡片，未跑真实模型与凭据，未测 busy/排队、stop/new-session、真实 idle 到期轮换。</li>
+<li>未走 32 工作空间上限、2000 字符路径、bootstrap 预算；Secret 仅验证隐藏回显与落盘，未做清除/轮换路径。</li>
+<li>完整手机真机触屏、6 引擎真模型列表、其他 Select 的 showSearch 键盘路径未验。</li>
+<li>本包不重采产品截图、不重跑任何模型/应用矩阵；门禁数字以 final-facts 现值为准。</li>
+</ul>
+
+<h2>5. 迁移说明</h2>
+<p>schema 9→11：第 10 步<b>仅</b>给子 Agent（<code>policy_workers</code>）增加可选并发上限列（<code>ALTER TABLE policy_workers ADD COLUMN max_parallel</code>，为空即不限，旧库直接可用；owner 表 <code>max_parallel</code> 早已存在，非本次新增）；第 11 步清理已下线 zcode 引擎的残留配置（引擎行、子 Agent、父 Agent 引用、阻断与运行状态，含历史策略快照中的同类引用），历史任务原样保留、可照常读取。迁移只向前应用，无 DB 自动回滚。准确语义沿用 <code>docs/releases/0.6.0.md</code>。</p>
+
+<h2>6. 发布与链接</h2>
+<p>固定 tag <code>v0.6.0</code>：<code>https://github.com/MarioJames/weaver/releases/tag/v0.6.0</code>。本报告为发布前验收；发布与本地升级另由 owner 交付确认，本报告不伪称已上线。</p>
+
+<h2>7. 资源与清理</h2>
+<p>截图包自有 longrun scope、浏览器 session/profile、隔离快照、合成 data（DB/settings/markers/fakebin/fakehome/workspaces/vite 缓存）已在截图包精确回收（见旧 <code>final-report/cleanup.json</code>）；生产与其他 owner 数据/服务不动。本报告定稿复核用独立 session <code>weaver-report-finalize-01a15cad</code> 以 file:// 打开复核相对图可达、无横滚、结论一致，复核产物只留必要记录，图片已在持久 <code>docs/verification/releases/0.6.0-assets/</code>、不重复存放。</p>
+</body>
+</html>
