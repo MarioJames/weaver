@@ -79,6 +79,7 @@ export class TaskManager {
       child.on('first-output',(at:string)=>{const current=this.store.get(id);if(run.error||run.cancelled||current.run?.firstOutputAt)return;clearTimeout(run.firstTimer);if(current.run)current.run.firstOutputAt=at;this.persist(current,'stream');});
       child.on('stderr-tail',(tail:string)=>{run.adapterTail=true;run.stderrTail=tail;});
       child.on('vendor-error',(message:string,failure?:TaskFailure)=>{run.vendorError=redactSecrets(message).slice(-2048);if(failure)this.failAttempt(id,{...failure,vendorError:run.vendorError});});
+      child.on('engine-model',(report:{actual:string;expected:string;match:boolean;responseModel?:string})=>this.recordEngineModel(id,run,report));
     }
 
     const parser = new JsonlParser(record => this.record(id, record));
@@ -164,6 +165,14 @@ export class TaskManager {
     const run=this.running.get(id);if(!run||run.cancelled||run.error)return;
     const task=this.store.get(id);task.failure={...failure,...(run.stderrTail?{stderrTail:run.stderrTail}:{}),...(run.vendorError?{vendorError:run.vendorError}:{})};
     run.error=failure.message;task.status='failed';clearTimeout(run.firstTimer);event(task,'error',this.failureDetail(task.failure));this.persist(task);if(this.running.has(id))this.terminate(run);
+  }
+  /** The model the engine says it actually used goes on the timeline once; a model other than the configured one fails the attempt, so a wrong-model result is never delivered as a success. */
+  private recordEngineModel(id:string,run:Running,report:{actual:string;expected:string;match:boolean;responseModel?:string}):void {
+    if(run.error||run.cancelled)return;
+    const task=this.store.get(id);const engine=task.dispatch?.engineKind??task.dispatch?.engine??'engine';
+    event(task,'lifecycle',`${engine} 实际模型：${report.actual}${report.responseModel?`（供应商响应模型：${report.responseModel}）`:''}`);
+    this.persist(task,'stream');
+    if(!report.match)this.failAttempt(id,{kind:'other',message:`${engine} 实际使用 ${report.actual}，配置为 ${report.expected}；结果不可信，已终止。请检查 cc-switch 或本地代理是否改写了模型`});
   }
   waitForFirstOutput(id:string,waitMs=10000):Promise<boolean>{
     const ready=()=>{const task=this.store.get(id);return !!task.run?.firstOutputAt;};

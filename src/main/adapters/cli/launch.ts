@@ -1,4 +1,4 @@
-import { classifyVendorError } from './vendor-errors';
+import { classifyVendorError, classifyVendorEvent } from './vendor-errors';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { chmodSync, lstatSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
@@ -131,9 +131,12 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
   private vendorBytes = 0;
   private vendorFrames = 0;
   private stderrBuffer: ReturnType<typeof createRedactedLineBuffer>;
+  private readonly requestedModel: string;
+  private readonly reportedModels = new Set<string>();
   constructor(prepared: PreparedCliAgent) {
     super();
     this.engine = prepared.engine;
+    this.requestedModel = prepared.model;
     this.scopeUnit = prepared.unit;
     this.evidence = { engine: prepared.engine, requestedModel: prepared.model, requestedEffort: prepared.effort, workspace: prepared.workspace, role: prepared.role, promptPath: prepared.promptPath, ...(prepared.sessionDir ? { sessionDir: prepared.sessionDir } : {}), terminal: 'pending' };
     this.normalizer = createNormalizer(prepared.engine);
@@ -145,8 +148,9 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
       if(records.length && !this.firstOutput){this.firstOutput=true;this.emit('first-output',new Date().toISOString());}
       let value: Record<string,unknown>|undefined;try{value=JSON.parse(line);}catch{}
       if(value && (/error|fail/i.test(String(value.type)) || value.error || value.is_error || (value.type==='result'&&value.subtype!=='success') || (value.message && typeof value.message==='object' && ['error','aborted'].includes(String((value.message as Record<string,unknown>).stopReason))))) {
-        const safe=redactSecrets(line);const message=safe.slice(0,2048);this.lastVendorError=message;this.emit('vendor-error',message,classifyVendorError(this.engine,safe));
+        const safe=redactSecrets(line);const message=safe.slice(0,2048);this.lastVendorError=message;this.emit('vendor-error',message,value?classifyVendorEvent(this.engine,value,safe):classifyVendorError(this.engine,safe));
       }
+      if(this.engine==='pi'&&value)this.noteActualModel(value);
       this.emitRecords(records);
     }, detail => this.logOversizedLine(detail));
     const env = { ...process.env };
@@ -181,6 +185,19 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
     if (this.evidence.terminal !== 'pending') return false;
     this.cancelled = true;
     return this.scope.kill(signal);
+  }
+  /**
+   * pi stamps every assistant message with the provider and model that actually served it. Each distinct pair is reported once
+   * ('engine-model'), with whether it is the configured `provider/model`; the task manager records it and fails a mismatch.
+   */
+  private noteActualModel(event: Record<string, unknown>): void {
+    const message = event.message && typeof event.message === 'object' ? event.message as Record<string, unknown> : undefined;
+    if (message?.role !== 'assistant' || typeof message.provider !== 'string' || typeof message.model !== 'string' || !message.provider || !message.model) return;
+    const actual = message.model.startsWith(`${message.provider}/`) ? message.model : `${message.provider}/${message.model}`;
+    const reply = typeof message.responseModel === 'string' && message.responseModel && message.responseModel !== message.model ? message.responseModel : undefined;
+    if (this.reportedModels.has(actual)) return;
+    this.reportedModels.add(actual);
+    this.emit('engine-model', { actual: redactSecrets(actual).slice(0, 200), expected: this.requestedModel, match: actual === this.requestedModel || message.model === this.requestedModel, ...(reply ? { responseModel: redactSecrets(reply).slice(0, 200) } : {}) });
   }
   private logOversizedLine(detail: LineOverflow): void {
     this.emitRecords([{ type: 'log', message: `vendor protocol frame exceeded limit: phase=${detail.phase} limitBytes=${detail.limitBytes} observedBytes=${detail.observedBytes} observedVendorBytes=${this.vendorBytes} parsedFrames=${this.vendorFrames}` }]);

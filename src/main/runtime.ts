@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { API_VERSION } from '../shared/contracts/commands';
 import { startCliAgent } from './adapters/cli/index';
 import { HelloJobs, sayHi } from './engines/hello';
+import { EngineModelLister } from './engines/models';
+import { createPiModelCheck } from './engines/pi-model-check';
+import { guardPiLaunch } from './adapters/cli/pi-guard';
 import { FreeChannelProbeMonitor } from './free-channel';
 import { embeddedApp } from './embedded';
 import { RoutingWorkerAdapter } from './adapters/routing';
@@ -104,9 +107,12 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   let vite: { middlewares: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next: (error?: unknown) => void) => void; close(): Promise<void> } | undefined;
   const inflight = new Set<Promise<unknown>>();
   const greetings = new AbortController();
+  // One `pi --list-models` cache for the models page, the pre-launch check of tasks, hello and free-channel probes.
+  const modelLister = new EngineModelLister();
+  const checkPiModel = createPiModelCheck(modelLister);
   const hellos = new HelloJobs(route => {
     const engine = policy?.snapshot().config.engines[route.engine];
-    return track(sayHi({ ...route, kind: engine?.kind ?? route.engine }, { root: join(dataDir, 'agent-state'), signal: greetings.signal }));
+    return track(sayHi({ ...route, kind: engine?.kind ?? route.engine }, { root: join(dataDir, 'agent-state'), signal: greetings.signal, checkPiModel }));
   });
   const track = <T>(job: Promise<T>): Promise<T> => {
     inflight.add(job);
@@ -146,6 +152,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     stall: () => stall!,
     freeProbe: () => freeProbe!,
     hellos,
+    modelLister,
     server: () => ({ url: runtime.url, port: runtime.port, dataDir, startedAt, managedBy: managedBy() }),
   });
   async function dispatch(method: string, args: unknown[]): Promise<unknown> {
@@ -207,7 +214,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       stateStore: dbStallStore(store.db),
       ready: () => ready && !draining,
       // Recovery is verified with the same light greeting the engines page runs, in this data dir's own scratch.
-      probe: (route, signal) => track(sayHi({ engine: route.engine, model: route.model, effort: route.effort, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal })
+      probe: (route, signal) => track(sayHi({ engine: route.engine, model: route.model, effort: route.effort, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal, checkPiModel })
         .then(result => ({ ok: result.ok, ms: result.durationMs, error: result.error }))),
       onBlocksChanged: () => commands?.pump(),
       log: message => console.error(`Stall monitor: ${message}`),
@@ -218,12 +225,12 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       vendorLadder: dbVendorLadder(store.db),
       ready: () => ready && !draining,
       // The same light greeting the penalty recovery uses.
-      probe: (route, signal) => track(sayHi({ ...route, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal })
+      probe: (route, signal) => track(sayHi({ ...route, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal, checkPiModel })
         .then(result => ({ ok: result.ok, ms: result.durationMs, error: result.error }))),
       onBlocksChanged: () => commands?.pump(),
       log: message => console.error(`Free channel probe: ${message}`),
     });
-    const workers = new RoutingWorkerAdapter(new MockWorkerAdapter(process.execPath, workerScript), startCliAgent, join(dataDir, 'agent-state'), id => store!.getPackage(id));
+    const workers = new RoutingWorkerAdapter(new MockWorkerAdapter(process.execPath, workerScript), guardPiLaunch(startCliAgent, checkPiModel), join(dataDir, 'agent-state'), id => store!.getPackage(id));
     manager = new TaskManager(store, workers, () => {}, undefined, error => {
       console.error(error instanceof Error ? error.message : 'Task history could not be saved');
     });

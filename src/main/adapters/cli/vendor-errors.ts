@@ -26,6 +26,24 @@ export function vendorBlockReason(failure:Pick<TaskFailure,'kind'|'message'>):st
  return reason.length>120?`${reason.slice(0,119)}…`:reason;
 }
 
+const text = (value: unknown): string => typeof value === 'string' ? value : '';
+
+/**
+ * The error text a pi JSON event carries: the assistant message's errorMessage, or an event-level error.
+ * pi events also hold provider names, token counters and timestamps, so classifying the serialized line
+ * can read those as a rate limit; only the error text itself is evidence.
+ */
+export function piErrorText(event: Record<string, unknown>): string {
+  const message = event.message && typeof event.message === 'object' ? event.message as Record<string, unknown> : undefined;
+  const error = event.error && typeof event.error === 'object' ? event.error as Record<string, unknown> : undefined;
+  return text(message?.errorMessage) || text(event.errorMessage) || text(error?.message) || text(event.error) || text(message?.error) || '';
+}
+
+/** Classifies one structured vendor line. Pi events are judged on their error text only; other engines keep whole-line matching. */
+export function classifyVendorEvent(engine: string, event: Record<string, unknown>, line: string, now = Date.now()): TaskFailure | undefined {
+  return classifyVendorError(engine, engine === 'pi' ? piErrorText(event) : line, now);
+}
+
 export function classifyVendorError(engine:string,message:string,now=Date.now()):TaskFailure|undefined {
  let kind:TaskFailure['kind']|undefined=LIMITS.find(rule=>rule.pattern.test(message))?.kind;
  if(!kind&&ENGINE_PATTERNS[engine]?.test(message))kind='quota';

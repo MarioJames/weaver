@@ -25,6 +25,17 @@ export function modelListView(list: EngineModelList | undefined, loading: boolea
   return { kind: 'manual', text: list.message ?? NO_LIST_TEXT };
 }
 
+export const PI_MISSING_MODEL_TEXT = 'pi 当前未提供此模型，可能已在 cc-switch 切换供应商';
+
+/**
+ * pi lists only the provider cc-switch currently points it at, so a saved `provider/model` can stop existing after a switch and
+ * the run would fail at launch. Only a list that was read successfully can say a model is missing; saving stays allowed.
+ */
+export function missingModelWarning(engine: string, model: string, list: EngineModelList | undefined): string | undefined {
+  if (engine !== 'pi' || list?.status !== 'ok' || !model.trim()) return undefined;
+  return list.models.some(item => item.id === model.trim()) ? undefined : PI_MISSING_MODEL_TEXT;
+}
+
 /** The picker options for a list; a value already typed that is not in the list stays out so the select shows nothing selected. */
 export function modelSelectOptions(list: EngineModelList | undefined): Array<{ value: string; label: string }> {
   return (list?.models ?? []).map(model => ({ value: model.id, label: model.label && model.label !== model.id ? `${model.id} · ${model.label}` : model.id }));

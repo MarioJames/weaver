@@ -4,6 +4,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
 import type { HelloInput, HelloJob, HelloResult } from '../../shared/engines';
+import type { PiModelCheck } from './pi-model-check';
 
 const PROMPT = 'Reply with exactly: hi';
 const SYSTEM = 'You are a connectivity check. Reply with one short line. Never use tools.';
@@ -146,7 +147,7 @@ type Outcome = Omit<HelloResult, 'durationMs' | 'checkedAt'>;
  * reports whether the model answered. This is a real model call; it proves
  * the route works now, not that it will keep working.
  */
-export function sayHi(route: HelloInput & { kind: string }, deps: { root: string; timeoutMs?: number; signal?: AbortSignal; spawn?: SpawnPrint }): Promise<HelloResult> {
+export function sayHi(route: HelloInput & { kind: string }, deps: { root: string; timeoutMs?: number; signal?: AbortSignal; spawn?: SpawnPrint; /** Confirms a pi model exists before pi is started; a returned message ends the probe without launching. */ checkPiModel?: PiModelCheck }): Promise<HelloResult> {
   const started = Date.now();
   const timeoutMs = deps.timeoutMs ?? HELLO_TIMEOUT_MS;
   const done = (result: Outcome): HelloResult => ({ ...result, durationMs: Date.now() - started, checkedAt: new Date().toISOString() });
@@ -155,46 +156,55 @@ export function sayHi(route: HelloInput & { kind: string }, deps: { root: string
   // Values become CLI arguments; a leading "-" would be read as a flag.
   if (!MODEL.test(route.model) || route.model.includes('..')) return Promise.resolve(done({ ok: false, error: '模型名称包含不支持的字符。' }));
   if (!EFFORT.test(route.effort)) return Promise.resolve(done({ ok: false, error: '推理强度包含不支持的字符。' }));
-  const scratch = join(deps.root, `hello-${randomBytes(4).toString('hex')}`);
-  const cleanup = () => rmSync(scratch, { recursive: true, force: true });
-  let child: HelloProcess;
-  try {
-    mkdirSync(scratch, { recursive: true, mode: 0o700 });
-    child = (deps.spawn ?? spawnPrint)(engine.command, engine.argv(route.model, route.effort), scratch);
-  } catch (error) {
-    cleanup();
-    return Promise.resolve(done({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+  if (route.kind === 'pi' && deps.checkPiModel) {
+    return deps.checkPiModel(route.model).then(
+      problem => problem ? done({ ok: false, error: problem }) : probeEngine(),
+      error => done({ ok: false, error: `无法确认 pi 是否提供模型 ${route.model}：${error instanceof Error ? error.message : String(error)}，未启动 pi` }),
+    );
   }
-  return new Promise(resolve => {
-    let stdout = '';
-    let stderr = '';
-    let timedOut = false;
-    child.stdout.on('data', (chunk: Buffer | string) => { if (stdout.length < OUTPUT_CAP) stdout += chunk.toString(); });
-    child.stderr.on('data', (chunk: Buffer | string) => { if (stderr.length < 4000) stderr += chunk.toString(); });
-    const stop = () => child.kill('SIGTERM');
-    deps.signal?.addEventListener('abort', stop, { once: true });
-    const timer = setTimeout(() => { timedOut = true; stop(); }, timeoutMs);
-    let finished = false;
-    const finish = (code: number | null, spawnError?: Error) => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      deps.signal?.removeEventListener('abort', stop);
+  return probeEngine();
+  function probeEngine(): Promise<HelloResult> {
+    const scratch = join(deps.root, `hello-${randomBytes(4).toString('hex')}`);
+    const cleanup = () => rmSync(scratch, { recursive: true, force: true });
+    let child: HelloProcess;
+    try {
+      mkdirSync(scratch, { recursive: true, mode: 0o700 });
+      child = (deps.spawn ?? spawnPrint)(engine.command, engine.argv(route.model, route.effort), scratch);
+    } catch (error) {
       cleanup();
-      if (timedOut) { resolve(done({ ok: false, error: `等待回复超时（${Math.round(timeoutMs / 1000)} 秒），已停止进程。` })); return; }
-      if (spawnError) { resolve(done({ ok: false, error: (spawnError as NodeJS.ErrnoException).code === 'ENOENT' ? `找不到命令 ${engine.command}，确认已安装并在 PATH 中。` : spawnError.message })); return; }
-      const parsed = engine.parse(stdout);
-      if (code === 0 && parsed.reply?.trim() && !parsed.error) { resolve(done({ ok: true, reply: clip(parsed.reply), model: parsed.model })); return; }
-      const stderrLine = stderr.trim().split('\n').filter(Boolean).at(-1) ?? '';
-      resolve(done({ ok: false, model: parsed.model, error: clip(parsed.error || stderrLine || `进程退出码 ${code ?? '未知'}，没有回复。`) }));
-    };
-    // Output can still be in flight when the process closes; wait for the stream to drain, briefly.
-    let ended = false;
-    let exit: number | null | undefined;
-    child.stdout.once('end', () => { ended = true; if (exit !== undefined) finish(exit); });
-    child.once('error', (error: Error) => finish(1, error));
-    child.once('close', (code: number | null) => { exit = code; if (ended) finish(code); else setTimeout(() => finish(code), 1000); });
-  });
+      return Promise.resolve(done({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+    }
+    return new Promise(resolve => {
+      let stdout = '';
+      let stderr = '';
+      let timedOut = false;
+      child.stdout.on('data', (chunk: Buffer | string) => { if (stdout.length < OUTPUT_CAP) stdout += chunk.toString(); });
+      child.stderr.on('data', (chunk: Buffer | string) => { if (stderr.length < 4000) stderr += chunk.toString(); });
+      const stop = () => child.kill('SIGTERM');
+      deps.signal?.addEventListener('abort', stop, { once: true });
+      const timer = setTimeout(() => { timedOut = true; stop(); }, timeoutMs);
+      let finished = false;
+      const finish = (code: number | null, spawnError?: Error) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        deps.signal?.removeEventListener('abort', stop);
+        cleanup();
+        if (timedOut) { resolve(done({ ok: false, error: `等待回复超时（${Math.round(timeoutMs / 1000)} 秒），已停止进程。` })); return; }
+        if (spawnError) { resolve(done({ ok: false, error: (spawnError as NodeJS.ErrnoException).code === 'ENOENT' ? `找不到命令 ${engine.command}，确认已安装并在 PATH 中。` : spawnError.message })); return; }
+        const parsed = engine.parse(stdout);
+        if (code === 0 && parsed.reply?.trim() && !parsed.error) { resolve(done({ ok: true, reply: clip(parsed.reply), model: parsed.model })); return; }
+        const stderrLine = stderr.trim().split('\n').filter(Boolean).at(-1) ?? '';
+        resolve(done({ ok: false, model: parsed.model, error: clip(parsed.error || stderrLine || `进程退出码 ${code ?? '未知'}，没有回复。`) }));
+      };
+      // Output can still be in flight when the process closes; wait for the stream to drain, briefly.
+      let ended = false;
+      let exit: number | null | undefined;
+      child.stdout.once('end', () => { ended = true; if (exit !== undefined) finish(exit); });
+      child.once('error', (error: Error) => finish(1, error));
+      child.once('close', (code: number | null) => { exit = code; if (ended) finish(code); else setTimeout(() => finish(code), 1000); });
+    });
+  }
 }
 
 /**

@@ -42,6 +42,8 @@ export interface RpcHost {
   stall(): StallMonitor;
   freeProbe(): FreeChannelProbeMonitor;
   hellos: HelloJobs;
+  /** The runtime's model-list cache, shared with the pi pre-launch check; a host without one gets its own. */
+  modelLister?: EngineModelLister;
   server(): { url: string; port: number; dataDir: string; startedAt: string; managedBy: 'systemd' | 'launchd' | null };
 }
 
@@ -95,7 +97,7 @@ function quotaHandlers(host: RpcHost): Handlers<'getQuota' | 'refreshQuota'> {
 
 function engineHandlers(host: RpcHost): Handlers<'scanEngines' | 'listEngineModels' | 'setEngineEnabled'> {
   const prober = new EngineProber();
-  const modelLister = new EngineModelLister();
+  const modelLister = host.modelLister ?? new EngineModelLister();
   let probes: EngineProbeRecord[] | null = null;
   const remember = (probe: EngineProbeRecord | null) => {
     if (!probe) return probes;

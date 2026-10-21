@@ -2,14 +2,22 @@ import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { createStaticStyles } from 'antd-style';
 import { ActionIcon, Text, Tooltip } from '@lobehub/ui/base-ui';
-import { matchModel, modelListView, modelSelectOptions, useEngineModels } from './engine-models';
+import type { EngineModelList } from '../../../shared/engines';
+import { matchModel, missingModelWarning, modelListView, modelSelectOptions, useEngineModels } from './engine-models';
 import { NamedAutoComplete } from '../../ui/NamedControls';
 import { styles } from '../../ui/styles';
 
 const pickerStyles = createStaticStyles(({ css, cssVar }) => ({
   /** The list floats over the card below the field: solid, so the card text never shows through it. */
   popup: css`background: ${cssVar.colorBgElevated}; box-shadow: ${cssVar.boxShadowSecondary};`,
+  warn: css`font-size: 12px; color: ${cssVar.colorWarningText};`,
 }));
+
+/** Under the field: the saved model is not among the models the engine reports now. Warns only; the value stays editable and savable. */
+export function ModelListWarning({ engine, value, list }: { engine: string; value: string; list: EngineModelList | undefined }) {
+  const text = missingModelWarning(engine, value, list);
+  return text ? <Text className={pickerStyles.warn} role="status">{text}</Text> : null;
+}
 
 /**
  * A model name is typed or picked in one field. Its suggestions are what the engine itself reports (fetched when the field appears and whenever its engine changes),
@@ -38,5 +46,6 @@ export function ModelPicker({ engine, value, onChange, id, placeholder = '例如
         <ActionIcon size="small" icon={RefreshCw} aria-label={`刷新 ${engine} 模型列表`} loading={models.loading} disabled={!engine || models.loading} onClick={() => void models.load(true)} />
       </Tooltip>} />
     <Text type="secondary" className={styles.meta} role="status">{text}</Text>
+    <ModelListWarning engine={engine} value={value} list={models.list} />
   </div>;
 }
