@@ -112,7 +112,7 @@ test('all four status columns group independently and the closed column remains 
 
 test('workspace multi-select ANDs other filters and time, counts tasks in scope, and keeps a chosen empty value checked', () => {
   const tasks = [base, { ...base, id: 'beta', workspace: '/elsewhere/alpha', status: 'failed' as const }, { ...base, id: 'old', workspace: '/projects/old', updatedAt: '2026-10-18T08:00:00Z' }];
-  const selection = { ...emptySelection(), workspace: ['/projects/alpha', '/elsewhere/alpha'], owner: ['Parent'], worker: ['WORKER'], time: '1h' as const };
+  const selection = { ...emptySelection(), workspace: ['/projects/alpha', '/elsewhere/alpha'], owner: ['parent-instance'], worker: ['WORKER'], time: '1h' as const };
   assert.deepEqual(applyTaskFilters(tasks, selection, undefined, now).map(task => task.id), ['one', 'beta']);
   assert.deepEqual(applyTaskFilters(tasks, { ...selection, worker: ['other'] }, undefined, now), []);
   /** Time scopes the options: the 4-hour-old directory is not offered; labels are the last segment, full path is identity. */

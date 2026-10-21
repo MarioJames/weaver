@@ -1,0 +1,164 @@
+[
+  {
+    "id": "b7cdd91e-4af6-4ef7-bae0-a04988e15dfb",
+    "title": "等待父 Agent 命名",
+    "status": "queued",
+    "reviewState": "pending",
+    "worker": null,
+    "execution": null,
+    "parent": false
+  },
+  {
+    "id": "72d296e8-c0ac-459a-b161-8c82e1596abd",
+    "title": "等待父 Agent 命名",
+    "status": "queued",
+    "reviewState": "pending",
+    "worker": null,
+    "execution": null,
+    "parent": false
+  },
+  {
+    "id": "d7a6e8fe-5f96-4317-8f04-dd965b5c97e7",
+    "title": "统一卡片底部派发文案",
+    "status": "completed",
+    "reviewState": "rejected",
+    "worker": "free_worker",
+    "execution": "native",
+    "parent": true
+  },
+  {
+    "id": "94168330-7773-4ae7-8bf6-7cc9ae2ffe57",
+    "title": "补充窄屏适配检查",
+    "status": "queued",
+    "reviewState": "pending",
+    "worker": null,
+    "execution": null,
+    "parent": true
+  },
+  {
+    "id": "9a7e44b6-72f3-401b-b6be-dea60d5e7d4e",
+    "title": "修正暗色主题对比度",
+    "status": "failed",
+    "reviewState": "pending",
+    "worker": "free_worker",
+    "execution": "native",
+    "parent": true
+  },
+  {
+    "id": "1a221d5f-0540-439c-97ec-6b9e57512540",
+    "title": "调整卡片底部派发文案",
+    "status": "cancelled",
+    "reviewState": "pending",
+    "worker": "paid_worker",
+    "execution": "real",
+    "parent": true
+  },
+  {
+    "id": "991e3c3b-5095-45d8-88ce-ae196decf955",
+    "title": "抽取免费渠道标签组件",
+    "status": "running",
+    "reviewState": "pending",
+    "worker": "free_worker",
+    "execution": "native",
+    "parent": true
+  },
+  {
+    "id": "48d0fc74-1f58-4f11-b9ea-1bbf6beebb8d",
+    "title": "实现状态色到标签色的映射",
+    "status": "completed",
+    "reviewState": "pending",
+    "worker": "paid_worker",
+    "execution": "mock",
+    "parent": true
+  },
+  {
+    "id": "8e4e0814-85f4-40a2-96ae-0c5380d6bf31",
+    "title": "梳理现有标签配色清单",
+    "status": "completed",
+    "reviewState": "accepted",
+    "worker": "free_worker",
+    "execution": "native",
+    "parent": true
+  },
+  {
+    "id": "0656ddac-856b-4846-acc8-d24b6342d77e",
+    "title": "编写脚本使用说明",
+    "status": "queued",
+    "reviewState": "pending",
+    "worker": null,
+    "execution": null,
+    "parent": false
+  },
+  {
+    "id": "ed08a5ca-4ff8-4c4d-8e25-a3b13b6d8aaf",
+    "title": "评估替代打包方案",
+    "status": "cancelled",
+    "reviewState": "pending",
+    "worker": "free_worker",
+    "execution": "native",
+    "parent": false
+  },
+  {
+    "id": "123253ac-f6cd-4dbb-b232-dfdaa843200a",
+    "title": "整理任务脚本依赖",
+    "status": "completed",
+    "reviewState": "accepted",
+    "worker": "free_worker",
+    "execution": "native",
+    "parent": false
+  },
+  {
+    "id": "6020e7ce-4f30-4d9c-8e3c-38fc90764535",
+    "title": "迁移旧构建入口",
+    "status": "completed",
+    "reviewState": "rejected",
+    "worker": "free_worker",
+    "execution": "mock",
+    "parent": false
+  },
+  {
+    "id": "f67ab41c-677d-4e16-965f-f2b3a9000d30",
+    "title": "核对看板筛选计数",
+    "status": "running",
+    "reviewState": "pending",
+    "worker": "free_worker",
+    "execution": "native",
+    "parent": false
+  },
+  {
+    "id": "829c63e8-03e2-4b38-9f3e-03d50c9cd8f3",
+    "title": "为构建脚本补充缓存说明",
+    "status": "completed",
+    "reviewState": "pending",
+    "worker": "paid_worker",
+    "execution": "mock",
+    "parent": false
+  },
+  {
+    "id": "43da920b-91ce-42fa-a3ef-93b1b1442025",
+    "title": "等待父 Agent 命名",
+    "status": "queued",
+    "reviewState": "pending",
+    "worker": null,
+    "execution": null,
+    "parent": false
+  },
+  {
+    "id": "23154b83-f72b-4aa0-8d13-3b5dfdd4bf3e",
+    "title": "等待父 Agent 命名",
+    "status": "running",
+    "reviewState": "pending",
+    "worker": null,
+    "execution": null,
+    "parent": false
+  },
+  {
+    "id": "d026f1bb-b53a-43e6-a619-cf354627f580",
+    "title": "重构登录页与看板样式",
+    "status": "running",
+    "reviewState": "pending",
+    "worker": null,
+    "execution": null,
+    "parent": false
+  }
+]

@@ -7,6 +7,8 @@ import { activeBlocks, availabilityOf } from '../../../shared/policy/availabilit
 import { type Block, type Config, type Owner } from '../../../shared/contracts/policy';
 import { blockOf, blockText, pauseOfBlock } from '../probes/probe-view';
 import { DEFAULT_WEIGHT, WEIGHT_MAX, appendWorker, withWorkerWeight, withoutListedWorker, workerWeight } from '../../policy/policy-edit';
+import { statusTagColor, tagColor } from '../../format/tag-colors';
+import { FreeChannelTag } from '../../ui/FreeChannelTag';
 import { styles } from '../../ui/styles';
 import { scheduleStyles } from './owner-schedule-style';
 
@@ -19,10 +21,10 @@ export function workerWeightLock(config: Config, workerId: string): { label: str
   return undefined;
 }
 
-/** Why dispatch would skip this worker right now, as a short tag. */
+/** Why dispatch would skip this worker right now, as a short tag. Colors come from the shared semantic scheme in format/tag-colors. */
 export function workerStatusTag(config: Config, blocks: Block[], workerId: string, weight: number): { label: string; color?: string; hint?: string; reason?: string } | undefined {
   const worker = config.workers[workerId];
-  if (!worker) return { label: '引用不存在', color: 'error' };
+  if (!worker) return { label: '引用不存在', color: tagColor('error') };
   const lock = workerWeightLock(config, workerId);
   if (lock) return lock;
   if (weight === 0) return { label: '不派发' };
@@ -32,7 +34,7 @@ export function workerStatusTag(config: Config, blocks: Block[], workerId: strin
   const hit = blockOf(blocks, worker, Date.now(), workerId);
   const pause = pauseOfBlock(hit);
   const reason = hit ? blockText(hit) : availability.reason;
-  return { label: pause?.label ?? '已限制', color: pause?.tone ?? 'warning', hint: reason, reason };
+  return { label: pause?.label ?? '已限制', color: statusTagColor(pause?.tone ?? 'warning'), hint: reason, reason };
 }
 
 const PRESETS = [{ label: '不派发', value: 0 }, { label: '默认', value: DEFAULT_WEIGHT }, { label: '最高', value: WEIGHT_MAX }];
@@ -60,7 +62,7 @@ export function OwnerScheduleFields({ config, blocks, record, savedRecord, updat
         const status = workerStatusTag(config, blocks, id, weight);
         const locked = workerWeightLock(config, id) !== undefined;
         return <div key={id} className={`${scheduleStyles.listRow} ${scheduleStyles.row}`}>
-          <span className={`${styles.row} ${scheduleStyles.name}`} style={{ minInlineSize: 0 }}><Text className={styles.wrap}>{id}</Text>{config.workers[id]?.free_channel && <Tag size="small">免费渠道</Tag>}{status && <Tag size="small" color={status.color} title={status.hint}>{status.label}</Tag>}{status?.reason && <span className={scheduleStyles.reason} title={status.reason}>{status.reason}</span>}</span>
+          <span className={`${styles.row} ${scheduleStyles.name}`} style={{ minInlineSize: 0 }}><Text className={styles.wrap}>{id}</Text>{config.workers[id]?.free_channel && <FreeChannelTag />}{status && <Tag size="small" color={status.color} title={status.hint}>{status.label}</Tag>}{status?.reason && <span className={scheduleStyles.reason} title={status.reason}>{status.reason}</span>}</span>
           <span className={scheduleStyles.controls}>
             <NamedInputNumber aria-label={`${id} 的权重`} size="small" disabled={locked} min={0} max={WEIGHT_MAX} step={1} precision={0} value={weight} style={{ inlineSize: 72 }} onChange={value => update(withWorkerWeight(record, id, typeof value === 'number' ? value : DEFAULT_WEIGHT))} />
             <span role="group" aria-label={`${id} 权重预设`} className={scheduleStyles.presets} data-locked={locked || undefined}>{PRESETS.map(preset => <Button key={preset.value} size="small" type="text" disabled={locked} aria-pressed={weight === preset.value} aria-label={`${id} ${preset.label}`} onClick={() => update(withWorkerWeight(record, id, preset.value))}>{preset.label}</Button>)}</span>

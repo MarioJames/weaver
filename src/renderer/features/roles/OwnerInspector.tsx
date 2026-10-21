@@ -8,6 +8,7 @@ import { command } from '../../api/commands';
 import { ownerLabel } from '../tasks/task-view';
 import { EngineIcon } from '../../ui/EngineIcon';
 import { NamedSelect } from '../../ui/NamedControls';
+import { tagColor } from '../../format/tag-colors';
 import { styles } from './owner-inspector-style';
 
 /** The continuation fields this row shows. */
@@ -105,9 +106,9 @@ export function OwnerInspector({ task, busy, action, owners, now = Date.now() }:
       <span className={styles.lead}>
         <EngineIcon kind={kind} size={16} />
         <Text className={styles.owner}>{owner}</Text>
-        {blocked ? <Tag size="small">{task.executionRole === 'owner' ? '父 Agent' : '子 Agent'} 执行中，暂不可接续</Tag>
-          : due ? <Tag size="small" color="warning">{`已空闲 ${idleMinutes} 分钟，建议接续`}</Tag>
-            : <Tag size="small" color="success">可接续</Tag>}
+        {blocked ? <Tag size="small" color={tagColor('inProgress')}>{task.executionRole === 'owner' ? '父 Agent' : '子 Agent'} 执行中，暂不可接续</Tag>
+          : due ? <Tag size="small" color={tagColor('warning')}>{`已空闲 ${idleMinutes} 分钟，建议接续`}</Tag>
+            : <Tag size="small" color={tagColor('success')}>可接续</Tag>}
       </span>
       <span className={styles.action}>
         {blockedReason

@@ -6,10 +6,12 @@ import { Drawer, Table, Tag, Text } from '@lobehub/ui/base-ui';
 import type { SelectProps, TableColumnsType } from '@lobehub/ui/base-ui';
 import type { Task } from '../../../shared/contracts/tasks';
 import type { FilterDimension, TaskSelection } from './task-filters';
-import { dispatchKind, ownerLabel, projectLabel, taskOwnerId, taskTitle } from './task-view';
+import { rootIndex } from './task-filters';
+import { cardOwner, dispatchKind, projectLabel, taskOwnerId, taskTitle } from './task-view';
+import { statusTagColor } from '../../format/tag-colors';
 import { ARCHIVE_PAGE_SIZES, ARCHIVE_PAGE_SIZE, ARCHIVE_PAGINATION_BAR, ARCHIVE_SIZE_CHANGER_LABEL, ARCHIVE_TABLE_WIDTH, applyArchivePage, archivePageSizeOptions, archiveScrollY, archiveTotalLabel, archivedTasks, clampArchivePage, resetArchivePage } from './task-archive';
 import type { ArchivePager } from './task-archive';
-import { TIME_RANGES, archiveRows, facetOptions, filterAriaLabel, filterLabels, foldedTriggerValue } from './task-filters';
+import { TIME_RANGES, ARCHIVE_ALL_VALUE, archiveRowValues, archiveRows, archiveSelectOptions, facetOptions, filterAriaLabel, filterLabels, foldedTriggerValue } from './task-filters';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../../format/status-colors';
 import { taskStyles } from './task-style';
 import { AgentLabel } from '../../ui/EngineIcon';
@@ -46,25 +48,28 @@ function useArchiveHeights(): [React.Ref<HTMLDivElement>, { available: number | 
 }
 
 /** What the archive table shows per owner: who ran the work and which agent did it. */
-export function archiveColumns(ownerKind?: (ownerId?: string) => string | undefined, now: number = Date.now()): TableColumnsType<Task> {
+export function archiveColumns(ownerKind?: (ownerId?: string) => string | undefined, now: number = Date.now(), rootOf?: (id: string) => Task | undefined): TableColumnsType<Task> {
   return [
     { title: '任务', dataIndex: 'title', key: 'title', width: 220, render: (_, task) => <Text strong className={taskStyles.archiveCell} title={taskTitle(task)}>{taskTitle(task)}</Text> },
     {
       title: '父 Agent → 子 Agent',
       key: 'agents',
       width: 250,
-      render: (_, task) => <span className={taskStyles.agentPair}>
-        <AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerLabel(task)} />
-        <span aria-hidden="true">→</span>
-        <AgentLabel kind={dispatchKind(task)} name={task.dispatch?.worker ?? '未记录子 Agent'} />
-      </span>,
+      render: (_, task) => {
+        const owner = cardOwner(task, rootOf);
+        return <span className={taskStyles.agentPair} title={owner.title}>
+          <AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={owner.name} />
+          <span aria-hidden="true">→</span>
+          <AgentLabel kind={dispatchKind(task)} name={task.dispatch?.worker ?? '未记录子 Agent'} />
+        </span>;
+      },
     },
     { title: '工作目录', key: 'project', width: 110, render: (_, task) => <span className={taskStyles.archiveDirectory} title={task.dispatch?.workspace || task.workspace}>{projectLabel(task) || '未记录工作目录'}</span> },
     {
       title: '结果',
       key: 'outcome',
       width: 80,
-      render: (_, task) => { const status = displayStatus(task); const tone = DISPLAY_TONES[status]; return <Tag size="small" color={tone === 'default' ? undefined : tone}>{DISPLAY_LABELS[status]}</Tag>; },
+      render: (_, task) => { const status = displayStatus(task); return <Tag size="small" color={statusTagColor(DISPLAY_TONES[status])}>{DISPLAY_LABELS[status]}</Tag>; },
     },
     { title: '结束于', key: 'ended', width: 120, render: (_, task) => <TimeText className={taskStyles.cardTime} value={task.updatedAt} now={now} /> },
   ];
@@ -104,6 +109,7 @@ export function ArchiveList({ tasks, selected, onSelect, ownerKind, now = Date.n
   /** Filtering pages a different list, so it starts over; live updates only move the reader when their page is gone. */
   const choose = (next: TaskSelection) => { setSelection(next); setPager(resetArchivePage); };
   const [tableRef, room] = useArchiveHeights();
+  const rootOf = (id: string) => rootIndex(tasks).get(id);
   const page = clampArchivePage(pager.page, rows.length, pager.pageSize);
   useEffect(() => { if (page !== pager.page) setPager(current => ({ ...current, page })); }, [page, pager.page]);
   const archived = archivedTasks(tasks, now);
@@ -113,9 +119,12 @@ export function ArchiveList({ tasks, selected, onSelect, ownerKind, now = Date.n
     const chosen = selection[dimension];
     const options = facetOptions(archived, dimension, selection, now, tasks);
     const labelOf = (value: string) => options.find(option => option.value === value)?.label ?? value;
-    return <NamedSelect classNames={filterClassNames} key={dimension} mode="multiple" allowClear prefix={`${filterLabels[dimension]}：`} aria-label={filterAriaLabel(filterLabels[dimension])} placeholder="全部" value={chosen}
+    return <NamedSelect classNames={filterClassNames} key={dimension} mode="multiple" allowClear prefix={`${filterLabels[dimension]}：`} aria-label={filterAriaLabel(filterLabels[dimension])} placeholder="全部"
+      value={chosen.length ? chosen : [ARCHIVE_ALL_VALUE]}
       labelRender={option => {
-        const view = foldedTriggerValue(chosen, String(option.value), labelOf);
+        const value = String(option.value);
+        if (value === ARCHIVE_ALL_VALUE) return null;
+        const view = foldedTriggerValue(chosen, value, labelOf);
         if (view.hidden) return null;
         const text = String(option.label);
         return <>
@@ -123,8 +132,8 @@ export function ArchiveList({ tasks, selected, onSelect, ownerKind, now = Date.n
           {view.extra > 0 && <span className={taskStyles.archiveFilterMore} title={view.extraTitle}>+{view.extra}</span>}
         </>;
       }}
-      options={options.map(option => ({ value: option.value, label: `${option.label} ${option.count}` }))}
-      onChange={value => choose({ ...selection, [dimension]: Array.isArray(value) ? value.map(String) : [] })} />;
+      options={archiveSelectOptions(archived, dimension, selection, now, tasks)}
+      onChange={value => choose({ ...selection, [dimension]: archiveRowValues(chosen, Array.isArray(value) ? value.map(String) : []) })} />;
   };
   return <div className={taskStyles.archiveBody}>
     <div className={taskStyles.archiveFilters}>
@@ -136,7 +145,7 @@ export function ArchiveList({ tasks, selected, onSelect, ownerKind, now = Date.n
     </div>
     {rows.length ? <div ref={tableRef} className={taskStyles.archiveTable}>
       {/* Virtual rows: only the ones in view are mounted, so the body needs a numeric height. */}
-      <Table<Task> virtual columns={archiveColumns(ownerKind, now)} dataSource={rows} rowKey="id" size="small" classNames={{ pagination: { root: taskStyles.archivePager } }}
+      <Table<Task> virtual columns={archiveColumns(ownerKind, now, rootOf)} dataSource={rows} rowKey="id" size="small" classNames={{ pagination: { root: taskStyles.archivePager } }}
         pagination={{ current: page, pageSize: pager.pageSize, pageSizeOptions: ARCHIVE_PAGE_SIZES, showSizeChanger: true, showTotal: archiveTotalLabel, components: { sizeChanger: ArchivePageSizeChanger }, onChange: (next, size) => setPager(current => applyArchivePage(current, rows.length, next, size)) }}
         scroll={{ x: ARCHIVE_TABLE_WIDTH, y: archiveScrollY(room.available, room.pager) }}
         onRow={task => archiveRowProps(task, selected, onSelect)} />

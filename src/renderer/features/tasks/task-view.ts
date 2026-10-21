@@ -29,15 +29,30 @@ export function ownerProfileOf(task: Pick<Task, 'ownerId'>, owners: Pick<OwnerIn
   return (task.ownerId && owners.find(owner => owner.id === task.ownerId)?.profileId) || '';
 }
 export const UNASSIGNED_OWNER = '未指定父 Agent';
+/** An owner root: the parent Agent task itself. It never sits in the board columns or the archive rows. */
+export function isOwnerRoot(task: Task): boolean {
+  return task.executionRole === 'owner' && !task.parentTaskId;
+}
+
+/** A page-created parent Agent before its first start: a queued draft bound to an owner instance, which becomes the root on start. It keeps its card until then. */
+export function isRootDraft(task: Task): boolean {
+  return !!task.ownerId && isDraft(task) && !logicalOwnerName(task);
+}
+
+/** A task that answers in the 父 Agent row by its own root id: started owner roots and the drafts that become them. */
+export function isRootTask(task: Task): boolean {
+  return !task.parentTaskId && (isOwnerRoot(task) || isRootDraft(task));
+}
+
 /** Placeholder assigned to per-task throwaway instances. */
 const PLACEHOLDER_OWNER = 'Task owner';
-type ProfiledTask = Task & { owner: Task['owner'] & { profileId?: string } };
+type ProfiledTask = Task & { owner: Task['owner'] & { profileId?: string; title?: string } };
 /** Enrich only the renderer's task copies; queued tasks have no frozen dispatch yet. */
-export function withOwnerProfiles(tasks: Task[], owners: Pick<OwnerInstance, 'id' | 'name' | 'profileId'>[]): Task[] {
+export function withOwnerProfiles(tasks: Task[], owners: Pick<OwnerInstance, 'id' | 'name' | 'profileId' | 'title'>[]): Task[] {
   const instances = new Map(owners.map(owner => [owner.id, owner]));
   return tasks.map(task => {
     const instance = task.ownerId ? instances.get(task.ownerId) : undefined;
-    return instance ? { ...task, owner: { ...task.owner, name: instance.name, profileId: instance.profileId } } : task;
+    return instance ? { ...task, owner: { ...task.owner, name: instance.name, profileId: instance.profileId, ...(instance.title ? { title: instance.title } : {}) } } : task;
   });
 }
 /** Named registrations carry a display name distinct from their policy profile. */
@@ -66,6 +81,11 @@ export function ownerKindLookup(config?: Config): (ownerId?: string) => string |
     return engineId ? engines[engineId]?.kind : undefined;
   };
 }
+/** Maps the saved policy to a lookup of worker id -> free channel; a missing config, a missing worker or no flag is simply not free. */
+export function freeChannelLookup(config?: Config): (workerId?: string) => boolean {
+  const workers = config?.workers;
+  return (workerId?: string) => Boolean(workerId && workers?.[workerId]?.free_channel === true);
+}
 /** The logical owner name a task carries itself, as opposed to the one its dispatch recorded. */
 export function logicalOwnerName(task: Task): string | undefined {
   const name = task.owner.name;
@@ -82,6 +102,32 @@ export function ownerHostName(task: Task): string {
   const full = ownerLabel(task);
   return full.split(' · ')[0]?.trim() || full;
 }
+
+/** A manual parent Agent instance answers with its current main-task title when one was described, so cards and filters read the work, not the session clock. */
+export function ownerInstanceTitle(task: Task): string | undefined {
+  return namedOwnerInstance(task) ? (task as ProfiledTask).owner.title : undefined;
+}
+/** The parent Agent a board card names: an A-type child names its root task, others their owner instance or profile. */
+export function cardOwner(task: Task, rootOf?: (id: string) => Task | undefined): { name: string; title: string } {
+  const root = task.parentTaskId ? rootOf?.(task.parentTaskId) : undefined;
+  if (root) {
+    const name = taskTitle(root);
+    return { name, title: root.title !== PENDING_TASK_TITLE ? root.title : name };
+  }
+  const full = ownerLabel(task);
+  const described = ownerInstanceTitle(task);
+  if (described) return { name: described, title: `${described} · ${full}` };
+  return { name: ownerHostName(task), title: full };
+}
+
+/** Why a selected parent Agent has no sub agent tasks on the board yet, and what happens next. */
+export function emptyRootNotice(root: Task): string {
+  const title = taskTitle(root);
+  if (root.status === 'failed') return `父 Agent「${title}」启动失败，没有创建子任务${root.failure?.message ? `：${root.failure.message}` : ''}`;
+  if (root.status === 'cancelled') return `父 Agent「${title}」已取消，没有子任务。`;
+  if (isActive(root)) return `父 Agent「${title}」正在拆分任务，子任务会自动出现在这里。`;
+  return `父 Agent「${title}」还没有子任务。`;
+}
 export function filterTasks(tasks: Task[], filter: TaskFilter): Task[] {
   return tasks.filter(task => filter === 'all' || (filter === 'active' && isActive(task)) || (filter === 'review' && task.status === 'completed' && reviewStatus(task) === 'pending') || (filter === 'closed' && !isActive(task)));
 }
@@ -94,19 +140,6 @@ export function recentWorkspaces(tasks: Task[], limit = 8): string[] {
     if (seen.size >= limit) break;
   }
   return [...seen];
-}
-/** Progress of a root's final children; a child that was retried is superseded by its retry and counts once. */
-export interface ChildSummary { total: number; completed: number; running: number }
-export function childSummary(root: Task, tasks: Task[]): ChildSummary | undefined {
- if (root.executionRole !== 'owner') return undefined;
- const children = tasks.filter(task => task.parentTaskId === root.id);
- const leaves = children.filter(task => !children.some(retry => retry.retryOf === task.id));
- if (!leaves.length) return undefined;
- return { total: leaves.length, completed: leaves.filter(task => task.status === 'completed').length, running: leaves.filter(task => task.status === 'running' || task.status === 'cancelling').length };
-}
-/** e.g. 子任务 2/3 完成 · 1 运行中; 运行中 is left out at zero. */
-export function childSummaryLabel(summary: ChildSummary): string {
- return `子任务 ${summary.completed}/${summary.total} 完成${summary.running ? ` · ${summary.running} 运行中` : ''}`;
 }
 /** Cancelling a running parent Agent root also stops its unfinished children and closes the Herdr pane; any other task cancels without a prompt. */
 export function rootCancelNotice(task: Task, tasks: Task[]): { title: string; description: string; detail: string } | undefined {

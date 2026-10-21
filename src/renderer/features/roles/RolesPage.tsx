@@ -18,6 +18,8 @@ import { type Availability, type Block, type Owner, type Worker } from '../../..
 import { blankOwner, blankWorker, removeRole, renameRole, roleDeleteImpact, roleIdError, syncRoleEditor, type RoleSection } from '../../policy/policy-edit';
 import { OwnerScheduleFields } from './OwnerSchedule';
 import { ModelPicker } from '../engines/ModelPicker';
+import { FreeChannelTag } from '../../ui/FreeChannelTag';
+import { statusTagColor, tagColor } from '../../format/tag-colors';
 import { PolicyHeader } from '../../policy/PolicyHeader';
 import type { PolicyDraft } from '../../policy/usePolicyDraft';
 import { styles } from '../../ui/styles';
@@ -38,13 +40,13 @@ export function availabilityText(availability: Availability | undefined): string
   return `已限制：${availability.reason ?? '未说明原因'}${availability.release_at ? `，${dateText(availability.release_at)} 恢复` : ''}`;
 }
 
-/** The one line a list item needs beyond its switch: only states the switch does not already show. A pause written by the penalty ladders or the free probe also names its kind as a tag. */
-export function roleNote(availability: Availability | undefined, unsaved: boolean, block?: Block): { text: string; warning?: boolean; tag?: { label: string; color: string } } | undefined {
+/** The one line a list item needs beyond its switch: only states the switch does not already show. A pause written by the penalty ladders or the free probe also names its kind as a tag. Tag colors come from the shared semantic scheme. */
+export function roleNote(availability: Availability | undefined, unsaved: boolean, block?: Block): { text: string; warning?: boolean; tag?: { label: string; color?: string } } | undefined {
   if (unsaved) return { text: availability ? '有未保存的修改' : '尚未保存', warning: true };
   if (availability?.status === 'engine_disabled') return { text: '引擎未启用' };
   if (availability?.status === 'blocked') {
     const pause = pauseOfBlock(block);
-    if (pause && block) return { text: blockText(block), warning: true, tag: { label: pause.label, color: pause.tone } };
+    if (pause && block) return { text: blockText(block), warning: true, tag: { label: pause.label, color: statusTagColor(pause.tone) } };
     return { text: availabilityText(availability), warning: true };
   }
   return undefined;
@@ -114,7 +116,10 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           return <div key={id} className={rolesStyles.roleItem} aria-current={id === current ? 'true' : undefined}>
             <NamedSwitch size="small" aria-label={`启用 ${id}`} checked={item.enabled} loading={toggling === id} disabled={!engineOn || !!toggling} title={engineOn ? undefined : `引擎 ${item.engine || '未选择'} 未启用，先在引擎页打开它`} onChange={checked => void toggle(id, checked)} />
             <button type="button" className={rolesStyles.roleButton} style={{ font: 'inherit' }} onClick={() => { acceptId(); setSelected(id); setPendingId(id); setIdError(''); scrollToEditor(); }}>
-              <strong className={styles.wrap}>{id}</strong>
+              <span className={rolesStyles.roleTitle}>
+                <strong className={styles.wrap}>{id}</strong>
+                {section === 'workers' && 'free_channel' in item && item.free_channel === true && <FreeChannelTag />}
+              </span>
               <span className={`${styles.wrap} ${styles.meta}`}>{item.engine} · {item.model || '未填模型'}</span>
               {note && (note.tag
                 ? <span className={rolesStyles.roleNote}><Tag size="small" color={note.tag.color}>{note.tag.label}</Tag><span className={`${styles.wrap} ${styles.meta} ${rolesStyles.warn}`}>{note.text}</span></span>
@@ -202,7 +207,7 @@ function ReplyCard({ result }: { result: HelloResult & { route: string } }) {
   return <article role="status" aria-label="连通测试结果" className={rolesStyles.replyCard} data-ok={result.ok ? 'true' : 'false'}>
     <header className={styles.spread} style={{ flexWrap: 'nowrap' }}>
       <span className={styles.row} style={{ flexWrap: 'nowrap', minInlineSize: 0 }}>
-        <Tag size="small" color={result.ok ? 'success' : 'error'}>{result.ok ? '可用' : '不可用'}</Tag>
+        <Tag size="small" color={result.ok ? tagColor('success') : tagColor('error')}>{result.ok ? '可用' : '不可用'}</Tag>
         <Text strong className={styles.wrap}>{result.route}</Text>
       </span>
       <Text type="secondary" className={`${styles.meta} ${styles.numbers}`} style={{ whiteSpace: 'nowrap' }}>{seconds && `${seconds} · `}<TimeText value={result.checkedAt} /></Text>

@@ -1,0 +1,37 @@
+{
+  "task": "c28558f6-ddb5-4842-bf39-df9abf1e029b",
+  "instance": {
+    "started": "systemd-run --user --scope --collect --unit=dev-weaver-tags-833f484a (MemoryHigh=8G, MemoryMax=10G)",
+    "command": "npx tsx src/cli/main.ts web --dev --no-open --port 4793 --data-dir /tmp/weaver-tags-833f484a.AQre/browser/data --output json",
+    "port": 4793,
+    "data_dir": "/tmp/weaver-tags-833f484a.AQre/browser/data",
+    "url": "http://127.0.0.1:4793"
+  },
+  "policy": {
+    "revision": 1,
+    "engines": ["claude (enabled, kind claude)", "codex (enabled, kind codex)"],
+    "owner_profiles": { "main_owner": { "engine": "claude", "model": "claude-opus-5-5", "workers": ["free_worker", "paid_worker", "rest_worker", "freebusy_worker"], "worker_weights": { "free_worker": 8, "paid_worker": 5, "rest_worker": 5, "freebusy_worker": 0 }, "max_parallel": 6 } },
+    "workers": {
+      "free_worker": "free_channel=true，正常（免费渠道夹具）",
+      "paid_worker": "free_channel 未设，codex（付费渠道夹具）",
+      "rest_worker": "手动限制：policy block（无 by）「手动暂停：模型账号维护中」",
+      "freebusy_worker": "free_channel=true 且被 by=weaver-free-probe 的 block 暂停（免费额度用完，orange）"
+    },
+    "notes": "quota.auto_refresh=false、free_channel_probe.enabled=false，避免后台触发真实 CLI；默认策略的其余 owner/worker 全部停用或移除。"
+  },
+  "fixture_method": "全部通过隔离实例的 weaver CLI（--data-dir 指向隔离目录）与页面操作创建；子任务执行只用 mock-jsonl provider 或 native（owner 内置子代理等待汇报，无进程）。父 Agent host 用 /tmp/weaver-tags-833f484a.AQre/browser/bin/herdr 假桩（PATH 前置）承接 Herdr 启动步骤，未触碰真实 Herdr、真实模型 CLI。",
+  "a_class_roots": {
+    "重构登录页与看板样式": "页面创建（ownerProfileId=main_owner）→ tasks.start（假桩 Herdr）→ tasks.describe → 7 个子任务：c1 已通过(free_worker native+reviews accepted)、c2 待验收(paid_worker mock-jsonl)、c3 执行中(free_worker native 未汇报)、c7 需修改(free_worker native+rejected)、c5 失败(free_worker native+failed)、c4 已取消(误派 real codex 后立即 cancel，见 incident)、c6 待执行(未派发)",
+    "拆分验收看板样例数据": "页面创建 → tasks.start（假桩 Herdr）→ 保持运行、无子任务（验收 C.3）",
+    "整理引擎页与设置页的文案排版": "页面创建草稿，未启动（待执行列保留的已知设计）"
+  },
+  "b_class_instances": {
+    "Claude · weaver · 22:37": "owners attach（无 title）；任务：为构建脚本补充缓存说明（paid_worker mock，待验收）、核对看板筛选计数（free_worker native，执行中）",
+    "Claude · scripts · 21:15": "owners attach + owners describe title=迁移构建脚本；任务：迁移旧构建入口（free_worker mock，rejected→需修改）、整理任务脚本依赖（free_worker native，accepted→已通过）、评估替代打包方案（native 后 cancel→已取消）、编写脚本使用说明（queued→待执行）"
+  },
+  "incident": {
+    "what": "夹具脚本 c4 任务漏传 provider/worker，dispatch 按 route 选中 paid_worker 并以 execution=real 启动了真实 codex exec 进程（约 40 秒）",
+    "response": "发现后立即 tasks.cancel，进程确认退出；codex 以 --ephemeral --cd /tmp/weaver-tags-833f484a.AQre/browser/workspaces/login-page 运行，工作目录为一次性夹具目录；随后补建 c7 覆盖「需修改」状态",
+    "evidence": "fixtures-out/c4-spawn.json（events 显示 codex thread started）、tasks list 中 c4 状态 cancelled"
+  }
+}

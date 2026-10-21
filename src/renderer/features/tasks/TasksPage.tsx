@@ -17,7 +17,7 @@ import { TaskBoard } from './TaskBoard';
 import { TaskDetail } from './TaskDetail';
 import type { useWorkbench } from './useWorkbench';
 
-export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWorkbench>; ownerKind?: (ownerId?: string) => string | undefined }) {
+export function TasksPage({ work, ownerKind, freeChannel }: { work: ReturnType<typeof useWorkbench>; ownerKind?: (ownerId?: string) => string | undefined; freeChannel?: (workerId?: string) => boolean }) {
   const [filters, setFilters] = useState(readTaskFilters);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -54,11 +54,11 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
       <Button ref={newTaskRef} type="primary" icon={Plus} disabled={work.busy || !work.caps || work.loading} onClick={() => setCreating(true)}>新建任务</Button>
       <Button icon={Archive} disabled={!work.caps || work.loading} onClick={() => setArchiving(true)}>归档 {work.loading ? <span role="status" aria-label="正在加载归档数量">…</span> : archived}</Button>
     </>} />
-    <TaskBoard filters={filters} onFiltersChange={setFilters} now={now} tasks={tasks} selected={selected} loading={work.loading} onSelect={setSelected} ownerKind={ownerKind} />
+    <TaskBoard filters={filters} onFiltersChange={setFilters} now={now} tasks={tasks} selected={selected} loading={work.loading} onSelect={setSelected} ownerKind={ownerKind} freeChannel={freeChannel} />
     <ArchiveDrawer now={now} tasks={tasks} selected={selected} open={archiving} onClose={() => setArchiving(false)} onSelect={setSelected} ownerKind={ownerKind} />
     <Drawer open={!!task} title={<span ref={detailTitleRef} tabIndex={-1}>任务详情</span>} afterOpenChange={open => { if (open) detailTitleRef.current?.focus({ preventScroll: true }); }} placement="right" width="min(960px, 92vw)" onClose={() => setSelected(undefined)}>
       {task && !fullTask && <div role="status" aria-label="正在加载任务详情"><Skeleton animated /></div>}
-      {task && fullTask && <TaskDetail key={task.id} task={{...fullTask, owner: task.owner}} tasks={tasks} onSelect={setSelected} busy={work.busy || !work.caps} action={work.action} ownerKind={ownerKind}
+      {task && fullTask && <TaskDetail key={task.id} task={{...fullTask, owner: task.owner}} tasks={tasks} onSelect={setSelected} busy={work.busy || !work.caps} action={work.action} ownerKind={ownerKind} freeChannel={freeChannel}
         onStart={id => void work.action(() => window.weaver.startTask(id))} onEdit={() => setEditing(true)}
         onCancel={id => void work.action(() => window.weaver.cancelTask(id))}
         onRetry={id => void work.action(async () => { const next = await command<{ id: string }>('tasks.retry', { taskId: id }, true); setSelected(next.id); })} />}
@@ -74,7 +74,11 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
       create={(input, start) => work.action(() => createTask(input, start, {
         create: value => command<{ id: string }>('tasks.create', { ...value }, true),
         start: id => window.weaver.startTask(id),
-        select: setSelected,
+        // The new parent Agent is on the board at once: it is selected, its 父 Agent filter is set, and the splitting notice points at it.
+        select: id => {
+          setSelected(id);
+          setFilters(current => current.owner.includes(id) ? current : { ...current, owner: [...current.owner, id] });
+        },
         startFailed: (id, error) => notifyError(error, '任务已创建，启动失败', { label: '重试启动', run: () => { void work.action(() => window.weaver.startTask(id)); } }),
       }))} />
   </>;

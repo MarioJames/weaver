@@ -1,0 +1,19 @@
+{
+  "note": "计算样式取自各页面 Tag 元素 getComputedStyle()；rgb 值为亮色主题（应用唯一主题）。",
+  "免费渠道_cyan": {
+    "fg": "rgb(47, 162, 138)", "bg": "rgba(26, 255, 155, 0.07)",
+    "observed_on": ["看板卡片（free_worker 派发的任务）", "子 Agent 页列表", "父 Agent 页权重列表", "根任务详情子任务列表"],
+    "same_class": "acss-6ooq9v（各页面同一 Tag 预设类）"
+  },
+  "免费额度用完_orange": { "fg": "rgb(209, 128, 0)", "bg": "rgba(255, 80, 30, 0.08)", "observed_on": ["子 Agent 页列表（freebusy_worker，by=weaver-free-probe）"] },
+  "已限制_warning": { "fg": "rgb(238, 158, 11)", "bg": "rgba(255, 155, 55, 0.08)", "observed_on": ["父 Agent 页权重列表（rest_worker）", "看板状态「待验收」同为 warning 语义"] },
+  "不派发_neutral": { "fg": "rgb(123, 126, 130)", "bg": "rgba(55, 55, 88, 0.03)", "observed_on": ["父 Agent 页权重列表（freebusy_worker，权重 0）"] },
+  "已通过_success": { "fg": "rgb(55, 157, 74)", "bg": "rgba(84, 205, 12, 0.1)", "observed_on": ["看板状态", "引擎页「已安装」"] },
+  "需修改_volcano": { "fg": "rgb(165, 55, 22)", "bg": "rgba(255, 44, 11, 0.06)", "observed_on": ["看板状态"] },
+  "失败_error": { "fg": "rgb(236, 94, 65)", "bg": "rgba(255, 44, 11, 0.06)", "observed_on": ["看板状态"] },
+  "待执行_草稿_已取消_default": { "fg": "rgb(123, 126, 130)", "bg": "rgba(55, 55, 88, 0.03)", "observed_on": ["看板状态"] },
+  "引擎页_已安装": { "fg": "rgb(55, 157, 74)" },
+  "引擎页_未找到": { "fg": "rgb(102, 102, 102)" },
+  "引擎页_手动暂停类别": { "fg": "rgb(123, 126, 130)" },
+  "dark_theme": "应用在 src/renderer/main.tsx:15 硬编码 themeMode=\"light\"，set media dark 后 body 背景仍为 rgb(249,249,250)，产品无深色模式（见 dark-no-effect.json 与 workers-media-dark-forced-still-light.png）。"
+}

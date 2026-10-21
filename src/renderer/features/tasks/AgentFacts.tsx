@@ -3,6 +3,7 @@ import { CopyButton } from '@lobehub/ui';
 import { Descriptions, Text, Tooltip } from '@lobehub/ui/base-ui';
 import type { Task } from '../../../shared/contracts/tasks';
 import { dispatchKind, ownerHostName, ownerLabel, taskOwnerId } from './task-view';
+import type { cardOwner } from './task-view';
 import { AgentLabel } from '../../ui/EngineIcon';
 import { TimeText } from '../../ui/TimeText';
 import { factsStyles } from './agent-facts-style';
@@ -19,7 +20,7 @@ export function modelText(task: Task): string | undefined {
  * Who owns the work, who runs it and where. Compact (board cards) is the parent agent alone; the full block is one
  * responsive Descriptions: sub agent, model and update time on the first row, parent agent and workspace on the second.
  */
-export function AgentFacts({ task, ownerKind, compact }: { task: Task; ownerKind?: (ownerId?: string) => string | undefined; compact?: boolean }) {
+export function AgentFacts({ task, ownerKind, compact, owner }: { task: Task; ownerKind?: (ownerId?: string) => string | undefined; compact?: boolean; owner?: ReturnType<typeof cardOwner> }) {
   const root = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(3);
   useEffect(() => {
@@ -34,7 +35,9 @@ export function AgentFacts({ task, ownerKind, compact }: { task: Task; ownerKind
   const dispatch = task.dispatch;
   const parent = <AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerLabel(task)} />;
   // A card shows the owner host only: the full instance name also carries the workspace and a session time, and stays in the tooltip.
-  if (compact) return <span className={taskStyles.cardParent} aria-label={`父 Agent：${ownerHostName(task)}`} title={ownerLabel(task)}><AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerHostName(task)} /></span>;
+  const compactName = owner?.name ?? ownerHostName(task);
+  const compactTitle = owner?.title ?? ownerLabel(task);
+  if (compact) return <span className={taskStyles.cardParent} aria-label={`父 Agent：${compactName}`} title={compactTitle}><AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={compactName} /></span>;
   const workspace = dispatch?.workspace || task.workspace;
   const model = modelText(task);
   const first = [

@@ -6,10 +6,10 @@ import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
 import { taskStyles as styles } from '../../src/renderer/features/tasks/task-style';
-import { TaskBoard } from '../../src/renderer/features/tasks/TaskBoard';
+import { TaskBoard, TaskFacets } from '../../src/renderer/features/tasks/TaskBoard';
 import { ArchiveList, archiveColumns } from '../../src/renderer/features/tasks/ArchiveDrawer';
 import { archivedTasks } from '../../src/renderer/features/tasks/task-archive';
-import { FILTER_DIMENSIONS, TIME_RANGES, applyTaskFilters, archiveRows, emptySelection, facetOptions, filterOptions, filterSummary, resolveSelection, selectedEntries } from '../../src/renderer/features/tasks/task-filters';
+import { FILTER_DIMENSIONS, TIME_RANGES, ARCHIVE_ALL_VALUE, applyTaskFilters, archiveRows, archiveRowValues, archiveSelectOptions, emptySelection, facetOptions, filterLabels, filterOptions, filterSummary, hasFilters, resolveSelection, selectedEntries } from '../../src/renderer/features/tasks/task-filters';
 import { FILTERS_COLLAPSED_KEY, TASK_FILTERS_KEY, readFiltersCollapsed, readTaskFilters, writeFiltersCollapsed } from '../../src/renderer/features/tasks/task-persistence';
 import type { TaskSelection } from '../../src/renderer/features/tasks/task-filters';
 
@@ -46,6 +46,26 @@ function markup(node: React.ReactNode) {
 const pressed = (html: string) => [...html.matchAll(/<button\b[^>]*aria-pressed="true"[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]);
 const board = (selection: TaskSelection, extra: Record<string, unknown> = {}) =>
   storage({}, () => markup(React.createElement(TaskBoard, { tasks, filters: selection, now, loading: false, onSelect: () => {}, ...extra })));
+
+/** Walks a rendered element tree (function components without hooks only) and visits every element. */
+function walk(node: React.ReactNode, visit: (element: React.ReactElement) => void): void {
+  if (Array.isArray(node)) { node.forEach(child => walk(child, visit)); return; }
+  if (!React.isValidElement(node)) return;
+  visit(node);
+  const props = node.props as { children?: React.ReactNode; leading?: React.ReactNode };
+  walk(props.children, visit);
+  walk(props.leading, visit);
+}
+/** The 「全部」 chips of a facet render, as their elements. */
+const allChips = (facets: React.ReactElement) => {
+  const found: React.ReactElement<{ ariaLabel?: string; checked?: boolean; count?: number; label?: string; onClick: () => void }>[] = [];
+  walk(facets, element => {
+    const label = (element.props as { ariaLabel?: string }).ariaLabel;
+    if (typeof label === 'string' && label.endsWith(' 全部')) found.push(element as React.ReactElement<{ ariaLabel?: string; checked?: boolean; count?: number; label?: string; onClick: () => void }>);
+  });
+  return found;
+};
+const facets = (selection: TaskSelection) => TaskFacets({ board: tasks, all: tasks, selection, collapsed: false, now, onChange: () => {}, onCollapse: () => {} });
 
 test('dimensions are 状态, 父 Agent, 子 Agent, 工作目录 and the time ranges start with 今天', () => {
   assert.deepEqual([...FILTER_DIMENSIONS], ['status', 'owner', 'worker', 'workspace']);
@@ -203,4 +223,110 @@ test('tasks without a workspace answer for one 未指定工作目录 option that
     assert.deepEqual(resolveSelection(readTaskFilters(), pool, now).workspace, ['']);
   });
   assert.match(board(sel({}), { tasks: pool }), /未指定工作目录/);
+});
+
+test('every multi-select row opens with a 全部 chip: selected on an empty row, cleared rows show it unselected, the time row has none', () => {
+  const html = board(sel({}));
+  for (const label of ['状态 全部', '父 Agent 全部', '子 Agent 全部', '工作目录 全部']) {
+    const chip = [...html.matchAll(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`, 'g'))].map(match => match[0]);
+    assert.equal(chip.length, 1, label);
+    assert.match(chip[0], /aria-pressed="true"/);
+  }
+  assert.doesNotMatch(html, /aria-label="时间 全部"/);
+  const narrowed = board(sel({ status: ['running'], owner: ['o1'] }));
+  assert.match(narrowed, /aria-label="状态 全部"[^>]*aria-pressed="false"|aria-pressed="false"[^>]*aria-label="状态 全部"/);
+  assert.match(narrowed, /aria-label="父 Agent 全部"[^>]*aria-pressed="false"|aria-pressed="false"[^>]*aria-label="父 Agent 全部"/);
+  for (const label of ['子 Agent 全部', '工作目录 全部']) {
+    const chip = [...narrowed.matchAll(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`, 'g'))].map(match => match[0]);
+    assert.match(chip[0], /aria-pressed="true"/, label);
+  }
+});
+
+test('clicking 全部 clears only its own row and writes no sentinel into the selection', () => {
+  const calls: TaskSelection[] = [];
+  const selection = sel({ status: ['running'], owner: ['o1'], workspace: ['/p/alpha'] });
+  const element = TaskFacets({ board: tasks, all: tasks, selection, collapsed: false, now, onChange: next => calls.push(next), onCollapse: () => {} });
+  const chips = allChips(element);
+  assert.deepEqual(chips.map(chip => chip.props.ariaLabel), ['状态 全部', '父 Agent 全部', '子 Agent 全部', '工作目录 全部']);
+  chips.find(chip => chip.props.ariaLabel === '父 Agent 全部')!.props.onClick();
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0], sel({ status: ['running'], workspace: ['/p/alpha'] }));
+  assert.ok(!JSON.stringify(calls).includes('__all__'));
+  // An already-selected 全部 (empty row) clicks without any change.
+  const empty = TaskFacets({ board: tasks, all: tasks, selection: sel({ status: ['running'] }), collapsed: false, now, onChange: next => calls.push(next), onCollapse: () => {} });
+  allChips(empty).find(chip => chip.props.ariaLabel === '父 Agent 全部')!.props.onClick();
+  assert.equal(calls.length, 1);
+});
+
+test('the 全部 chip counts the tasks that match when only its own row is ignored', () => {
+  const selection = sel({ status: ['running'], worker: ['w1'] });
+  const chips = allChips(facets(selection));
+  for (const dimension of FILTER_DIMENSIONS) {
+    const chip = chips.find(item => item.props.ariaLabel === `${filterLabels[dimension]} 全部`)!;
+    assert.equal(chip.props.count, applyTaskFilters(tasks, selection, dimension, now, tasks).length, dimension);
+    assert.equal(chip.props.checked, !selection[dimension].length, dimension);
+  }
+  assert.equal(chips.find(chip => chip.props.ariaLabel === '子 Agent 全部')!.props.count, 2);
+  assert.equal(chips.find(chip => chip.props.ariaLabel === '状态 全部')!.props.count, 3);
+});
+
+test('全部 never enters the 已选 summary, the removable entries or hasFilters', () => {
+  const html = board(sel({ time: 'today', status: ['running'] }));
+  assert.doesNotMatch(html, /移除 全部/);
+  assert.doesNotMatch(html, /已选：[\s\S]*全部 [0-9]/);
+  const afterAll = sel({ time: 'today', status: [] });
+  assert.equal(hasFilters(afterAll), false);
+  assert.equal(filterSummary(afterAll, Object.fromEntries(FILTER_DIMENSIONS.map(dimension => [dimension, filterOptions(tasks, dimension, afterAll, now)])) as never), '筛选：今天');
+});
+
+test('rows with many options keep every 全部 visible next to 更多', () => {
+  const many = Array.from({ length: 12 }, (_, index) => make(`m${index}`, 'queued', 'o1', 'w1', `/p/many${index}`, hoursAgo(0.1)));
+  const html = storage({}, () => markup(React.createElement(TaskBoard, { tasks: many, filters: sel({ time: 'today' }), now, loading: false, onSelect: () => {} })));
+  assert.match(html, /更多/);
+  for (const label of ['状态 全部', '父 Agent 全部', '子 Agent 全部', '工作目录 全部']) assert.match(html, new RegExp(`aria-label="${label}"`), label);
+  const workspaceRow = html.slice(html.indexOf('>工作目录<'), html.indexOf('已选：'));
+  assert.ok(workspaceRow.indexOf('aria-label="工作目录 全部"') < workspaceRow.indexOf('更多'));
+});
+
+test('a row with no options shows its 全部 chip instead of 暂无', () => {
+  const html = board(sel({ time: '1h' }));
+  const workspaceRow = html.slice(html.indexOf('>工作目录<'), html.indexOf('已选：'));
+  assert.match(workspaceRow, /aria-label="工作目录 全部"/);
+  assert.doesNotMatch(workspaceRow, /暂无/);
+});
+
+test('archive dropdowns open with 全部 N first, counted with the row ignored', () => {
+  const old = [
+    make('x1', 'failed', 'o1', 'w1', '/p/alpha', hoursAgo(30)),
+    make('x2', 'completed', 'o2', 'w2', '/p/beta', hoursAgo(50), { reviewState: 'accepted' }),
+    make('x3', 'cancelled', 'o2', 'w1', '/p/beta', hoursAgo(80)),
+  ];
+  const base = { ...emptySelection(), time: 'all' as const };
+  const owner = archiveSelectOptions(old, 'owner', base, now);
+  assert.equal(owner[0].value, ARCHIVE_ALL_VALUE);
+  assert.equal(owner[0].label, '全部 3');
+  assert.deepEqual(owner.slice(1).map(option => option.value), ['o2', 'o1']);
+  // The count respects the other rows: status narrowed, the owner row itself never is.
+  const narrowed = archiveSelectOptions(old, 'owner', { ...base, status: ['cancelled'] }, now);
+  assert.equal(narrowed[0].label, '全部 1');
+  assert.deepEqual(narrowed.slice(1).map(option => option.label), ['o2 1']);
+  assert.equal(archiveSelectOptions(old, 'status', base, now)[0].label, '全部 3');
+  assert.equal(archiveSelectOptions(old, 'worker', { ...base, owner: ['o1'] }, now)[0].label, '全部 1');
+});
+
+test('choosing the archive 全部 entry clears the row and never stores the sentinel', () => {
+  // An empty row reads as 全部 chosen, so picking values drops it.
+  assert.deepEqual(archiveRowValues([], [ARCHIVE_ALL_VALUE, 'o2']), ['o2']);
+  assert.deepEqual(archiveRowValues([], ['o1', 'o2']), ['o1', 'o2']);
+  // Choosing 全部 over chosen values clears the row.
+  assert.deepEqual(archiveRowValues(['o1'], ['o1', ARCHIVE_ALL_VALUE]), []);
+  assert.deepEqual(archiveRowValues(['o1', 'o2'], [ARCHIVE_ALL_VALUE]), []);
+  // Deselecting 全部 from an empty row stays empty; ordinary changes pass through.
+  assert.deepEqual(archiveRowValues([], []), []);
+  assert.deepEqual(archiveRowValues(['o1'], []), []);
+  assert.deepEqual(archiveRowValues(['o1'], ['o1', 'o2']), ['o1', 'o2']);
+  for (const next of [[], [ARCHIVE_ALL_VALUE], [ARCHIVE_ALL_VALUE, 'x'], ['x']]) {
+    assert.ok(!archiveRowValues(['o1'], next).includes(ARCHIVE_ALL_VALUE));
+    assert.ok(!archiveRowValues([], next).includes(ARCHIVE_ALL_VALUE));
+  }
 });

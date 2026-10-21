@@ -6,14 +6,16 @@ import { ChevronDown, ChevronRight, ChevronUp, Clock, Folder, Loader2, X } from 
 import type { Task } from '../../../shared/contracts/tasks';
 import { displayLog } from './log-view';
 import type { FilterDimension, FilterOption, TaskSelection, TaskTimeRange } from './task-filters';
-import { childSummary, childSummaryLabel, dispatchKind, taskTitle } from './task-view';
+import { cardOwner, dispatchKind, emptyRootNotice, taskTitle } from './task-view';
 import { cardFooter } from './task-footer';
 import { TASK_COLUMNS, boardRows, columnize, isOpenTask, workspaceGroups } from './task-columns';
 import { nonArchived } from './task-archive';
-import { FILTER_DIMENSIONS, TIME_RANGES, applyTaskFilters, emptySelection, facetOptions, filterLabels, filterSummary, hasFilters, resolveSelection, selectedEntries, toggleOption } from './task-filters';
+import { FILTER_DIMENSIONS, TIME_RANGES, applyTaskFilters, childIndex, emptySelection, facetOptions, filterLabels, filterSummary, hasFilters, resolveSelection, rootIndex, selectedEntries, toggleOption } from './task-filters';
 import { readEndedExpanded, readFiltersCollapsed, readTaskFilters, writeEndedExpanded, writeFiltersCollapsed, writeTaskFilters } from './task-persistence';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../../format/status-colors';
 import type { DisplayStatus } from '../../format/status-colors';
+import { statusTagColor, tagColor } from '../../format/tag-colors';
+import { FreeChannelTag } from '../../ui/FreeChannelTag';
 import { styles } from '../../ui/styles';
 import { taskStyles } from './task-style';
 import { AgentFacts } from './AgentFacts';
@@ -24,8 +26,7 @@ import { VirtualLane } from './VirtualLane';
 /** Every card has a shared status tag; dispatching states also carry a spinner and activity. */
 function cardStatus(task: Task): { label: string; color?: string; spin: boolean } {
   const status = displayStatus(task);
-  const tone = DISPLAY_TONES[status];
-  return { label: DISPLAY_LABELS[status], color: tone === 'default' ? undefined : tone, spin: status === 'running' || status === 'cancelling' };
+  return { label: DISPLAY_LABELS[status], color: statusTagColor(DISPLAY_TONES[status]), spin: status === 'running' || status === 'cancelling' };
 }
 
 /** One time inside the footer sentence: compact text, the full timestamp on hover. */
@@ -38,8 +39,8 @@ const ENDED_BODY_ID = 'board-ended';
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 /** One checkable chip: label, optional brand/dot, and how many tasks in scope carry it. */
-export function FacetChip({ checked, label, count, icon, tone, title, onClick }: { checked: boolean; label: string; count?: number; icon?: ReactNode; tone?: string; title?: string; onClick: () => void }) {
-  return <button type="button" className={taskStyles.facetChip} aria-pressed={checked} title={title} onClick={onClick}>
+export function FacetChip({ checked, label, count, icon, tone, title, ariaLabel, onClick }: { checked: boolean; label: string; count?: number; icon?: ReactNode; tone?: string; title?: string; ariaLabel?: string; onClick: () => void }) {
+  return <button type="button" className={taskStyles.facetChip} aria-pressed={checked} aria-label={ariaLabel} title={title} onClick={onClick}>
     {tone && <span className={taskStyles.facetDot} data-tone={tone} aria-hidden="true" />}
     {icon}
     <span className={taskStyles.facetChipLabel}>{label}</span>
@@ -47,8 +48,8 @@ export function FacetChip({ checked, label, count, icon, tone, title, onClick }:
   </button>;
 }
 
-/** A single-line row of chips; whatever does not fit collapses behind 「更多」, which expands only this row. */
-function FacetRow({ label, size, children }: { label: string; size: number; children: ReactNode }) {
+/** A single-line row of chips; the leading 「全部」 chip sits outside the measured list so it never folds into 「更多」; whatever else does not fit collapses behind 「更多」, which expands only this row. */
+function FacetRow({ label, size, leading, children }: { label: string; size: number; leading?: ReactNode; children: ReactNode }) {
   const row = useRef<HTMLDivElement>(null);
   const chips = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState(false);
@@ -84,10 +85,11 @@ function FacetRow({ label, size, children }: { label: string; size: number; chil
   return <div className={taskStyles.facetRow}>
     <span className={taskStyles.facetLabel}>{label}</span>
     <div ref={row} className={taskStyles.facetValues}>
+      {leading}
       <div ref={chips} className={taskStyles.facetChips} data-expanded={expanded}>
         {size ? Children.toArray(children).map((child, index) => <span key={index} className={taskStyles.facetItem}
           data-hidden={!expanded && index >= visibleCount} aria-hidden={!expanded && index >= visibleCount} inert={!expanded && index >= visibleCount}>{child}</span>) :
-          <span className={taskStyles.facetEmpty}>暂无</span>}
+          leading ? null : <span className={taskStyles.facetEmpty}>暂无</span>}
       </div>
       <button type="button" className={`${taskStyles.facetChip} ${taskStyles.facetMore}`} data-visible={overflow}
         aria-hidden={!overflow} inert={!overflow} aria-expanded={expanded} aria-label={`${label} ${expanded ? '收起' : '更多'}`}
@@ -124,12 +126,22 @@ export function TaskFacets({ board, all = board, selection, collapsed, now, owne
         count={applyTaskFilters(board, { ...selection, time: range.value as TaskTimeRange }, undefined, now, all).length}
         onClick={() => onChange({ ...selection, time: range.value })} />)}
     </FacetRow>
-    {FILTER_DIMENSIONS.map(dimension => <FacetRow key={dimension} label={filterLabels[dimension]} size={options[dimension].length}>
-      {options[dimension].map(option => <FacetChip key={option.value} checked={selection[dimension].includes(option.value)} label={option.label} count={option.count}
-        tone={dimension === 'status' ? DISPLAY_TONES[option.value as DisplayStatus] : undefined}
-        icon={optionIcon(dimension, option, ownerKind)} title={dimension === 'workspace' ? option.value || undefined : dimension === 'owner' ? option.title : undefined}
-        onClick={() => onChange({ ...selection, [dimension]: toggleOption(selection[dimension], option.value) })} />)}
-    </FacetRow>)}
+    {FILTER_DIMENSIONS.map(dimension => {
+      const chosen = selection[dimension];
+      return <FacetRow key={dimension} label={filterLabels[dimension]} size={options[dimension].length}
+        leading={<FacetChip checked={!chosen.length} label="全部" ariaLabel={`${filterLabels[dimension]} 全部`}
+          count={applyTaskFilters(board, selection, dimension, now, all).length}
+          onClick={() => { if (chosen.length) onChange({ ...selection, [dimension]: [] }); }} />}>
+      {options[dimension].map(option => {
+        const rootStatus = dimension === 'owner' ? option.ownerStatus : undefined;
+        return <FacetChip key={option.value} checked={selection[dimension].includes(option.value)} label={option.label} count={option.count}
+          tone={rootStatus ? DISPLAY_TONES[rootStatus] : dimension === 'status' ? DISPLAY_TONES[option.value as DisplayStatus] : undefined}
+          icon={rootStatus === 'running' || rootStatus === 'cancelling' ? spinner : optionIcon(dimension, option, ownerKind)}
+          title={dimension === 'workspace' ? option.value || undefined : dimension === 'owner' ? option.title : undefined}
+          onClick={() => onChange({ ...selection, [dimension]: toggleOption(selection[dimension], option.value) })} />;
+      })}
+      </FacetRow>;
+    })}
     <div className={taskStyles.facetSelected}>
       <div className={taskStyles.facetSelectedDetails} data-active={hasFilters(selection)} aria-hidden={!hasFilters(selection)} inert={!hasFilters(selection)}>
         <span>已选：</span>
@@ -149,7 +161,7 @@ export function TaskFacets({ board, all = board, selection, collapsed, now, owne
   </div>;
 }
 
-export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filters, onFiltersChange, now = Date.now() }: { filters?: TaskSelection; onFiltersChange?: (selection: TaskSelection) => void; tasks: Task[]; selected?: string; loading: boolean; onSelect: (id: string) => void; ownerKind?: (ownerId?: string) => string | undefined; now?: number }) {
+export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, freeChannel, filters, onFiltersChange, now = Date.now() }: { filters?: TaskSelection; onFiltersChange?: (selection: TaskSelection) => void; tasks: Task[]; selected?: string; loading: boolean; onSelect: (id: string) => void; ownerKind?: (ownerId?: string) => string | undefined; freeChannel?: (workerId?: string) => boolean; now?: number }) {
   const [stored, setStored] = useState(readTaskFilters);
   const [ended, setEnded] = useState(readEndedExpanded);
   const [collapsed, setCollapsed] = useState(readFiltersCollapsed);
@@ -160,6 +172,14 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
   const board = nonArchived(tasks, now);
   const visible = applyTaskFilters(board, selection, undefined, now, tasks);
   const columns = columnize(visible);
+  // Parent Agents answer by their root task: a selected root with no children at all explains its empty board.
+  const roots = rootIndex(tasks);
+  const rootOf = (id: string) => roots.get(id);
+  const childRoots = childIndex(tasks);
+  const childlessRoots = [...new Set(selection.owner)].flatMap(id => {
+    const root = roots.get(id);
+    return root && !childRoots.has(id) ? [root] : [];
+  });
   const olderOpenWork = !visible.length && selection.time === 'today' &&
     applyTaskFilters(board, { ...selection, time: 'all' }, undefined, now, tasks).some(isOpenTask);
   const update = (next: TaskSelection) => {
@@ -180,33 +200,38 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
   const card = (task: Task) => {
     const tag = cardStatus(task);
     const latest = task.events.at(-1);
-    const children = childSummary(task, tasks);
-    const footer = cardFooter(task);
-    const activity = task.executionRole === 'owner' ? task.ownerHost ? `Herdr · ${task.ownerHost.agentName}` : '正在 Herdr 中启动父 Agent' : displayLog(latest?.message ?? '等待首次调度');
+    const owner = cardOwner(task, rootOf);
+    const footer = cardFooter(task, owner);
+    const activity = task.ownerHost ? `Herdr · ${task.ownerHost.agentName}` : displayLog(latest?.message ?? '等待首次调度');
     return <button type="button" className={taskStyles.taskCard} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
       <span className={taskStyles.cardTitle}>
-        {task.executionRole === 'owner' && <Tag className={taskStyles.cardTag} size="small">父 Agent</Tag>}
-        {task.parentTaskId && <Tag className={taskStyles.cardTag} size="small">子任务</Tag>}
-        {task.dispatch?.worker && <Tag className={taskStyles.cardTag} title={task.dispatch.worker} size="small" icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
+        {task.parentTaskId && <Tag className={taskStyles.cardTag} size="small" color={tagColor('childRole')}>子任务</Tag>}
+        {task.dispatch?.worker && <Tag className={taskStyles.cardTag} title={task.dispatch.worker} size="small" color={tagColor('neutral')} icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
+        {task.dispatch?.worker && freeChannel?.(task.dispatch.worker) && <FreeChannelTag className={taskStyles.cardTag} title={`子 Agent ${task.dispatch.worker} 使用免费渠道`} />}
         <strong className={taskStyles.cardTitleText}>{taskTitle(task)}</strong>
       </span>
       <span className={taskStyles.cardStatus}>
         <Tag size="small" color={tag.color} icon={tag.spin ? spinner : displayStatus(task) === 'scheduled' ? <Icon icon={Clock} size="small" /> : undefined}>{tag.label}</Tag>
         {tag.spin && <Text type="secondary" className={taskStyles.cardActivity} title={activity}>{activity}</Text>}
       </span>
-      {children && <Text type="secondary" className={taskStyles.cardChildren} title={childSummaryLabel(children)}>{childSummaryLabel(children)}</Text>}
       <span className={taskStyles.cardMeta}>
-        <span className={taskStyles.cardWho}>由 <AgentFacts compact task={task} ownerKind={ownerKind} /> <span className={taskStyles.cardTail}>于 <CardTime value={footer.at} now={now} /> {footer.verb}{footer.tail && <span className={taskStyles.cardSep} aria-hidden="true"> ·</span>}</span></span>
+        <span className={taskStyles.cardWho}>由 <AgentFacts compact task={task} owner={owner} ownerKind={ownerKind} /> <span className={taskStyles.cardTail}>于 <CardTime value={footer.at} now={now} /> {footer.verb}{footer.tail && <span className={taskStyles.cardSep} aria-hidden="true"> ·</span>}</span></span>
         {footer.tail && <>{' '}<span className={taskStyles.cardTail}>{footer.tail.label} <CardTime value={footer.tail.at} now={now} /></span></>}
       </span>
     </button>;
   };
   return <section aria-label="任务看板" className={taskStyles.board}>
     <TaskFacets board={board} all={tasks} selection={selection} collapsed={collapsed} now={now} ownerKind={ownerKind} onChange={update} onCollapse={collapse} />
-    {!visible.length && <Empty title="没有匹配的任务" description={olderOpenWork ? '今天没有任务，还有更早的未结束任务。' : undefined} action={<div className={styles.row}>
+    {!visible.length && <>
+      {childlessRoots.map(root => <div key={root.id} className={styles.row} role="status">
+        <Text type="secondary">{emptyRootNotice(root)}</Text>
+        <Button size="small" onClick={() => onSelect(root.id)}>查看父任务</Button>
+      </div>)}
+      <Empty title="没有匹配的任务" description={olderOpenWork ? '今天没有任务，还有更早的未结束任务。' : undefined} action={<div className={styles.row}>
       <Button size="small" onClick={() => update(emptySelection())}>清除筛选</Button>
       {olderOpenWork && <Button size="small" onClick={() => update({ ...selection, time: 'all' })}>查看全部</Button>}
-    </div>} />}
+    </div>} />
+    </>}
     {visible.length > 0 && <>
     <Text type="secondary" className={taskStyles.boardScrollHint}>左右滚动查看其他状态列</Text>
     <div className={taskStyles.columns} aria-label="任务状态列" role="region" tabIndex={0} aria-busy={loading}>

@@ -1,10 +1,11 @@
 import type { Task } from '../../../shared/contracts/tasks';
 import { DISPLAY_LABELS, DISPLAY_STATUSES, displayStatus } from '../../format/status-colors';
 import type { DisplayStatus } from '../../format/status-colors';
+import { PENDING_TASK_TITLE } from '../../../shared/validation';
 import { projectTimeZone, startOfZonedDay } from '../../format/timezone';
-import { archivedTasks, nonArchived } from './task-archive';
+import { archivedTasks, isArchived, nonArchived } from './task-archive';
 import { workspaceLabel } from './task-columns';
-import { dispatchKind, logicalOwnerName, ownerLabel, taskOwnerId } from './task-view';
+import { dispatchKind, isRootTask, logicalOwnerName, ownerInstanceTitle, ownerLabel, taskOwnerId, taskTitle } from './task-view';
 /** The facet rows below 时间, in display order. */
 export type FilterDimension = 'status' | 'owner' | 'worker' | 'workspace';
 export const FILTER_DIMENSIONS: readonly FilterDimension[] = ['status', 'owner', 'worker', 'workspace'];
@@ -22,6 +23,21 @@ export function foldedTriggerValue(chosen: readonly string[], value: string, lab
   if (index > 0) return { hidden: true, extra: 0, extraTitle: '' };
   const rest = chosen.slice(index + 1).map(labelOf);
   return { hidden: false, extra: rest.length, extraTitle: rest.length ? `其余 ${rest.length} 项：${rest.join('、')}` : '' };
+}
+/**
+ * The archive dropdown's own 「全部」 entry: never a stored value (a real option value can never collide with it),
+ * and an empty row counts as 「全部」 chosen so the option renders selected without entering the selection.
+ */
+export const ARCHIVE_ALL_VALUE = '__all__';
+/** One dropdown change for an archive facet: choosing 「全部」 clears the row, choosing values drops 「全部」. */
+export function archiveRowValues(chosen: string[], next: string[]): string[] {
+  const effective = chosen.length ? chosen : [ARCHIVE_ALL_VALUE];
+  return next.includes(ARCHIVE_ALL_VALUE) && !effective.includes(ARCHIVE_ALL_VALUE) ? [] : next.filter(item => item !== ARCHIVE_ALL_VALUE);
+}
+/** The archive dropdown's options: 「全部 N」 first — N counts the archive narrowed by every other row, this one ignored — then the facet values with their counts. */
+export function archiveSelectOptions(archived: Task[], dimension: FilterDimension, selection: TaskSelection, now: number = Date.now(), all: Task[] = archived): { value: string; label: string }[] {
+  const allCount = applyTaskFilters(archived, selection, dimension, now, all).length;
+  return [{ value: ARCHIVE_ALL_VALUE, label: `全部 ${allCount}` }, ...facetOptions(archived, dimension, selection, now, all).map(option => ({ value: option.value, label: `${option.label} ${option.count}` }))];
 }
 export const TIME_RANGES = [
   { value: 'today', label: '今天' },
@@ -47,20 +63,39 @@ export function filterByTime(tasks: Task[], range: TaskTimeRange, now: number, z
 }
 export function emptySelection(): TaskSelection { return { status: [], owner: [], worker: [], workspace: [], time: 'today' }; }
 /** One chip: what it is called, how many tasks in scope carry it, and the brand to draw. */
-export interface FilterOption { value: string; label: string; kind?: string; count: number; ownerProfile?: string; /** Hover text when the chip shortens a longer name. */ title?: string }
+export interface FilterOption { value: string; label: string; kind?: string; count: number; ownerProfile?: string; /** Hover text when the chip shortens a longer name. */ title?: string; /** A-type parent Agents show the root task's own status beside their name. */ ownerStatus?: DisplayStatus }
 /** A parent Agent chip reads "<host> · <session time>"; the workspace directory in the middle of the instance name is the lane's heading and stays in the hover. */
 export function ownerChipLabel(full: string): string {
   const parts = full.split(' · ');
   return parts.length >= 3 ? `${parts[0]} · ${parts[parts.length - 1]}` : full;
 }
+/** Owner roots by id: an A-type parent Agent is found by its root task, whose children answer for it. */
+export type RootIndex = Map<string, Task>;
+export function rootIndex(tasks: Task[]): RootIndex {
+  const index: RootIndex = new Map();
+  for (const task of tasks) if (isRootTask(task)) index.set(task.id, task);
+  return index;
+}
 /** The value a task answers for in one dimension; undefined when the task has no value to group by. */
-export function taskOption(task: Task, dimension: FilterDimension): { value: string; label: string; title?: string } | undefined {
+export function taskOption(task: Task, dimension: FilterDimension, roots: RootIndex = new Map()): { value: string; label: string; title?: string; status?: DisplayStatus } | undefined {
   if (dimension === 'owner') {
-    const named = !!task.ownerId && !!logicalOwnerName(task);
-    const value = named ? task.owner.name : taskOwnerId(task) ?? ownerLabel(task);
-    const full = named ? task.owner.name : logicalOwnerName(task) ?? ownerLabel(task);
+    // A-type: children answer for their root task, and the root itself for its own future children.
+    const root = task.parentTaskId ? roots.get(task.parentTaskId) : isRootTask(task) ? task : undefined;
+    if (root) {
+      const label = taskTitle(root);
+      return { value: root.id, label, title: root.title !== PENDING_TASK_TITLE ? root.title : label, status: displayStatus(root) };
+    }
+    // B-type: a manually attached parent Agent instance answers by its instance id; its described title names the chip when present, the full instance name stays on hover.
+    if (task.ownerId && logicalOwnerName(task)) {
+      const full = task.owner.name;
+      const described = ownerInstanceTitle(task);
+      const label = described ?? ownerChipLabel(full);
+      return { value: task.ownerId, label, ...(label !== full ? { title: described ? `${described} · ${full}` : full } : {}) };
+    }
+    // Legacy tasks without a registration or a root fall back to their frozen policy profile.
+    const full = ownerLabel(task);
     const label = ownerChipLabel(full);
-    return { value, label, ...(label !== full ? { title: full } : {}) };
+    return { value: taskOwnerId(task) ?? full, label, ...(label !== full ? { title: full } : {}) };
   }
   if (dimension === 'status') {
     const status = displayStatus(task);
@@ -87,9 +122,9 @@ export function childIndex(tasks: Task[]): ChildIndex {
   return index;
 }
 /** Every value a task answers for in one dimension. Only 子 Agent can be several: the task's own dispatch plus each child's, each once. */
-export function taskOptions(task: Task, dimension: FilterDimension, children: ChildIndex = new Map()): (NonNullable<ReturnType<typeof taskOption>> & { kind?: string })[] {
+export function taskOptions(task: Task, dimension: FilterDimension, children: ChildIndex = new Map(), roots: RootIndex = new Map()): (NonNullable<ReturnType<typeof taskOption>> & { kind?: string })[] {
   if (dimension !== 'worker') {
-    const option = taskOption(task, dimension);
+    const option = taskOption(task, dimension, roots);
     return option ? [option] : [];
   }
   const seen = new Map<string, { value: string; label: string; kind?: string }>();
@@ -106,11 +141,12 @@ export function taskOptions(task: Task, dimension: FilterDimension, children: Ch
  */
 export function applyTaskFilters(tasks: Task[], selection: TaskSelection, skip?: FilterDimension, now: number = Date.now(), all: Task[] = tasks): Task[] {
   const children = childIndex(all);
+  const roots = rootIndex(all);
   return filterByTime(tasks, selection.time, now).filter(task => FILTER_DIMENSIONS.every(dimension => {
     if (dimension === skip) return true;
     const chosen = selection[dimension];
     if (!chosen.length) return true;
-    return taskOptions(task, dimension, children).some(option => chosen.includes(option.value));
+    return taskOptions(task, dimension, children, roots).some(option => chosen.includes(option.value));
   }));
 }
 /**
@@ -119,22 +155,34 @@ export function applyTaskFilters(tasks: Task[], selection: TaskSelection, skip?:
  */
 export function facetOptions(pool: Task[], dimension: FilterDimension, selection: TaskSelection, now: number = Date.now(), all: Task[] = pool): FilterOption[] {
   const children = childIndex(all);
+  const roots = rootIndex(all);
   const scoped = new Set(applyTaskFilters(pool, selection, dimension, now, all).map(task => task.id));
   const seen = new Map<string, FilterOption>();
   for (const task of pool) {
     const counted = scoped.has(task.id);
-    for (const option of taskOptions(task, dimension, children)) {
+    for (const option of taskOptions(task, dimension, children, roots)) {
       const known = seen.get(option.value);
       if (known) {
         if (counted) known.count += 1;
         continue;
       }
-      seen.set(option.value, { value: option.value, label: option.label, kind: dimension === 'worker' ? option.kind : undefined, ...(dimension === 'owner' ? { ownerProfile: taskOwnerId(task), ...(option.title ? { title: option.title } : {}) } : {}), count: counted ? 1 : 0 });
+      seen.set(option.value, { value: option.value, label: option.label, kind: dimension === 'worker' ? option.kind : undefined, ...(dimension === 'owner' ? { ownerProfile: taskOwnerId(task), ownerStatus: option.status, ...(option.title ? { title: option.title } : {}) } : {}), count: counted ? 1 : 0 });
+    }
+  }
+  const rootBacked = new Set<string>();
+  if (dimension === 'owner') {
+    // A parent Agent with no sub agent tasks yet still offers itself, at count 0, wherever it is in the time scope.
+    const boardPool = pool.some(task => !isArchived(task, now));
+    if (boardPool) for (const root of roots.values()) {
+      if (seen.has(root.id) || isArchived(root, now)) continue;
+      const label = taskTitle(root);
+      rootBacked.add(root.id);
+      seen.set(root.id, { value: root.id, label, ownerProfile: taskOwnerId(root), ownerStatus: displayStatus(root), title: root.title !== PENDING_TASK_TITLE ? root.title : label, count: 0 });
     }
   }
   const chosen = selection[dimension];
   for (const value of chosen) if (!seen.has(value)) seen.set(value, { value, label: dimension === 'status' ? DISPLAY_LABELS[value as DisplayStatus] ?? value : value, count: 0 });
-  const options = [...seen.values()].filter(option => option.count > 0 || chosen.includes(option.value));
+  const options = [...seen.values()].filter(option => option.count > 0 || chosen.includes(option.value) || rootBacked.has(option.value));
   if (dimension === 'owner') {
     // Two instances of one host with the same session time keep their directory so the chips stay distinguishable.
     const labels = new Map<string, number>();
@@ -166,12 +214,14 @@ export function toggleOption(values: string[], value: string): string[] {
 }
 /** Choices that no longer name anything on the board (in any time range) are dropped, so a stale payload never empties it. */
 export function resolveSelection(selection: TaskSelection, tasks: Task[], now: number = Date.now()): TaskSelection {
+  const roots = rootIndex(tasks);
   return FILTER_DIMENSIONS.reduce((next, dimension) => {
     const known = new Set(filterOptions(tasks, dimension, { ...emptySelection(), time: 'all' }, now).map(option => option.value));
-    next[dimension] = [...new Set(selection[dimension].map(value => {
-      if (dimension !== 'owner' || known.has(value)) return value;
-      const task = tasks.find(task => task.ownerId === value);
-      return task ? taskOption(task, 'owner')?.value ?? value : value;
+    next[dimension] = [...new Set(selection[dimension].flatMap(value => {
+      if (dimension !== 'owner' || known.has(value)) return [value];
+      // Old payloads named a parent by instance id, or by the instance name that used to merge same-name registrations; both remap onto the current values.
+      const matched = tasks.filter(task => task.ownerId === value || task.owner.name === value);
+      return matched.length ? matched.map(task => taskOption(task, 'owner', roots)?.value ?? value) : [value];
     }).filter(value => known.has(value)))];
     return next;
   }, { ...emptySelection(), time: selection.time });

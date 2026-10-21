@@ -5,8 +5,9 @@ import { Button, Input, Steps, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
 import { Loader2 } from 'lucide-react';
 import type { TaskEvent, TaskFailure } from '../../../shared/contracts/tasks';
 import { command } from '../../api/commands';
-import { condenseEvents, displayLog, eventBadge, filterCondensed, kindLabels, redactLog, relativeTime, toneColor, type TimelineItem } from './log-view';
+import { condenseEvents, displayLog, eventBadge, filterCondensed, kindLabels, redactLog, relativeTime, type TimelineItem } from './log-view';
 import { loadAllEvents, progressiveFor, type EventPage } from './load-events';
+import { statusTagColor, tagColor } from '../../format/tag-colors';
 import { styles } from '../../ui/styles';
 import { styles as eventStyles } from './events-style';
 import { TaskTextBlock } from './TaskTextBlock';
@@ -54,7 +55,7 @@ function FailureCard({ failure }: { failure: TaskFailure }) {
 function BadgeTag({ event }: { event: TaskEvent }): ReactNode {
   const badge = eventBadge(event);
   if (!badge) return null;
-  return <Tag size="small" className={eventStyles.tag} variant={badge.outcome ? 'outlined' : 'solid'} color={toneColor(badge.tone)}>{badge.label}</Tag>;
+  return <Tag size="small" className={eventStyles.tag} variant={badge.outcome ? 'outlined' : 'solid'} color={statusTagColor(badge.tone)}>{badge.label}</Tag>;
 }
 
 function dotClass(event: TaskEvent): string {
@@ -90,7 +91,7 @@ function StepsNode({ item }: { item: Extract<TimelineItem, { type: 'steps' }> })
     <div className={eventStyles.headMain}>
       {item.inProgress && <Icon icon={Loader2} spin size="small" />}
       <Text>执行了 {item.count} 个步骤</Text>
-      {item.tools.map(tool => <Tag key={tool.name} size="small" className={eventStyles.tag}>{tool.name} {tool.count}</Tag>)}
+      {item.tools.map(tool => <Tag key={tool.name} size="small" className={eventStyles.tag} color={tagColor('neutral')}>{tool.name} {tool.count}</Tag>)}
     </div>
     <RelativeTime at={item.to.at} />
   </div>;

@@ -1,5 +1,6 @@
 import type { Task } from '../../../shared/contracts/tasks';
 import { taskColumn } from './task-columns';
+import { isOwnerRoot } from './task-view';
 /** The archive table header sits above its scrolling body; its rows are virtual, so the body needs a numeric height. */
 export const ARCHIVE_TABLE_HEADER = 40;
 export const ARCHIVE_TABLE_MIN_BODY = 240;
@@ -48,15 +49,14 @@ export const ARCHIVE_AFTER_MS = 24 * 60 * 60 * 1000;
 export function isArchived(task: Task, now: number = Date.now()): boolean {
  return taskColumn(task) === 'closed' && now - Date.parse(task.updatedAt) > ARCHIVE_AFTER_MS;
 }
-/** A child whose root is in the list lives inside the root (card summary, detail list), never as its own card; an orphan keeps its card. */
-export function withoutNestedChildren(tasks: Task[]): Task[] {
- const ids = new Set(tasks.map(task => task.id));
- return tasks.filter(task => !task.parentTaskId || !ids.has(task.parentTaskId));
+/** The board and archive rows are sub agent tasks: owner roots live only in the 父 Agent filter row and the detail links. */
+export function withoutRootTasks(tasks: Task[]): Task[] {
+ return tasks.filter(task => !isOwnerRoot(task));
 }
 export function nonArchived(tasks: Task[], now: number = Date.now()): Task[] {
- return withoutNestedChildren(tasks).filter(task => !isArchived(task, now));
+ return withoutRootTasks(tasks).filter(task => !isArchived(task, now));
 }
 /** Everything the board has moved on from, newest first: the archive drawer's rows. */
 export function archivedTasks(tasks: Task[], now: number = Date.now()): Task[] {
- return withoutNestedChildren(tasks).filter(task => isArchived(task, now)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+ return withoutRootTasks(tasks).filter(task => isArchived(task, now)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }

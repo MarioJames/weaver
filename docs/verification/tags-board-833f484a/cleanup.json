@@ -1,0 +1,34 @@
+{
+  "taskId": "c28558f6-ddb5-4842-bf39-df9abf1e029b",
+  "unit": {
+    "name": "dev-weaver-tags-833f484a.scope",
+    "started_with": "systemd-run --user --scope --collect --unit=dev-weaver-tags-833f484a -p MemoryHigh=8G -p MemoryMax=10G",
+    "stop_command": "systemctl --user stop dev-weaver-tags-833f484a.scope",
+    "state_after": "inactive（--collect，unit 已不存在：`systemctl --user status` 返回 could not be found）"
+  },
+  "port": { "port": 4793, "closed": true, "check": "/dev/tcp 探测拒绝连接" },
+  "data_dir": {
+    "path": "/tmp/weaver-tags-833f484a.AQre/browser/data",
+    "deleted": true,
+    "note": "整个任务浏览器根 /tmp/weaver-tags-833f484a.AQre/browser/（数据目录、假 herdr 桩 bin/、夹具工作区 workspaces/、夹具输出 fixtures-out/、dev-server.log）已 rm -rf 删除"
+  },
+  "browser": {
+    "session": "weaver-tags-833f484a",
+    "close": "agent-browser close succeeded（任务模式自有 Chrome 实例终止）",
+    "profile": "/tmp/weaver-tags-833f484a.AQre/browser-profile",
+    "profile_deleted": true,
+    "check": "bh task-profile remove 报告已删除；目录不存在；无以该 profile 启动的 Chrome 进程（环境中仅存 Convorel 共享 persistent profile 的 Chrome，未触碰）"
+  },
+  "temp_root": {
+    "path": "/tmp/weaver-tags-833f484a.AQre/",
+    "note": "仅删除本任务创建的 browser/ 子目录与三个临时指纹文件；根下其余文件（allchip、board 等）为派发方既有草稿，未触碰"
+  },
+  "source_unchanged": {
+    "head_before": "2ed8288bd6252dab4d1ddd2e531a89098453173d",
+    "head_after": "2ed8288bd6252dab4d1ddd2e531a89098453173d",
+    "src_tests_before": "src-tests-before.txt（46 条，验收前记录）",
+    "src_tests_after": "src-tests-after.txt（验收后记录）",
+    "diff": "仅并行会话对 src/renderer/features/settings/、src/cli/input.ts、src/cli/parse.ts、src/main/im/、src/shared/contracts/im.ts 及 im/schedules 测试的改动；本任务对 src/ tests/ 改动为 0"
+  },
+  "preserved": "docs/verification/tags-board-833f484a/ 为唯一交付目录；共享 Weaver 服务（4737 等）、~/.weaver、~/.local/share/weaver、Herdr default session 全程未读写、未启停"
+}

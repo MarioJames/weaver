@@ -119,9 +119,6 @@ export function eventBadge(event: TaskEvent): EventBadge | undefined {
   return status ? { label: DISPLAY_LABELS[status], tone: DISPLAY_TONES[status], outcome: false } : undefined;
 }
 
-/** Tag color preset of a status tone; the neutral tone uses the Tag default. */
-export function toneColor(tone: StatusTone): string | undefined { return tone === 'default' ? undefined : tone; }
-
 /** Translate known lifecycle messages only at the display boundary; exports preserve source text. */
 export function displayLog(value: string): string {
   return redactLog(value)

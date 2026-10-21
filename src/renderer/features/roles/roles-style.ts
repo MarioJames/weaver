@@ -78,6 +78,14 @@ export const rolesStyles = createStaticStyles(({ css, cssVar, responsive }) => (
       border-radius: ${cssVar.borderRadiusSM};
     }
   `,
+  /** The list entry's title row: the id, then the free-channel badge; the badge wraps to its own line before anything overflows. */
+  roleTitle: css`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    align-items: center;
+    min-inline-size: 0;
+  `,
   /** A list entry's pause: its kind as a tag, then the reason; the reason moves under the tag when the pane is narrow. */
   roleNote: css`
     display: flex;

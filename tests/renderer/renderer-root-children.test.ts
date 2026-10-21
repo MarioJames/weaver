@@ -12,10 +12,10 @@ import { TaskAgents } from '../../src/renderer/features/tasks/TaskAgents';
 import { TaskBoard } from '../../src/renderer/features/tasks/TaskBoard';
 import { TaskComposer, criteriaError, criteriaLines } from '../../src/renderer/features/tasks/TaskComposer';
 import { createTask } from '../../src/renderer/features/tasks/task-create';
-import { childSummary, childSummaryLabel, recentWorkspaces, rootCancelNotice } from '../../src/renderer/features/tasks/task-view';
+import { recentWorkspaces, rootCancelNotice } from '../../src/renderer/features/tasks/task-view';
 import { columnize } from '../../src/renderer/features/tasks/task-columns';
 import { archivedTasks, nonArchived } from '../../src/renderer/features/tasks/task-archive';
-import { emptySelection } from '../../src/renderer/features/tasks/task-filters';
+import { emptySelection, rootIndex } from '../../src/renderer/features/tasks/task-filters';
 import { ENDED_EXPANDED_KEY } from '../../src/renderer/features/tasks/task-persistence';
 
 function markup(node: React.ReactNode) {
@@ -35,17 +35,23 @@ const root = make('root', { executionRole: 'owner', title: '根任务' });
 const child = (id: string, status: Task['status'], extra: Partial<Task> = {}) => make(id, { parentTaskId: 'root', status, title: `子任务 ${id}`, ...extra });
 const DAY = 24 * 3600e3;
 
-test('children whose root is listed are not board cards; an orphan child still is', () => {
+ test('board columns hold sub agent tasks; owner roots stay out of the lanes', () => {
+  const parent = make('root', { executionRole: 'owner', title: 'ROOT_PARENT' });
   const orphan = make('orphan', { parentTaskId: 'missing', title: '孤立子任务' });
-  const tasks = [root, child('c1', 'running'), child('c2', 'completed'), orphan];
-  assert.deepEqual(nonArchived(tasks, now).map(task => task.id), ['root', 'orphan']);
+  const tasks = [parent, child('c1', 'running'), child('c2', 'completed'), orphan];
+  assert.deepEqual(nonArchived(tasks, now).map(task => task.id), ['c1', 'c2', 'orphan']);
   const html = withStorage(() => markup(React.createElement(TaskBoard, { tasks, filters: { ...emptySelection(), time: 'all' }, now, loading: false, onSelect: () => {} })));
-  assert.match(html, /根任务/);
-  assert.match(html, /孤立子任务/);
-  assert.doesNotMatch(html, /子任务 c1|子任务 c2/);
+  const cards = [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]).filter(card => card.includes("<time"));
+  assert.equal(cards.length, 3);
+  assert.ok(cards.some(card => card.includes('子任务 c1')));
+  assert.ok(cards.some(card => card.includes('子任务 c2')));
+  assert.ok(cards.some(card => card.includes('孤立子任务')));
+  assert.ok(cards.every(card => !/<strong[^>]*>ROOT_PARENT</.test(card)));
+  // The root stays reachable as a 父 Agent chip only.
+  assert.match(html, /ROOT_PARENT/);
 });
 
-test('board lanes, filter counts and the archive count all leave nested children out', () => {
+test('the 父 Agent filter row answers by root task; the archive rows are children, not roots', () => {
   const old = new Date(now - 2 * DAY).toISOString();
   const tasks = [
     root, child('c1', 'running'), child('c2', 'completed', { reviewState: 'accepted' }),
@@ -53,24 +59,11 @@ test('board lanes, filter counts and the archive count all leave nested children
     make('oldchild', { parentTaskId: 'oldroot', status: 'completed', reviewState: 'accepted', updatedAt: old }),
   ];
   const lanes = columnize(nonArchived(tasks, now));
-  assert.deepEqual(lanes.map(lane => lane.map(task => task.id)), [[], ['root'], [], []]);
-  assert.deepEqual(archivedTasks(tasks, now).map(task => task.id), ['oldroot']);
-});
-
-test('a root card summarises its final children; none means no summary', () => {
-  const tasks = [root, child('c1', 'running'), child('c2', 'completed'), child('c3', 'completed'), child('c4', 'queued')];
-  assert.deepEqual(childSummary(root, tasks), { total: 4, completed: 2, running: 1 });
-  assert.equal(childSummaryLabel({ total: 3, completed: 2, running: 1 }), '子任务 2/3 完成 · 1 运行中');
-  assert.equal(childSummaryLabel({ total: 3, completed: 3, running: 0 }), '子任务 3/3 完成');
-  assert.equal(childSummary(root, [root]), undefined);
-  assert.equal(childSummary(make('plain'), [make('plain'), child('c1', 'running')]), undefined);
-  // A failed child that was retried is replaced by its retry and counts once.
-  const retried = [root, child('a', 'failed'), child('b', 'running', { retryOf: 'a' })];
-  assert.deepEqual(childSummary(root, retried), { total: 1, completed: 0, running: 1 });
-  const html = withStorage(() => markup(React.createElement(TaskBoard, { tasks: [root, child('c1', 'running'), child('c2', 'completed'), child('c3', 'completed')], filters: { ...emptySelection(), time: 'all' }, now, loading: false, onSelect: () => {} })));
-  assert.match(html, /子任务 2\/3 完成 · 1 运行中/);
-  const bare = withStorage(() => markup(React.createElement(TaskBoard, { tasks: [root], filters: { ...emptySelection(), time: 'all' }, now, loading: false, onSelect: () => {} })));
-  assert.doesNotMatch(bare, /子任务 \d+\/\d+/);
+  assert.deepEqual(lanes.map(lane => lane.map(task => task.id)), [[], ['c1'], [], ['c2']]);
+  assert.deepEqual(archivedTasks(tasks, now).map(task => task.id), ['oldchild']);
+  // The owner row names the root and counts only its board children; the old root itself is not an option.
+  const owners = rootIndex(tasks);
+  assert.ok(owners.get('root') && owners.get('oldroot'));
 });
 
 test('cancelling a running root explains the cascade; other tasks get no prompt', () => {

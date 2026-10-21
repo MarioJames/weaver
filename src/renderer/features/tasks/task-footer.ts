@@ -12,12 +12,12 @@ export interface CardFooter {
   at: string;
   tail?: { label: '最新上报' | '完成于' | '结束于'; at: string };
 }
-export function cardFooter(task: Task): CardFooter {
+export function cardFooter(task: Task, owner?: { name: string; title: string }): CardFooter {
   // A root parent task has no worker run of its own: its Herdr launch is when it was dispatched.
   const startedAt = task.run?.startedAt ?? (task.executionRole === 'owner' ? task.ownerHost?.launchedAt : undefined);
   const started = validTime(startedAt) ? startedAt : undefined;
   const at = started ?? task.createdAt;
-  const head = { owner: ownerHostName(task), ownerTitle: ownerLabel(task), verb: started ? '派发' as const : '创建' as const, at };
+  const head = { owner: owner?.name ?? ownerHostName(task), ownerTitle: owner?.title ?? ownerLabel(task), verb: started ? '派发' as const : '创建' as const, at };
   if (isActive(task)) {
     // A task that has not started has reported nothing: its only time is its creation.
     if (!started) return head;

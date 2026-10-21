@@ -162,8 +162,8 @@ test('choices OR within a dimension and AND across dimensions', () => {
 
 test('the option a board narrows by is the owner key and the worker', () => {
   assert.deepEqual(taskOption(claude, 'owner'), { value: 'claude_owner', label: 'claude_owner' });
-  /** A named instance uses its display name rather than joining the profile group. */
-  assert.deepEqual(taskOption({ ...claude, ownerId: 'p9', owner: { ...owner, name: 'Mario' } }, 'owner'), { value: 'Mario', label: 'Mario' });
+  /** A named instance answers by its instance id, named by its display name. */
+  assert.deepEqual(taskOption({ ...claude, ownerId: 'p9', owner: { ...owner, name: 'Mario' } }, 'owner'), { value: 'p9', label: 'Mario' });
   assert.deepEqual(taskOption(unassigned, 'owner'), { value: UNASSIGNED_OWNER, label: UNASSIGNED_OWNER });
   assert.deepEqual(taskOption(claude, 'worker'), { value: 'claude_worker', label: 'claude_worker' });
   /** A legacy task with no frozen dispatch has no worker to filter on. */
@@ -452,42 +452,47 @@ test('the inspector row is the owner, its status and one action', () => {
 });
 
 
-test('throwaway owner instances group by profile while named instances group by name', () => {
+test('throwaway owner instances group by profile while named instances answer by their instance id', () => {
   const first = { ...claude, id: 'first', ownerId: 'instance-1' };
   const second = { ...claude, id: 'second', ownerId: 'instance-2' };
   const named = { ...claude, id: 'named', ownerId: 'attached-1', owner: { ...owner, name: 'Mario' } };
   assert.equal(taskOwnerId(first), 'claude_owner');
-  assert.deepEqual(taskOption(named, 'owner'), { value: 'Mario', label: 'Mario' });
+  assert.deepEqual(taskOption(named, 'owner'), { value: 'attached-1', label: 'Mario' });
   const options = filterOptions([first, second, named], 'owner', emptySelection(), now);
   assert.deepEqual(options.map(({ value, label, count }) => ({ value, label, count })), [
     { value: 'claude_owner', label: 'claude_owner', count: 2 },
-    { value: 'Mario', label: 'Mario', count: 1 },
+    { value: 'attached-1', label: 'Mario', count: 1 },
   ]);
   assert.deepEqual(applyTaskFilters([first, second, named], sel({ owner: ['claude_owner'] }), undefined, now).map(task => task.id), ['first', 'second']);
 });
 
 
-test('queued throwaways use registry profiles without changing original task records', () => {
+test('queued page drafts answer as parent Agents by their own id, without changing original task records', () => {
   const queued = { ...unassigned, id: 'queued', status: 'queued' as const, ownerId: 'instance-queued' };
   const [task] = withOwnerProfiles([queued], [{ id: queued.ownerId, name: 'Task owner', profileId: 'claude_owner' }]);
-  assert.deepEqual(taskOption(task, 'owner'), { value: 'claude_owner', label: 'claude_owner' });
+  // The draft is the parent Agent before its first start: it answers by its own id, named by its title.
+  assert.deepEqual(taskOption(task, 'owner'), { value: 'queued', label: '重排任务面板', title: '重排任务面板', status: 'draft' });
   assert.equal(taskOwnerId(task), 'claude_owner');
   assert.equal(taskOwnerId(queued), 'instance-queued');
   assert.equal(taskOwnerId({ ...task, dispatch: { ...dispatch, owner: 'codex_owner' } }), 'codex_owner');
   assert.strictEqual(withOwnerProfiles([queued], [])[0], queued);
 });
 
-test('named registrations merge by name and legacy instance selections resolve to that name', () => {
+test('each named registration answers by its instance id, and legacy selections remap onto it', () => {
   const options = filterOptions(['attached-one', 'attached-two'].map(ownerId => ({
     ...claude, id: ownerId, ownerId, owner: { ...owner, name: 'Mario' },
   })), 'owner', emptySelection(), now);
-  assert.deepEqual(options.map(({ value, label, count, ownerProfile }) => ({ value, label, count, ownerProfile })), [{ value: 'Mario', label: 'Mario', count: 2, ownerProfile: 'claude_owner' }]);
+  assert.deepEqual(options.map(({ value, label, count, ownerProfile }) => ({ value, label, count, ownerProfile })), [
+    { value: 'attached-one', label: 'Mario', count: 1, ownerProfile: 'claude_owner' },
+    { value: 'attached-two', label: 'Mario', count: 1, ownerProfile: 'claude_owner' },
+  ]);
   const named = ['attached-one', 'attached-two'].map(ownerId => ({ ...claude, id: ownerId, ownerId, owner: { ...owner, name: 'Mario' } }));
-  const selection = resolveSelection(sel({ owner: ['attached-one', 'attached-two', 'gone'] }), named, now);
-  assert.deepEqual(selection.owner, ['Mario']);
+  // Old payloads named a parent by its instance name; they remap onto the instance ids.
+  const selection = resolveSelection(sel({ owner: ['Mario', 'gone'] }), named, now);
+  assert.deepEqual(selection.owner, ['attached-one', 'attached-two']);
   assert.equal(applyTaskFilters(named, selection, undefined, now).length, 2);
-  assert.deepEqual(taskOption({ ...named[0], dispatch: undefined }, 'owner'), { value: 'Mario', label: 'Mario' });
-  assert.equal(filterOptions([...named, { ...named[0], id: 'closed', status: 'failed' }], 'owner', emptySelection(), now)[0].count, 3);
+  assert.deepEqual(taskOption({ ...named[0], dispatch: undefined }, 'owner'), { value: 'attached-one', label: 'Mario' });
+  assert.equal(filterOptions([...named, { ...named[0], id: 'closed', status: 'failed' }], 'owner', emptySelection(), now)[0].count, 2);
 });
 
 

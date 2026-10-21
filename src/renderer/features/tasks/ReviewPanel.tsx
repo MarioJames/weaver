@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, Descriptions, Modal, Tag, Text, TextArea } from '@lobehub/ui/base-ui';
 import type { Task } from '../../../shared/contracts/tasks';
 import { command } from '../../api/commands';
-import { toneColor } from './log-view';
 import { DISPLAY_LABELS, DISPLAY_TONES, type DisplayStatus } from '../../format/status-colors';
+import { statusTagColor, tagColor } from '../../format/tag-colors';
 import { ownerLabel, taskOwnerId } from './task-view';
 import { styles } from '../../ui/styles';
 import { AgentLabel } from '../../ui/EngineIcon';
@@ -30,8 +30,8 @@ export function ReviewView({ task, manifest, busy, ownerKind, open, comment, onO
   const status = DECISION_STATUS[manifest?.acceptance ?? 'pending'];
   const note = comment.trim() ? { comment: comment.trim() } : {};
   const items = [
-    { key: 'delivery', label: '交付', children: <Tag size="small" variant="outlined" color={manifest?.delivery === 'acknowledged' ? 'success' : undefined}>{manifest?.delivery === 'acknowledged' ? '已确认收到' : '待确认收到'}</Tag> },
-    { key: 'decision', label: '验收结论', children: <Tag size="small" variant="solid" color={toneColor(DISPLAY_TONES[status])}>{DISPLAY_LABELS[status]}</Tag> },
+    { key: 'delivery', label: '交付', children: <Tag size="small" variant="outlined" color={manifest?.delivery === 'acknowledged' ? tagColor('success') : tagColor('warning')}>{manifest?.delivery === 'acknowledged' ? '已确认收到' : '待确认收到'}</Tag> },
+    { key: 'decision', label: '验收结论', children: <Tag size="small" variant="solid" color={statusTagColor(DISPLAY_TONES[status])}>{DISPLAY_LABELS[status]}</Tag> },
     ...(decided ? [
       { key: 'by', label: '决定者', children: <AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerLabel(task)} /> },
       ...(decision ? [{ key: 'at', label: '决定时间', children: <TimeText value={decision.at} /> }] : []),

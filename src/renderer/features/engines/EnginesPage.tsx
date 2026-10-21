@@ -19,6 +19,7 @@ import { TimeText } from '../../ui/TimeText';
 import { compactTime } from '../../format/timezone';
 import { createStaticStyles } from 'antd-style';
 import type { StatusTone } from '../../format/status-colors';
+import { statusTagColor, tagColor } from '../../format/tag-colors';
 
 const blockStyles = createStaticStyles(({ css, cssVar }) => ({
   row: css`display: flex; align-items: center; gap: 8px; min-width: 0; color: ${cssVar.colorTextSecondary}; font-size: ${cssVar.fontSizeSM}; > :not([data-block-reason]) { flex-shrink: 0; }`,
@@ -30,11 +31,11 @@ export function engineVersionText(version: string): string {
 }
 
 const PROBE: Record<string, { label: string; color?: string }> = {
-  installed: { label: '已安装', color: 'success' },
-  missing: { label: '未找到' },
-  probe_failed: { label: '探测失败', color: 'error' },
-  loading: { label: '正在探测', color: 'processing' },
-  unknown: { label: '尚未探测' },
+  installed: { label: '已安装', color: tagColor('success') },
+  missing: { label: '未找到', color: tagColor('neutral') },
+  probe_failed: { label: '探测失败', color: tagColor('error') },
+  loading: { label: '正在探测', color: tagColor('inProgress') },
+  unknown: { label: '尚未探测', color: tagColor('neutral') },
 };
 
 function mergeProbes(current: EngineProbeRecord[], probe: EngineProbeRecord | null): EngineProbeRecord[] {
@@ -214,7 +215,7 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
           </div>
         </Surface>;
       })}
-      {unsupported.map(([id, record]) => <Surface key={id} aria-label={id} title={id} description={<Tag size="small">暂不支持探测</Tag>}>
+      {unsupported.map(([id, record]) => <Surface key={id} aria-label={id} title={id} description={<Tag size="small" color={tagColor('neutral')}>暂不支持探测</Tag>}>
         <Text type="secondary" className={styles.wrap}>类型 {record.kind}。这条记录原样保留，不能在这里启用。{record.enabled ? '当前为启用状态。' : ''}</Text>
       </Surface>)}
     </div>}
@@ -253,7 +254,7 @@ export function BlockList({ blocks, disabled, onRemove, now = Date.now(), state 
     {active.map(block => {
       const text = engineBlockText(block, now, state);
       return <div key={`${block.engine}:${block.model ?? ''}:${block.worker ?? ''}`} data-engine-block={block.engine} className={blockStyles.row}>
-        <Tag size="small" color={text.tone}>{text.category}</Tag>
+        <Tag size="small" color={statusTagColor(text.tone)}>{text.category}</Tag>
         <Tooltip title={text.fullReason}><span data-block-reason className={blockStyles.reason}>{block.worker ? `${block.worker} · ` : ''}{block.model ? `${block.model} · ` : ''}{text.reason}</span></Tooltip>
         <span>{text.release}</span>
         <Tooltip title="恢复派发"><ActionIcon size="small" icon={Play} aria-label="恢复派发" disabled={disabled} onClick={() => onRemove(block)} /></Tooltip>

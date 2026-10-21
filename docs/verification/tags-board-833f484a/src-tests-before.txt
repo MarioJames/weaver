@@ -1,0 +1,46 @@
+ M src/cli/catalog.ts
+ M src/main/application/commands/registry.ts
+ M src/main/application/owners/lifecycle.ts
+ M src/main/owner-host.ts
+ M src/main/owners/prompts.ts
+ M src/renderer/app/App.tsx
+ M src/renderer/features/engines/EnginesPage.tsx
+ M src/renderer/features/probes/FreeProbePanel.tsx
+ M src/renderer/features/roles/OwnerInspector.tsx
+ M src/renderer/features/roles/OwnerSchedule.tsx
+ M src/renderer/features/roles/RolesPage.tsx
+ M src/renderer/features/roles/roles-style.ts
+ M src/renderer/features/tasks/AgentFacts.tsx
+ M src/renderer/features/tasks/ArchiveDrawer.tsx
+ M src/renderer/features/tasks/EventsPanel.tsx
+ M src/renderer/features/tasks/ReviewPanel.tsx
+ M src/renderer/features/tasks/TaskAgents.tsx
+ M src/renderer/features/tasks/TaskBoard.tsx
+ M src/renderer/features/tasks/TaskDetail.tsx
+ M src/renderer/features/tasks/TasksPage.tsx
+ M src/renderer/features/tasks/log-view.ts
+ M src/renderer/features/tasks/task-archive.ts
+ M src/renderer/features/tasks/task-filters.ts
+ M src/renderer/features/tasks/task-footer.ts
+ M src/renderer/features/tasks/task-view.ts
+ M src/renderer/format/status-colors.ts
+ M src/shared/contracts/commands.ts
+ M src/shared/contracts/owners.ts
+ M src/shared/contracts/tasks.ts
+ M tests/cli/cli-catalog.test.ts
+ M tests/main/commands.test.ts
+ M tests/main/continuation.test.ts
+ M tests/main/owner-host-async.test.ts
+ M tests/main/owner-host.test.ts
+ M tests/main/owner-instances.test.ts
+ M tests/main/owner-launch-async.test.ts
+ M tests/renderer/renderer-board-cards.test.ts
+ M tests/renderer/renderer-board-footer.test.ts
+ M tests/renderer/renderer-facets.test.ts
+ M tests/renderer/renderer-root-children.test.ts
+ M tests/renderer/renderer-task-view.test.ts
+?? src/renderer/format/tag-colors.ts
+?? src/renderer/ui/FreeChannelTag.tsx
+?? tests/renderer/renderer-free-channel.test.ts
+?? tests/renderer/renderer-parent-agents.test.ts
+?? tests/renderer/renderer-tag-colors.test.ts

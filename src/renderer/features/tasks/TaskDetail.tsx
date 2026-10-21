@@ -5,8 +5,9 @@ import { Loader2 } from 'lucide-react';
 import { useNotifyError } from '../../api/notify';
 import { TaskAgents } from './TaskAgents';
 import type { Task } from '../../../shared/contracts/tasks';
-import { displayLog, redactLog, timelineActive, toneColor } from './log-view';
+import { displayLog, redactLog, timelineActive } from './log-view';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../../format/status-colors';
+import { statusTagColor } from '../../format/tag-colors';
 import { isActive, isDraft, rootCancelNotice, taskTitle } from './task-view';
 import { styles } from '../../ui/styles';
 import { AgentFacts } from './AgentFacts';
@@ -18,7 +19,7 @@ import { TaskTextBlock } from './TaskTextBlock';
 import { styles as detailStyles } from './task-detail-style';
 
 const queueLabels = { waiting_for_capacity: '等待执行槽位', policy_blocked: '当前策略阻止派发', frozen_route_changed: '已冻结路由发生变化', workspace_changed: '工作目录发生变化', launch_blocked: '执行启动受阻' };
-export function TaskDetail({ task, busy, onStart, onEdit, onCancel, action, onRetry, ownerKind, tasks = [], onSelect }: { tasks?: Task[]; onSelect?: (id: string) => void; task?: Task; busy: boolean; onStart: (id: string) => void; onEdit?: (id: string) => void; onCancel: (id: string) => void; action: (fn: () => Promise<unknown>) => Promise<boolean>; onRetry?: (id: string) => void; ownerKind?: (ownerId?: string) => string | undefined }) {
+export function TaskDetail({ task, busy, onStart, onEdit, onCancel, action, onRetry, ownerKind, freeChannel, tasks = [], onSelect }: { tasks?: Task[]; onSelect?: (id: string) => void; task?: Task; busy: boolean; onStart: (id: string) => void; onEdit?: (id: string) => void; onCancel: (id: string) => void; action: (fn: () => Promise<unknown>) => Promise<boolean>; onRetry?: (id: string) => void; ownerKind?: (ownerId?: string) => string | undefined; freeChannel?: (workerId?: string) => boolean }) {
   const [tab, setTab] = useState('overview');
   const [askCancel, setAskCancel] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -43,9 +44,9 @@ export function TaskDetail({ task, busy, onStart, onEdit, onCancel, action, onRe
   useNotifyError(failedMessage, '执行失败');
   if (!task) return <Empty title="选择一项任务" description="创建或导入后，执行、交接和验收都留在同一条记录里。" />;
   const retryLaunch = task.executionRole === 'owner' && task.status === 'failed' && !task.ownerHost;
-  const canStart = !task.parentTaskId && ((task.status === 'queued' && !task.scheduled) || retryLaunch);
   const draft = isDraft(task);
   const needsWorkspace = draft && !task.workspace?.trim();
+  const canStart = !task.parentTaskId && ((task.status === 'queued' && !task.scheduled) || retryLaunch);
   const latest = task.events.at(-1);
   const failure = [...task.events].reverse().find(event => event.kind === 'error');
   const status = displayStatus(task);
@@ -60,7 +61,7 @@ export function TaskDetail({ task, busy, onStart, onEdit, onCancel, action, onRe
       <div className={detailStyles.heading}>
         <Text className={styles.wrap} style={{ fontSize: 18, fontWeight: 600 }}>{taskTitle(task)}</Text>
         <div className={styles.row}>
-          <Tag className={detailStyles.statusTag} variant="solid" color={toneColor(DISPLAY_TONES[status])} icon={timelineActive(task.status) ? <Icon icon={Loader2} spin size="small" /> : undefined}>{DISPLAY_LABELS[status]}</Tag>
+          <Tag className={detailStyles.statusTag} variant="solid" color={statusTagColor(DISPLAY_TONES[status])} icon={timelineActive(task.status) ? <Icon icon={Loader2} spin size="small" /> : undefined}>{DISPLAY_LABELS[status]}</Tag>
         </div>
         {needsWorkspace && <Text type="secondary">先编辑补充目标项目目录，才能开始执行。</Text>}
       </div>
@@ -82,7 +83,7 @@ export function TaskDetail({ task, busy, onStart, onEdit, onCancel, action, onRe
             : task.status === 'cancelled' ? <Alert type="secondary" title="执行已取消" description={redactLog(failure?.message ?? latest?.message ?? '查看时间线。')} /> : showActivity ? <Text type="secondary" className={detailStyles.activity}>{activity}</Text> : undefined}
           {task.summary && <TaskTextBlock key={`${task.id}:summary`} title="执行结果" content={task.summary} markdown clamp={6} />}
           <AgentFacts task={task} ownerKind={ownerKind} />
-          <TaskAgents task={task} tasks={tasks} onSelect={onSelect} ownerKind={ownerKind} />
+          <TaskAgents task={task} tasks={tasks} onSelect={onSelect} ownerKind={ownerKind} freeChannel={freeChannel} />
           {task.retryOf && <Text type="secondary" className={styles.wrap}>重试来源：{task.retryOf}</Text>}
         </div> },
         { key: 'prompt', label: 'Prompt', children: <TaskTextBlock key={`${task.id}:prompt`} title="Prompt" content={task.instruction} /> },

@@ -5,10 +5,11 @@ import type { FreeWorkerStatus } from '../../../shared/contracts/monitoring';
 import type { FreeProbe } from './useFreeProbe';
 import { PROBE_HISTORY_SHOWN, lastProbeOf, nextProbeText, probeDurationText, probeNoteText, probeStateView, recentProbes, type ProbeHistoryRecord } from './probe-view';
 import { TimeText } from '../../ui/TimeText';
+import { statusTagColor, tagColor } from '../../format/tag-colors';
 import { styles } from '../../ui/styles';
 import { probeStyles } from './free-probe-style';
 
-const outcomeTag = (record: ProbeHistoryRecord) => <Tag size="small" color={record.probe.ok ? 'success' : 'error'}>{record.probe.ok ? '成功' : '失败'}</Tag>;
+const outcomeTag = (record: ProbeHistoryRecord) => <Tag size="small" color={record.probe.ok ? tagColor('success') : tagColor('error')}>{record.probe.ok ? '成功' : '失败'}</Tag>;
 
 /** The history, newest first: outcome, when, how long, and what the failure or the policy change said. */
 export function ProbeHistory({ status }: { status: FreeWorkerStatus | undefined }) {
@@ -51,7 +52,7 @@ export function FreeProbePanel({ worker, probe }: { worker: string; probe: FreeP
   const reason = entry?.probed && entry.availability.status === 'blocked' ? entry.availability.reason : undefined;
   const items = [
     { key: 'state', label: '当前状态', span: columns, children: <span className={probeStyles.state}>
-      <Tag color={state.tone === 'default' ? undefined : state.tone}>{state.label}</Tag>
+      <Tag color={statusTagColor(state.tone)}>{state.label}</Tag>
       {state.detail && <Text type="secondary">{state.detail}</Text>}
     </span> },
     ...(reason ? [{ key: 'reason', label: '暂停原因', span: columns, children: <Text className={styles.wrap}>{reason}</Text> }] : []),

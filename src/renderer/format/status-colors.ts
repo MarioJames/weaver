@@ -3,7 +3,8 @@ import { isDraft } from '../features/tasks/task-view';
 
 /**
  * One color scheme for every place that shows where a task is: board lanes, card and detail tags,
- * timeline outcomes and filter dots. Values are Tag color presets; lanes map them to cssVar tokens.
+ * timeline outcomes and filter dots. Values are StatusTones; the Tag colors they resolve to live in
+ * format/tag-colors.ts, so lanes map them to cssVar tokens and tags to one shared semantic scheme.
  */
 export type StatusTone = 'default' | 'processing' | 'warning' | 'success' | 'error' | 'orange' | 'volcano';
 

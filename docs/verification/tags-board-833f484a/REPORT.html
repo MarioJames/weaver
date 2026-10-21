@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weaver Web 标签语义色与看板验收报告（tags-board-833f484a）</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0 auto; padding: 16px; max-width: 1100px; line-height: 1.65; color: #1c1e21; background: #f9f9fa; }
+  main { background: #fff; border: 1px solid #e3e5e8; border-radius: 10px; padding: 24px 28px; }
+  h1 { font-size: 1.45rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; border-bottom: 1px solid #e3e5e8; padding-bottom: 6px; margin-top: 2.2em; }
+  code, .mono { font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 0.92em; background: #f2f3f5; padding: 1px 5px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 0.95rem; }
+  th, td { border: 1px solid #e3e5e8; padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: #f6f7f8; }
+  .ok { color: #1c7c33; font-weight: 600; }
+  .fail { color: #c2372a; font-weight: 600; }
+  .partial { color: #a06209; font-weight: 600; }
+  .na { color: #666; font-weight: 600; }
+  .meta { color: #666; font-size: 0.92rem; }
+  figure { margin: 12px 0; }
+  figure img { max-width: 100%; border: 1px solid #e3e5e8; border-radius: 6px; }
+  figcaption { font-size: 0.88rem; color: #666; margin-top: 4px; }
+  .verdict { border-left: 4px solid #1c7c33; background: #f2faf4; padding: 10px 14px; border-radius: 0 6px 6px 0; }
+  .warnbox { border-left: 4px solid #a06209; background: #fdf7ec; padding: 10px 14px; border-radius: 0 6px 6px 0; }
+  details { margin: 8px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  @media (max-width: 720px) { body { padding: 8px; } main { padding: 14px; } table { display: block; overflow-x: auto; } }
+  @media print { body { background: #fff; } main { border: none; padding: 0; } figure img { max-height: 420px; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Weaver Web 标签语义色与看板统一展示 · 独立浏览器验收报告</h1>
+<p class="meta">任务 <code>c28558f6-ddb5-4842-bf39-df9abf1e029b</code> · 交付目录 <code>docs/verification/tags-board-833f484a/</code> · 验收日期 2026-10-21 · 被测版本：工作树未提交改动（HEAD <code>2ed8288b</code>，见 checks.json 备注）</p>
+
+<section id="verdict">
+<h2>总体结论</h2>
+<div class="verdict">
+<p><strong>验收范围内 A–E 各项在亮色主题下全部通过</strong>，其中两项带已说明的限制：暗色主题子项因产品无深色模式未覆盖（<code>src/renderer/main.tsx:15</code> 硬编码 <code>themeMode="light"</code>）；C1/C3 的运行中根任务由 PATH 前置的假 herdr 桩承接外部宿主（未触碰真实 Herdr 与真实模型），任务状态机本身全部真实。</p>
+<p>逐项结论见 <a href="#checks">下表</a>；证据为 <code>checks.json</code> 与同目录截图/JSON。</p>
+</div>
+<div class="warnbox">
+<p><strong>过程事件（已处置）：</strong>夹具脚本一次误派发以 <code>execution=real</code> 启动了真实 <code>codex exec</code> 进程（约 40 秒），发现后立即 <code>tasks.cancel</code> 终止并确认进程退出。该进程以 <code>--ephemeral --cd /tmp/…/workspaces/login-page</code> 运行于一次性隔离目录，未接触共享服务、真实 Herdr 会话或用户数据；详见 <a href="#incident">事件与限制</a>。</p>
+</div>
+</section>
+
+<section id="scope">
+<h2>验证范围与环境</h2>
+<ul>
+  <li><strong>被测实例</strong>：dev 实例 <code>npx tsx src/cli/main.ts web --dev --no-open --port 4793 --data-dir /tmp/weaver-tags-833f484a.AQre/browser/data</code>，systemd unit <code>dev-weaver-tags-833f484a.scope</code>（MemoryHigh=8G / MemoryMax=10G），URL <code>http://127.0.0.1:4793</code>。端口 4793 ∈ 4790–4799，数据目录在任务临时根下，未触碰共享 Weaver 服务、<code>~/.weaver</code>、<code>~/.local/share/weaver</code> 与 Herdr default session。</li>
+  <li><strong>夹具</strong>：全部经指向该隔离实例的 weaver CLI 与页面操作创建（<a href="#fixtures">夹具清单</a>）；子任务执行只用 <code>mock-jsonl</code> provider 或 native（等待 owner 汇报，无进程）。策略含 free_channel 子 Agent ×2（其中 1 个被免费额度暂停）、付费子 Agent、手动限制子 Agent；A 类根任务 ×2（1 个带 7 个不同状态子任务、1 个无子任务运行中）+ 草稿根任务 ×2；B 类手动父 Agent ×2（一个设 title、一个不设）带 6 个任务。</li>
+  <li><strong>浏览器</strong>：agent-browser 任务模式，独立 profile <code>/tmp/weaver-tags-833f484a.AQre/browser-profile</code>（session <code>weaver-tags-833f484a</code>），桌面 1440×900 与窄屏 390×844。</li>
+  <li><strong>源码</strong>：只读。验收前后 <code>git status --porcelain -- src tests</code> 对比，本任务新增改动为 0（见 <a href="#cleanup">清理与交付说明</a>）。</li>
+</ul>
+</section>
+
+<section id="checks">
+<h2>逐项结论</h2>
+<table>
+<tr><th style="width:9rem">项</th><th>结论</th><th>要点与证据</th></tr>
+<tr>
+  <td><strong>A</strong> 标签语义色</td>
+  <td><span class="ok">通过</span>（亮色）；暗色 <span class="na">未覆盖</span></td>
+  <td>语义→预设映射与 <code>src/renderer/format/tag-colors.ts:22-35</code> 一致；同语义同色：免费渠道青色 <code>rgb(47,162,138)</code> 在看板卡片 / 子 Agent 页 / 权重列表 / 根任务详情四处一致；success <code>rgb(55,157,74)</code> 在「已通过」与引擎页「已安装」一致；warning <code>rgb(238,158,11)</code> 在「待验收」与「已限制」一致；volcano/error/orange/gray 各归其位，实测值见 <code>tag-color-observations.json</code>。<br>暗色：<code>main.tsx:15</code> 硬编码 <code>themeMode="light"</code>，模拟系统深色后 body 仍 <code>rgb(249,249,250)</code>，产品无深色模式（与 manual-review-459ab4f9 期结论一致）。证据：<a href="workers-media-dark-forced-still-light.png">workers-media-dark-forced-still-light.png</a>、<code>dark-no-effect.json</code>。</td>
+</tr>
+<tr>
+  <td><strong>B1</strong> 子 Agent 页列表</td>
+  <td><span class="ok">通过</span></td>
+  <td>free_worker / freebusy_worker 显示青色「免费渠道」，paid_worker / rest_worker 等不显示（<code>RolesPage.tsx:121</code>、<code>FreeChannelTag.tsx:10-12</code>）；rest_worker「已限制：手动暂停…」与 freebusy_worker「免费渠道 + 免费额度用完(orange) + 原因 + 恢复时间」同屏，逐行排布无重叠；390px 无溢出（scrollWidth=390）。<br><a href="workers-desktop-light.png">亮·桌面</a> · <a href="workers-narrow-light.png">亮·390px</a></td>
+</tr>
+<tr>
+  <td><strong>B2</strong> 权重列表</td>
+  <td><span class="ok">通过</span></td>
+  <td>父 Agent 页 main_owner 权重列表（<code>OwnerSchedule.tsx:65</code>）：免费渠道=青 <code>rgb(47,162,138)</code>、不派发=无色灰 <code>rgb(123,126,130)</code>、已限制=warning <code>rgb(238,158,11)</code>+原因，三态明显区分。<br><a href="owners-weight-list-light.png">截图</a></td>
+</tr>
+<tr>
+  <td><strong>B3</strong> 看板卡与子任务列表</td>
+  <td><span class="ok">通过</span></td>
+  <td>free_worker 派发的卡片显示同色「免费渠道」，paid_worker 卡无该标识（<code>TaskBoard.tsx:210</code>）；根任务详情「子任务 · 7」列表逐条一致。<br><a href="board-desktop-light.png">看板</a> · <a href="root-detail-children-list.png">子任务列表</a></td>
+</tr>
+<tr>
+  <td><strong>C1</strong> 看板按子 Agent 任务展示</td>
+  <td><span class="ok">通过</span></td>
+  <td>两个 <code>executionRole=owner</code> 运行中根任务不在四列出现；其 7 个子任务各自成卡（DOM 证据 <code>c1-columns-dom.json</code>：列内无根任务标题）；B 类任务各自成卡；未启动草稿根任务保留待执行列（已知设计例外）。<br><a href="board-desktop-light-all-columns.png">四列全景</a></td>
+</tr>
+<tr>
+  <td><strong>C2</strong> 父 Agent 筛选行</td>
+  <td><span class="ok">通过</span></td>
+  <td>A 类显示根任务标题并带状态色/运行中转圈；B 类无 title 显示缩写「Claude · 22:37」（<code>task-filters.ts:68</code> ownerChipLabel），悬停=<code>title="Claude · weaver · 22:37"</code>；有 title 显示「迁移构建脚本」，悬停=<code>迁移构建脚本 · Claude · scripts · 21:15</code>；整页无 'Task owner'（<code>c2-no-task-owner.json</code>）。</td>
+</tr>
+<tr>
+  <td><strong>C3</strong> 无子任务运行中根任务</td>
+  <td><span class="ok">通过</span>（假桩宿主）</td>
+  <td>出现在「父 Agent」行、计数 0；选中后显示「…正在拆分任务，子任务会自动出现在这里。」+「查看父任务」（<code>TaskBoard.tsx:226-228</code>、<code>task-view.ts:124</code>）；点击打开根任务详情（子任务 · 0）。<br><a href="board-childless-root-notice.png">提示</a> · <a href="root-detail-childless.png">详情</a><br><span class="meta">限制：tasks.start 需启动真实 Herdr 父 Agent（任务禁止），由假 herdr 桩承接启动步骤，任务状态机真实。</span></td>
+</tr>
+<tr>
+  <td><strong>C4</strong> 「由 X 派发」</td>
+  <td><span class="ok">通过</span></td>
+  <td>A 类子任务=根任务标题（「由 重构登录页与看板样式」）；B 类=title（「由 父 Agent：迁移构建脚本」）或实例名缩写（「由 Claude」）（<code>task-view.ts:111</code> cardOwner）。</td>
+</tr>
+<tr>
+  <td><strong>C5</strong> 新建任务自动定位</td>
+  <td><span class="ok">通过</span></td>
+  <td>「新建任务」→填目标→「存为草稿」后，看板立即把新任务的父 Agent chip 置为选中（aria-pressed=true），草稿卡出现在待执行列。<br><a href="board-auto-located-new-task.png">截图</a></td>
+</tr>
+<tr>
+  <td><strong>D</strong> 「全部」chip 与归档下拉</td>
+  <td><span class="ok">通过</span></td>
+  <td>四个筛选行行首「全部」常显、空选时选中、点击只清空本行、计数=忽略本行匹配数（选中「执行中」后其余行全部=2）、不进「已选」摘要、390px 折进「更多」时仍可见（<code>TaskBoard.tsx:132</code>）。归档抽屉各下拉首项「全部 N」（状态行「全部 7」），选值自动取消「全部」（7→2 条），多选共存（共 4 条），选回「全部」清空该维度（<code>task-filters.ts:31-40</code>）。<br><span class="meta">归档数据以页面内 Date.now+25h init-script 模拟（未改源码，重载失效）。</span><br><a href="board-narrow-selected-two-rows.png">窄屏选中两行</a> · <a href="board-narrow-owner-all-cleared.png">点击「全部」仅清本行</a> · <a href="archive-drawer-open.png">归档下拉</a> · <a href="archive-drawer-two-values.png">多选两值</a></td>
+</tr>
+<tr>
+  <td><strong>E</strong> 通用</td>
+  <td><span class="ok">通过</span></td>
+  <td>console 无 app 报错、无页面错误（<code>console-final.json</code>、<code>page-errors-final.json</code>；仅 vite dev 调试信息）；390px 下任务/引擎/父 Agent/子 Agent 页 scrollWidth=390 无溢出；Tab 遍历筛选 chips、卡片 Enter 开详情、Escape 关闭（<code>keyboard-tab-sequence.txt</code>）。</td>
+</tr>
+</table>
+</section>
+
+<section id="issues">
+<h2>发现的问题</h2>
+<p><strong>问题 1（产品，非阻塞）：无深色模式，A 项「暗色主题下清晰可辨」无法验证。</strong></p>
+<ul>
+  <li>复现：任意页面，浏览器/系统设为深色（agent-browser <code>set media dark</code>），页面仍为浅色。</li>
+  <li>源码位置：<code>src/renderer/main.tsx:15</code> — <code>&lt;ThemeProvider themeMode="light" …&gt;</code> 为硬编码。</li>
+  <li>影响：无法用系统偏好运行深色；A 项暗色子项判未覆盖。建议实现主题切换或跟随系统后复验。</li>
+  <li>证据：<a href="workers-media-dark-forced-still-light.png">workers-media-dark-forced-still-light.png</a>、<code>dark-no-effect.json</code>。</li>
+</ul>
+<p><strong>问题 2（观察，非本特性缺陷）：运行中根任务详情展示假桩宿主信息。</strong></p>
+<ul>
+  <li>现象：详情「父 Agent · 在 Herdr 中运行」显示桩返回的会话/工作区 ID（<a href="root-detail-childless.png">截图</a>）。这是夹具桩的输出，非缺陷；仅提示该区域直接信任宿主返回值。</li>
+</ul>
+<p><strong>问题 3（工作树环境，非本任务造成）：</strong>验收中途另一会话正在编辑 <code>src/renderer/features/settings/</code>（新增 <code>ImSettings.tsx</code> 等），期间约 2 分钟 vite 因 <code>Failed to resolve import "./ImSettings"</code> 全页空白（<code>vite-import-error-incident.txt</code>）。对方补齐文件后恢复；本报告所有结论均在页面可正常渲染时取得。</p>
+</section>
+
+<section id="incident">
+<h2>事件与限制</h2>
+<details open>
+<summary>真实 codex 进程事件（约 40 秒，已处置）</summary>
+<ul>
+  <li>经过：夹具脚本为 c4 子任务调用 <code>workers spawn</code> 时漏传 provider/worker，路由按权重选中 paid_worker 且未指定 provider → <code>execution=real</code>，服务启动真实 <code>codex exec --ephemeral --cd /tmp/weaver-tags-833f484a.AQre/browser/workspaces/login-page --model gpt-6.1-sol</code>（约 40 秒）。</li>
+  <li>处置：巡检发现后立即 <code>tasks.cancel</code>，确认进程退出；任务转为「已取消」（这也为看板提供了一个已取消夹具）。随后以 c7（native 派发 free_worker + reviews rejected）补齐「需修改」状态。</li>
+  <li>影响评估：进程运行于一次性隔离目录（任务临时根），<code>--ephemeral</code>，未接触共享 Weaver 服务、共享 Herdr 会话、<code>~/.weaver</code> 或用户项目；消耗了少量 codex 额度。</li>
+  <li>证据：<code>fixtures-out/c4-spawn.json</code>（事件流含 "codex thread started"）、<code>fixtures-evidence.json</code>（c4 状态 cancelled）。</li>
+</ul>
+</details>
+<details>
+<summary>假 herdr 桩说明</summary>
+<p>为在不启动真实 Herdr 父 Agent / 真实模型的前提下产生「运行中根任务」状态，将 <code>/tmp/weaver-tags-833f484a.AQre/browser/bin/herdr</code> 前置于 dev 实例 PATH。该桩对所有 owner-host 启动步骤（workspace list/create、agent start/prompt/rename、tab/workspace close）返回确定性的内存收据，不发起任何网络或进程。除外部宿主外，任务状态机（startRoot → running → describe → 子任务创建/派发/汇报/评审）全部真实执行。桩脚本随临时目录在清理时删除，内容已存档于 fixtures.json 说明。</p>
+</details>
+<details>
+<summary>未覆盖项清单</summary>
+<ul>
+  <li>A 暗色主题：产品无深色模式（问题 1）。</li>
+  <li>真实 Herdr 链路下的 C1/C3：tasks.start 会启动真实 Herdr 父 Agent，任务约束禁止；以假桩替代，状态机真实。</li>
+  <li>ownerRole purple 标签：当前工作树无渲染使用点（仅 <code>tag-colors.ts:33</code> 定义），无页面场景；geekblue「子任务」签已验证。</li>
+  <li>「排队中」（scheduled）状态：需 max_parallel 打满才产生，夹具未打满。</li>
+  <li>归档满 24h 的真实时效：以页面时钟 +25h 模拟验证抽屉行为，未真实等待一天。</li>
+</ul>
+</details>
+</section>
+
+<section id="fixtures">
+<h2>夹具清单</h2>
+<table>
+<tr><th>夹具</th><th>内容</th><th>状态覆盖</th></tr>
+<tr><td>A 类根任务「重构登录页与看板样式」</td><td>页面创建 → 假桩启动 → describe → 7 子任务（free_worker×4、paid_worker×2、未派发×1）</td><td>待执行 / 执行中 / 待验收 / 已通过 / 需修改 / 失败 / 已取消</td></tr>
+<tr><td>A 类根任务「拆分验收看板样例数据…」</td><td>运行中、无子任务</td><td>父 Agent 行计数 0 + 拆分提示（C3）</td></tr>
+<tr><td>B 类实例「Claude · weaver · 22:37」</td><td>owners attach，无 title；2 任务</td><td>执行中（free native）、待验收（paid mock）</td></tr>
+<tr><td>B 类实例「Claude · scripts · 21:15」+ title「迁移构建脚本」</td><td>owners attach + owners describe；4 任务</td><td>需修改、已通过、已取消、待执行</td></tr>
+<tr><td>草稿根任务 ×2（页面创建未启动）</td><td>ownerProfileId=main_owner</td><td>待执行列保留（已知设计例外）</td></tr>
+<tr><td>策略 blocks</td><td>rest_worker 手动限制；freebusy_worker 免费额度用完（by=weaver-free-probe，含恢复时间）</td><td>子 Agent 页 note、权重列表「已限制」、orange「免费额度用完」</td></tr>
+</table>
+<p class="meta">详见 <code>fixtures.json</code> 与 <code>fixtures-evidence.json</code>（tasks list 快照）。</p>
+</section>
+
+<section id="cleanup">
+<h2>清理与交付说明</h2>
+<ul>
+  <li>dev 实例按 unit <code>dev-weaver-tags-833f484a.scope</code> 精确停止；端口 4793 关闭（见 <code>cleanup.json</code>）。</li>
+  <li>浏览器任务会话 <code>agent-browser close</code>；任务 profile 目录 <code>/tmp/weaver-tags-833f484a.AQre/browser-profile</code> 用 <code>bh task-profile remove</code> 删除。</li>
+  <li>临时根 <code>/tmp/weaver-tags-833f484a.AQre/</code>（含数据目录、假 herdr 桩、工作区目录、夹具输出）整体删除。</li>
+  <li>交付物仅保留在本目录：本报告、<code>checks.json</code>、<code>fixtures.json</code>、<code>cleanup.json</code>、截图与 JSON 证据。</li>
+  <li>源码只读：验收前后 <code>git status --porcelain -- src tests</code> 对比，本任务未新增任何改动（46 → 48 个变更条目，差异全部来自并行会话对 <code>src/renderer/features/settings/</code> 的编辑，与本任务无关）。</li>
+</ul>
+</section>
+
+<section id="attachments">
+<h2>证据索引</h2>
+<table>
+<tr><th>文件</th><th>说明</th></tr>
+<tr><td><a href="board-desktop-light.png">board-desktop-light.png</a></td><td>看板桌面亮色（筛选行、父 Agent 行、卡片）</td></tr>
+<tr><td><a href="board-desktop-light-all-columns.png">board-desktop-light-all-columns.png</a></td><td>四列全景（待执行/执行中/待验收/已结束展开）</td></tr>
+<tr><td><a href="board-childless-root-notice.png">board-childless-root-notice.png</a></td><td>C3 拆分提示 + 查看父任务</td></tr>
+<tr><td><a href="root-detail-childless.png">root-detail-childless.png</a></td><td>无子任务根任务详情</td></tr>
+<tr><td><a href="root-detail-children-list.png">root-detail-children-list.png</a></td><td>根任务详情子任务列表（免费渠道标识）</td></tr>
+<tr><td><a href="workers-desktop-light.png">workers-desktop-light.png</a></td><td>子 Agent 页桌面亮色</td></tr>
+<tr><td><a href="workers-narrow-light.png">workers-narrow-light.png</a></td><td>子 Agent 页 390px（标签与暂停 note 不溢出）</td></tr>
+<tr><td><a href="workers-media-dark-forced-still-light.png">workers-media-dark-forced-still-light.png</a></td><td>模拟系统深色仍为浅色（问题 1 证据）</td></tr>
+<tr><td><a href="owners-weight-list-light.png">owners-weight-list-light.png</a></td><td>父 Agent 页权重列表（B2）</td></tr>
+<tr><td><a href="owners-narrow-light.png">owners-narrow-light.png</a></td><td>父 Agent 页 390px</td></tr>
+<tr><td><a href="engines-light.png">engines-light.png</a></td><td>引擎页标签（A 证据）</td></tr>
+<tr><td><a href="board-narrow-light.png">board-narrow-light.png</a></td><td>看板 390px（「全部」常显、其余折叠）</td></tr>
+<tr><td><a href="board-narrow-selected-two-rows.png">board-narrow-selected-two-rows.png</a></td><td>两行各选一值后的计数与已选摘要</td></tr>
+<tr><td><a href="board-narrow-owner-all-cleared.png">board-narrow-owner-all-cleared.png</a></td><td>点击「父 Agent 全部」仅清本行</td></tr>
+<tr><td><a href="archive-drawer-open.png">archive-drawer-open.png</a></td><td>归档抽屉</td></tr>
+<tr><td><a href="archive-drawer-status-selected.png">archive-drawer-status-selected.png</a></td><td>归档状态选值（全部自动取消）</td></tr>
+<tr><td><a href="archive-drawer-two-values.png">archive-drawer-two-values.png</a></td><td>归档多选两值</td></tr>
+<tr><td><a href="board-auto-located-new-task.png">board-auto-located-new-task.png</a></td><td>C5 新建任务后自动定位</td></tr>
+<tr><td>checks.json / fixtures.json / fixtures-evidence.json / cleanup.json</td><td>机器结论、夹具与清理记录</td></tr>
+<tr><td>tag-color-observations.json / c1-columns-dom.json / c2-no-task-owner.json / console-final.json / page-errors-final.json / keyboard-tab-sequence.txt / dark-no-effect.json / vite-import-error-incident.txt</td><td>DOM/样式/控制台/键盘/事件证据</td></tr>
+</table>
+</section>
+
+<p class="meta">报告生成：Weaver worker（tags-board-833f484a）· 结论核对方式：每项结论均有同目录截图或 DOM/JSON 证据支撑，未覆盖项已注明原因。</p>
+</main>
+</body>
+</html>

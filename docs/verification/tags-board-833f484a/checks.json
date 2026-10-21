@@ -1,0 +1,84 @@
+{
+  "taskId": "c28558f6-ddb5-4842-bf39-df9abf1e029b",
+  "generatedAt": "2026-10-21T05:00:00Z",
+  "verdicts": {
+    "A_tag_semantic_colors": {
+      "verdict": "通过（亮色主题）/ 暗色主题未覆盖",
+      "detail": "十个语义色映射与 src/renderer/format/tag-colors.ts:22-35 一致：中性=gray、进行中=processing、成功=success、警告=warning、错误=error、需修改=volcano、停止中/额度用完=orange、父 Agent=purple、子任务=geekblue、免费渠道=cyan。实测同语义同色：免费渠道 rgb(47,162,138) 在看板卡片/子 Agent 页/父 Agent 权重列表/根任务详情四处一致（同类 acss-6ooq9v）；success rgb(55,157,74) 在看板「已通过」与引擎页「已安装」一致；warning rgb(238,158,11) 在「待验收」与「已限制」一致。不同语义不撞色（见 tag-color-observations.json）。geekblue「子任务」签在看板卡可见（TaskBoard.tsx:208）；ownerRole purple 在当前工作树仅定义于 tag-colors.ts:33，渲染端暂无使用点，无独立截图场景。",
+      "dark": "应用硬编码浅色：src/renderer/main.tsx:15 themeMode=\"light\"，模拟系统深色后 body 仍为 rgb(249,249,250)。产品当前没有深色模式，该子项未覆盖（与 manual-review-459ab4f9 结论一致）。",
+      "evidence": ["tag-color-observations.json", "board-desktop-light-all-columns.png", "workers-desktop-light.png", "owners-weight-list-light.png", "root-detail-children-list.png", "engines-light.png", "workers-media-dark-forced-still-light.png", "dark-no-effect.json"]
+    },
+    "B_free_channel_tag": {
+      "B1_roles_list": {
+        "verdict": "通过",
+        "detail": "子 Agent 页左侧列表：free_worker/freebusy_worker（及停用的 qoder/opencode 夹具继承）显示青色「免费渠道」，paid_worker/rest_worker/claude_worker/codex_worker 不显示；rest_worker「已限制：手动暂停…」与 freebusy_worker「免费渠道+免费额度用完+原因+恢复时间」同屏出现，逐行换行，无重叠。390px 下 document.scrollWidth=390 无溢出。",
+        "evidence": ["workers-desktop-light.png", "workers-narrow-light.png", "tag-color-observations.json"]
+      },
+      "B2_owner_weight_list": {
+        "verdict": "通过",
+        "detail": "父 Agent 页 main_owner 权重列表：free_worker 与 freebusy_worker 显示青色「免费渠道」；freebusy_worker（权重 0）显示无色「不派发」；rest_worker 显示 warning 色「已限制」+原因。三色实测 rgb(47,162,138)/rgb(123,126,130)/rgb(238,158,11)，明显区分（OwnerSchedule.tsx:30,37,65）。",
+        "evidence": ["owners-weight-list-light.png", "tag-color-observations.json"]
+      },
+      "B3_board_and_children": {
+        "verdict": "通过",
+        "detail": "看板卡片：free_worker 派发的「抽取免费渠道标签组件」「核对看板筛选计数」显示同色「免费渠道」，paid_worker 派发的卡片无该标识（TaskBoard.tsx:210）。根任务详情「子任务 · 7」列表中 free_worker 子任务显示「免费渠道」，paid_worker 不显示。两处颜色 rgb(47,162,138) 与列表一致。",
+        "evidence": ["board-desktop-light.png", "root-detail-children-list.png", "board-desktop-light-all-columns.png"]
+      }
+    },
+    "C_board_by_subagent": {
+      "C1": {
+        "verdict": "通过",
+        "detail": "两个 executionRole=owner 的运行中根任务（假桩 Herdr 启动）均不出现在四列；其 7 个子任务各自成卡（c1-columns-dom.json：四列卡片标题中无根任务标题）。B 类手动父 Agent 的任务各自成卡。例外符合设计：两个未启动草稿根任务保留在待执行列。",
+        "evidence": ["c1-columns-dom.json", "board-desktop-light-all-columns.png"]
+      },
+      "C2": {
+        "verdict": "通过",
+        "detail": "父 Agent 行：A 类显示根任务标题并带状态色/转圈（运行中根任务 chip 为 processing 色带 spinner）；B 类无 title 显示实例名缩写「Claude · 22:37」（ownerChipLabel，task-filters.ts:68），悬停 title=「Claude · weaver · 22:37」；有 title 显示「迁移构建脚本」，悬停=「迁移构建脚本 · Claude · scripts · 21:15」。整页无 'Task owner' 文案（c2-no-task-owner.json）。",
+        "evidence": ["c2-no-task-owner.json", "board-desktop-light.png", "board-childless-root-notice.png"]
+      },
+      "C3": {
+        "verdict": "通过（假桩 Herdr 的运行中根任务）",
+        "detail": "无子任务的运行中根任务出现在「父 Agent」行，计数 0；选中后看板显示「父 Agent「拆分验收看板样例数据…」正在拆分任务，子任务会自动出现在这里。」与「查看父任务」按钮（TaskBoard.tsx:226-228、task-view.ts:124）；点击打开根任务详情（root-detail-childless.png，子任务 · 0）。",
+        "limitation": "运行中根任务由 PATH 前置的假 herdr 桩承接启动（未触碰真实 Herdr/模型）；真实 Herdr 链路下该状态未单独验证。",
+        "evidence": ["board-childless-root-notice.png", "root-detail-childless.png"]
+      },
+      "C4": {
+        "verdict": "通过",
+        "detail": "卡片底部「由 X 派发」：A 类子任务显示根任务标题（「由 重构登录页与看板样式…」），B 类显示 title（「由 父 Agent：迁移构建脚本」）或实例名缩写（「由 Claude」）（cardOwner，task-view.ts:111）。",
+        "evidence": ["c1-columns-dom.json", "board-desktop-light-all-columns.png"]
+      },
+      "C5": {
+        "verdict": "通过",
+        "detail": "页面右上角「新建任务」→填写目标→「存为草稿」后，看板自动定位：新任务的父 Agent chip 立即处于选中态（aria-pressed=true），草稿卡出现在待执行列，无需手动刷新。",
+        "evidence": ["board-auto-located-new-task.png"]
+      }
+    },
+    "D_filter_rows_and_archive": {
+      "board_all_chip": {
+        "verdict": "通过",
+        "detail": "状态/父 Agent/子 Agent/工作目录四行行首均有常显「全部」chip；空选择时 aria-pressed=true；选中「执行中」后其余行「全部」计数=忽略本行的匹配数（父 Agent 全部 2、子 Agent 全部 2、工作目录 全部 2），且「全部」不进入「已选」摘要；加选父 Agent 后点击「父 Agent 全部」仅清空该行，状态选择保留；390px 下各行折叠进「更多」而「全部」始终可见（TaskBoard.tsx:132）。",
+        "evidence": ["board-narrow-light.png", "board-narrow-selected-two-rows.png", "board-narrow-owner-all-cleared.png"]
+      },
+      "archive_drawer": {
+        "verdict": "通过（浏览器时钟 +25h 模拟归档）",
+        "detail": "归档抽屉状态/父 Agent/子 Agent/工作目录下拉首项为「全部 N」（N=忽略该维度的匹配数，如状态行「全部 7」）；选择「已通过」后「全部」自动取消（data-selected 移除）、共 7 条→2 条；加选「需修改」保持多选（共 4 条）；选回「全部」清空该维度（共 7 条）（task-filters.ts:31-40）。",
+        "limitation": "归档数据由页面内 Date.now +25h 的 init-script 模拟（未修改源码，重载后失效）；真实满 24h 归档未等待。",
+        "evidence": ["archive-drawer-open.png", "archive-drawer-status-selected.png", "archive-drawer-two-values.png"]
+      }
+    },
+    "E_general": {
+      "console": { "verdict": "通过", "detail": "遍历任务/引擎/父 Agent/子 Agent/设置页并交互后 console 无 app 错误（仅 vite dev 调试信息与 React DevTools 提示），无页面错误（page-errors-final.json）。", "evidence": ["console-final.json", "page-errors-final.json"] },
+      "narrow": { "verdict": "通过", "detail": "390px：任务/引擎/父 Agent/子 Agent 页 document.scrollWidth=390=innerWidth，无横向溢出；看板列区为设计内横向滚动。", "evidence": ["board-narrow-light.png", "workers-narrow-light.png", "owners-narrow-light.png"] },
+      "keyboard": { "verdict": "通过", "detail": "Tab 依次走过筛选 chips（草稿→待执行→执行中→…）；卡片 Enter 打开详情；Escape 关闭对话框。", "evidence": ["keyboard-tab-sequence.txt"] }
+    }
+  },
+  "uncovered": [
+    "A 暗色主题：产品无深色模式（src/renderer/main.tsx:15 themeMode=\"light\" 硬编码），无法验证；需产品实现主题切换后再验。",
+    "C3/C1 的真实 Herdr 链路：tasks.start 会启动真实 Herdr 父 Agent（禁止），改用 PATH 前置假 herdr 桩承接启动步骤，任务状态机（running/owner root/子任务创建派发）全部真实，仅外部宿主为桩。",
+    "ownerRole purple 标签（「父 Agent」角色签）在当前工作树无渲染使用点（仅定义于 tag-colors.ts:33），无页面场景可验证；geekblue「子任务」签已验证。",
+    "排队中（scheduled）状态未覆盖：需要 max_parallel 打满才能产生，夹具 max_parallel=6 未打满。"
+  ],
+  "incidents": [
+    "夹具脚本 c4 误以 execution=real 派发 paid_worker，真实 codex exec 进程运行约 40 秒后经 tasks.cancel 终止（--ephemeral，隔离一次性目录，无共享资源影响）；详见 fixtures.json incident。"
+  ]
+}

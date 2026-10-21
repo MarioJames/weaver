@@ -5,7 +5,7 @@ import { ToastHost } from '@lobehub/ui/base-ui';
 import weaverIcon from '../assets/weaver-icon.png';
 import weaverLockup from '../assets/weaver-lockup.svg';
 import { useWorkbench } from '../features/tasks/useWorkbench';
-import { ownerKindLookup } from '../features/tasks/task-view';
+import { ownerKindLookup, freeChannelLookup } from '../features/tasks/task-view';
 import { EnginesPage } from '../features/engines/EnginesPage';
 import { RolesPage } from '../features/roles/RolesPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
@@ -66,6 +66,7 @@ export function App() {
   const policy = usePolicyDraft();
   const [page, open] = usePage();
   const ownerKind = ownerKindLookup(policy.config);
+  const workerFreeChannel = freeChannelLookup(policy.config);
   // The saved policy decides the time zone for the whole page; a draft elsewhere never moves it.
   return <TimeZoneProvider zone={displayTimeZone(policy.snapshot?.config)}><ConsoleShell
     className={shellStyles.shell}
@@ -78,7 +79,7 @@ export function App() {
     openNavigationLabel="打开导航" closeNavigationLabel="关闭导航" collapseLabel="收起导航" expandLabel="展开导航" skipToContentLabel="跳到内容"
   >
     <ToastHost position="bottom-right" />
-    {page === 'tasks' ? <TasksPage work={work} ownerKind={ownerKind} />
+    {page === 'tasks' ? <TasksPage work={work} ownerKind={ownerKind} freeChannel={workerFreeChannel} />
       : page === 'engines' ? <EnginesPage policy={policy} />
         : page === 'owners' ? <RolesPage key="owners" section="owners" policy={policy} />
           : page === 'workers' ? <RolesPage key="workers" section="workers" policy={policy} />

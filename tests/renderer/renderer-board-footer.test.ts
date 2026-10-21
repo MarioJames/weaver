@@ -10,7 +10,7 @@ import { TaskBoard } from '../../src/renderer/features/tasks/TaskBoard';
 import { ownerHostName, ownerLabel } from '../../src/renderer/features/tasks/task-view';
 import { cardFooter, cardFooterText } from '../../src/renderer/features/tasks/task-footer';
 import { columnize } from '../../src/renderer/features/tasks/task-columns';
-import { nonArchived } from '../../src/renderer/features/tasks/task-archive';
+import { archivedTasks, nonArchived } from '../../src/renderer/features/tasks/task-archive';
 import { applyTaskFilters, archiveRows, emptySelection, facetOptions, filterOptions, resolveSelection, taskOptions, childIndex } from '../../src/renderer/features/tasks/task-filters';
 import { ENDED_EXPANDED_KEY } from '../../src/renderer/features/tasks/task-persistence';
 
@@ -136,9 +136,9 @@ test('a root answers for the sub agents its children ran on, once each', () => {
   assert.deepEqual(taskOptions(all[0]!, 'status').map(option => option.value), ['running']);
 });
 
-test('sub agent chips count root tasks, the way the board lays them out', () => {
+test('sub agent chips count the child cards, the way the board lays them out', () => {
   const options = filterOptions(all, 'worker', everything, now);
-  assert.deepEqual(options.map(option => [option.value, option.count]), [['qoder_worker', 2], ['claude_worker', 1], ['codex_worker', 1]]);
+  assert.deepEqual(options.map(option => [option.value, option.count]), [['qoder_worker', 3], ['claude_worker', 1], ['codex_worker', 1]]);
   assert.equal(options.find(option => option.value === 'codex_worker')?.kind, 'codex');
   // The chip's count is what choosing it leaves on the board.
   for (const option of options) {
@@ -148,21 +148,21 @@ test('sub agent chips count root tasks, the way the board lays them out', () => 
   }
 });
 
-test('choosing a sub agent shows the roots that contain its children and ORs sub agents', () => {
+test('choosing a sub agent shows the child cards that ran on it, and ORs sub agents', () => {
   const pick = (...worker: string[]) => applyTaskFilters(nonArchived(all, now), { ...everything, worker }, undefined, now, all).map(task => task.id);
-  assert.deepEqual(pick('qoder_worker'), ['r1', 'r2']);
-  assert.deepEqual(pick('codex_worker'), ['r1']);
-  assert.deepEqual(pick('codex_worker', 'claude_worker'), ['r1', 'solo']);
+  assert.deepEqual(pick('qoder_worker'), ['r1b', 'r2a', 'r2b']);
+  assert.deepEqual(pick('codex_worker'), ['r1a']);
+  assert.deepEqual(pick('codex_worker', 'claude_worker'), ['r1a', 'solo']);
   assert.deepEqual(pick('ghost_worker'), []);
-  // Without the full list a root cannot be matched: the old per-card behaviour is only for tasks that carry their own dispatch.
-  assert.deepEqual(applyTaskFilters(nonArchived(all, now), { ...everything, worker: ['qoder_worker'] }, undefined, now).map(task => task.id), []);
+  // Children carry their own dispatch, so the pool alone is enough; roots are not rows any more.
+  assert.deepEqual(applyTaskFilters(nonArchived(all, now), { ...everything, worker: ['qoder_worker'] }, undefined, now).map(task => task.id), ['r1b', 'r2a', 'r2b']);
 });
 
 test('other rows narrow the sub agent counts, and sub agent counts narrow the other rows', () => {
   const running = { ...everything, status: ['running' as const] };
   assert.deepEqual(filterOptions(all, 'worker', running, now).map(option => [option.value, option.count]), [['claude_worker', 1], ['codex_worker', 1], ['qoder_worker', 1]]);
   const qoder = { ...everything, worker: ['qoder_worker'] };
-  assert.deepEqual(filterOptions(all, 'status', qoder, now).map(option => [option.value, option.count]), [['running', 1], ['review', 1]]);
+  assert.deepEqual(filterOptions(all, 'status', qoder, now).map(option => [option.value, option.count]), [['running', 1], ['review', 2]]);
 });
 
 test('a chosen sub agent survives resolution while any child still carries it', () => {
@@ -170,12 +170,15 @@ test('a chosen sub agent survives resolution while any child still carries it', 
   assert.deepEqual(facetOptions(nonArchived(all, now), 'worker', everything, now, all).map(option => option.value), ['qoder_worker', 'claude_worker', 'codex_worker']);
 });
 
-test('the archive filters finished roots by their children too', () => {
+test('the archive rows are the finished children; the owner filter answers by root', () => {
   const old = (id: string) => new Date(now - 3 * 24 * 3600e3 - id.length).toISOString();
   const tasks = [
-    root('a1', { status: 'completed', reviewState: 'accepted', updatedAt: old('a1') }), child('a1c', 'a1', 'qoder_worker', { status: 'completed', updatedAt: old('a1c') }),
+    root('a1', { status: 'completed', reviewState: 'accepted', updatedAt: old('a1') }), child('a1c', 'a1', 'qoder_worker', { status: 'completed', reviewState: 'accepted', updatedAt: old('a1c') }),
     root('a2', { status: 'failed', updatedAt: old('a2') }), child('a2c', 'a2', 'codex_worker', { status: 'failed', updatedAt: old('a2c') }),
   ];
-  assert.deepEqual(archiveRows(tasks, { ...everything, worker: ['qoder_worker'] }, now).map(task => task.id), ['a1']);
-  assert.deepEqual(facetOptions(tasks.filter(task => !task.parentTaskId), 'worker', everything, now, tasks).map(option => option.value).sort(), ['codex_worker', 'qoder_worker']);
+  assert.deepEqual(archivedTasks(tasks, now).map(task => task.id), ['a1c', 'a2c']);
+  assert.deepEqual(archiveRows(tasks, { ...everything, worker: ['qoder_worker'] }, now).map(task => task.id), ['a1c']);
+  assert.deepEqual(archiveRows(tasks, { ...everything, owner: ['a1'] }, now).map(task => task.id), ['a1c']);
+  // The options are carried by the archived children rows themselves.
+  assert.deepEqual(facetOptions(archivedTasks(tasks, now), 'worker', everything, now, tasks).map(option => option.value).sort(), ['codex_worker', 'qoder_worker']);
 });
