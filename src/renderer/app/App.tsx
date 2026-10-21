@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bot, CalendarClock, Cpu, ListTodo, Settings2, UserRound } from 'lucide-react';
+import { Bot, CalendarClock, Cpu, ListTodo, MessageSquare, Settings2, UserRound } from 'lucide-react';
 import { ConsoleBrand, ConsoleNav, ConsoleShell } from '@lobehub/ui/dashboard';
 import { ToastHost } from '@lobehub/ui/base-ui';
 import weaverIcon from '../assets/weaver-icon.png';
@@ -8,6 +8,7 @@ import { useWorkbench } from '../features/tasks/useWorkbench';
 import { ownerKindLookup, freeChannelLookup } from '../features/tasks/task-view';
 import { EnginesPage } from '../features/engines/EnginesPage';
 import { RolesPage } from '../features/roles/RolesPage';
+import { BotsPage } from '../features/bots/BotsPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { TasksPage } from '../features/tasks/TasksPage';
 import { SchedulesPage } from '../features/schedules/SchedulesPage';
@@ -16,7 +17,7 @@ import { usePolicyDraft } from '../policy/usePolicyDraft';
 import { displayTimeZone } from '../policy/policy-edit';
 import { TimeZoneProvider } from '../format/timezone';
 
-const PAGES = ['tasks', 'schedules', 'engines', 'owners', 'workers', 'settings'] as const;
+const PAGES = ['tasks', 'schedules', 'engines', 'owners', 'workers', 'bots', 'settings'] as const;
 type Page = typeof PAGES[number];
 
 const NAVIGATION = [
@@ -25,6 +26,7 @@ const NAVIGATION = [
   { href: '/#/engines', label: '引擎', icon: Cpu },
   { href: '/#/owners', label: '父 Agent', icon: UserRound },
   { href: '/#/workers', label: '子 Agent', icon: Bot },
+  { href: '/#/bots', label: 'Bot', icon: MessageSquare },
   { href: '/#/settings', label: '设置', icon: Settings2 },
 ];
 
@@ -91,6 +93,7 @@ export function App() {
         : page === 'engines' ? <EnginesPage policy={policy} />
           : page === 'owners' ? <RolesPage key="owners" section="owners" policy={policy} />
             : page === 'workers' ? <RolesPage key="workers" section="workers" policy={policy} />
-              : <SettingsPage policy={policy} />}
+              : page === 'bots' ? <BotsPage policy={policy} />
+                : <SettingsPage policy={policy} />}
   </ConsoleShell></TimeZoneProvider>;
 }

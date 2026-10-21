@@ -19,6 +19,9 @@ export interface RpcMethodSpec {
 }
 
 export const RPC_METHODS = {
+  getImSettings: { arity: 0, retryable: true },
+  saveImSettings: { arity: 1, mutation: true },
+  reconnectIm: { arity: 0, mutation: true },
   command: { arity: 1 },
   getPolicy: { arity: 0, retryable: true, cli: 'policy.get', mutation: false },
   policyHistory: { arity: 0, cli: 'policy.history', mutation: false },

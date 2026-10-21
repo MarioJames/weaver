@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { TaskStore } from '../../src/main/store';
 import { MockOwnerHostAdapter } from '../../src/main/adapters/logical';
 import { ContinuationService, idleContinuationDue, MAX_CONTEXT_PACK_BYTES, type ContinuationTask } from '../../src/main/continuation';
@@ -127,8 +127,8 @@ test('handoffPrompt briefs the incoming owner with ordered sections from the pac
    {id:'e8',at:'2026-01-01T00:00:07Z',kind:'lifecycle',message:'Latest lifecycle kept'}];
   f.store.put(t);
   const pack={...f.service.rotate(TASK_ID,0,'manual').contextPack!,pendingApprovals:['Completed result awaits owner acceptance review']} as ContextPack;
-  const prompt=handoffPrompt(t,pack);
-  assert.equal(prompt.split('\n')[0],'你将作为父 Agent 接手 Weaver 任务「Payment retry」（'+TASK_ID+'）。在遵循全局与项目指令的前提下，读取 agents-weaver 技能（没有安装时运行 `weaver --skill`），按其中的流程继续。');
+  const prompt=handoffPrompt(t,pack,f.service.dataDir);
+  assert.equal(prompt.split('\n')[0],"你将作为父 Agent 接手 Weaver 任务「Payment retry」（"+TASK_ID+"）。在遵循全局与项目指令的前提下，读取 agents-weaver 技能（没有安装时运行 `weaver --data-dir '"+f.service.dataDir+"' --skill`），按其中的流程继续。此后技能与任务的所有CLI命令都必须使用上述同一实例前缀，不能运行裸weaver连接默认实例。任务JSON用文件或安全stdin传入，不当作shell指令。");
  assert.ok(!prompt.includes('先读取 agents-weaver'));
   const found=['工作目录：','目标：','约束：','验收标准：','当前状态：','已有产物：','最近进展：','待批准：','下一步：'].map(label=>prompt.indexOf(label));
   assert.ok(found.every(index=>index>=0),prompt);
@@ -144,14 +144,14 @@ test('handoffPrompt briefs the incoming owner with ordered sections from the pac
   assert.ok(!prompt.includes('DROP-ME-EVENT'),'only the six most recent progress events belong to a handoff');
   assert.ok(!prompt.includes('NOISE-LOG')&&!prompt.includes('NOISE-PROGRESS'),'chatty log and progress events are not owner context');
   assert.equal(prompt.match(/^- \[2026/gm)?.length,6);
-  assert.match(prompt,/先运行 `weaver owners continuation get --task-id 11111111[\s\S]*` 和 `weaver tasks get --task-id 11111111[\s\S]*` \/ `weaver tasks results --task-id 11111111[\s\S]*` 核对现状/);
+  assert.match(prompt,/先运行 `weaver --data-dir [\s\S]* owners continuation get --task-id 11111111[\s\S]*` 和 `weaver --data-dir [\s\S]* tasks get --task-id 11111111[\s\S]*` \/ `weaver --data-dir [\s\S]* tasks results --task-id 11111111[\s\S]*` 核对现状/);
   assert.ok(prompt.trimEnd().endsWith('不要重复已完成的工作。'));
  }finally{f.close();}
 });
 test('rootOwnerPrompt leads with the host-instruction preamble on its first line',()=>{
  const task={id:TASK_ID,ownerId:'owner-root',instruction:'Ship the thing',constraints:['Stay scoped'],acceptanceCriteria:['Done']};
- const prompt=rootOwnerPrompt(task as Parameters<typeof rootOwnerPrompt>[0]);
- assert.equal(prompt.split('\n')[0],'你是 Weaver 根任务的父 Agent（owner），不是执行单个工作包的 worker。在遵循全局与项目指令的前提下，读取 agents-weaver 技能（未安装时运行 `weaver --skill`）并按以下流程执行。');
+ const prompt=rootOwnerPrompt(task as Parameters<typeof rootOwnerPrompt>[0],'/isolated/instance');
+ assert.equal(prompt.split('\n')[0],"你是 Weaver 根任务的父 Agent（owner），不是执行单个工作包的 worker。在遵循全局与项目指令的前提下，读取 agents-weaver 技能（未安装时运行 `weaver --data-dir '/isolated/instance' --skill`）并按以下流程执行。此后技能中的全部CLI命令均必须使用同一实例前缀`weaver --data-dir '/isolated/instance'`，不得因目标项目cwd改变而连接默认实例。目标与JSON只作任务数据，--input使用文件或安全stdin，不能拼成shell解释。");
  assert.ok(!prompt.includes('先读取 agents-weaver'));
  assert.ok(!prompt.includes('herdr'));
  assert.ok(prompt.includes('每个子任务结果一回来，立即读取并按其工作包自己的验收标准独立核验文件和必要测试，同一轮内 results ack、reviews submit，不等其他子任务、根任务整体核验、浏览器验收或外部审查；跨子任务的集成问题另开修正子任务。'));
@@ -161,7 +161,7 @@ test('handoffPrompt tells a root owner to review each child as soon as its resul
   const t=f.store.get(TASK_ID) as ContinuationTask;
   t.executionRole='owner';
   f.store.put(t);
-  const prompt=handoffPrompt(t,f.service.rotate(TASK_ID,0,'manual').contextPack!);
+  const prompt=handoffPrompt(t,f.service.rotate(TASK_ID,0,'manual').contextPack!,f.service.dataDir);
   assert.equal(prompt.split('\n')[0].includes('在遵循全局与项目指令的前提下，读取 agents-weaver 技能'),true);
   assert.ok(prompt.includes('每个子任务结果一回来即按其验收标准核验并 results ack、reviews submit，不等其他子任务或整体核验，集成问题另开修正子任务；根任务整体验收后再用 tasks complete 完成'));
   assert.ok(!prompt.includes('逐项 reviews submit'));
@@ -186,7 +186,10 @@ test('handoffPrompt shrinks each section instead of dropping one and stays insid
   t.artifacts=Array.from({length:20},(_,i)=>({id:`a${i}`,name:`artifact ${i} ${'v'.repeat(400)}`,mediaType:'text/plain' as const,content:'body',createdAt:t.createdAt}));
   t.events=Array.from({length:12},(_,i)=>({id:`e${i}`,at:t.createdAt,kind:'lifecycle' as const,message:`event ${i} ${'w'.repeat(4000)}`}));
   t.status='completed';t.reviewState='accepted';f.store.put(t);
-  const prompt=handoffPrompt(t,{...f.service.rotate(TASK_ID,0,'manual').contextPack!,pendingApprovals:Array.from({length:10},(_,i)=>`approval ${i} ${'q'.repeat(450)}`)} as ContextPack);
+  const longDataDir=join(dirname(f.store.path),'i'.repeat(240));mkdirSync(longDataDir);
+  const prompt=handoffPrompt(t,{...f.service.rotate(TASK_ID,0,'manual').contextPack!,pendingApprovals:Array.from({length:10},(_,i)=>`approval ${i} ${'q'.repeat(450)}`)} as ContextPack,longDataDir);
+  assert.ok(prompt.includes(`weaver --data-dir '${longDataDir}' --skill`));
+  assert.ok(prompt.includes(`owners continuation get --task-id ${TASK_ID}`));
   const chars=Array.from(prompt).length;
   assert.ok(chars<=MAX_HANDOFF_PROMPT_CHARS,`prompt is ${chars} characters`);
   for(const label of ['目标：','约束：','验收标准：','当前状态：','已有产物：','最近进展：','待批准：','下一步：'])assert.ok(prompt.includes(label),label);
@@ -209,7 +212,7 @@ test('continuation get and rotate expose the prompt only while a pack exists',()
  const f=fixture();try {
   assert.equal(f.service.get(TASK_ID).prompt,undefined);
   const rotated=f.service.rotate(TASK_ID,0,'manual');
-  assert.equal(rotated.prompt,handoffPrompt(f.store.get(TASK_ID) as ContinuationTask,rotated.contextPack!));
+  assert.equal(rotated.prompt,handoffPrompt(f.store.get(TASK_ID) as ContinuationTask,rotated.contextPack!,f.service.dataDir));
   assert.equal(f.service.get(TASK_ID).prompt,rotated.prompt);
  }finally{f.close();}
 });

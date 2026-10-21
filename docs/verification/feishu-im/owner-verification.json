@@ -1,0 +1,524 @@
+{
+  "attribution": "Owner executed full checks, deployment preparation and historical live probes; independent browser worker executed browser-direct; Pro reviewed source only; report worker read listed sanitized proofs and existing reports only.",
+  "status": "Independent Bot v2/low connected; phone low server processing35263/20318ms observed, second same production parent; latency not accepted or explained; source1374/browser/Pro unchanged",
+  "versions": {
+    "baseHEAD": "75a8db794127d71d9baf888e8ba6c16ebd70d17c",
+    "fullCheckTree": "88207d65a354f060fef645d61ef06b25ee73e3bb",
+    "finalTree": null,
+    "browserTree": "7dd6e2918fe8b5cc80cf8a81f345514a1cca0e33",
+    "fullCheckToFinalChangedFiles": [
+      "tests/fixtures/parent/claude-fixture.mjs"
+    ],
+    "remainingProgramAndDependencyHashesEqual": 39,
+    "finalChange": "One extra trailing newline removed from Claude test fixture; owner compared bytes and ran node --check. Product/runtime files unchanged from browser snapshot; later additions are tests.",
+    "previousFinalTree": "0fbc79da44eb701bc0dd65e2a5dd8fe5d1dc7743",
+    "latestValidatedTree": "c05f0c65520d4de290b006b33b312fb392f38865",
+    "programHashesFrozen": true,
+    "latestBaselineProgramDependencyHashesEqual": 40,
+    "note": "Five IM renderer/API hashes remain identical to prior comprehensive browser and latest024 host smoke. Later backend service/test correction verified by owner full check, not a claimed browser rerun.",
+    "previousValidatedTree": "402387431595d246835d7eb25847731fa016972a",
+    "latestValidatedBase": "3b5c2c97f0a8b577bb751b056a7aa28061217849",
+    "latestFrozenSourceFiles": 40
+  },
+  "fullCheck": {
+    "command": "npm run check",
+    "tests": 1374,
+    "pass": 1374,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "typecheckExitCode": 0,
+    "buildExitCode": 0,
+    "exitCode": 0,
+    "attribution": "Owner independently executed unchanged frozen snapshot; not Pro or report-worker execution",
+    "environmentCorrection": "First run TMPDIR nested path exceeded Unix socket limit. Used canonical task root. One existing 30ms IPC test failed under parallel load; standalone10/10 and entire unchanged check rerun passed1374/1374."
+  },
+  "engines": [
+    {
+      "engine": "claude",
+      "pass": true,
+      "sameSession": true,
+      "closed": true,
+      "recallMatches": true,
+      "deltaBeforeFinal": true,
+      "abortAfterFirstDelta": true,
+      "abortRejected": true,
+      "note": "Four-turn sequence includes an interrupted turn. abort.durationMs is total turn observation and is not cancellation latency."
+    },
+    {
+      "engine": "codex",
+      "pass": true,
+      "sameSession": true,
+      "closed": true,
+      "recallMatches": true,
+      "deltaBeforeFinal": true,
+      "abortAfterFirstDelta": true,
+      "abortRejected": true,
+      "note": "Four-turn sequence includes an interrupted turn. abort.durationMs is total turn observation and is not cancellation latency."
+    }
+  ],
+  "realAgentToPrivateCLI": {
+    "pass": true,
+    "randomProofNotInPrompt": true,
+    "expectedMatched": true,
+    "taskCount": 0,
+    "ownerCount": 0,
+    "closed": true,
+    "runtimeClosed": true
+  },
+  "productionBundleFeishu": {
+    "pass": true,
+    "initial": {
+      "connection": "connected",
+      "activeSessions": 0,
+      "secretConfigured": true
+    },
+    "reconnect": {
+      "connection": "connected",
+      "activeSessions": 0
+    },
+    "disable": {
+      "connection": "disabled",
+      "activeSessions": 0
+    },
+    "messagesSent": 0,
+    "modelsRequested": 0,
+    "taskCount": 0,
+    "exitCode": 0,
+    "processClosed": true,
+    "portClosed": true,
+    "sharedServiceTouched": false
+  },
+  "featureAcceptance": {
+    "fileCount": 339,
+    "exitCode": 0,
+    "errorCount": 0,
+    "candidateCount": 119,
+    "verdict": "needs-review",
+    "ownedReviewedCandidates": {
+      "count": 8,
+      "reportStaticColors": 1,
+      "existingRelativeImportsWithoutProjectAliases": 7
+    },
+    "ownerReview": "tsconfig/vite have no project alias; keep existing relative imports. Other candidates belong to baseline. Hooks, request ref gates, labels, narrow viewport and keyboard were checked by owner."
+  },
+  "proReview": {
+    "runId": "60f65f58-5482-4557-a24e-344640dee6c3",
+    "status": "passed",
+    "passed": true,
+    "replyFinal": true,
+    "archiveStatus": "stored",
+    "archiveGaps": [],
+    "buildsAndTests": false,
+    "openBlockingFindings": 0,
+    "ownerVerifiedActualFileHashes": 7,
+    "scope": "Independent direct-route implementation and UI wiring source/hash/assertion review; no builds/tests/browser/model/Feishu execution",
+    "observationRecovery": "Original unresponsive view replaced by same-conversation observation only; no prompt resend. Own duplicate views closed; Convorel consumed same run.",
+    "organizationVerified": true,
+    "finishClosed": false,
+    "finishReason": "borrowed view",
+    "cleanup": {
+      "ownTabsClosed": true,
+      "ownDaemonReleased": true,
+      "sharedChromePreserved": true,
+      "reason": "Only task-owned duplicate review targets closed; exact conversation and Pro result retained in Convorel archive."
+    }
+  },
+  "remainingBoundary": "Phone low35263ms and same-parent warm20318ms server admission-to-final update measured; first public delta/phone rendering and root cause unmeasured. Isolated31.036/11.079s first deltas cannot partition phone durations. No speed-fix, card actions/menu or phone-dispatch acceptance.",
+  "fullCheckHistory": [
+    {
+      "command": "npm run check",
+      "tests": 1252,
+      "pass": 1252,
+      "fail": 0,
+      "skip": 0,
+      "typecheckExitCode": 0,
+      "buildExitCode": 0,
+      "exitCode": 0,
+      "summary": [
+        "ℹ tests 1252",
+        "ℹ suites 2",
+        "ℹ pass 1252",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 26309.321799",
+        "✓ built in 1.56s"
+      ]
+    },
+    {
+      "command": "npm run check",
+      "tests": 1269,
+      "pass": 1269,
+      "fail": 0,
+      "skipped": 0,
+      "typecheckExitCode": 0,
+      "buildExitCode": 0,
+      "exitCode": 0,
+      "note": "Passed before newly identified fatal interrupt service defect; does not prove that defect fixed."
+    },
+    {
+      "command": "npm run check",
+      "tests": 1341,
+      "pass": 1341,
+      "fail": 0,
+      "skipped": 0,
+      "typecheckExitCode": 0,
+      "buildExitCode": 0,
+      "exitCode": 0,
+      "note": "Latest fixed-source snapshot independently checked by owner; does not substitute final Pro rereview."
+    },
+    {
+      "command": "npm run check",
+      "tests": 1363,
+      "pass": 1363,
+      "fail": 0,
+      "skipped": 0,
+      "typecheckExitCode": 0,
+      "buildExitCode": 0,
+      "exitCode": 0,
+      "note": "Owner independently executed1363 tests/typecheck/build on tree40238743; final read-only Pro passed without reexecuting tests."
+    }
+  ],
+  "correction": {
+    "taskId": "4e20139f-345f-4ef0-878c-c8fa6f3ed933",
+    "status": "fatal parent classification implemented and verified; later not-started boundary also corrected and Pro passed",
+    "files": {
+      "src": 4,
+      "tests": 3
+    },
+    "targetedFixtureTests": 60,
+    "targetedFixtureFail": 0,
+    "targetedFixtureSkip": 0,
+    "redTestsBeforeFix": {
+      "total": 22,
+      "pass": 18,
+      "fail": 4
+    },
+    "details": "Fatal interrupt closes/releases session without sending B to stale parent; new C starts new epoch. Normal confirmed cancel and completed-parent/output-stop race retain same context.",
+    "policyRoute": "restored; no longer a dispatch blocker",
+    "complete": true
+  },
+  "resourceClosure": {
+    "ownedVerificationUnitsInactive": true,
+    "temporaryPlaintextSecretRemoved": true,
+    "credentialBearingPrivateDataRemoved": true,
+    "sharedOriginalDataAndServicePreserved": true,
+    "source": "Owner TASK_STATE.json handoff; no shared policy read or mutation by report worker",
+    "scope": "Previous isolated verification and historical temporary credential cleanup; current persistent user service/settings/backup/release are retained separately",
+    "currentPersistentServiceRetained": true,
+    "currentPersistentServicePort": 4737
+  },
+  "proReviewHistory": [
+    {
+      "runId": "663bd309-2bcb-4c25-a3c3-665c280b2fa2",
+      "status": "not passed",
+      "passed": false,
+      "openFindingCount": 1,
+      "finding": "Service treats fatal interrupt failure as reusable cancellation: parent may be closed after failed ACK or missing terminal while stale reference remains; next queued/new message hits the closed parent.",
+      "evidenceType": "read-only source control-flow review, not claimed as runtime reproduction",
+      "otherFindings": "closed"
+    },
+    {
+      "runId": "65857e0c-b5f8-455d-824b-d83a0110c602",
+      "status": "not passed",
+      "passed": false,
+      "previousBlockingFinding": "Corrected with structured parentOutcome and explicit confirmed cancellation; waiting for same-conversation independent rereview.",
+      "openFindingCount": 1,
+      "finding": "not-started CardKit stop path; original fatal parent classification closed"
+    },
+    {
+      "runId": "c10bbd10-9069-4d9a-94d9-26612d2a6d21",
+      "status": "passed",
+      "passed": true,
+      "replyFinal": true,
+      "archiveStatus": "stored",
+      "archiveGaps": [],
+      "ownerConsumedCompleteReply": true,
+      "scope": "Two specified file hashes, state transitions, cancellation/failure boundaries and regression test source; read-only review, no tests/models/Feishu operations executed by reviewer.",
+      "closedFinding": "not-started CardKit stop no longer clears healthy parent/FIFO; prior fatal classification remains closed",
+      "serviceSHA256": "caf74a434adb7e068f9649a12479b7e0213ee6297faf536a98e557ecffde3cc2",
+      "testSHA256": "cd5d9b99a27a4bad0963c92eb465330c7ec0a693263a848513fa60e5d4c7228e",
+      "openBlockingFindings": 0
+    }
+  ],
+  "latestHostSmoke": {
+    "artifact": "browser-latest-smoke.json",
+    "pass": true,
+    "tree": "02472200c2a7cf332720e80879d02ae9d36c2a07"
+  },
+  "backendNotStartedCorrection": {
+    "status": "implemented, owner independently verified, final same-conversation Pro passed",
+    "changedFiles": [
+      "src/main/im/service.ts",
+      "tests/main/im-service.test.ts"
+    ],
+    "hashes": {
+      "src/main/im/service.ts": "caf74a434adb7e068f9649a12479b7e0213ee6297faf536a98e557ecffde3cc2",
+      "tests/main/im-service.test.ts": "cd5d9b99a27a4bad0963c92eb465330c7ec0a693263a848513fa60e5d4c7228e"
+    },
+    "otherIMSourceAndDependencies": "unchanged per owner freeze",
+    "rendererApiHashMatch": true,
+    "browserRerunOnLatestTree": false,
+    "complete": true
+  },
+  "liveConfigurationBoundary": {
+    "source": "Owner safe activation-proof.json; no direct settings/DB/credentials/service read by report worker",
+    "historicalObservation": {
+      "saved": true,
+      "enabled": false,
+      "matcherClosed": true,
+      "cutoverPerformed": false
+    },
+    "currentDeploymentStatus": "Owner activated strict v2/revision4 independent Codex/gpt-6.1-sol/low connected; previous v1/max record is historical",
+    "phoneChatEndToEndVerified": false,
+    "privateIdentifiersArchived": false
+  },
+  "deliveryScope": {
+    "reportPackageComplete": true,
+    "codeAndBrowserVerificationPassed": true,
+    "deploymentClaimed": true,
+    "phoneMessageStreamingButtonsMenusVerified": false,
+    "weaverMetadataCompletion": "owner handles separately",
+    "deploymentSource": "Owner actual v2 activation proof plus independent public API recheck; phone low test not performed"
+  },
+  "liveActivation": {
+    "attribution": "Owner actual service cutover and RPC enablement, not a fixture or a new browser run by this worker",
+    "configuredAt": "2026-10-21T09:25:11.050130+00:00",
+    "serviceRestartedAt": "2026-10-21T09:25:07.735927+00:00",
+    "enabled": true,
+    "connection": "connected",
+    "settingsRevision": 3,
+    "allowedAccounts": 1,
+    "parentProfile": "codex_owner",
+    "engine": "codex",
+    "idleTimeoutMinutes": 30,
+    "privateSettingsMode": "0600",
+    "workspace": "project repository",
+    "secretConfigured": true,
+    "port": 4737,
+    "mainPid": 697343,
+    "release": "/home/mocha/.local/share/weaver/releases/20261021-feishu-402387431595",
+    "releaseFilesVerified": 315,
+    "oldBinaryPreserved": true,
+    "baseUnitPreserved": true,
+    "cutoverMethod": "user-service drop-in selects versioned Node release; same 4737 service/dataDir",
+    "persistentDataPreserved": true,
+    "consistentBackupRetained": true,
+    "backupQuickCheck": "ok",
+    "schemaBefore": 9,
+    "schemaAfter": 11,
+    "zcodeMutationTargets": 0,
+    "nativeTaskCountBefore": 3,
+    "nativeTaskCountAfter": 3,
+    "nativeTasksPreserved": true,
+    "managedWorkersBefore": 0,
+    "resourceRetention": "Actual user service on 4737, persistent data/settings, consistent backup and versioned release remain in use; only isolated verification scopes/PIDs/ports/data were released",
+    "privateIdentifiersArchived": false,
+    "reportWorkerPerformedActivation": false,
+    "phoneExperience": {
+      "status": "pending acceptance; user-reported slow streaming under owner investigation",
+      "performancePassed": false,
+      "streamingButtonsMenusAccepted": false,
+      "additionalDiagnostics": "awaiting owner-supplied sanitized facts; report worker does not inspect chats"
+    },
+    "historicalObservation": true
+  },
+  "applicationPermissions": {
+    "attribution": "Owner read-only SDK application metadata, code 0; not a platform UI interaction test",
+    "readOnly": true,
+    "code": 0,
+    "sendAsBotConfigured": true,
+    "p2pReadConfigured": true,
+    "cardkitWriteConfigured": true,
+    "cardActionCallbackSubscribed": true,
+    "messageReceptionProvenByChallenge": true,
+    "messageMenuSubscriptionMetadata": "not reported by application.get; do not infer menu setup"
+  },
+  "independentBotDelivery": {
+    "stage": "activated by owner; subsequent low phone reply observed, latency not accepted",
+    "intended": {
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "profileBinding": false
+    },
+    "browser": {
+      "artifact": "browser-direct.json",
+      "passed": true,
+      "tree": "c05f0c65520d4de290b006b33b312fb392f38865",
+      "widths": [
+        1280,
+        390
+      ],
+      "ownerCount": 0,
+      "workerCount": 0,
+      "modelsCalled": 0,
+      "messagesSent": 0,
+      "artifactErrors": [],
+      "consoleErrors": 0,
+      "consoleWarnings": 0,
+      "fixtures": "External Channel/parent and model-directory interaction boundaries; real HTTP/RPC/persistence",
+      "resourcesReleased": true
+    },
+    "release": {
+      "path": "/home/mocha/.local/share/weaver/releases/20261021-feishu-c05f0c65520d",
+      "sourceHashesMatched": 40,
+      "distFilesMatched": 315,
+      "cliSHA256": "1965c5676552d8dc281a4229f949e73137c9a0f8c2d82d4a6b4d784237173176",
+      "independentNodeNoAncestorNodeModules": true,
+      "apiUiDefaultDisabledVerified": true,
+      "messagesSent": 0,
+      "modelsCalled": 0,
+      "scopePidPortDataReleased": true,
+      "candidateRetained": true
+    },
+    "preparedConfiguration": {
+      "version": 2,
+      "revision": 4,
+      "actualFileChanged": false,
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "idleTimeoutMinutes": 30,
+      "allowCount": 1,
+      "credentialsBindingWorkspaceRetained": true,
+      "note": "Historical isolated preparation; owner subsequently activated matching v2/low settings"
+    },
+    "backup": {
+      "path": "/home/mocha/.local/share/weaver/backups/20261021-feishu-independent-c05f0c65520d",
+      "oldVersion": 1,
+      "oldRevision": 3,
+      "consistentSQLiteQuickCheck": "ok",
+      "mode": "0600",
+      "persistent": true,
+      "deleteAuthorized": false
+    },
+    "actualCutoverPerformed": true,
+    "activationProofConsumed": true,
+    "currentLive": {
+      "version": 2,
+      "revision": 4,
+      "enabled": true,
+      "connection": "connected",
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "idleTimeoutMinutes": 30,
+      "allowedAccounts": 1,
+      "privateFileMode": "0o600",
+      "secretConfigured": true,
+      "pid": 864159,
+      "url": "http://127.0.0.1:4737",
+      "release": "/home/mocha/.local/share/weaver/releases/20261021-feishu-c05f0c65520d",
+      "activeSessions": 0,
+      "observedAt": "2026-10-21T10:23:00.951127+00:00",
+      "source": "Owner actual activation proof and separate public API recheck; report worker did not query live service"
+    },
+    "globalCodexOwnerChanged": false,
+    "activationProtection": {
+      "credentialsAndBindingRetained": true,
+      "globalOwnerUnchanged": true,
+      "nativeCountBefore": 4,
+      "nativeTasksPreserved": true,
+      "managedWorkersBefore": 0,
+      "databasePreserved": true,
+      "sqliteQuickCheck": "ok",
+      "oldMaxScopeInactive": true,
+      "phoneLowTestPerformed": false,
+      "backup": "/home/mocha/.local/share/weaver/backups/20261021-feishu-independent-c05f0c65520d",
+      "newContext": "No active sessions at activation; next genuine user message starts new context",
+      "phoneLowTestPerformedNote": "Historical activation-time value; later low observation recorded in latencyDiagnosis"
+    }
+  },
+  "phoneTiming": {
+    "attribution": "Owner supplied sanitized old max message/reply timestamps; report worker did not read chats",
+    "oldMaxObservations": [
+      {
+        "messageAt": "2026-10-21T09:27:34.822Z",
+        "replyAt": "2026-10-21T09:28:38.141Z",
+        "totalDurationMs": 63319
+      },
+      {
+        "messageAt": "2026-10-21T09:31:07.226Z",
+        "replyAt": "2026-10-21T09:31:30.880Z",
+        "totalDurationMs": 23654
+      }
+    ],
+    "firstDeltaMeasured": false,
+    "bottleneckLocated": false,
+    "lowPerformanceMeasured": true,
+    "actualButtonsMenusDispatchAccepted": false,
+    "metric": "All phone observations are server durable admission to final card update, excluding previous WS delivery and phone rendering",
+    "note": "Old max63319/23654ms and low35263/20318ms are server admission-to-final update, not first public delta or phone RTT; second low reused same production Codex process/scope, no claimed fix"
+  },
+  "openCodeQuotaNote": {
+    "separateCommit": "3b5c2c9",
+    "targetedOwnerRerunPass": 30,
+    "includedInFull1374": true,
+    "visibleTimeExample": "14h41m",
+    "nonInteractiveJsonMayOmitTime": true,
+    "existingBlocksRecomputed": false,
+    "recoveryGuaranteed": false,
+    "noTimeUsesFallback": true,
+    "newBundleSwitchRequired": false,
+    "deploymentNote": "Matching new bundle now activated; no claim of old block recalculation or observed quota recovery"
+  },
+  "reportReadabilityQA": {
+    "scope": "Report file only, not product/phone retest",
+    "fileUrl": "file:///home/mocha/opensource/weaver/docs/verification/feishu-im/browser.html",
+    "viewportWidth": 390,
+    "documentWidth": 390,
+    "horizontalOverflow": false,
+    "brokenImages": 0,
+    "screenshotsVisuallyReviewed": true,
+    "printPdfFirstTwoPagesRenderedAndReviewed": true,
+    "printTextIncludesActivationAndLimits": true,
+    "consoleErrors": 0,
+    "consoleWarnings": 0,
+    "pageErrors": 0,
+    "ownChromeClosed": true,
+    "ownProfileRemoved": true,
+    "ownScopeReleased": true,
+    "oneTimeScreenshotPdfArtifactsRemovedWithProfile": true,
+    "productionServiceUntouched": true
+  },
+  "latencyDiagnosis": {
+    "artifact": "latency-evidence.json",
+    "phoneLowTestPerformed": true,
+    "serverAdmissionToFinalCardMs": [
+      35263,
+      20318
+    ],
+    "phoneFirstDeltaMeasured": false,
+    "phoneRenderingMeasured": false,
+    "isolatedFactoryFirstDeltaMs": [
+      31036.4,
+      11079.0
+    ],
+    "systemTunObserved": true,
+    "directDelayMs": 457,
+    "currentHy2DelayMs": 365,
+    "rootCauseConfirmed": false,
+    "proxyResponsibilityConfirmed": false,
+    "performanceAccepted": false,
+    "warmFollowupPending": false,
+    "productChanged": false,
+    "sameProductionParentWarmTurnVerified": true,
+    "reportQA": {
+      "fileOnly": true,
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "brokenImages": 0,
+      "screenshotsVisuallyReviewed": true,
+      "printPdfFirstTwoPagesRenderedAndReviewed": true,
+      "consoleErrors": 0,
+      "consoleWarnings": 0,
+      "pageErrors": 0,
+      "ownSessionClosed": true,
+      "ownProfileRemoved": true,
+      "temporaryScreenshotPdfRemoved": true
+    }
+  }
+}

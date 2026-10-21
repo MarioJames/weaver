@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
-import type { Readable } from 'node:stream';
+import type { Readable, Writable } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
 
 const VERIFY_MS = 5000;
@@ -14,6 +14,8 @@ export interface OwnedScope extends EventEmitter {
   pid?: number;
   stdout: Readable;
   stderr: Readable;
+  /** Writable child stdin; only present when startOwnedScope was called with keepStdinOpen. */
+  stdin?: Writable;
   kill(signal?: NodeJS.Signals): boolean;
 }
 
@@ -102,7 +104,8 @@ export async function recoverOwnedScope(unit: string, invocation?: string): Prom
 }
 
 /** One systemd user scope around a fixed argv. Descendants stay in the cgroup and die with it. */
-export function startOwnedScope(options: { command: readonly string[]; cwd: string; env: NodeJS.ProcessEnv; stdin: string | null; stdinPath?: string; unit: string; detached?: boolean }): OwnedScope {
+export function startOwnedScope(options: { command: readonly string[]; cwd: string; env: NodeJS.ProcessEnv; stdin: string | null; stdinPath?: string; unit: string; keepStdinOpen?: boolean; detached?: boolean }): OwnedScope {
+  if (options.keepStdinOpen && (options.stdin !== null || options.stdinPath !== undefined)) throw new Error('keepStdinOpen requires stdin: null and no stdinPath');
   if (process.platform !== 'linux') throw new Error('Owned CLI scope requires Linux systemd user sessions');
   const handle = new EventEmitter() as OwnedScope;
   let invocation: string | undefined;
@@ -130,6 +133,10 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
   handle.stdout = child.stdout;
   handle.stderr = child.stderr;
   if (promptFd !== undefined) { /* inherited read-only prompt file */ }
+  else if (options.keepStdinOpen) {
+    handle.stdin = child.stdin;
+    child.stdin.on('error', error => handle.emit('error', new Error(`Scope stdin failed: ${error.message}`)));
+  }
   else if (options.stdin === null) child.stdin.end();
   else {
     child.stdin.on('error', error => handle.emit('error', new Error(`Prompt delivery failed: ${error.message}`)));

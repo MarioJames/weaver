@@ -1,3 +1,4 @@
+import { ImService, ImServiceError, type ImServiceOptions } from './im/service';
 import { spawn } from 'node:child_process';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +47,7 @@ export interface RuntimeOptions {
   /** Internal dependency injection for isolated runtime tests; never supplied over RPC. */
   quotaProber?: QuotaProber;
   ownerHost?: AsyncOwnerHost;
+  im?: Pick<ImServiceOptions, 'parentFactory' | 'channelFactory' | 'now'>;
 }
 
 export interface WeaverRuntime {
@@ -66,6 +68,7 @@ export function modulePaths(moduleUrl = import.meta.url) {
 }
 
 function publicError(error: unknown): { code: string; message: string } {
+  if (error instanceof ImServiceError) return { code: error.code, message: error.message };
   if (error instanceof RpcError) return { code: error.code, message: error.message };
   if (error instanceof Error) return { code: 'INVALID_REQUEST', message: error.message };
   return { code: 'INTERNAL_ERROR', message: 'Request failed' };
@@ -94,6 +97,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   if (embedded && options.dev) throw new Error('--dev needs a source checkout; this is a standalone executable');
   // A standalone executable runs the mock worker as itself with a hidden argument.
   const workerScript = options.workerScript ?? embedded?.mockWorkerArg ?? paths.workerScript;
+  let im: ImService | undefined;
   let ready = false;
   let draining = false;
   let commands: CommandHandler | undefined;
@@ -148,12 +152,15 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     freeProbe: () => freeProbe!,
     hellos,
     modelLister,
+    im: () => im!,
     server: () => ({ url: runtime.url, port: runtime.port, dataDir, startedAt, managedBy: managedBy() }),
   });
   async function dispatch(method: string, args: unknown[]): Promise<unknown> {
     const active = requireReady();
     if (!Object.hasOwn(handlers, method)) throw new RpcError('INVALID_REQUEST', 'Unknown method');
-    return await handlers[method as RpcMethod](active, args);
+    const result = await handlers[method as RpcMethod](active, args);
+    if (!['getImSettings', 'saveImSettings', 'reconnectIm'].includes(method)) await im?.reconcile();
+    return result;
   }
   async function call(method: string, args: unknown[]): Promise<unknown> {
     try { return await dispatch(method, args); }
@@ -201,6 +208,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     store = new TaskStore(join(dataDir, 'weaver.db'));
     recoverInterruptedTasks(store);
     policy = new PolicyStore(store.db);
+    im = new ImService({ dataDir, policy: () => policy!.snapshot(), ...options.im, taskStatus: () => `Weaver 任务共 ${store!.listSummaries().length} 项。` });
     quotaProber = options.quotaProber ?? new QuotaProber({ snapshotStore: dbQuotaStore(store.db) });
     // Ladders and probe answers live in the same weaver.db, so a restart keeps its penalties and history.
     stall = new StallMonitor({
@@ -246,10 +254,12 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     freeProbe.start();
     runtime.port = http.port;
     runtime.url = `http://127.0.0.1:${http.port}`;
+    im.start();
     if (options.open) openBrowser(runtime.url);
     return runtime;
   } catch (error) {
     ready = false;
+    await im?.close().catch(() => {});
     await commands?.drain().catch(() => {});
     await quotaProber?.close().catch(() => {});
     await vite?.close().catch(() => {});
@@ -265,6 +275,8 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     closed = true;
     draining = true;
     ready = false;
+    let imCloseFailure: unknown;
+    try { await im?.close(); } catch (error) { imCloseFailure = error; }
     const ownerDrain = commands?.drain();
     await commands?.schedules.stop().catch(() => {});
     await stall?.stop().catch(() => {});
@@ -279,5 +291,6 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     await http?.close().catch(() => {});
     await ipc.close().catch(() => {});
     resolveDone();
+    if (imCloseFailure) throw imCloseFailure;
   }
 }

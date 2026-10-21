@@ -29,6 +29,12 @@ function writeHelp(argv: string[], errorFormat: OutputFormat): void {
 }
 
 export async function runCLI(argv: string[], pollRuntime: Partial<PollRuntime> = {}): Promise<number> {
+  if (argv[0] === '__weaver-im-parent-host') {
+    try {
+      const { runParentHost } = await import('../main/im/parent-host');
+      process.exit(await runParentHost(argv.slice(1)));
+    } catch { return 1; }
+  }
   let commandId: string | undefined;
   let errorFormat: OutputFormat = requestedOutput(argv);
   try {

@@ -1,0 +1,2030 @@
+{
+  "version": {
+    "baseHEAD": "b54e425b3fda4b742945415a7b7195c1ca5dded6",
+    "tree": "7dd6e2918fe8b5cc80cf8a81f345514a1cca0e33",
+    "sourceHashCount": 39,
+    "sourceHashMismatches": [
+      "tests/cli/cli-rpc-contract.test.ts",
+      "tests/integration/runtime-http.test.ts"
+    ]
+  },
+  "url": "http://127.0.0.1:43119/#/settings",
+  "artifact_errors": [],
+  "console": [
+    {
+      "args": [
+        {
+          "type": "string",
+          "value": "[vite] connecting..."
+        }
+      ],
+      "text": "[vite] connecting...",
+      "type": "debug"
+    },
+    {
+      "args": [
+        {
+          "type": "string",
+          "value": "[vite] connected."
+        }
+      ],
+      "text": "[vite] connected.",
+      "type": "debug"
+    },
+    {
+      "args": [
+        {
+          "type": "string",
+          "value": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools"
+        },
+        {
+          "type": "string",
+          "value": "font-weight:bold"
+        }
+      ],
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+      "type": "info"
+    },
+    {
+      "args": [
+        {
+          "type": "string",
+          "value": "[vite] connecting..."
+        }
+      ],
+      "text": "[vite] connecting...",
+      "type": "debug"
+    },
+    {
+      "args": [
+        {
+          "type": "string",
+          "value": "[vite] connected."
+        }
+      ],
+      "text": "[vite] connected.",
+      "type": "debug"
+    },
+    {
+      "args": [
+        {
+          "type": "string",
+          "value": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools"
+        },
+        {
+          "type": "string",
+          "value": "font-weight:bold"
+        }
+      ],
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+      "type": "info"
+    }
+  ],
+  "requests": [
+    {
+      "requestId": "261935.149",
+      "status": 200,
+      "timestamp": 1792565176688,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.186",
+      "status": 200,
+      "timestamp": 1792565206706,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.196",
+      "status": 200,
+      "timestamp": 1792565214544,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.198",
+      "status": 200,
+      "timestamp": 1792565214806,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 0,
+          "config": {
+            "enabled": false,
+            "appId": "",
+            "allowedOpenIds": [],
+            "ownerProfileId": "",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 30
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.199",
+      "status": 200,
+      "timestamp": 1792565214983,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.200",
+      "status": 200,
+      "timestamp": 1792565215565,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.202",
+      "status": 200,
+      "timestamp": 1792565215834,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.203",
+      "status": 200,
+      "timestamp": 1792565216416,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.205",
+      "status": 200,
+      "timestamp": 1792565216683,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.206",
+      "status": 200,
+      "timestamp": 1792565217106,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 1,
+          "config": {
+            "enabled": false,
+            "appId": "",
+            "allowedOpenIds": [],
+            "ownerProfileId": "",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 30,
+            "appSecret": "[REDACTED FIXTURE]"
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.207",
+      "status": 200,
+      "timestamp": 1792565217259,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.230",
+      "status": 200,
+      "timestamp": 1792565236706,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.266",
+      "status": 200,
+      "timestamp": 1792565266529,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.267",
+      "status": 200,
+      "timestamp": 1792565266638,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.270",
+      "status": 200,
+      "timestamp": 1792565266724,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 2,
+          "config": {
+            "enabled": false,
+            "appId": "",
+            "allowedOpenIds": [],
+            "ownerProfileId": "",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 30,
+            "appSecret": "[REDACTED FIXTURE]"
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.272",
+      "status": 200,
+      "timestamp": 1792565266954,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.273",
+      "status": 200,
+      "timestamp": 1792565267637,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.275",
+      "status": 200,
+      "timestamp": 1792565268206,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 3,
+          "config": {
+            "enabled": false,
+            "appId": "",
+            "allowedOpenIds": [],
+            "ownerProfileId": "",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 1
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.276",
+      "status": 200,
+      "timestamp": 1792565268336,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.277",
+      "status": 200,
+      "timestamp": 1792565268563,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 4,
+          "config": {
+            "enabled": false,
+            "appId": "",
+            "allowedOpenIds": [],
+            "ownerProfileId": "",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 1440
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.278",
+      "status": 200,
+      "timestamp": 1792565268789,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.280",
+      "status": 200,
+      "timestamp": 1792565269006,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 5,
+          "config": {
+            "enabled": false,
+            "appId": "",
+            "allowedOpenIds": [],
+            "ownerProfileId": "",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 30
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.281",
+      "status": 200,
+      "timestamp": 1792565269216,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.282",
+      "status": 200,
+      "timestamp": 1792565269653,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.313",
+      "status": 200,
+      "timestamp": 1792565296706,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.328",
+      "status": 200,
+      "timestamp": 1792565308395,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.350",
+      "status": 200,
+      "timestamp": 1792565326706,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.377",
+      "status": 200,
+      "timestamp": 1792565349116,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.379",
+      "status": 200,
+      "timestamp": 1792565350705,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 6,
+          "config": {
+            "enabled": true,
+            "appId": "cli_a1b2c3d4e5f6a7b8",
+            "allowedOpenIds": [
+              "ou_fixture_user"
+            ],
+            "ownerProfileId": "codex_owner",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 30,
+            "appSecret": "[REDACTED FIXTURE]"
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.380",
+      "status": 200,
+      "timestamp": 1792565350914,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.381",
+      "status": 200,
+      "timestamp": 1792565351005,
+      "method": "reconnectIm",
+      "args": []
+    },
+    {
+      "requestId": "261935.383",
+      "status": 200,
+      "timestamp": 1792565351177,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.533",
+      "status": 200,
+      "timestamp": 1792565351905,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.536",
+      "status": 200,
+      "timestamp": 1792565352069,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.537",
+      "status": 200,
+      "timestamp": 1792565352306,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.538",
+      "status": 200,
+      "timestamp": 1792565352496,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.572",
+      "status": 200,
+      "timestamp": 1792565381905,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.578",
+      "status": 200,
+      "timestamp": 1792565384508,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.580",
+      "status": 200,
+      "timestamp": 1792565384906,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.584",
+      "status": 200,
+      "timestamp": 1792565385006,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.615",
+      "status": 200,
+      "timestamp": 1792565412543,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.616",
+      "status": 200,
+      "timestamp": 1792565412543,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 7,
+          "config": {
+            "enabled": true,
+            "appId": "cli_a1b2c3d4e5f6a7b8",
+            "allowedOpenIds": [
+              "ou_fixture_user"
+            ],
+            "ownerProfileId": "codex_owner",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 40
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.617",
+      "status": 200,
+      "timestamp": 1792565412605,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.618",
+      "status": 200,
+      "timestamp": 1792565412817,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.619",
+      "status": 400,
+      "timestamp": 1792565412909,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 7,
+          "config": {
+            "enabled": true,
+            "appId": "cli_a1b2c3d4e5f6a7b8",
+            "allowedOpenIds": [
+              "ou_fixture_user"
+            ],
+            "ownerProfileId": "codex_owner",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 30,
+            "appSecret": "[REDACTED FIXTURE]"
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.620",
+      "status": 200,
+      "timestamp": 1792565412909,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.622",
+      "status": 200,
+      "timestamp": 1792565413095,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.624",
+      "status": 200,
+      "timestamp": 1792565414169,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.625",
+      "status": 200,
+      "timestamp": 1792565414906,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.661",
+      "status": 200,
+      "timestamp": 1792565444906,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.697",
+      "status": 200,
+      "timestamp": 1792565474906,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.717",
+      "status": 200,
+      "timestamp": 1792565490437,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.718",
+      "status": 200,
+      "timestamp": 1792565490443,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.719",
+      "status": 200,
+      "timestamp": 1792565490443,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 8,
+          "config": {
+            "enabled": true,
+            "appId": "cli_a1b2c3d4e5f6a7b8",
+            "allowedOpenIds": [
+              "ou_fixture_user"
+            ],
+            "ownerProfileId": "codex_owner",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 40
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.720",
+      "status": 200,
+      "timestamp": 1792565490505,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.721",
+      "status": 200,
+      "timestamp": 1792565490704,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.722",
+      "status": 400,
+      "timestamp": 1792565490806,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 8,
+          "config": {
+            "enabled": true,
+            "appId": "cli_a1b2c3d4e5f6a7b8",
+            "allowedOpenIds": [
+              "ou_fixture_user"
+            ],
+            "ownerProfileId": "codex_owner",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 40,
+            "appSecret": "[REDACTED FIXTURE]"
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.723",
+      "status": 200,
+      "timestamp": 1792565490806,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.724",
+      "status": 200,
+      "timestamp": 1792565490973,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.725",
+      "status": 200,
+      "timestamp": 1792565491250,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.726",
+      "status": 200,
+      "timestamp": 1792565491407,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.743",
+      "status": 200,
+      "timestamp": 1792565504906,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.777",
+      "status": 200,
+      "timestamp": 1792565532731,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.778",
+      "status": 200,
+      "timestamp": 1792565532738,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.779",
+      "status": 200,
+      "timestamp": 1792565532738,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 9,
+          "config": {
+            "enabled": true,
+            "appId": "cli_a1b2c3d4e5f6a7b8",
+            "allowedOpenIds": [
+              "ou_fixture_user"
+            ],
+            "ownerProfileId": "codex_owner",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 40
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.780",
+      "status": 200,
+      "timestamp": 1792565532805,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.781",
+      "status": 200,
+      "timestamp": 1792565533007,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.782",
+      "status": 400,
+      "timestamp": 1792565533051,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 9,
+          "config": {
+            "enabled": true,
+            "appId": "cli_a1b2c3d4e5f6a7b8",
+            "allowedOpenIds": [
+              "ou_fixture_user"
+            ],
+            "ownerProfileId": "codex_owner",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 40,
+            "appSecret": "[REDACTED FIXTURE]"
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.783",
+      "status": 200,
+      "timestamp": 1792565533106,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.784",
+      "status": 200,
+      "timestamp": 1792565533279,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.786",
+      "status": 200,
+      "timestamp": 1792565533559,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.787",
+      "status": 200,
+      "timestamp": 1792565533714,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.795",
+      "status": 200,
+      "timestamp": 1792565539062,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.796",
+      "status": 200,
+      "timestamp": 1792565539469,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.797",
+      "status": 200,
+      "timestamp": 1792565539469,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 10,
+          "config": {
+            "enabled": true,
+            "appId": "cli_a1b2c3d4e5f6a7b8",
+            "allowedOpenIds": [
+              "ou_fixture_user"
+            ],
+            "ownerProfileId": "codex_owner",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 40
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.799",
+      "status": 200,
+      "timestamp": 1792565539609,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.800",
+      "status": 200,
+      "timestamp": 1792565539892,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.801",
+      "status": 200,
+      "timestamp": 1792565540130,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.802",
+      "status": 200,
+      "timestamp": 1792565540505,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.804",
+      "status": 200,
+      "timestamp": 1792565540667,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.805",
+      "status": 200,
+      "timestamp": 1792565540806,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 11,
+          "config": {
+            "enabled": true,
+            "appId": "cli_a1b2c3d4e5f6a7b8",
+            "allowedOpenIds": [
+              "ou_fixture_user"
+            ],
+            "ownerProfileId": "codex_owner",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 40,
+            "appSecret": "[REDACTED FIXTURE]"
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.806",
+      "status": 200,
+      "timestamp": 1792565540998,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.807",
+      "status": 200,
+      "timestamp": 1792565541594,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.809",
+      "status": 200,
+      "timestamp": 1792565541838,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.810",
+      "status": 200,
+      "timestamp": 1792565542505,
+      "method": "reconnectIm",
+      "args": []
+    },
+    {
+      "requestId": "261935.812",
+      "status": 200,
+      "timestamp": 1792565542695,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.813",
+      "status": 200,
+      "timestamp": 1792565543106,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.814",
+      "status": 200,
+      "timestamp": 1792565543383,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 12,
+          "config": {
+            "enabled": true,
+            "appId": "cli_a1b2c3d4e5f6a7b8",
+            "allowedOpenIds": [
+              "ou_fixture_user"
+            ],
+            "ownerProfileId": "codex_owner",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 40,
+            "appSecret": "[REDACTED FIXTURE]"
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.822",
+      "status": 200,
+      "timestamp": 1792565548835,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.823",
+      "status": 200,
+      "timestamp": 1792565549206,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 13,
+          "config": {
+            "enabled": false,
+            "appId": "cli_a1b2c3d4e5f6a7b8",
+            "allowedOpenIds": [
+              "ou_fixture_user"
+            ],
+            "ownerProfileId": "codex_owner",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 40
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.824",
+      "status": 200,
+      "timestamp": 1792565549406,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.826",
+      "status": 200,
+      "timestamp": 1792565549806,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.827",
+      "status": 200,
+      "timestamp": 1792565549973,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.828",
+      "status": 200,
+      "timestamp": 1792565550106,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 14,
+          "config": {
+            "enabled": false,
+            "appId": "cli_a1b2c3d4e5f6a7b8",
+            "allowedOpenIds": [
+              "ou_fixture_user"
+            ],
+            "ownerProfileId": "codex_owner",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 40,
+            "appSecret": "[REDACTED FIXTURE]"
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.829",
+      "status": 200,
+      "timestamp": 1792565550278,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.831",
+      "status": 200,
+      "timestamp": 1792565550764,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.832",
+      "status": 200,
+      "timestamp": 1792565551471,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.834",
+      "status": 200,
+      "timestamp": 1792565552218,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.850",
+      "status": 200,
+      "timestamp": 1792565564905,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.879",
+      "status": 200,
+      "timestamp": 1792565590176,
+      "method": "saveImSettings",
+      "args": [
+        {
+          "expectedRevision": 15,
+          "config": {
+            "enabled": true,
+            "appId": "cli_a1b2c3d4e5f6a7b8",
+            "allowedOpenIds": [
+              "ou_fixture_user"
+            ],
+            "ownerProfileId": "codex_owner",
+            "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8",
+            "idleTimeoutMinutes": 40,
+            "appSecret": "[REDACTED FIXTURE]"
+          }
+        }
+      ]
+    },
+    {
+      "requestId": "261935.880",
+      "status": 200,
+      "timestamp": 1792565590402,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.887",
+      "status": 200,
+      "timestamp": 1792565594906,
+      "method": "getImSettings",
+      "args": []
+    },
+    {
+      "requestId": "261935.923",
+      "status": 200,
+      "timestamp": 1792565624905,
+      "method": "getImSettings",
+      "args": []
+    }
+  ],
+  "observations": [
+    {
+      "name": "initial",
+      "alerts": [],
+      "guard": false,
+      "idle": "30",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [],
+          "appId": "",
+          "appSecretConfigured": false,
+          "enabled": false,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "",
+          "workspace": ""
+        },
+        "revision": 0,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "disabled incomplete saved",
+      "alerts": [],
+      "guard": false,
+      "idle": "30",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [],
+          "appId": "",
+          "appSecretConfigured": false,
+          "enabled": false,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 1,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "invalid '0'",
+      "alerts": [
+        "空闲超时是 1 到 1440 之间的整数分钟。"
+      ],
+      "guard": true,
+      "idle": "0",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [],
+          "appId": "",
+          "appSecretConfigured": false,
+          "enabled": false,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 1,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": true
+    },
+    {
+      "name": "discard '0'",
+      "alerts": [],
+      "guard": false,
+      "idle": "30",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [],
+          "appId": "",
+          "appSecretConfigured": false,
+          "enabled": false,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 1,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "invalid '1441'",
+      "alerts": [
+        "空闲超时是 1 到 1440 之间的整数分钟。"
+      ],
+      "guard": true,
+      "idle": "1441",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [],
+          "appId": "",
+          "appSecretConfigured": false,
+          "enabled": false,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 1,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": true
+    },
+    {
+      "name": "discard '1441'",
+      "alerts": [],
+      "guard": false,
+      "idle": "30",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [],
+          "appId": "",
+          "appSecretConfigured": false,
+          "enabled": false,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 1,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "decimal",
+      "alerts": [
+        "空闲超时是 1 到 1440 之间的整数分钟。"
+      ],
+      "guard": true,
+      "idle": "1.5",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [],
+          "appId": "",
+          "appSecretConfigured": true,
+          "enabled": false,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 3,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": true
+    },
+    {
+      "name": "valid 1",
+      "alerts": [],
+      "guard": false,
+      "idle": "1",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [],
+          "appId": "",
+          "appSecretConfigured": true,
+          "enabled": false,
+          "idleTimeoutMinutes": 1,
+          "ownerProfileId": "",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 4,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "valid 1440",
+      "alerts": [],
+      "guard": false,
+      "idle": "1440",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [],
+          "appId": "",
+          "appSecretConfigured": true,
+          "enabled": false,
+          "idleTimeoutMinutes": 1440,
+          "ownerProfileId": "",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 5,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "valid 30",
+      "alerts": [],
+      "guard": false,
+      "idle": "30",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [],
+          "appId": "",
+          "appSecretConfigured": true,
+          "enabled": false,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 6,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "illegal only keyboard",
+      "alerts": [
+        "空闲超时是 1 到 1440 之间的整数分钟。"
+      ],
+      "guard": true,
+      "idle": "0",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [],
+          "appId": "",
+          "appSecretConfigured": true,
+          "enabled": false,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 6,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "real empty keyboard blocked",
+      "alerts": [
+        "空闲超时是 1 到 1440 之间的整数分钟。"
+      ],
+      "guard": true,
+      "idle": "",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [],
+          "appId": "",
+          "appSecretConfigured": true,
+          "enabled": false,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 6,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": true
+    },
+    {
+      "name": "enabled valid",
+      "alerts": [],
+      "guard": false,
+      "idle": "30",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 7,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "reconnected",
+      "alerts": [],
+      "guard": false,
+      "idle": "30",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 7,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "reload",
+      "alerts": [],
+      "guard": false,
+      "idle": "30",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 7,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "secret refresh",
+      "alerts": [],
+      "guard": true,
+      "idle": "30",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 7,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": true
+    },
+    {
+      "name": "secret automatic poll",
+      "alerts": [],
+      "guard": true,
+      "idle": "30",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 7,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": true,
+      "observedGetTimes": [
+        1792565381846,
+        1792565384503
+      ]
+    },
+    {
+      "name": "secret navigation",
+      "alerts": [],
+      "guard": true,
+      "idle": "30",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 30,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 7,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": true
+    },
+    {
+      "name": "conflict preserves baseline and secret",
+      "alerts": [
+        "配置在别处被修改页面里的草稿基于修订 9，控制面已推进到修订 10（可能来自另一标签页或其他工具）。直接保存会被版本冲突拒绝；点「放弃修改并载入最新」改用控制面的当前配置，未保存的输入不会保留。放弃修改并载入最新"
+      ],
+      "guard": true,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 10,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": true
+    },
+    {
+      "name": "conflict rejected",
+      "alerts": [
+        "配置在别处被修改页面里的草稿基于修订 9，控制面已推进到修订 10（可能来自另一标签页或其他工具）。直接保存会被版本冲突拒绝；点「放弃修改并载入最新」改用控制面的当前配置，未保存的输入不会保留。放弃修改并载入最新",
+        "IM_SETTINGS_CONFLICT: IM 操作失败，请检查配置或重新连接。"
+      ],
+      "guard": true,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 10,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": true
+    },
+    {
+      "name": "force rejected keeps draft",
+      "alerts": [
+        "配置在别处被修改页面里的草稿基于修订 9，控制面已推进到修订 10（可能来自另一标签页或其他工具）。直接保存会被版本冲突拒绝；点「放弃修改并载入最新」改用控制面的当前配置，未保存的输入不会保留。放弃修改并载入最新",
+        "IM_SETTINGS_CONFLICT: IM 操作失败，请检查配置或重新连接。"
+      ],
+      "guard": true,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 10,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": true
+    },
+    {
+      "name": "conflict new baseline",
+      "alerts": [],
+      "guard": true,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 9,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": true
+    },
+    {
+      "name": "force success resets and clears errors",
+      "alerts": [],
+      "guard": false,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 10,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "force invalid visible reset",
+      "alerts": [],
+      "guard": false,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 11,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "save rejected",
+      "alerts": [
+        "ACCEPTANCE_REJECTED: Injected browser transport refusal"
+      ],
+      "guard": true,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 11,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": true
+    },
+    {
+      "name": "save retry success",
+      "alerts": [],
+      "guard": false,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 12,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "getImSettings retry success",
+      "alerts": [],
+      "guard": false,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 12,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "reconnectIm retry success",
+      "alerts": [],
+      "guard": false,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 12,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "old refresh after save",
+      "alerts": [],
+      "guard": false,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 13,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "disabled disconnect",
+      "alerts": [],
+      "guard": false,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": false,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 14,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "clear pending survives refresh",
+      "alerts": [],
+      "guard": true,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": false,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 14,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "clear committed",
+      "alerts": [],
+      "guard": false,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": false,
+          "enabled": false,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 15,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "bad appid",
+      "alerts": [
+        "App ID 形如 cli_a1b2c3d4e5f6a7b8：cli_ 后跟 16 位十六进制字符，这一输入不符合。"
+      ],
+      "guard": true,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": false,
+          "enabled": false,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 15,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "duplicate whitelist",
+      "alerts": [
+        "白名单里有重复行，每行只保留一个。"
+      ],
+      "guard": true,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": false,
+          "enabled": false,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 15,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "missing secret",
+      "alerts": [
+        "开启时需要已保存的 App Secret，或现在粘贴一个新的。"
+      ],
+      "guard": true,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": false,
+          "enabled": false,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 15,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "disabled"
+        }
+      },
+      "secretPresent": false
+    },
+    {
+      "name": "final connected",
+      "alerts": [],
+      "guard": false,
+      "idle": "40",
+      "saved": {
+        "config": {
+          "allowedOpenIds": [
+            "ou_fixture_user"
+          ],
+          "appId": "cli_a1b2c3d4e5f6a7b8",
+          "appSecretConfigured": true,
+          "enabled": true,
+          "idleTimeoutMinutes": 40,
+          "ownerProfileId": "codex_owner",
+          "workspace": "/tmp/weaver-feishu-sqivf643/validation-7dd6e2918fe8"
+        },
+        "revision": 16,
+        "status": {
+          "activeSessions": 0,
+          "busySessions": 0,
+          "connection": "connected"
+        }
+      },
+      "secretPresent": false
+    }
+  ],
+  "methodology": "Selected last completed observations per case. agent-browser fill empty did not clear the control, so only real keyboard Control+A/Backspace is the empty-input test. One transient network refusal recovered through existing read retry; explicit UI failure used one browser fetch HTTP400 refusal with ACCEPTANCE_REJECTED. Real server HTTP400s are expected optimistic conflicts. No external Feishu or model calls.",
+  "cleanup": {
+    "unit": "dev-weaver-feishu-browser-01a15cad.scope",
+    "pid": 260651,
+    "port": 43119,
+    "portClosed": true,
+    "pidExited": true,
+    "profileDeleted": true,
+    "dataDeleted": true,
+    "fixtureCountsBeforeRuntimeClose": {
+      "connect": 10,
+      "close": 9,
+      "send": 0,
+      "parent": 0
+    }
+  }
+}

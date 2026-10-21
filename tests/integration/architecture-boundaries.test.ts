@@ -23,7 +23,9 @@ const ALLOWED: Record<Layer, readonly Layer[]> = {
 };
 
 /** cli -> main imports that are part of the rule, not legacy debt (module paths without extension, relative to src). */
-const CLI_MAIN_ALLOWED = new Set(['main/local-ipc', 'main/runtime', 'main/embedded']);
+// parent-host is the private same-release process entry, loaded dynamically only for its internal marker.
+// It must never join the ordinary client's static graph (guarded by cli-rpc-contract.test.ts).
+const CLI_MAIN_ALLOWED = new Set(['main/local-ipc', 'main/runtime', 'main/embedded', 'main/im/parent-host']);
 
 /** "<importing file> -> <imported module>", both relative to src and without extension. */
 const LEGACY_VIOLATIONS = new Set<string>([]);

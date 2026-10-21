@@ -10,6 +10,7 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node22',
+  banner: { js: `import { createRequire as __weaverCreateRequire } from 'node:module'; import { fileURLToPath as __weaverFileURLToPath } from 'node:url'; const require = __weaverCreateRequire(import.meta.url); const __dirname = __weaverFileURLToPath(new URL('.', import.meta.url));` },
   external: ['vite'],
 
 });

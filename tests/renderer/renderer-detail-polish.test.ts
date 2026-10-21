@@ -13,7 +13,8 @@ import { readFileSync } from 'node:fs';
 import { transformSync } from 'esbuild';
 const app = readFileSync(new URL('../../src/renderer/app/App.tsx', import.meta.url), 'utf8');
 const routeSource = app.slice(app.indexOf('function pageFromHash'), app.indexOf('/** The hash'));
-const pageFromHash = new Function('PAGES', transformSync(routeSource.replace('export ', ''), { loader: 'ts' }).code + '; return pageFromHash;' )(['tasks', 'engines', 'owners', 'workers', 'settings']) as () => string;
+const pagesSource = app.slice(app.indexOf('const PAGES ='), app.indexOf('type Page ='));
+const pageFromHash = new Function(transformSync(pagesSource + routeSource.replace('export ', ''), { loader: 'ts' }).code + '; return pageFromHash;')() as () => string;
 const markup = (node: React.ReactNode) => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { enableCustomFonts: false, children: node }) }));
 test('completed and interrupted artifact empty states explain the actual status', () => {
   const completed = markup(React.createElement(ArtifactsPanel, { artifacts: [], status: 'completed' }));
@@ -52,7 +53,7 @@ test('not found error displays one Chinese message without raw duplicated codes'
 test('direct and copied legacy URLs resolve to the same page', () => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'window');
   try {
-    for (const [pathname, hash, expected] of [['/owners', '', 'owners'], ['/owners', '#/workers', 'workers'], ['/', '#/settings', 'settings'], ['/unknown', '', 'tasks']]) {
+    for (const [pathname, hash, expected] of [['/owners', '', 'owners'], ['/owners', '#/workers', 'workers'], ['/', '#/settings', 'settings'], ['/', '#/bots', 'bots'], ['/bots', '', 'bots'], ['/', '#/schedules', 'schedules'], ['/unknown', '', 'tasks']]) {
       Object.defineProperty(globalThis, 'window', { configurable: true, value: { location: { pathname, hash } } });
       assert.equal(pageFromHash(), expected);
     }

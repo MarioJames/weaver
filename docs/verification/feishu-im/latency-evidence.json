@@ -1,0 +1,154 @@
+{
+  "attribution": "Owner safe phone/network observations and independently accepted factory/source probes; report worker performed no model/Feishu/network tests",
+  "productChanged": false,
+  "configuration": {
+    "version": 2,
+    "revision": 4,
+    "engine": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "low"
+  },
+  "phone": {
+    "lowTestPerformed": true,
+    "actualParentEffortVerified": true,
+    "observations": [
+      {
+        "lastMessageAt": "2026-10-21T10:26:24.550Z",
+        "lastReplyAt": "2026-10-21T10:26:59.813Z",
+        "durationMs": 35263,
+        "residentReuse": "not established by this proof"
+      },
+      {
+        "lastMessageAt": "2026-10-21T10:43:30.038Z",
+        "lastReplyAt": "2026-10-21T10:43:50.356Z",
+        "durationMs": 20318,
+        "residentReuse": true,
+        "sameParentProcessAsFirstLowPhoneTurnVerified": true
+      }
+    ],
+    "metric": "Server durable admission to successful final card update; excludes preceding WS delivery and phone rendering",
+    "firstDeltaMeasured": false,
+    "phoneEndToEndRttMeasured": false,
+    "performanceAccepted": false,
+    "buttonsMenusPhoneDispatchAccepted": false,
+    "warmFollowup": "Owner verified same production Codex process and scope as first low phone turn; connected, activeSessions1, busySessions0"
+  },
+  "factoryProbe": {
+    "factory": "createParentAgent",
+    "instructions": "same actual imInstructions",
+    "cliVersion": "0.163.0",
+    "nodeVersion": "v24.21.0",
+    "ephemeralNewThread": true,
+    "startupMs": 613.3,
+    "modelRequests": 2,
+    "feishuMessages": 0,
+    "turns": [
+      {
+        "turn": 1,
+        "residentReuse": false,
+        "firstPublicDeltaMs": 31036.4,
+        "completionMs": 31080.5,
+        "deltaCount": 3,
+        "exactExpectedReply": true
+      },
+      {
+        "turn": 2,
+        "residentReuse": true,
+        "firstPublicDeltaMs": 11079.0,
+        "completionMs": 11240.3,
+        "deltaCount": 3,
+        "exactExpectedReply": true
+      }
+    ],
+    "cleanup": {
+      "parentClosed": true,
+      "outerScopeReleased": true,
+      "parentScopeReleased": true,
+      "launcherParentPidsReleased": true,
+      "compileCacheRemoved": true,
+      "productionParentTouched": false
+    }
+  },
+  "network": {
+    "attribution": "Owner observed process sockets, ip route and read-only Mihomo connections",
+    "systemTunEnabled": true,
+    "feishuWebsocket": {
+      "host": "msg-frontier.feishu.cn",
+      "rule": "default Match",
+      "transport": "HY2"
+    },
+    "codexUpstream": {
+      "host": "chatgpt.com",
+      "rule": "OpenAI",
+      "transport": "US HY2"
+    },
+    "httpHttpsAllProxyEnvPresent": false,
+    "routingSelectorsRulesChanged": false
+  },
+  "httpReadOnly": {
+    "transport": "Same axios timeout, kernel TUN, no explicit proxy env",
+    "samples": [
+      {
+        "phase": "tenant-token",
+        "durationMs": 859.8,
+        "code": 0
+      },
+      {
+        "phase": "bot-info-readonly",
+        "durationMs": 623.8,
+        "code": 0
+      },
+      {
+        "phase": "bot-info-readonly",
+        "durationMs": 612.4,
+        "code": 0
+      }
+    ],
+    "modelRequests": 0,
+    "messagesSent": 0
+  },
+  "proxyDelayComparison": {
+    "method": "Mihomo GET individual proxy delay; unauthenticated Feishu bot-info HTTP GET",
+    "samples": [
+      {
+        "route": "DIRECT",
+        "delayMs": 457,
+        "status": 200
+      },
+      {
+        "route": "current HY2",
+        "delayMs": 365,
+        "status": 200
+      }
+    ],
+    "samplesPerRoute": 1,
+    "routingSelectionChanged": false,
+    "metric": "Mihomo own delay definition; not axios request wall time",
+    "officialApi": "https://wiki.metacubex.one/en/api/"
+  },
+  "sourceFindings": [
+    "Connected Feishu WS is reused; ordinary messages do not reconnect it",
+    "Cold parent initialize/thread precedes initial CardKit create/send and turn/start",
+    "Short public Chinese delta is appended without waiting for100 characters or final; normal100ms throttle may wait behind in-flight HTTP",
+    "lastReplyAt includes terminal, flush, card settings and final full-card update"
+  ],
+  "limits": [
+    "Two isolated model samples reproduce31s first public delta without Feishu, supporting focus on Codex first-context/upstream waiting; model service/network/tools not separately timed",
+    "Cannot decompose original35263ms into isolated probe durations",
+    "Single DIRECT457ms / current HY2 365ms comparison does not establish proxy responsibility",
+    "Server lastReplyAt is not first delta or phone rendering",
+    "No verified root cause, speed improvement, button/menu or phone dispatch conclusion",
+    "Two low phone observations35263/20318ms include complete server processing, not first delta or phone RTT; unchanged product means no claimed fix or precise causal breakdown"
+  ],
+  "sources": [
+    "phone-safe.json",
+    "probe.json",
+    "probe.cleanup.json",
+    "codex-probe-result.md",
+    "source-result.md",
+    "network-safe.json",
+    "http-safe.json",
+    "direct-comparison-safe.json",
+    "warm-phone-safe.json"
+  ]
+}

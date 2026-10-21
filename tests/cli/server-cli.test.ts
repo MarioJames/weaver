@@ -78,7 +78,7 @@ const ran = (runs: string[][], ...prefix: string[]) => runs.some(call => call.sl
 // ---------------------------------------------------------------- real CLI lifecycle
 
 test('weaver server start, status and stop drive a real control plane on a free port', () => {
-  const dataDir = mkdtempSync(join(scratch, 'live-'));
+  const dataDir = mkdtempSync(join(tmpdir(), 'live-'));
   // Strip service-manager wiring (env var and unit path) so the spawned CLI sees an unmanaged server regardless of host.
   const isolatedEnv = (): NodeJS.ProcessEnv => {
     const clean = Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'WEAVER_SERVICE' && key !== 'XDG_CONFIG_HOME'));
@@ -144,7 +144,7 @@ test('weaver server --help prints the group help and the CLI help points at it',
 });
 
 test('weaver web reuses a running service instead of starting a second instance', async () => {
-  const dataDir = mkdtempSync(join(scratch, 'live-'));
+  const dataDir = mkdtempSync(join(tmpdir(), 'live-'));
   // Async spawns only: the runtime answers the CLI probe from this test's own event loop.
   const cli = (words: string[]) => exec(process.execPath, ['--import', 'tsx', entry, ...words], { encoding: 'utf8', cwd: resolve('.'), maxBuffer: 1 << 24 });
   let runtime;

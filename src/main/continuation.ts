@@ -1,3 +1,4 @@
+import { dirname, resolve } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import type { Task } from '../shared/contracts/tasks';
 import type { ContextPack, ContinuationPolicy, HandoffRecord } from '../shared/contracts/continuation';
@@ -40,14 +41,18 @@ function assertQuiescent(task: Task): void {
  * CommandHandler owns durable command receipts; all mutations must enter via that handler.
  */
 export class ContinuationService {
- constructor(private readonly store: TaskStore, private readonly host: OwnerHostAdapter, private readonly now: () => number = Date.now) {}
+ readonly dataDir: string;
+ constructor(private readonly store: TaskStore, private readonly host: OwnerHostAdapter, private readonly now: () => number = Date.now) {
+  // Runtime opens join(resolve(dataDir), 'weaver.db'); this is the already-bound instance, never target cwd.
+  this.dataDir = dirname(resolve(store.path));
+ }
  get(taskId: string): ContinuationStatus {
   const task = this.read(taskId);
   const result = structuredClone({taskId, ownerId: task.ownerId, ownerEpoch: task.ownerEpoch ?? 0,
    policy: task.continuationPolicy ?? {idleRotationMinutes: DEFAULT_IDLE_TTL_MINUTES},
    lastActivityAt: task.ownerLastActivityAt ?? task.createdAt, due: idleContinuationDue(task, this.now()),
    history: task.continuationHistory ?? [], contextPack: task.contextPack ?? null}) as ContinuationStatus;
-  if (result.contextPack) result.prompt = handoffPrompt(task, result.contextPack);
+  if (result.contextPack) result.prompt = handoffPrompt(task, result.contextPack, this.dataDir);
   return result;
  }
  due(taskId: string): boolean { return idleContinuationDue(this.read(taskId), this.now()); }
@@ -75,6 +80,10 @@ export class ContinuationService {
   const at = new Date(this.now()).toISOString();
   const pack = this.assemble(original, targetProfile, epoch + 1, at);
   const replacement: LogicalOwner = {id: randomUUID(), name: owner.name, profileId: targetProfile, mode: owner.mode, state: owner.mode === 'mock' ? 'ready' : 'attached', createdAt: at};
+  // Validate before creating a replacement or committing: an unrenderable CLI path must never
+  // leave an owner binding changed while reporting failure.
+  try { handoffPrompt({...original, ownerId: replacement.id}, pack, this.dataDir); }
+  catch { fail('CONTEXT_LIMIT', 'Owner handoff cannot fit its instance command and required context'); }
   let spawned = false;
   try {
    // Register cleanup before creating a mock host or a manual local attachment.

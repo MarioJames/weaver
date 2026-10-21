@@ -1,0 +1,591 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, readFile, writeFile, mkdir, copyFile, chmod } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { realpath } from 'node:fs/promises';
+import { join } from 'node:path';
+import { IM_ENGINE_KINDS } from '../../src/shared/im-engines';
+import { ImService } from '../../src/main/im/service';
+import type { ImChannelFactory, ImChannelHandlers } from '../../src/main/im/channel';
+import { createParentAgent, parentError, type ParentAgentSession, type ParentAgentFactory, type ParentAgentInput } from '../../src/main/im/parent-agent';
+import type { PolicySnapshot } from '../../src/shared/contracts/policy';
+import type { NormalizedMessage, CardActionEvent } from '@larksuite/channel';
+// One isolated root per run under the OS temp dir (respecting TMPDIR); removed again after the suite.
+const ROOT = await mkdtemp(join(tmpdir(), 'weaver-im-service-'));
+test.after(async () => { await rm(ROOT, { recursive: true, force: true }); });
+const tick = async () => { for (let n=0;n<12;n++) await new Promise<void>(r=>setImmediate(r)); };
+function deferred<T>() { let resolve!: (v:T)=>void; const promise=new Promise<T>(r=>resolve=r); return {promise,resolve}; }
+function policy(): PolicySnapshot { return { revision:0, config:{version:1,engines:{codex:{enabled:true,kind:'codex'}},owners:{main:{enabled:true,engine:'codex',model:'gpt-test',effort:'medium',workers:[],max_parallel:1}},workers:{},herdr:{max_wait_minutes:30}}, blocks:[],activeBlocks:[],owners:{},workers:{},execution:'disabled' }; }
+function fixture(parent?: ParentAgentFactory, connect?:()=>Promise<void>) {
+ let handlers!: ImChannelHandlers; const chunks:string[]=[]; const cards:{id:string;card:any}[]=[]; const notices:string[]=[]; let closed=0; let seq=0; let updateFailure=false;
+ const factory: ImChannelFactory=(_c,h)=>{handlers=h;return { connect:connect??(async()=>{}),close:async()=>{closed++;},state:()=> 'connected',send:async(_to,text)=>{notices.push(text);},retireCard:async()=>{},stream:async(_to,producer,delivery)=>{const id=`om_bot${++seq}`;await producer({messageId:id,append:async text=>{assert.ok(delivery.valid());chunks.push(text);},setContent:async text=>{chunks.push(text);}});return id;},updateCard:async(id,card,delivery)=>{assert.ok(delivery.valid());if(updateFailure)throw new Error('CANARY_SECRET');cards.push({id,card});}};};
+ return {factory,failUpdate:()=>{updateFailure=true;},get handlers(){return handlers;},chunks,cards,notices,get closed(){return closed;}};
+}
+function message(id:string,user='ou_a',chat='oc_a',text='你好',now=Date.now()): NormalizedMessage {
+ return {messageId:`om_${id}`,chatId:chat,chatType:'p2p',senderId:user,senderType:'user',content:text,rawContentType:'text',resources:[],mentions:[],mentionAll:false,mentionedBot:false,createTime:now,raw:{sender:{sender_type:'user',sender_id:{open_id:user}},message:{message_id:`om_${id}`,chat_id:chat,chat_type:'p2p',message_type:'text',create_time:String(now),content:JSON.stringify({text})}}};
+}
+async function setup(t:any,parent:ParentAgentFactory,options:{now?:()=>number;connect?:()=>Promise<void>}={}) {
+ const dir=await mkdtemp(join(ROOT, 'service-'));const f=fixture(parent,options.connect); const live=policy(); const service=new ImService({dataDir:dir,policy:()=>live,parentFactory:parent,channelFactory:f.factory,now:options.now});
+ t.after(async()=>{await service.close();await rm(dir,{recursive:true,force:true});});
+ const config={enabled:true,appId:'cli_test',appSecret:'CANARY_SECRET',allowedOpenIds:['ou_a','ou_b'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes:1};
+ await service.save({expectedRevision:0,config});await tick();return {dir,f,service,config,live};
+}
+test('授权、两条快速原始消息、串行复用、跨用户独立 epoch、持久去重',async t=>{
+ const calls:{input:ParentAgentInput;texts:string[];close:number}[]=[];
+ const parent:ParentAgentFactory=async input=>{const record={input,texts:[] as string[],close:0};calls.push(record);return {send:async text=>{record.texts.push(text);return `答：${text}`;},close:async()=>{record.close++;}};};
+ const {f,service,dir,config}=await setup(t,parent);
+ f.handlers.message(message('x','ou_unknown'));f.handlers.message({...message('group'),chatType:'group'});f.handlers.message({...message('bot'),senderType:'bot'});await tick();assert.equal(calls.length,1);assert.deepEqual(calls[0]!.texts,[]);
+ f.handlers.message(message('one'));f.handlers.message(message('two'));f.handlers.message(message('three','ou_b','oc_b'));await tick();assert.equal(calls.length,2);assert.deepEqual(calls[0]!.texts,['你好','你好']);assert.notEqual(calls[0]!.input.instructions,calls[1]!.input.instructions);assert.match(calls[0]!.input.instructions,/sessionRef=im:/);assert.ok(!JSON.stringify(service.snapshot()).includes('CANARY_SECRET'));
+ f.handlers.message(message('one'));await tick();assert.equal(calls[0]!.texts.length,2);
+ await service.close();const f2=fixture(parent);const again=new ImService({dataDir:dir,policy,channelFactory:f2.factory,parentFactory:parent});await again.reconnect();await tick();f2.handlers.message(message('one'));await tick();assert.equal(calls.length,3);assert.deepEqual(calls[2]!.texts,[]);await again.close();
+});
+test('父 turn 完成前流式显示、控制块拆分不泄露、最终按钮点击成为同会话新 user 一次',async t=>{
+ const finish=deferred<string>();const sent:string[]=[];let delta:((s:string)=>void)|undefined;let count=0;
+ const {f}=await setup(t,async()=>({send:async(text,_signal,onDelta)=>{sent.push(text);if(++count>1)return '继续完成';delta=onDelta;return finish.promise;},close:async()=>{finish.resolve('已停止');}}));
+ f.handlers.message(message('stream'));await tick();delta?.('公开一');await tick();delta?.('公开二<weaver-act');await tick();delta?.('ions>{"actions":[{"label":"继续","message":"执行下一步"}]}</weaver-actions>');await tick();assert.deepEqual(f.chunks,['公开一','公开二']);assert.equal(f.cards.length,0);
+ finish.resolve('权威正文<weaver-actions>{"actions":[{"label":"继续","message":"执行下一步"}]}</weaver-actions>');await tick();assert.equal(f.cards.length,1);const card=f.cards[0]!;assert.match(JSON.stringify(card.card),/权威正文/);assert.ok(!JSON.stringify(card.card).includes('执行下一步'));const value=card.card.body.elements[1].columns[0].elements[0].behaviors[0].value;
+ const event:CardActionEvent={messageId:card.id,chatId:'oc_a',operator:{openId:'ou_a'},action:{tag:'button',value},raw:{event_id:'click1',context:{open_message_id:card.id}}};
+ assert.match(JSON.stringify(f.handlers.card({...event,operator:{openId:'ou_b'}})),/失效/);
+ assert.deepEqual(Object.keys(f.handlers.card(event)),['toast']);assert.match(JSON.stringify(f.handlers.card({...event,raw:{event_id:'click2',context:{open_message_id:card.id}}})),/失效/);await tick();assert.deepEqual(sent,['你好','执行下一步']);
+});
+test('受控 idle 最后用户 deadline：忙时不杀，完成过期后重建；重复不刷新',async t=>{
+ let now=Date.now();const finish=deferred<string>();let launches=0;let closes=0;
+ const {f,service}=await setup(t,async()=>{launches++;return {send:async()=>launches===1?finish.promise:'新会话',close:async()=>{closes++;finish.resolve('完成');}};},{now:()=>now});
+ f.handlers.message(message('idle','ou_a','oc_a','忙',now));await tick();now+=61_000;assert.equal(closes,0);finish.resolve('完成');await tick();assert.equal(closes,1);assert.equal(service.snapshot().status.activeSessions,1);
+ f.handlers.message(message('new','ou_a','oc_a','新',now));await tick();assert.equal(launches,2);
+});
+test('stop取消A后已准入B自动同进程继续，重复旧stop不取消B，闲时stop不换上下文',async t=>{
+ const a=deferred<string>();const b=deferred<string>();const sent:string[]=[];let closes=0;let launches=0;const aborted:string[]=[];
+ const {f,config}=await setup(t,async()=>{launches++;return {send:async(text,signal)=>{sent.push(text);if(text==='C')return '完成C';signal?.addEventListener('abort',()=>{aborted.push(text);if(text==='A')a.resolve('已停止A');else b.resolve('不应停B');},{once:true});return text==='A'?a.promise:b.promise;},close:async()=>{closes++;a.resolve('退出');b.resolve('退出');}};});
+ const menu=(id:string)=>({app_id:config.appId,event_id:id,event_key:'stop',create_time:String(Date.now()),operator:{operator_id:{open_id:'ou_a'}}});
+ f.handlers.message(message('busy','ou_a','oc_a','A'));f.handlers.message(message('queued','ou_a','oc_a','B'));await tick();
+ f.handlers.menu({...menu('unauth'),operator:{operator_id:{open_id:'ou_unknown'}}});await tick();assert.deepEqual(aborted,[]);
+ f.handlers.menu(menu('stopA'));await tick();assert.deepEqual(sent,['A','B']);assert.deepEqual(aborted,['A']);assert.equal(closes,0);assert.equal(launches,1);
+ f.handlers.menu(menu('stopA'));await tick();assert.deepEqual(aborted,['A']);b.resolve('完成B');await tick();
+ f.handlers.menu(menu('idleStop'));await tick();assert.ok(f.notices.some(text=>text.includes('没有正在生成')));assert.equal(closes,0);
+ f.handlers.message(message('C','ou_a','oc_a','C'));await tick();assert.deepEqual(sent,['A','B','C']);assert.equal(launches,1);
+});
+test('disable 回收晚到 factory、不发过期回复；policy 撤权使旧代立即失败关闭',async t=>{
+ const late=deferred<any>();let closes=0;let sends=0;
+ const {f,service,config}=await setup(t,async()=>late.promise);
+ f.handlers.message(message('late'));await tick();const disable=service.save({expectedRevision:1,config:{...config,enabled:false}});await tick();late.resolve({send:async()=>{sends++;return '不应发出';},close:async()=>{closes++;}});await disable;await tick();assert.equal(sends,0);assert.ok(closes>=1);assert.equal(f.cards.length,0);assert.equal(service.snapshot().status.connection,'disabled');
+});
+test('出站失败不能重跑已执行输入，status 不含 secret',async t=>{
+ let sends=0; const {f,service}=await setup(t,async()=>({send:async()=>{sends++;return '完成';},close:async()=>{}}));
+ // Throw only at the external transport boundary.
+ f.failUpdate();f.handlers.message(message('failure'));await tick();f.handlers.message(message('failure'));await tick();assert.equal(sends,1);assert.equal(service.snapshot().status.agentState,'error');assert.equal(service.snapshot().status.lastReplyAt,undefined);assert.ok(!JSON.stringify(service.snapshot()).includes('CANARY_SECRET'));
+});
+test('独立Bot参数不依赖owner/worker；无关profile变化保留session，Bot参数改变关闭旧代',async t=>{
+ const inputs:ParentAgentInput[]=[];let closes=0;
+ const {f,service,live,config}=await setup(t,async input=>{inputs.push(input);return {send:async()=> 'ok',close:async()=>{closes++;}};});
+ live.config.owners={};live.config.workers={};await service.reconcile();f.handlers.message(message('direct1'));await tick();
+ assert.equal(inputs.length,1);assert.equal(inputs[0]!.model,'gpt-test');assert.equal(inputs[0]!.effort,'medium');assert.equal(inputs[0]!.engineKind,'codex');
+ live.config.owners=policy().config.owners;live.config.owners.main!.model='unrelated';live.config.workers.other={enabled:true,engine:'codex',model:'unrelated',effort:'high'};await service.reconcile();f.handlers.message(message('direct2'));await tick();assert.equal(inputs.length,1);assert.equal(closes,0);
+ const old=f.handlers;await service.save({expectedRevision:1,config:{...config,model:'gpt-next',effort:'high'}});await tick();assert.equal(closes,1);old.message(message('fenced'));f.handlers.message(message('direct3'));await tick();assert.equal(inputs.length,2);assert.equal(inputs[1]!.model,'gpt-next');assert.equal(inputs[1]!.effort,'high');assert.notEqual(inputs[0]!.instructions,inputs[1]!.instructions);
+});
+test('独立chat尊重engine/model真实block，忽略单worker block；非法参数拒绝且不保存',async t=>{
+ let launches=0;const {f,service,live,config}=await setup(t,async()=>{launches++;return {send:async()=> 'ok',close:async()=>{}};});
+ live.blocks=[{engine:'codex',worker:'other',reason:'worker',since:new Date().toISOString()}];f.handlers.message(message('worker-block'));await tick();assert.equal(launches,1);
+ for(const patch of [{engine:'missing'},{model:'bad; command'},{effort:'ultra'}])await assert.rejects(service.save({expectedRevision:1,config:{...config,...patch}}),{code:'IM_CONFIG_UNAVAILABLE'});
+ assert.equal(service.snapshot().revision,1);
+ for(const block of [{engine:'codex',reason:'manual'},{engine:'codex',model:'gpt-test',reason:'额度耗尽',by:'weaver-quota:codex'}]){
+  live.blocks=[{...block,since:new Date().toISOString()}];await assert.rejects(service.save({expectedRevision:1,config}),{code:'IM_CONFIG_UNAVAILABLE'});
+ }
+ live.blocks=[];live.config.engines.codex!.enabled=false;await service.reconcile();assert.equal(service.snapshot().status.connection,'error');assert.equal(service.snapshot().status.activeSessions,0);
+ await assert.rejects(service.save({expectedRevision:1,config}),{code:'IM_CONFIG_UNAVAILABLE'});
+  live.config.engines.codex={enabled:true,kind:'not-an-engine'};await assert.rejects(service.save({expectedRevision:1,config}),{code:'IM_CONFIG_UNAVAILABLE'});
+});
+test('单卡任意选项只消费一次，idle到期旧卡不能复活父Agent，new_session撤销旧nonce',async t=>{
+ let now=Date.now();let launches=0;let sends=0;
+ const {f,config}=await setup(t,async()=>{launches++;return {send:async()=>{sends++;return '正文<weaver-actions>{"actions":[{"label":"a","message":"选a"},{"label":"b","message":"选b"}]}</weaver-actions>';},close:async()=>{}};},{now:()=>now});
+ const click=(card:any,index:number,id:string):CardActionEvent=>({messageId:card.id,chatId:'oc_a',operator:{openId:'ou_a'},action:{tag:'button',value:card.card.body.elements[1].columns[index].elements[0].behaviors[0].value},raw:{event_id:id,context:{open_message_id:card.id}}});
+ f.handlers.message(message('actions','ou_a','oc_a','文本',now));await tick();const card=f.cards[0]!;assert.match(JSON.stringify(f.handlers.card(click(card,0,'choose_a'))),/已作为/);assert.match(JSON.stringify(f.handlers.card(click(card,1,'choose_b'))),/失效/);await tick();assert.equal(sends,2);
+ const later=f.cards[1]!;now+=61_000;assert.match(JSON.stringify(f.handlers.card(click(later,0,'expired'))),/失效/);await tick();assert.equal(launches,2);
+ f.handlers.message(message('renew','ou_a','oc_a','新消息',now));await tick();assert.equal(launches,2);f.handlers.menu({app_id:config.appId,event_id:'new_epoch',event_key:'new_session',create_time:String(now),operator:{operator_id:{open_id:'ou_a'}}});await tick();assert.match(JSON.stringify(f.handlers.card(click(f.cards[2]!,0,'old_epoch'))),/失效/);assert.equal(sends,3);
+});
+test('channel close失败重连不启动新代，失败引用保留供再次关闭',async t=>{
+ let handlers!:ImChannelHandlers;let creations=0;let closes=0;let fail=true;
+ const dir=await mkdtemp(`${ROOT}close-`);const service=new ImService({dataDir:dir,policy,parentFactory:async()=>({send:async()=>{throw new Error('unexpected model turn');},close:async()=>{}}),channelFactory:(_c,h)=>{handlers=h;creations++;return {connect:async()=>{},close:async()=>{closes++;if(fail)throw new Error('SECRET');},send:async()=>{},stream:async()=>'',updateCard:async()=>{},retireCard:async()=>{},state:()=> 'connected'};}});
+ await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes:1}});await tick();
+ await assert.rejects(service.reconnect(),/IM 操作失败/);assert.equal(creations,1);assert.equal(service.snapshot().status.connection,'error');handlers.message(message('fenced'));await tick();assert.equal(service.snapshot().status.activeSessions,0);
+ fail=false;await service.reconnect();await tick();assert.equal(creations,2);assert.ok(closes>=2);await service.close();await rm(dir,{recursive:true,force:true});
+});
+
+test('idle计时器未运行时满16会话中的单条新消息先claim，真实close后新epoch执行且保留准入时间',async t=>{
+ let now=Date.now();const oldClosed=deferred<void>();const entries:{input:ParentAgentInput;texts:string[];closed:number}[]=[];
+ const {dir,f,service}=await setup(t,async input=>{const record={input,texts:[] as string[],closed:0};entries.push(record);const index=entries.length;return {send:async text=>{record.texts.push(text);return '完成';},close:async()=>{record.closed++;if(index===1)await oldClosed.promise;}};},{now:()=>now});
+ for(let n=0;n<16;n++)f.handlers.message(message(`initial${n}`,'ou_a',`oc_${n}`,'旧',now));await tick();assert.equal(entries.length,16);
+ now+=61_000;const admittedAt=now;f.handlers.message(message('reborn','ou_a','oc_0','唯一新消息',now));await tick();assert.equal(entries.length,16);assert.equal(service.snapshot().status.activeSessions,16);assert.match(await readFile(join(dir,'im-inbox.json'),'utf8'),/message:om_reborn/);assert.equal(service.snapshot().status.lastMessageAt,new Date(admittedAt).toISOString());
+ now+=61_000;oldClosed.resolve();await tick();assert.equal(entries.length,18);assert.deepEqual(entries[16]!.texts,['唯一新消息']);assert.notEqual(entries[0]!.input.instructions,entries[16]!.input.instructions);assert.equal(entries[16]!.closed,1,'deadline按准入时刻，执行完成已到期即回收');assert.equal(service.snapshot().status.lastMessageAt,new Date(admittedAt).toISOString());
+ f.handlers.message(message('reborn','ou_a','oc_0','唯一新消息',now));await tick();assert.equal(entries.length,18,'重复消息不再启动');
+});
+test('idle timer已开始close时只发一条新消息，无重发自动等close；关闭失败有安全回执且零新父',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});let now=Date.now();const close=deferred<void>();let launches=0;t.after(()=>close.resolve());
+ const {f}=await setup(t,async()=>{launches++;return {send:async()=> '完成',close:async()=>close.promise};},{now:()=>now});
+ f.handlers.message(message('first','ou_a','oc_a','旧',now));await tick();now+=60_000;t.mock.timers.tick(60_000);await tick();
+ f.handlers.message(message('waiting','ou_a','oc_a','只发一次',now));await tick();assert.equal(launches,1);close.resolve();await tick();assert.equal(launches,2);
+});
+test('idle关闭失败和有界超时保留旧引用，等待消息不启动模型并有失败反馈',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});let now=Date.now();const close=deferred<void>();let launches=0;t.after(()=>close.resolve());
+ const {f,service}=await setup(t,async()=>{launches++;return {send:async()=> '完成',close:async()=>close.promise};},{now:()=>now});
+ f.handlers.message(message('first','ou_a','oc_a','旧',now));await tick();now+=61_000;f.handlers.message(message('waiting','ou_a','oc_a','新',now));await tick();t.mock.timers.tick(60_000);await tick();assert.equal(launches,1);assert.ok(f.notices.some(text=>text.includes('关闭未完成')));assert.equal(service.snapshot().status.activeSessions,1);
+ close.resolve();await tick();assert.equal(launches,1,'超时后late close不得晚启动');
+});
+test('inbox损坏/写入IO失败：合法手机消息收到固定回执，只有预启Agent、0send且不暴露错误',async t=>{
+ let launches=0;let sends=0;const first=await setup(t,async()=>{launches++;return {send:async()=>{sends++;return '';},close:async()=>{}};});
+ await writeFile(join(first.dir,'im-inbox.json'),'invalid PRIVATE_PATH', {mode:0o600});first.f.handlers.message(message('broken'));await tick();assert.equal(launches,1);assert.equal(sends,0);assert.ok(first.f.notices.some(text=>text.includes('记录写入失败')));assert.ok(!first.f.notices.join().includes('PRIVATE_PATH'));
+ const second=await setup(t,async()=>{launches++;return {send:async()=>{sends++;return '';},close:async()=>{}};});
+ // Real file boundary: a directory occupies the inbox target, causing fail-closed IO.
+ await mkdir(join(second.dir,'im-inbox.json'));second.f.handlers.message(message('io'));await tick();assert.equal(launches,2);assert.equal(sends,0);assert.ok(second.f.notices.some(text=>text.includes('记录写入失败')));
+});
+test('idle等待分支持久化失败也有手机回执；pending被disable作废不晚启动',async t=>{
+ let now=Date.now();const close=deferred<void>();let launches=0;t.after(()=>close.resolve());
+ const {dir,f,service,config}=await setup(t,async()=>{launches++;return {send:async()=> 'ok',close:async()=>close.promise};},{now:()=>now});
+ f.handlers.message(message('old','ou_a','oc_a','旧',now));await tick();now+=61_000;await rm(join(dir,'im-inbox.json'));await mkdir(join(dir,'im-inbox.json'));f.handlers.message(message('io_wait','ou_a','oc_a','失败输入',now));await tick();assert.ok(f.notices.some(text=>text.includes('记录写入失败')));assert.equal(launches,1);
+ await rm(join(dir,'im-inbox.json'),{recursive:true});f.handlers.message(message('good_wait','ou_a','oc_a','成功准入',now));await tick();assert.match(await readFile(join(dir,'im-inbox.json'),'utf8'),/message:om_good_wait/);
+ const disabling=service.save({expectedRevision:1,config:{...config,enabled:false}});await tick();close.resolve();await disabling;await tick();assert.equal(launches,1);assert.equal(service.snapshot().status.connection,'disabled');
+});
+test('菜单ms/sec/us时间严格归一，stale与无效create_time不从其他字段回退，重复new_session不影响新上下文',async t=>{
+ let now=Date.now();let launches=0;let closes=0;const {f,config}=await setup(t,async()=>{launches++;return {send:async()=> 'ok',close:async()=>{closes++;}};},{now:()=>now});
+ f.handlers.message(message('menu_time','ou_a','oc_a','文本',now));await tick();
+ const menu=(id:string,time:unknown,key='status')=>({app_id:config.appId,event_id:id,event_key:key,create_time:time,operator:{operator_id:{open_id:'ou_a'}}});
+ for(const time of [String(now),String(Math.floor(now/1000)),String(now*1000)])f.handlers.menu(menu(`time_${time}`,time));await tick();assert.equal(f.notices.filter(text=>text.includes('排队')).length,3);
+ const before=f.notices.length;f.handlers.menu(menu('stale',String(now-301_000)));f.handlers.menu({...menu('invalid','bad'),timestamp:now});await tick();assert.equal(f.notices.length,before);
+ f.handlers.menu(menu('reset_once',String(now),'new_session'));await tick();f.handlers.message(message('new_context','ou_a','oc_a','文本',now));await tick();assert.equal(launches,2);assert.equal(closes,1);f.handlers.menu(menu('reset_once',String(now),'new_session'));await tick();assert.equal(closes,1);
+});
+test('pending在撤权/关机后不会随late close启动；同ID等待重发保持安静',async t=>{
+ for(const mode of ['revoke','shutdown'] as const){
+  let now=Date.now();const close=deferred<void>();t.after(()=>close.resolve());let launches=0;
+  const {f,service,live}=await setup(t,async()=>{launches++;return {send:async()=> '完成',close:async()=>close.promise};},{now:()=>now});
+  f.handlers.message(message(`old_${mode}`,'ou_a','oc_a','旧',now));await tick();now+=61_000;const input=message(`wait_${mode}`,'ou_a','oc_a','已准入',now);f.handlers.message(input);await tick();const notices=f.notices.length;f.handlers.message(input);await tick();assert.equal(f.notices.length,notices);
+  let shutting:Promise<void>|undefined;if(mode==='revoke'){live.config.engines.codex!.enabled=false;void service.reconcile();}else shutting=service.close();await tick();close.resolve();await shutting;await tick();assert.equal(launches,1);
+ }
+});
+test('父close明确失败不启动下一代，持久等待消息收到失败回执且旧引用仍可见',async t=>{
+ let now=Date.now();let launches=0;const dir=await mkdtemp(join(ROOT,'close-fail-'));const f=fixture();const service=new ImService({dataDir:dir,policy,now:()=>now,channelFactory:f.factory,parentFactory:async()=>{launches++;return {send:async()=> '完成',close:async()=>{throw new Error('PRIVATE_CLOSE_DETAIL');}};}});
+ t.after(async()=>{await service.close().catch(()=>{});await rm(dir,{recursive:true,force:true});});
+ await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes:1}});await tick();f.handlers.message(message('old_close','ou_a','oc_a','旧',now));await tick();now+=61_000;f.handlers.message(message('wait_close','ou_a','oc_a','新',now));await tick();assert.equal(launches,1);assert.ok(f.notices.some(s=>s.includes('关闭未完成')));assert.ok(!f.notices.join().includes('PRIVATE_CLOSE_DETAIL'));assert.equal(service.snapshot().status.activeSessions,1);
+});
+
+async function waitFor(predicate:()=>boolean,label:string):Promise<void>{
+ const deadline=Date.now()+5_000;
+ while(!predicate()){if(Date.now()>deadline)throw new Error(`fixture condition timed out: ${label}`);await new Promise<void>(r=>setTimeout(r,10));}
+}
+for(const engine of ['claude','codex'] as const)for(const queued of [false,true,'confirmed'] as const){
+ test(`${engine}真实协议${queued==='confirmed'?'双确认stop保留FIFO/context':queued?'interrupt ACK失败且B已准入':'terminal缺失无B'}`,async()=>{
+  const dir=await mkdtemp(join(ROOT,`fatal-${engine}-`));const bin=join(dir,'bin');await mkdir(bin);const previousPath=process.env.PATH;const scenarioKey=`${engine.toUpperCase()}_FIXTURE_SCENARIO`;const markerKey=`${engine.toUpperCase()}_FIXTURE_MARKER`;const previousScenario=process.env[scenarioKey];const previousMarker=process.env[markerKey];const marker=join(dir,'marker.ndjson');
+  await copyFile(new URL(`../fixtures/parent/${engine}-fixture.mjs`,import.meta.url),join(bin,engine));await chmod(join(bin,engine),0o700);
+  await writeFile(join(bin,'systemd-run'),'#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n',{mode:0o700});await writeFile(join(bin,'systemctl'),'#!/bin/sh\necho ActiveState=inactive\n',{mode:0o700});process.env.PATH=`${bin}:${previousPath}`;process.env[markerKey]=marker;
+  const parents:ParentAgentSession[]=[];const calls:{input:ParentAgentInput;texts:string[]}[]=[];const f=fixture();const live=policy();live.config.engines.codex!.kind=engine;
+  const service=new ImService({dataDir:dir,policy:()=>live,channelFactory:f.factory,parentFactory:async input=>{
+   process.env[scenarioKey]=calls.length===0?(queued==='confirmed'?'abort':queued?'interrupt-failed':'missing-terminal'):'default';const record={input,texts:[] as string[]};calls.push(record);const parent=await createParentAgent(input,{startupMs:3_000,turnMs:3_000,closeMs:300});parents.push(parent);return {send:(text,signal,onDelta)=>{record.texts.push(text);return parent.send(text,signal,onDelta);},close:()=>parent.close()};
+  }});
+  try{
+   await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes:30}});await tick();
+   f.handlers.message(message('fatal_A','ou_a','oc_a','A'));await waitFor(()=>f.chunks.length>0,'first delta');if(queued)f.handlers.message(message('fatal_B','ou_a','oc_a','B'));
+   f.handlers.menu({app_id:'cli_test',event_id:'fatal_stop',event_key:'stop',create_time:String(Date.now()),operator:{operator_id:{open_id:'ou_a'}}});await waitFor(()=>service.snapshot().status.busySessions===0,'fatal A settled');await tick();
+   if(queued==='confirmed'){
+    assert.deepEqual(calls[0]!.texts,['A','B']);assert.equal(service.snapshot().status.activeSessions,1);assert.ok(!f.notices.some(text=>text.includes('本轮回复失败')));
+    f.handlers.message(message('confirmed_C','ou_a','oc_a','C'));await waitFor(()=>f.cards.length===2,'same-context C completed');assert.equal(calls.length,1);assert.deepEqual(calls[0]!.texts,['A','B','C']);
+   }else{
+   assert.deepEqual(calls[0]!.texts,['A'],'fatal parent must never receive claimed B or the next message');assert.equal(service.snapshot().status.activeSessions,0,'fatal A releases before any future input');assert.ok(f.notices.some(text=>text.includes('本轮回复失败')));assert.ok(!f.notices.join().includes('interrupt'));
+   f.handlers.message(message('fatal_C','ou_a','oc_a','C'));await waitFor(()=>f.cards.length===1,'first new message C completed');assert.equal(calls.length,2);assert.deepEqual(calls[1]!.texts,['C']);assert.notEqual(calls[0]!.input.instructions,calls[1]!.input.instructions);
+   }
+  }finally{
+   await service.close().catch(()=>{});for(const parent of parents)await parent.close().catch(()=>{});
+   process.env.PATH=previousPath;for(const [key,old] of [[scenarioKey,previousScenario],[markerKey,previousMarker]]){if(old===undefined)delete process.env[key!];else process.env[key!]=old;}
+   const entries=(await readFile(marker,'utf8').catch(()=> '')).split('\n').filter(Boolean).map(line=>JSON.parse(line));for(const entry of entries)if(typeof entry.spawnPid==='number')assert.throws(()=>process.kill(entry.spawnPid,0),{code:'ESRCH'},'fixture PID survived close');await rm(dir,{recursive:true,force:true});
+  }
+ });
+}
+test('父正常完成后仅出站update期间stop，仍允许原父FIFO继续',async t=>{
+ const updating=deferred<void>();const finishUpdate=deferred<void>();t.after(()=>finishUpdate.resolve());let calls=0;let launches=0;const dir=await mkdtemp(join(ROOT,'outbound-stop-'));const f=fixture();let handlers!:ImChannelHandlers;
+ const factory:ImChannelFactory=(config,h)=>{handlers=h;const channel=f.factory(config,h);return {...channel,updateCard:async(id,card,delivery)=>{if(calls===1){updating.resolve();await finishUpdate.promise;}if(!delivery.valid())throw new Error('stopped outbound');await channel.updateCard(id,card,delivery);}};};
+ const service=new ImService({dataDir:dir,policy,channelFactory:factory,parentFactory:async()=>{launches++;return {send:async()=>{calls++;return '完成';},close:async()=>{}};}});t.after(async()=>{await service.close();await rm(dir,{recursive:true,force:true});});
+ await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes:30}});await tick();handlers.message(message('out_A'));await updating.promise;handlers.message(message('out_B'));handlers.menu({app_id:'cli_test',event_id:'out_stop',event_key:'stop',create_time:String(Date.now()),operator:{operator_id:{open_id:'ou_a'}}});finishUpdate.resolve();await tick();assert.equal(calls,2);assert.equal(launches,1);assert.equal(f.cards.length,1);
+});
+
+test('同配置保存保留同parent/epoch/按钮/FIFO，secret省略同样不重建', async t => {
+  const inputs: ParentAgentInput[] = []; const texts: string[] = []; let closes = 0; let launches = 0;
+  const { f, service, config } = await setup(t, async input => {
+    launches++; inputs.push(input);
+    return { send: async text => { texts.push(text); return texts.length === 1 ? '正文<weaver-actions>{"actions":[{"label":"a","message":"选a"}]}</weaver-actions>' : `答:${text}`; }, close: async () => { closes++; } };
+  });
+  f.handlers.message(message('keep1')); f.handlers.message(message('keep2')); await tick();
+  assert.equal(launches, 1); assert.deepEqual(texts, ['你好', '你好']); assert.equal(f.cards.length, 2);
+  const epoch = inputs[0]!.instructions;
+  const rev1 = service.snapshot().revision;
+  await service.save({ expectedRevision: rev1, config: { ...config } }); await tick();
+  assert.equal(closes, 0); assert.equal(launches, 1);
+  f.handlers.message(message('keep3')); await tick();
+  assert.equal(launches, 1); assert.deepEqual(texts, ['你好', '你好', '你好']); assert.equal(inputs.length, 1); assert.equal(inputs[0]!.instructions, epoch);
+  const card = f.cards[0]!;
+  const value = card.card.body.elements[1].columns[0].elements[0].behaviors[0].value;
+  const click = { messageId: card.id, chatId: 'oc_a', operator: { openId: 'ou_a' }, action: { tag: 'button', value }, raw: { event_id: 'keep_click', context: { open_message_id: card.id } } } as unknown as CardActionEvent;
+  assert.match(JSON.stringify(f.handlers.card(click)), /已作为/); await tick();
+  assert.equal(launches, 1); assert.deepEqual(texts, ['你好', '你好', '你好', '选a']);
+  const { appSecret, ...keep } = { ...config, idleTimeoutMinutes: config.idleTimeoutMinutes };
+  void appSecret;
+  const rev2 = service.snapshot().revision;
+  await service.save({ expectedRevision: rev2, config: keep as typeof config }); await tick();
+  assert.equal(closes, 0); assert.equal(launches, 1);
+  assert.ok(!JSON.stringify(service.snapshot()).includes('CANARY_SECRET'));
+  f.handlers.message(message('keep4')); await tick();
+  assert.equal(launches, 1); assert.equal(inputs.length, 1); assert.equal(texts.length, 5);
+  // Retention proof: the omitted save kept CANARY_SECRET, so an explicit same-secret
+  // save is still a no-op while a rotated secret rebuilds exactly once.
+  const rev3 = service.snapshot().revision;
+  await service.save({ expectedRevision: rev3, config: { ...config } }); await tick();
+  assert.equal(closes, 0); assert.equal(launches, 1);
+  const rev4 = service.snapshot().revision;
+  await service.save({ expectedRevision: rev4, config: { ...config, appSecret: 'ROTATED_SECRET' } }); await tick();
+  assert.equal(closes, 1); assert.equal(launches, 2);
+  f.handlers.message(message('keep5')); await tick();
+  assert.equal(launches, 2); assert.equal(texts.length, 6);
+});
+
+test('忙时同配置保存不中断FIFO，不重复不丢失', async t => {
+  const first = deferred<string>(); const sent: string[] = []; let launches = 0; let closes = 0; const aborted: string[] = [];
+  const { f, service, config } = await setup(t, async () => {
+    launches++;
+    return {
+      send: async (text, signal) => { sent.push(text); signal?.addEventListener('abort', () => aborted.push(text), { once: true }); if (text === '你好' && sent.filter(s => s === '你好').length === 1) return first.promise; return `答:${text}`; },
+      close: async () => { closes++; },
+    };
+  });
+  f.handlers.message(message('busy1')); await tick();
+  f.handlers.message(message('busy2')); await tick();
+  const rev = service.snapshot().revision;
+  await service.save({ expectedRevision: rev, config: { ...config } }); await tick();
+  assert.equal(launches, 1); assert.equal(closes, 0); assert.deepEqual(aborted, []);
+  first.resolve('完成A'); await tick();
+  assert.deepEqual(sent, ['你好', '你好']); assert.equal(launches, 1); assert.equal(closes, 0); assert.equal(f.cards.length, 2);
+});
+
+test('模型/effort/凭据/白名单/工作空间变化仍fence旧代且先关后建', async t => {
+  const dir = await mkdtemp(join(ROOT, 'effective-')); const f = fixture();
+  const inputs: ParentAgentInput[] = []; const texts: string[] = []; let closes = 0; let creations = 0;
+  const service = new ImService({ dataDir: dir, policy, parentFactory: async input => { inputs.push(input); creations++; return { send: async text => { texts.push(text); return 'ok'; }, close: async () => { closes++; } }; }, channelFactory: f.factory });
+  t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET_ONE', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  await service.save({ expectedRevision: 0, config: base }); await tick();
+  f.handlers.message(message('eff1')); await tick();
+  assert.equal(creations, 1); assert.deepEqual(texts, ['你好']);
+  const epoch0 = inputs[0]!.instructions;
+  // Secret-only change must still rebuild (route fingerprint alone would miss it).
+  const stale = f.handlers;
+  await service.save({ expectedRevision: 1, config: { ...base, appSecret: 'SECRET_TWO' } }); await tick();
+  assert.equal(closes, 1); assert.equal(creations, 2); assert.notEqual(inputs[1]!.instructions, epoch0);
+  stale.message(message('fenced')); await tick();
+  assert.deepEqual(texts, ['你好'], '旧代已fence，不再执行');
+  f.handlers.message(message('eff2')); await tick();
+  assert.deepEqual(texts, ['你好', '你好']); assert.equal(creations, 2);
+  // Whitelist change rebuilds as well.
+  await service.save({ expectedRevision: 2, config: { ...base, appSecret: 'SECRET_TWO', allowedOpenIds: ['ou_a', 'ou_b'] } }); await tick();
+  assert.equal(closes, 2); assert.equal(creations, 3);
+});
+
+test('idle变更保留健康parent并按准入重算，不延长保活，忙时不杀，starting不误杀', async t => {
+  let now = Date.now(); let launches = 0; let closes = 0;
+  const { f, service, config } = await setup(t, async () => { launches++; return { send: async () => 'ok', close: async () => { closes++; } }; }, { now: () => now });
+  // Blank standby survives an idle-only save (starting deadline 0 is not expired).
+  assert.equal(launches, 1);
+  const rev0 = service.snapshot().revision;
+  await service.save({ expectedRevision: rev0, config: { ...config, idleTimeoutMinutes: 30 } }); await tick();
+  assert.equal(launches, 1); assert.equal(closes, 0);
+  // Admit at T, save at T+50s with idle 2min: deadline must stay T+120s, not T+170s.
+  f.handlers.message(message('idle_keep', 'ou_a', 'oc_a', '旧', now)); await tick();
+  assert.equal(launches, 1);
+  now += 50_000;
+  const rev1 = service.snapshot().revision;
+  await service.save({ expectedRevision: rev1, config: { ...config, idleTimeoutMinutes: 2 } }); await tick();
+  assert.equal(launches, 1); assert.equal(closes, 0);
+  now += 80_000; // T+130s: past T+120s, so the idle session must have rotated.
+  f.handlers.message(message('idle_expired', 'ou_a', 'oc_a', '新', now)); await tick();
+  assert.equal(launches, 2); assert.equal(closes, 1);
+  // Busy session is not killed by an idle-only save.
+  let resolveBusy!: (v: string) => void; const busyGate = new Promise<string>(r => (resolveBusy = r));
+  const dir2 = await mkdtemp(join(ROOT, 'idle-busy-')); const f2 = fixture();
+  const svc2 = new ImService({ dataDir: dir2, policy, parentFactory: async () => ({ send: async () => busyGate, close: async () => {} }), channelFactory: f2.factory, now: () => now });
+  t.after(async () => { resolveBusy('done'); await svc2.close().catch(() => {}); await rm(dir2, { recursive: true, force: true }); });
+  const cfg2 = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir2], idleTimeoutMinutes: 1 };
+  await svc2.save({ expectedRevision: 0, config: cfg2 }); await tick();
+  f2.handlers.message(message('b1', 'ou_a', 'oc_a', '忙', now)); await tick();
+  now += 61_000;
+  await svc2.save({ expectedRevision: 1, config: { ...cfg2, idleTimeoutMinutes: 30 } }); await tick();
+  assert.equal(svc2.snapshot().status.busySessions, 1);
+  resolveBusy('完成'); await tick();
+  assert.equal(svc2.snapshot().status.busySessions, 0);
+});
+
+test('同fingerprint故障态显式save仍重建恢复，不会永远跳过', async t => {
+  let creations = 0;
+  const { f, service, config } = await setup(t, async () => {
+    creations++;
+    const gen = creations;
+    return { send: async () => { if (gen === 1) throw new Error('MODEL_BOOM'); return 'recovered'; }, close: async () => {} };
+  });
+  f.handlers.message(message('fault1')); await tick();
+  assert.equal(service.snapshot().status.agentState, 'error');
+  const rev = service.snapshot().revision;
+  await service.save({ expectedRevision: rev, config: { ...config } }); await tick();
+  assert.equal(creations, 2);
+  f.handlers.message(message('fault2')); await tick();
+  assert.equal(service.snapshot().status.activeSessions, 1);
+  assert.equal(f.cards.length, 1);
+});
+
+test('16会话idle-only保存全部保留，空白standby不误杀', async t => {
+  let now = Date.now(); let launches = 0; let closes = 0;
+  const { f, service, config } = await setup(t, async () => { launches++; return { send: async () => 'ok', close: async () => { closes++; } }; }, { now: () => now });
+  assert.equal(launches, 1);
+  for (let n = 0; n < 16; n++) f.handlers.message(message(`bulk${n}`, 'ou_a', `oc_${n}`, '旧', now));
+  await tick();
+  assert.equal(launches, 16);
+  const rev = service.snapshot().revision;
+  // setup idle=1, save idle=30: a real idle-only change; all 16 live sessions must survive it.
+  assert.notEqual(config.idleTimeoutMinutes, 30);
+  await service.save({ expectedRevision: rev, config: { ...config, idleTimeoutMinutes: 30 } }); await tick();
+  assert.equal(launches, 16); assert.equal(closes, 0); assert.equal(service.snapshot().status.activeSessions, 16);
+});
+
+test('live policy漂移未reconcile时同配置保存必须重建，不静默改fingerprint', async t => {
+  const inputs: ParentAgentInput[] = []; let launches = 0; let closes = 0;
+  const { f, service, live, config } = await setup(t, async input => {
+    launches++; inputs.push(input);
+    return { send: async () => 'ok', close: async () => { closes++; } };
+  });
+  f.handlers.message(message('drift1')); await tick();
+  assert.equal(launches, 1); assert.equal(inputs[0]!.engineKind, 'codex');
+  // Live policy flips the engine kind without reconcile: the running parent is
+  // still codex, so an identical save must rebuild instead of adopting the new route.
+  live.config.engines.codex!.kind = 'claude';
+  const rev = service.snapshot().revision;
+  await service.save({ expectedRevision: rev, config: { ...config } }); await tick();
+  assert.equal(closes, 1); assert.equal(launches, 2);
+  assert.equal(inputs[1]!.engineKind, 'claude');
+  f.handlers.message(message('drift2')); await tick();
+  assert.equal(launches, 2);
+});
+
+test('disable关闭失败后同disabled保存重试清理，不吞失败', async t => {
+  let closes = 0; let fail = true;
+  const dir = await mkdtemp(join(ROOT, 'disable-retry-')); const f = fixture();
+  const service = new ImService({
+    dataDir: dir, policy, channelFactory: f.factory,
+    parentFactory: async () => ({ send: async () => 'ok', close: async () => { closes++; if (fail) throw new Error('STUCK_CLOSE'); } }),
+  });
+  t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  await service.save({ expectedRevision: 0, config: base }); await tick();
+  await assert.rejects(service.save({ expectedRevision: 1, config: { ...base, enabled: false } }), /IM 操作失败/);
+  assert.equal(closes, 1);
+  assert.equal(service.snapshot().status.connection, 'error');
+  assert.equal(service.snapshot().config.enabled, false);
+  // Same-disabled save must retry the failed cleanup instead of returning early.
+  fail = false;
+  await service.save({ expectedRevision: 2, config: { ...base, enabled: false } }); await tick();
+  assert.ok(closes >= 2);
+  assert.equal(service.snapshot().status.connection, 'disabled');
+  assert.equal(service.snapshot().status.agentState, 'disabled');
+});
+
+for(const startup of ['start-rejected','late-success','real-failure'] as const){
+ test(`健康父context的A建卡${startup}窗口stop：未提交输入边界`,async t=>{
+  const started=deferred<void>();const finishStart=deferred<void>();t.after(()=>finishStart.resolve());const dir=await mkdtemp(join(ROOT,'not-started-'));const f=fixture();let handlers!:ImChannelHandlers;let streams=0;let launches=0;let closes=0;const inputs:ParentAgentInput[]=[];const sent:string[]=[];
+  const factory:ImChannelFactory=(config,h)=>{handlers=h;const channel=f.factory(config,h);return {...channel,stream:async(to,producer,delivery)=>{
+   if(++streams===2){started.resolve();
+    if(startup==='start-rejected')await new Promise<never>((_resolve,reject)=>delivery.abort.signal.addEventListener('abort',()=>reject(new Error('local start cancelled')),{once:true}));
+    else {await finishStart.promise;if(startup==='real-failure'){delivery.failed=true;throw new Error('PRIVATE_PLATFORM_FAILURE');}}
+   }
+   return channel.stream(to,producer,delivery);
+  }};};
+  const service=new ImService({dataDir:dir,policy,channelFactory:factory,parentFactory:async input=>{launches++;inputs.push(input);return {send:async(text,signal)=>{sent.push(text);if(signal?.aborted)throw new Error('pre-aborted parent input');return `context:${sent.join('/')}`;},close:async()=>{closes++;}};}});
+  t.after(async()=>{await service.close();await rm(dir,{recursive:true,force:true});});
+  await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes:30}});await tick();
+  handlers.message(message('healthy','ou_a','oc_a','健康上下文'));await tick();assert.deepEqual(sent,['健康上下文']);assert.equal(f.cards.length,1);
+  handlers.message(message('not_started_A','ou_a','oc_a','A'));await started.promise;handlers.message(message('not_started_B','ou_a','oc_a','B'));assert.match(await readFile(join(dir,'im-inbox.json'),'utf8'),/message:om_not_started_B/);
+  handlers.menu({app_id:'cli_test',event_id:'not_started_stop',event_key:'stop',create_time:String(Date.now()),operator:{operator_id:{open_id:'ou_a'}}});finishStart.resolve();await tick();
+  if(startup==='real-failure'){
+   assert.deepEqual(sent,['健康上下文']);assert.equal(closes,1);assert.equal(service.snapshot().status.activeSessions,0);assert.ok(f.notices.some(text=>text.includes('本轮回复失败')));
+  }else{
+   assert.deepEqual(sent,['健康上下文','B'],'A从未提交，B应无需新消息自动继续');assert.equal(closes,0);assert.equal(launches,1);assert.equal(inputs.length,1,'保持唯一sessionEpoch');
+    handlers.message(message('not_started_C','ou_a','oc_a','C'));await tick();assert.deepEqual(sent,['健康上下文','B','C']);assert.equal(launches,1);assert.match(JSON.stringify(f.cards.at(-1)!.card),/健康上下文\/B\/C/);assert.ok(!f.notices.some(text=>text.includes('本轮回复失败')));
+   }
+  });
+}
+
+const EFFORT_FOR: Record<string, string> = { claude: 'medium', codex: 'medium', opencode: 'my-variant.1', pi: 'minimal', grok: 'none', qodercli: 'auto' };
+
+test('6成熟引擎经别名engine id分别save/准入：factory收到对应kind/effort/全部roots，同会话复用', async t => {
+  assert.deepEqual([...IM_ENGINE_KINDS].sort(), ['claude', 'codex', 'grok', 'opencode', 'pi', 'qodercli']);
+  for (const kind of IM_ENGINE_KINDS) {
+    const dir = await mkdtemp(join(ROOT, `six-${kind}-`));
+    const extra = await mkdtemp(join(ROOT, `six-${kind}-extra-`));
+    const live = policy();
+    live.config.engines = { alias: { enabled: true, kind } };
+    const inputs: ParentAgentInput[] = [];
+    const f = fixture();
+    const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: async input => { inputs.push(input); return { send: async text => `ok:${text}`, close: async () => {} }; }, channelFactory: f.factory });
+    try {
+      await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'alias', model: 'test-model', effort: EFFORT_FOR[kind]!, workspaces: [dir, extra], idleTimeoutMinutes: 30 } });
+      await tick();
+      f.handlers.message(message(`m1-${kind}`)); await tick();
+      f.handlers.message(message(`m2-${kind}`)); await tick();
+      assert.equal(inputs.length, 1, `${kind} 同会话两轮复用同一parent`);
+      assert.equal(inputs[0]!.engineKind, kind);
+      assert.equal(inputs[0]!.model, 'test-model');
+      assert.equal(inputs[0]!.effort, EFFORT_FOR[kind]);
+      assert.deepEqual([inputs[0]!.workspace, ...(inputs[0]!.additionalWorkspaces ?? [])].sort(), [await realpath(dir), await realpath(extra)].sort(), `${kind} 全部roots送达factory`);
+      assert.equal(f.cards.length, 2);
+    } finally {
+      await service.close().catch(() => {});
+      await rm(dir, { recursive: true, force: true });
+      await rm(extra, { recursive: true, force: true });
+    }
+  }
+});
+
+test('未知未实现kind仍拒绝；OpenCode合法variant通过、非法effort拒绝', async t => {
+  const dir = await mkdtemp(join(ROOT, 'unknown-kind-'));
+  const live = policy();
+  live.config.engines = { alias: { enabled: true, kind: 'not-an-engine' } };
+  const f = fixture();
+  const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: async () => ({ send: async () => 'ok', close: async () => {} }), channelFactory: f.factory });
+  t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'alias', model: 'test-model', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  await assert.rejects(service.save({ expectedRevision: 0, config: base }), { code: 'IM_CONFIG_UNAVAILABLE' });
+  live.config.engines = { alias: { enabled: true, kind: 'opencode' } };
+  await service.save({ expectedRevision: 0, config: { ...base, effort: 'valid-variant_2.0' } });
+  await tick();
+  f.handlers.message(message('variant-ok')); await tick();
+  assert.equal(f.cards.length, 1);
+  await assert.rejects(service.save({ expectedRevision: 1, config: { ...base, effort: 'bad effort!' } }), { code: 'IM_CONFIG_UNAVAILABLE' });
+});
+
+test('切engine旧代close完成后才新建，旧代fence不再执行', async t => {
+  const dir = await mkdtemp(join(ROOT, 'engine-switch-'));
+  const live = policy();
+  live.config.engines = { aaa: { enabled: true, kind: 'claude' }, bbb: { enabled: true, kind: 'codex' } };
+  const inputs: ParentAgentInput[] = [];
+  const texts: string[] = [];
+  let closes = 0;
+  const f = fixture();
+  const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: async input => { inputs.push(input); return { send: async text => { texts.push(text); return 'ok'; }, close: async () => { closes++; } }; }, channelFactory: f.factory });
+  t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'aaa', model: 'm', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  await service.save({ expectedRevision: 0, config: base }); await tick();
+  f.handlers.message(message('before')); await tick();
+  assert.equal(inputs.length, 1); assert.equal(inputs[0]!.engineKind, 'claude');
+  const stale = f.handlers;
+  await service.save({ expectedRevision: 1, config: { ...base, engine: 'bbb' } }); await tick();
+  assert.equal(closes, 1); assert.equal(inputs.length, 2); assert.equal(inputs[1]!.engineKind, 'codex');
+  assert.notEqual(inputs[0]!.instructions, inputs[1]!.instructions);
+  stale.message(message('fenced')); await tick();
+  assert.deepEqual(texts, ['你好'], '旧代已fence，不再执行');
+  f.handlers.message(message('after')); await tick();
+  assert.deepEqual(texts, ['你好', '你好']); assert.equal(inputs.length, 2);
+});
+
+test('启动缺binary/auth/protocol/未知错误各固定安全agentMessage且不回显', async t => {
+  const cases = [
+    { reason: 'engine_missing' as const, expected: 'Bot 引擎缺失，请安装对应 CLI 后重新连接。' },
+    { reason: 'auth' as const, expected: 'Bot 引擎认证失败，请检查登录或密钥后重新连接。' },
+    { reason: 'protocol' as const, expected: 'Bot 与引擎协议不兼容，请升级引擎后重新连接。' },
+    { reason: 'engine' as const, expected: 'IM 操作失败，请检查配置或重新连接。' },
+  ];
+  for (const { reason, expected } of cases) {
+    const dir = await mkdtemp(join(ROOT, `startup-${reason}-`));
+    const canary = `LEAK_CANARY_${reason}_SECRET_TOKEN`;
+    const f = fixture();
+    const service = new ImService({ dataDir: dir, policy, parentFactory: async () => { throw parentError(reason, `${canary} at /tmp/private/${reason} vendor detail`); }, channelFactory: f.factory });
+    try {
+      await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 } });
+      await tick();
+      const snapshot = service.snapshot();
+      assert.equal(snapshot.status.agentState, 'error');
+      assert.equal(snapshot.status.agentMessage, expected);
+      assert.ok(!JSON.stringify(snapshot).includes(canary) && !JSON.stringify(snapshot).includes('/tmp/private'), `${reason} 不回显原始错误与路径`);
+    } finally {
+      await service.close().catch(() => {});
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+  const unknownDir = await mkdtemp(join(ROOT, 'startup-unknown-'));
+  const unknownCanary = 'LEAK_VENDOR_DETAIL_TOKEN';
+  const unknownFixture = fixture();
+  const unknownService = new ImService({ dataDir: unknownDir, policy, parentFactory: async () => { throw new Error(`${unknownCanary} /etc/shadow`); }, channelFactory: unknownFixture.factory });
+  try {
+    await unknownService.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [unknownDir], idleTimeoutMinutes: 30 } });
+    await tick();
+    const snapshot = unknownService.snapshot();
+    assert.equal(snapshot.status.agentState, 'error');
+    assert.equal(snapshot.status.agentMessage, 'IM 操作失败，请检查配置或重新连接。');
+    assert.ok(!JSON.stringify(snapshot).includes(unknownCanary));
+  } finally {
+    await unknownService.close().catch(() => {});
+    await rm(unknownDir, { recursive: true, force: true });
+  }
+});
+
+test('回合auth失败固定安全status且手机回执不回显；旧代late失败不覆盖新代', async t => {
+  const canary = 'LEAK_TURN_AUTH_SECRET';
+  const { service, f } = await setup(t, async () => ({ send: async () => { throw parentError('auth', `${canary} token=abc /tmp/secret`); }, close: async () => {} }));
+  f.handlers.message(message('turn-auth')); await tick();
+  const snapshot = service.snapshot();
+  assert.equal(snapshot.status.agentState, 'error');
+  assert.equal(snapshot.status.agentMessage, 'Bot 引擎认证失败，请检查登录或密钥后重新连接。');
+  assert.ok(!JSON.stringify(snapshot).includes(canary) && !JSON.stringify(snapshot).includes('/tmp/secret'));
+  assert.ok(f.notices.some(text => text.includes('本轮回复失败')) && !f.notices.join().includes(canary));
+
+  // Stale generation: first launch hangs, second generation rebuilds healthy, then the old
+  // launch rejects with auth — the live status must not regress and no replay happens.
+  const lateDir = await mkdtemp(join(ROOT, 'late-auth-'));
+  const lateCanary = 'LEAK_LATE_AUTH_SECRET';
+  let failFirst!: (error: unknown) => void;
+  const firstLaunch = new Promise<ParentAgentSession>((_resolve, reject) => { failFirst = reject; });
+  // Prevent an unhandled rejection between factory call and release attaching its catcher.
+  firstLaunch.catch(() => {});
+  let calls = 0;
+  const lateFixture = fixture();
+  const late = new ImService({
+    dataDir: lateDir, policy, channelFactory: lateFixture.factory,
+    parentFactory: () => { calls++; return calls === 1 ? firstLaunch : Promise.resolve({ send: async () => 'ok', close: async () => {} }); },
+  });
+  t.after(async () => { await late.close().catch(() => {}); await rm(lateDir, { recursive: true, force: true }); });
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [lateDir], idleTimeoutMinutes: 30 };
+  await late.save({ expectedRevision: 0, config: base }); await tick();
+  const rebuilding = late.save({ expectedRevision: 1, config: { ...base, model: 'gpt-next' } });
+  await tick();
+  failFirst(parentError('auth', lateCanary));
+  await rebuilding; await tick();
+  assert.equal(calls, 2, '只建新代，不提前重放');
+  assert.equal(late.snapshot().status.agentState, 'ready');
+  assert.equal(late.snapshot().status.agentMessage, undefined);
+  assert.ok(!JSON.stringify(late.snapshot()).includes(lateCanary));
+  lateFixture.handlers.message(message('late-healthy')); await tick();
+  assert.equal(lateFixture.cards.length, 1);
+  assert.equal(calls, 2);
+});
+
+test('控制unavailable先到时同代分类失败仍覆盖通用engine且旧代不污染新代', async t => {
+  const canary = 'LEAK_RACE_AUTH_SECRET';
+  let releaseUnavailable!: () => void;
+  const gate = new Promise<void>(resolve => { releaseUnavailable = resolve; });
+  const { service, f } = await setup(t, async () => ({
+    unavailable: gate,
+    send: async () => {
+      releaseUnavailable();
+      await new Promise(resolve => setTimeout(resolve, 20));
+      throw parentError('auth', `${canary} token=abc /tmp/secret`);
+    },
+    close: async () => {},
+  }));
+  f.handlers.message(message('race-auth')); await tick();
+  await new Promise(resolve => setTimeout(resolve, 200));
+  const snapshot = service.snapshot();
+  assert.equal(snapshot.status.agentState, 'error');
+  assert.equal(snapshot.status.agentMessage, 'Bot 引擎认证失败，请检查登录或密钥后重新连接。');
+  assert.ok(!JSON.stringify(snapshot).includes(canary) && !JSON.stringify(snapshot).includes('/tmp/secret'));
+  assert.ok(f.notices.some(text => text.includes('本轮回复失败')) && !f.notices.join().includes(canary));
+});

@@ -305,6 +305,7 @@ Repository honesty: real runs record the frozen route, requested engine/model/ef
 - [agent-interface](docs/agent-interface.md): command catalog, envelope, outputs, and a full real lifecycle example
 - [local engine operation guide](docs/local-integration-plan.md): discovery, enablement, roles, models, timeout, cancellation, and failure diagnosis for OpenCode/Pi/Grok/Codex
 - [script-migration](docs/script-migration.md): the real Apache-2.0 upstream provenance and migration mapping
+- [feishu-im](docs/feishu-im.md)：手机飞书单聊接入的企业自建应用逐步配置（权限/事件/回调/机器人菜单）、open_id 白名单、多实例限制与已验证边界
 - Skill: [skills/agents-weaver/SKILL.md](skills/agents-weaver/SKILL.md) with references for [the CLI handoff](skills/agents-weaver/references/handoff.md), [policy](skills/agents-weaver/references/config.md) and [Convorel review](skills/agents-weaver/references/convorel.md)
 
 Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).

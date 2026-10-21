@@ -239,7 +239,7 @@ export function createBrowserClient(): RendererAPI {
       if(read) return reconnect.recover(()=>checked(method,args,signal),signal).catch(cause=>{notifyError(cause);throw cause;});
       notifyInfo('操作结果未确认，正在核对…', 'operation-reconcile', 0);
       // A fresh authoritative read reconciles the UI, but cannot prove which writer changed it.
-      void call('getPolicy',[]).then(()=>{
+      void call(method === 'saveImSettings' || method === 'reconnectIm' ? 'getImSettings' : 'getPolicy',[]).then(()=>{
         for(const listener of invalidations) listener();
         notifyInfo('连接已恢复，正在刷新状态，请核对操作是否生效。未自动重复操作。', 'operation-reconcile');
       }).catch(cause=>{notifyInfo('无法核对操作结果，请检查当前状态。', 'operation-reconcile');notifyError(cause,'状态核对失败');});

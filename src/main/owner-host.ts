@@ -342,3 +342,33 @@ export const defaultAsyncRunner: AsyncRunner = ({ file, args, timeout, signal })
   signal?.addEventListener('abort', abort, { once: true });
   if (signal?.aborted) abort();
 });
+
+/** Allocate only a no-focus tab; unlike launchOwner this never starts an interactive agent or sends a prompt. */
+export async function allocateHerdrLane(input: { workspace: string; label: string; receipt: (value: { workspaceId?: string; tabId?: string; paneId?: string; createdWorkspace: boolean }) => void; asyncRunner?: AsyncRunner }): Promise<{ workspaceId: string; tabId: string; paneId: string; createdWorkspace: boolean }> {
+  const file = findExecutableSync('herdr');
+  if (!file) throw new OwnerLaunchError('OWNER_LAUNCH_UNAVAILABLE', 'Herdr is unavailable');
+  const runner = input.asyncRunner ?? defaultAsyncRunner;
+  function* allocate(): Protocol<{ workspaceId: string; tabId: string; paneId: string; createdWorkspace: boolean }> {
+    const match = yield* findMatchingWorkspace(file!, 'default', realpathSync(input.workspace));
+    const createdWorkspace = !match;
+    const args = match
+      ? ['tab', 'create', '--workspace', match.workspaceId, '--cwd', input.workspace, '--label', input.label, '--no-focus']
+      : ['workspace', 'create', '--cwd', input.workspace, '--label', basename(input.workspace), '--no-focus'];
+    let workspaceId = match?.workspaceId, tabId: string | undefined, paneId: string | undefined;
+    yield* runStep('lane create', { file: file!, args: ['--session', 'default', ...args], timeout: 30000 }, output => {
+      let value: unknown;
+      try { value = JSON.parse(output.stdout); }
+      catch { return; /* Missing receipt cannot authorize guessed cleanup. */ }
+      workspaceId ??= asId(dig(value, ['result', 'workspace', 'workspace_id']));
+      tabId = asId(dig(value, ['result', 'tab', 'tab_id']));
+      paneId = asId(dig(value, ['result', 'root_pane', 'pane_id']));
+      input.receipt({ workspaceId, tabId, paneId, createdWorkspace });
+    });
+    if (!workspaceId || !tabId || !paneId) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'Herdr lane receipt is incomplete');
+    yield* runStep('tab rename', { file: file!, args: ['--session', 'default', 'tab', 'rename', tabId, input.label], timeout: 15000 });
+    const check = readJson('tab get', yield* runStep('tab get', { file: file!, args: ['--session', 'default', 'tab', 'get', tabId], timeout: 15000 }));
+    if (dig(check, ['result', 'tab', 'label']) !== input.label) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'Herdr tab label was not confirmed');
+    return { workspaceId, tabId, paneId, createdWorkspace };
+  }
+  return driveAsync(allocate(), runner);
+}

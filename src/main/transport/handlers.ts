@@ -1,3 +1,5 @@
+import type { ImService } from '../im/service';
+import type { SaveImSettingsInput } from '../../shared/contracts/im';
 import { randomUUID } from 'node:crypto';
 import { API_VERSION } from '../../shared/contracts/commands';
 import type { RpcMethod } from '../../shared/contracts/rpc';
@@ -34,6 +36,7 @@ export interface ActiveServices {
 
 /** What the runtime lends to the handlers: its in-flight tracking, shared quota refresh, monitors and identity. */
 export interface RpcHost {
+  im(): ImService;
   track<T>(job: Promise<T>): Promise<T>;
   /** Manual and scheduled refresh share one probe-then-merge path. */
   refreshQuota(input: QuotaRefreshInput): Promise<QuotaRefreshResult>;
@@ -201,6 +204,9 @@ function serverHandlers(host: RpcHost): Handlers<'capabilities' | 'serverInfo'> 
 /** The business implementation behind every RPC method; HTTP /api/rpc and the Unix socket both reach it through the runtime. */
 export function createRpcHandlers(host: RpcHost): RpcHandlers {
   return {
+    getImSettings: () => host.im().snapshot(),
+    saveImSettings: (_active, args) => host.im().save(args[0] as SaveImSettingsInput),
+    reconnectIm: () => host.im().reconnect(),
     ...policyHandlers(),
     ...quotaHandlers(host),
     ...engineHandlers(host),

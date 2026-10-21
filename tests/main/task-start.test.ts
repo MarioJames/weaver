@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
@@ -82,19 +82,20 @@ test('failed launch is visible, drain aborts pending launches, and cancellation 
 test('HTTP startTask, tasks.start and CLI IPC acknowledge slow injected launchers within one second',async t=>{
  const directory=mkdtempSync(join(tmpdir(),'wvts-rt-'));const inputs:(OwnerLaunchInput & {signal?:AbortSignal})[]=[];
  const quota=new QuotaProber({env:{HOME:directory}});quota.refresh=async()=>quota.get();
+ const project=join(directory,'project');mkdirSync(project);
  const runtime=await startRuntime({dataDir:directory,port:0,open:false,quotaProber:quota,ownerHost:{launcher:input=>new Promise((_resolve,reject)=>{inputs.push(input);input.signal?.addEventListener('abort',()=>reject(new Error('fake drain')),{once:true});}),closer:async()=>{}}}).catch(error=>{rmSync(directory,{recursive:true,force:true});throw error;});
  const envelope=(command:string,args:Record<string,unknown>={})=>({apiVersion:'weaver.v1',command,args,commandId:randomUUID()});
  const rpc=async(method:string,args:unknown[])=>{const response=await fetch(`http://127.0.0.1:${runtime.port}/api/rpc`,{method:'POST',headers:{origin:`http://127.0.0.1:${runtime.port}`,'content-type':'application/json'},body:JSON.stringify({method,args})});assert.equal(response.status,200);const body:any=await response.json();assert.equal(body.error,undefined,JSON.stringify(body));return body.result;};
  try{
   for(const transport of ['http-command','http-startTask','cli'] as const){
-   const created:any=await sendRequest(directory,envelope('tasks.create',{goal:'root runtime fixture',workspace:directory,ownerProfileId:transport==='cli'?'claude_owner':'codex_owner'}));assert.equal(created.ok,true);const task=created.data;
+   const created:any=await sendRequest(directory,envelope('tasks.create',{goal:'root runtime fixture',workspace:project,ownerProfileId:transport==='cli'?'claude_owner':'codex_owner'}));assert.equal(created.ok,true);const task=created.data;
    const started=Date.now();let result:any;
    if(transport==='http-command'){const response=await rpc('command',[envelope('tasks.start',{taskId:task.id})]);assert.equal(response.ok,true);result=response.data;}
    else if(transport==='http-startTask')result=await rpc('startTask',[task.id]);
    else {const response=await promisify(execFile)(process.execPath,['--import','tsx','src/cli/main.ts','tasks','start','--task-id',task.id,'--command-id',randomUUID(),'--data-dir',directory],{timeout:5000});const parsed=JSON.parse(response.stdout);assert.equal(parsed.ok,true);result=parsed.data;}
    const elapsed=Date.now()-started;assert.ok(elapsed<1000,`${transport}: ${elapsed}ms`);assert.equal(result.status,'running');assert.equal(result.executionRole,'owner');assert.equal(result.ownerHost,undefined);t.diagnostic(`${transport}: ${elapsed}ms`);
   }
-  assert.equal(inputs.length,3);assert.equal(inputs[2].engineKind,'claude');
+  assert.equal(inputs.length,3);assert.equal(inputs[2].engineKind,'claude');for(const input of inputs){assert.equal(input.workspace,project);assert.ok(input.prompt.includes(`weaver --data-dir '${directory}' --skill`));}
   const childRequest={command:'tasks.create',args:{parentTaskId:randomUUID()}};applyCallerWorkspace(childRequest,'/irrelevant');assert.equal('workspace' in childRequest.args,false);
   await runtime.close();assert.ok(inputs.every(input=>input.signal?.aborted));
  }finally{await runtime.close();rmSync(directory,{recursive:true,force:true});}

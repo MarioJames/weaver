@@ -1,0 +1,458 @@
+{
+  "taskId": "a18a5519-89b0-4df8-8c05-71a8384053ef",
+  "date": "2026-10-21",
+  "source": {
+    "tree": "230411bba97f2efad4790186d3b3775232483891",
+    "base": "84178ebcedc95325cc88fa340d02f6de0a8007c1",
+    "nodeHash": "b3fcb325226c50a40a60d388f54bec783de0f8b7f32fbd4b40a4f151adab6866",
+    "bunHash": "87f93d88f72e7974def4d12f3698f2ec999af413300881bc6c71a6b1635f1770"
+  },
+  "checks": {
+    "command": "npm run check",
+    "exit": 0,
+    "tests": 1455,
+    "passed": 1445,
+    "failed": 0,
+    "optInSkipped": 10,
+    "typecheck": "pass",
+    "viteBuild": "pass",
+    "nodeBuild": "pass",
+    "bunStandaloneBuild": "pass",
+    "safeTerminalSummary": [
+      "npm notice run tsc --noEmit",
+      "ℹ tests 1455",
+      "ℹ pass 1445",
+      "ℹ fail 0",
+      "ℹ skipped 10",
+      "npm notice run tsc --noEmit && vite build && node scripts/build-main.mjs",
+      "✓ built in 1.96s",
+      " [138ms] compile  /tmp/weaver-feishu-sqivf643/bot-page/standalone-out-230411/weaver-linux-x64",
+      "built dist/release/weaver-linux-x64"
+    ]
+  },
+  "browser": {
+    "result": "pass",
+    "assertions": 42,
+    "fullTree": "3d2e152d62bf7d7c0f355468e06fe7b9d88654c9",
+    "finalSmokeTree": "3b5ee0fe26e28b11ff9295ff5be7e497766d349d",
+    "fullAssertions": 38,
+    "finalSmokeAssertions": 4,
+    "sourceImpact": {
+      "fullTree": "3d2e152d62bf7d7c0f355468e06fe7b9d88654c9",
+      "smokeTree": "0c77eca0ed20be620411da41df82782e72003502",
+      "sourceFilesCompared": 227,
+      "sourceDifferences": [
+        "src/cli/run.ts"
+      ],
+      "sameSourceFileCount": 226,
+      "ownerReportedOtherDifference": "tests/integration/architecture-boundaries.test.ts",
+      "comparison": "SHA256 of every regular src file from full snapshot; all renderer/runtime/IM/config/workspaces source unchanged"
+    },
+    "artifact_errors": [],
+    "unexpectedConsoleErrors": 0,
+    "unexpectedNetworkErrors": 0,
+    "expectedNetworkFailures": 16,
+    "boundary": "真实runtime/HTTP/RPC/store/目录；外部parent/channel/catalog fake",
+    "resourceCleanup": {
+      "unit": "dev-weaver-bot-browser-2f95bd7b.scope",
+      "activeState": "inactive",
+      "profilesRemoved": true,
+      "profileChromeProcesses": 0,
+      "bothRunDirsRemoved": true,
+      "allFourPortsClosed": true,
+      "compileCacheRemoved": true,
+      "realProductionTouched": false
+    },
+    "historical0c77SmokeAssertions": 4,
+    "finalSmokeCollection": {
+      "artifact_errors": [],
+      "evidence_dir_used": "/tmp/weaver-feishu-sqivf643/bot-page/browser-ready-gate/.browser-harness/evidence/20261021T084936",
+      "requestCount": 43,
+      "errors": [
+        {
+          "rpc": "workerProbeStatus",
+          "status": 403,
+          "path": "/api/rpc"
+        }
+      ],
+      "groups": [
+        {
+          "rpc": "getImSettings",
+          "status": 200,
+          "count": 7
+        },
+        {
+          "rpc": "command",
+          "status": 200,
+          "count": 21
+        },
+        {
+          "rpc": "listTasks",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "rpc": "capabilities",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "rpc": "getPolicy",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "rpc": "getQuota",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "rpc": "workerProbeStatus",
+          "status": 403,
+          "count": 1
+        },
+        {
+          "rpc": "listEngineModels",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "rpc": "saveImSettings",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "rpc": "reconnectIm",
+          "status": 200,
+          "count": 3
+        }
+      ],
+      "consoleTypes": {
+        "debug": 4,
+        "info": 2
+      },
+      "pageErrors": [],
+      "bodiesRetained": false
+    },
+    "finalSmokeCleanup": {
+      "unit": "dev-weaver-bot-ready-5cb5f950.scope",
+      "portsClosed": true,
+      "runDirRemoved": true,
+      "chromeProfile": "must be closed and removed separately with bh",
+      "chromeClosed": true,
+      "profileRemoved": true,
+      "profileChromeProcesses": 0,
+      "cacheRemoved": true,
+      "pidExited": true,
+      "dataRemoved": true
+    },
+    "finalSourceImpact": {
+      "comparedSourceFiles": 227,
+      "fromTree": "3b5ee0fe26e28b11ff9295ff5be7e497766d349d",
+      "toTree": "230411bba97f2efad4790186d3b3775232483891",
+      "differences": [
+        "src/main/im/parent-herdr.ts"
+      ],
+      "rendererSame": true,
+      "serviceSame": true,
+      "parentHerdrFinalHash": "96373dee7c011d219c8092e629e114dc877d3c68ebcd089157bd42003577fc6a"
+    }
+  },
+  "host": {
+    "nodeFullFaultCases": 10,
+    "bunFullFaultCases": 10,
+    "finalDynamicEntryCases": 4,
+    "externalCli": "fake",
+    "allOwnedResourcesAbsent": true,
+    "fixtureDirectoriesAbsent": true,
+    "finalArtifactSmoke": [
+      {
+        "kind": "node",
+        "ready": true,
+        "httpRpc": true,
+        "assetsCount": 3,
+        "pidReleased": true,
+        "portReleased": true,
+        "temporaryDataRemoved": true
+      },
+      {
+        "kind": "bun",
+        "ready": true,
+        "httpRpc": true,
+        "assetsCount": 3,
+        "pidReleased": true,
+        "portReleased": true,
+        "temporaryDataRemoved": true
+      }
+    ],
+    "fullFaultMatrixBasis": "existing 0c77 baseline; final 230411 independently ran 4 host cases"
+  },
+  "realCodexInitialization": {
+    "ready": true,
+    "initializeMs": 1382,
+    "workspaceCount": 2,
+    "engine": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "low",
+    "permissionGatePassed": true,
+    "sameCgroup": true,
+    "parentSendCalls": 0,
+    "turnStartCalls": 0,
+    "providerTrafficAudited": false,
+    "toolReadWriteVerified": false,
+    "cleanup": {
+      "unitAbsent": true,
+      "cgroupAbsent": true,
+      "tabAbsent": true,
+      "hostAbsent": true,
+      "childPidsAbsent": true,
+      "journalEmpty": true
+    }
+  },
+  "review": {
+    "status": "pass",
+    "run": "646ed8f4-a4a6-4351-8671-30f301e511f7",
+    "replyFinal": true,
+    "archiveStatus": "stored",
+    "gaps": [],
+    "capabilitiesBuildsAndTests": false,
+    "history": [
+      {
+        "run": "fde95025-e29f-4a18-a34b-8aa1f047bfa8",
+        "status": "failed",
+        "blocker": "尚未ready的replacement deadline0误过期，后由service parent gate及两条受控回归关闭"
+      },
+      {
+        "run": "4486e49d-2979-4cb1-a989-2c5db50780aa",
+        "status": "pass",
+        "scope": "service ready gate闭合"
+      },
+      {
+        "run": "646ed8f4-a4a6-4351-8671-30f301e511f7",
+        "status": "pass",
+        "scope": "socket预检空epoch清理与连续失败重试闭合"
+      }
+    ]
+  },
+  "activation": {
+    "status": "deferred",
+    "label": "源码验收通过，生产等待托管任务完成而未切换",
+    "observed": true,
+    "activated": false,
+    "deploymentVerified": false,
+    "timestamp": "2026-10-21T13:08:44.945696+00:00",
+    "sourceTree": "230411bba97f2efad4790186d3b3775232483891",
+    "preparedRelease": "/home/mocha/.local/share/weaver/releases/20261021-bot-230411bba97f",
+    "managedWorkersAtObservation": 4,
+    "credentialsOrPolicyChanged": false,
+    "dataPreserved": true,
+    "summary": "安全观测时间 2026-10-21T13:08:44.945696+00:00：activated=false，managedWorkers=4，4737原服务保留。用户要求等待托管任务自然完成，先提交已验收Bot基线，继续新增功能后统一切换。这是有意延后，非激活失败，不代表新版已上线。prepared release为 /home/mocha/.local/share/weaver/releases/20261021-bot-230411bba97f；凭据/策略未因本次准备改变，真实数据保留。"
+  },
+  "unverified": [
+    "真实手机全链路与多项目派发",
+    "流式卡片实时推进/正文选项/机器人菜单",
+    "真实模型busy与多目录工具读写",
+    "actual dark主题",
+    "recent-directory历史分支",
+    "新版消息响应性能"
+  ],
+  "retainedResources": {
+    "production": {
+      "service": "原weaver.service，4737；本版新Herdr host尚未上线，激活后才按用户要求常驻",
+      "port": 4737,
+      "persistent": "真实DB/settings/一致性备份/immutable release",
+      "reason": "用户要求持续运行；实际新版本激活结果以activation项为准"
+    },
+    "foreign": {
+      "session": "wv-botlife-28d56c0a-e0101f1f",
+      "unit": "herdr-session-wv-botlife-28d56c0a-e0101f1f.scope",
+      "pid": 989261,
+      "starttime": 12297610,
+      "invocationId": "07ffa57839194b3c84ed90fb8b89f17a",
+      "sessionDirectory": "/home/mocha/.config/herdr/sessions/wv-botlife-28d56c0a-e0101f1f",
+      "reason": "session_foreign:1，归属不明，不读内容/不停止/不删除",
+      "recipient": "当前owner/user",
+      "releaseCondition": "用户核实归属并明确授权"
+    }
+  },
+  "ownerAudit": {
+    "frozenPathsHashMatched": 47,
+    "protectedBaselineUnchanged": true,
+    "gitDiffCheck": "pass",
+    "verificationBy": "owner independent audit",
+    "foreignCwd": "/home/mocha/opensource/weaver",
+    "foreignDependsOnTaskroot": false,
+    "basisTree": "0c77eca0ed20be620411da41df82782e72003502 (historical stage)"
+  },
+  "sourceEvidence": [
+    {
+      "path": "validation-state.json",
+      "sha256": "a2f55638bde641b1ee10921be645252ec5f9cb8c4900a54f55e3636cc9181b25"
+    },
+    {
+      "path": "browser/evidence/final-summary.json",
+      "sha256": "8512b24ccee2bd6251b9d2079f85deb10a685aa744d8f79e2363beffd5ffdaf8"
+    },
+    {
+      "path": "browser/evidence/checks.json",
+      "sha256": "db341118b0806fd294ee20537107d3e818066b9c7204dc753acc12237a745dee"
+    },
+    {
+      "path": "browser/evidence/collection-summary.json",
+      "sha256": "7f419476cb9fefc7a42b2552fb7372df8b5a1d8eaddc99fb5de0a2b2c23aaf32"
+    },
+    {
+      "path": "browser/evidence/source-impact.json",
+      "sha256": "bb5d6d277b244f96ccbb3eec90dec9c947cb4551275a56dfaa66f3403d506564"
+    },
+    {
+      "path": "browser/final-result.md",
+      "sha256": "747a29ff5daf176163cd9e61c876debd7e3f81ab86c7d8c25359e0027979a506"
+    },
+    {
+      "path": "herdr-host-result.md",
+      "sha256": "7f1b7f69a0ce718c3a91a560b91ef5a5b640bf0e4c2df2445132a2117df6ef32"
+    },
+    {
+      "path": "host-cleanup-audit.json",
+      "sha256": "9936372ff7d9c760bfb717c9608f5af902af16d0f6f4eeef210216133f0c4667"
+    },
+    {
+      "path": "final-artifacts-socket-preflight/result.md",
+      "sha256": "06664773ad7264fedc37677285d91e6bceff621420bcdc9b455c76bb57930a55"
+    },
+    {
+      "path": "final-artifacts-socket-preflight/smoke-proof.json",
+      "sha256": "e56f6d496775932da2774863f11ee08022f1eae35adeeac9fa4e9c1adc1af8fe"
+    },
+    {
+      "path": "final-artifacts-socket-preflight/cleanup-proof.json",
+      "sha256": "58403e050bbde37cf22661152547ea356f280843c8e3e8cded00533cd5b1aa7d"
+    },
+    {
+      "path": "final-artifacts-socket-preflight/source-proof.json",
+      "sha256": "42e4dde5e524a3d30722a13ecea23f73fa36eef73293259651972e87b7d0ab27"
+    },
+    {
+      "path": "real-codex-init/result.md",
+      "sha256": "76fac741150c5d73098d51b59dbea2aee07c3aac1bebe0945b07c879aa1550cd"
+    },
+    {
+      "path": "real-codex-init/result.json",
+      "sha256": "006d5adfe8e874d0f4534c0c7f07ce192baa2536928fab59bd5667313e4ba00f"
+    },
+    {
+      "path": "lifecycle-probe/summary.json",
+      "sha256": "3d723f406bf582cbbf1ccc16be6313d2d7d2581c470486c5b9e7c49eddccabcc"
+    },
+    {
+      "path": "lifecycle-probe/herdr-proof.json",
+      "sha256": "a670fb14086bfd4699c4cae38ab770c89a7c2d644e617fe32c8043dd763acf21"
+    },
+    {
+      "path": "lifecycle-probe/result.md",
+      "sha256": "f62ed351635480b4bc664fbffb93920eff42575106bab8fae1d567f757b105e9"
+    },
+    {
+      "path": "full-check4.log",
+      "sha256": "c2b6c322df144ff9b1e0787aa61d7c5d2eafb75dde36f448b16cca893089f9a3"
+    },
+    {
+      "path": "full-check4.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "standalone-socket-build.log",
+      "sha256": "31a9ad843b79fd3709f8b843b4854ab0d1d1ed1ab13f534d01dc959a500fb582"
+    },
+    {
+      "path": "standalone-socket-build.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "browser-ready-gate/summary.json",
+      "sha256": "ef838ae83fb13e1f8a0ae1d20f5c8adcadf74a15e346cfccede72f9cb5e22582"
+    },
+    {
+      "path": "browser-ready-gate/result.md",
+      "sha256": "6a497e6e0118f6e7a9af0940984fb1a6bdc7203d9694312957b5165e5e0a1711"
+    },
+    {
+      "path": "ready-gate-review.md",
+      "sha256": "084dadb4c019e1a9ba1b0b195ca318b9be96d8e8fadaeb9c85559dc33c2fb4d6"
+    },
+    {
+      "path": "ready-gate-review-result.json",
+      "sha256": "afb9b96199129b4b74c6ee3373633222861822d7c41030009e22b4a089c60c0c"
+    },
+    {
+      "path": "socket-final-review.md",
+      "sha256": "4216862e8e01b4a2f56d1c4cc88b5213acfae02b4dfd2685b06616e9b31a2875"
+    },
+    {
+      "path": "socket-final-review-result.json",
+      "sha256": "6f59a0028f2ddebd221953ca7d6f4b94251fb908826bf5571a5adf15c352f827"
+    },
+    {
+      "path": "socket-preflight/result.md",
+      "sha256": "0d14162e2a3d34dd0f9bb0c62d219bfc15d6b77d3e54b382709d120a4496d6fb"
+    },
+    {
+      "path": "ops/activation-deferred-proof.json",
+      "sha256": "a43f63818b2aeb2d7474be22e24c2a34e3145c3c52d3f0409a0a902c34e6e55a"
+    },
+    {
+      "path": "ready-gate/result.md",
+      "sha256": "6e3f48d10d0bbfd896a6f160925cb727d75bf3237e9dddc2ba3e2ec587afcfbd"
+    },
+    {
+      "path": "delivery/final-source-impact.json",
+      "sha256": "627343fcdb3ef569a815671747237841e52b360a5f06e71f66e4124045b81539"
+    }
+  ],
+  "resolvedFindings": [
+    {
+      "name": "replacement ready gate",
+      "red": "0pass/2fail",
+      "green": "2/2",
+      "verification": "实际ImService、临时durable claim与factory/close gates；不是手机或真实模型验证"
+    },
+    {
+      "name": "overlong socket empty epoch cleanup",
+      "red": "ERR_FS_EISDIR then ENOENT, 0/1",
+      "green": "1/1，两次invalid_input、每轮空root、0700、runner0",
+      "verification": "正式factory, rmdirSync仅删除本次空epoch，不递归/force"
+    }
+  ],
+  "ownerConfidentialityAudit": {
+    "candidateAndPreparedReleaseFilesVerified": 322,
+    "realSensitiveMatches": 0,
+    "privateValuesOnlyUsedLocallyForScanAndPreservationComparison": true,
+    "verificationBy": "owner"
+  },
+  "reviewBrowserCleanup": {
+    "ownTarget": "3D11",
+    "closedManuallyByOwner": true,
+    "finishBorrowedClosedFalse": true,
+    "sharedChromeAndOtherConversationsPreserved": true
+  },
+  "reportReadability": {
+    "url": "file:///home/mocha/opensource/weaver/docs/verification/feishu-im/bot-workspaces.html",
+    "desktop1280": true,
+    "mobile390": true,
+    "overflowFixed": "unbroken prepared-release text now wraps",
+    "allThreeImagesLoaded": true,
+    "relativeJsonLinkActuallyOpened": true,
+    "allLinksExist": true,
+    "printPdfPages": 6,
+    "printFirstPageViewed": true,
+    "noAppServiceStarted": true,
+    "allSixPrintPagesViewed": true,
+    "profileRemoved": true,
+    "ownChromeProcesses": 0,
+    "pageErrors": [],
+    "consoleErrors": [],
+    "finalWordingDesktop390AndPrintRechecked": true,
+    "finalProfileRemoved": true
+  }
+}

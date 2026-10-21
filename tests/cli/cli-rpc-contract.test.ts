@@ -9,6 +9,7 @@ import { createRpcHandlers, type RpcHost } from '../../src/main/transport/handle
 
 /** The allowlist the browser and the CLI shared before the contract table existed; it must not drift. */
 const FROZEN_ARITY: Record<string, number> = {
+  getImSettings: 0, saveImSettings: 1, reconnectIm: 0,
   command: 1, getPolicy: 0, policyHistory: 0, policyRollback: 1, validatePolicy: 1, savePolicy: 1, previewRoute: 1, scanEngines: 0,
   listEngineModels: 1, getQuota: 0, refreshQuota: 1, getStall: 0, workerProbe: 1, workerProbeStatus: 0, sayHi: 1, sayHiResult: 1,
   setEngineEnabled: 1, listTasks: 0, getTask: 1, createTask: 1, startTask: 1, cancelTask: 1, capabilities: 0, serverInfo: 0,

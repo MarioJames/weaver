@@ -28,7 +28,7 @@ function deferredLaunch() {
   return {pending,launcher};
 }
 function fixture(options:{closeFailure?:boolean}={}) {
-  const directory=mkdtempSync(join(tmpdir(),'wv-async-command-'));
+  const directory=mkdtempSync(join(tmpdir(),'wv-async-'));
   const store=new TaskStore(join(directory,'weaver.db'));const policy=new PolicyStore(join(directory,'weaver.db'));
   const manager=new TaskManager(store,new MockWorkerAdapter(process.execPath,resolve('scripts/mock-worker.mjs')));
   const launch=deferredLaunch();const closed:OwnerLaunchResult[]=[];

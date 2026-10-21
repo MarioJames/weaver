@@ -77,6 +77,33 @@ export function writeWebHelp(rest: string[]): void {
   else writeEnvelope(web.output, { apiVersion: 'weaver.v1', ok: true, data: { command: 'web', mutation: false, usage: WEB_HELP } });
 }
 
+/**
+ * Foreground signal wiring for `weaver web`. The first SIGINT/SIGTERM starts the runtime's close once; every
+ * further signal joins that same promise instead of calling close again. The exit code comes from the real
+ * close result — `done` settles earlier than close, so awaiting it alone would turn a failed shutdown into a
+ * fake success. A close failure is reported as a static line (the runtime already logs the concrete cause) and
+ * a non-zero exit code. Whether shutdown succeeds or fails, this run's signal listeners are removed on the way
+ * out and none of the awaited rejections stays unhandled.
+ */
+export async function runForegroundShutdown(runtime: { done: Promise<void>; close(): Promise<void> }): Promise<number> {
+  let closing: Promise<void> | undefined;
+  const closeOnce = (): Promise<void> => { closing ??= runtime.close(); return closing; };
+  const onSignal = (): void => { void closeOnce().catch(() => { /* the outcome is read below from `closing`. */ }); };
+  process.on('SIGINT', onSignal);
+  process.on('SIGTERM', onSignal);
+  try {
+    await runtime.done;
+    if (closing !== undefined) {
+      try { await closing; }
+      catch { writeSync(process.stderr.fd, 'Weaver stopped, but shutdown reported an error\n'); return 1; }
+    }
+    return 0;
+  } finally {
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
+  }
+}
+
 /** Run the service in the foreground. The runtime is loaded here, so client commands never pull in the server. */
 export async function runWeb(argv: string[], words: string[], setErrorFormat: (format: OutputFormat) => void): Promise<number> {
   if (words.length !== 1) throw new LocalIPCError('INVALID_ARGUMENT', 'Unexpected web arguments');
@@ -94,10 +121,5 @@ export async function runWeb(argv: string[], words: string[], setErrorFormat: (f
   try { runtime = await (await import('../../main/runtime')).startRuntime({ dataDir: web.dataDir, port: web.port, open: web.open, dev: web.dev }); }
   catch (error) { throw startupFailure(error, web.port); }
   writeSync(process.stdout.fd, readyLine(runtime.url, runtime.port, web.output));
-  const stop = () => { void runtime.close(); };
-  // Repeated signals (process-group stops deliver one per process) join the same idempotent drain.
-  process.on('SIGINT', stop);
-  process.on('SIGTERM', stop);
-  await runtime.done;
-  return 0;
+  return await runForegroundShutdown(runtime);
 }
