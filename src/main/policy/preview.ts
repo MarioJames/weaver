@@ -2,7 +2,7 @@ import { object } from '../../shared/validation';
 import type { Block, Config, RoutePreview, RouteOptions } from '../../shared/contracts/policy';
 import { activeBlocks } from '../../shared/policy/availability';
 import { chatgptReviewEnabled } from '../../shared/policy/settings';
-import { resolveDispatch } from './routing';
+import { resolveDispatch, workerCap } from './routing';
 import { exact, text } from './input';
 
 /** A dry run of dispatch routing against the saved config and the blocks in force at `now`; writes nothing. */
@@ -25,6 +25,11 @@ export function previewRoute(config: Config, blocks: Block[], now: number, value
   }
   const count=input.runningCount??0; if(!Number.isSafeInteger(count)||Number(count)<0) throw new Error('Invalid running count');
   const route=resolveDispatch(config,activeBlocks({version:1,blocks},now),opts);
-  const maxParallel=config.owners[opts.owner].max_parallel;
-  return {...route,maxParallel,capacityAvailable:Number(count)<maxParallel,chatgptReview:chatgptReviewEnabled(config)};
+  const ownerConf=config.owners[opts.owner];
+  const limit=workerCap(config.workers[route.worker]);
+  // A worker at its own max_parallel is out of room even when the owner still has a free slot;
+  // without a load report the route assumes it is idle, as the running count does.
+  const running=opts.workerLoad?.[route.worker]??0;
+  return {...route,maxParallel:ownerConf.max_parallel,capacityAvailable:Number(count)<ownerConf.max_parallel&&(!limit||running<limit),
+   ...(limit!==undefined?{workerCapacity:{limit,running}}:{}),chatgptReview:chatgptReviewEnabled(config)};
 }

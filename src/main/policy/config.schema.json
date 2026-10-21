@@ -255,6 +255,12 @@
         "description": {
           "type": "string"
         },
+        "max_parallel": {
+          "description": "Cap on tasks this worker runs concurrently across every owner, native runs included. Missing means no cap. Routing skips a worker at its cap; when every available worker of the owner is at its cap the task waits in the queue until a slot frees.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
         "free_channel": {
           "type": "boolean",
           "description": "Explicit free route; ignores native account quota blocks only. Manual and vendor limits still apply."

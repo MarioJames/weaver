@@ -6,18 +6,19 @@ import { TimeText } from '../../ui/TimeText';
 import { notifyError, useNotifyError } from '../../api/notify';
 import { NamedSelect, NamedSwitch, NamedInputNumber } from '../../ui/NamedControls';
 import { useEffect, useId, useRef, useState } from 'react';
-import { Plus, Trash2, Zap } from 'lucide-react';
+import { Play, Plus, Trash2, Zap } from 'lucide-react';
 import { Empty } from '@lobehub/ui';
 import { Surface } from '@lobehub/ui/dashboard';
-import { Button, Checkbox, Input, Modal, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
+import { Alert, Button, Checkbox, Input, Modal, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
 import type { HelloResult } from '../../../shared/engines';
 import { startHello, useHelloRun } from '../engines/hello-runs';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
 import { EFFORTS } from '../../../shared/policy/settings';
 import { type Availability, type Block, type Owner, type Worker } from '../../../shared/contracts/policy';
-import { blankOwner, blankWorker, removeRole, renameRole, roleDeleteImpact, roleIdError, syncRoleEditor, type RoleSection } from '../../policy/policy-edit';
+import { blankOwner, blankWorker, removeRole, renameRole, roleDeleteImpact, roleIdError, syncRoleEditor, withWorkerParallel, workerParallelText, type RoleSection } from '../../policy/policy-edit';
 import { OwnerScheduleFields } from './OwnerSchedule';
 import { ModelPicker } from '../engines/ModelPicker';
+import { engineBlockText, removeWorkerResume } from '../engines/EnginesPage';
 import { FreeChannelTag } from '../../ui/FreeChannelTag';
 import { statusTagColor, tagColor } from '../../format/tag-colors';
 import { PolicyHeader } from '../../policy/PolicyHeader';
@@ -62,6 +63,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   const [idError, setIdError] = useState('');
   const [askDelete, setAskDelete] = useState(false);
   const [toggling, setToggling] = useState('');
+  const [resuming, setResuming] = useState(false);
   const form = useForm();
   const fieldId = useId();
   const freeProbe = useFreeProbe(policy.snapshot?.revision);
@@ -102,7 +104,16 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
     catch (error) { notifyError(error, '保存失败'); }
     finally { setToggling(''); }
   }
+  /** Lifts the ban that keeps this worker out, plus the whole-engine vendor ban that depended on it, on top of the saved policy. */
+  async function resume(target: Block) {
+    setResuming(true);
+    try { await policy.commit(doc => ({ ...doc, blocks: removeWorkerResume(doc.blocks, target) })); }
+    catch (error) { notifyError(error, '恢复派发失败'); }
+    finally { setResuming(false); }
+  }
   const impact = current ? roleDeleteImpact(config, section, current) : undefined;
+  const savedWorker = section === 'workers' && current ? policy.snapshot?.config.workers[current] : undefined;
+  const pausedBy = savedWorker && current && policy.snapshot ? blockOf(policy.snapshot.blocks, savedWorker, Date.now(), current) : undefined;
   return <>
     {header}
     <div className={rolesStyles.split}>
@@ -112,6 +123,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           const item = config[section][id]!;
           const engineOn = config.engines[item.engine]?.enabled === true;
           const saved = policy.snapshot?.config[section][id];
+          const cap = section === 'workers' ? workerParallelText(item as Worker) : undefined;
           const note = roleNote(policy.snapshot?.[section][id], false, policy.snapshot && saved ? blockOf(policy.snapshot.blocks, saved, Date.now(), section === 'workers' ? id : undefined) : undefined);
           return <div key={id} className={rolesStyles.roleItem} aria-current={id === current ? 'true' : undefined}>
             <NamedSwitch size="small" aria-label={`启用 ${id}`} checked={item.enabled} loading={toggling === id} disabled={!engineOn || !!toggling} title={engineOn ? undefined : `引擎 ${item.engine || '未选择'} 未启用，先在引擎页打开它`} onChange={checked => void toggle(id, checked)} />
@@ -120,7 +132,10 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
                 <strong className={styles.wrap}>{id}</strong>
                 {section === 'workers' && 'free_channel' in item && item.free_channel === true && <FreeChannelTag />}
               </span>
-              <span className={`${styles.wrap} ${styles.meta}`}>{item.engine} · {item.model || '未填模型'}</span>
+              <span className={rolesStyles.roleNote}>
+                <span className={`${styles.wrap} ${styles.meta}`}>{item.engine} · {item.model || '未填模型'}</span>
+                {cap && <Tag size="small" color={tagColor('neutral')}>{cap}</Tag>}
+              </span>
               {note && (note.tag
                 ? <span className={rolesStyles.roleNote}><Tag size="small" color={note.tag.color}>{note.tag.label}</Tag><span className={`${styles.wrap} ${styles.meta} ${rolesStyles.warn}`}>{note.text}</span></span>
                 : <span className={`${styles.wrap} ${styles.meta} ${note.warning ? rolesStyles.warn : ''}`}>{note.text}</span>)}
@@ -130,6 +145,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
       </nav>
       <div ref={editor} tabIndex={-1}><Surface padded>
         {!record || !current ? <Empty title={`还没有${name}`} description={`新建一个${name}，选择引擎和模型后保存。`} action={<Button icon={Plus} onClick={add}>新建{name}</Button>} /> : <Form form={form} layout="vertical" className={styles.stack}>
+          {pausedBy && <WorkerBlockNotice block={pausedBy} busy={resuming} disabled={policy.busy} onResume={() => void resume(pausedBy)} />}
           <div className={styles.spread}>
             <Text strong>{name} 配置</Text>
             <Button danger size="small" icon={Trash2} disabled={policy.busy} onClick={() => setAskDelete(true)}>删除</Button>
@@ -171,8 +187,29 @@ function WorkerFields({ id, record, probe, update }: { id: string; record: Worke
     <Form.Field label="免费渠道" desc="仅跳过原生账户额度暂停；手动暂停、供应商限流仍生效。调度权重由父 Agent 分别设置。"><Checkbox checked={record.free_channel === true} onChange={checked => update({ ...record, free_channel: checked === true })}>此子 Agent 使用免费渠道</Checkbox></Form.Field>
     <Form.Field label="用途说明"><Input id={`${fieldId}-description`} aria-label="用途说明" value={record.description ?? ''} placeholder="例如：负责前端界面与浏览器验收" onChange={event => update({ ...record, description: event.target.value })} /></Form.Field>
     {record.free_channel === true && <FreeProbePanel worker={id} probe={probe} />}
+    <WorkerParallelField record={record} update={update} />
     <HelloCheck id={id} record={record} />
   </>;
+}
+
+/** Off means no cap and removes the key; on stores the 1–100 limit on tasks this worker runs at once across every parent Agent. */
+export function WorkerParallelField({ record, update }: { record: Worker; update: (next: Worker) => void }) {
+  const on = record.max_parallel !== undefined;
+  return <Form.Field label="并发上限" desc="同一时间最多运行几个任务，超出的任务排队等待；用于避免供应商限流。">
+    <div className={styles.row} style={{ flexWrap: 'nowrap' }}>
+      <NamedSwitch size="small" aria-label="限制同时运行的任务数" checked={on} onChange={checked => update(withWorkerParallel(record, checked, record.max_parallel))} />
+      <Text>限制同时运行的任务数</Text>
+      {on && <NamedInputNumber aria-label="并发上限" size="small" min={1} max={100} step={1} precision={0} value={record.max_parallel} style={{ inlineSize: 88 }} onChange={value => update(withWorkerParallel(record, true, typeof value === 'number' ? value : undefined))} />}
+    </div>
+  </Form.Field>;
+}
+
+/** Why dispatch skips this worker right now, with the one button that lifts it. The ban is read from the saved policy, so the notice never shows an unsaved draft. */
+export function WorkerBlockNotice({ block, now = Date.now(), busy, disabled, onResume }: { block: Block; now?: number; busy?: boolean; disabled?: boolean; onResume: () => void }) {
+  const text = engineBlockText(block, now);
+  const scope = block.worker ? '' : block.model ? `（作用于引擎 ${block.engine} 的模型 ${block.model}）` : `（作用于整个引擎 ${block.engine}，恢复后该引擎的所有子 Agent 都会恢复）`;
+  return <Alert type="warning" title={`已暂停派发 · ${text.category}`} description={`${text.reason}；${text.release}${scope}`}
+    style={{ marginBlockEnd: 12 }} action={<Button size="small" icon={Play} aria-label="恢复派发" loading={busy} disabled={disabled} onClick={onResume}>恢复派发</Button>} />;
 }
 
 /** Sends one real "say hi" through the route as currently filled in, saved or not. The run outlives this form. */

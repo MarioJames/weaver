@@ -5,7 +5,7 @@ export interface QuotaSettings { auto_refresh: boolean; interval_minutes: number
 /** Scheduled live probes of free_channel workers; missing means enabled every 10 minutes. */
 export interface FreeChannelProbeSettings { enabled: boolean; interval_minutes: number }
 export interface Owner { enabled: boolean; engine: string; model: string; effort: string; workers: string[]; max_parallel: number; worker_weights?: Record<string, number> }
-export interface Worker { free_channel?: boolean; enabled: boolean; engine: string; model: string; effort: string; description?: string }
+export interface Worker { free_channel?: boolean; enabled: boolean; engine: string; model: string; effort: string; description?: string; /** Cap on tasks this worker runs at once across every owner; missing means no cap. */ max_parallel?: number }
 export interface Herdr { max_wait_minutes: number }
 /** Rendering preferences; missing means follow the browser. */
 export interface Display { timezone?: string }
@@ -22,6 +22,8 @@ export interface Dispatch {
  weight?: number;
  /** Dispatchable workers in the order they would be chosen, with the running count the choice used. */
  candidates?: {worker:string; weight:number; running:number}[];
+ /** The chosen worker's concurrency cap and the running count the choice used; present only when that worker carries a max_parallel. */
+ workerCapacity?: {running:number; limit:number};
 }
 export interface RouteOptions { owner: string; worker?: string; /** Running tasks per worker, across all owners. */ workerLoad?: Record<string, number>; /** Engines whose attempt already failed or was cancelled earlier in this task's retry chain. */ excludeEngines?: string[]; /** Workers that must not be chosen, for example the one a queued task was frozen to before it was blocked. */ excludeWorkers?: string[] }
 export interface PolicySnapshot {

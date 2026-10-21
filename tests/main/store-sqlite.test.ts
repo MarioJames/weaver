@@ -105,7 +105,7 @@ test('upgrading a version 6 database keeps its blocks, adds the worker column an
   seeded.save({revision:base.revision,config:base.config,blocks:[{engine:'codex',reason:'manual hold',since:'2026-10-19T00:00:00.000Z',by:'manual'},{engine:'qoder',model:'m1',reason:'model hold',since:'2026-10-19T00:00:00.000Z',release_at:'2030-01-01T00:00:00.000Z',by:'weaver-free-probe'}]});
   const before=seeded.snapshot().blocks;
   const raw=new DatabaseSync(path);
-  raw.exec('ALTER TABLE policy_owners ADD COLUMN proxy TEXT; ALTER TABLE policy_workers ADD COLUMN proxy TEXT; ALTER TABLE policy_blocks DROP COLUMN worker; DROP TABLE vendor_worker_limits; CREATE TABLE vendor_limits(engine TEXT PRIMARY KEY, level INTEGER NOT NULL, last_trigger_at INTEGER NOT NULL); INSERT INTO vendor_limits VALUES (\'codex\',2,123); PRAGMA user_version=6');
+  raw.exec('ALTER TABLE policy_workers DROP COLUMN max_parallel; ALTER TABLE policy_owners ADD COLUMN proxy TEXT; ALTER TABLE policy_workers ADD COLUMN proxy TEXT; ALTER TABLE policy_blocks DROP COLUMN worker; DROP TABLE vendor_worker_limits; CREATE TABLE vendor_limits(engine TEXT PRIMARY KEY, level INTEGER NOT NULL, last_trigger_at INTEGER NOT NULL); INSERT INTO vendor_limits VALUES (\'codex\',2,123); PRAGMA user_version=6');
   assert.deepEqual((raw.prepare('PRAGMA table_info(policy_blocks)').all() as {name:string}[]).map(column=>column.name).includes('worker'),false);
   raw.close();
   for(let round=0;round<3;round++){
@@ -137,7 +137,7 @@ test('upgrading a version 7 database drops the role proxy columns and strips pro
   const expected=seeded.snapshot().config;
   const raw=new DatabaseSync(path);
   // Rebuild the shape version 7 left behind: proxy columns with values, and snapshots that carry the field.
-  raw.exec('ALTER TABLE policy_owners ADD COLUMN proxy TEXT; ALTER TABLE policy_workers ADD COLUMN proxy TEXT');
+  raw.exec('ALTER TABLE policy_workers DROP COLUMN max_parallel; ALTER TABLE policy_owners ADD COLUMN proxy TEXT; ALTER TABLE policy_workers ADD COLUMN proxy TEXT');
   raw.prepare('UPDATE policy_owners SET proxy=?').run('direct');raw.prepare('UPDATE policy_workers SET proxy=?').run('http://127.0.0.1:7890');
   const revisions=raw.prepare('SELECT revision,body FROM policy_revisions ORDER BY revision').all() as {revision:number;body:string}[];
   assert.ok(revisions.length>=2);

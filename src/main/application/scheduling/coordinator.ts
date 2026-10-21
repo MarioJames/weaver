@@ -8,6 +8,7 @@ import { redactContext } from '../../redact-context';
 import { assertFrozenWorkspace, workspaceIdentity } from '../../workspace';
 import { terminal, type TaskRecords } from '../tasks/records';
 import type { Dispatcher } from './dispatch';
+import { workerLoad } from './dispatch';
 
 /** Admits queued work as capacity and policy allow: the one place that starts scheduled tasks. */
 export class Coordinator {
@@ -16,7 +17,7 @@ export class Coordinator {
  private pumpScheduled?:NodeJS.Immediate;
  private delivered=new Map<string,string>();
  constructor(private readonly manager:TaskManager,private readonly policy:PolicyStore,private readonly records:TaskRecords,
-  private readonly dispatch:Pick<Dispatcher,'routeOf'|'decideExecution'|'capacityWait'>,private readonly applyVendorBlocks:()=>void,
+  private readonly dispatch:Pick<Dispatcher,'routeOf'|'decideExecution'|'capacityWait'|'queueWaitText'>,private readonly applyVendorBlocks:()=>void,
   private readonly deliver:(taskId:string)=>void,private readonly isDraining:()=>boolean){}
  private queueBlocked(task:Task, code:NonNullable<Task['queueReason']>['code'], message:string):void {
   const bounded=redactContext(message,700);
@@ -56,12 +57,12 @@ export class Coordinator {
 
     const running=slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner));
     const live=this.policy.snapshot();
-    const route=previewRoute(live.config,live.blocks,Date.now(),{owner:frozen.owner,worker:frozen.worker,runningCount:running});
+    const route=previewRoute(live.config,live.blocks,Date.now(),{owner:frozen.owner,worker:frozen.worker,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads())});
     const kind=live.config.engines[route.engine]?.kind;
     if(route.worker!==frozen.worker||route.engine!==frozen.engine||route.model!==frozen.model||route.effort!==frozen.effort||(frozen.engineKind!==undefined&&kind!==frozen.engineKind)){
      this.queueBlocked(task,'frozen_route_changed','Current worker engine, kind, model or effort no longer matches the frozen dispatch; restore the route or cancel and create a new task.');continue;
     }
-    if(!route.capacityAvailable){this.queueBlocked(task,'waiting_for_capacity',this.dispatch.capacityWait(frozen.owner,task.ownerId,route.maxParallel));continue;}
+    if(!route.capacityAvailable){this.queueBlocked(task,'waiting_for_capacity',this.dispatch.queueWaitText(task.ownerId,route));continue;}
     phase='workspace_changed';if(frozen.execution==='real')assertFrozenWorkspace(frozen);
     phase='launch_blocked';this.manager.start(task.id,route.maxParallel);
    }catch(error){

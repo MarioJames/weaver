@@ -7,7 +7,7 @@ import { ActionIcon, Button, Progress, Skeleton, Tag, Text, Tooltip } from '@lob
 import { ENGINE_CATALOG, catalogEntry, type EngineProbeRecord } from '../../../shared/engines';
 import type { EngineQuotaRecord, QuotaEngine, QuotaWindow } from '../../../shared/contracts/quota';
 import { QUOTA_KINDS, quotaRefreshEnabled } from '../../../shared/policy/settings';
-import { STALL_BLOCK_BY, VENDOR_BLOCK_BY, isQuotaBlockBy } from '../../../shared/policy/blocks';
+import { STALL_BLOCK_BY, VENDOR_BLOCK_BY, isEngineBlock, isQuotaBlockBy } from '../../../shared/policy/blocks';
 import { type Block, type Engine } from '../../../shared/contracts/policy';
 import { acceptQuotaPolicy, dateText, quotaPercentText, quotaProgressPercent, quotaRecordStale, quotaRecoveryText, quotaRetryMs, quotaStatusText, quotaNextUpdateMs, quotaCountText, quotaVisibleWindows, quotaThirdParty } from '../quota/quota-view';
 import type { PolicyDraft, PolicyUpdate } from '../../policy/usePolicyDraft';
@@ -247,6 +247,11 @@ export function removeBlock(blocks: Block[], target: Block): Block[] {
   return blocks.filter(item => !(item.engine === target.engine && item.model === target.model && item.worker === target.worker));
 }
 
+/** Resuming one worker's dispatch also lifts the whole-engine vendor block that only stood because every worker of the engine was limited; bans from any other writer stay. */
+export function removeWorkerResume(blocks: Block[], target: Block): Block[] {
+  return removeBlock(blocks, target).filter(item => !(isEngineBlock(item, target.engine) && item.by === VENDOR_BLOCK_BY));
+}
+
 export function BlockList({ blocks, disabled, onRemove, now = Date.now(), state }: { blocks: Block[]; disabled: boolean; onRemove: (block: Block) => void; now?: number; state?: EngineBlockState }) {
   const active = blocks.filter(block => block.by === STALL_BLOCK_BY || !block.release_at || Date.parse(block.release_at) > now);
   if (!active.length) return null;
@@ -257,7 +262,7 @@ export function BlockList({ blocks, disabled, onRemove, now = Date.now(), state 
         <Tag size="small" color={statusTagColor(text.tone)}>{text.category}</Tag>
         <Tooltip title={text.fullReason}><span data-block-reason className={blockStyles.reason}>{block.worker ? `${block.worker} · ` : ''}{block.model ? `${block.model} · ` : ''}{text.reason}</span></Tooltip>
         <span>{text.release}</span>
-        <Tooltip title="恢复派发"><ActionIcon size="small" icon={Play} aria-label="恢复派发" disabled={disabled} onClick={() => onRemove(block)} /></Tooltip>
+        <Button size="small" icon={Play} aria-label="恢复派发" disabled={disabled} onClick={() => onRemove(block)}>恢复派发</Button>
       </div>;
     })}
   </section>;

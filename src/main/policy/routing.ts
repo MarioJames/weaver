@@ -130,16 +130,29 @@ function requireOwner(config: Config, blocks: Block[], id: string, what = "owner
 }
 /** Why an engine never comes back for this task: the owner's earlier attempt on it did not succeed. */
 export const EXCLUDED_ENGINE_REASON = "failed earlier in this retry chain";
+/** Why a worker was passed over only because the policy caps its own concurrency: n running against a cap of max. */
+export const WORKER_CAPACITY_REASON = "并发已满";
+/** A worker's concurrency cap: a positive integer, or nothing when it carries none. */
+export const workerCap = (worker: { max_parallel?: number } | undefined): number | undefined => {
+  const cap = worker?.max_parallel;
+  return cap !== undefined && Number.isSafeInteger(cap) && cap >= 1 ? cap : undefined;
+};
+export const workerCapacityText = (running: number, limit: number): string => `${WORKER_CAPACITY_REASON}（${running}/${limit}）`;
 /**
  * An explicit worker, or the owner's least-loaded available worker relative to its weight:
  * the lowest (running + 1) / weight wins, ties go to the higher weight, then to list order.
  * Idle workers are tried by weight; under load, work spreads in proportion to the weights.
- * A worker on an excluded engine is never selected, so a retry always changes engine.
+ * A worker with a max_parallel runs at most that many tasks at once across every owner; a worker at its cap is
+ * skipped as 并发已满（n/max）, so the choice falls to another worker. When
+ * every worker that could take the task is at its cap, the least-overloaded one is still selected and the
+ * queue waits on its next free slot. A worker on an excluded engine is never selected, so a retry always
+ * changes engine.
  */
 export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOptions): Dispatch {
   const owner = requireOwner(config, blocks, opts.owner);
   const excluded = new Set(opts.excludeEngines ?? []);
   const excludedWorkers = new Set(opts.excludeWorkers ?? []);
+  const capOf = (workerId: string): number | undefined => workerCap(config.workers[workerId]);
   if (opts.worker) {
     const worker = Object.hasOwn(config.workers,opts.worker) ? config.workers[opts.worker] : undefined;
     if (!worker) throw new PolicyError(`unknown worker ${opts.worker}`);
@@ -154,14 +167,34 @@ export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOpti
   const load = (id: string) => opts.workerLoad?.[id] ?? 0;
   const candidates = owner.workers
     .map((id, index) => ({ id, index, engine: config.workers[id]!.engine, weight: effectiveWeight(owner, id), running: load(id), availability: availabilityOf(config, blocks, config.workers[id]!, id) }));
-  const reason = (c: (typeof candidates)[number]) => c.weight === 0 ? "priority weight 0" : excludedWorkers.has(c.id) ? "excluded for this dispatch" : c.availability.status !== "available" ? describeUnavailable(c.availability) : excluded.has(c.engine) ? EXCLUDED_ENGINE_REASON : "available";
+  const atCap = (c: (typeof candidates)[number]) => {
+    const cap = capOf(c.id);
+    return cap !== undefined && c.running >= cap;
+  };
+  const reason = (c: (typeof candidates)[number]) => {
+    const cap = atCap(c) ? capOf(c.id)! : undefined;
+    return c.weight === 0 ? "priority weight 0"
+      : excludedWorkers.has(c.id) ? "excluded for this dispatch"
+      : c.availability.status !== "available" ? describeUnavailable(c.availability)
+      : excluded.has(c.engine) ? EXCLUDED_ENGINE_REASON
+      : cap !== undefined ? workerCapacityText(c.running, cap)
+      : "available";
+  };
   const usable = candidates.filter(c => c.weight > 0 && c.availability.status === "available" && !excludedWorkers.has(c.id));
   // (a+1)/wa < (b+1)/wb, compared without division.
-  const eligible = usable.filter(c => !excluded.has(c.engine))
+  const eligible = usable.filter(c => !excluded.has(c.engine) && !atCap(c))
     .sort((a, b) => (a.running + 1) * b.weight - (b.running + 1) * a.weight || b.weight - a.weight || a.index - b.index);
   const hit = eligible[0];
   if (!hit) {
     if (usable.length) {
+      const deferred = usable.filter(c => !excluded.has(c.engine));
+      if (deferred.length) {
+        // Every worker that could run this task is at its own cap. Freeze the one closest to a free slot
+        // (smallest running over cap, then the stronger weight, then the list order); the queue waits on it.
+        const excess = (c: (typeof candidates)[number]) => c.running - capOf(c.id)!;
+        const chosen = [...deferred].sort((a, b) => excess(a) - excess(b) || b.weight - a.weight || a.index - b.index)[0]!;
+        return { ...previewSelection(config, opts.owner, chosen.id, []), selected_by: "weight", skipped: candidates.map(c => ({ worker: c.id, reason: reason(c) })), candidates: [] };
+      }
       const detail = usable.map(c => `${c.id}: ${EXCLUDED_ENGINE_REASON}`).join("; ");
       throw new PolicyError(`NO_ALTERNATIVE_ENGINE: every available worker for owner ${opts.owner} is on an excluded engine (excluded: ${[...excluded].join(", ")}): ${detail}`, usable.map(c => ({ path: `$.owners.${opts.owner}.workers`, message: `${c.id}: ${EXCLUDED_ENGINE_REASON}` })));
     }

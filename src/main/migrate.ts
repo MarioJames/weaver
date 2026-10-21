@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 /** Every schema change lands here as one ordered step; PRAGMA user_version tracks what ran. */
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 const STEPS: string[][] = [
   // 1: the task store tables.
@@ -79,6 +79,11 @@ const STEPS: string[][] = [
        END,
        last_trigger_at = max(excluded.last_trigger_at, vendor_worker_limits.last_trigger_at)`,
     `UPDATE free_probe_workers SET level = 0, last_trigger_at = NULL WHERE mode = 'rate_limit'`,
+  ],
+  // 10: workers may carry an optional concurrency cap: tasks this worker runs at once across every owner.
+  // Nullable; NULL (or an absent older snapshot) means no cap, so a plain ALTER TABLE upgrades any database in place.
+  [
+    `ALTER TABLE policy_workers ADD COLUMN max_parallel INTEGER`,
   ],
 ];
 

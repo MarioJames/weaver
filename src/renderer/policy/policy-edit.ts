@@ -109,6 +109,19 @@ export function blankWorker(config: Config): Worker {
   return { enabled: false, engine: Object.keys(config.engines)[0] ?? '', model: '', effort: 'high', description: '' };
 }
 
+/** Worker concurrency cap: off (or no longer limited) removes the key, on stores an integer 1–100; an empty or out-of-range input lands inside that range. */
+export function withWorkerParallel(worker: Worker, on: boolean, value: number | undefined): Worker {
+  const next: Worker = { ...worker };
+  if (!on) { delete next.max_parallel; return next; }
+  next.max_parallel = Math.min(100, Math.max(1, typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : 1));
+  return next;
+}
+
+/** The short list label for a worker's concurrency cap, or nothing when the worker is not limited. */
+export function workerParallelText(worker: Pick<Worker, 'max_parallel'> | undefined): string | undefined {
+  const cap = worker?.max_parallel;
+  return typeof cap === 'number' && Number.isSafeInteger(cap) && cap >= 1 ? `并发 ≤ ${cap}` : undefined;
+}
 
 /** Point the ID editor at the record actually on screen. This does not rename. */
 export function syncRoleEditor(ids: readonly string[], selected: string): { selected: string; pendingId: string } {

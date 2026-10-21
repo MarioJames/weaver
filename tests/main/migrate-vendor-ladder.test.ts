@@ -14,6 +14,8 @@ const T = Date.parse('2030-01-01T12:00:00Z');
 function v8Database(): DatabaseSync {
   const db = new DatabaseSync(':memory:');
   migrate(db);
+  // Step 10 added a column; the version 8 shape does not have it.
+  db.exec('ALTER TABLE policy_workers DROP COLUMN max_parallel');
   db.exec('PRAGMA user_version=8');
   return db;
 }
@@ -34,12 +36,12 @@ test('an empty database migrates from 0 to the current version with both ladder 
   const db = new DatabaseSync(':memory:');
   assert.equal(version(db), 0);
   migrate(db);
-  assert.equal(SCHEMA_VERSION, 9);
-  assert.equal(version(db), 9);
+  assert.ok(SCHEMA_VERSION >= 9);
+  assert.equal(version(db), SCHEMA_VERSION);
   assert.deepEqual(ladders(db), {});
   assert.deepEqual(probes(db), []);
   migrate(db);
-  assert.equal(version(db), 9, 'a current database runs nothing');
+  assert.equal(version(db), SCHEMA_VERSION, 'a current database runs nothing');
   db.close();
 });
 
@@ -64,7 +66,7 @@ test('a worker with a rate-limit question in both tables keeps the newer trigger
   ladder(db, 'both_inside_vendor_newer', 2, T);
   probe(db, 'both_inside_vendor_newer', { mode: 'rate_limit', level: 3, last: T - LADDER_RESET_MS + 1_000 });
   migrate(db);
-  assert.equal(version(db), 9);
+  assert.equal(version(db), SCHEMA_VERSION);
   assert.deepEqual(ladders(db), {
     both_close_vendor_higher: [3, T],
     both_close_probe_higher: [2, T],
@@ -125,9 +127,10 @@ test('running the migration again, even from version 8 once more, neither fails 
   assert.deepEqual(merged.ladders, { w1: [3, T], w2: [2, T - HOUR] });
   migrate(db);
   assert.deepEqual({ ladders: ladders(db), probes: probes(db) }, merged, 'a current database is left alone');
+  db.exec('ALTER TABLE policy_workers DROP COLUMN max_parallel');
   db.exec('PRAGMA user_version=8');
   migrate(db);
-  assert.equal(version(db), 9);
+  assert.equal(version(db), SCHEMA_VERSION);
   assert.deepEqual({ ladders: ladders(db), probes: probes(db) }, merged, 'and so is one that runs the step a second time');
   db.close();
 });

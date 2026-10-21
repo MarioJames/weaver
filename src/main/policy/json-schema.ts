@@ -6,7 +6,7 @@ import type { Issue } from '../../shared/contracts/policy';
 export type Schema = { [key: string]: any };
 
 const ANNOTATIONS = new Set(["$schema", "$id", "$comment", "$defs", "title", "description", "default", "examples"]);
-const APPLICATORS = new Set(["type", "properties", "required", "additionalProperties", "enum", "const", "pattern", "minimum", "minLength", "minItems", "uniqueItems", "items", "$ref", "if", "then", "propertyNames"]);
+const APPLICATORS = new Set(["type", "properties", "required", "additionalProperties", "enum", "const", "pattern", "minimum", "maximum", "minLength", "minItems", "uniqueItems", "items", "$ref", "if", "then", "propertyNames"]);
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const child = (path: string, key: string | number) =>
@@ -52,6 +52,7 @@ function check(schema: Schema, value: unknown, path: string, root: Schema, out: 
     if (schema.pattern !== undefined && !new RegExp(schema.pattern).test(value)) add(`must match ${schema.pattern}`);
   }
   if (typeof value === "number" && schema.minimum !== undefined && value < schema.minimum) add(`must be >= ${schema.minimum}`);
+  if (typeof value === "number" && schema.maximum !== undefined && value > schema.maximum) add(`must be <= ${schema.maximum}`);
   if (Array.isArray(value)) {
     if (schema.minItems !== undefined && value.length < schema.minItems) add(`must have at least ${schema.minItems} item(s)`);
     if (schema.uniqueItems) {

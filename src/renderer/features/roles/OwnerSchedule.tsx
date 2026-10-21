@@ -6,7 +6,7 @@ import { Form } from '@lobehub/ui/base-ui/form';
 import { activeBlocks, availabilityOf } from '../../../shared/policy/availability';
 import { type Block, type Config, type Owner } from '../../../shared/contracts/policy';
 import { blockOf, blockText, pauseOfBlock } from '../probes/probe-view';
-import { DEFAULT_WEIGHT, WEIGHT_MAX, appendWorker, withWorkerWeight, withoutListedWorker, workerWeight } from '../../policy/policy-edit';
+import { DEFAULT_WEIGHT, WEIGHT_MAX, appendWorker, withWorkerWeight, withoutListedWorker, workerParallelText, workerWeight } from '../../policy/policy-edit';
 import { statusTagColor, tagColor } from '../../format/tag-colors';
 import { FreeChannelTag } from '../../ui/FreeChannelTag';
 import { styles } from '../../ui/styles';
@@ -62,7 +62,7 @@ export function OwnerScheduleFields({ config, blocks, record, savedRecord, updat
         const status = workerStatusTag(config, blocks, id, weight);
         const locked = workerWeightLock(config, id) !== undefined;
         return <div key={id} className={`${scheduleStyles.listRow} ${scheduleStyles.row}`}>
-          <span className={`${styles.row} ${scheduleStyles.name}`} style={{ minInlineSize: 0 }}><Text className={styles.wrap}>{id}</Text>{config.workers[id]?.free_channel && <FreeChannelTag />}{status && <Tag size="small" color={status.color} title={status.hint}>{status.label}</Tag>}{status?.reason && <span className={scheduleStyles.reason} title={status.reason}>{status.reason}</span>}</span>
+          <span className={`${styles.row} ${scheduleStyles.name}`} style={{ minInlineSize: 0 }}><Text className={styles.wrap}>{id}</Text>{config.workers[id]?.free_channel && <FreeChannelTag />}{workerParallelText(config.workers[id]) && <Tag size="small" color={tagColor('neutral')} title="该子 Agent 同时运行的任务数上限，超出的任务排队">{workerParallelText(config.workers[id])}</Tag>}{status && <Tag size="small" color={status.color} title={status.hint}>{status.label}</Tag>}{status?.reason && <span className={scheduleStyles.reason} title={status.reason}>{status.reason}</span>}</span>
           <span className={scheduleStyles.controls}>
             <NamedInputNumber aria-label={`${id} 的权重`} size="small" disabled={locked} min={0} max={WEIGHT_MAX} step={1} precision={0} value={weight} style={{ inlineSize: 72 }} onChange={value => update(withWorkerWeight(record, id, typeof value === 'number' ? value : DEFAULT_WEIGHT))} />
             <span role="group" aria-label={`${id} 权重预设`} className={scheduleStyles.presets} data-locked={locked || undefined}>{PRESETS.map(preset => <Button key={preset.value} size="small" type="text" disabled={locked} aria-pressed={weight === preset.value} aria-label={`${id} ${preset.label}`} onClick={() => update(withWorkerWeight(record, id, preset.value))}>{preset.label}</Button>)}</span>

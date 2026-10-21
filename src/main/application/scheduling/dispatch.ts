@@ -38,6 +38,15 @@ export class Dispatcher {
  capacityWait(profile:string, ownerId:string|undefined, limit:number):string {
   return `${slotGroupName(this.manager.store.listOwners(),ownerId,profile)} is at its current concurrency limit (${limit}).`;
  }
+ /** A worker's own cap holds the queue too; the worker named is the one a free task slot belongs to. */
+ workerCapacityWait(worker:string, running:number, limit:number):string {
+  return `子 Agent ${worker} 并发已满（${running}/${limit}）；任务已排队，该子 Agent 有任务结束后自动派发。`;
+ }
+ /** The queue message for a routed task: the worker cap it waits behind, else the owner's slot count. */
+ queueWaitText(ownerId:string|undefined, route:RoutePreview):string {
+  const full=route.workerCapacity!==undefined&&route.workerCapacity.running>=route.workerCapacity.limit;
+  return full?this.workerCapacityWait(route.worker,route.workerCapacity!.running,route.workerCapacity!.limit):this.capacityWait(route.owner,ownerId,route.maxParallel);
+ }
  /** maxWaitMinutes is frozen for the owner and the UI as their polling bound; Weaver never stops a worker with it. */
  decideExecution(engine:string,provider:unknown,task:Task,ownerEngine?:string):{execution:'real'|'mock'|'native';adapter:string;maxWaitMinutes:number;workspace?:string;engineKind?:string} {
   const minutes=this.policy.snapshot().config.herdr.max_wait_minutes;
@@ -108,6 +117,6 @@ export class Dispatcher {
   task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,...(decision.execution==='real'?{workspaceIdentity:workspaceIdentity(decision.workspace)}:{})}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
   const selected=decision.execution==='real'?`Policy selected ${route.worker}; launching ${decision.engineKind} in ${decision.workspace}`:decision.execution==='native'?`Policy selected ${route.worker} on the owner's engine; the owner runs it with its built-in subagent tool (${route.model}, ${route.effort})`:`Policy selected ${route.worker}; explicit mock-jsonl provider`;
   event(task,'lifecycle',`${selected}${excluded.length?`; engines excluded because they ${EXCLUDED_ENGINE_REASON}: ${excluded.join(', ')}`:''}`);
-  if(!route.capacityAvailable){task.scheduled=true;task.queueReason={code:'waiting_for_capacity',message:this.capacityWait(route.owner,task.ownerId,route.maxParallel)};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.records.put(task);return this.dispatchResponse(task,excluded);}this.records.put(task);return this.dispatchResponse(this.manager.start(task.id,route.maxParallel),excluded);
+  if(!route.capacityAvailable){task.scheduled=true;task.queueReason={code:'waiting_for_capacity',message:this.queueWaitText(task.ownerId,route)};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.records.put(task);return this.dispatchResponse(task,excluded);}this.records.put(task);return this.dispatchResponse(this.manager.start(task.id,route.maxParallel),excluded);
  }
 }
