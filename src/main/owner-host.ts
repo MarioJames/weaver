@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { basename } from 'node:path';
 import { findExecutableSync } from './system/executables';
 
@@ -39,7 +40,7 @@ export interface OwnerLaunchInput {
   engineKind: string; model: string; effort: string; prompt: string;
   session?: string; runner?: Runner; pathEnv?: string; herdrPath?: string; claudePath?: string;
 }
-export interface OwnerLaunchResult { session: string; workspaceId: string; paneId: string; agentName: string }
+export interface OwnerLaunchResult { session: string; workspaceId: string; paneId: string; tabId?: string; createdWorkspace?: boolean; agentName: string }
 
 const bounded = (value: string, max = 500): string => Array.from(value.trim()).slice(0, max).join('');
 const messageOf = (value: unknown): string => value instanceof Error ? value.message : String(value);
@@ -60,6 +61,23 @@ const required = (field: string, value: unknown): string => {
 
 type LaunchStep = RunnerInput & { cleanup?: boolean };
 type Protocol<T> = Generator<LaunchStep, T, RunnerResult>;
+const trimTrailingSlashes = (value: string): string => value.trim().replace(/\/+$/, '');
+// Reuse matching compares realpath-normalized directories; a missing path can never match an existing target.
+const normalizeDir = (value: string): string | undefined => {
+  const trimmed = trimTrailingSlashes(value);
+  if (!trimmed) return undefined;
+  try { return realpathSync(trimmed); } catch { return undefined; }
+};
+const matchesTargetDir = (pane: unknown, target: string): boolean => {
+  if (!pane || typeof pane !== 'object' || Array.isArray(pane)) return false;
+  const record = pane as Record<string, unknown>;
+  return ['cwd', 'foreground_cwd'].some(key => {
+    const raw = record[key];
+    if (typeof raw !== 'string') return false;
+    const normalized = normalizeDir(raw);
+    return normalized !== undefined && normalized === target;
+  });
+};
 
 // Herdr reports a rejected command as {"error":{"code","message"}}; a client can print it while still exiting 0.
 const envelopeFailure = (stdout: string): string | null => {
@@ -100,6 +118,51 @@ function* runStep(step: string, request: LaunchStep, observe?: (result: RunnerRe
   if (result.stdout.trim()) readJson(step, result);
   return result;
 }
+/** A listing step: like runStep, but empty output is also a failure — never a silent reason to duplicate a workspace. */
+function* listStep(step: string, request: LaunchStep): Protocol<Record<string, unknown>> {
+  let result: RunnerResult;
+  try { result = yield request; }
+  catch (error) { throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', `herdr ${step} failed: ${bounded(messageOf(error))}`); }
+  if (result.code !== 0 || envelopeFailure(result.stdout)) {
+    const detail = detailOf(result);
+    throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', `herdr ${step} failed (exit ${result.code})${detail ? `: ${detail}` : ''}`);
+  }
+  return readJson(step, result);
+}
+type WorkspaceMatch = { workspaceId: string; number: number };
+/** Finds the workspace whose pane cwd/foreground_cwd equals the target directory (exact realpath equality). */
+function* findMatchingWorkspace(file: string, session: string, target: string): Protocol<WorkspaceMatch | null> {
+  const listed = yield* listStep('workspace list', { file, args: ['--session', session, 'workspace', 'list'], timeout: 15000 });
+  const workspaces = dig(listed, ['result', 'workspaces']);
+  if (!Array.isArray(workspaces)) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'herdr workspace list returned no workspace array');
+  const matches: WorkspaceMatch[] = [];
+  for (const entry of workspaces) {
+    const record = entry && typeof entry === 'object' && !Array.isArray(entry) ? entry as Record<string, unknown> : undefined;
+    const workspaceId = record ? asId(record.workspace_id) : undefined;
+    if (!workspaceId || !record) continue;
+    const panes = yield* listStep('pane list', { file, args: ['--session', session, 'pane', 'list', '--workspace', workspaceId], timeout: 15000 });
+    const list = dig(panes, ['result', 'panes']);
+    if (!Array.isArray(list)) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', `herdr pane list returned no pane array for workspace ${workspaceId}`);
+    if (!list.some(pane => matchesTargetDir(pane, target))) continue;
+    const rawNumber = record.number;
+    matches.push({ workspaceId, number: typeof rawNumber === 'number' && Number.isSafeInteger(rawNumber) ? rawNumber : Number.MAX_SAFE_INTEGER });
+  }
+  // Deterministic when several workspaces hold the same directory: Herdr's lowest workspace number wins.
+  matches.sort((left, right) => left.number - right.number);
+  return matches[0] ?? null;
+}
+function* closeTab(file: string, session: string, tabId: string): Protocol<string | null> {
+  let result: RunnerResult;
+  try { result = yield { file, args: ['--session', session, 'tab', 'close', tabId], timeout: 15000, cleanup: true }; }
+  catch (error) { return `herdr tab close cleanup also failed: ${bounded(messageOf(error), 300)}`; }
+  if (result.code === 0 && !envelopeFailure(result.stdout)) {
+    try { if (result.stdout.trim()) readJson('tab close', result); }
+    catch (error) { return `herdr tab close cleanup also failed: ${bounded(messageOf(error), 300)}`; }
+    return null;
+  }
+  const detail = detailOf(result, 300);
+  return `herdr tab close cleanup also failed (exit ${result.code})${detail ? `: ${detail}` : ''}`;
+}
 function* closeWorkspace(file: string, session: string, workspaceId: string): Protocol<string | null> {
   let result: RunnerResult;
   try { result = yield { file, args: ['--session', session, 'workspace', 'close', workspaceId], timeout: 15000, cleanup: true }; }
@@ -128,18 +191,44 @@ function* launchProtocol(input: OwnerLaunchInput, signal?: AbortSignal): Protoco
   const agentName = ownerAgentName(input.taskId, input.epoch);
   // Match Herdr's own default (cwd directory name) so page-launched workspaces look like hand-opened ones.
   const label = basename(input.workspace.trim().replace(/\/+$/, '')) || truncateChars(input.title, 40);
+  // A reused tab is titled after the task; a fresh workspace keeps Herdr's directory-name label.
+  const tabLabel = input.title.trim() ? truncateChars(input.title, 40) : (basename(trimTrailingSlashes(input.workspace)) || label);
 
   const run = (step: string, args: string[], timeout: number) => runStep(step, { file: herdrPath, args, timeout });
   let workspaceId: string | undefined;
+  let tabId: string | undefined;
+  let createdWorkspace = false;
   try {
-    const createRequest = { file: herdrPath, args: ['--session', session, 'workspace', 'create', '--cwd', input.workspace, '--label', label, '--no-focus'], timeout: 30000 };
-    const create = readJson('workspace create', yield* runStep('workspace create', createRequest, result => {
-      // A terminated create can already have emitted its exact resource receipt. Preserve that cleanup authority.
-      try { workspaceId = asId(dig(JSON.parse(result.stdout), ['result', 'workspace', 'workspace_id'])); } catch { /* No exact receipt, no guessed cleanup. */ }
-    }));
-    const paneId = asId(dig(create, ['result', 'root_pane', 'pane_id']));
-    if (!workspaceId) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'herdr workspace create returned no workspace id');
-    if (!paneId) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'herdr workspace create returned no root pane id');
+    const target = normalizeDir(input.workspace);
+    const match = target ? yield* findMatchingWorkspace(herdrPath, session, target) : null;
+    checkAbort(signal);
+    let paneId: string | undefined;
+    if (match) {
+      // Reuse the existing workspace: open one tab in it, never create a duplicate workspace, never steal focus.
+      const createRequest = { file: herdrPath, args: ['--session', session, 'tab', 'create', '--workspace', match.workspaceId, '--cwd', input.workspace, '--label', tabLabel], timeout: 30000 };
+      const create = readJson('tab create', yield* runStep('tab create', createRequest, result => {
+        // A terminated create can already have emitted its exact resource receipt. Preserve that cleanup authority.
+        try { tabId = asId(dig(JSON.parse(result.stdout), ['result', 'tab', 'tab_id'])); } catch { /* No exact receipt, no guessed cleanup. */ }
+      }));
+      paneId = asId(dig(create, ['result', 'root_pane', 'pane_id']));
+      workspaceId = match.workspaceId;
+      if (!tabId) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'herdr tab create returned no tab id');
+      if (!paneId) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'herdr tab create returned no root pane id');
+    } else {
+      createdWorkspace = true;
+      const createRequest = { file: herdrPath, args: ['--session', session, 'workspace', 'create', '--cwd', input.workspace, '--label', label, '--no-focus'], timeout: 30000 };
+      const create = readJson('workspace create', yield* runStep('workspace create', createRequest, result => {
+        // A terminated create can already have emitted its exact resource receipt. Preserve that cleanup authority.
+        try {
+          const parsed = JSON.parse(result.stdout);
+          workspaceId = asId(dig(parsed, ['result', 'workspace', 'workspace_id']));
+          tabId = asId(dig(parsed, ['result', 'tab', 'tab_id']));
+        } catch { /* No exact receipt, no guessed cleanup. */ }
+      }));
+      paneId = asId(dig(create, ['result', 'root_pane', 'pane_id']));
+      if (!workspaceId) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'herdr workspace create returned no workspace id');
+      if (!paneId) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'herdr workspace create returned no root pane id');
+    }
     checkAbort(signal);
     const args = kind === 'codex' ? ['-m', input.model, '-c', `model_reasoning_effort="${input.effort}"`] : ['--model', input.model];
     const claudePath = kind === 'claude' ? input.claudePath ?? findExecutableSync('claude', input.pathEnv ?? process.env.PATH ?? '') : null;
@@ -158,10 +247,14 @@ function* launchProtocol(input: OwnerLaunchInput, signal?: AbortSignal): Protoco
     // Cosmetic only: a cleared name makes the sidebar show the engine type. Never fail the launch over it.
     try { yield { file: herdrPath, args: ['--session', session, 'agent', 'rename', paneId, '--clear'], timeout: 15000 }; } catch { /* appearance only */ }
     checkAbort(signal);
-    return { session, workspaceId, paneId, agentName };
+    return { session, workspaceId, paneId, ...(tabId ? { tabId } : {}), createdWorkspace, agentName };
   } catch (error) {
-    const failure = error instanceof OwnerLaunchError ? error : new OwnerLaunchError('OWNER_LAUNCH_FAILED', `herdr owner launch failed after workspace create: ${bounded(messageOf(error))}`);
-    const cleanup = workspaceId ? yield* closeWorkspace(herdrPath, session, workspaceId) : null;
+    const failure = error instanceof OwnerLaunchError ? error : new OwnerLaunchError('OWNER_LAUNCH_FAILED', `herdr owner launch failed after create: ${bounded(messageOf(error))}`);
+    // Only this launch's own resources are disposable: an exact tab, or a freshly created workspace when
+    // no tab receipt exists. A reused workspace is never closed, and without an exact id nothing is guessed.
+    let cleanup: string | null = null;
+    if (tabId) cleanup = yield* closeTab(herdrPath, session, tabId);
+    else if (createdWorkspace && workspaceId) cleanup = yield* closeWorkspace(herdrPath, session, workspaceId);
     throw cleanup ? new OwnerLaunchError(failure.code, `${failure.message}; ${cleanup}`) : failure;
   }
 }
@@ -198,12 +291,15 @@ export function launchOwnerAsync(input: OwnerLaunchInput & { signal?: AbortSigna
 }
 type CloseHostOptions = { herdrPath?: string; pathEnv?: string };
 function* closeHostProtocol(host: OwnerLaunchResult, options: CloseHostOptions): Protocol<void> {
-  if (!asId(host.session) || host.session !== host.session.trim() || !asId(host.workspaceId) || host.workspaceId !== host.workspaceId.trim()) {
-    throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'Exact owner session and workspace id are required for cleanup');
+  const tabId = asId(host.tabId);
+  if (!asId(host.session) || host.session !== host.session.trim() || (!tabId && (!asId(host.workspaceId) || host.workspaceId !== host.workspaceId.trim()))) {
+    throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', 'Exact owner session and tab or workspace id are required for cleanup');
   }
   const file = options.herdrPath ?? findExecutableSync('herdr', options.pathEnv ?? process.env.PATH ?? '');
   if (!file) throw new OwnerLaunchError('OWNER_LAUNCH_UNAVAILABLE', 'herdr was not found on PATH');
-  const failure = yield* closeWorkspace(file, host.session, host.workspaceId);
+  // A tab id addresses exactly the tab this launch created (closing the last tab also removes a fresh
+  // workspace); legacy records without a tab id keep closing their workspace. A reused workspace is never closed.
+  const failure = tabId ? yield* closeTab(file, host.session, tabId) : yield* closeWorkspace(file, host.session, host.workspaceId);
   if (failure) throw new OwnerLaunchError('OWNER_LAUNCH_FAILED', failure);
 }
 /** Synchronous callers retain the same exact cleanup protocol when an injected launcher supersedes its binding. */

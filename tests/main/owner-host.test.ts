@@ -3,35 +3,46 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,chmodSync,writeFileSync,rmSync,realpathSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,delimiter} from 'node:path';
-import {launchOwner, ownerAgentName, herdrOnPath, defaultRunner, OWNER_AGENT_START_TIMEOUT_MS, OwnerLaunchError, type Runner, type RunnerInput} from '../../src/main/owner-host';
+import {launchOwner, closeOwnerHost, ownerAgentName, herdrOnPath, defaultRunner, OWNER_AGENT_START_TIMEOUT_MS, OwnerLaunchError, type Runner, type RunnerInput} from '../../src/main/owner-host';
 import {findExecutableSync} from '../../src/main/system/executables';
 const HERDR='/opt/fake-herdr/herdr';
 const CLAUDE='/opt/fake-claude/claude';
 const START_TIMEOUT=String(OWNER_AGENT_START_TIMEOUT_MS);
+const WS_LIST_OK=JSON.stringify({result:{type:'workspace_list',workspaces:[]}});
+const PANE_LIST_OK=JSON.stringify({result:{type:'pane_list',panes:[]}});
+const TAB_CLOSE_OK=JSON.stringify({result:{type:'ok'}});
 type Step={stdout?:string;stderr?:string;code?:number};
-type Script={create?:Step;claudeHelp?:string|null;start?:Step;prompt?:Step;rename?:Step;close?:Step};
-function fakeRunner(script:Script={},calls:RunnerInput[]=[]):Runner {
+type Script={workspaceList?:Step;paneList?:Step|((workspaceId:string)=>Step|undefined);create?:Step;claudeHelp?:string|null;start?:Step;prompt?:Step;rename?:Step;close?:Step;tabCreate?:Step;tabClose?:Step};
+function fakeRunner(script:Script={},calls:RunnerInput[]=[]):Runner{
  let unexpected=0;
  return input=>{
   calls.push(input);
   if(input.file===CLAUDE){const help=script.claudeHelp;if(help===undefined)return {code:1,stdout:'',stderr:'unexpected claude probe'};if(help===null)return {code:1,stdout:'',stderr:'claude --help exited non-zero'};return {code:0,stdout:help,stderr:''};}
   const group=input.args[2],action=input.args[3];
-  const known=(group==='workspace'&&['create','close'].includes(String(action)))||(group==='agent'&&['start','prompt','rename'].includes(String(action)));
+  const known=(group==='workspace'&&['list','create','close'].includes(String(action)))||(group==='pane'&&action==='list')||(group==='tab'&&['create','close'].includes(String(action)))||(group==='agent'&&['start','prompt','rename'].includes(String(action)));
   // An unknown command group or action is a launcher bug, never a silent success.
   if(!known){unexpected++;return {code:1,stdout:'',stderr:`unexpected herdr call #${unexpected}`};}
-  const step=group==='workspace'?(action==='create'?script.create:script.close):(action==='start'?script.start:action==='rename'?script.rename:script.prompt);
-  return {code:step?.code??0,stdout:step?.stdout??'',stderr:step?.stderr??''};
+  const step=group==='workspace'?(action==='list'?script.workspaceList:action==='create'?script.create:script.close)
+    :group==='pane'?script.paneList
+    :group==='tab'?(action==='create'?script.tabCreate:script.tabClose)
+    :(action==='start'?script.start:action==='rename'?script.rename:script.prompt);
+  if(group==='pane'){const resolved=typeof step==='function'?step(input.args[5]??''):step as Step|undefined;return {code:0,stdout:PANE_LIST_OK,stderr:'',...(resolved??{})};}
+  if(group==='workspace'&&action==='list')return {code:0,stdout:WS_LIST_OK,stderr:'',...(step as Step|undefined)};
+  if(group==='tab'&&action==='close')return {code:0,stdout:TAB_CLOSE_OK,stderr:'',...(step as Step|undefined)};
+  return {code:0,stdout:'',stderr:'',...(step as Step|undefined)};
  };
 }
 const createOk=JSON.stringify({result:{workspace:{workspace_id:'w7'},tab:{tab_id:'w7:t1'},root_pane:{pane_id:'w7:p1'}}});
+const tabCreateOk=JSON.stringify({result:{tab:{tab_id:'w9:t2',workspace_id:'w9'},root_pane:{pane_id:'w9:p2'},type:'tab_created'}});
 const promptOk=JSON.stringify({result:{status:'submitted'}});
 const launch=(overrides:Partial<Parameters<typeof launchOwner>[0]>={},runner:Runner)=>launchOwner({taskId:'11111111-1111-4111-8111-111111111111',epoch:1,title:'Fixture title',workspace:'/srv/proj',engineKind:'claude',model:'claude-opus-5-5',effort:'high',prompt:'continue the fixture work now',runner,herdrPath:HERDR,pathEnv:'',...overrides});
 const codeOf=(error:unknown):string=>error instanceof OwnerLaunchError?error.code:'<none>';
+const createResult={session:'default',workspaceId:'w7',paneId:'w7:p1',tabId:'w7:t1',createdWorkspace:true,agentName:'owner-11111111-1'};
 test('claude launch drives herdr through argv arrays, detects the effort flag and parses the workspace JSON',()=>{
  const calls:RunnerInput[]=[];
  const runner=fakeRunner({create:{stdout:createOk},claudeHelp:'--effort <level>   Effort level for the current session'},calls);
  const result=launch({claudePath:CLAUDE},runner);
- assert.deepEqual(result,{session:'default',workspaceId:'w7',paneId:'w7:p1',agentName:'owner-11111111-1'});
+ assert.deepEqual(result,createResult);
  assert.deepEqual(calls[0],{file:HERDR,args:['--session','default','workspace','create','--cwd','/srv/proj','--label','proj','--no-focus'],timeout:30000});
  assert.deepEqual(calls[1],{file:CLAUDE,args:['--help'],timeout:15000});
  assert.deepEqual(calls[2],{file:HERDR,args:['--session','default','agent','start','owner-11111111-1','--kind','claude','--pane','w7:p1','--timeout',START_TIMEOUT,'--','--model','claude-opus-5-5','--effort','high'],timeout:70000});
@@ -44,7 +55,7 @@ test('codex launch skips the help probe and passes the effort config as one argv
  const calls:RunnerInput[]=[];
  const runner=fakeRunner({create:{stdout:JSON.stringify({result:{workspace:{workspace_id:'w7'},root_pane:{pane_id:'w7:p2'}}})}},calls);
  const result=launch({engineKind:'codex',model:'gpt-6-astra',session:'work'},runner);
- assert.equal(result.session,'work');assert.equal(result.workspaceId,'w7');assert.equal(result.paneId,'w7:p2');
+ assert.equal(result.session,'work');assert.equal(result.workspaceId,'w7');assert.equal(result.paneId,'w7:p2');assert.equal(result.createdWorkspace,true);
  assert.equal(calls.length,4);
  assert.deepEqual(calls[1].args,['--session','work','agent','start','owner-11111111-1','--kind','codex','--pane','w7:p2','--timeout',START_TIMEOUT,'--','-m','gpt-6-astra','-c','model_reasoning_effort="high"']);
  assert.ok(!calls.some(call=>call.file===CLAUDE));
@@ -84,7 +95,7 @@ test('a failing or throwing rename --clear is cosmetic: the launch succeeds and 
   const calls:RunnerInput[]=[];
   const base=fakeRunner({create:{stdout:createOk},rename:mode==='exit'?{code:1,stderr:'rename refused'}:mode==='envelope'?{stdout:JSON.stringify({error:{code:'agent_not_found',message:'gone'}})}:undefined},calls);
   const runner:Runner=input=>{if(mode==='throw'&&input.args[3]==='rename'){calls.push(input);throw new Error('rename exploded');}return base(input);};
-  assert.deepEqual(launch({},runner),{session:'default',workspaceId:'w7',paneId:'w7:p1',agentName:'owner-11111111-1'});
+  assert.deepEqual(launch({},runner),createResult);
   assert.equal(calls.at(-1)!.args[3],'rename');
   assert.ok(!calls.some(call=>call.args.includes('close')));
  }
@@ -142,13 +153,16 @@ test('unparseable create JSON fails the launch without touching any other resour
  assert.throws(()=>launch({},runner),error=>{assert.ok(error instanceof Error);assert.match(error.message,/workspace create returned unparseable JSON/);return true;});
  assert.equal(calls.length,1);
 });
-test('a create response without a root pane still closes the workspace it created',()=>{
- for(const create of ['{"result":{"workspace":{"workspace_id":"w7"},"tab":{"tab_id":"w7:t1"}}}','{"result":{"workspace":{"workspace_id":"w7"},"root_pane":"w7:p4"}}']){
+test('a create response without a root pane closes its tab, or the workspace when no tab receipt exists',()=>{
+ for(const [create,closeArgs] of [
+  ['{"result":{"workspace":{"workspace_id":"w7"},"tab":{"tab_id":"w7:t1"}}}',['--session','default','tab','close','w7:t1']],
+  ['{"result":{"workspace":{"workspace_id":"w7"},"root_pane":"w7:p4"}}',['--session','default','workspace','close','w7']],
+ ] as const){
   const calls:RunnerInput[]=[];
   const runner=fakeRunner({create:{stdout:create},close:{stdout:'{"result":{"type":"ok"}}'}},calls);
   assert.throws(()=>launch({},runner),error=>{assert.ok(error instanceof Error);assert.match(error.message,/no root pane id/);return true;});
   assert.equal(calls.length,2);
-  assert.deepEqual(calls[1]!.args,['--session','default','workspace','close','w7']);
+  assert.deepEqual(calls[1]!.args,closeArgs);
  }
 });
 test('a failed cleanup of a paneless workspace is reported inside the launch failure',()=>{
@@ -172,37 +186,38 @@ test('a create response with no documented workspace id never launches, prompts 
   assert.deepEqual(calls.map(call=>[call.args[2],call.args[3]]),[['workspace','create']]);
  }
 });
-test('cleanup closes the documented workspace id, not a prefix of the pane id',()=>{
+test('cleanup closes the documented tab id, not a prefix of the pane id',()=>{
  const calls:RunnerInput[]=[];
  const runner=fakeRunner({create:{stdout:JSON.stringify({result:{workspace:{workspace_id:'ws-42'},tab:{tab_id:'w8:t1'},root_pane:{pane_id:'w8:p4'}}})},start:{code:1,stderr:'boom'}},calls);
  assert.throws(()=>launch({},runner),error=>{assert.ok(error instanceof Error);assert.match(error.message,/agent start failed/);return true;});
  assert.equal(calls.length,3);
- assert.deepEqual(calls[2]!.args,['--session','default','workspace','close','ws-42']);
+ assert.deepEqual(calls[2]!.args,['--session','default','tab','close','w8:t1']);
 });
-test('a failing agent start closes only the workspace it created',()=>{
+test('a failing agent start closes only the tab it created',()=>{
  const calls:RunnerInput[]=[];
  const runner=fakeRunner({create:{stdout:createOk},start:{code:1,stderr:'agent_not_ready: pane never reached a prompt'}},calls);
  assert.throws(()=>launch({},runner),error=>{assert.ok(error instanceof Error);assert.match(error.message,/agent start failed \(exit 1\)/);assert.match(error.message,/agent_not_ready/);return true;});
  const close=calls[2];
- assert.deepEqual(close.args,['--session','default','workspace','close','w7']);
+ assert.deepEqual(close.args,['--session','default','tab','close','w7:t1']);
  assert.equal(close.timeout,15000);
  assert.equal(calls.length,3);
+ assert.ok(!calls.some(call=>call.args[2]==='workspace'&&call.args[3]==='close'));
 });
 test('failed cleanup is reported inside the launch failure',()=>{
  const calls:RunnerInput[]=[];
- const runner=fakeRunner({create:{stdout:createOk},start:{code:1,stderr:'agent start blew up'},close:{code:1,stderr:`close ${'y'.repeat(900)}`}},calls);
+ const runner=fakeRunner({create:{stdout:createOk},start:{code:1,stderr:'agent start blew up'},tabClose:{code:1,stderr:`close ${'y'.repeat(900)}`}},calls);
  assert.throws(()=>launch({},runner),error=>{
   assert.ok(error instanceof Error);
-  assert.match(error.message,/workspace close cleanup also failed \(exit 1\): close /);
+  assert.match(error.message,/tab close cleanup also failed \(exit 1\): close /);
   assert.ok(!error.message.includes('y'.repeat(301)));
   return true;});
  assert.equal(calls.length,3);
 });
-test('a failing prompt submission also cleans up the created workspace',()=>{
+test('a failing prompt submission also cleans up the created tab',()=>{
  const calls:RunnerInput[]=[];
  const runner=fakeRunner({create:{stdout:createOk},prompt:{code:1,stderr:'agent_blocked'}},calls);
  assert.throws(()=>launch({},runner),error=>{assert.match((error as Error).message,/agent prompt failed \(exit 1\)/);return true;});
- assert.deepEqual(calls[3]!.args,['--session','default','workspace','close','w7']);
+ assert.deepEqual(calls[3]!.args,['--session','default','tab','close','w7:t1']);
  assert.equal(calls.length,4);
 });
 test('a runner that throws on workspace create reports the step and closes nothing',()=>{
@@ -216,12 +231,12 @@ test('a runner that throws on workspace create reports the step and closes nothi
  assert.equal(calls.length,1);
  assert.ok(!calls.some(call=>call.args.includes('close')));
 });
-test('a runner that throws after workspace create still closes exactly the created workspace',()=>{
+test('a runner that throws after workspace create still closes exactly the created tab',()=>{
  const calls:RunnerInput[]=[];
  const runner:Runner=input=>{
   calls.push(input);
   if(input.args[2]==='workspace'&&input.args[3]==='create')return {code:0,stdout:createOk,stderr:''};
-  if(input.args[2]==='workspace'&&input.args[3]==='close')return {code:0,stdout:'{"result":{"type":"ok"}}',stderr:''};
+  if(input.args[2]==='tab'&&input.args[3]==='close')return {code:0,stdout:TAB_CLOSE_OK,stderr:''};
   throw new Error('agent start crashed');
  };
  assert.throws(()=>launch({},runner),error=>{
@@ -229,10 +244,10 @@ test('a runner that throws after workspace create still closes exactly the creat
   assert.ok(error instanceof Error);
   assert.match(error.message,/agent start failed: agent start crashed/);
   return true;});
- assert.deepEqual(calls[2]!.args,['--session','default','workspace','close','w7']);
+ assert.deepEqual(calls[2]!.args,['--session','default','tab','close','w7:t1']);
  assert.equal(calls.length,3);
 });
-test('a failure envelope with exit code 0 fails agent start, skips the prompt and closes the workspace',()=>{
+test('a failure envelope with exit code 0 fails agent start, skips the prompt and closes the created tab',()=>{
  const calls:RunnerInput[]=[];
  const runner=fakeRunner({create:{stdout:createOk},start:{stdout:JSON.stringify({id:'cli:agent:start',error:{code:'agent_not_ready',message:'pane never reached a prompt'}})}},calls);
  assert.throws(()=>launch({},runner),error=>{
@@ -241,10 +256,10 @@ test('a failure envelope with exit code 0 fails agent start, skips the prompt an
   assert.match(error.message,/agent start failed \(exit 0\): agent_not_ready: pane never reached a prompt/);
   return true;});
  assert.ok(!calls.some(call=>call.args[2]==='agent'&&call.args[3]==='prompt'));
- assert.deepEqual(calls[2]!.args,['--session','default','workspace','close','w7']);
+ assert.deepEqual(calls[2]!.args,['--session','default','tab','close','w7:t1']);
  assert.equal(calls.length,3);
 });
-test('a blocked agent prompt envelope with exit code 0 fails the launch and closes the workspace',()=>{
+test('a blocked agent prompt envelope with exit code 0 fails the launch and closes the created tab',()=>{
  const calls:RunnerInput[]=[];
  const runner=fakeRunner({create:{stdout:createOk},prompt:{stdout:JSON.stringify({id:'cli:agent:prompt',error:{code:'agent_blocked',message:'agent is blocked'}})}},calls);
  assert.throws(()=>launch({},runner),error=>{
@@ -252,7 +267,7 @@ test('a blocked agent prompt envelope with exit code 0 fails the launch and clos
   assert.ok(error instanceof Error);
   assert.match(error.message,/agent prompt failed \(exit 0\): agent_blocked: agent is blocked/);
   return true;});
- assert.deepEqual(calls[3]!.args,['--session','default','workspace','close','w7']);
+ assert.deepEqual(calls[3]!.args,['--session','default','tab','close','w7:t1']);
  assert.equal(calls.length,4);
 });
 test('documented success envelopes are not mistaken for failures',()=>{
@@ -260,7 +275,7 @@ test('documented success envelopes are not mistaken for failures',()=>{
  for(const prompt of [promptOk, JSON.stringify({id:'cli:agent:prompt',result:{type:'agent_prompted',agent:{pane_id:'w7:p1',agent_status:'working'}}})]){
   const calls:RunnerInput[]=[];
   const runner=fakeRunner({create:{stdout:createOk},start:{stdout:started},prompt:{stdout:prompt}},calls);
-  assert.deepEqual(launch({},runner),{session:'default',workspaceId:'w7',paneId:'w7:p1',agentName:'owner-11111111-1'});
+  assert.deepEqual(launch({},runner),createResult);
   assert.equal(calls.length,4);
  }
 });
@@ -270,28 +285,165 @@ test('a cleanup that throws is appended to the launch failure it recovers from',
   calls.push(input);
   if(input.args[2]==='workspace'&&input.args[3]==='create')return {code:0,stdout:createOk,stderr:''};
   if(input.args[2]==='agent'&&input.args[3]==='start')return {code:1,stdout:'',stderr:'agent start failed on purpose'};
-  if(input.args[2]==='workspace'&&input.args[3]==='close')throw new Error('close socket gone');
+  if(input.args[2]==='tab'&&input.args[3]==='close')throw new Error('close socket gone');
   return {code:0,stdout:'',stderr:''};
  };
  assert.throws(()=>launch({},runner),error=>{
   assert.equal(codeOf(error),'OWNER_LAUNCH_FAILED');
   assert.ok(error instanceof Error);
   assert.match(error.message,/agent start failed \(exit 1\): agent start failed on purpose/);
-  assert.match(error.message,/workspace close cleanup also failed: close socket gone/);
+  assert.match(error.message,/tab close cleanup also failed: close socket gone/);
   return true;});
  assert.equal(calls.length,3);
  assert.ok(!calls.some(call=>call.args[2]==='agent'&&call.args[3]==='prompt'));
 });
 test('a cleanup reporting a failure envelope with exit code 0 is still reported as cleanup failure',()=>{
  const calls:RunnerInput[]=[];
- const runner=fakeRunner({create:{stdout:createOk},start:{code:1,stderr:'nope'},close:{stdout:JSON.stringify({id:'cli:workspace:close',error:{code:'confirmation_required',message:'closing would remove a worktree parent'}})}},calls);
+ const runner=fakeRunner({create:{stdout:createOk},start:{code:1,stderr:'nope'},tabClose:{stdout:JSON.stringify({id:'cli:tab:close',error:{code:'confirmation_required',message:'closing would remove a worktree parent'}})}},calls);
  assert.throws(()=>launch({},runner),error=>{
   assert.equal(codeOf(error),'OWNER_LAUNCH_FAILED');
   assert.ok(error instanceof Error);
   assert.match(error.message,/agent start failed \(exit 1\): nope/);
-  assert.match(error.message,/workspace close cleanup also failed \(exit 0\): confirmation_required: closing would remove a worktree parent/);
+  assert.match(error.message,/tab close cleanup also failed \(exit 0\): confirmation_required: closing would remove a worktree parent/);
   return true;});
  assert.equal(calls.length,3);
+});
+test('an exact directory match reuses that workspace with one unfocused tab and never creates a workspace',()=>{
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),'wv-owner-reuse-')));
+ try{
+  const calls:RunnerInput[]=[];
+  const workspaceList={stdout:JSON.stringify({result:{type:'workspace_list',workspaces:[{workspace_id:'w3B',number:14},{workspace_id:'w1',number:2}]}})};
+  const paneList=(id:string):Step=>({stdout:JSON.stringify({result:{type:'pane_list',panes:id==='w3B'?[{pane_id:'w3B:p1',cwd:`${dir}/`}]:[{pane_id:'w1:p1',cwd:'/srv/elsewhere'}]}})});
+  const runner=fakeRunner({workspaceList,paneList,tabCreate:{stdout:tabCreateOk}},calls);
+  const result=launch({workspace:dir},runner);
+  assert.deepEqual(result,{session:'default',workspaceId:'w3B',paneId:'w9:p2',tabId:'w9:t2',createdWorkspace:false,agentName:'owner-11111111-1'});
+  assert.deepEqual(calls[0].args,['--session','default','workspace','list']);
+  assert.deepEqual(calls[1].args,['--session','default','pane','list','--workspace','w3B']);
+  assert.deepEqual(calls[2].args,['--session','default','pane','list','--workspace','w1']);
+  assert.deepEqual(calls[3],{file:HERDR,args:['--session','default','tab','create','--workspace','w3B','--cwd',dir,'--label','Fixture title'],timeout:30000});
+  assert.equal(calls[4]!.args[8],'w9:p2');
+  assert.ok(!calls.some(call=>call.args[2]==='workspace'&&call.args[3]==='create'));
+  assert.ok(!calls.some(call=>call.args.includes('--focus')));
+  assert.ok(!calls.some(call=>call.args.includes('--no-focus')&&call.args[2]==='tab'));
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('a foreground_cwd match reuses the workspace, and the tab label is the title truncated to 40 characters',()=>{
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),'wv-owner-reuse-fg-')));
+ try{
+  const calls:RunnerInput[]=[];
+  const workspaceList={stdout:JSON.stringify({result:{type:'workspace_list',workspaces:[{workspace_id:'wA',number:3}]}})};
+  const paneList={stdout:JSON.stringify({result:{type:'pane_list',panes:[{cwd:'/srv/nowhere'},{foreground_cwd:dir}]}})};
+  const title='T'.repeat(64);
+  const result=launch({workspace:dir,title},fakeRunner({workspaceList,paneList,tabCreate:{stdout:tabCreateOk}},calls));
+  assert.equal(result.createdWorkspace,false);
+  assert.deepEqual(calls[2].args,['--session','default','tab','create','--workspace','wA','--cwd',dir,'--label','T'.repeat(40)]);
+  assert.ok(!calls.some(call=>call.args[2]==='workspace'&&call.args[3]==='create'));
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('several matching workspaces reuse the one with the lowest Herdr number',()=>{
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),'wv-owner-reuse-multi-')));
+ try{
+  const calls:RunnerInput[]=[];
+  const workspaceList={stdout:JSON.stringify({result:{type:'workspace_list',workspaces:[{workspace_id:'wD',number:40},{workspace_id:'wB',number:2},{workspace_id:'wC',number:21}]} })};
+  const paneList=(id:string):Step=>({stdout:JSON.stringify({result:{type:'pane_list',panes:[{pane_id:`${id}:p1`,foreground_cwd:dir}]}})});
+  const runner=fakeRunner({workspaceList,paneList,tabCreate:{stdout:tabCreateOk}},calls);
+  const result=launch({workspace:dir},runner);
+  assert.equal(result.workspaceId,'wB');assert.equal(result.tabId,'w9:t2');assert.equal(result.createdWorkspace,false);
+  assert.deepEqual(calls[4].args.slice(4,8),['--workspace','wB','--cwd',dir]);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('workspaces without a matching directory fall through to the existing workspace create flow',()=>{
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),'wv-owner-reuse-none-')));
+ try{
+  const calls:RunnerInput[]=[];
+  const workspaceList={stdout:JSON.stringify({result:{type:'workspace_list',workspaces:[{workspace_id:'wA',number:1}]}})};
+  const paneList={stdout:JSON.stringify({result:{type:'pane_list',panes:[{cwd:'/srv/unrelated'}]}})};
+  const runner=fakeRunner({workspaceList,paneList,create:{stdout:createOk}},calls);
+  const result=launch({workspace:dir},runner);
+  assert.deepEqual(result,createResult);
+  assert.deepEqual(calls.map(call=>[call.args[2],call.args[3]]),[['workspace','list'],['pane','list'],['workspace','create'],['agent','start'],['agent','prompt'],['agent','rename']]);
+  assert.deepEqual(calls[2]!.args,['--session','default','workspace','create','--cwd',dir,'--label',realpathSync(dir).split('/').at(-1),'--no-focus']);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('a workspace list failure reports the step and never falls back to creating a workspace',()=>{
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),'wv-owner-reuse-wsl-')));
+ try{
+  for(const workspaceList of [{code:1,stderr:'socket gone'},{stdout:JSON.stringify({id:'cli:workspace:list',error:{code:'denied',message:'no'}})},{stdout:'not json'},{stdout:''}] as const){
+   const calls:RunnerInput[]=[];
+   assert.throws(()=>launch({workspace:dir},fakeRunner({workspaceList},calls)),error=>{
+    assert.equal(codeOf(error),'OWNER_LAUNCH_FAILED');
+    assert.ok(error instanceof Error);
+    assert.match(error.message,/herdr workspace list/);
+    return true;});
+   assert.equal(calls.length,1);
+   assert.ok(!calls.some(call=>call.args[3]==='create'));
+  }
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('a pane list failure reports the step and never falls back to creating a workspace',()=>{
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),'wv-owner-reuse-pain-')));
+ try{
+  for(const paneList of [{code:1,stderr:'pane list exploded'},{stdout:JSON.stringify({error:{code:'nope',message:'denied'}})},{stdout:'garbage'}] as const){
+   const calls:RunnerInput[]=[];
+   const workspaceList={stdout:JSON.stringify({result:{type:'workspace_list',workspaces:[{workspace_id:'wA',number:1}]}})};
+   assert.throws(()=>launch({workspace:dir},fakeRunner({workspaceList,paneList},calls)),error=>{
+    assert.equal(codeOf(error),'OWNER_LAUNCH_FAILED');
+    assert.ok(error instanceof Error);
+    assert.match(error.message,/herdr pane list/);
+    return true;});
+   assert.equal(calls.length,2);
+   assert.ok(!calls.some(call=>call.args[3]==='create'));
+  }
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('a failed tab create with an exact receipt closes only that tab; without a receipt nothing is guessed',()=>{
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),'wv-owner-reuse-fail-')));
+ try{
+  const base={workspaceList:{stdout:JSON.stringify({result:{type:'workspace_list',workspaces:[{workspace_id:'wA',number:1}]}})},paneList:{stdout:JSON.stringify({result:{type:'pane_list',panes:[{cwd:dir}]}})}};
+  const calls:RunnerInput[]=[];
+  const withReceipt=fakeRunner({...base,tabCreate:{code:1,stdout:JSON.stringify({result:{tab:{tab_id:'wA:t9'}}}),stderr:'tab create refused'}},calls);
+  assert.throws(()=>launch({workspace:dir},withReceipt),error=>{assert.match((error as Error).message,/tab create failed \(exit 1\): tab create refused/);return true;});
+  assert.equal(calls.length,4);
+  assert.deepEqual(calls[3]!.args,['--session','default','tab','close','wA:t9']);
+  const noReceiptCalls:RunnerInput[]=[];
+  const withoutReceipt=fakeRunner({...base,tabCreate:{code:1,stderr:'tab create refused'}},noReceiptCalls);
+  assert.throws(()=>launch({workspace:dir},withoutReceipt),error=>{assert.match((error as Error).message,/tab create failed \(exit 1\): tab create refused/);return true;});
+  assert.deepEqual(noReceiptCalls.map(call=>[call.args[2],call.args[3]]),[['workspace','list'],['pane','list'],['tab','create']]);
+  assert.ok(!calls.some(call=>call.args[2]==='workspace'&&call.args[3]==='close'));
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('a tab create without a tab id fails the launch and never starts or closes a guessed tab',()=>{
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),'wv-owner-reuse-notab-')));
+ try{
+  const calls:RunnerInput[]=[];
+  const workspaceList={stdout:JSON.stringify({result:{type:'workspace_list',workspaces:[{workspace_id:'wA',number:1}]}})};
+  const paneList={stdout:JSON.stringify({result:{type:'pane_list',panes:[{cwd:dir}]}})};
+  assert.throws(()=>launch({workspace:dir},fakeRunner({workspaceList,paneList,tabCreate:{stdout:'{"result":{"root_pane":{"pane_id":"wA:p1"}}}'}},calls)),error=>{
+   assert.equal(codeOf(error),'OWNER_LAUNCH_FAILED');
+   assert.ok(error instanceof Error);
+   assert.match(error.message,/tab create returned no tab id/);
+   return true;});
+  assert.deepEqual(calls.map(call=>[call.args[2],call.args[3]]),[['workspace','list'],['pane','list'],['tab','create']]);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('a failing agent start after reuse closes only the new tab, never the reused workspace',()=>{
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),'wv-owner-reuse-guard-')));
+ try{
+  const calls:RunnerInput[]=[];
+  const workspaceList={stdout:JSON.stringify({result:{type:'workspace_list',workspaces:[{workspace_id:'wA',number:1}]}})};
+  const paneList={stdout:JSON.stringify({result:{type:'pane_list',panes:[{cwd:dir}]}})};
+  assert.throws(()=>launch({workspace:dir},fakeRunner({workspaceList,paneList,tabCreate:{stdout:tabCreateOk},start:{code:1,stderr:'agent_not_ready'}},calls)),error=>{assert.match((error as Error).message,/agent start failed \(exit 1\)/);return true;});
+  assert.deepEqual(calls.at(-1)!.args,['--session','default','tab','close','w9:t2']);
+  assert.ok(!calls.some(call=>call.args[2]==='workspace'&&call.args[3]==='close'));
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('closeOwnerHost closes only the tab for records with a tab id; legacy records still close the workspace',()=>{
+ const tabCalls:RunnerInput[]=[];
+ closeOwnerHost({session:'default',workspaceId:'wA',paneId:'wA:p1',tabId:'wA:t9',createdWorkspace:false,agentName:'owner-x'},{herdrPath:HERDR,runner:fakeRunner({},tabCalls)});
+ assert.deepEqual(tabCalls.map(call=>[call.args[2],call.args[3],call.args[4]]),[['tab','close','wA:t9']]);
+ const legacyCalls:RunnerInput[]=[];
+ closeOwnerHost({session:'default',workspaceId:'wA',paneId:'wA:p1',agentName:'owner-x'},{herdrPath:HERDR,runner:fakeRunner({},legacyCalls)});
+ assert.deepEqual(legacyCalls.map(call=>[call.args[2],call.args[3],call.args[4]]),[['workspace','close','wA']]);
 });
 test('invalid epochs and task ids are rejected deterministically',()=>{
  const calls:RunnerInput[]=[];

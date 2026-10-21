@@ -25,7 +25,7 @@ export interface OwnerRef { name: string; transport: 'herdr-visible'; session: s
 export interface TaskInput { workspace?: string; acceptanceCriteria?: string[]; constraints?: string[]; title?: string; instruction: string; owner: OwnerRef }
 export interface Artifact { id: string; name: string; mediaType: 'text/plain' | 'text/markdown' | 'application/json'; content: string; createdAt: string }
 export interface TaskEvent { id: string; at: string; kind: 'lifecycle' | 'log' | 'progress' | 'artifact' | 'result' | 'error'; message: string }
-export interface TaskOwnerHost { kind: 'herdr'; session: string; workspaceId: string; paneId: string; agentName: string; launchedAt: string }
+export interface TaskOwnerHost { kind: 'herdr'; session: string; workspaceId: string; paneId: string; /** Exact tab of this host; absent on records created before tab-level launch/cleanup existed. */ tabId?: string; /** True only when this launch created the workspace; false/absent means an existing workspace was reused. */ createdWorkspace?: boolean; agentName: string; launchedAt: string }
 export interface TaskDispatch {
   owner: string; worker: string; engine: string; model: string; effort: string;
   /** native: the owner runs this same-engine worker with its built-in subagent tool; no process is launched. */

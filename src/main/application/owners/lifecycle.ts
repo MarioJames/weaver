@@ -80,14 +80,14 @@ export class OwnerLifecycle {
      cleanupAttempted=true;try{yield {kind:'close',host:launched};}catch(error){throw new OwnerLaunchError('OWNER_LAUNCH_FAILED',`Owner launch superseded; host cleanup failed: ${error instanceof Error?error.message:String(error)}`);}
      throw new OwnerLaunchError('OWNER_LAUNCH_FAILED','Owner launch superseded by a newer binding or app shutdown');
     }
-    ownerHost={kind:'herdr',session:launched.session,workspaceId:launched.workspaceId,paneId:launched.paneId,agentName:launched.agentName,launchedAt:new Date().toISOString()};
+    ownerHost={kind:'herdr',session:launched.session,workspaceId:launched.workspaceId,paneId:launched.paneId,...(launched.tabId?{tabId:launched.tabId}:{}),...(launched.createdWorkspace===undefined?{}:{createdWorkspace:launched.createdWorkspace}),agentName:launched.agentName,launchedAt:new Date().toISOString()};
     fresh.ownerHost=ownerHost;event(fresh,'lifecycle',`Started ${profile} in Herdr (${ownerHost.agentName})`);this.records.put(fresh);
     return {ownerHost};
    }catch(error){
     // update() also notifies listeners after its atomic store write. A listener failure must not dispose a durably visible host.
     const saved=this.manager.store.get(task.id);
     if(ownerHost&&saved.ownerId===ownerId&&(saved.ownerEpoch??0)===epoch&&saved.ownerHost&&
-      saved.ownerHost.session===ownerHost.session&&saved.ownerHost.workspaceId===ownerHost.workspaceId&&saved.ownerHost.paneId===ownerHost.paneId&&saved.ownerHost.agentName===ownerHost.agentName&&saved.ownerHost.launchedAt===ownerHost.launchedAt)return {ownerHost:saved.ownerHost};
+      saved.ownerHost.session===ownerHost.session&&saved.ownerHost.workspaceId===ownerHost.workspaceId&&saved.ownerHost.paneId===ownerHost.paneId&&saved.ownerHost.tabId===ownerHost.tabId&&saved.ownerHost.createdWorkspace===ownerHost.createdWorkspace&&saved.ownerHost.agentName===ownerHost.agentName&&saved.ownerHost.launchedAt===ownerHost.launchedAt)return {ownerHost:saved.ownerHost};
     const code=error instanceof OwnerLaunchError?error.code:'OWNER_LAUNCH_FAILED';let message=error instanceof Error?error.message:String(error);
     if(launched&&!cleanupAttempted){
      cleanupAttempted=true;

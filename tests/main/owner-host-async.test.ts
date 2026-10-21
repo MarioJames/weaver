@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { launchOwnerAsync, closeOwnerHostAsync, defaultAsyncRunner, OwnerLaunchError, type AsyncRunner, type OwnerLaunchInput, type RunnerInput, type RunnerResult } from '../../src/main/owner-host';
@@ -22,7 +22,7 @@ const failure = (pattern: RegExp) => (error: unknown) => error instanceof OwnerL
 test('async codex launch preserves exact IDs, explicit argv, unicode labels and budgets', async () => {
   const calls: RunnerInput[] = [];
   const host = await launchOwnerAsync({ ...input, asyncRunner: fixture({}, calls) });
-  assert.deepEqual(host, { session: 'default', workspaceId: 'exact-workspace', paneId: 'different:pane', agentName: 'owner-1234abcd-2' });
+  assert.deepEqual(host, { session: 'default', workspaceId: 'exact-workspace', paneId: 'different:pane', createdWorkspace: true, agentName: 'owner-1234abcd-2' });
   assert.deepEqual(calls.map(call => call.timeout), [30000, 70000, 60000, 15000]);
   assert.deepEqual(calls[0].args.slice(4, 8), ['--cwd', '/fake/project/', '--label', 'project']);
   assert.deepEqual(calls[1].args, ['--session', 'default', 'agent', 'start', host.agentName, '--kind', 'codex', '--pane', 'different:pane', '--timeout', '60000', '--', '-m', 'explicit-model', '-c', 'model_reasoning_effort="high"']);
@@ -35,7 +35,7 @@ test('async rename --clear failure is cosmetic and never closes the workspace', 
   for (const rename of [{ code: 1, stdout: '', stderr: 'refused' }, ok('{"error":{"message":"gone"}}'), new Error('rename exploded')]) {
     const calls: RunnerInput[] = [];
     const host = await launchOwnerAsync({ ...input, asyncRunner: fixture({ rename }, calls) });
-    assert.deepEqual(host, { session: 'default', workspaceId: 'exact-workspace', paneId: 'different:pane', agentName: 'owner-1234abcd-2' });
+    assert.deepEqual(host, { session: 'default', workspaceId: 'exact-workspace', paneId: 'different:pane', createdWorkspace: true, agentName: 'owner-1234abcd-2' });
     assert.equal(calls.at(-1)!.args[3], 'rename');
     assert.equal(calls.some(call => call.args[3] === 'close'), false);
   }
@@ -115,6 +115,70 @@ test('explicit close validates exact identity and closes no other resource', asy
   await assert.rejects(closeOwnerHostAsync({ ...host, session: ' ' }, { asyncRunner: fixture({}, calls) }), failure(/Exact owner/));
   await assert.rejects(closeOwnerHostAsync({ ...host, workspaceId: '' }, { asyncRunner: fixture({}, calls) }), failure(/Exact owner/));
   assert.equal(calls.length, 1);
+});
+
+// Reuse tests need a real directory (matching compares realpaths) and a runner that tells `workspace list` from `pane list`.
+function reuseFixture(options: { dir: string; workspaces: { workspace_id: string; number: number }[]; panes: Record<string, unknown[]>; overrides?: Record<string, RunnerResult | Error>; calls: RunnerInput[] }): AsyncRunner {
+  return async request => {
+    options.calls.push(request);
+    const key = request.args[0] === '--help' ? 'help' : `${request.args[2]} ${request.args[3]}`;
+    const override = options.overrides?.[key];
+    if (override instanceof Error) throw override;
+    if (override) return override;
+    if (key === 'workspace list') return ok(JSON.stringify({ result: { workspaces: options.workspaces } }));
+    if (key === 'pane list') return ok(JSON.stringify({ result: { panes: options.panes[request.args[5]] ?? [] } }));
+    if (key === 'tab create') return ok(JSON.stringify({ result: { tab: { tab_id: 'wB:t5' }, root_pane: { pane_id: 'wB:p5' } } }));
+    if (key === 'workspace create') return ok(create);
+    if (key === 'tab close') return ok('{"result":{"type":"ok"}}');
+    return ok('');
+  };
+}
+
+test('async launch reuses the lowest-numbered exact-directory workspace via one unfocused tab', async () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'weaver-owner-reuse-')));
+  try {
+    const calls: RunnerInput[] = [];
+    const host = await launchOwnerAsync({ ...input, workspace: `${dir}/`, title: 'Reuse title', asyncRunner: reuseFixture({ dir, calls,
+      workspaces: [{ workspace_id: 'wC', number: 9 }, { workspace_id: 'wB', number: 3 }, { workspace_id: 'wA', number: 1 }],
+      panes: { wC: [{ cwd: dir }], wB: [{ cwd: '/elsewhere', foreground_cwd: `${dir}/` }], wA: [{ cwd: '/not/it' }] } }) });
+    assert.deepEqual(host, { session: 'default', workspaceId: 'wB', paneId: 'wB:p5', tabId: 'wB:t5', createdWorkspace: false, agentName: 'owner-1234abcd-2' });
+    const tab = calls.find(call => call.args[2] === 'tab' && call.args[3] === 'create')!;
+    assert.deepEqual(tab.args, ['--session', 'default', 'tab', 'create', '--workspace', 'wB', '--cwd', `${dir}/`, '--label', 'Reuse title']);
+    assert.equal(calls.some(call => call.args[2] === 'workspace' && call.args[3] === 'create'), false);
+    assert.equal(calls.some(call => call.args.includes('--focus')), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('async reuse failure closes only the new tab; close of a tab record never touches the workspace', async () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'weaver-owner-reuse-')));
+  try {
+    const calls: RunnerInput[] = [];
+    await assert.rejects(launchOwnerAsync({ ...input, workspace: dir, asyncRunner: reuseFixture({ dir, calls, workspaces: [{ workspace_id: 'wB', number: 3 }], panes: { wB: [{ cwd: dir }] },
+      overrides: { 'agent start': new Error('start exploded') } }) }), failure(/agent start failed: start exploded/));
+    assert.deepEqual(calls.at(-1)!.args, ['--session', 'default', 'tab', 'close', 'wB:t5']);
+    assert.equal(calls.some(call => call.args[3] === 'close' && call.args[2] === 'workspace'), false);
+    const closing: RunnerInput[] = [];
+    await closeOwnerHostAsync({ session: 'default', workspaceId: 'wB', paneId: 'wB:p5', tabId: 'wB:t5', createdWorkspace: false, agentName: 'owner-x' }, { herdrPath: '/fake/herdr', asyncRunner: fixture({}, closing) });
+    assert.deepEqual(closing.map(call => call.args.slice(2)), [['tab', 'close', 'wB:t5']]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('async workspace or pane list failure never falls back to creating a workspace; no match creates one', async () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'weaver-owner-reuse-')));
+  try {
+    for (const [overrides, pattern] of [
+      [{ 'workspace list': { code: 1, stdout: '', stderr: 'socket gone' } }, /herdr workspace list failed \(exit 1\)/],
+      [{ 'pane list': new Error('pane list exploded') }, /herdr pane list failed: pane list exploded/],
+    ] as const) {
+      const calls: RunnerInput[] = [];
+      await assert.rejects(launchOwnerAsync({ ...input, workspace: dir, asyncRunner: reuseFixture({ dir, calls, workspaces: [{ workspace_id: 'wB', number: 3 }], panes: {}, overrides }) }), failure(pattern));
+      assert.equal(calls.some(call => call.args[3] === 'create'), false);
+    }
+    const calls: RunnerInput[] = [];
+    const host = await launchOwnerAsync({ ...input, workspace: dir, asyncRunner: reuseFixture({ dir, calls, workspaces: [{ workspace_id: 'wB', number: 3 }], panes: { wB: [{ cwd: '/else' }] } }) });
+    assert.equal(host.createdWorkspace, true); assert.equal(host.workspaceId, 'exact-workspace');
+    assert.equal(calls.some(call => call.args[2] === 'tab' && call.args[3] === 'create'), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('default async process runner stays nonblocking, bounds evidence and terminates on timeout or abort', async () => {
