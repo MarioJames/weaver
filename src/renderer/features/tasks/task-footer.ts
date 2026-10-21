@@ -24,9 +24,12 @@ export function cardFooter(task: Task, owner?: { name: string; title: string }):
     const last = task.events.at(-1)?.at;
     return { ...head, tail: { label: '最新上报', at: validTime(last) ? last : task.updatedAt } };
   }
+  return { ...head, tail: { label: task.status === 'completed' ? '完成于' : '结束于', at: completedAt(task) } };
+}
+/** When a task ended: its run's end, else its last update. The same time the card footer shows as 完成于. */
+export function completedAt(task: Task): string {
   const endedAt = task.run?.endedAt;
-  const ended = validTime(endedAt) ? endedAt : task.updatedAt;
-  return { ...head, tail: { label: task.status === 'completed' ? '完成于' : '结束于', at: ended } };
+  return validTime(endedAt) ? endedAt : task.updatedAt;
 }
 /** The sentence as plain text, times in the board's compact format: 由 Claude 于 22:52 派发 · 最新上报 22:55. */
 export function cardFooterText(footer: CardFooter, now: number = Date.now(), zone: string = projectTimeZone()): string {

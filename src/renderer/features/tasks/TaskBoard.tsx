@@ -8,6 +8,7 @@ import { displayLog } from './log-view';
 import type { FilterDimension, FilterOption, TaskSelection, TaskTimeRange } from './task-filters';
 import { cardOwner, dispatchKind, emptyRootNotice, taskTitle } from './task-view';
 import { cardFooter } from './task-footer';
+import { reviewWait } from './task-wait';
 import { TASK_COLUMNS, boardRows, columnize, isOpenTask, workspaceGroups } from './task-columns';
 import { nonArchived } from './task-archive';
 import { FILTER_DIMENSIONS, TIME_RANGES, applyTaskFilters, childIndex, emptySelection, facetOptions, filterLabels, filterSummary, hasFilters, resolveSelection, rootIndex, selectedEntries, toggleOption } from './task-filters';
@@ -202,6 +203,7 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, freeC
     const latest = task.events.at(-1);
     const owner = cardOwner(task, rootOf);
     const footer = cardFooter(task, owner);
+    const wait = reviewWait(task, now);
     const activity = task.ownerHost ? `Herdr · ${task.ownerHost.agentName}` : displayLog(latest?.message ?? '等待首次调度');
     return <button type="button" className={taskStyles.taskCard} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
       <span className={taskStyles.cardTitle}>
@@ -214,6 +216,7 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, freeC
         <Tag size="small" color={tag.color} icon={tag.spin ? spinner : displayStatus(task) === 'scheduled' ? <Icon icon={Clock} size="small" /> : undefined}>{tag.label}</Tag>
         {tag.spin && <Text type="secondary" className={taskStyles.cardActivity} title={activity}>{activity}</Text>}
       </span>
+      {wait && <span className={taskStyles.cardWait} data-overdue={wait.overdue} data-wait={wait.acknowledged ? 'acknowledged' : 'pending'} title={wait.title}>{wait.text}</span>}
       <span className={taskStyles.cardMeta}>
         <span className={taskStyles.cardWho}>由 <AgentFacts compact task={task} owner={owner} ownerKind={ownerKind} /> <span className={taskStyles.cardTail}>于 <CardTime value={footer.at} now={now} /> {footer.verb}{footer.tail && <span className={taskStyles.cardSep} aria-hidden="true"> ·</span>}</span></span>
         {footer.tail && <>{' '}<span className={taskStyles.cardTail}>{footer.tail.label} <CardTime value={footer.tail.at} now={now} /></span></>}

@@ -367,6 +367,15 @@ export const taskStyles = createStaticStyles(({ css, cssVar }) => ({
     white-space: nowrap;
     font-size: ${cssVar.fontSizeSM};
   `,
+  /** 待验收 wait line: secondary text, warning color once the wait is overdue. */
+  cardWait: css`
+    min-inline-size: 0;
+    color: ${cssVar.colorTextSecondary};
+    font-size: ${cssVar.fontSizeSM};
+    line-height: 20px;
+    font-variant-numeric: tabular-nums;
+    &[data-overdue='true'] { color: ${cssVar.colorWarningText}; }
+  `,
   cardChildren: css`
     min-inline-size: 0;
     overflow: hidden;
