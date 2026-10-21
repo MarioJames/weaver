@@ -5,6 +5,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ConfirmedParentCancellation, ParentAgentError, createParentAgent, type ParentAgentSession, type ParentProcessLauncher } from '../../src/main/im/parent-agent';
+import { imInstructions } from '../../src/main/im/bootstrap';
 
 const FIXTURE = new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url).pathname;
 const sessions = new Set<ParentAgentSession>();
@@ -375,6 +376,79 @@ test('opencode later tool assistants under the same prompt never truncate or lea
     assert.ok(text.includes('最终'), `final text must include the newest assistant tail, got ${JSON.stringify(text)}`);
     assert.ok(!text.includes('SECRET'), 'reasoning/tool parts must never leak into the public text');
     assert.ok(!deltas.join('').includes('SECRET'), 'streamed deltas must never leak reasoning/tool parts');
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('opencode sends the complete prepared bootstrap as the native system field while startup stays prompt-free', async () => {
+  const harness = setup('bootstrap', 'default');
+  try {
+    const dataDir = join(harness.dir, "实例 data '特殊' 目录");
+    mkdirSync(dataDir);
+    const instructions = imInstructions(dataDir, 'opencode', '00000000-0000-4000-8000-000000000001', [harness.workspace, harness.extra]);
+    const session = await createParentAgent(input(harness, { instructions }), { launch, startupMs: 4000, turnMs: 3000, closeMs: 500 });
+    sessions.add(session);
+    assert.equal(markers(harness).filter(entry => typeof entry.turn === 'number').length, 0, 'startup must not send a prompt');
+    assert.equal(await session.send('第一条用户消息'), '你好，世界1');
+    assert.equal(await session.send('第二条用户消息'), '你好，世界2');
+    const turns = markers(harness).filter(entry => typeof entry.turn === 'number') as Array<Record<string, unknown>>;
+    assert.equal(turns.length, 2);
+    assert.deepEqual(turns.map(entry => entry.text), ['第一条用户消息', '第二条用户消息']);
+    for (const turn of turns) {
+      assert.equal(turn.system, instructions, 'every user prompt must carry the exact factory instructions as system');
+      assert.deepEqual(turn.model, { providerID: 'fixture-provider', modelID: 'fixture-model' });
+      assert.equal(turn.variant, 'high');
+      assert.match(String(turn.messageID), /^msg/);
+    }
+    assert.ok(instructions.includes('weaver --data-dir'));
+    assert.ok(instructions.includes(harness.workspace));
+    assert.ok(instructions.includes(harness.extra));
+    assert.ok(instructions.includes('<weaver-actions>'));
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('opencode streams only confirmed public text and drops reasoning deltas before and after metadata', async () => {
+  const harness = setup('reasoning-stream', 'reasoning-stream');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 500 });
+    sessions.add(session);
+    const deltas: string[] = [];
+    const text = await session.send('解释一下', undefined, chunk => deltas.push(chunk));
+    assert.deepEqual(deltas, ['公开', '-正文'], 'public text must still stream exactly once and in order');
+    assert.equal(text, '公开-正文');
+    assert.ok(!deltas.join('').includes('SECRET'), 'reasoning deltas must never reach the public stream');
+    assert.ok(!text.includes('SECRET'), 'reasoning parts must never reach the final text');
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('opencode buffered private parts replay with their original type and flags', async () => {
+  const harness = setup('buffered-private', 'buffered-private');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 500 });
+    sessions.add(session);
+    const deltas: string[] = [];
+    const text = await session.send('缓冲', undefined, chunk => deltas.push(chunk));
+    assert.deepEqual(deltas, ['BUFFERED-PUBLIC']);
+    assert.equal(text, 'BUFFERED-PUBLIC');
+    assert.ok(!deltas.join('').includes('SECRET'), 'buffered reasoning/synthetic deltas must never replay publicly');
+    assert.ok(!text.includes('SECRET'), 'buffered private parts must never reach the final text');
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('opencode synthetic and ignored text parts cannot stream or reach the final text', async () => {
+  const harness = setup('synthetic-text', 'synthetic-text');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 500 });
+    sessions.add(session);
+    const deltas: string[] = [];
+    const text = await session.send('合成文本', undefined, chunk => deltas.push(chunk));
+    assert.deepEqual(deltas, ['PUBLIC']);
+    assert.equal(text, 'PUBLIC');
+    assert.ok(!deltas.join('').includes('SECRET'), 'synthetic/ignored deltas must never reach the public stream');
+    assert.ok(!text.includes('SECRET'), 'synthetic/ignored text must never reach the final text');
     await session.close();
   } finally { await teardown(harness); }
 });

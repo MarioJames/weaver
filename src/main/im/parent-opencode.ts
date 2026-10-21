@@ -28,12 +28,18 @@ import {
  * `OPENCODE_SERVER_PASSWORD` with the native username `opencode`; the random password exists only
  * in the child environment. The stdout URL is accepted only when it is exactly the preallocated
  * `http://127.0.0.1:<port>`; a different host, port or redirect is a protocol failure. No prompt is
- * sent during startup: health and session creation are the only handshake requests.
+ * sent during startup: health and session creation are the only handshake requests. Each user
+ * prompt carries the factory-provided Weaver bootstrap in the native `system` field (the same
+ * `prompt_async` request body as the message endpoint), while `parts` stays the original user text.
  *
- * Every assistant delta is attributed by the native `messageID`/`parentID` pair: only a text part
- * whose assistant message has `parentID === prompt messageID` and matching `sessionID` is public.
- * Reasoning, tool, subtask and foreign-session parts are dropped. Cumulative `part.updated`
- * snapshots subtract the already-streamed suffix, and a divergent snapshot fails closed.
+ * Every assistant delta is attributed by the native `messageID`/`parentID` pair and by the
+ * original part metadata: only a `type: "text"` part that is neither `synthetic` nor `ignored`
+ * on the current-turn assistant is public. Reasoning, tool, subtask, synthetic/ignored text and
+ * foreign-session parts are dropped. A delta whose part metadata has not arrived yet is kept in
+ * a bounded per-turn buffer until that metadata confirms public text; private metadata discards
+ * it. Cumulative `part.updated` snapshots subtract the already-streamed suffix, and a divergent
+ * snapshot fails closed. Buffered updates replay with their original type/flags, never rebuilt
+ * as public text.
  * `session.idle` alone settles nothing: a success turn also needs the newest current-turn
  * assistant message fetched from the authoritative message list to show a native terminal, and
  * a cancellation needs the bound message to show a native stop after the abort ACK plus
@@ -88,8 +94,20 @@ interface BufferedPart {
   event: 'delta' | 'update';
   partID: string;
   messageID: string;
+  text?: string;
+  part?: Record<string, unknown>;
+}
+
+interface PendingDelta {
+  partID: string;
+  messageID: string;
   text: string;
-  field?: string;
+}
+
+interface PartQualification {
+  messageID: string;
+  partID: string;
+  public: boolean;
 }
 
 export interface OpenCodeParentWaits {
@@ -125,6 +143,9 @@ export class OpenCodeParentSession implements ParentAgentSession {
   private readonly parts = new Map<string, string>();
   private readonly buffered = new Map<string, BufferedPart[]>();
   private bufferedCount = 0;
+  private readonly pendingDeltas = new Map<string, PendingDelta[]>();
+  private pendingCount = 0;
+  private readonly partKinds = new Map<string, PartQualification>();
   private readonly sse = new AbortController();
   private baseUrl = '';
   private sessionId?: string;
@@ -395,12 +416,53 @@ export class OpenCodeParentSession implements ParentAgentSession {
     }
   }
 
+  private partKey(messageID: string, partID: string): string {
+    return `${messageID}\u0000${partID}`;
+  }
+
+  private bufferedSize(): number {
+    return this.bufferedCount + this.pendingCount;
+  }
+
+  private resetTurnState(): void {
+    this.parts.clear();
+    this.partKinds.clear();
+    this.buffered.clear();
+    this.bufferedCount = 0;
+    this.pendingDeltas.clear();
+    this.pendingCount = 0;
+  }
+
   private bufferPart(part: BufferedPart): void {
-    if (this.bufferedCount >= 512) { this.failSession(parentError('protocol', 'opencode part buffer exceeded the limit')); return; }
+    if (this.bufferedSize() >= 512) { this.failSession(parentError('protocol', 'opencode part buffer exceeded the limit')); return; }
     const rows = this.buffered.get(part.messageID) ?? [];
     rows.push(part);
     this.buffered.set(part.messageID, rows);
     this.bufferedCount += 1;
+  }
+
+  private bufferPendingDelta(row: PendingDelta): void {
+    if (this.bufferedSize() >= 512) { this.failSession(parentError('protocol', 'opencode part buffer exceeded the limit')); return; }
+    const key = this.partKey(row.messageID, row.partID);
+    const rows = this.pendingDeltas.get(key) ?? [];
+    rows.push(row);
+    this.pendingDeltas.set(key, rows);
+    this.pendingCount += 1;
+  }
+
+  private dropPending(key: string): void {
+    const rows = this.pendingDeltas.get(key);
+    if (!rows) return;
+    this.pendingDeltas.delete(key);
+    this.pendingCount -= rows.length;
+  }
+
+  private flushPending(key: string): void {
+    const rows = this.pendingDeltas.get(key);
+    if (!rows) return;
+    this.pendingDeltas.delete(key);
+    this.pendingCount -= rows.length;
+    for (const row of rows) this.emitDelta(row);
   }
 
   private replayBuffered(messageID: string): void {
@@ -409,8 +471,8 @@ export class OpenCodeParentSession implements ParentAgentSession {
     this.buffered.delete(messageID);
     this.bufferedCount -= rows.length;
     for (const row of rows) {
-      if (row.event === 'delta') this.emitDelta(row);
-      else this.handleTextPart({ id: row.partID, messageID: row.messageID, type: 'text', text: row.text });
+      if (row.event === 'delta') this.applyDelta({ messageID: row.messageID, partID: row.partID, text: row.text ?? '' });
+      else if (row.part) this.applyPartUpdate(row.part);
     }
   }
 
@@ -425,45 +487,79 @@ export class OpenCodeParentSession implements ParentAgentSession {
     const row: BufferedPart = { event: 'delta', messageID, partID, text: props.delta };
     if (!active.assistantMessageID) { this.bufferPart(row); return; }
     if (messageID !== active.assistantMessageID) return;
+    this.applyDelta({ messageID, partID, text: props.delta });
+  }
+
+  private applyDelta(row: PendingDelta): void {
+    const active = this.active;
+    if (!active || active.settled || active.cancelError) return;
+    const kind = this.partKinds.get(this.partKey(row.messageID, row.partID));
+    if (!kind) { this.bufferPendingDelta(row); return; }
+    if (!kind.public) return;
     this.emitDelta(row);
   }
 
-  private emitDelta(row: BufferedPart): void {
+  private emitDelta(row: Pick<BufferedPart, 'partID' | 'text'>): void {
     const active = this.active;
     if (!active || active.settled || active.cancelError) return;
+    const text = row.text ?? '';
+    if (!text) return;
     active.sawPart = true;
-    if (!this.parts.has(row.partID) || this.parts.get(row.partID) === '') this.parts.set(row.partID, '');
-    this.parts.set(row.partID, (this.parts.get(row.partID) ?? '') + row.text);
+    this.parts.set(row.partID, (this.parts.get(row.partID) ?? '') + text);
     if (!active.onDelta) return;
-    try { active.onDelta(row.text); }
+    try { active.onDelta(text); }
     catch (error) { this.failSession(parentError('engine', error instanceof Error ? error.message : String(error))); }
   }
 
   private handlePartUpdated(props: Record<string, unknown>): void {
     if (props.sessionID !== this.sessionId) return;
     const part = props.part as Record<string, unknown> | undefined;
-    if (!part || part.type !== 'text' || typeof part.text !== 'string') return;
+    if (!part) return;
+    if (part.sessionID !== undefined && part.sessionID !== this.sessionId) return;
     const messageID = typeof part.messageID === 'string' ? part.messageID : '';
     const partID = typeof part.id === 'string' ? part.id : '';
     if (!messageID || !partID) return;
     const active = this.active;
     if (!active || active.settled) return;
-    const row: BufferedPart = { event: 'update', messageID, partID, text: part.text };
+    const row: BufferedPart = { event: 'update', messageID, partID, part };
     if (!active.assistantMessageID) { this.bufferPart(row); return; }
     if (messageID !== active.assistantMessageID) return;
-    this.handleTextPart(part as Record<string, unknown>);
+    this.applyPartUpdate(part);
+  }
+
+  private applyPartUpdate(part: Record<string, unknown>): void {
+    const active = this.active;
+    if (!active || active.settled || active.cancelError) return;
+    if (typeof part.type !== 'string' || !part.type) return;
+    const messageID = typeof part.messageID === 'string' ? part.messageID : '';
+    const partID = typeof part.id === 'string' ? part.id : '';
+    if (!messageID || !partID) return;
+    const isPublic = part.type === 'text' && part.synthetic !== true && part.ignored !== true;
+    const key = this.partKey(messageID, partID);
+    const known = this.partKinds.get(key);
+    if (known && known.public !== isPublic) {
+      this.failSession(parentError('protocol', 'opencode changed the public qualification of a part after it was observed'));
+      return;
+    }
+    if (!known) {
+      if (this.partKinds.size >= 512) { this.failSession(parentError('protocol', 'opencode part metadata exceeded the limit')); return; }
+      this.partKinds.set(key, { messageID, partID, public: isPublic });
+    }
+    if (!isPublic) { this.dropPending(key); return; }
+    this.flushPending(key);
+    this.handleTextPart(part);
   }
 
   private handleTextPart(part: Record<string, unknown>): void {
     const active = this.active;
     if (!active || active.settled || active.cancelError) return;
-    if (part.synthetic === true || part.ignored === true) return;
+    if (part.type !== 'text' || part.synthetic === true || part.ignored === true) return;
     const partID = typeof part.id === 'string' ? part.id : '';
     const text = typeof part.text === 'string' ? part.text : '';
     if (!partID || !text) return;
-    active.sawPart = true;
     const previous = this.parts.get(partID) ?? '';
     if (text === previous) return;
+    active.sawPart = true;
     if (text.startsWith(previous)) {
       const suffix = text.slice(previous.length);
       this.parts.set(partID, text);
@@ -692,6 +788,7 @@ export class OpenCodeParentSession implements ParentAgentSession {
   private finishTurn(active: ActiveTurn, outcome: string | Error): void {
     if (this.active !== active) return;
     this.active = undefined;
+    this.resetTurnState();
     active.timer.cancel();
     if (active.settled) return;
     active.settled = true;
@@ -767,6 +864,7 @@ export class OpenCodeParentSession implements ParentAgentSession {
   private failAll(error: ParentAgentError): void {
     const active = this.active;
     this.active = undefined;
+    this.resetTurnState();
     if (active) {
       active.timer.cancel();
       if (!active.settled) { active.settled = true; active.onDelta = undefined; active.reject?.(error); }
@@ -791,6 +889,7 @@ export class OpenCodeParentSession implements ParentAgentSession {
     const providerID = this.prepared.model.slice(0, slash);
     const modelID = this.prepared.model.slice(slash + 1);
     const promptMessageID = `msg_${randomUUID().replaceAll('-', '')}`;
+    this.resetTurnState();
     const active: ActiveTurn = {
       promptMessageID,
       promptAccepted: false,
@@ -813,6 +912,7 @@ export class OpenCodeParentSession implements ParentAgentSession {
               messageID: promptMessageID,
               model: { providerID, modelID },
               ...(this.prepared.effort ? { variant: this.prepared.effort } : {}),
+              system: this.prepared.instructions,
               parts: [{ type: 'text', text }],
             }),
           },

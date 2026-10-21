@@ -62,7 +62,7 @@ async function runTurn(frame, prompt) {
   const assistantID = `msg_a${current}`;
   const partID = `prt_${current}_1`;
   const promptID = prompt.messageID;
-  log({ pid: process.pid, turn: current, messageID: promptID, model: prompt.model, variant: prompt.variant, text: prompt.parts?.[0]?.text });
+  log({ pid: process.pid, turn: current, messageID: promptID, model: prompt.model, variant: prompt.variant, system: prompt.system, text: prompt.parts?.[0]?.text });
   if (scenario === 'stale-success' || scenario === 'stale-cancel' || scenario === 'abort-error' || scenario === 'abort-early' || scenario === 'intermediate-success' || scenario === 'intermediate-cancel' || scenario === 'missing-finish' || scenario === 'finalize-race') {
     active = { turn: current, promptID, assistantID };
   }
@@ -72,6 +72,7 @@ async function runTurn(frame, prompt) {
     // arrives first and must not settle the turn. The true terminal follows ~400ms later.
     active = { turn: current, promptID, assistantID };
     event('message.updated', { sessionID: sessionId, info: assistantInfoOpen(assistantID, promptID) });
+    event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '' } });
     event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID, field: 'text', delta: 'PARTIAL-' });
     messages = [{ info: assistantInfoOpen(assistantID, promptID), parts: [{ id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'PARTIAL-' }] }];
     event('session.idle', { sessionID: sessionId });
@@ -90,6 +91,7 @@ async function runTurn(frame, prompt) {
     // is still busy. The adapter must not report a confirmed stop from this sequence.
     active = { turn: current, promptID, assistantID };
     event('message.updated', { sessionID: sessionId, info: assistantInfoOpen(assistantID, promptID) });
+    event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '' } });
     event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID, field: 'text', delta: 'PARTIAL-' });
     messages = [{ info: assistantInfoOpen(assistantID, promptID), parts: [{ id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'PARTIAL-' }] }];
     return;
@@ -102,6 +104,7 @@ async function runTurn(frame, prompt) {
     const mid = { id: assistantID, sessionID: sessionId, role: 'assistant', parentID: promptID, modelID: 'fixture-model', providerID: 'fixture-provider', time: { created: Date.now(), completed: Date.now() }, finish: 'tool-calls' };
     active = { turn: current, promptID, assistantID };
     event('message.updated', { sessionID: sessionId, info: mid });
+    event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '' } });
     event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID, field: 'text', delta: 'PARTIAL-' });
     messages = [{ info: mid, parts: [{ id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'PARTIAL-' }] }];
     event('session.status', { sessionID: sessionId, status: { type: 'busy' } });
@@ -123,6 +126,7 @@ async function runTurn(frame, prompt) {
     const open = { id: assistantID, sessionID: sessionId, role: 'assistant', parentID: promptID, modelID: 'fixture-model', providerID: 'fixture-provider', time: { created: Date.now(), completed: Date.now() } };
     active = { turn: current, promptID, assistantID };
     event('message.updated', { sessionID: sessionId, info: open });
+    event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '' } });
     event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID, field: 'text', delta: 'PARTIAL-' });
     messages = [{ info: open, parts: [{ id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'PARTIAL-' }] }];
     event('session.status', { sessionID: sessionId, status: { type: 'busy' } });
@@ -142,6 +146,7 @@ async function runTurn(frame, prompt) {
     // The adapter must re-check instead of dropping that wake and stalling to turn timeout.
     active = { turn: current, promptID, assistantID };
     event('message.updated', { sessionID: sessionId, info: assistantInfoOpen(assistantID, promptID) });
+    event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '' } });
     event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID, field: 'text', delta: 'PARTIAL-' });
     messages = [{ info: assistantInfoOpen(assistantID, promptID), parts: [{ id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'PARTIAL-' }] }];
     holdFirstMessageGet = true;
@@ -159,6 +164,7 @@ async function runTurn(frame, prompt) {
     // Abort arrives mid-generation; the server records a native MessageAbortedError terminal.
     active = { turn: current, promptID, assistantID };
     event('message.updated', { sessionID: sessionId, info: assistantInfoOpen(assistantID, promptID) });
+    event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '' } });
     event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID, field: 'text', delta: 'PARTIAL-' });
     messages = [{ info: assistantInfoOpen(assistantID, promptID), parts: [{ id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'PARTIAL-' }] }];
     return;
@@ -192,12 +198,82 @@ async function runTurn(frame, prompt) {
     event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '中间-' } });
     event('message.part.updated', { sessionID: sessionId, part: { id: `prt_think_${current}`, sessionID: sessionId, messageID: assistantID, type: 'reasoning', text: 'SECRET_REASONING' } });
     event('message.updated', { sessionID: sessionId, info: assistantInfo(secondID, promptID) });
+    event('message.part.updated', { sessionID: sessionId, part: { id: `prt_${current}_2`, sessionID: sessionId, messageID: secondID, type: 'text', text: '' } });
     event('message.part.delta', { sessionID: sessionId, messageID: secondID, partID: `prt_${current}_2`, field: 'text', delta: '最终' });
     event('message.part.updated', { sessionID: sessionId, part: { id: `prt_${current}_2`, sessionID: sessionId, messageID: secondID, type: 'text', text: '最终' } });
     messages = [
       { info: assistantInfo(assistantID, promptID, undefined, 'tool-calls'), parts: [{ id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '中间-' }] },
       { info: assistantInfo(secondID, promptID), parts: [{ id: `prt_${current}_2`, sessionID: sessionId, messageID: secondID, type: 'text', text: '最终' }] },
     ];
+    event('session.idle', { sessionID: sessionId });
+    return;
+  }
+  if (scenario === 'reasoning-stream') {
+    // The native producer uses field:"text" for both public text and reasoning deltas; only
+    // the part metadata distinguishes them. Cover metadata-before-delta and delta-before-
+    // metadata for a private reasoning part, then a normally streamed public text part.
+    const known = `prt_reason_${current}`;
+    const unknown = `prt_reason_unknown_${current}`;
+    active = { turn: current, promptID, assistantID };
+    event('message.updated', { sessionID: sessionId, info: assistantInfoOpen(assistantID, promptID) });
+    event('message.part.updated', { sessionID: sessionId, part: { id: known, sessionID: sessionId, messageID: assistantID, type: 'reasoning', text: 'SECRET_REASONING' } });
+    event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID: known, field: 'text', delta: 'SECRET_REASONING_DELTA' });
+    event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID: unknown, field: 'text', delta: 'SECRET_UNKNOWN_DELTA' });
+    event('message.part.updated', { sessionID: sessionId, part: { id: unknown, sessionID: sessionId, messageID: assistantID, type: 'reasoning', text: 'SECRET_UNKNOWN_DELTA' } });
+    event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '' } });
+    event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID, field: 'text', delta: '公开' });
+    event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID, field: 'text', delta: '-正文' });
+    await sleep(20);
+    event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '公开-正文' } });
+    messages = [{ info: assistantInfo(assistantID, promptID), parts: [
+      { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '公开-正文' },
+      { id: known, sessionID: sessionId, messageID: assistantID, type: 'reasoning', text: 'SECRET_REASONING_DELTA' },
+      { id: unknown, sessionID: sessionId, messageID: assistantID, type: 'reasoning', text: 'SECRET_UNKNOWN_DELTA' },
+    ] }];
+    event('session.idle', { sessionID: sessionId });
+    return;
+  }
+  if (scenario === 'buffered-private') {
+    // Private metadata and deltas arrive before the assistant binding. Replay must preserve
+    // the original type/flags, drop the reasoning deltas, and still flush the later public text.
+    const reasoning = `prt_buf_reason_${current}`;
+    const synthetic = `prt_buf_synthetic_${current}`;
+    active = { turn: current, promptID, assistantID };
+    event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID: reasoning, field: 'text', delta: 'SECRET_BUFFERED_DELTA' });
+    event('message.part.updated', { sessionID: sessionId, part: { id: reasoning, sessionID: sessionId, messageID: assistantID, type: 'reasoning', text: 'SECRET_BUFFERED_DELTA' } });
+    event('message.part.updated', { sessionID: sessionId, part: { id: synthetic, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'SECRET_BUFFERED_SYNTHETIC', synthetic: true } });
+    event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID: synthetic, field: 'text', delta: 'SECRET_BUFFERED_SYNTHETIC_DELTA' });
+    event('message.updated', { sessionID: sessionId, info: assistantInfoOpen(assistantID, promptID) });
+    event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '' } });
+    event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID, field: 'text', delta: 'BUFFERED-PUBLIC' });
+    event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'BUFFERED-PUBLIC' } });
+    messages = [{ info: assistantInfo(assistantID, promptID), parts: [
+      { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'BUFFERED-PUBLIC' },
+      { id: reasoning, sessionID: sessionId, messageID: assistantID, type: 'reasoning', text: 'SECRET_BUFFERED_DELTA' },
+      { id: synthetic, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'SECRET_BUFFERED_SYNTHETIC', synthetic: true },
+    ] }];
+    event('session.idle', { sessionID: sessionId });
+    return;
+  }
+  if (scenario === 'synthetic-text') {
+    // Synthetic and ignored text parts use type:"text" but are not public conversation text.
+    // Neither their deltas nor their final snapshots may stream or reach the final text.
+    const synthetic = `prt_synthetic_${current}`;
+    const ignored = `prt_ignored_${current}`;
+    active = { turn: current, promptID, assistantID };
+    event('message.updated', { sessionID: sessionId, info: assistantInfoOpen(assistantID, promptID) });
+    event('message.part.updated', { sessionID: sessionId, part: { id: synthetic, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'SECRET_SYNTHETIC', synthetic: true } });
+    event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID: synthetic, field: 'text', delta: 'SECRET_SYNTHETIC_DELTA' });
+    event('message.part.updated', { sessionID: sessionId, part: { id: ignored, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'SECRET_IGNORED', ignored: true } });
+    event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID: ignored, field: 'text', delta: 'SECRET_IGNORED_DELTA' });
+    event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '' } });
+    event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID, field: 'text', delta: 'PUBLIC' });
+    event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'PUBLIC' } });
+    messages = [{ info: assistantInfo(assistantID, promptID), parts: [
+      { id: synthetic, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'SECRET_SYNTHETIC', synthetic: true },
+      { id: ignored, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'SECRET_IGNORED', ignored: true },
+      { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: 'PUBLIC' },
+    ] }];
     event('session.idle', { sessionID: sessionId });
     return;
   }
@@ -221,6 +297,7 @@ async function runTurn(frame, prompt) {
     event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID, field: 'text', delta: '你好，' });
   }
   event('message.updated', { sessionID: sessionId, info: assistantInfo(assistantID, promptID) });
+  event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '' } });
   event('message.updated', { sessionID: sessionId, info: assistantInfo('msg_foreign', 'msg_not_mine') });
   event('message.part.delta', { sessionID: sessionId, messageID: 'msg_foreign', partID: 'prt_for', field: 'text', delta: 'SECRET_FOREIGN' });
   event('message.part.updated', { sessionID: sessionId, part: { id: `prt_think_${current}`, sessionID: sessionId, messageID: assistantID, type: 'reasoning', text: 'SECRET_REASONING' } });
@@ -258,6 +335,7 @@ function respondPermission(kind, reply) {
   log({ permissionReply: { kind, reply } });
   if (!active) return;
   event('message.updated', { sessionID: sessionId, info: assistantInfo(active.assistantID, active.promptID) });
+  event('message.part.updated', { sessionID: sessionId, part: { id: 'prt_1', sessionID: sessionId, messageID: active.assistantID, type: 'text', text: '' } });
   event('message.part.delta', { sessionID: sessionId, messageID: active.assistantID, partID: 'prt_1', field: 'text', delta: '工具请求已处理' });
   messages.push(messageEntry(active.assistantID, active.promptID, [{ id: 'prt_1', sessionID: sessionId, messageID: active.assistantID, type: 'text', text: '工具请求已处理' }]));
   event('session.idle', { sessionID: sessionId });
@@ -350,6 +428,7 @@ const server = createServer(async (req, res) => {
     res.writeHead(204); res.end();
     if (active) {
       event('message.updated', { sessionID: sessionId, info: assistantInfo(active.assistantID, active.promptID) });
+      event('message.part.updated', { sessionID: sessionId, part: { id: `prt_q_${active.turn}`, sessionID: sessionId, messageID: active.assistantID, type: 'text', text: '' } });
       event('message.part.delta', { sessionID: sessionId, messageID: active.assistantID, partID: `prt_q_${active.turn}`, field: 'text', delta: '问题已拒绝' });
       messages.push(messageEntry(active.assistantID, active.promptID, [{ id: `prt_q_${active.turn}`, sessionID: sessionId, messageID: active.assistantID, type: 'text', text: '问题已拒绝' }]));
       event('session.idle', { sessionID: sessionId });
