@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { History, Pencil, Play, Plus, RefreshCw, Search, Square, Trash2 } from 'lucide-react';
 import { Empty } from '@lobehub/ui';
-import { PageHeader, Surface } from '@lobehub/ui/dashboard';
+import { PageHeader } from '@lobehub/ui/dashboard';
 import { ActionIcon, Alert, Button, Input, Modal, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
 import { command } from '../../api/commands';
 import { notifyError, notifyInfo } from '../../api/notify';
@@ -208,7 +208,7 @@ export function SchedulesPage({ onOpenTask, onPolicyChanged }: {
     <PageHeader title="定时任务" description="按时间规则自动执行脚本命令，或让独立的父 Agent 定时处理目标；运行结果保留在各自的历史里。" action={
       <Button ref={newButtonRef} type="primary" icon={Plus} disabled={paused} onClick={() => setCreating(true)}>新建定时任务</Button>
     } />
-    <Surface>
+    <div className={schedulesStyles.page}>
       <div className={schedulesStyles.toolbar}>
         <Input className={schedulesStyles.search} allowClear aria-label="搜索定时任务" prefix={<Search size={14} />} placeholder="按名称、命令或目标搜索" value={search} onChange={event => setSearch(event.target.value)} />
         <NamedSelect className={schedulesStyles.kindFilter} aria-label="按类型筛选" value={kind} options={KIND_FILTER_OPTIONS} onChange={value => { if (typeof value === 'string') setKind(value as KindFilter); }} />
@@ -217,7 +217,7 @@ export function SchedulesPage({ onOpenTask, onPolicyChanged }: {
       {stale && <p role="status" className={`${styles.meta} ${schedulesStyles.staleNote}`}>后台刷新失败，显示的是上次结果：{problem}。可再点刷新重试。</p>}
       {pendingForPage && <PendingNotice notice={pendingForPage} />}
       {listBody()}
-    </Surface>
+    </div>
     <ScheduleFormModal open={creating} busy={busy} pendingNotice={pendingForForm} close={() => setCreating(false)} onClosed={() => newButtonRef.current?.focus()} submit={submit} />
     <ScheduleFormModal key={editing?.id} open={!!editing} definition={editing} active={!!editingCurrent?.activeRunId} busy={busy} pendingNotice={pendingForForm} close={() => setEditing(undefined)} onClosed={() => setEditing(undefined)} submit={submit} />
     {historyOf && <ScheduleRunsDrawer schedule={historyCurrent!} open={!!historyOf} onClose={() => setHistoryOf(undefined)} pendingNotice={pendingInHistory ? notice : undefined} cancelBusy={paused} onCancelRun={runId => historyOf && stopRun(historyOf, runId)} onViewTask={onOpenTask} />}

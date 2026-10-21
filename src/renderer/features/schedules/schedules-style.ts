@@ -2,6 +2,14 @@ import { createStaticStyles } from 'antd-style';
 
 /** The schedules management page: toolbar, compact responsive rows, run history and form layout. */
 export const schedulesStyles = createStaticStyles(({ css, cssVar, responsive }) => ({
+  /* Page body under PageHeader: filters above, cards below, one vertical stack like the tasks board. */
+  page: css`
+    display: flex;
+    flex-direction: column;
+    gap: ${cssVar.marginSM};
+    min-inline-size: 0;
+    max-inline-size: 100%;
+  `,
   /* Desktop: search + type + refresh stay on one line; narrow screens wrap compactly without horizontal overflow. */
   toolbar: css`
     display: flex;
@@ -10,7 +18,6 @@ export const schedulesStyles = createStaticStyles(({ css, cssVar, responsive }) 
     align-items: center;
     min-inline-size: 0;
     max-inline-size: 100%;
-    margin-block-end: 12px;
 
     ${responsive.mobile} {
       flex-wrap: wrap;
@@ -116,7 +123,7 @@ export const schedulesStyles = createStaticStyles(({ css, cssVar, responsive }) 
     }
   `,
   staleNote: css`
-    margin: 0 0 8px;
+    margin: 0;
   `,
   /** The history drawer keeps runs scannable: one bordered block per run, output below. */
   runs: css`
