@@ -76,8 +76,8 @@ test('the lister runs only the engine list command with fixed arguments, and nev
 
 test('an engine without a list command falls back to manual entry without running anything', async () => {
   let ran = 0;
-  const lister = new EngineModelLister({ find: async () => '/fake/zcode', run: async () => { ran++; return ok(''); } });
-  const list = await lister.list({ engine: 'zcode' });
+  const lister = new EngineModelLister({ find: async () => '/fake/unknown', run: async () => { ran++; return ok(''); } });
+  const list = await lister.list({ engine: 'unknown' });
   assert.deepEqual([list.status, list.models, list.message], ['unsupported', [], NO_LIST_MESSAGE]);
   assert.equal(NO_LIST_MESSAGE, '该引擎不提供模型列表，请手动填写');
   assert.equal(ran, 0);

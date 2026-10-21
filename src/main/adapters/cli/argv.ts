@@ -19,12 +19,6 @@ export function buildLaunchSpec(input: {
   leaderSocket: string;
 }): LaunchSpec {
   switch (input.engine) {
-    case 'zcode':
-      // Verified against zcode CLI 0.16.9: the prompt runs headless with --prompt, and the
-      // parsed option schema has no --model and no --permission-mode. The session model
-      // comes from provider config, not from a per-run flag. stream-json emits one JSON
-      // event per line followed by a single `{type:"result",...,response}` summary.
-      return { stdin: null, argv: ['zcode', '--prompt', input.instruction, '--output-format', 'stream-json', '--mode', 'yolo'] };
     case 'pi':
       if (!PI_THINKING.has(input.effort)) throw new Error(`Pi thinking level is not one of ${[...PI_THINKING].join(', ')}`);
       return {

@@ -7,7 +7,6 @@ export const ENGINE_CATALOG = [
   { id: 'grok', kind: 'grok', command: 'grok' },
   { id: 'opencode', kind: 'opencode', command: 'opencode' },
   { id: 'pi', kind: 'pi', command: 'pi' },
-  { id: 'zcode', kind: 'zcode', command: 'zcode' },
   { id: 'qoder', kind: 'qodercli', command: 'qodercli' },
 ] as const;
 
@@ -42,7 +41,7 @@ export interface EngineReadiness {
   probe: EngineProbeRecord;
 }
 
-const REAL_ADAPTER_KINDS = new Set(['opencode', 'pi', 'grok', 'codex', 'qodercli', 'zcode']);
+const REAL_ADAPTER_KINDS = new Set(['opencode', 'pi', 'grok', 'codex', 'qodercli']);
 
 function adapterStatusFor(kind: string): EngineReadiness['adapterStatus'] {
   if (kind === 'claude') return 'deferred';

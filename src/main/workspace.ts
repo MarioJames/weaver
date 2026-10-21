@@ -4,7 +4,7 @@ import type { TaskDispatch } from '../shared/contracts/tasks';
 import type { RealEngineKind } from '../shared/contracts/tasks';
 
 /** Kinds with a real worker launcher. Claude Code stays deferred. */
-export const REAL_ENGINE_KINDS = ['opencode', 'pi', 'grok', 'codex', 'qodercli', 'zcode'] as const;
+export const REAL_ENGINE_KINDS = ['opencode', 'pi', 'grok', 'codex', 'qodercli'] as const;
 
 export function isRealEngineKind(kind: string): kind is RealEngineKind {
   return (REAL_ENGINE_KINDS as readonly string[]).includes(kind);

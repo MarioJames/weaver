@@ -27,7 +27,7 @@ test('no warning without a successful list, without a model, or for any other en
   assert.equal(missingModelWarning('pi', SAVED, list('failed')), undefined, 'a failed list proves nothing');
   assert.equal(missingModelWarning('pi', SAVED, list('unavailable')), undefined);
   assert.equal(missingModelWarning('pi', '', after), undefined);
-  for (const engine of ['claude', 'codex', 'grok', 'opencode', 'qoder', 'zcode']) assert.equal(missingModelWarning(engine, SAVED, { ...after, engine }), undefined, engine);
+  for (const engine of ['claude', 'codex', 'grok', 'opencode', 'qoder']) assert.equal(missingModelWarning(engine, SAVED, { ...after, engine }), undefined, engine);
 });
 
 test('the warning renders under the field as a status line only while the model is missing', () => {

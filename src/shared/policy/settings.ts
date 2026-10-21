@@ -2,7 +2,6 @@ import type { Engine, FreeChannelProbeSettings, QuotaSettings } from '../contrac
 
 /** The single kind -> legal effort table; kinds not listed accept any non-empty string. */
 export const EFFORTS: Record<string, string[]> = {
-  zcode: ["auto"],
   claude: ["low", "medium", "high", "xhigh", "max"],
   codex: ["low", "medium", "high", "xhigh", "max"],
   grok: ["none", "minimal", "low", "medium", "high", "xhigh", "max"],

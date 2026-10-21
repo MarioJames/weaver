@@ -31,7 +31,7 @@ Weaver 是本地任务控制面，交付三件套：
           ├─ CommandHandler ─ src/main/commands.ts 门面：CommandGateway（信封校验、durable intent/receipt、统一错误出口）+ registry 路由 + tasks/scheduling/owners 应用单元（src/main/application/**），调度 pump 与结果/重试/owner 生命周期都在这些单元里
           ├─ TaskManager ─ worker 子进程监督（SIGTERM→1.5s SIGKILL）
           │    ├─ MockWorkerAdapter（显式 mock-jsonl，bundled scripts/mock-worker.mjs）
-          │    └─ RoutingWorkerAdapter → startCliAgent（src/main/adapters/cli）真实引擎（含 qodercli 与 zcode）
+          │    └─ RoutingWorkerAdapter → startCliAgent（src/main/adapters/cli）真实引擎（含 qodercli）
           ├─ PolicyStore（weaver.db 的 policy_* 表）+ 纯路由 policy/routing.ts、路由预览 policy/preview.ts
           ├─ TaskStore（weaver.db，SQLite 事务）；槽位/事件规则 domain/tasks.ts，启动恢复 application/tasks/recovery.ts
           ├─ StallMonitor（src/main/stall.ts，60 秒一次采样/惩罚/恢复探测；CPU 读取 monitors/cpu.ts；状态经 storage/stall-state.ts 落 weaver.db 的 stall_* 表，free-channel 与额度观测的 SQLite 适配同在 src/main/storage/；监视器共用的小机制是 monitors/ladder.ts（阶梯起算、级别、重置窗口、供应商限流步进）与 monitors/lifecycle.ts（tick 合并、定时器、可中止探测、stop 围栏），不是监视器基类）
@@ -54,7 +54,7 @@ src/
     engines.ts validation.ts redact.ts version.ts
   main/                   服务进程（唯一写者）
     runtime.ts            装配、全局 ready/draining、启动与关闭顺序
-    migrate.ts            有序 SQLite 迁移（SCHEMA_VERSION=9，追加式）
+    migrate.ts            有序 SQLite 迁移（SCHEMA_VERSION=11，追加式）
     commands.ts           CommandHandler 门面：只装配应用层单元
     application/          用例层：commands/{gateway,registry,errors}、tasks/{queries,mutations,records,results,recovery}、
                           scheduling/{coordinator,dispatch,retry,vendor-limits}、owners/lifecycle、engines/unblock
@@ -99,7 +99,7 @@ src/
 
 全部持久状态只有一个权威：`--data-dir` 下的 `weaver.db`（SQLite，0600）。进程启动只认它，不读也不写任何 `*.v1.json`。目录里其余内容都不是状态权威：认证用的 endpoint/control 文件（`control.v1.json`）、后台模式的 `server.log`、`agent-state/` 下每个 launch 私有的提示词与厂商会话目录（保留，不回收）以及 dev 模式的 Vite 缓存。Agent 与用户读取状态一律经提示词 + CLI，不直接读文件或库。
 
-- `weaver.db`：内置 `node:sqlite` DatabaseSync，WAL + synchronous=FULL，所有写者共用同一个连接与事务。结构由有序迁移步骤建立，`PRAGMA user_version` 记录已执行到哪一步（当前 9）：空库从 0 逐步升到最新，已是最新时为空操作，版本比本构建新则拒绝启动；后续结构变更只追加新步骤。
+- `weaver.db`：内置 `node:sqlite` DatabaseSync，WAL + synchronous=FULL，所有写者共用同一个连接与事务。结构由有序迁移步骤建立，`PRAGMA user_version` 记录已执行到哪一步（当前 11；第 11 步移除已下线的 zcode 引擎：删除 kind 为 zcode 的引擎行及其子 Agent、父 Agent、引用、封禁与运行状态，历史任务原样保留）：空库从 0 逐步升到最新，已是最新时为空操作，版本比本构建新则拒绝启动；后续结构变更只追加新步骤。
   - 任务面（步骤 1、6）：`tasks` 保存主字段及不含 events/artifacts 的 JSON；`task_events`、`artifacts`（content 独立列）、`owners`、`packages`、`receipts`、`kv`（sequence）按访问模式分表；`vendor_worker_limits`（worker，无法确定 worker 时是 `@engine:<id>`；level、last_trigger_at）是**唯一**的供应商限流阶梯（步骤 6 起为按引擎的 `vendor_limits`，步骤 7 改为按 worker）：派发失败路径与免费渠道探测路径都读写它，窗口同为 2 小时、级数同为 10 → 30 → 60 分钟，两条路径互相可见。命令 intent、spawn 前状态都先同步提交再产生进程效果。保留每任务 500 events、20 artifacts（内容 ≤32,000 字符）。流式输出只缓冲被改动任务，500ms 合并检查点；同步命令同时提交待落盘流式记录，失败回滚数据库及内存 sequence/缓冲。子 Agent 运行记录（task 的 `run.evidence`）登记 `promptPath`、仅 pi 引擎才有的 `sessionDir` 与从事件流解析出的厂商会话 ID（`vendorSessionId`，如 codex thread id、claude session id），`tasks get` 原样返回。
   - 策略（步骤 2）：`policy_engines`、`policy_owners`、`policy_owner_workers`（owner 的子 Agent 顺序与权重）、`policy_workers`、`policy_settings`（`herdr`、`chatgpt_review`、`quota`、`free_channel_probe`、`display` 等按键一行）、`policy_blocks`，整体上限 256 KiB、500 blocks；`revision` 乐观锁，保存在单个事务里整体替换各表并追加一行 `policy_revisions`（修订号、时间、来源 `save`/`rollback:N`/`import`、完整快照），取代原来的 `.bak`/`pre-*` 备份文件；回滚把某修订的快照作为新修订写入，从不原地改写历史。`blocks` 是唯一的持久阻断来源，额度自动阻断（`by:"weaver-quota:<kind>"`）与卡住惩罚（`by:"weaver-stall"`）都写在这里，人工条目按来源保留。`display.timezone` 是可选 IANA 时区名，保存时按 Intl 校验。owners 与 workers 不再有 proxy 字段——迁移步骤 8 把它从表和历史快照里删除，agent 进程一律沿用服务进程自身环境，没有按角色的代理设置。
   - 惩罚（步骤 3）：`stall_penalties`（每引擎一行：level、lastTriggerAt、needsAttention、blockedUntil、nextProbeAt、probeSuccesses、head）与 `stall_history`（全局最近 50 条，每条 `engine`、`level`、`at` 与 JSON 明细：`tasks` 至多 50 个完整任务 ID 并以 `taskCount` 保留总数、触发时的 `stalledMinutes`，或探测结果 `probe:{ok, ms, error?}` 加 `model`/`effort`，或恢复 `message`；探测错误经脱敏并截到 200 字符）。`blockedUntil`/`nextProbeAt` 是名义期限与下次探测时刻（epoch ms，不是策略 `release_at`），`probeSuccesses` 是 level 3 的连续成功数。重启后期限、连击与记录接着用；某次读取的语义校验失败（level/连击超出整数范围、时间戳无效等）则整份忽略、记一行日志，阶梯从 0 重新开始——但策略里那条 stall block 还在，下一 tick 会按它把级别补到至少 1 并重新武装探测，不会静默放行。只有监控器与手动解除会改这些表。
@@ -138,7 +138,7 @@ src/
 
 ## 5. 真实 worker 执行（src/main/adapters/cli）
 
-launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|'codex'|'qodercli'|'zcode'`（`REAL_ENGINE_KINDS`，同一份清单也是 `capabilities.workerProviders` 里真实引擎的来源）。固定可执行名+固定 argv 组装（`adapters/cli/argv.ts`），`shell:false`，workspace 必须是已存在的绝对路径，启动前核验并随 dispatch 冻结 `workspaceIdentity`。认证使用各引擎自身的本机配置（settings/auth 文件），Weaver 不复制、不打印、不把它写进 argv/日志/请求包。
+launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|'codex'|'qodercli'`（`REAL_ENGINE_KINDS`，同一份清单也是 `capabilities.workerProviders` 里真实引擎的来源）。固定可执行名+固定 argv 组装（`adapters/cli/argv.ts`），`shell:false`，workspace 必须是已存在的绝对路径，启动前核验并随 dispatch 冻结 `workspaceIdentity`。认证使用各引擎自身的本机配置（settings/auth 文件），Weaver 不复制、不打印、不把它写进 argv/日志/请求包。
 
 - 指令传递走 stdin 或私有 prompt 文件优先，不在 argv 放长 prompt。state 目录是 app 拥有的 `agent-state` 下私有 job 目录，不是凭据目录。
 - Codex 使用 `--sandbox danger-full-access`，与其他引擎的 bypass 模式一样允许本机 Docker、端口和网络访问；OpenCode 使用 `--print-logs --log-level ERROR` 及时暴露供应商限制（提交 `76933be` 记录约 2 秒，代码不保证该时限）。
@@ -179,9 +179,9 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 
 ## 8. 引擎目录与探测
 
-固定 catalog（`src/shared/engines.ts`）：claude/codex/grok/opencode/pi/zcode/qoder 七个 id，kind 分别 claude/codex/grok/opencode/pi/zcode/qodercli。探测只做 PATH 可执行文件（与 owner-host 查 herdr/claude 共用 src/main/system/executables.ts：跳过空 PATH 段、检查 X_OK、只接受解析后的普通文件、返回 realpath）+ 带超时 `--version`（shell:false、ANSI 去除、4s 超时、进程组收尾）；结果永远 `authenticated:false`、`modelUsable:false`。启用权威是 PolicyStore `engines[id].enabled`（`engines set-enabled` 需 installed 探测 + revision）；启用引擎不会创建任何角色。adapter 状态按 kind 判：`real` = opencode/pi/grok/codex/qodercli/zcode（`REAL_ADAPTER_KINDS`），`deferred` = claude，其余 kind 才是 `not_implemented`；`realExecution` = 该引擎 adapter 为 real 且已启用且有启用的 worker 使用它，探测≠可用。`EXECUTION_BOUNDARY.realAdapter` 也从同一份真实 adapter 清单生成，包含 qodercli。
+固定 catalog（`src/shared/engines.ts`）：claude/codex/grok/opencode/pi/qoder 六个 id，kind 分别 claude/codex/grok/opencode/pi/qodercli。探测只做 PATH 可执行文件（与 owner-host 查 herdr/claude 共用 src/main/system/executables.ts：跳过空 PATH 段、检查 X_OK、只接受解析后的普通文件、返回 realpath）+ 带超时 `--version`（shell:false、ANSI 去除、4s 超时、进程组收尾）；结果永远 `authenticated:false`、`modelUsable:false`。启用权威是 PolicyStore `engines[id].enabled`（`engines set-enabled` 需 installed 探测 + revision）；启用引擎不会创建任何角色。adapter 状态按 kind 判：`real` = opencode/pi/grok/codex/qodercli（`REAL_ADAPTER_KINDS`），`deferred` = claude，其余 kind 才是 `not_implemented`；`realExecution` = 该引擎 adapter 为 real 且已启用且有启用的 worker 使用它，探测≠可用。`EXECUTION_BOUNDARY.realAdapter` 也从同一份真实 adapter 清单生成，包含 qodercli。
 
-真实执行适配（`src/main/adapters/cli/argv.ts` + `normalize.ts`）覆盖 opencode、pi、grok、codex、qodercli、zcode。qodercli 以 `-p -o stream-json` 从 stdin 读任务，`--permission-mode bypass_permissions`（CLI 策略，不是 OS 隔离），`--setting-sources ""` 与 `--strict-mcp-config` 跳过用户级 hooks、插件与 MCP，`--no-session-persistence` 不落会话；输出按 Claude Code 风格的 system/assistant/result 事件归一化。claude 仍无执行适配。
+真实执行适配（`src/main/adapters/cli/argv.ts` + `normalize.ts`）覆盖 opencode、pi、grok、codex、qodercli。qodercli 以 `-p -o stream-json` 从 stdin 读任务，`--permission-mode bypass_permissions`（CLI 策略，不是 OS 隔离），`--setting-sources ""` 与 `--strict-mcp-config` 跳过用户级 hooks、插件与 MCP，`--no-session-persistence` 不落会话；输出按 Claude Code 风格的 system/assistant/result 事件归一化。claude 仍无执行适配。
 
 ## 9. 已知限制（不是未来路线）
 

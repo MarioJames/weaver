@@ -20,9 +20,8 @@ const prepare = (dir: string, engine: RealEngineKind) => prepareCliAgentInput({
 test('only pi gets a session directory; every engine records its prompt file', () => {
   const dir = mkdtempSync(join(tmpdir(), 'weaver-run-record-'));
   try {
-    for (const engine of ['pi', 'opencode', 'grok', 'codex', 'qodercli', 'zcode'] as RealEngineKind[]) {
-      let prepared;
-      try { prepared = prepare(dir, engine); } catch (error) { if (engine === 'zcode') continue; throw error; }
+    for (const engine of ['pi', 'opencode', 'grok', 'codex', 'qodercli'] as RealEngineKind[]) {
+      const prepared = prepare(dir, engine);
       assert.equal(readFileSync(prepared.promptPath, 'utf8'), instruction, `${engine}: the prompt file is kept`);
       if (engine === 'pi') {
         assert.ok(prepared.sessionDir && existsSync(prepared.sessionDir), 'pi owns a session directory');

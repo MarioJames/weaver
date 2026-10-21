@@ -1,9 +1,12 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 /** Every schema change lands here as one ordered step; PRAGMA user_version tracks what ran. */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
-const STEPS: string[][] = [
+/** A step is plain SQL, or a function for data work SQL alone cannot express (here: rewriting JSON snapshots). */
+type Step = (string | ((db: DatabaseSync) => void))[];
+
+const STEPS: Step[] = [
   // 1: the task store tables.
   [
     `CREATE TABLE IF NOT EXISTS tasks(id TEXT PRIMARY KEY, owner_id TEXT, parent_task_id TEXT, status TEXT NOT NULL, updated_at TEXT NOT NULL, body TEXT NOT NULL)`,
@@ -85,7 +88,77 @@ const STEPS: string[][] = [
   [
     `ALTER TABLE policy_workers ADD COLUMN max_parallel INTEGER`,
   ],
+  // 11: the zcode engine is gone (ZCode is a desktop client, not a schedulable agent engine). Remove what an older default
+  // policy and its users left behind: the engine rows of kind 'zcode', every worker and owner running on them, the
+  // owner-to-worker links and weights that name those workers, blocks aimed at them, and their runtime state (stall, quota,
+  // free-channel probe and vendor ladder rows). An owner of another engine whose workers were all zcode ones is deleted too
+  // (an owner needs at least one worker to pass the schema); one that keeps workers but loses its last enabled one is
+  // disabled instead, because an enabled owner without an enabled worker fails policy validation. Either would otherwise
+  // stop the whole policy from loading. Task history is not touched: tasks keep dispatch.engine/run.adapter 'zcode'
+  // as plain text. Saved policy snapshots (policy_revisions) are pruned the same way so a rollback to an old revision is
+  // not refused by the schema. Idempotent: with nothing of kind 'zcode' left every statement matches no rows.
+  [
+    `UPDATE policy_owners SET enabled = 0 WHERE enabled = 1 AND engine NOT IN (SELECT id FROM policy_engines WHERE kind = 'zcode')
+       AND EXISTS (SELECT 1 FROM policy_owner_workers l WHERE l.owner_id = policy_owners.id AND l.worker_id IN (SELECT id FROM policy_workers WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode')))
+       AND NOT EXISTS (SELECT 1 FROM policy_owner_workers l JOIN policy_workers w ON w.id = l.worker_id
+                       WHERE l.owner_id = policy_owners.id AND w.enabled = 1 AND w.engine NOT IN (SELECT id FROM policy_engines WHERE kind = 'zcode'))`,
+    `DELETE FROM policy_owners WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode')
+       OR (EXISTS (SELECT 1 FROM policy_owner_workers l WHERE l.owner_id = policy_owners.id AND l.worker_id IN (SELECT id FROM policy_workers WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode')))
+           AND NOT EXISTS (SELECT 1 FROM policy_owner_workers l WHERE l.owner_id = policy_owners.id AND l.worker_id NOT IN (SELECT id FROM policy_workers WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode'))))`,
+    `DELETE FROM policy_owner_workers WHERE worker_id IN (SELECT id FROM policy_workers WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode')) OR owner_id NOT IN (SELECT id FROM policy_owners)`,
+    `DELETE FROM policy_blocks WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode') OR worker IN (SELECT id FROM policy_workers WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode'))`,
+    `DELETE FROM stall_penalties WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode')`,
+    `DELETE FROM stall_history WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode')`,
+    `DELETE FROM quota_records WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode')`,
+    `DELETE FROM free_probe_history WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode') OR worker IN (SELECT id FROM policy_workers WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode'))`,
+    `DELETE FROM free_probe_workers WHERE worker IN (SELECT id FROM policy_workers WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode'))`,
+    `DELETE FROM vendor_worker_limits WHERE worker IN (SELECT id FROM policy_workers WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode'))`,
+    `DELETE FROM policy_workers WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode')`,
+    `DELETE FROM policy_engines WHERE kind = 'zcode'`,
+    dropZcodeFromSnapshots,
+  ],
 ];
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** The same removal as step 11's SQL, applied to one saved policy snapshot body; returns the new body, or undefined when nothing changes. */
+function withoutZcode(body: string): string | undefined {
+  let snapshot: unknown;
+  try { snapshot = JSON.parse(body); } catch { return undefined; }
+  if (!isRecord(snapshot) || !isRecord(snapshot.config) || !isRecord(snapshot.config.engines)) return undefined;
+  const { config } = snapshot;
+  const engines = config.engines as Record<string, unknown>;
+  const gone = new Set(Object.keys(engines).filter(id => isRecord(engines[id]) && engines[id].kind === 'zcode'));
+  if (!gone.size) return undefined;
+  const workers: Record<string, unknown> = isRecord(config.workers) ? config.workers : {};
+  const goneWorkers = new Set(Object.keys(workers).filter(id => { const worker = workers[id]; return isRecord(worker) && gone.has(String(worker.engine)); }));
+  for (const id of goneWorkers) delete workers[id];
+  const enabledWorker = (id: unknown) => { const worker = workers[String(id)]; return isRecord(worker) && worker.enabled === true; };
+  const owners: Record<string, unknown> = isRecord(config.owners) ? config.owners : {};
+  for (const [id, owner] of Object.entries(owners)) {
+    if (!isRecord(owner)) continue;
+    if (gone.has(String(owner.engine))) { delete owners[id]; continue; }
+    if (!Array.isArray(owner.workers) || !owner.workers.some(worker => goneWorkers.has(String(worker)))) continue;
+    const kept = owner.workers.filter(worker => !goneWorkers.has(String(worker)));
+    if (!kept.length) { delete owners[id]; continue; }
+    owner.workers = kept;
+    if (isRecord(owner.worker_weights)) for (const worker of goneWorkers) delete owner.worker_weights[worker];
+    if (owner.enabled === true && !kept.some(enabledWorker)) owner.enabled = false;
+  }
+  for (const id of gone) delete engines[id];
+  if (Array.isArray(snapshot.blocks)) {
+    snapshot.blocks = snapshot.blocks.filter(block => !isRecord(block) || !(gone.has(String(block.engine)) || (typeof block.worker === 'string' && goneWorkers.has(block.worker))));
+  }
+  return JSON.stringify(snapshot);
+}
+
+function dropZcodeFromSnapshots(db: DatabaseSync): void {
+  const update = db.prepare('UPDATE policy_revisions SET body=? WHERE revision=?');
+  for (const row of db.prepare('SELECT revision, body FROM policy_revisions').all() as { revision: number | bigint; body: string }[]) {
+    const next = withoutZcode(String(row.body));
+    if (next !== undefined) update.run(next, row.revision);
+  }
+}
 
 /** Bring an opened database up to SCHEMA_VERSION: empty at 0 runs every step, current runs nothing. */
 export function migrate(db: DatabaseSync): void {
@@ -95,7 +168,7 @@ export function migrate(db: DatabaseSync): void {
   for (let version = current + 1; version <= SCHEMA_VERSION; version++) {
     db.exec('BEGIN IMMEDIATE');
     try {
-      for (const statement of STEPS[version - 1]!) db.exec(statement);
+      for (const statement of STEPS[version - 1]!) { if (typeof statement === 'string') db.exec(statement); else statement(db); }
       db.exec(`PRAGMA user_version=${version}`);
       db.exec('COMMIT');
     } catch (error) {

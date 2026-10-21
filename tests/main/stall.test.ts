@@ -1185,7 +1185,7 @@ test('getStall is a zero-arg RPC returning the ladder, its deadlines and its con
   try {
     assert.deepEqual(parseRpcBody({ method: 'getStall', args: [] }), { method: 'getStall', args: [] });
     assert.throws(() => parseRpcBody({ method: 'getStall', args: [{}] }), /Invalid argument arity/);
-    assert.deepEqual(Object.keys(h.status().engines).sort(), ['claude', 'codex', 'grok', 'opencode', 'pi', 'qoder', 'zcode'], 'a configured engine without a penalty is level 0');
+    assert.deepEqual(Object.keys(h.status().engines).sort(), ['claude', 'codex', 'grok', 'opencode', 'pi', 'qoder'], 'a configured engine without a penalty is level 0');
     assert.deepEqual(h.status().engines.grok, { level: 0, lastTriggerAt: null, needsAttention: false, blocked: false, blockedUntil: null, nextProbeAt: null, probeSuccesses: 0, history: [] });
     await h.advance(11);
     assert.deepEqual(h.status().config, { stallMinutes: 5, quorum: 2, ladder: [5, 10, null], resetHours: 2 });

@@ -7,8 +7,6 @@ import { defaultConfig, resolveDispatch, validateConfig } from '../../src/main/p
 import { availabilityOf } from '../../src/shared/policy/availability';
 import { type Block } from '../../src/shared/contracts/policy';
 import { PolicyStore } from '../../src/main/policy/store';
-import { createNormalizer } from '../../src/main/adapters/cli/normalize';
-import { HELLO_ENGINES } from '../../src/main/engines/hello';
 import { previewOn } from '../helpers/policy-preview';
 
 const quota: Block = { engine: 'codex', reason: 'exhausted', since: '2026-10-19T00:00:00Z', by: 'weaver-quota:codex' };
@@ -57,16 +55,4 @@ test('free channel roundtrips, and a role carrying a proxy field is refused by t
     withProxy.workers.codex_worker!.proxy = 'http://127.0.0.1:7890';
     assert.deepEqual(validateConfig(withProxy as never).map(issue => issue.path).sort(), ['$.owners.claude_owner.proxy', '$.workers.codex_worker.proxy']);
   } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('ZCode official response envelope produces success only with a final response and zero exit', () => {
-  for (const [exitCode, response, expected] of [[0, 'done', 'success'], [1, 'done', 'error'], [0, '', 'error']] as const) {
-    const normalizer = createNormalizer('zcode');
-    normalizer.push(JSON.stringify({ type: 'result', sessionId: 's-1', response }));
-    const result = normalizer.finish({ exitCode, cancelled: false, truncated: false });
-    assert.equal(result.evidence.terminal, expected);
-    assert.equal(result.records.some(record => record.type === 'result'), expected === 'success');
-  }
-  assert.deepEqual(HELLO_ENGINES.zcode!.parse('{"response":"hi"}'), { reply: 'hi' });
-  assert.ok(HELLO_ENGINES.zcode!.parse('not json').error);
 });

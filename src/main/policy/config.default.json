@@ -10,8 +10,7 @@
     "grok": { "enabled": false, "kind": "grok", "quota_refresh": true },
     "opencode": { "enabled": false, "kind": "opencode", "quota_refresh": false },
     "pi": { "enabled": false, "kind": "pi", "quota_refresh": false },
-    "qoder": { "enabled": false, "kind": "qodercli", "quota_refresh": false },
-    "zcode": { "enabled": false, "kind": "zcode", "quota_refresh": false }
+    "qoder": { "enabled": false, "kind": "qodercli", "quota_refresh": false }
   },
   "owners": {
     "claude_owner": {
