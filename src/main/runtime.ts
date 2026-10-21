@@ -259,8 +259,8 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     return runtime;
   } catch (error) {
     ready = false;
-    await im?.close().catch(() => {});
     await commands?.drain().catch(() => {});
+    await im?.close().catch(() => {});
     await quotaProber?.close().catch(() => {});
     await vite?.close().catch(() => {});
     await http?.close().catch(() => {});

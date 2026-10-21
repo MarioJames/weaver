@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { QuotaProber } from '../../src/main/quota';
 import { readNativeCredential } from '../../src/main/quota/credentials';
+import { VERSION } from '../../src/shared/version';
 
 const start = Date.parse('2026-10-18T12:00:00Z');
 // Synthetic windows only: fixed-clock-relative resets and small integer ratios.
@@ -90,7 +91,7 @@ test('active Console login uses only the fixed same-origin GET and projects safe
   assert.equal(headers.get('Authorization'), 'Bearer secret-console');
   assert.equal(headers.get('x-org-id'), 'wrk_01234567890123456789012345');
   assert.equal(headers.get('Accept'), 'application/json');
-  assert.match(headers.get('User-Agent')!, /^Weaver\/0\.5\.0$/);
+  assert.equal(headers.get('User-Agent'), `Weaver/${VERSION}`);
   assert.equal(record.status, 'available');
   assert.deepEqual(record.windows.map(w => w.id), ['opencode:rolling', 'opencode:weekly', 'opencode:monthly']);
   assert.equal(record.windows[0].usedPercent, 10);

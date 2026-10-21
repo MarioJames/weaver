@@ -71,7 +71,7 @@ src/
     adapters/             worker JSONL 适配与真实引擎 launcher（adapters/cli/{argv,launch,normalize,redact,scope,vendor-errors}）
     engines/              probe/control/hello/models
     owner-host.ts owners/prompts.ts continuation.ts
-    quota/                credentials/providers/scheduler/third-party/timestamps
+    quota/                credentials/index/providers/opencode-console/third-party/timestamps
     system/executables.ts 可执行文件查找（PATH 扫描、X_OK、realpath）
     manager.ts protocol.ts workspace.ts embedded.ts redact-context.ts
   cli/                    main.ts run.ts catalog.ts parse.ts input.ts output.ts client.ts poll-task.ts、
@@ -108,7 +108,7 @@ src/
   - 读取入口都是 CLI：`tasks get/list`、`policy get`、`policy history`、`engines health/penalty`、`workers probe-status`、`quota get`。
   - 旧 JSON 数据的一次性迁入不在产品内：产品里没有任何 JSON 自动导入；迁移由仓库外的单文件脚本在部署时手动对真实数据执行（目标库有数据即拒绝；在临时库构建并校验后原子替换；不改不删源 JSON）。回滚方式是停服务后移走 `weaver.db`，原 JSON 未被改动（需旧版本二进制读取）。
 
-额度观测：`QuotaProber` 只读原生认证并通过三个固定非公开 HTTPS GET 获取数据，观测保鲜 5 分钟（之后显示陈旧）、每 provider 请求间隔至少 60 秒，每次观测写入 `quota_records`，重启后可读；`quota get` 无网络，`quota refresh` 显式触发探测与自有 blocks 合并。`QuotaScheduler` 每分钟按已保存的 `quota.auto_refresh` / `quota.interval_minutes`（缺省开启、15 分钟，5–1440）检查一次，到期后对已启用且 `quota_refresh` 生效的引擎所属 kind 走同一探测与合并路径；进程启动后首轮至少等一个检查周期。`policy.blocks` 仍是唯一持久阻断来源；人工来源不被自动覆盖，遇到妨碍施加自动阻断的过期 foreign 唯一 key 返回原子冲突。请求/认证边界及错误语义见 [额度接口](agent-interface.md#31-原生账户额度)。
+额度观测：`QuotaProber` 只读原生认证并通过固定非公开/未文档化 HTTPS GET 获取四种额度数据（Codex、Claude Code、Grok 各一个，OpenCode 按当前 Console 账号/org 与 Go API key 各走一个，不承诺为公开稳定 API），观测保鲜 5 分钟（之后显示陈旧）、每 provider 请求间隔至少 60 秒，每次观测写入 `quota_records`，重启后可读；`quota get` 无网络，`quota refresh` 显式触发探测与自有 blocks 合并。内置 `quota.refresh` 定时任务（`builtinSchedule`，`src/main/schedules/service.ts` 的 `builtin:'quota.refresh'`）按已保存的 `quota.auto_refresh` / `quota.interval_minutes`（缺省开启、15 分钟，5–1440）触发，到期后对已启用且 `quota_refresh` 生效的引擎所属 kind 走同一探测与合并路径；进程启动后首轮至少等一个检查周期。Codex/Claude Code/Grok 的新鲜耗尽观测可增删自有阻断，OpenCode Go 套餐窗口仅展示三窗口百分比（金额为 `null`，reset 用服务端时间）、永不自动增删阻断。`policy.blocks` 仍是唯一持久阻断来源；人工来源不被自动覆盖，遇到妨碍施加自动阻断的过期 foreign 唯一 key 返回原子冲突。请求/认证边界及错误语义见 [额度接口](agent-interface.md#31-原生账户额度)。
 
 写入模型均在 SQLite 事务内完成（`src/main/store.ts`）；中断的写命令先以 durable intent（receipt 写入）暴露为 `COMMAND_INDETERMINATE`，要求用 `operations.get` 查收据并核对现状，不做自动重放。命令收据键为 `local-demo:<commandId>`，同键同参返回原响应、同键不同参拒绝 `IDEMPOTENCY_CONFLICT`。这不是 exactly-once 外部执行保证，也没有事务 outbox。
 

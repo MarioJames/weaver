@@ -162,7 +162,7 @@ weaver schedules delete --schedule-id <UUID> --expected-revision <revision> --co
 
 ### 3.1 原生账户额度
 
-`quota get` → `getQuota`（arity 0），只返回 `{records,schedule}`（最近一次观测存于 `weaver.db`，重启后仍可读），不读认证文件、不联网、不写策略；`schedule` 为 `{enabled,intervalMinutes,lastRunAt,nextRunAt}`，反映同一持久化定时任务的已保存设置与运行时间。首次读取三家都为 `unknown`，`checkedAt/observedAt:null`、`stale:true`。`quota refresh` → `refreshQuota`（arity 1），先探测选定 provider，再将自有阻断合并到当前最新的策略，返回 `{records,snapshot,policyChanged}`。它是 mutation，机器帮助明确标注会同步策略阻断且不做推理。
+`quota get` → `getQuota`（arity 0），只返回 `{records,schedule}`（最近一次观测存于 `weaver.db`，重启后仍可读），不读认证文件、不联网、不写策略；`schedule` 为 `{enabled,intervalMinutes,lastRunAt,nextRunAt}`，反映同一持久化定时任务的已保存设置与运行时间。首次读取四家都为 `unknown`，`checkedAt/observedAt:null`、`stale:true`。`quota refresh` → `refreshQuota`（arity 1），先探测选定 provider，再将自有阻断合并到当前最新的策略，返回 `{records,snapshot,policyChanged}`。它是 mutation，机器帮助明确标注会同步策略阻断且不做推理。
 
 ```sh
 weaver quota get --output json
@@ -175,25 +175,27 @@ printf '{"engine":"codex"}\n' | weaver quota refresh --input - --output json
 weaver quota refresh --help --output json
 ```
 
-以上刷新命令各自会请求额度并可能写策略。缺省输入 `{}` 探测全部三家；单家输入只接受 `{"engine":"codex"}`、`{"engine":"claude"}` 或 `{"engine":"grok"}`，不接受别名、URL、路径、header、force、commandId 或 taskId。HTTP 与 Unix 使用同一 RPC 白名单及参数校验；别名引擎按策略中的 `engines[id].kind` 共用相应原生账户观测。
+以上刷新命令各自会请求额度并可能写策略。缺省输入 `{}` 探测全部四家；单家输入只接受 `{"engine":"codex"}`、`{"engine":"claude"}`、`{"engine":"grok"}` 或 `{"engine":"opencode"}`，不接受别名、URL、路径、header、force、commandId 或 taskId。OpenCode 记录仅展示 Go 套餐窗口，永不自动增删阻断。HTTP 与 Unix 使用同一 RPC 白名单及参数校验；别名引擎按策略中的 `engines[id].kind` 共用相应原生账户观测。
 
 每条 record 含 `engine/status/source/checkedAt/observedAt/stale/windows/detail/retryAt`，可选 `statusBasis:"account_restriction"` 标识服务端明确的独立全账户消费限制。该限制不会随着套餐窗口 reset 解除，自动阻断不借用套餐 reset 设期限；5 分钟过期及失败状态仍照常生效。窗口保留账户、模型或未知范围、服务端百分比/计数及可信 reset；缺失值保留 `null`，不补 0，不把模型子池耗尽推广为整个账户耗尽。`available` 表示本次有明确账户可继续使用的依据，不证明某个模型可以执行；`exhausted` 表示明确账户耗尽；`unknown`、`unauthenticated`、`unsupported`、`error` 分别保留不确定、原生登录、认证模式与探测失败的信息。读取成功的 CLI 信封可包含失败状态的 provider record，不能只凭 `ok:true` 判定账户可用。
 
-观测仅驻留内存，成功观测 5 分钟后标记 `stale`；进程重启不恢复观测。每家请求合并进行中的刷新，网络请求最短间隔 60 秒，HTTP 429 遵守更晚的 `Retry-After` 并通过 `retryAt` 告知；429 表示探测接口限流，不等于订阅额度耗尽。失败可保留同一凭据的旧窗口，但明确标为过期；身份变化不沿用旧观测。除按 `quota.interval_minutes` 定时刷新外没有后台轮询，也没有循环重试或 force 绕过。
+成功观测保鲜 5 分钟后标记 `stale`，每次观测写入 `weaver.db` 的 `quota_records`，进程重启后 `quota get` 仍可读到；`quota_state` 保留凭据指纹、上次账号与下次请求时刻，身份变化不沿用旧观测。每家请求合并进行中的刷新，网络请求最短间隔 60 秒，HTTP 429 遵守更晚的 `Retry-After` 并通过 `retryAt` 告知；429 表示探测接口限流，不等于订阅额度耗尽。失败可保留同一凭据的旧窗口，但明确标为过期。除内置 `quota.refresh` 定时任务按 `quota.interval_minutes` 触发外没有后台轮询，也没有循环重试或 force 绕过。
 
-策略只持久保存自有 engine-level 阻断：`by:"weaver-quota:<kind>"`，不设置 model，且只作用于 `quota_refresh` 生效的引擎（缺省 codex、claude、grok 开启，其他 kind 没有额度接口、不得开启）；关闭的引擎不被自动阻断，因为不再有新鲜观测解除它。新鲜 `exhausted` 新增/更新；只有新鲜 `available` 删除自己的 source，其他状态及 stale 观测都不清旧阻断。人工、foreign 和 model-level 阻断原样保留。期限取仍耗尽账户窗口的最晚可信 reset；未知 reset 则不猜期限。新阻断不取消 running 任务；现有队列与新派发继续遵守 policy/pin，不自动改派。
+策略只持久保存自有 engine-level 阻断：`by:"weaver-quota:<kind>"`，不设置 model，且只作用于 `quota_refresh` 生效的 Codex/Claude Code/Grok 引擎（缺省 codex、claude、grok、opencode 有额度探针，默认配置中 OpenCode 为 `quota_refresh:false` 需显式开启，其他 kind 没有额度接口、不得开启）；关闭的引擎不被自动阻断，因为不再有新鲜观测解除它。OpenCode 记录永不新增/删除任何自有阻断，实际限额继续走供应商/模型失败路径。新鲜 `exhausted` 新增/更新；只有新鲜 `available` 删除自己的 source，其他状态及 stale 观测都不清旧阻断。人工、foreign 和 model-level 阻断原样保留。期限取仍耗尽账户窗口的最晚可信 reset；未知 reset 则不猜期限。新阻断不取消 running 任务；现有队列与新派发继续遵守 policy/pin，不自动改派。
 
 刷新结束后原子合并此刻最新策略，保留请求期间的其他保存；无 block 实质变化不增加 revision。过期人工/foreign engine-level 记录占用唯一 key、导致无法同时保留它并建立有效自动阻断时，整次合并返回 `QUOTA_POLICY_CONFLICT`（HTTP 409），文件、内存策略和 revision 不变；先通过已有策略编辑流程处理该历史记录，再刷新。有效人工阻断正常保留。持久保存失败报 `PERSISTENCE_ERROR`（HTTP 500），不能当作自动阻断成功。退出时先中止探测；draining 后完成的请求不写策略。
 
-主动探测读取既有本地登录的 access token，并仅发送下列固定 HTTPS GET。三个地址均是原生实现或开源客户端使用的**非公开接口**，接口变化可能导致未知、401/403 或限流；当前实现不启动 Codex app-server 或 Claude statusline，也不把它们称为公开额度 API。
+主动探测读取既有本地登录的 access token，并仅发送下列固定 HTTPS GET（OpenCode 两种原生登录各走一个）。这些地址均是原生实现或开源客户端使用的**非公开/未文档化接口**，不承诺为公开稳定 API；接口变化可能导致未知、401/403 或限流；当前实现不启动 Codex app-server 或 Claude statusline，也不把它们称为公开额度 API。
 
 | 引擎 / source | 固定 GET | 原生认证来源 |
 |---|---|---|
 | Codex / `codex_usage` | `https://chatgpt.com/backend-api/wham/usage` | `$CODEX_HOME/auth.json`，否则 `~/.codex/auth.json`；准确的 `tokens.access_token` 与同对象 `account_id`，只支持明确的 ChatGPT 登录；API key 或不明确模式拒绝 |
 | Claude Code / `claude_oauth_usage` | `https://api.anthropic.com/api/oauth/usage` | `$CLAUDE_CONFIG_DIR/.credentials.json`，否则 `~/.claude/.credentials.json`；仅 `claudeAiOauth.accessToken`，不读取 MCP OAuth 作为账户 bearer |
 | Grok / `grok_cli_billing` | `https://cli-chat-proxy.grok.com/v1/billing?format=credits` | `~/.grok/auth.json`；唯一官方 `https://auth.x.ai::<client-id>` OIDC 条目的 `key`；多候选不猜 |
+| OpenCode Go（API key） / `opencode_go_usage` | `https://opencode.ai/zen/go/v1/usage` | `$XDG_DATA_HOME/opencode/auth.json`，否则 `~/.local/share/opencode/auth.json` 中 `opencode-go` 优先、`opencode` 回退的 `{type:'api',key}`；只有原生库确实没有 active account（库缺失/state 空/无游标）时使用，不读 env/第三方 key；`usage.rolling/weekly/monthly` 的 status/percent/服务端 resetsAt，只投影百分比 |
+| OpenCode Go（当前 Console 账号/org） / `opencode_console_status` | `https://opencode.ai/console/api/go/status` | 只读 `opencode.db` 的 `account_state` 唯一行指向的 `account`（仅 `url/access_token/token_expiry` + 是否可续期布尔，不读 email/refresh 值）；origin 须为 `https://opencode.ai/console`，以 `Bearer` 原生 access + `x-org-id` 发送；`access.meters.fiveHour/week/month` 的 used/limitMicroCents 比值百分比；active 过期、缺 org、state 歧义或多行、来源非法、读取失败一律失败关闭，不回退另一凭据 |
 
-这些认证文件只读；不提取或使用 refresh token，不刷新登录、不登录/登出、不切换账户、不扫描浏览器/Keychain、不启动 TUI 或模型。请求禁止重定向，不遵循自定义 base URL；一次探测的总截止时间 8 秒，认证文件与响应均实际限制为 256 KiB，只输出受控字段与错误，不回传 token、账户 ID 或原始响应。Claude Code 即便未接入真实 worker，也可以独立探测额度。Grok CLI 订阅 credits 与 xAI API 团队钱包、美元余额、RPM/TPM、token 费用不同，不能拿后者替代此处的订阅额度。
+这些认证文件只读；不提取或使用 refresh token，不刷新登录、不登录/登出、不切换账户、不扫描浏览器/Keychain、不启动 TUI 或模型。`opencode.db` 仅 `readOnly + query_only` 参数化读取当前登录行，不写库。请求禁止重定向，不遵循自定义 base URL，不读 cookie；一次探测的总截止时间 8 秒，认证文件与响应均实际限制为 256 KiB，只输出受控字段与错误，不回传 token、账户 ID 或原始响应。Claude Code 即便未接入真实 worker，也可以独立探测额度。Grok CLI 订阅 credits 与 xAI API 团队钱包、美元余额、RPM/TPM、token 费用不同，不能拿后者替代此处的订阅额度。OpenCode 两种来源只投影三窗口百分比（`used/total/remaining` 为 `null`、`unit:percent`，reset 用服务端时间），`subscriberUserId/paymentMethodId` 等不读取；Console 仪表是套餐计量百分比，不是实际美元消费。Console 凭据仅向其官方同源发送；active 过期、缺 org、state 歧义或多行、来源非法、读取失败、401 本地登录无效、403 无权限（`unsupported`）一律失败关闭，都不回退另一凭据。额度 `status` 不保证模型可运行，也不是免费渠道倒计时（供应商错误 `release_at` 已独立支持）。OpenCode 记录仅展示、不自动增删任何自有阻断；真实供应商限额走模型失败路径并独立封禁。
 
 ### 3.2 服务命令组 `weaver server`
 
@@ -322,7 +324,7 @@ weaver reviews submit --task-id <taskId> --input review.json --command-id review
 
 `capabilities.get` 返回的是本进程现状，不是愿景：`workerProviders` 为 `["mock-jsonl","opencode","pi","grok","codex","qodercli"]`（真实 launcher 加载后）或 `["mock-jsonl"]`，顺序与 `REAL_ENGINE_KINDS` 一致；`realExecution` 布尔表示 launcher 已加载，不表示跑通过一次推理或证明过登录；`mcp:false`。父 Agent 侧是 `ownerSpawn`（PATH 上找得到 `herdr` 时为 `'herdr'`，否则 `'logical-registration'`——这只证明有一个可执行文件，不证明有活着的宿主、模型或登录）、`manualAttach:'metadata-only'`、`ownerModelSpawned:false`、`attachmentVerified:false`；显式发起的 launch 成功也不会翻转这几个字段，宿主是否真在推理由你在 Herdr 里看。安全边界是 `authentication:'ephemeral-local-trusted-user-demo'`、`ownerScopedAuthorization:false`、`authenticated:false`、`modelUsable:false`。容量口径是 `capacity:{unit:'owner-instance', aggregate:'sum of enabled owner profile max_parallel', admission:'…'}` 加 `maxParallel`（各启用 profile 上限之和，规模提示而非全局上限，见上文两层身份）；`policyAdmission:true`、`durability:'durable intent before effect; …'`、`cliTransport` 描述当前传输。`commands` 数组只列逻辑读命令与写命令，method-wrapped RPC 动词与本地 `tasks wait/watch` 不在其中——完整 CLI 目录一律读 `weaver --help --output json`，本文不复制任何一个数量。
 
-`quota` 提供额外发现入口：`engines:["codex","claude","grok"]`，`get` 的 CLI/RPC 名及 `network:false`，`refresh` 的 CLI/RPC 名及 `updatesPolicyBlocks:true/inference:false`。
+`quota` 提供额外发现入口：`engines:["codex","claude","grok","opencode"]`，`get` 的 CLI/RPC 名及 `network:false`，`refresh` 的 CLI/RPC 名及 `updatesPolicyBlocks:true/inference:false`（OpenCode 窗口仅展示，不自动阻断）。
 
 ## 7. 本地传输与错误
 
