@@ -73,8 +73,59 @@ test('pi keeps one RPC process across turns, streams only public text, and start
   } finally { await teardown(harness); }
 });
 
-test('pi abort requires the abort ACK and agent_settled, then reuses the same process', async () => {
-  const harness = setup('abort', 'abort-early-settled');
+const ABORT_ORDERS = [
+  { name: 'ack-first', scenario: 'abort', observed: (entry: Record<string, unknown>) => entry.abort !== undefined },
+  { name: 'settled-first', scenario: 'abort-early-settled', observed: (entry: Record<string, unknown>) => entry.settledBeforeAck === true },
+] as const;
+
+for (const order of ABORT_ORDERS) {
+  test(`pi abort requires the abort ACK and agent_settled (${order.name}), then reuses the same process`, async () => {
+    const harness = setup(`abort-${order.name}`, order.scenario);
+    try {
+      const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 2000, closeMs: 800 });
+      sessions.add(session);
+      const controller = new AbortController();
+      let settled = false;
+      const pending = session.send('取消', controller.signal, () => controller.abort()).finally(() => { settled = true; });
+      const checked = assert.rejects(pending, error => error instanceof ConfirmedParentCancellation && error.name === 'AbortError');
+      await until(() => markers(harness).some(order.observed), `${order.name} abort half observed`);
+      assert.equal(settled, false, 'one abort half alone released the send');
+      await checked;
+      const next: string[] = [];
+      assert.equal(await session.send('第二轮', undefined, chunk => next.push(chunk)), '最终回答2');
+      assert.ok(!next.join('').includes('部分'));
+      assert.equal(new Set(markers(harness).filter(entry => typeof entry.turn === 'number' && typeof entry.pid === 'number').map(entry => entry.pid)).size, 1);
+      await session.close();
+    } finally { await teardown(harness); }
+  });
+}
+
+test('pi native retry success clears the recovered attempt error and reuses the same process', async () => {
+  const harness = setup('retry-success', 'retry-success');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 2000, closeMs: 800 });
+    sessions.add(session);
+    const deltas: string[] = [];
+    assert.equal(await session.send('第一轮', undefined, chunk => deltas.push(chunk)), '最终回答1');
+    assert.deepEqual(deltas, ['你好，', '世界']);
+    assert.equal(await session.send('第二轮'), '最终回答2');
+    assert.equal(new Set(markers(harness).filter(entry => typeof entry.turn === 'number').map(entry => entry.pid)).size, 1);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('pi exhausted native retry still fails with the terminal error classification', async () => {
+  const harness = setup('retry-exhausted', 'retry-exhausted');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 2000, closeMs: 800 });
+    sessions.add(session);
+    await assert.rejects(session.send('问题'), error => error instanceof ParentAgentError && error.reason === 'engine' && /transient stream drop/.test(error.message));
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('pi retry-shaped frames during cancellation do not fake completion', async () => {
+  const harness = setup('abort-retry', 'abort-retry');
   try {
     const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 2000, closeMs: 800 });
     sessions.add(session);
@@ -82,14 +133,10 @@ test('pi abort requires the abort ACK and agent_settled, then reuses the same pr
     let settled = false;
     const pending = session.send('取消', controller.signal, () => controller.abort()).finally(() => { settled = true; });
     const checked = assert.rejects(pending, error => error instanceof ConfirmedParentCancellation && error.name === 'AbortError');
-    // The fixture emits agent_settled before the abort ACK; neither half alone may release the send.
-    await until(() => markers(harness).some(entry => entry.settledBeforeAck), 'settled before ack');
-    assert.equal(settled, false, 'settled before the abort acknowledgement released the send');
+    await until(() => markers(harness).some(entry => entry.abort !== undefined), 'abort observed');
+    assert.equal(settled, false, 'retry frames during cancellation released the send');
     await checked;
-    const next: string[] = [];
-    assert.equal(await session.send('第二轮', undefined, chunk => next.push(chunk)), '最终回答2');
-    assert.ok(!next.join('').includes('部分'));
-    assert.equal(new Set(markers(harness).filter(entry => typeof entry.turn === 'number' && typeof entry.pid === 'number').map(entry => entry.pid)).size, 1);
+    assert.equal(await session.send('第二轮'), '最终回答2');
     await session.close();
   } finally { await teardown(harness); }
 });

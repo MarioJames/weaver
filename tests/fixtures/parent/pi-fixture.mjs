@@ -66,8 +66,24 @@ async function runPrompt(frame) {
     emit({ type: 'extension_ui_request', id: 'ui-1', method: 'confirm', title: 'Allow dangerous command?', message: 'Fixture', timeout: 5000 });
     return;
   }
-  if (current === 1 && (scenario === 'abort' || scenario === 'abort-early-settled' || scenario === 'missing-terminal' || scenario === 'abort-fail')) {
+  if (current === 1 && (scenario === 'abort' || scenario === 'abort-early-settled' || scenario === 'missing-terminal' || scenario === 'abort-fail' || scenario === 'abort-retry')) {
     emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: `部分${current}` } });
+    return;
+  }
+  if (scenario === 'retry-success' && current === 1) {
+    emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: '你好，' } });
+    emit({ type: 'message_end', message: assistant([{ type: 'text', text: 'transient fail' }], 'error', 'transient stream drop') });
+    await sleep(20);
+    emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: '世界' } });
+    emit({ type: 'message_end', message: assistant([{ type: 'text', text: `最终回答${current}` }]) });
+    emit({ type: 'auto_retry_end', success: true, attempt: 1 });
+    emit({ type: 'agent_settled', aborted: false });
+    return;
+  }
+  if (scenario === 'retry-exhausted' && current === 1) {
+    emit({ type: 'message_end', message: assistant([{ type: 'text', text: 'failed' }], 'error', 'transient stream drop') });
+    emit({ type: 'auto_retry_end', success: false, attempt: 2, finalError: 'transient stream drop' });
+    emit({ type: 'agent_settled', aborted: false });
     return;
   }
   const answer = `最终回答${current}`;
@@ -109,6 +125,15 @@ async function handle(frame) {
       await sleep(40);
       log({ ackAfterSettled: true });
       respond(frame.id, 'abort', undefined);
+      return;
+    }
+    if (scenario === 'abort-retry') {
+      log({ abort: frame.id, turn });
+      respond(frame.id, 'abort', undefined);
+      await sleep(40);
+      emit({ type: 'message_end', message: assistant([{ type: 'text', text: '不该成为正文' }]) });
+      emit({ type: 'auto_retry_end', success: true, attempt: 1 });
+      emit({ type: 'agent_settled', aborted: true });
       return;
     }
     respond(frame.id, 'abort', undefined);

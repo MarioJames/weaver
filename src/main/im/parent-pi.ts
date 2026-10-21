@@ -222,9 +222,21 @@ export class PiParentSession implements ParentAgentSession {
     if (type === 'agent_start') { if (this.active) this.active.running = true; return; }
     if (type === 'message_update') { this.handleMessageUpdate(frame); return; }
     if (type === 'message_end') { this.handleMessageEnd(frame); return; }
-    if (type === 'auto_retry_end' && frame.success === false) {
-      const active = this.active;
-      if (active && active.accepted) active.errorText = typeof frame.finalError === 'string' ? frame.finalError : active.errorText;
+    if (type === 'auto_retry_end') {
+      // Native retry terminal for the current accepted/running turn. An explicit
+      // retry-success clears an already recovered attempt error; exhaustion records
+      // the terminal error. Cancelled, settled, foreign, or subagent frames never
+      // touch the current turn, and nothing here replays a prompt at the Weaver layer.
+      const active = this.activeRunning();
+      if (!active) return;
+      if (frame.parentToolCallId != null || frame.parentToolUseId != null) return;
+      if (frame.success === true) {
+        active.errorText = undefined;
+        return;
+      }
+      if (frame.success === false && typeof frame.finalError === 'string' && frame.finalError) {
+        active.errorText = frame.finalError;
+      }
       return;
     }
     if (type === 'agent_settled') { this.handleSettled(frame); return; }
@@ -292,7 +304,13 @@ export class PiParentSession implements ParentAgentSession {
       .filter((part): part is Record<string, unknown> => !!part && typeof part === 'object' && (part as Record<string, unknown>).type === 'text')
       .map(part => typeof part.text === 'string' ? part.text : '')
       .join('');
-    if (text) active.finalText = text;
+    if (text) {
+      active.finalText = text;
+      // A successful attempt supersedes an earlier failed attempt of the same turn:
+      // native auto-retry emits the failed message_end first, then the recovered
+      // message_end (plus auto_retry_end success:true) before agent_settled.
+      active.errorText = undefined;
+    }
   }
 
   private handleSettled(frame: Record<string, unknown>): void {
@@ -302,7 +320,6 @@ export class PiParentSession implements ParentAgentSession {
     if (!active.accepted || !active.running) return;
     const aborted = frame.aborted === true;
     if (active.cancelError) {
-      if (aborted && active.abortAck) { this.finishCancellation(active); return; }
       if (!aborted) { this.failSession(parentError('engine', 'pi completed before cancellation was confirmed')); return; }
       active.abortTerminal = true;
       if (active.abortAck) this.finishCancellation(active);
