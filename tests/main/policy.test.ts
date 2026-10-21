@@ -216,6 +216,37 @@ test('policy keeps per-table rows: engines, owners, ordered worker links with we
  assert.deepEqual(new PolicyStore(db,()=>now).snapshot().config,store.snapshot().config,'a reopen reads the same document back');
  assert.deepEqual(new PolicyStore(db,()=>now).snapshot().blocks,blocks);
 });
+test('role order is written as position and survives reopening the database',()=>{
+ const db=new DatabaseSync(':memory:');const store=new PolicyStore(db,()=>now);
+ const before=store.snapshot();const config=structuredClone(before.config);
+ const reverse=<T>(record:Record<string,T>):Record<string,T>=>Object.fromEntries(Object.entries(record).reverse());
+ config.owners=reverse(config.owners);config.workers=reverse(config.workers);
+ store.save({revision:before.revision,config,blocks:[]});
+ const reopened=new PolicyStore(db,()=>now).snapshot().config;
+ assert.deepEqual(Object.keys(reopened.owners),Object.keys(config.owners));
+ assert.deepEqual(Object.keys(reopened.workers),Object.keys(config.workers));
+ assert.deepEqual(reopened.owners.claude_owner.workers,before.config.owners.claude_owner.workers);
+ assert.deepEqual(reopened.owners.claude_owner.worker_weights,before.config.owners.claude_owner.worker_weights);
+ assert.deepEqual(reopened.workers,config.workers);
+ const ownerPositions=(db.prepare('SELECT id FROM policy_owners ORDER BY position').all() as {id:string}[]).map(row=>row.id);
+ const workerPositions=(db.prepare('SELECT id FROM policy_workers ORDER BY position').all() as {id:string}[]).map(row=>row.id);
+ assert.deepEqual(ownerPositions,Object.keys(config.owners));
+ assert.deepEqual(workerPositions,Object.keys(config.workers));
+});
+test('worker ids use the shared id rule: suffix optional, characters and length still checked',()=>{
+ const accepted=defaultConfig();
+ accepted.workers.research={...accepted.workers.claude_worker!};
+ accepted.workers['a'.repeat(40)]={...accepted.workers.claude_worker!};
+ accepted.owners.research={...accepted.owners.claude_owner!,enabled:false};
+ accepted.owners.claude_owner.workers=[...accepted.owners.claude_owner.workers,'research'];
+ accepted.owners.claude_owner.worker_weights={research:8};
+ assert.deepEqual(validateConfig(accepted),[]);
+ for(const id of ['Research','research-worker','a'.repeat(41)]){
+  const bad=defaultConfig();bad.workers[id]={...bad.workers.claude_worker!};
+  const issues=validateConfig(bad);
+  assert.ok(issues.some(issue=>issue.path.includes('workers')&&issue.message.includes('property name')),id);
+ }
+});
 test('every save records a revision and rollback restores one as a new revision; conflicts still refuse',()=>{
  let clock=now;const store=new PolicyStore(new DatabaseSync(':memory:'),()=>clock);
  const base=store.snapshot();assert.equal(base.revision,0);assert.deepEqual(store.history(),[]);

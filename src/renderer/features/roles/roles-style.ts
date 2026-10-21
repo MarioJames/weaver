@@ -27,6 +27,45 @@ export const rolesStyles = createStaticStyles(({ css, cssVar, responsive }) => (
       position: static;
     }
   `,
+  /** The sortable list keeps the pane's own spacing instead of the browser's list margin. */
+  sortList: css`
+    margin-block: 0;
+  `,
+  /** A sortable list row: the drag handle, then the record. */
+  sortItem: css`
+    min-inline-size: 0;
+  `,
+  /** The independent drag handle. Touch drags move the row instead of scrolling the page. */
+  roleGrip: css`
+    flex: none;
+    margin-block-start: 2px;
+    color: ${cssVar.colorTextTertiary};
+    touch-action: none;
+  `,
+  /** The same grip while another action holds the page: it keeps the row width but cannot start a drag. */
+  roleGripOff: css`
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    inline-size: 44px;
+    block-size: 44px;
+    margin-block-start: 2px;
+    color: ${cssVar.colorTextQuaternary};
+  `,
+  /** The drag preview shows the record's identity only, never copies its switches or buttons. */
+  roleOverlay: css`
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    box-sizing: border-box;
+    inline-size: 100%;
+    padding: 8px 10px;
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: ${cssVar.borderRadius};
+    background: ${cssVar.colorBgElevated};
+    box-shadow: ${cssVar.boxShadowSecondary};
+  `,
   /** Two fields side by side; one column when the form is narrow. */
   pair: css`
     display: grid;
@@ -41,6 +80,7 @@ export const rolesStyles = createStaticStyles(({ css, cssVar, responsive }) => (
   /** A list entry: its enable switch, then a button that selects it. No outer frame. */
   roleItem: css`
     display: grid;
+    flex: 1;
     grid-template-columns: auto minmax(0, 1fr);
     gap: 4px 10px;
     align-items: start;

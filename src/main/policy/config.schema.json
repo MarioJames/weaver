@@ -92,10 +92,10 @@
       }
     },
     "workers": {
-      "description": "Workers keyed by worker id; every id ends with _worker.",
+      "description": "Workers keyed by worker id.",
       "type": "object",
       "propertyNames": {
-        "pattern": "^[a-z][a-z0-9_]{0,32}_worker$"
+        "$ref": "#/$defs/id"
       },
       "additionalProperties": {
         "$ref": "#/$defs/worker"
@@ -123,8 +123,7 @@
       "pattern": "^[a-z][a-z0-9_]{0,39}$"
     },
     "workerId": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9_]{0,32}_worker$"
+      "$ref": "#/$defs/id"
     },
     "effort": {
       "description": "Engine-native effort. Allowed set depends on the engine kind: claude low|medium|high|xhigh|max; codex low|medium|high|xhigh|max; grok none|minimal|low|medium|high|xhigh|max; pi off|minimal|low|medium|high|xhigh|max; other kinds (e.g. opencode, whose --variant is provider/model specific) any non-empty string. Checked by the script.",

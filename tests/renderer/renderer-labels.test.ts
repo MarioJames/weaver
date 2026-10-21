@@ -63,6 +63,17 @@ test('role native inputs have visible label links, including config id and freef
   assert.equal((html.match(/aria-label="模型列表"/g) ?? []).length, 0);
 });
 
+test('a sortable role list has one dedicated drag handle per row and none while saving', () => {
+  const config = defaultConfig();
+  config.workers = { opencode_worker: config.workers.opencode_worker!, claude_worker: config.workers.claude_worker! };
+  const html = markup(React.createElement(RolesPage, { section: 'workers', policy: { config } as PolicyDraft }));
+  assert.equal((html.match(/aria-label="拖动排序 /g) ?? []).length, 2);
+  for (const id of ['opencode_worker', 'claude_worker']) assert.match(html, new RegExp(`aria-label="拖动排序 ${id}"`));
+  assert.match(html, /touch-action:\s*none/);
+  const busy = markup(React.createElement(RolesPage, { section: 'workers', policy: { config, busy: true } as PolicyDraft }));
+  assert.doesNotMatch(busy, /aria-label="拖动排序 /);
+});
+
 test('task native input and textareas have visible label links even with workspace validation shown', () => {
   nativeFieldLinks(markup(React.createElement(React.Fragment, null, composer(), composer())), ['目标与约束'], 2);
 });

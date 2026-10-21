@@ -6,8 +6,8 @@ import { TimeText } from '../../ui/TimeText';
 import { notifyError, useNotifyError } from '../../api/notify';
 import { NamedSelect, NamedSwitch, NamedInputNumber } from '../../ui/NamedControls';
 import { useEffect, useId, useRef, useState } from 'react';
-import { Play, Plus, Trash2, Zap } from 'lucide-react';
-import { Empty } from '@lobehub/ui';
+import { GripVertical, Play, Plus, Trash2, Zap } from 'lucide-react';
+import { Empty, SortableList } from '@lobehub/ui';
 import { Surface } from '@lobehub/ui/dashboard';
 import { Alert, Button, Checkbox, Input, Modal, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
 import type { HelloResult } from '../../../shared/engines';
@@ -15,7 +15,7 @@ import { startHello, useHelloRun } from '../engines/hello-runs';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
 import { EFFORTS } from '../../../shared/policy/settings';
 import { type Availability, type Block, type Owner, type Worker } from '../../../shared/contracts/policy';
-import { blankOwner, blankWorker, removeRole, renameRole, roleDeleteImpact, roleIdError, syncRoleEditor, withWorkerParallel, workerParallelText, type RoleSection } from '../../policy/policy-edit';
+import { blankOwner, blankWorker, removeRole, renameRole, reorderRoles, roleDeleteImpact, roleIdError, syncRoleEditor, withWorkerParallel, workerParallelText, type RoleSection } from '../../policy/policy-edit';
 import { OwnerScheduleFields } from './OwnerSchedule';
 import { ModelPicker } from '../engines/ModelPicker';
 import { engineBlockText, removeBlock } from '../engines/EnginesPage';
@@ -123,36 +123,55 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   const impact = current ? roleDeleteImpact(config, section, current) : undefined;
   const savedWorker = section === 'workers' && current ? policy.snapshot?.config.workers[current] : undefined;
   const pausedBy = savedWorker && current && policy.snapshot ? blockOf(policy.snapshot.blocks, savedWorker, Date.now(), current) : undefined;
+  const canSort = ids.length > 1 && !policy.busy && !toggling && !resuming;
   return <>
     {header}
     <div className={rolesStyles.split}>
       <nav aria-label={`${name} 列表`} className={rolesStyles.listPane}>
         {!ids.length && <Text type="secondary" className={styles.meta}>还没有{name}。</Text>}
-        {ids.map(id => {
-          const item = config[section][id]!;
-          const engineOn = config.engines[item.engine]?.enabled === true;
-          const saved = policy.snapshot?.config[section][id];
-          const cap = section === 'workers' ? workerParallelText(item as Worker) : undefined;
-          const hit = policy.snapshot && saved ? blockOf(policy.snapshot.blocks, saved, Date.now(), section === 'workers' ? id : undefined) : undefined;
-          const note = roleNote(policy.snapshot?.[section][id], false, hit);
-          return <div key={id} className={rolesStyles.roleItem} aria-current={id === current ? 'true' : undefined}>
-            <NamedSwitch size="small" aria-label={`启用 ${id}`} checked={item.enabled} loading={toggling === id} disabled={!engineOn || !!toggling} title={engineOn ? undefined : `引擎 ${item.engine || '未选择'} 未启用，先在引擎页打开它`} onChange={checked => void toggle(id, checked)} />
-            <button type="button" className={rolesStyles.roleButton} style={{ font: 'inherit' }} onClick={() => { acceptId(); setSelected(id); setPendingId(id); setIdError(''); scrollToEditor(); }}>
-              <span className={rolesStyles.roleTitle}>
-                <strong className={styles.wrap}>{id}</strong>
-                {section === 'workers' && 'free_channel' in item && item.free_channel === true && <FreeChannelTag />}
-              </span>
-              <span className={rolesStyles.roleNote}>
-                <span className={`${styles.wrap} ${styles.meta}`}>{item.engine} · {item.model || '未填模型'}</span>
-                {cap && <Tag size="small" color={tagColor('neutral')}>{cap}</Tag>}
-              </span>
-              {note && (note.tag
-                ? <span className={rolesStyles.roleNote}><Tag size="small" color={note.tag.color}>{note.tag.label}</Tag><span className={`${styles.wrap} ${styles.meta} ${rolesStyles.warn}`}>{note.text}</span></span>
-                : <span className={`${styles.wrap} ${styles.meta} ${note.warning ? rolesStyles.warn : ''}`}>{note.text}</span>)}
-            </button>
-            {section === 'workers' && hit && <Button size="small" type="text" icon={Play} className={rolesStyles.roleResume} aria-label={`恢复派发 ${id}`} loading={resuming === id} disabled={policy.busy || (!!resuming && resuming !== id)} onClick={() => void resume(id, hit)}>恢复派发</Button>}
-          </div>;
-        })}
+        {ids.length > 1 && <Text type="secondary" className={styles.meta}>拖动左侧手柄调整顺序，保存后生效。</Text>}
+        {!!ids.length && <SortableList
+          className={rolesStyles.sortList}
+          items={ids.map(id => ({ id }))}
+          onChange={items => { if (canSort) policy.setConfig(current => current ? reorderRoles(current, section, items.map(item => item.id)) : current); }}
+          renderItem={({ id }) => {
+            const item = config[section][id]!;
+            const engineOn = config.engines[item.engine]?.enabled === true;
+            const saved = policy.snapshot?.config[section][id];
+            const cap = section === 'workers' ? workerParallelText(item as Worker) : undefined;
+            const hit = policy.snapshot && saved ? blockOf(policy.snapshot.blocks, saved, Date.now(), section === 'workers' ? id : undefined) : undefined;
+            const note = roleNote(policy.snapshot?.[section][id], false, hit);
+            return <SortableList.Item id={id} align="flex-start" className={rolesStyles.sortItem}>
+              {ids.length > 1 && (canSort
+                ? <SortableList.DragHandle className={rolesStyles.roleGrip} aria-label={`拖动排序 ${id}`} size={{ blockSize: 44, borderRadius: 8, size: 16 }} style={{ touchAction: 'none' }} />
+                : <span className={rolesStyles.roleGripOff} aria-hidden="true"><GripVertical size={16} /></span>)}
+              <div className={rolesStyles.roleItem} aria-current={id === current ? 'true' : undefined}>
+                <NamedSwitch size="small" aria-label={`启用 ${id}`} checked={item.enabled} loading={toggling === id} disabled={!engineOn || !!toggling} title={engineOn ? undefined : `引擎 ${item.engine || '未选择'} 未启用，先在引擎页打开它`} onChange={checked => void toggle(id, checked)} />
+                <button type="button" className={rolesStyles.roleButton} style={{ font: 'inherit' }} onClick={() => { acceptId(); setSelected(id); setPendingId(id); setIdError(''); scrollToEditor(); }}>
+                  <span className={rolesStyles.roleTitle}>
+                    <strong className={styles.wrap}>{id}</strong>
+                    {section === 'workers' && 'free_channel' in item && item.free_channel === true && <FreeChannelTag />}
+                  </span>
+                  <span className={rolesStyles.roleNote}>
+                    <span className={`${styles.wrap} ${styles.meta}`}>{item.engine} · {item.model || '未填模型'}</span>
+                    {cap && <Tag size="small" color={tagColor('neutral')}>{cap}</Tag>}
+                  </span>
+                  {note && (note.tag
+                    ? <span className={rolesStyles.roleNote}><Tag size="small" color={note.tag.color}>{note.tag.label}</Tag><span className={`${styles.wrap} ${styles.meta} ${rolesStyles.warn}`}>{note.text}</span></span>
+                    : <span className={`${styles.wrap} ${styles.meta} ${note.warning ? rolesStyles.warn : ''}`}>{note.text}</span>)}
+                </button>
+                {section === 'workers' && hit && <Button size="small" type="text" icon={Play} className={rolesStyles.roleResume} aria-label={`恢复派发 ${id}`} loading={resuming === id} disabled={policy.busy || (!!resuming && resuming !== id)} onClick={() => void resume(id, hit)}>恢复派发</Button>}
+              </div>
+            </SortableList.Item>;
+          }}
+          renderOverlay={({ id }) => {
+            const item = config[section][id];
+            return <div className={rolesStyles.roleOverlay}>
+              <strong className={styles.wrap}>{id}</strong>
+              <span className={`${styles.wrap} ${styles.meta}`}>{item ? `${item.engine} · ${item.model || '未填模型'}` : ''}</span>
+            </div>;
+          }}
+        />}
       </nav>
       <div ref={editor} tabIndex={-1}><Surface padded>
         {!record || !current ? <Empty title={`还没有${name}`} description={`新建一个${name}，选择引擎和模型后保存。`} action={<Button icon={Plus} onClick={add}>新建{name}</Button>} /> : <Form form={form} layout="vertical" className={styles.stack}>
@@ -163,7 +182,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           </div>
           <div className={rolesStyles.pair}>
           <Form.Field label="配置 ID" required desc="改名后按 Enter 或离开输入框，引用处一起更新。">
-            <Input id={`${fieldId}-id`} aria-label="配置 ID" aria-invalid={!!idError} value={pendingId} placeholder={section === 'workers' ? '例如：research_worker' : '例如：codex_owner'} onChange={event => setPendingId(event.target.value)} onBlur={acceptId} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); acceptId(); } }} />
+            <Input id={`${fieldId}-id`} aria-label="配置 ID" aria-invalid={!!idError} value={pendingId} placeholder={section === 'workers' ? '例如：research' : '例如：codex'} onChange={event => setPendingId(event.target.value)} onBlur={acceptId} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); acceptId(); } }} />
           </Form.Field>
             <Form.Field label="所属引擎" required><NamedSelect id={`${fieldId}-engine`} aria-label="所属引擎" value={record.engine || undefined} options={Object.keys(config.engines).map(id => ({ value: id, label: `${id}${config.engines[id]?.enabled ? '' : '（未启用）'}` }))} onChange={value => { if (typeof value === 'string') update({ ...record, engine: value, effort: EFFORTS[config.engines[value]?.kind ?? '']?.includes(record.effort) === false ? EFFORTS[config.engines[value]!.kind]![0]! : record.effort, enabled: config.engines[value]?.enabled ? record.enabled : false }); }} /></Form.Field>
           </div>
@@ -273,9 +292,8 @@ function OwnerFields({ config, blocks, record, savedRecord, update }: { config: 
 }
 
 function uniqueId(section: RoleSection, config: NonNullable<PolicyDraft['config']>): string {
-  const base = section === 'workers' ? 'new_worker' : 'new_owner';
-  let id = base;
+  let id = 'new';
   let index = 2;
-  while (Object.hasOwn(config[section], id) || roleIdError(section, id, config)) { id = section === 'workers' ? `new${index}_worker` : `new${index}_owner`; index += 1; }
+  while (Object.hasOwn(config[section], id) || roleIdError(section, id, config)) { id = `new${index}`; index += 1; }
   return id;
 }

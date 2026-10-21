@@ -6,14 +6,34 @@ export { DEFAULT_WEIGHT, WEIGHT_MAX };
 export type RoleSection = 'owners' | 'workers';
 
 const ID = /^[a-z][a-z0-9_]{0,39}$/;
-const WORKER_ID = /^[a-z][a-z0-9_]{0,32}_worker$/;
 
 export function roleIdError(section: RoleSection, id: string, config: Config, currentId?: string): string {
-  if (section === 'workers' ? !WORKER_ID.test(id) : !ID.test(id)) {
-    return section === 'workers' ? '示例：research_worker。以小写字母开头，并以 _worker 结尾。' : '示例：codex_owner。以小写字母开头，只含小写字母、数字和下划线。';
-  }
+  if (!ID.test(id)) return `示例：${section === 'workers' ? 'research' : 'codex'}。以小写字母开头，只含小写字母、数字和下划线，最多 40 个字符。`;
   if (id !== currentId && Object.hasOwn(config[section], id)) return '这个 ID 已经存在';
   return '';
+}
+
+/** Rebuild one role section in the given order. Unknown or repeated ids are ignored, omitted records keep their original order, and every record field (including owner references and weights) stays as it was. */
+function reorderSection<T>(records: Record<string, T>, orderedIds: readonly string[]): Record<string, T> {
+  const next: Record<string, T> = {};
+  const seen = new Set<string>();
+  for (const id of orderedIds) {
+    if (!Object.hasOwn(records, id) || seen.has(id)) continue;
+    seen.add(id);
+    next[id] = records[id]!;
+  }
+  for (const [id, record] of Object.entries(records)) {
+    if (seen.has(id)) continue;
+    next[id] = record;
+  }
+  return next;
+}
+
+/** Reordering only replaces the chosen section object; the other section and every role record are reused unchanged. */
+export function reorderRoles(config: Config, section: RoleSection, orderedIds: readonly string[]): Config {
+  return section === 'owners'
+    ? { ...config, owners: reorderSection(config.owners, orderedIds) }
+    : { ...config, workers: reorderSection(config.workers, orderedIds) };
 }
 
 function renameKey<T>(record: Record<string, T>, from: string, to: string): Record<string, T> {
