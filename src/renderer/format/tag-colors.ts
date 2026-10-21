@@ -20,6 +20,7 @@ export type TagSemantic =
   | 'stopping'     // 停止中 / 免费额度用完（沿用 orange）
   | 'ownerRole'    // 身份：父 Agent
   | 'childRole'    // 身份：子任务
+  | 'fresh'        // 新任务：创建 2 分钟内（task-pins 的 NEW_TASK_WINDOW_MS），看板标题行最前的「新」标识
   | 'freeChannel'; // 计费渠道：免费渠道
 
 export const TAG_COLORS: Record<TagSemantic, string> = {
@@ -32,6 +33,7 @@ export const TAG_COLORS: Record<TagSemantic, string> = {
   stopping: 'orange',
   ownerRole: 'purple',
   childRole: 'geekblue',
+  fresh: 'magenta',
   freeChannel: 'cyan',
 };
 

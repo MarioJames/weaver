@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weaver 任务看板「新」标签与置顶验收报告（board-pins-61adaee6）</title>
+<style>
+  :root { color-scheme: light; --fg:#1d1d1f; --mute:#6b6f76; --line:#e3e4e8; --bg:#fafafb; --ok:#1a7f37; --warn:#b26a00; --bad:#c62828; --accent:#0b5fff; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.65 -apple-system,"Segoe UI","PingFang SC","Noto Sans CJK SC",sans-serif; color:var(--fg); background:var(--bg); }
+  main { max-width: 1040px; margin: 0 auto; padding: 28px 20px 80px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 19px; margin: 36px 0 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 22px 0 6px; }
+  p, li { margin: 6px 0; }
+  .meta { color: var(--mute); font-size: 13px; }
+  .verdict { background:#fff; border:1px solid var(--line); border-left:4px solid var(--ok); border-radius:8px; padding:14px 18px; margin:18px 0; }
+  .verdict.warn { border-left-color: var(--warn); }
+  .tag { display:inline-block; padding:0 8px; border-radius:10px; font-size:12px; line-height:20px; border:1px solid currentColor; white-space:nowrap; }
+  .pass { color: var(--ok); } .fix { color: var(--warn); } .no { color: var(--mute); } .fail { color: var(--bad); }
+  table { width:100%; border-collapse: collapse; background:#fff; border:1px solid var(--line); font-size:14px; }
+  th, td { text-align:left; vertical-align:top; padding:8px 10px; border-bottom:1px solid var(--line); }
+  th { background:#f2f3f5; font-weight:600; }
+  .scroll { overflow-x:auto; }
+  code, .mono { font-family: ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-size: 12.5px; background:#f0f1f3; padding:1px 5px; border-radius:4px; word-break: break-all; }
+  pre { background:#f0f1f3; padding:10px 12px; border-radius:6px; overflow-x:auto; font-size:12.5px; line-height:1.5; }
+  .incident { background:#fff7f5; border:1px solid #f3c7bd; border-left:4px solid var(--bad); border-radius:8px; padding:12px 18px; }
+  figure { margin: 14px 0; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px; }
+  figure img { max-width:100%; height:auto; display:block; border:1px solid var(--line); border-radius:4px; }
+  figcaption { font-size:13px; color:var(--mute); margin-top:6px; }
+  .pair { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  .pair figure { margin:0; }
+  @media (max-width: 760px) { .pair { grid-template-columns: 1fr; } main { padding: 18px 12px 60px; } }
+  nav ul { columns: 2; padding-left: 18px; }
+  @media print { body { background:#fff; } details { display:block; } figure { break-inside: avoid; } }
+  details { background:#fff; border:1px solid var(--line); border-radius:6px; padding:6px 12px; margin:10px 0; }
+  summary { cursor:pointer; font-weight:600; }
+</style>
+</head>
+<body>
+<main>
+<h1>Weaver 任务看板「新」标签与置顶 · 浏览器验收报告</h1>
+<p class="meta">任务 5cfddb97-6ec3-41d3-9985-d6915997a7c5（重试，上一轮 95901f74 因供应商限流中断）· 验收日期 2026-10-21 · 被测版本：HEAD 82547de 快照 + 工作树中的 9 个看板文件（含本轮修正）· 仅亮色主题 · 交付目录 <code>docs/verification/board-pins-61adaee6/</code></p>
+
+<div class="verdict">
+  <strong>结论：验收标准全部满足，验收中发现 5 个问题并已修正复验。</strong>
+  <ul>
+    <li>隔离实例（端口 4795）从干净快照启动，夹具没有触发任何真实引擎执行（54 个任务：native 35、mock-jsonl 8、未派发 11）。</li>
+    <li>「新」标签、置顶区、手动置顶、换列、已结束折叠、「查看全部 N」、桌面与 390px 均已用真实浏览器操作取证；不刷新页面等待 2 分钟后「新」与自动置顶在到期后约 50ms 内全部消失。</li>
+    <li>修正：多张手动置顶时间戳相同导致顺序不确定；置顶区与普通分组边界不清；整卡右侧留白造成无谓换行；触屏下置顶按钮不可达；已置顶卡片常显斜杠图钉、状态表达反了（父 Agent 复核后追加，问题 5）。</li>
+    <li>tests/renderer：工作树 486/486 通过，快照 456/456 通过，快照 <code>tsc --noEmit</code> 退出码 0。</li>
+    <li>未验证：暗色主题（产品仅亮色）、真实触屏手势、样式调整后未重跑 Tab 序列、工作树整体 tsc。详见「未验证与风险」。</li>
+    <li>上一轮事故（误写共享策略）已写入下文，本轮全程隔离，未对共享服务执行任何命令。</li>
+  </ul>
+</div>
+
+<nav><strong>目录</strong>
+<ul>
+  <li><a href="#incident">上一轮事故与本轮隔离措施</a></li>
+  <li><a href="#env">被测环境与夹具</a></li>
+  <li><a href="#results">逐条验收结果</a></li>
+  <li><a href="#issues">发现的问题与修正</a></li>
+  <li><a href="#evidence">分步证据</a></li>
+  <li><a href="#verify">运行的验证命令</a></li>
+  <li><a href="#cleanup">清理</a></li>
+  <li><a href="#risks">未验证与风险</a></li>
+  <li><a href="#index">证据索引</a></li>
+</ul></nav>
+
+<h2 id="incident">1. 上一轮事故与本轮隔离措施</h2>
+<div class="incident">
+  <p><strong>事故（上一轮 opencode，任务 95901f74）：</strong>在快照目录执行 <code>npx tsx src/cli/main.ts policy save --input &lt;夹具策略&gt;</code> 时没有带 <code>--data-dir</code>。CLI 按默认数据目录找到共享 Weaver 服务（端口 4737），把共享策略覆盖成夹具策略（返回修订 99，夹具里只有 claude 引擎与 fixture_owner/fixture_worker）。</p>
+  <p><strong>原因：</strong>CLI 的数据目录默认取 <code>$XDG_DATA_HOME/weaver</code> 或 <code>~/.local/share/weaver</code>，漏写 <code>--data-dir</code> 就连到了共享服务；写之前也没有用 <code>policy get</code> 确认目标实例。</p>
+  <p><strong>处置：</strong>父 Agent 在用户同意后已把共享策略回滚到修订 100。证据保留在 <a href="incident/policy-save.json">incident/policy-save.json</a> 与 <a href="incident/policy-save.out">incident/policy-save.out</a>（上一轮现场原样复制）。</p>
+</div>
+<h3>本轮采取的隔离措施与核对证据</h3>
+<ul>
+  <li><strong>包装脚本：</strong>所有 weaver CLI 调用都经同一个包装脚本，脚本固定 <code>export XDG_DATA_HOME=&lt;临时根&gt;/xdg</code> 并在每条命令末尾追加 <code>--data-dir &lt;临时根&gt;/data</code>；没有绕过它直接调用过 CLI。npm 回显的实际命令行均带 <code>--data-dir</code>（如 <code>…policy get --output json --data-dir /tmp/weaver-worker-cap.r5XK/board-pin-browser/data</code>）。</li>
+  <li><strong>写前核对：</strong>第一次写操作前先 <code>policy get</code>，返回<strong>修订 0</strong>、7 个引擎（claude、codex、grok、opencode、pi、qoder、zcode），与共享服务的「修订 100、6 个引擎」明显不同，确认来自临时实例（<a href="evidence/policy-initial-isolated-instance.json">evidence/policy-initial-isolated-instance.json</a>）。之后每次 <code>policy save</code> 前都再 <code>policy get</code> 取当前修订；保存返回修订 1、2，不是共享服务会给出的 101+。</li>
+  <li><strong>数据目录：</strong>新建（权限 0700），没有复用上一轮的 wd；服务只监听 127.0.0.1:4795，数据目录在临时根内。</li>
+  <li><strong>未触碰共享服务：</strong>本轮没有对默认数据目录、端口 4737 做任何读写（连只读的 policy get 也没有发给它）。我无法从共享服务侧再核对它此刻的修订，需要时由父 Agent 复核应仍为 100。</li>
+</ul>
+
+<h2 id="env">2. 被测环境与夹具</h2>
+<ul>
+  <li><strong>快照：</strong><code>git archive HEAD</code>（当时 HEAD 为 82547de）导出到临时根，<code>node_modules</code> 符号链接到工作区。随后只复制 9 个文件：<code>task-pins.ts</code>、<code>task-persistence.ts</code>、<code>task-columns.ts</code>、<code>TaskBoard.tsx</code>、<code>task-style.ts</code>、<code>tag-colors.ts</code> 与 3 个 renderer 测试。其余 198 个 src/package.json 文件逐一对照与 82547de 相同；导出之后才提交的 zcode 移除（76ba062）与 workers unblock（defb4f1、485b042）不在快照中。对照结果见 <a href="evidence/snapshot-vs-worktree.txt">evidence/snapshot-vs-worktree.txt</a>。</li>
+  <li><strong>实例：</strong><code>weaver web --dev --no-open --port 4795 --data-dir …/data</code>，由 <code>systemd-run --user --scope --collect --unit=dev-weaver-pins-61adaee6 -p MemoryHigh=8G -p MemoryMax=10G</code> 启动（vite dev 模式）。</li>
+  <li><strong>策略：</strong>修订 1 只保留 claude 引擎、<code>fixture_owner</code>（<code>max_parallel</code> 12，修订 2 升到 40 以容纳 20+ 进行中任务）、<code>fixture_worker</code>，关闭额度自动刷新（<a href="evidence/policy-fixture-save-rev0.json">rev1 请求体</a>、<a href="evidence/policy-fixture-save-rev1.json">rev2 请求体</a>）。</li>
+  <li><strong>夹具：</strong>3 个工作目录（alpha、beta、gamma）。共 54 个任务，清单见 <a href="evidence/fixtures-tasks.tsv">evidence/fixtures-tasks.tsv</a>：待执行草稿、进行中（native 挂起，未汇报）、待验收（mock-jsonl 完成）、已通过（mock + 评审通过）、已取消。旧任务 33 个，createdAt/updatedAt 在服务停机时直接改写临时库回溯到约 26 小时前，其中 7 个已完成/已取消任务的 updatedAt 之后又在运行中改为 2 至 9 小时前，让它们留在看板而不进归档；进行中旧任务 23 个（超过 20）。新任务按需在页面打开时分批创建，用于「新」窗口取证。卡片页脚里的「派发/上报于」时间是真实当前时间，只有 createdAt/updatedAt 被回溯。</li>
+  <li><strong>真实执行确认：</strong>临时库审计显示 54 个任务的执行方式为 native 35、mock-jsonl 8、无 11（未派发），没有 real；策略里只有 claude 引擎，而 claude 的真实执行在 Weaver 里是 deferred，无法拉起进程。上次验收误触发过一次真实 codex，本轮没有再发生（<a href="evidence/ev-20-execution-audit.txt">evidence/ev-20-execution-audit.txt</a>）。</li>
+  <li><strong>浏览器：</strong>agent-browser 任务模式，独立 profile 与 session <code>weaver-pins-61adaee6</code>。桌面用 1440×900 并以 <code>--blink-settings=primaryHoverType=2</code> 启动让无头 Chrome 具备 hover 能力（默认无头 Chrome 的 <code>(hover: none)</code> 为真，会把触屏分支误当桌面）；窄屏用 390×844 与默认无头（hover: none）。</li>
+</ul>
+
+<h2 id="results">3. 逐条验收结果</h2>
+<div class="scroll"><table>
+<thead><tr><th style="width:26%">验收标准</th><th style="width:12%">结论</th><th>要点与证据</th></tr></thead>
+<tbody>
+<tr><td>1. 隔离实例从快照启动，夹具未触发真实引擎并在报告确认</td><td><span class="tag pass">通过</span></td><td>快照与工作树/82547de 对照见 <a href="evidence/snapshot-vs-worktree.txt">snapshot-vs-worktree.txt</a>；执行方式审计见 <a href="evidence/ev-20-execution-audit.txt">ev-20</a>：native 35、mock-jsonl 8、无 11、real 0。</td></tr>
+<tr><td>2a. 「新」Tag、列顶置顶区、区头计数、目录组头、不重复、列头总数不变</td><td><span class="tag pass">通过</span></td><td>待执行 5 = 置顶 2 + 普通 3；执行中 25 = 置顶 2 + 普通 23；待验收 4 = 置顶 1 + 普通 3（<a href="evidence/ev-03-dom-before-expiry.json">DOM</a>）。置顶区先出「置顶 · N」，再按目录出组头，卡片标题行最前是「新」Tag，普通分组不再出现这些卡片。截图 <a href="02-new-desktop.png">02</a>、<a href="15-final-desktop-before-expiry.png">15</a>。</td></tr>
+<tr><td>2b. 不刷新等待超过 2 分钟后自动消失</td><td><span class="tag pass">通过</span></td><td>第一轮：创建 08:22:28.905–.923Z，MutationObserver 记录 08:24:28.954Z 起「新」5→4→…→0（最早到期后 49ms），期间 navigation entries 恒为 1，页面未刷新。修正后又做一轮：创建 08:32:57.5Z，08:34:57.562–.713Z 5→0。前后截图 <a href="03-before-expiry.png">03</a>/<a href="04-after-expiry.png">04</a>、<a href="16-final-desktop-just-before-expiry.png">16</a>/<a href="17-final-desktop-after-expiry.png">17</a>，日志 <a href="evidence/ev-04-fresh-log.json">ev-04</a>、<a href="evidence/ev-12-final-fresh-log.json">ev-12</a>。</td></tr>
+<tr><td>3a. 悬停与键盘可达</td><td><span class="tag pass">通过</span></td><td>空闲 opacity 0 / pointer-events none，悬停后 opacity 1（<a href="05-hover-pin-button.png">05</a>）；焦点在卡片上按一次 Tab 到置顶按钮，opacity 1 且有焦点环（<a href="07-keyboard-focus-pin.png">07</a>）。</td></tr>
+<tr><td>3b. aria-pressed / aria-label，点击不打开详情</td><td><span class="tag pass">通过</span></td><td>置顶后 <code>aria-pressed=true</code>、<code>aria-label=取消置顶</code>；真实鼠标点置顶按钮详情未打开，点卡片则打开详情（对照，<a href="evidence/ev-15-realmouse-pin.json">ev-15 pin</a>、<a href="evidence/ev-15-realmouse-card.json">ev-15 card</a>）。</td></tr>
+<tr><td>3c. 多张手动置顶按置顶时间倒序</td><td><span class="tag fix">发现缺陷，已修正</span></td><td>修正前两张相隔约 1.5 秒的置顶得到相同时间戳；修正后严格递增，列内顺序 探针-执行 → 旧任务-执行-B5 → 旧任务-执行-B3（<a href="06-three-pins-running.png">06</a>，见问题 1）。</td></tr>
+<tr><td>3d. 刷新后保留、取消后回到普通分组</td><td><span class="tag pass">通过</span></td><td>重载后 <code>weaver-task-pins</code> 三条原样（<a href="evidence/ev-06-pins-ls-after-reload.json">ev-06</a>、<a href="08-after-reload-pins-persist.png">08</a>）；取消后条目移除，卡片回普通分组，「查看全部」22→23（<a href="evidence/ev-08-dom-after-unpin.json">ev-08</a>）。</td></tr>
+<tr><td>3e. 换列后仍置顶</td><td><span class="tag pass">通过</span></td><td>置顶的 native 任务经 <code>workers complete</code> 进入待验收，仍在待验收置顶区（<a href="09-pinned-follows-column-change.png">09</a>、<a href="evidence/ev-07-dom-after-column-change.json">ev-07</a>）；另一张被取消后进入已结束，展开后仍在置顶区（<a href="10-closed-expanded-with-pin.png">10</a>、<a href="22-final-desktop-closed-expanded.png">22</a>）。</td></tr>
+<tr><td>4a. 已结束列折叠不被置顶/新任务展开</td><td><span class="tag pass">通过</span></td><td>已结束里有新任务与手动置顶时 <code>data-collapsed=true</code>、挂载卡片 0 张；展开后「置顶 · 1」正常（<a href="22-final-desktop-closed-expanded.png">22</a>）。</td></tr>
+<tr><td>4b. 「查看全部 N」只计普通分组</td><td><span class="tag pass">通过</span></td><td>执行中 29 = 置顶 2 + 普通 27，按钮「查看全部 27」，置顶区 2 张全部显示；展开后变「收起」，列头仍 29（<a href="21-view-all-button-counts-plain-only.png">21</a>、<a href="evidence/ev-16-view-all-before.json">before</a>、<a href="evidence/ev-16-view-all-after.json">after</a>）。</td></tr>
+<tr><td>4c. 桌面与 390px：不遮挡、不错位</td><td><span class="tag pass">通过（经修正）</span></td><td>逐卡测量置顶按钮与卡内全部文字、图标矩形：桌面 22 张、窄屏 26 张均无交叠（<a href="evidence/ev-11-overlap-desktop.json">桌面</a>、<a href="evidence/ev-14-overlap-narrow-final.json">窄屏</a>）；390px 下 scrollWidth = clientWidth = 390；「新」为 magenta（rgb 163,36,102），与蓝色「执行中」、橙色「待验收」、灰色「草稿」、青色免费渠道可区分。区头与组头的区分经修正后才合格（问题 2）。</td></tr>
+<tr><td>4d. 控制台无错误</td><td><span class="tag pass">通过（带说明）</span></td><td>看板加载、置顶/取消、折叠/展开、查看全部全程只有 vite 与 React DevTools 的 debug/info，无 error/warn、无页面异常（<a href="evidence/ev-19-console-final.txt">ev-19</a>）。仅在打开「任务详情」抽屉时出现 React 19 <code>element.ref</code> 弃用报错，把 5 个看板文件换回 HEAD 版本后同样出现（<a href="evidence/ev-17-console-detail-drawer.txt">带功能</a>、<a href="evidence/ev-17-console-detail-drawer-HEAD.txt">HEAD</a>），不是本功能引入。</td></tr>
+<tr><td>5. 问题已修正复验，源码与测试同步，tests/renderer 全部通过</td><td><span class="tag pass">通过</span></td><td>见第 4、6 节。工作树 486/486，快照 456/456。</td></tr>
+<tr><td>6. 交付物与清理</td><td><span class="tag pass">通过</span></td><td>REPORT.html、<a href="checks.json">checks.json</a>、<a href="cleanup.json">cleanup.json</a> 在本目录；scope unit 已停止、浏览器已关闭、临时数据与快照已删除（第 7 节）。</td></tr>
+</tbody></table></div>
+
+<h2 id="issues">4. 发现的问题与修正</h2>
+
+<h3>问题 1　多张手动置顶时间戳相同，倒序不确定 <span class="tag fix">已修正</span></h3>
+<p><strong>现象：</strong>连续手动置顶三张卡，localStorage 里两张的时间是同一个值：<code>{"68663b1f…":1792571115994,"28fb246d…":1792571131003,"13639270…":1792571131003}</code>（<a href="evidence/ev-05-pins-ls-3-BEFORE-FIX.json">修正前</a>）。第二、三张相隔约 1.5 秒，却同值，列内顺序就只能靠排序稳定性。</p>
+<p><strong>原因：</strong><code>onTogglePin</code> 用的是看板的 <code>boardNow</code>，这是页面渲染时递下来的时钟，两次数据刷新之间不会前进。</p>
+<p><strong>修正：</strong><code>task-pins.ts</code> 新增 <code>nextPinTime(pins, renderNow, wallNow)</code>，取墙钟、渲染时钟与「已有最新置顶 + 1」的最大值，严格递增；<code>TaskBoard.tsx</code> 的 <code>onTogglePin</code> 改用它；<code>renderer-board-pins.test.ts</code> 增加覆盖。<strong>复验：</strong>重新置顶后三个时间戳 1792571189814 &lt; 1792571191502 &lt; 1792571193201（<a href="evidence/ev-05-pins-ls-3.json">修正后</a>），顺序正确（<a href="06-three-pins-running.png">06</a>）。</p>
+
+<h3>问题 2　置顶区与普通分组边界不清 <span class="tag fix">已修正</span></h3>
+<p><strong>现象：</strong>区头「置顶 · N」是三级灰字，比目录组头还淡；置顶区里的「beta 1」与紧随其后普通分组的「beta 1」之间没有任何分隔，读起来像同一目录重复出现（待验收列最明显）。</p>
+<p><strong>修正：</strong>区头改为正文色加粗，Pin 图标用主色；置顶区之后的第一个普通组头带 <code>afterZone</code> 标记，渲染一条虚线 <code>role="separator"</code>。首版曾新增 <code>zoneEnd</code> 行类型，导致不可写的 <code>tests/renderer/renderer-virtual.test.ts:54</code> 在 <code>tsc</code> 下报 TS2339，因此改为组头标记，不改变行类型联合。文件：<code>task-columns.ts</code>、<code>TaskBoard.tsx</code>、<code>task-style.ts</code>、测试。</p>
+<div class="pair">
+<figure><a href="09-pinned-follows-column-change.png"><img src="09-pinned-follows-column-change.png" alt="修正前：置顶区头偏淡，同名目录相邻"></a><figcaption>修正前：区头偏淡，待验收列「beta 1」与下一组「beta 1」相邻无分隔。</figcaption></figure>
+<figure><a href="14-desktop-after-fix-zones.png"><img src="14-desktop-after-fix-zones.png" alt="修正后：区头加粗并有虚线分隔"></a><figcaption>修正后：区头加粗、图标主色，置顶区与普通分组之间有虚线。</figcaption></figure>
+</div>
+
+<h3>问题 3　整卡 36px 右侧留白造成无谓换行 <span class="tag fix">已修正</span></h3>
+<p><strong>现象：</strong>为让出置顶按钮，整张卡右侧内边距加到 36px，390px 下「待父 Agent 确认收到 · 已等 1 分钟」折成「…已等 1 / 分钟」两行，页脚也更挤。</p>
+<p><strong>修正：</strong>置顶按钮只占卡片右上角的第一行，所以把内边距还原为 12px，仅给标题行 <code>cardTitle</code> 加 <code>padding-inline-end: 24px</code>。复验：状态行与页脚恢复全宽；逐卡矩形测量无交叠。</p>
+<div class="pair">
+<figure><a href="12-narrow-390-review-pinned.png"><img src="12-narrow-390-review-pinned.png" alt="修正前窄屏：等待文案换行"></a><figcaption>修正前（390px）：等待文案换成两行。</figcaption></figure>
+<figure><a href="13-narrow-390-after-fix-review.png"><img src="13-narrow-390-after-fix-review.png" alt="修正后窄屏"></a><figcaption>修正后（390px）：等待文案一行，区头加粗，虚线分隔。</figcaption></figure>
+</div>
+
+<h3>问题 4　触屏（无 hover）下置顶按钮不可达 <span class="tag fix">已修正</span></h3>
+<p><strong>现象：</strong>按钮只在悬停或键盘焦点时显示，且 <code>pointer-events: none</code>，没有 hover 的设备上无法手动置顶。</p>
+<p><strong>修正：</strong><code>pinButton</code> 增加 <code>@media (hover: none)</code>，未置顶时以 0.7 不透明度常显并可点击。复验：无头 Chrome 默认 <code>(hover: none)</code>，390px 下全部卡片的按钮 opacity 0.7、pointer-events auto（<a href="18-final-narrow-390-touch-queued.png">18</a>）；带 <code>primaryHoverType=2</code> 的桌面模式下空闲 opacity 仍为 0。限制：只验证了媒体特性分支，没有真实触屏手势。</p>
+
+<h3>问题 5　已置顶卡片常显带斜杠的图钉，状态表达反了 <span class="tag fix">已修正</span></h3>
+<p><strong>来源：</strong>父 Agent 复核意见。已置顶时按钮常显 PinOff（带斜杠的图钉），用户会读成「没有置顶」或「置顶被禁用」。</p>
+<p><strong>修正：</strong>按钮内同时渲染两个图标容器：已置顶时常显主色实心 Pin（<code>fill: currentColor</code>），悬停或键盘聚焦这个按钮时才换成 PinOff，提示点击会取消；未置顶时只有 Pin，行为不变；<code>aria-pressed</code>、<code>aria-label</code> 不变。改动文件：<code>TaskBoard.tsx</code>、<code>task-style.ts</code>（新增 <code>pinGlyph</code>、<code>pinButton</code> 的图标切换规则）、<code>renderer-board-pins.test.ts</code> 的对应断言（常显 Pin、PinOff 只作为第二个图标、未置顶没有 PinOff）。</p>
+<p><strong>复验：</strong>重新起了隔离实例（沿用全部隔离措施：包装脚本、<code>XDG_DATA_HOME</code>、每条命令 <code>--data-dir</code>、写前 <code>policy get</code> 为修订 0 而非共享的 100；夹具 4 个任务，native 2、未派发 2，无真实执行）。读数：已置顶空闲时 Pin 显示且填充色 rgb(0,114,245)、PinOff <code>display:none</code>；悬停与键盘聚焦时 Pin 隐藏、PinOff 显示；未置顶卡片空闲 opacity 0、没有 PinOff（<a href="evidence/ev-21-pinned-icon-idle.json">idle</a>、<a href="evidence/ev-21-pinned-icon-hover.json">hover</a>、<a href="evidence/ev-21-pinned-icon-focus.json">focus</a>）。tests/renderer 全量 486/486 通过，renderer-board-pins 19/19。</p>
+<div class="pair">
+<figure><a href="23-pinned-icon-idle.png"><img src="23-pinned-icon-idle.png" alt="已置顶空闲：实心主色图钉"></a><figcaption>23 已置顶空闲：待执行与执行中各一张已置顶卡，右上角是实心主色 Pin；未置顶卡不显示按钮。</figcaption></figure>
+<figure><a href="24-pinned-icon-hover.png"><img src="24-pinned-icon-hover.png" alt="悬停：带斜杠图钉"></a><figcaption>24 悬停执行中已置顶卡的按钮：换成带斜杠的 PinOff，提示点击取消置顶。</figcaption></figure>
+</div>
+<figure><a href="25-pinned-icon-keyboard-focus.png"><img src="25-pinned-icon-keyboard-focus.png" alt="键盘聚焦"></a><figcaption>25 键盘聚焦已置顶按钮：同样显示 PinOff 并带焦点环。</figcaption></figure>
+<p>此前报告中 06、08、09、10、13 等截图是改前的 PinOff 样式，保留作修正前记录。</p>
+
+<h2 id="evidence">5. 分步证据</h2>
+<h3>夹具与「新」窗口（步骤 1–3）</h3>
+<figure><a href="01-old-only-desktop.png"><img src="01-old-only-desktop.png" alt="仅旧任务的看板"></a><figcaption>01 仅旧任务：33 个任务，无「新」与置顶区；执行中 23（旧任务）。</figcaption></figure>
+<div class="pair">
+<figure><a href="02-new-desktop.png"><img src="02-new-desktop.png" alt="新任务出现在各列顶部置顶区"></a><figcaption>02 新任务页面不刷新即出现在置顶区（修正前版本）。</figcaption></figure>
+<figure><a href="15-final-desktop-before-expiry.png"><img src="15-final-desktop-before-expiry.png" alt="最终版：新任务与置顶区"></a><figcaption>15 最终版：区头加粗、虚线分隔，列头总数不变。</figcaption></figure>
+</div>
+<div class="pair">
+<figure><a href="16-final-desktop-just-before-expiry.png"><img src="16-final-desktop-just-before-expiry.png" alt="到期前"></a><figcaption>16 到期前约 7 秒（08:34:50Z）。</figcaption></figure>
+<figure><a href="17-final-desktop-after-expiry.png"><img src="17-final-desktop-after-expiry.png" alt="到期后"></a><figcaption>17 到期后（08:35:08Z）：「新」与自动置顶消失，只剩手动置顶的待验收卡，页面未刷新。</figcaption></figure>
+</div>
+<details><summary>第一轮到期前后截图（修正前版本）</summary>
+<div class="pair">
+<figure><a href="03-before-expiry.png"><img src="03-before-expiry.png" alt="到期前"></a><figcaption>03 到期前（08:24:22Z）。</figcaption></figure>
+<figure><a href="04-after-expiry.png"><img src="04-after-expiry.png" alt="到期后"></a><figcaption>04 到期后（08:24:34Z）。</figcaption></figure>
+</div></details>
+
+<h3>手动置顶（步骤 4–5）</h3>
+<div class="pair">
+<figure><a href="05-hover-pin-button.png"><img src="05-hover-pin-button.png" alt="悬停出现置顶按钮"></a><figcaption>05 悬停：右上角出现置顶按钮。</figcaption></figure>
+<figure><a href="07-keyboard-focus-pin.png"><img src="07-keyboard-focus-pin.png" alt="键盘焦点在置顶按钮"></a><figcaption>07 Tab 到置顶按钮：按钮可见且有焦点环。</figcaption></figure>
+</div>
+<div class="pair">
+<figure><a href="06-three-pins-running.png"><img src="06-three-pins-running.png" alt="三张手动置顶"></a><figcaption>06 三张手动置顶（修正后），已置顶按钮常显蓝色取消图标。</figcaption></figure>
+<figure><a href="08-after-reload-pins-persist.png"><img src="08-after-reload-pins-persist.png" alt="刷新后保留"></a><figcaption>08 刷新页面后置顶保留。</figcaption></figure>
+</div>
+<figure><a href="09-pinned-follows-column-change.png"><img src="09-pinned-follows-column-change.png" alt="换列后仍置顶"></a><figcaption>09 置顶任务汇报完成后进入待验收，仍在置顶区（修正前样式）。</figcaption></figure>
+<div class="pair">
+<figure><a href="19-narrow-manual-pin-tapped.png"><img src="19-narrow-manual-pin-tapped.png" alt="窄屏手动置顶"></a><figcaption>19 窄屏手动置顶（点击置顶按钮，详情未打开）。</figcaption></figure>
+<figure><a href="20-narrow-card-click-opens-detail-control.png"><img src="20-narrow-card-click-opens-detail-control.png" alt="点击卡片打开详情（对照）"></a><figcaption>20 对照：点击卡片本体会打开任务详情。</figcaption></figure>
+</div>
+
+<h3>已结束折叠与「查看全部」（步骤 6）</h3>
+<div class="pair">
+<figure><a href="21-view-all-button-counts-plain-only.png"><img src="21-view-all-button-counts-plain-only.png" alt="查看全部 27"></a><figcaption>21 执行中列底部「查看全部 27」：只计普通分组。</figcaption></figure>
+<figure><a href="22-final-desktop-closed-expanded.png"><img src="22-final-desktop-closed-expanded.png" alt="已结束展开后的置顶区"></a><figcaption>22 已结束展开：置顶区 1 张，普通分组按目录排列。</figcaption></figure>
+</div>
+
+<h3>桌面与窄屏视觉（步骤 7）</h3>
+<div class="pair">
+<figure><a href="11-narrow-390-new-and-pinned.png"><img src="11-narrow-390-new-and-pinned.png" alt="窄屏执行中列"></a><figcaption>11 390px 执行中列（修正前）：「新」Tag 在标题行最前。</figcaption></figure>
+<figure><a href="18-final-narrow-390-touch-queued.png"><img src="18-final-narrow-390-touch-queued.png" alt="窄屏最终版"></a><figcaption>18 390px 最终版（无 hover 环境）：「新」、置顶区、虚线分隔、常显的置顶按钮。</figcaption></figure>
+</div>
+<p>DOM 与测量证据：<a href="evidence/ev-12-final-dom-before-expiry.json">ev-12 到期前 DOM</a>、<a href="evidence/ev-12-final-dom-after-expiry.json">到期后 DOM</a>、<a href="evidence/ev-18-final-closed-expanded.json">ev-18 已结束展开</a>、<a href="evidence/ev-14-narrow-width.json">ev-14 窄屏宽度</a>。DOM 提取脚本 <a href="evidence/dom.js">dom.js</a> 与交叠测量脚本 <a href="evidence/overlap.js">overlap.js</a> 一并保留。</p>
+
+<h2 id="verify">6. 运行的验证命令</h2>
+<div class="scroll"><table>
+<thead><tr><th>命令</th><th>位置</th><th>结果</th></tr></thead>
+<tbody>
+<tr><td><code>node --import tsx --test tests/renderer/renderer-board-pins.test.ts</code></td><td>工作树</td><td>19 通过 / 0 失败（修正前为 17，新增置顶时刻与分隔标记两个用例）</td></tr>
+<tr><td><code>node --import tsx --test tests/renderer/*.test.ts</code></td><td>工作树</td><td>486 通过 / 0 失败</td></tr>
+<tr><td><code>node --import tsx --test tests/renderer/*.test.ts</code></td><td>快照</td><td>456 通过 / 0 失败（快照基于 82547de，用例数较少）</td></tr>
+<tr><td><code>npx --no-install tsc --noEmit -p tsconfig.json</code></td><td>快照</td><td>退出码 0。首版 <code>zoneEnd</code> 行类型曾使 <code>tests/renderer/renderer-virtual.test.ts:54</code> 报 TS2339，改为 <code>afterZone</code> 标记后消除</td></tr>
+<tr><td><code>node --import tsx --test tests/renderer/*.test.ts</code>（图标修正后）</td><td>工作树</td><td>486 通过 / 0 失败；renderer-board-pins 19 通过 / 0 失败</td></tr>
+</tbody></table></div>
+<p>浏览器验收的每一步命令与读数保存在 <code>evidence/</code>。关于测试先行：问题 1 先在浏览器里复现（时间戳相同）再修正，对应单测在修正后补入，不是严格的先红后绿；其余修正以截图与逐卡测量复验。</p>
+<p>本轮对源码与测试的修改（均在工作树，未提交）：<code>src/renderer/features/tasks/task-pins.ts</code>（<code>nextPinTime</code>）、<code>TaskBoard.tsx</code>（<code>onTogglePin</code>、置顶区与分隔标记渲染）、<code>task-columns.ts</code>（<code>BoardRow.afterZone</code>、<code>afterZone()</code>）、<code>task-style.ts</code>（<code>pinnedHeading</code>、<code>pinnedEnd</code>、<code>cardTitle</code> 留白、<code>pinButton</code> 的 <code>hover: none</code>）、<code>tests/renderer/renderer-board-pins.test.ts</code>。其他文件未改。</p>
+
+<h2 id="cleanup">7. 清理</h2>
+<ul>
+  <li>scope unit <code>dev-weaver-pins-61adaee6.scope</code> 已停止，<code>systemctl --user status</code> 返回 could not be found；端口 4795 已无监听。</li>
+  <li><code>agent-browser close</code> 已关闭本任务 Chrome；任务 profile 用 <code>bh task-profile remove</code> 删除，目录不存在、无进程引用。</li>
+  <li>快照、数据目录与 XDG 根、浏览器根、夹具与脚本、截图缓存、夹具工作目录、以及上一轮遗留的 fixtures/（事故证据已先复制到 incident/）均已删除；父 Agent 放在临时根里的文件未动。</li>
+  <li>共享 Weaver 服务（端口 4737）清理时仍在监听，本轮未对它做任何读写或启停；未执行 git commit/push/stash/checkout/reset/restore。</li>
+  <li>图标修正复验轮（问题 5）重新起的隔离实例、浏览器与临时数据同样已全部回收：unit 已停、端口 4795 无监听、profile 已删、临时数据与快照已删。</li>
+  <li>详见 <a href="cleanup.json">cleanup.json</a>。</li>
+</ul>
+
+<h2 id="risks">8. 未验证与风险</h2>
+<ul>
+  <li><strong>暗色主题：</strong>产品仅亮色，按要求未验证。</li>
+  <li><strong>真实触屏：</strong>只验证了 <code>(hover: none)</code> 媒体特性分支下按钮可见且可点，没有真实触屏手势与点按热区实测。</li>
+  <li><strong>键盘序列：</strong>Tab 到置顶按钮在样式调整前做过；调整后只重新核对了空闲/悬停状态与逐卡无交叠，没有重跑 Tab 序列（焦点相关 CSS 未改动）。</li>
+  <li><strong>类型检查范围：</strong>只在快照上跑了 tsc；工作树里并行任务有半成品文件，整体 tsc 结果会受其干扰，未作为依据。</li>
+  <li><strong>标题折行：</strong>标题与「新」、子 Agent 标签同行流式排列，<code>overflow-wrap: anywhere</code> 会在窄卡片里按字符折行（如「旧任务-执／行-B2」）。这是 HEAD 既有排版，不属于本功能，没有改动。</li>
+  <li><strong>夹具真实性：</strong>旧任务的创建/更新时间是回溯的；页脚「派发/上报」时间与已等待时长是真实时间，与回溯后的时间不一致，不影响本功能判定。部分旧已完成任务的 updatedAt 在服务运行时直接写临时库，仅用于让它们留在看板，没有其他用途。</li>
+  <li><strong>代理工具点击：</strong>agent-browser 用元素引用点击卡片偶尔没有命中，所以「点击不打开详情」的对照改用真实鼠标坐标（点按钮不开详情、点卡片开详情）。</li>
+  <li><strong>已有警告：</strong>React 19 <code>element.ref</code> 报错出现在任务详情抽屉，与本功能无关，建议另行处理。</li>
+</ul>
+
+<h2 id="index">9. 证据索引</h2>
+<div class="scroll"><table>
+<thead><tr><th>文件</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><a href="checks.json">checks.json</a>、<a href="cleanup.json">cleanup.json</a></td><td>机器可读的逐条结果、问题清单、命令结果、清理记录</td></tr>
+<tr><td><a href="incident/">incident/</a></td><td>上一轮误写共享策略的原始请求与响应（policy-save.json、policy-save.out）</td></tr>
+<tr><td><a href="evidence/">evidence/</a></td><td>ev-03…ev-21 的 DOM、时间戳、控制台、测量、执行审计；快照对照；夹具与策略请求体；DOM/测量脚本</td></tr>
+<tr><td>01–25 号 PNG</td><td>桌面 1440×900 与窄屏 390×844 截图；02–12 为修正前版本，13–22 为修正后版本（06、08 为问题 1 修正后），23–25 为问题 5（已置顶图标）修正后</td></tr>
+</tbody></table></div>
+</main>
+</body>
+</html>

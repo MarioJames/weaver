@@ -1,0 +1,14 @@
+# 快照与工作树对照（清理前）。快照由当时的 HEAD 82547de 导出，之后并行任务才提交了 zcode 移除（76ba062）与 workers unblock（defb4f1/485b042）
+SAME_AS_WORKTREE src/renderer/features/tasks/task-pins.ts
+SAME_AS_WORKTREE src/renderer/features/tasks/task-persistence.ts
+SAME_AS_WORKTREE src/renderer/features/tasks/task-columns.ts
+SAME_AS_WORKTREE src/renderer/features/tasks/TaskBoard.tsx
+SAME_AS_WORKTREE src/renderer/features/tasks/task-style.ts
+SAME_AS_WORKTREE src/renderer/format/tag-colors.ts
+SAME_AS_WORKTREE tests/renderer/renderer-board-pins.test.ts
+SAME_AS_WORKTREE tests/renderer/renderer-board-polish.test.ts
+SAME_AS_WORKTREE tests/renderer/renderer-virtual.test.ts
+# 其余文件与 82547de 的对照（应相同，即不含并行半成品或其后提交）
+src+package.json 文件 203 个（排除 5 个本功能被改文件），与 82547de 相同 198 个
+# zcode 仍在快照默认策略中：
+1

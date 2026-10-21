@@ -311,6 +311,7 @@ export const taskStyles = createStaticStyles(({ css, cssVar }) => ({
     padding-block-end: ${cssVar.marginXS};
 
     &[data-row='heading'] { padding-block: 4px 12px; }
+    &[data-row='zoneHeading'] { padding-block: 8px 12px; }
   `,
   workspaceHeading: css`
     display: flex;
@@ -333,6 +334,8 @@ export const taskStyles = createStaticStyles(({ css, cssVar }) => ({
   cardTitle: css`
     display: -webkit-box;
     min-inline-size: 0;
+    /* The pin action sits in the card's top-right corner (24px button + 8px inset, 20px past the content edge); only this first row shares that corner, so only it keeps clear — status and footer lines keep the full width. */
+    padding-inline-end: 24px;
     overflow: hidden;
     overflow-wrap: anywhere;
     -webkit-box-orient: vertical;
@@ -529,6 +532,74 @@ export const taskStyles = createStaticStyles(({ css, cssVar }) => ({
     &:focus-visible {
       outline: 2px solid ${cssVar.colorPrimaryBorder};
       outline-offset: -2px;
+    }
+  `,
+  /** 置顶区 header inside a lane: Pin icon + 「置顶 · N」, a step quieter than a workspace heading. */
+  pinnedHeading: css`
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-inline-size: 0;
+    margin: 4px 0;
+    color: ${cssVar.colorText};
+    font-size: ${cssVar.fontSizeSM};
+    font-weight: 500;
+    > svg { flex: none; color: ${cssVar.colorPrimary}; }
+  `,
+  /** Closes the 置顶 zone so a workspace listed in it and again below reads as two sections, not a repeated group. */
+  pinnedEnd: css`
+    margin: 0 0 12px;
+    border: 0;
+    border-block-start: 1px dashed ${cssVar.colorBorder};
+  `,
+  /** Card and its pin action share a shell; the action is a sibling of the card button, never nested inside it. */
+  cardShell: css`
+    position: relative;
+    min-inline-size: 0;
+
+    &:hover [data-pinned='false'], &:focus-within [data-pinned='false'] {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  `,
+  pinGlyph: css`
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  `,
+  /** The pin action sits in the card's top-right corner, revealed on hover or keyboard focus and permanent once pinned (and always shown where there is no hover). */
+  pinButton: css`
+    position: absolute;
+    inset-block-start: 8px;
+    inset-inline-end: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 24px;
+    block-size: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: ${cssVar.borderRadiusSM};
+    background: ${cssVar.colorBgContainer};
+    color: ${cssVar.colorTextSecondary};
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s, color 0.15s, background 0.15s;
+
+    &:hover { background: ${cssVar.colorFillSecondary}; color: ${cssVar.colorText}; }
+    &[data-pinned='true'] { opacity: 1; pointer-events: auto; color: ${cssVar.colorPrimary}; }
+    &:focus-visible { outline: 2px solid ${cssVar.colorPrimaryBorder}; outline-offset: 1px; }
+
+    /* Pinned shows a filled Pin in the primary colour; the slashed PinOff replaces it only while hovered or focused (the click unpins). */
+    [data-icon='unpin'] { display: none; }
+    &[data-pinned='true'] [data-icon='pin'] svg { fill: currentColor; }
+    &[data-pinned='true']:hover [data-icon='pin'], &[data-pinned='true']:focus-visible [data-icon='pin'] { display: none; }
+    &[data-pinned='true']:hover [data-icon='unpin'], &[data-pinned='true']:focus-visible [data-icon='unpin'] { display: inline-flex; }
+
+    /* No hover to reveal it on touch screens: keep the action reachable, quietly. */
+    @media (hover: none) {
+      &[data-pinned='false'] { opacity: 0.7; pointer-events: auto; }
     }
   `,
 }));

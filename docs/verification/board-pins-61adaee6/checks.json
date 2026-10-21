@@ -1,0 +1,297 @@
+{
+  "task": "5cfddb97-6ec3-41d3-9985-d6915997a7c5",
+  "date": "2026-10-21",
+  "base": {
+    "snapshot_of_head": "82547de",
+    "note": "快照由 82547de 导出；zcode 移除（76ba062）与 workers unblock（defb4f1/485b042）在快照导出之后才提交，快照不含它们。9 个看板文件取自工作树（含本任务修正），见 evidence/snapshot-vs-worktree.txt"
+  },
+  "instance": {
+    "url": "http://127.0.0.1:4795",
+    "mode": "weaver web --dev（vite dev）",
+    "unit": "dev-weaver-pins-61adaee6.scope",
+    "isolation": [
+      "每条 weaver CLI 调用经包装脚本，显式追加 --data-dir <临时根>/data",
+      "所有 shell 前 export XDG_DATA_HOME=<临时根>/xdg",
+      "任何写操作前先 policy get：修订 0、7 个引擎（claude/codex/grok/opencode/pi/qoder/zcode），不是共享服务的修订 100/6 个引擎",
+      "未对默认数据目录或端口 4737 执行任何命令"
+    ]
+  },
+  "real_execution": {
+    "confirmed_none": true,
+    "audit": "evidence/ev-20-execution-audit.txt",
+    "detail": "54 个夹具任务：native 35、mock-jsonl 8、未派发 11；策略只有 claude 引擎（claude 真实执行为 deferred，无法拉起）；没有 real 执行"
+  },
+  "criteria": [
+    {
+      "id": "AC1",
+      "title": "隔离实例从快照启动，夹具不触发真实引擎",
+      "result": "pass",
+      "evidence": [
+        "evidence/snapshot-vs-worktree.txt",
+        "evidence/ev-20-execution-audit.txt",
+        "evidence/policy-initial-isolated-instance.json"
+      ]
+    },
+    {
+      "id": "AC2a",
+      "title": "「新」Tag、列顶置顶区、区头计数、目录组头、不重复、列头总数不变",
+      "result": "pass",
+      "evidence": [
+        "02-new-desktop.png",
+        "15-final-desktop-before-expiry.png",
+        "evidence/ev-03-dom-before-expiry.json",
+        "evidence/ev-12-final-dom-before-expiry.json"
+      ],
+      "facts": "待执行 5 = 置顶 2 + 普通 3；执行中 25 = 置顶 2 + 普通 23，「查看全部 23」；待验收 4 = 置顶 1 + 普通 3；最终轮 待执行 9/执行中 28/待验收 7 同理"
+    },
+    {
+      "id": "AC2b",
+      "title": "不刷新等待超过 2 分钟，「新」与自动置顶自动消失",
+      "result": "pass",
+      "evidence": [
+        "03-before-expiry.png",
+        "04-after-expiry.png",
+        "16-final-desktop-just-before-expiry.png",
+        "17-final-desktop-after-expiry.png",
+        "evidence/ev-04-fresh-log.json",
+        "evidence/ev-12-final-fresh-log.json"
+      ],
+      "facts": "第一轮创建 08:22:28.905–.923Z，08:24:28.954Z 起「新」5→0（最早到期 +49ms），page 未刷新（navigation entries=1）；修正后最终轮创建 08:32:57.5Z，08:34:57.562–.713Z 5→0"
+    },
+    {
+      "id": "AC3a",
+      "title": "悬停与键盘可达",
+      "result": "pass",
+      "evidence": [
+        "05-hover-pin-button.png",
+        "07-keyboard-focus-pin.png"
+      ],
+      "facts": "空闲 opacity 0/pointer-events none；悬停 opacity 1；卡片 Tab 一次到置顶按钮，opacity 1 且有焦点环；样式调整（标题行留白）后空闲 opacity 0 与悬停可见再次观察到，Tab 序列未在样式调整后重跑"
+    },
+    {
+      "id": "AC3b",
+      "title": "aria-pressed / aria-label 正确，点击不打开详情",
+      "result": "pass",
+      "evidence": [
+        "evidence/ev-05-dom-after-pin1.json",
+        "evidence/ev-15-realmouse-pin.json",
+        "evidence/ev-15-realmouse-card.json",
+        "19-narrow-manual-pin-tapped.png"
+      ],
+      "facts": "置顶后 pressed=true、label=取消置顶；真实鼠标点置顶按钮：详情未打开、仅该卡置顶；真实鼠标点卡片：详情打开（对照）"
+    },
+    {
+      "id": "AC3c",
+      "title": "多张手动置顶按置顶时间倒序",
+      "result": "pass（发现并修正缺陷）",
+      "evidence": [
+        "evidence/ev-05-pins-ls-3-BEFORE-FIX.json",
+        "evidence/ev-05-pins-ls-3.json",
+        "06-three-pins-running.png"
+      ],
+      "facts": "修正前两张相隔约 1.5 秒的置顶得到同一时间戳 1792571131003（使用了过期的渲染时钟），顺序不确定；修正后 1792571189814 < 1792571191502 < 1792571193201，列内顺序 探针-执行、旧任务-执行-B5、旧任务-执行-B3"
+    },
+    {
+      "id": "AC3d",
+      "title": "刷新后保留（localStorage）、取消后回到普通分组",
+      "result": "pass",
+      "evidence": [
+        "evidence/ev-06-pins-ls-after-reload.json",
+        "08-after-reload-pins-persist.png",
+        "evidence/ev-08-pins-ls-after-unpin.json",
+        "evidence/ev-08-dom-after-unpin.json"
+      ],
+      "facts": "重载后 weaver-task-pins 三条原样；取消置顶后条目移除，卡片回到普通分组，「查看全部」从 22 回到 23"
+    },
+    {
+      "id": "AC3e",
+      "title": "换列后仍置顶",
+      "result": "pass",
+      "evidence": [
+        "09-pinned-follows-column-change.png",
+        "evidence/ev-07-dom-after-column-change.json"
+      ],
+      "facts": "手动置顶的 native 任务经 workers complete 从执行中进入待验收，仍在待验收置顶区；另一张被取消后进入已结束（折叠），展开后仍在置顶区（10、22 号截图）"
+    },
+    {
+      "id": "AC4a",
+      "title": "已结束列折叠不被置顶/新任务展开",
+      "result": "pass",
+      "evidence": [
+        "evidence/ev-03-dom-before-expiry.json",
+        "evidence/ev-12-final-dom-before-expiry.json",
+        "22-final-desktop-closed-expanded.png"
+      ],
+      "facts": "已结束含新任务与手动置顶时 data-collapsed=true、0 张卡片挂载；展开后置顶区「置顶 · 1」正常"
+    },
+    {
+      "id": "AC4b",
+      "title": "「查看全部 N」只计普通分组，置顶区完整",
+      "result": "pass",
+      "evidence": [
+        "evidence/ev-16-view-all-before.json",
+        "evidence/ev-16-view-all-after.json",
+        "21-view-all-button-counts-plain-only.png"
+      ],
+      "facts": "执行中 29 = 置顶 2 + 普通 27，按钮「查看全部 27」；置顶区 2 张全部显示；展开后按钮变「收起」，列头仍为 29"
+    },
+    {
+      "id": "AC4c",
+      "title": "桌面与 390px 视觉：不遮挡、不错位、Tag 可区分、区头与组头可区分",
+      "result": "pass（经修正）",
+      "evidence": [
+        "14-desktop-after-fix-zones.png",
+        "18-final-narrow-390-touch-queued.png",
+        "13-narrow-390-after-fix-review.png",
+        "evidence/ev-11-overlap-desktop.json",
+        "evidence/ev-14-overlap-narrow-final.json",
+        "evidence/ev-14-narrow-width.json"
+      ],
+      "facts": "逐卡测量置顶按钮与卡内全部文字/图标矩形无交叠（桌面 22 卡、窄屏 26 卡）；390px scrollWidth=clientWidth=390；「新」为 magenta rgb(163,36,102)，与其他 Tag 可区分；区头与目录组头的区分经修正后才合格（见问题 2）"
+    },
+    {
+      "id": "AC4d",
+      "title": "控制台无错误",
+      "result": "pass（带说明）",
+      "evidence": [
+        "evidence/ev-19-console-final.txt",
+        "evidence/ev-19-pageerrors-final.txt",
+        "evidence/ev-17-console-detail-drawer.txt",
+        "evidence/ev-17-console-detail-drawer-HEAD.txt"
+      ],
+      "facts": "看板加载、置顶/取消、展开折叠、查看全部全程无 error/warn、无页面异常；仅打开「任务详情」抽屉时出现 React 19 的 element.ref 弃用报错，把看板文件换回 HEAD 版本后同样出现，非本功能引入"
+    },
+    {
+      "id": "AC5",
+      "title": "问题已修正并复验，源文件与测试同步；tests/renderer 全部通过",
+      "result": "pass",
+      "facts": "工作树 node --import tsx --test tests/renderer/*.test.ts：486 通过 / 0 失败；快照（HEAD 82547de + 看板文件）：456 通过 / 0 失败；快照 tsc --noEmit 退出码 0；renderer-board-pins 19 通过"
+    },
+    {
+      "id": "AC6",
+      "title": "交付物与清理",
+      "result": "pass",
+      "evidence": [
+        "REPORT.html",
+        "checks.json",
+        "cleanup.json"
+      ]
+    },
+    {
+      "id": "AC7",
+      "title": "追加：已置顶图标状态表达（父 Agent 复核）",
+      "result": "pass",
+      "evidence": [
+        "23-pinned-icon-idle.png",
+        "24-pinned-icon-hover.png",
+        "25-pinned-icon-keyboard-focus.png"
+      ]
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "多张手动置顶时间戳相同，倒序不确定",
+      "severity": "中（功能）",
+      "status": "已修正并复验",
+      "files": [
+        "src/renderer/features/tasks/task-pins.ts（新增 nextPinTime）",
+        "src/renderer/features/tasks/TaskBoard.tsx（onTogglePin）",
+        "tests/renderer/renderer-board-pins.test.ts"
+      ]
+    },
+    {
+      "id": 2,
+      "title": "置顶区与普通分组边界不清：区头比目录组头更淡，同目录在两区重复出现像重复分组",
+      "severity": "中（视觉）",
+      "status": "已修正并复验",
+      "files": [
+        "src/renderer/features/tasks/task-columns.ts（BoardRow.afterZone、afterZone()）",
+        "src/renderer/features/tasks/TaskBoard.tsx",
+        "src/renderer/features/tasks/task-style.ts（pinnedHeading、pinnedEnd）",
+        "tests/renderer/renderer-board-pins.test.ts"
+      ]
+    },
+    {
+      "id": 3,
+      "title": "整张卡右侧 36px 留白使「待父 Agent 确认收到 · 已等 N 分钟」等行无谓换行",
+      "severity": "低（视觉）",
+      "status": "已修正并复验",
+      "files": [
+        "src/renderer/features/tasks/task-style.ts（taskCard 内边距还原，cardTitle 加 padding-inline-end: 24px）"
+      ]
+    },
+    {
+      "id": 4,
+      "title": "触屏（无 hover）下置顶按钮不可达",
+      "severity": "中（可用性）",
+      "status": "已修正，无头 Chrome 的 hover:none 下复验；未做真实触屏手势",
+      "files": [
+        "src/renderer/features/tasks/task-style.ts（pinButton 的 @media (hover: none)）"
+      ]
+    },
+    {
+      "id": 5,
+      "title": "已置顶卡片常显带斜杠的 PinOff，状态表达反了（父 Agent 复核意见）",
+      "severity": "中（状态表达）",
+      "status": "已修正并复验",
+      "files": [
+        "src/renderer/features/tasks/TaskBoard.tsx（按钮内同时渲染 Pin 与 PinOff 两个图标容器）",
+        "src/renderer/features/tasks/task-style.ts（pinGlyph、pinButton 的图标切换规则）",
+        "tests/renderer/renderer-board-pins.test.ts（断言常显 Pin、PinOff 只作第二图标、未置顶行为不变）"
+      ],
+      "facts": "已置顶：空闲常显主色实心 Pin（fill=rgb(0,114,245)，PinOff display:none）；悬停或键盘聚焦：Pin 隐藏、PinOff 显示；未置顶：只有 Pin，空闲 opacity 0，行为不变；aria-pressed、aria-label 不变。复验在新建的隔离实例上完成",
+      "evidence": [
+        "23-pinned-icon-idle.png",
+        "24-pinned-icon-hover.png",
+        "25-pinned-icon-keyboard-focus.png",
+        "evidence/ev-21-pinned-icon-idle.json",
+        "evidence/ev-21-pinned-icon-hover.json",
+        "evidence/ev-21-pinned-icon-focus.json"
+      ]
+    }
+  ],
+  "not_verified": [
+    "暗色主题（产品仅亮色，按要求不验）",
+    "真实触屏手势（仅用无头 Chrome 的 hover:none 媒体特性）",
+    "样式调整后未重跑键盘 Tab 序列",
+    "工作树整体 tsc（并行任务的半成品文件会干扰），仅快照 tsc 通过"
+  ],
+  "commands": [
+    {
+      "cmd": "node --import tsx --test tests/renderer/renderer-board-pins.test.ts",
+      "cwd": "工作树",
+      "result": "19 通过 / 0 失败"
+    },
+    {
+      "cmd": "node --import tsx --test tests/renderer/*.test.ts",
+      "cwd": "工作树",
+      "result": "486 通过 / 0 失败"
+    },
+    {
+      "cmd": "node --import tsx --test tests/renderer/*.test.ts",
+      "cwd": "快照",
+      "result": "456 通过 / 0 失败"
+    },
+    {
+      "cmd": "npx --no-install tsc --noEmit -p tsconfig.json",
+      "cwd": "快照",
+      "result": "退出码 0（首版 zoneEnd 行类型曾使 tests/renderer/renderer-virtual.test.ts:54 报 TS2339，已改为 afterZone 标记消除）"
+    },
+    {
+      "cmd": "node --import tsx --test tests/renderer/*.test.ts",
+      "cwd": "工作树（图标修正后）",
+      "result": "486 通过 / 0 失败；renderer-board-pins 19 通过 / 0 失败"
+    }
+  ],
+  "isolation_round2": {
+    "note": "图标修正复验时重新起了隔离实例（端口 4795，新数据目录）",
+    "measures": [
+      "同一包装脚本：XDG_DATA_HOME=<临时根>/xdg，每条 CLI 命令末尾追加 --data-dir",
+      "首次写入前 policy get：修订 0（共享服务为 100），随后 policy save 返回修订 1",
+      "夹具 4 个任务：native 2、未派发 2，无真实执行",
+      "scope unit 与第一轮同名 dev-weaver-pins-61adaee6，已停止"
+    ],
+    "snapshot": "git archive HEAD（485b042）+ 9 个看板文件取自工作树"
+  }
+}

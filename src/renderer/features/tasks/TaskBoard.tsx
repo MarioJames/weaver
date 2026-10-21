@@ -2,17 +2,19 @@ import { Children, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Empty, Icon } from '@lobehub/ui';
 import { Button, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
-import { ChevronDown, ChevronRight, ChevronUp, Clock, Folder, Loader2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, Clock, Folder, Loader2, Pin, PinOff, X } from 'lucide-react';
 import type { Task } from '../../../shared/contracts/tasks';
 import { displayLog } from './log-view';
 import type { FilterDimension, FilterOption, TaskSelection, TaskTimeRange } from './task-filters';
 import { cardOwner, dispatchKind, emptyRootNotice, taskTitle } from './task-view';
 import { cardFooter } from './task-footer';
 import { reviewWait } from './task-wait';
-import { TASK_COLUMNS, boardRows, columnize, isOpenTask, workspaceGroups } from './task-columns';
+import { TASK_COLUMNS, afterZone, boardRows, columnize, isOpenTask, pinnedRows, workspaceGroups } from './task-columns';
 import { nonArchived } from './task-archive';
 import { FILTER_DIMENSIONS, TIME_RANGES, applyTaskFilters, childIndex, emptySelection, facetOptions, filterLabels, filterSummary, hasFilters, resolveSelection, rootIndex, selectedEntries, toggleOption } from './task-filters';
-import { readEndedExpanded, readFiltersCollapsed, readTaskFilters, writeEndedExpanded, writeFiltersCollapsed, writeTaskFilters } from './task-persistence';
+import { readEndedExpanded, readFiltersCollapsed, readTaskFilters, readTaskPins, writeEndedExpanded, writeFiltersCollapsed, writeTaskFilters, writeTaskPins } from './task-persistence';
+import { isNewTask, isPinned, nextNewExpiry, nextPinTime, pruneStalePins, splitPinned, togglePin } from './task-pins';
+import type { TaskPins } from './task-pins';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../../format/status-colors';
 import type { DisplayStatus } from '../../format/status-colors';
 import { statusTagColor, tagColor } from '../../format/tag-colors';
@@ -167,11 +169,32 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, freeC
   const [ended, setEnded] = useState(readEndedExpanded);
   const [collapsed, setCollapsed] = useState(readFiltersCollapsed);
   const [expandedLanes, setExpandedLanes] = useState<string[]>([]);
+  const [pins, setPins] = useState(readTaskPins);
+  /** The page hands down a render-time clock; the board keeps it monotonic and steps it to the earliest 「新」 expiry, so freshness ends without waiting for new data. */
+  const [freshNow, setFreshNow] = useState(now);
+  const boardNow = Math.max(now, freshNow);
+  useEffect(() => {
+    const expiry = nextNewExpiry(nonArchived(tasks, boardNow), boardNow);
+    if (expiry === null) return;
+    /** Step one tick past the exclusive end: at expiry the age is exactly the window and the task is still new, so a no-op setState here would strand it 「新」 forever. */
+    const timer = setTimeout(() => setFreshNow(expiry + 1), expiry - boardNow + 1);
+    return () => clearTimeout(timer);
+  }, [tasks, boardNow]);
+  useEffect(() => {
+    if (!tasks.length) return;
+    const pruned = pruneStalePins(pins, tasks.map(task => task.id));
+    if (pruned !== pins) { setPins(pruned); writeTaskPins(pruned); }
+  }, [pins, tasks]);
+  const onTogglePin = (id: string) => {
+    const next = togglePin(pins, id, nextPinTime(pins, boardNow, Date.now()));
+    setPins(next);
+    writeTaskPins(next);
+  };
   if (loading && !tasks.length) return <div role="status" className={styles.stack}><Skeleton animated /><Text type="secondary">正在加载本地任务…</Text></div>;
   if (!tasks.length) return <Empty title="还没有任务" description="从右上角新建第一个任务。" />;
-  const selection = resolveSelection(filters ?? stored, tasks, now);
-  const board = nonArchived(tasks, now);
-  const visible = applyTaskFilters(board, selection, undefined, now, tasks);
+  const selection = resolveSelection(filters ?? stored, tasks, boardNow);
+  const board = nonArchived(tasks, boardNow);
+  const visible = applyTaskFilters(board, selection, undefined, boardNow, tasks);
   const columns = columnize(visible);
   // Parent Agents answer by their root task: a selected root with no children at all explains its empty board.
   const roots = rootIndex(tasks);
@@ -182,7 +205,7 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, freeC
     return root && !childRoots.has(id) ? [root] : [];
   });
   const olderOpenWork = !visible.length && selection.time === 'today' &&
-    applyTaskFilters(board, { ...selection, time: 'all' }, undefined, now, tasks).some(isOpenTask);
+    applyTaskFilters(board, { ...selection, time: 'all' }, undefined, boardNow, tasks).some(isOpenTask);
   const update = (next: TaskSelection) => {
     setStored(next);
     onFiltersChange?.(next);
@@ -203,28 +226,39 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, freeC
     const latest = task.events.at(-1);
     const owner = cardOwner(task, rootOf);
     const footer = cardFooter(task, owner);
-    const wait = reviewWait(task, now);
+    const wait = reviewWait(task, boardNow);
     const activity = task.ownerHost ? `Herdr · ${task.ownerHost.agentName}` : displayLog(latest?.message ?? '等待首次调度');
-    return <button type="button" className={taskStyles.taskCard} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
-      <span className={taskStyles.cardTitle}>
-        {task.parentTaskId && <Tag className={taskStyles.cardTag} size="small" color={tagColor('childRole')}>子任务</Tag>}
-        {task.dispatch?.worker && <Tag className={taskStyles.cardTag} title={task.dispatch.worker} size="small" color={tagColor('neutral')} icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
-        {task.dispatch?.worker && freeChannel?.(task.dispatch.worker) && <FreeChannelTag className={taskStyles.cardTag} title={`子 Agent ${task.dispatch.worker} 使用免费渠道`} />}
-        <strong className={taskStyles.cardTitleText}>{taskTitle(task)}</strong>
-      </span>
-      <span className={taskStyles.cardStatus}>
-        <Tag size="small" color={tag.color} icon={tag.spin ? spinner : displayStatus(task) === 'scheduled' ? <Icon icon={Clock} size="small" /> : undefined}>{tag.label}</Tag>
-        {tag.spin && <Text type="secondary" className={taskStyles.cardActivity} title={activity}>{activity}</Text>}
-      </span>
-      {wait && <span className={taskStyles.cardWait} data-overdue={wait.overdue} data-wait={wait.acknowledged ? 'acknowledged' : 'pending'} title={wait.title}>{wait.text}</span>}
-      <span className={taskStyles.cardMeta}>
-        <span className={taskStyles.cardWho}>由 <AgentFacts compact task={task} owner={owner} ownerKind={ownerKind} /> <span className={taskStyles.cardTail}>于 <CardTime value={footer.at} now={now} /> {footer.verb}{footer.tail && <span className={taskStyles.cardSep} aria-hidden="true"> ·</span>}</span></span>
-        {footer.tail && <>{' '}<span className={taskStyles.cardTail}>{footer.tail.label} <CardTime value={footer.tail.at} now={now} /></span></>}
-      </span>
-    </button>;
+    const fresh = isNewTask(task, boardNow);
+    const pinnedNow = isPinned(pins, task.id);
+    return <div className={taskStyles.cardShell}>
+      <button type="button" className={taskStyles.taskCard} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
+        <span className={taskStyles.cardTitle}>
+          {fresh && <Tag className={taskStyles.cardTag} size="small" color={tagColor('fresh')}>新</Tag>}
+          {task.parentTaskId && <Tag className={taskStyles.cardTag} size="small" color={tagColor('childRole')}>子任务</Tag>}
+          {task.dispatch?.worker && <Tag className={taskStyles.cardTag} title={task.dispatch.worker} size="small" color={tagColor('neutral')} icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
+          {task.dispatch?.worker && freeChannel?.(task.dispatch.worker) && <FreeChannelTag className={taskStyles.cardTag} title={`子 Agent ${task.dispatch.worker} 使用免费渠道`} />}
+          <strong className={taskStyles.cardTitleText}>{taskTitle(task)}</strong>
+        </span>
+        <span className={taskStyles.cardStatus}>
+          <Tag size="small" color={tag.color} icon={tag.spin ? spinner : displayStatus(task) === 'scheduled' ? <Icon icon={Clock} size="small" /> : undefined}>{tag.label}</Tag>
+          {tag.spin && <Text type="secondary" className={taskStyles.cardActivity} title={activity}>{activity}</Text>}
+        </span>
+        {wait && <span className={taskStyles.cardWait} data-overdue={wait.overdue} data-wait={wait.acknowledged ? 'acknowledged' : 'pending'} title={wait.title}>{wait.text}</span>}
+        <span className={taskStyles.cardMeta}>
+          <span className={taskStyles.cardWho}>由 <AgentFacts compact task={task} owner={owner} ownerKind={ownerKind} /> <span className={taskStyles.cardTail}>于 <CardTime value={footer.at} now={boardNow} /> {footer.verb}{footer.tail && <span className={taskStyles.cardSep} aria-hidden="true"> ·</span>}</span></span>
+          {footer.tail && <>{' '}<span className={taskStyles.cardTail}>{footer.tail.label} <CardTime value={footer.tail.at} now={boardNow} /></span></>}
+        </span>
+      </button>
+      {/* A sibling of the card button, never nested inside it; the click stays a pin toggle and never selects the card. */}
+      <button type="button" className={taskStyles.pinButton} data-pinned={pinnedNow} aria-pressed={pinnedNow} aria-label={pinnedNow ? '取消置顶' : '置顶'} onClick={() => onTogglePin(task.id)}>
+        {/* Pinned reads as 「已钉住」 (filled Pin); the slashed PinOff only appears while the button is hovered or focused, to say the click unpins. */}
+        <span data-icon="pin" className={taskStyles.pinGlyph}><Icon icon={Pin} size="small" /></span>
+        {pinnedNow && <span data-icon="unpin" className={taskStyles.pinGlyph}><Icon icon={PinOff} size="small" /></span>}
+      </button>
+    </div>;
   };
   return <section aria-label="任务看板" className={taskStyles.board}>
-    <TaskFacets board={board} all={tasks} selection={selection} collapsed={collapsed} now={now} ownerKind={ownerKind} onChange={update} onCollapse={collapse} />
+    <TaskFacets board={board} all={tasks} selection={selection} collapsed={collapsed} now={boardNow} ownerKind={ownerKind} onChange={update} onCollapse={collapse} />
     {!visible.length && <>
       {childlessRoots.map(root => <div key={root.id} className={styles.row} role="status">
         <Text type="secondary">{emptyRootNotice(root)}</Text>
@@ -240,9 +274,12 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, freeC
     <div className={taskStyles.columns} aria-label="任务状态列" role="region" tabIndex={0} aria-busy={loading}>
       {TASK_COLUMNS.map((column, index) => {
         const items = columns[index];
+        /** 置顶区 leads the column: manual pins and still-new tasks grouped by workspace, the plain groups follow without them. */
+        const split = splitPinned(items, pins, boardNow);
         const expanded = expandedLanes.includes(column.key);
-        const rows = boardRows(workspaceGroups(expanded ? items : items.slice(0, 20)));
-        /** Only 已结束 folds; the columns with live work are always in view. */
+        const zone = pinnedRows(split.pinned);
+        const rows = [...zone, ...afterZone(zone, boardRows(workspaceGroups(expanded ? split.rest : split.rest.slice(0, 20))))];
+        /** Only 已结束 folds; the columns with live work are always in view, and pins never unfold it. */
         const foldable = column.key === 'closed';
         const shown = !foldable || ended || !items.length;
         const count = <>
@@ -258,15 +295,21 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, freeC
           </header>
           {shown && <>
             {items.length > 0 && <VirtualLane rows={rows} rowKey={row => row.key} rowKind={row => row.kind} pinned={rows.flatMap((row, at) => row.kind === 'card' && row.task.id === selected ? [at] : [])}>
-              {row => row.kind === 'heading' ? <h3 className={taskStyles.workspaceHeading} title={row.title}>
-                <Icon icon={Folder} size="small" />
-                <span className={taskStyles.workspaceName}>{row.label}</span>
-                <span className={styles.numbers}>{row.count}</span>
-              </h3> : card(row.task)}
+              {row => row.kind === 'zoneHeading' ? <div className={taskStyles.pinnedHeading}>
+                <Icon icon={Pin} size="small" />
+                <span>置顶 · {row.count}</span>
+              </div> : row.kind === 'heading' ? <>
+                {row.afterZone && <div role="separator" className={taskStyles.pinnedEnd} />}
+                <h3 className={taskStyles.workspaceHeading} title={row.title}>
+                  <Icon icon={Folder} size="small" />
+                  <span className={taskStyles.workspaceName}>{row.label}</span>
+                  <span className={styles.numbers}>{row.count}</span>
+                </h3>
+              </> : card(row.task)}
             </VirtualLane>}
             {!items.length && <Text type="secondary" className={styles.meta}>暂无任务</Text>}
-            {items.length > 20 && <Button size="small" type="text" aria-expanded={expanded} onClick={() => setExpandedLanes(current => expanded ? current.filter(key => key !== column.key) : [...current, column.key])}>
-              {expanded ? '收起' : `查看全部 ${items.length}`}
+            {split.rest.length > 20 && <Button size="small" type="text" aria-expanded={expanded} onClick={() => setExpandedLanes(current => expanded ? current.filter(key => key !== column.key) : [...current, column.key])}>
+              {expanded ? '收起' : `查看全部 ${split.rest.length}`}
             </Button>}
           </>}
         </div>;

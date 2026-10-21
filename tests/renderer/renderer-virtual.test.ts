@@ -51,7 +51,7 @@ test('a lane of hundreds of rows mounts only a window of them, in order', () => 
   const rows = boardRows(workspaceGroups(crowd(300)));
   assert.equal(rows.length, 305);
   const html = markup(React.createElement(VirtualLane<typeof rows[number]>, { rows, rowKey: row => row.key, rowKind: row => row.kind,
-    children: row => row.kind === 'card' ? React.createElement('span', null, row.task.title) : React.createElement('h3', null, row.label) }));
+    children: row => row.kind === 'card' ? React.createElement('span', null, row.task.title) : React.createElement('h3', null, row.kind === 'heading' ? row.label : `置顶 · ${row.count}`) }));
   const mounted = html.match(/data-row="(card|heading)"/g) ?? [];
   assert.equal(mounted.length, SSR_ROWS);
   assert.ok(mounted.length < rows.length / 5);

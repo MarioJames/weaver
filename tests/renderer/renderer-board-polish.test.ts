@@ -24,7 +24,8 @@ function board(tasks: Task[], filters = emptySelection()) {
 
 test('every lane limits the initial cards to the newest twenty', () => {
   for (const status of ['queued', 'running', 'completed', 'failed'] as const) {
-    const tasks = Array.from({ length: 23 }, (_, n) => ({ ...task, status, id: `item-${n}`, title: `POLISH_${n}_END`, updatedAt: new Date(now - n * 1000).toISOString() }));
+    /** Older creations: a task created just now is 「新」 and would live in the pinned zone, which never truncates. */
+    const tasks = Array.from({ length: 23 }, (_, n) => ({ ...task, status, id: `item-${n}`, title: `POLISH_${n}_END`, createdAt: new Date(now - 86400000).toISOString(), updatedAt: new Date(now - n * 1000).toISOString() }));
     const html = board(tasks);
     assert.equal((html.match(/<strong[^>]*>POLISH_\d+_END/g) ?? []).length, 20);
     assert.match(html, /POLISH_0_END/);

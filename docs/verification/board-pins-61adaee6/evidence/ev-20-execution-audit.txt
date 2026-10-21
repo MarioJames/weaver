@@ -1,0 +1,3 @@
+tasks 54 {"none":11,"native":35,"mock":8}
+{"none":11,"native":35,"mock-jsonl":8}
+[{"id":"claude","kind":"claude","enabled":1}]

@@ -1,4 +1,5 @@
 import { FILTER_DIMENSIONS, TIME_RANGES, emptySelection, type TaskSelection } from './task-filters';
+import type { TaskPins } from './task-pins';
 /** localStorage key holding the board's filter selection. */
 export const TASK_FILTERS_KEY = 'weaver-task-filters';
 /** A stored payload decodes to a selection; anything malformed or of the wrong shape is no selection at all. */
@@ -41,4 +42,25 @@ export function readEndedExpanded(): boolean {
 }
 export function writeEndedExpanded(open: boolean): void {
   try { localStorage.setItem(ENDED_EXPANDED_KEY, String(open)); } catch { /* The choice stays for this session only. */ }
+}
+/** localStorage key recording which task ids the reader pinned, with the moment of each pin. */
+export const TASK_PINS_KEY = 'weaver-task-pins';
+/** A stored payload decodes to id -> pin time; anything malformed or off-shape counts no pin. */
+function parsePins(raw: string | null): TaskPins {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
+    const pins: TaskPins = {};
+    for (const [id, at] of Object.entries(parsed)) if (typeof at === 'number' && Number.isFinite(at)) pins[id] = at;
+    return pins;
+  } catch { return {}; }
+}
+/** The saved pins; unreadable storage is the same as none. */
+export function readTaskPins(): TaskPins {
+  try { return parsePins(localStorage.getItem(TASK_PINS_KEY)); } catch { return {}; }
+}
+/** Persist the pins; a private-mode or full storage only loses the memory. */
+export function writeTaskPins(pins: TaskPins): void {
+  try { localStorage.setItem(TASK_PINS_KEY, JSON.stringify(pins)); } catch { /* The pins stay for this session only. */ }
 }

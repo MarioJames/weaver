@@ -1,0 +1,38 @@
+{
+  "task": "5cfddb97-6ec3-41d3-9985-d6915997a7c5",
+  "unit": {
+    "name": "dev-weaver-pins-61adaee6.scope",
+    "stop": "systemctl --user stop dev-weaver-pins-61adaee6.scope",
+    "state_after": "Unit ... could not be found（--collect 已回收）"
+  },
+  "port": {
+    "port": 4795,
+    "closed": true,
+    "check": "ss -ltn 无 :4795 监听"
+  },
+  "browser": {
+    "session": "weaver-pins-61adaee6",
+    "close": "agent-browser close：Browser closed",
+    "profile": "/tmp/weaver-worker-cap.r5XK/board-pin-browser/browser-profile",
+    "profile_deleted": true,
+    "check": "bh task-profile remove 已删除；目录不存在；无进程引用该 profile"
+  },
+  "deleted": [
+    "快照目录 snapshot/（node_modules 仅为符号链接，目标 /home/mocha/opensource/weaver/node_modules 完好）",
+    "数据目录 data/（含 weaver.db、socket）与 XDG 根 xdg/",
+    "浏览器根 browser/（dev-server.log、env 脚本）",
+    "上一轮遗留 fixtures/（policy-save.json、policy-save.out 已先复制到 incident/）",
+    "夹具脚本 fx/、截图缓存 shots/、夹具工作目录 ws/、包装脚本 wv.sh、policy-initial.json",
+    "上一轮遗留的 wd/ 与 browser/snapshot 在本轮开始时已删除并重建"
+  ],
+  "kept_in_temp_root": "父 Agent 的 create.out、dispatch.json、pkg.json、retry-full.txt、retry-prompt.txt、retry.out、spawn.out、task.json 未触碰",
+  "kept_in_repo": "docs/verification/board-pins-61adaee6/（REPORT.html、checks.json、cleanup.json、截图、evidence/、incident/）；源码与测试修改留在工作树未提交",
+  "untouched": "共享 Weaver 服务（端口 4737，清理时仍在监听）、默认数据目录、~/.weaver、~/.local/share/weaver 全程未读写；未执行 git commit/push/stash/checkout/reset/restore；Convorel 共享 Chrome 未触碰",
+  "round2_result": {
+    "unit": "dev-weaver-pins-61adaee6.scope 已停止（could not be found）",
+    "port_4795": "已无监听",
+    "browser": "agent-browser close；任务 profile 已删除且目录不存在",
+    "deleted": "快照、数据目录、XDG 根、夹具与脚本、截图缓存、夹具工作目录、日志均已删除",
+    "shared_service_4737": "仍在监听，本轮未对其做任何读写或启停；父 Agent 的临时根文件未动"
+  }
+}

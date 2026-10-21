@@ -1,0 +1,46 @@
+[
+  {
+    "color": "rgb(0, 114, 245)",
+    "label": "取消置顶",
+    "opacity": "1",
+    "pin": "flex",
+    "pinFill": "rgb(0, 114, 245)",
+    "pressed": "true",
+    "svgClass": "lucide lucide-pin",
+    "t": "已置顶-排队-A",
+    "unpin": "none"
+  },
+  {
+    "color": "rgb(123, 126, 130)",
+    "label": "置顶",
+    "opacity": "0",
+    "pin": "flex",
+    "pinFill": "rgba(0, 0, 0, 0)",
+    "pressed": "false",
+    "svgClass": "lucide lucide-pin",
+    "t": "普通-排队-B",
+    "unpin": "absent"
+  },
+  {
+    "color": "rgb(0, 114, 245)",
+    "label": "取消置顶",
+    "opacity": "1",
+    "pin": "none",
+    "pinFill": "rgb(0, 114, 245)",
+    "pressed": "true",
+    "svgClass": "lucide lucide-pin",
+    "t": "已置顶-执行-A",
+    "unpin": "flex"
+  },
+  {
+    "color": "rgb(123, 126, 130)",
+    "label": "置顶",
+    "opacity": "0",
+    "pin": "flex",
+    "pinFill": "rgba(0, 0, 0, 0)",
+    "pressed": "false",
+    "svgClass": "lucide lucide-pin",
+    "t": "普通-执行-B",
+    "unpin": "absent"
+  }
+]
