@@ -1,3 +1,4 @@
+import { ScheduleService, type ScheduleOptions } from './schedules/service';
 import type { CommandResponse } from '../shared/contracts/commands';
 import type { OwnerMessage } from '../shared/contracts/owners';
 import { MockOwnerHostAdapter, type OwnerHostEvidence } from './adapters/logical';
@@ -24,13 +25,14 @@ import { PolicyStore } from './policy/store';
 export class CommandHandler {
  draining=false;
  transportStatus:'ready'|'unavailable'|'not-started'='not-started';
+ readonly schedules:ScheduleService;
  private readonly gateway:CommandGateway;
  private readonly runner:EffectRunner;
  private readonly coordinator:Coordinator;
  private readonly continuation:ContinuationService;
   constructor(readonly manager:TaskManager,readonly policy:PolicyStore,
    hostLauncher: typeof launchOwner = launchOwner, herdrPresent: () => boolean = () => herdrOnPath(),
-   diagnostics?: TaskDiagnostics, asyncHost:AsyncOwnerHost = {}){
+   diagnostics?: TaskDiagnostics, asyncHost:AsyncOwnerHost = {}, scheduleOptions:Pick<ScheduleOptions,'refreshQuota'|'now'> = {}){
    const ownerHost=new MockOwnerHostAdapter();
    const isDraining=()=>this.draining;
    this.continuation=new ContinuationService(manager.store,ownerHost);
@@ -46,7 +48,9 @@ export class CommandHandler {
    const queries=new Queries(manager,policy,records,diagnostics,{transportStatus:()=>this.transportStatus,herdrPresent},task=>dispatch.nextFor(task));
    const mutations=new Mutations(manager,records,policy,a=>owners.register('owners.spawn',a),task=>owners.closeCancelledRoot(task));
    this.coordinator=new Coordinator(manager,policy,records,dispatch,applyVendorBlocks,taskId=>{results.deliver({taskId});},isDraining);
-   this.gateway=new CommandGateway(manager,this.runner,createRegistry({queries,mutations,results,owners,dispatch,retries}),isDraining);
+   this.schedules=new ScheduleService({store:manager.store,policy,createTask:a=>mutations.create(a),notify:()=>manager.notify(),...scheduleOptions,
+    command:(command,args,commandId)=>this.handle({apiVersion:'weaver.v1',command,args,commandId})});
+   this.gateway=new CommandGateway(manager,this.runner,createRegistry({queries,mutations,results,owners,dispatch,retries,schedules:this.schedules}),isDraining);
    manager.listeners.add(()=>this.pump());
    for(const owner of manager.store.listOwners()) if(owner.host)ownerHost.restore(owner.host as OwnerHostEvidence,(owner.messages??[]) as OwnerMessage[]);
    this.pump();
@@ -56,6 +60,7 @@ export class CommandHandler {
  pump():void {this.coordinator.pump();}
  async drain():Promise<void>{
   this.draining=true;this.coordinator.stop();
+  await this.schedules.stop();
   await this.runner.drain();
  }
 }

@@ -73,6 +73,7 @@ export function makeRequest(options: CLIOptions, input: unknown = {}): Record<st
   if (options.command && isEnvelope && envelope.command !== options.command) throw new LocalIPCError('INVALID_ARGUMENT', 'Input command does not match CLI command');
   if (options.commandId && envelope.commandId && envelope.commandId !== options.commandId) throw new LocalIPCError('INVALID_ARGUMENT', 'Input command ID does not match CLI command ID');
   envelope.commandId = options.commandId || envelope.commandId || randomUUID();
+  if (options.scheduleId !== undefined) mergeArg(envelope, 'scheduleId', options.scheduleId, 'schedule ID');
   if (options.taskId) mergeArg(envelope, 'taskId', options.taskId, 'task ID');
   if (options.engine !== undefined) mergeArg(envelope, 'engine', options.engine, 'engine');
   if (options.cancel) mergeArg(envelope, 'cancel', true, 'cancel');
@@ -82,14 +83,14 @@ export function makeRequest(options: CLIOptions, input: unknown = {}): Record<st
   }
   return envelope;
 }
-/** Fill tasks create workspace from the CLI caller cwd before the request is submitted. */
+/** Fill tasks/schedules create workspace from the CLI caller cwd before the request is submitted. */
 export function applyCallerWorkspace(request: Record<string, unknown>, cwd: string): void {
-  if (request.command !== 'tasks.create') return;
+  if (request.command !== 'tasks.create' && request.command !== 'schedules.create') return;
   const args = request.args;
   if (!args || typeof args !== 'object' || Array.isArray(args)) return;
   const record = args as Record<string, unknown>;
   const workspace = record.workspace;
-  if (workspace === undefined) { if (record.parentTaskId === undefined) record.workspace = cwd; }
+  if (workspace === undefined) { if (request.command === 'schedules.create' || record.parentTaskId === undefined) record.workspace = cwd; }
   else if (typeof workspace !== 'string' || workspace.trim() === '') throw new LocalIPCError('INVALID_ARGUMENT', 'Explicit workspace must be a nonempty path string');
   else if (!isAbsolute(workspace)) record.workspace = resolve(cwd, workspace);
 }

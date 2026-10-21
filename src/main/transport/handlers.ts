@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { API_VERSION } from '../../shared/contracts/commands';
 import type { RpcMethod } from '../../shared/contracts/rpc';
-import type { QuotaRefreshInput, QuotaRefreshResult } from '../../shared/contracts/quota';
+import type { QuotaRefreshInput, QuotaRefreshResult, QuotaSchedule } from '../../shared/contracts/quota';
 import { EXECUTION_BOUNDARY, ENGINE_CATALOG, readinessFor, type EngineProbeRecord } from '../../shared/engines';
 import { parseId, parseTaskInput } from '../../shared/validation';
 import { VERSION } from '../../shared/version';
@@ -19,7 +19,6 @@ import { previewRoute } from '../policy/preview';
 import { validateConfig } from '../policy/routing';
 import type { PolicyStore } from '../policy/store';
 import type { QuotaProber } from '../quota';
-import type { QuotaScheduler } from '../quota/scheduler';
 import { RpcError } from '../rpc';
 import type { StallMonitor } from '../stall';
 import type { TaskStore } from '../store';
@@ -38,7 +37,7 @@ export interface RpcHost {
   track<T>(job: Promise<T>): Promise<T>;
   /** Manual and scheduled refresh share one probe-then-merge path. */
   refreshQuota(input: QuotaRefreshInput): Promise<QuotaRefreshResult>;
-  quotaSchedule(): ReturnType<QuotaScheduler['status']>;
+  quotaSchedule(): QuotaSchedule;
   stall(): StallMonitor;
   freeProbe(): FreeChannelProbeMonitor;
   hellos: HelloJobs;

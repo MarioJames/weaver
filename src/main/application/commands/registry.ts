@@ -1,3 +1,4 @@
+import type { ScheduleService } from '../../schedules/service';
 import type { LogicalCommand } from '../../../shared/contracts/commands';
 import type { OwnerLifecycle } from '../owners/lifecycle';
 import type { Dispatcher } from '../scheduling/dispatch';
@@ -15,7 +16,7 @@ export interface CommandRegistry {
  sync: Record<SyncCommand, (args: CommandArgs) => unknown>;
  flow: Record<FlowCommand, (args: CommandArgs) => CommandFlow<unknown>>;
 }
-export interface CommandUnits { queries: Queries; mutations: Mutations; results: Results; owners: OwnerLifecycle; dispatch: Dispatcher; retries: Retries }
+export interface CommandUnits { queries: Queries; mutations: Mutations; results: Results; owners: OwnerLifecycle; dispatch: Dispatcher; retries: Retries; schedules: ScheduleService }
 
 export function createRegistry(u: CommandUnits): CommandRegistry {
  return {
@@ -57,6 +58,16 @@ export function createRegistry(u: CommandUnits): CommandRegistry {
    'results.ack': a => u.results.settle('results.ack', a),
    'reviews.submit': a => u.results.settle('reviews.submit', a),
    'operations.get': a => u.queries.operationGet(a),
+   'schedules.list': a => u.schedules.list(a),
+   'schedules.get': a => u.schedules.get(a),
+   'schedules.create': a => u.schedules.create(a),
+   'schedules.update': a => u.schedules.update(a),
+   'schedules.enable': a => u.schedules.enable(a,true),
+   'schedules.disable': a => u.schedules.enable(a,false),
+   'schedules.delete': a => u.schedules.delete(a),
+   'schedules.run': a => u.schedules.run(a),
+   'schedules.cancel': a => u.schedules.cancel(a),
+   'schedules.runs': a => u.schedules.runs(a),
   },
   flow: {
    'owners.launch': a => u.owners.launchOwner(a),

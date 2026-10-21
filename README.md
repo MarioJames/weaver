@@ -90,6 +90,38 @@ weaver web              # same service, in this terminal; --no-open skips the br
 
 It is the same single writer and supervisor: it binds `127.0.0.1` only (default port 4737; `--port` selects another, `0` picks a free port), prints the URL after the stores and endpoints are ready, and keeps running after the browser closes. When a Weaver service is already running, `weaver web` returns that service's address instead of failing. `--dev` serves the UI with Vite on the same loopback origin. `--data-dir` overrides the state directory, which is also the discoverable endpoint root (`control.v1.json`). A busy port reports `EADDRINUSE` and names `--port`. Stop it with Ctrl+C or SIGTERM: the process drains, stops the workers it started, and exits. Task and policy data in `weaver.db` is kept, closing the browser tab does not stop tasks, and there is no second daemon behind any of this. Weaver does not read, migrate, or delete `~/.config/weaver-desktop`.
 
+## 定时任务
+
+`schedules.*` 与网页共用 `weaver.v1` 命令和回执；多词与点号形式等价，支持 `--output json|jsonl|text`。写命令传稳定的 `--command-id`，重试同一次操作时复用它。下面创建每小时运行一次的脚本（省略 workspace 使用 CLI 调用方目录，也可显式指定）：
+
+```sh
+weaver schedules create --command-id hourly-check-create --input - <<'JSON'
+{"name":"每小时检查","kind":"script","enabled":true,"timing":{"mode":"interval","seconds":3600},"script":{"command":"git status --short","timeoutSeconds":60}}
+JSON
+weaver schedules list --output json
+```
+
+Agent 任务使用已配置的父 Agent profile；从 `weaver policy get` 选择有效 `ownerProfileId`，把下面的 `your-owner-profile` 替换为该 ID，再执行：
+
+```sh
+weaver schedules create --command-id daily-agent-create --input - <<'JSON'
+{"name":"每日项目检查","kind":"agent","enabled":true,"timing":{"mode":"cron","expression":"0 9 * * 1-5","timezone":"Asia/Shanghai"},"agent":{"goal":"检查项目状态并汇报风险，不推送代码","ownerProfileId":"your-owner-profile","acceptanceCriteria":["提供检查结果与实际验证证据"],"constraints":["保留现有未提交修改"]}}
+JSON
+```
+
+`interval.seconds` 为 1–31536000；cron 只接受 5/6 段表达式及有效 IANA 时区，不接受日期字符串。仅在服务运行时触发，同一任务不重叠。重启时，没有活跃运行的已启用记录将错过的触发最多合并执行一次，不逐次补跑；旧活跃脚本须先核实所属进程已结束或将其回收，再记为 `interrupted` 并释放活跃标记，其忙期间错过的触发直接跳过。无法核实进程身份时，记录保持活跃并显示恢复错误，不启动重叠运行。`schedules run` 接受请求返回 `running`，不代表成功；Agent 每次创建独立 root，经 `tasks.start` 启动父 Agent 链路，等任务终态才结算。通过 `schedules get` / `schedules runs` 查状态和分页历史摘要，Agent 的 `taskId` 可继续用 `tasks get` 查看。先分页取得 run id，再查询单条完整输出，避免历史日志累计超过 IPC 的 1 MiB 单帧上限：
+
+```sh
+weaver schedules runs --schedule-id <UUID> --input '{"offset":0,"limit":20}' --output json
+weaver schedules runs --schedule-id <UUID> --input '{"runId":"<run-UUID>"}' --output json
+```
+
+管理时用返回的 schedule `id` 和最新 `revision`；例如 `weaver schedules disable --schedule-id <UUID> --expected-revision <revision> --command-id <stable-id>` 只停用未来触发，正在运行的任务继续。手动 `schedules run` 可运行停用记录；`schedules cancel --schedule-id <UUID> --input '{"runId":"<active-run-UUID>"}' --command-id <stable-id>` 只取消指定本次运行。运行中只允许改 enabled，不能删除；内置额度刷新由 policy quota 配置管理，不能删除或改成任意脚本。
+
+脚本是显式 shell 命令，以 Weaver 服务账户权限执行；自定义脚本的执行与安全恢复当前要求 Linux 和可用的 systemd 用户会话，其他平台会明确失败。只使用可信命令与工作区，输出会进入运行历史，避免打印凭据。脚本超时为 1–86400 秒，取消会终止本次进程组。
+
+最多保存 100 条定时任务定义（包括内置任务），每条仅保留最近 100 次运行；单次 stdout 与 stderr 合并输出最多 64 KiB，超限会标记 `truncated`。分页摘要也可能带该标记，判断完整输出是否截断应读取单次详情。运行历史不是永久审计档案。完整输入、更新与分页例子见 [Agent 接口](docs/agent-interface.md#定时任务命令)。
+
 ## Skill entry and preflight
 
 The skill instructs the owner to use Weaver CLI for capability inspection, routing, bounded packages, dispatch, and result verification; workers never delegate. Before any dispatch the owner checks existing state with the CLI:

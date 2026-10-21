@@ -23,7 +23,6 @@ import { PolicyStore } from './policy/store';
 import { applyQuotaSnapshot, QuotaPolicyConflict } from './policy/quota';
 import type { QuotaRefreshInput } from '../shared/contracts/quota';
 import { QuotaProber } from './quota';
-import { QuotaScheduler } from './quota/scheduler';
 import { StallMonitor } from './stall';
 import { RpcError, parseRpcBody } from './rpc';
 import { createRpcHandlers } from './transport/handlers';
@@ -140,15 +139,10 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       return result;
     })());
   }
-  const scheduler = new QuotaScheduler({
-    config: () => policy!.snapshot().config,
-    refresh: async engine => { if (ready && !draining) await refreshQuota({ engine }); },
-    log: error => console.error(`Scheduled quota refresh failed: ${error instanceof Error ? error.message : 'unknown error'}`),
-  });
   const handlers = createRpcHandlers({
     track,
     refreshQuota,
-    quotaSchedule: () => scheduler.status(),
+    quotaSchedule: () => commands!.schedules.quotaStatus(),
     stall: () => stall!,
     freeProbe: () => freeProbe!,
     hellos,
@@ -242,10 +236,10 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       status: () => stall!.status(),
       unblock: engine => unblockEngine({ blocks: unblockBlocks, stall: stall!, freeProbe: freeProbe! }, engine),
     };
-    commands = new CommandHandler(manager, policy, undefined, undefined, diagnostics, options.ownerHost);
+    commands = new CommandHandler(manager, policy, undefined, undefined, diagnostics, options.ownerHost, {refreshQuota:engine=>refreshQuota({engine})});
     commands.transportStatus = 'ready';
     ready = true;
-    scheduler.start();
+    await commands.schedules.start();
     stall.start();
     freeProbe.start();
     runtime.port = http.port;
@@ -254,6 +248,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     return runtime;
   } catch (error) {
     ready = false;
+    await commands?.drain().catch(() => {});
     await quotaProber?.close().catch(() => {});
     await vite?.close().catch(() => {});
     await http?.close().catch(() => {});
@@ -269,7 +264,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     draining = true;
     ready = false;
     const ownerDrain = commands?.drain();
-    await scheduler.stop().catch(() => {});
+    await commands?.schedules.stop().catch(() => {});
     await stall?.stop().catch(() => {});
     await freeProbe?.stop().catch(() => {});
     await quotaProber?.close().catch(() => {});

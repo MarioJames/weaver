@@ -13,6 +13,7 @@ export interface CLIOptions {
   commandId?: string;
   input?: string;
   taskId?: string;
+  scheduleId?: string;
   dataDir: string;
   output: OutputFormat;
   forSeconds?: number;
@@ -36,7 +37,7 @@ export function positionals(argv: string[]): string[] {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg.startsWith('--')) { words.push(arg); continue; }
-    if (['--input', '--command-id', '--data-dir', '--task-id', '--port', '--output', '--for', '--agent', '--dir', '--timeout', '--engine', '--worker', '--field', '--expected-revision', '--manifest-digest', '--decision', '--comment', '--comment-file'].includes(arg)) i++;
+    if (['--input', '--command-id', '--data-dir', '--task-id', '--schedule-id', '--port', '--output', '--for', '--agent', '--dir', '--timeout', '--engine', '--worker', '--field', '--expected-revision', '--manifest-digest', '--decision', '--comment', '--comment-file'].includes(arg)) i++;
   }
   return words;
 }
@@ -78,7 +79,7 @@ export function parseCLI(argv: string[]): CLIOptions {
       options.expectedRevision = Number(value);
       continue;
     }
-    const key = ({ '--field': 'field', '--manifest-digest': 'manifestDigest', '--decision': 'decision', '--comment': 'comment', '--comment-file': 'commentFile', '--input': 'input', '--command-id': 'commandId', '--data-dir': 'dataDir', '--task-id': 'taskId', '--engine': 'engine', '--worker': 'worker' } as const)[arg as '--input'];
+    const key = ({ '--field': 'field', '--manifest-digest': 'manifestDigest', '--decision': 'decision', '--comment': 'comment', '--comment-file': 'commentFile', '--input': 'input', '--command-id': 'commandId', '--data-dir': 'dataDir', '--task-id': 'taskId', '--schedule-id': 'scheduleId', '--engine': 'engine', '--worker': 'worker' } as const)[arg as '--input'];
     if (!key) throw new LocalIPCError('INVALID_ARGUMENT', `Unknown option ${arg}`);
     const value = argv[++i];
     if (!value || value.startsWith('--')) throw new LocalIPCError('INVALID_ARGUMENT', `Missing value for ${arg}`);
@@ -94,6 +95,10 @@ export function parseCLI(argv: string[]): CLIOptions {
   if (!options.command && !options.input) throw new LocalIPCError('INVALID_ARGUMENT', 'A command or --input envelope is required');
   if (options.input && CLI_CATALOG.find(item => item.command === options.command)?.local) throw new LocalIPCError('INVALID_ARGUMENT', 'tasks wait/watch do not accept --input; use --task-id and --for');
   if (options.forSeconds !== undefined && !CLI_CATALOG.find(item => item.command === options.command)?.local) throw new LocalIPCError('INVALID_ARGUMENT', '--for is only valid for tasks wait and tasks watch');
+  if (options.scheduleId !== undefined) {
+    if (!['schedules.get', 'schedules.update', 'schedules.delete', 'schedules.enable', 'schedules.disable', 'schedules.run', 'schedules.cancel', 'schedules.runs'].includes(options.command ?? '')) throw new LocalIPCError('INVALID_ARGUMENT', '--schedule-id is only valid for schedules get/update/delete/enable/disable/run/cancel/runs');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.scheduleId)) throw new LocalIPCError('INVALID_ARGUMENT', '--schedule-id must be a UUID');
+  }
   if (options.engine !== undefined && !ENGINE_FLAG_COMMANDS.includes(options.command ?? '')) throw new LocalIPCError('INVALID_ARGUMENT', '--engine is only valid for engines penalty, engines unblock and engines models');
   if (options.worker !== undefined && !WORKER_FLAG_COMMANDS.includes(options.command ?? '')) throw new LocalIPCError('INVALID_ARGUMENT', '--worker is only valid for workers probe');
   if (options.cancel && options.command !== 'tasks.retry') throw new LocalIPCError('INVALID_ARGUMENT', '--cancel is only valid for tasks retry');

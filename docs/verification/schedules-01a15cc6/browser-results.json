@@ -1,0 +1,243 @@
+{
+  "stage": "浏览器已执行范围与最终 Pro 结果复审通过",
+  "url": "http://127.0.0.1:35955/#/schedules",
+  "base": "03dcc21bc56ce467d6b7ec795e91e6eac6cd6d96",
+  "uiDigests": {
+    "src/renderer/api/commands.ts": "0901a0ef0fe067cca99e62db8a2fb5e9f96bbd7ea0f89f4dcda7d879ab7b44cd",
+    "src/renderer/app/App.tsx": "97f6bfd74a0970b935bb43cad57ac538934b6ac36e5762e95ea8863d5fc429d4",
+    "src/renderer/features/schedules/ScheduleFormModal.tsx": "3eea0d6cefc8c697082f22153d87c7c69bda55635ae7b664fc5dd3675640c83b",
+    "src/renderer/features/schedules/ScheduleRunsDrawer.tsx": "a1c2518aa9fc194000b12fb2bca0ec2027803cb2a2575dc9caba812cbb7c134c",
+    "src/renderer/features/schedules/SchedulesPage.tsx": "81b63e82b0c7c7036a26884d6676f659075ebf9df5dd21754ad269d981796ab6",
+    "src/renderer/features/schedules/schedule-history.ts": "6a01ca2ce741e3391203334591fa0c2d9c93b25eecad2b1e0ef3cafef51a2853",
+    "src/renderer/features/schedules/schedule-mutations.ts": "5e7adb1498fd984c46f030ffe3b0ddf08b423509661d0f84ac6ed9b56835b761",
+    "src/renderer/features/schedules/schedules-style.ts": "67f75bc68589ffb9c3b6e918ac50c97674abaed1929bd34077c46eb57c33bb56",
+    "src/renderer/features/schedules/schedules-view.ts": "541c137159e812008a7b6119d862377af7718802c8e4d000c9fa8c36a8b8f6fd",
+    "src/renderer/features/schedules/useSchedules.ts": "b67e3e2db64a8ced84abe3d6cbe7893197e4d7d742de95ff634666bbd6f099b7",
+    "src/renderer/features/tasks/TasksPage.tsx": "941e59806ec008760851263659b3c9da76b78932b34a665e089c95d116be28cb",
+    "tests/renderer/renderer-command-intent.test.ts": "418e70dacb1fe0df47eca4db563f25efcd8c4db4700a76ed9517087e542a8ad9",
+    "tests/renderer/renderer-schedules-history.test.ts": "b9f8716145ef20eefdd445e557bc2584cbd76850ad120bcd4e6acdf390839dce",
+    "tests/renderer/renderer-schedules.test.ts": "c807d55535e6dafcf20f0c986d84d37b4fbd919af2f0b495ff51c5ebe28dba55"
+  },
+  "checks": [
+    {
+      "id": "navigation",
+      "status": "pass",
+      "evidence": "导航、类型脚本/Agent、名称搜索、无匹配清除真实交互"
+    },
+    {
+      "id": "create-edit",
+      "status": "pass",
+      "evidence": "UI创建停用脚本，编辑名称/命令，表单空workspace/命令错误，dirty关闭确认继续编辑，启停，disabled手动运行"
+    },
+    {
+      "id": "cas",
+      "status": "pass",
+      "evidence": "旧草稿revision2；CLI改同记录至3；后台刷新后保存拒绝，draft仍在",
+      "screenshot": "revision-conflict.png"
+    },
+    {
+      "id": "script-run",
+      "status": "pass",
+      "evidence": "browser-ok成功exitCode0，runId完整输出，详情单次读取失败可重试；长脚本字段及删除禁用，enabled停用后仍running，精确run取消终态cancelled"
+    },
+    {
+      "id": "agent",
+      "status": "pass",
+      "evidence": "UI保存codex_owner及goal/criteria/constraints/workspace；cron+America/New_York；2月30被拒留草稿；taskId=294ee84e-7fb9-4c97-92ee-0c15c2259fea精确打开browser-agent详情，UI取消终态cancelled；受控fixture，无模型推理"
+    },
+    {
+      "id": "builtin",
+      "status": "pass",
+      "evidence": "无删除/脚本编辑，单update enabled:true+timing1200秒，getQuota同源20min；恢复disabled，手动运行skipped无targets"
+    },
+    {
+      "id": "history",
+      "status": "pass",
+      "evidence": "53条50→加载更多53，15s刷新后旧页保留，最老browser-ok和已取消browser-long逐条输出匹配"
+    },
+    {
+      "id": "uncertain-create",
+      "status": "pass",
+      "evidence": "真实create完成后TypeError，Modal锁草稿，核对结果仅1条"
+    },
+    {
+      "id": "uncertain-delete",
+      "status": "pass",
+      "evidence": "服务器delete完成后TypeError，Modal内核对/重发可达，重发同commandId成功关闭"
+    },
+    {
+      "id": "uncertain-run",
+      "status": "pass",
+      "evidence": "服务器run完成后TypeError，等待script结束，再同ID a661cd31-2a2f-45ec-980d-a4a936a336b4重发；runId c6295efb-f56d-4220-97c6-7025edfe0984一致，history53→54"
+    },
+    {
+      "id": "narrow",
+      "status": "pass",
+      "evidence": "375×812列表/表单scrollWidth375；无横向溢出；取消表单焦点回新建按钮"
+    },
+    {
+      "id": "accessible-names",
+      "status": "pass",
+      "evidence": "stage2修复复验：数字/Select全部可读名称；数字label正确聚焦，Select label开启正确下拉且Escape回焦点"
+    },
+    {
+      "id": "numeric-validation",
+      "status": "pass",
+      "evidence": "stage2修复复验：间隔/超时0、负数、越界、小数、空值失焦保留并错误禁保存；正常901秒/30秒保存；builtin0/-1/4/1441/5.5/空拒绝且保留，25分钟同源保存disabled"
+    },
+    {
+      "id": "runtime-console",
+      "status": "partial",
+      "evidence": "stage2与最终清buffer只读复验console error0/未捕获异常0。跨阶段累计buffer再次出现React19 element.ref告警，原记录无stack/location，未精确重现，保留兼容性限制；HTTP错误0，所有bh artifact_errors空"
+    },
+    {
+      "id": "builtin-active",
+      "status": "not_run",
+      "evidence": "无enabled quota targets，运行即时skipped，未制造真实外部慢请求；不能验活跃中修改"
+    },
+    {
+      "id": "final-integration",
+      "status": "pass",
+      "evidence": "base03dcc21+最终38文件manifest，54条旧history保留且UI最老browser-ok可读；新script browser-final-ok成功exit0；长run60b28033-ff28-47f0-a64e-9e4b531bfc21精确取消；新Agent task1079680a-024d-4586-9c7b-fc4d45218637精准详情/取消，fixture无推理"
+    }
+  ],
+  "evidence": {
+    "dir": "/tmp/weaver-schedules-y92cil8v/.browser-harness/evidence/20261021T021316",
+    "artifact_errors": [],
+    "networkRequests": 704,
+    "httpErrors": 0
+  },
+  "resources": {
+    "session": "weaver-schedules-01a15cc6",
+    "profile": "/tmp/weaver-schedules-y92cil8v/browser-profile",
+    "browser": "已关闭任务Chrome；精确profile已删除；/proc无该user-data-dir进程",
+    "serviceOwner": "/root",
+    "serviceScope": "dev-weaver-schedules-01a15cc6.scope",
+    "servicePid": 425623,
+    "dataDir": "/tmp/weaver-schedules-y92cil8v/acceptance-data",
+    "scriptScopes": "无残留",
+    "serviceUrl": "http://127.0.0.1:35955",
+    "view": "/tmp/weaver-schedules-y92cil8v/validation-final",
+    "profileRemoved": true,
+    "serviceStatus": "已由owner精确停止；PID gone；scope not-found/inactive/dead",
+    "serviceRunning": false,
+    "dataStatus": "仅本任务acceptance-data/fixture-workspace/browser-workspace已删除；真实业务/开发数据未动",
+    "scheduleScopesRemaining": 0,
+    "retainedOwner": "/root",
+    "retainedResources": [
+      "validation",
+      "validation-final",
+      "task scratch"
+    ],
+    "retainedDependency": "final-view for exact verified Git commit; source/diagnostic evidence for task handoff",
+    "releaseWhen": "commit verified and Weaver receipts recorded"
+  },
+  "stage2Evidence": {
+    "target": "http://127.0.0.1:46235/#/schedules",
+    "mode": "task",
+    "session": "weaver-schedules-01a15cc6",
+    "reuse_page": true,
+    "profile_dir": "/tmp/weaver-schedules-y92cil8v/browser-profile",
+    "timestamp": "20261021T023051",
+    "evidence_dir": "/tmp/weaver-schedules-y92cil8v/.browser-harness/evidence/20261021T023051",
+    "artifacts": {
+      "screenshot": "screenshot.png",
+      "dom": "dom.json",
+      "console": "console.json",
+      "network_xhr": "network-xhr.json",
+      "network_errors": "network-errors.json"
+    },
+    "counts": {
+      "network_xhr": 1980,
+      "network_errors": 0
+    },
+    "artifact_errors": []
+  },
+  "versions": {
+    "stage1": {
+      "base": "c0287721cd192fa34080fac3ab8660959299fa57",
+      "url": "http://127.0.0.1:46235/#/schedules",
+      "purpose": "UI主要行为与初版缺陷发现"
+    },
+    "stage2": {
+      "url": "http://127.0.0.1:46235/#/schedules",
+      "formHash": "3eea0d6cefc8c697082f22153d87c7c69bda55635ae7b664fc5dd3675640c83b",
+      "purpose": "数字、标签修正复验"
+    },
+    "final": {
+      "base": "03dcc21bc56ce467d6b7ec795e91e6eac6cd6d96",
+      "sourceTree": "62dfd75572e7c262258841932a80bc645337174f",
+      "url": "http://127.0.0.1:35955/#/schedules",
+      "purpose": "最终后端集成核心复验",
+      "uiHashMatchesStage2": true
+    }
+  },
+  "finalEvidence": {
+    "target": "http://127.0.0.1:35955/#/schedules",
+    "mode": "task",
+    "session": "weaver-schedules-01a15cc6",
+    "reuse_page": true,
+    "profile_dir": "/tmp/weaver-schedules-y92cil8v/browser-profile",
+    "timestamp": "20261021T033111",
+    "evidence_dir": "/tmp/weaver-schedules-y92cil8v/.browser-harness/evidence/20261021T033111",
+    "artifacts": {
+      "screenshot": "screenshot.png",
+      "dom": "dom.json",
+      "console": "console.json",
+      "network_xhr": "network-xhr.json",
+      "network_errors": "network-errors.json"
+    },
+    "counts": {
+      "network_xhr": 5523,
+      "network_errors": 0
+    },
+    "artifact_errors": []
+  },
+  "proReview": {
+    "status": "passed",
+    "runId": "f9d4a342-3798-4f3b-9aae-07aa15aa6a1c",
+    "url": "https://chatgpt.com/g/g-p-6aa94760a174819191d12fd6fef4aee6-lobe-agent/c/6ad84409-ff40-83e9-aaa7-1d25ebd24c9a",
+    "archiveStored": true,
+    "archiveGaps": [],
+    "summary": "最终精确base/tree、38文件与完整patch经源码/截图复核，4个P1及临时测试路径P2关闭，无新增阻断。",
+    "boundary": "Pro核对源码、截图和独立验收材料；没有重跑1202项测试或浏览器验收。",
+    "base": "03dcc21bc56ce467d6b7ec795e91e6eac6cd6d96",
+    "sourceSnapshotTree": "62dfd75572e7c262258841932a80bc645337174f",
+    "patchSha256": "f2b8ab24d54b21f09b6cb184e88e1471af314b557b2d1222851065969dc0b675"
+  },
+  "reportValidation": {
+    "brokenLinks": 0,
+    "desktopWidth": 1440,
+    "narrowWidth": 375,
+    "horizontalOverflow": false,
+    "print": "浏览器PDF导出并检查首页；仅scratch留存"
+  },
+  "engineeringEvidence": {
+    "manifest": "snapshot-final-manifest.json",
+    "validation": "validation-final-summary.json",
+    "featureScan": "fa-scan.json",
+    "featureReview": "fa-review.json",
+    "featureReviewNote": "最终base03dcc21扫描12项seed-deep-import warning/candidate，经owner审查非阻断；原raw verdict needs-review保留，不等于零命中。"
+  },
+  "ownerResourceClose": {
+    "serviceUnit": "dev-weaver-schedules-01a15cc6.scope",
+    "servicePid": 425623,
+    "processReleased": true,
+    "unitState": [
+      "LoadState=not-found",
+      "ActiveState=inactive",
+      "SubState=dead"
+    ],
+    "scheduleScopesRemaining": 0,
+    "disposableDirectoriesRemoved": [
+      "acceptance-data",
+      "fixture-workspace",
+      "browser-workspace"
+    ],
+    "browserProfileAbsent": true,
+    "realDevelopmentAndBusinessDataTouched": false,
+    "retainedOwner": "/root",
+    "retainedDependency": "final-view for exact verified Git commit; source/diagnostic evidence for task handoff",
+    "releaseWhen": "commit verified and Weaver receipts recorded"
+  }
+}

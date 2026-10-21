@@ -1,4 +1,4 @@
-import { openSync, closeSync } from 'node:fs';
+import { openSync, closeSync, readdirSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -70,8 +70,39 @@ function owns(unit: string, info: ScopeInfo | undefined, invocation: string | un
   return true;
 }
 
+/** Recover a persisted, UUID-named run scope. Failure to verify ownership fails closed.
+ * Verify any existing invocation, then stop matching launchers before the final inspection. */
+export async function recoverOwnedScope(unit: string, invocation?: string): Promise<void> {
+  if (process.platform !== 'linux' || !/^weaver-schedule-[0-9a-f-]{36}$/.test(unit)) throw new Error('Cannot verify persisted schedule process identity');
+  const inspect = async (): Promise<ScopeInfo | undefined> => {
+    const result = await systemctl(['show', `${unit}.scope`, '-p', 'Id', '-p', 'LoadState', '-p', 'ActiveState', '-p', 'InvocationID', '--no-pager']);
+    if (/^LoadState=not-found$/m.test(result.stdout)) return undefined;
+    if (result.code !== 0 || !result.stdout.trim()) throw new Error(`Cannot inspect schedule scope ${unit}; restore the systemd user session and retry recovery`);
+    const info = parseShow(result.stdout);
+    if (!info.active) throw new Error(`Cannot inspect schedule scope ${unit}; ActiveState is missing`);
+    if (info.id !== `${unit}.scope` || invocation && info.invocation !== invocation) throw new Error(`Schedule scope ${unit} identity changed; manual ownership inspection required`);
+    return info;
+  };
+  // Reject a replaced scope before touching its launcher or descendants.
+  await inspect();
+  for (const entry of readdirSync('/proc')) {
+    if (!/^\d+$/.test(entry)) continue;
+    try {
+      const argv = readFileSync(`/proc/${entry}/cmdline`, 'utf8').split('\0');
+      if (argv[0]?.split('/').at(-1) === 'systemd-run' && argv.includes(`--unit=${unit}`)) process.kill(Number(entry), 'SIGKILL');
+    } catch { /* Process may have exited while enumerating. */ }
+  }
+  const info = await inspect();
+  if (!info || ['inactive','failed'].includes(info.active ?? '')) return;
+  const killed = await systemctl(['kill', '-s', 'SIGKILL', '--kill-whom=all', `${unit}.scope`]);
+  if (killed.code !== 0) throw new Error(`Could not terminate schedule scope ${unit}`);
+  await systemctl(['stop', `${unit}.scope`]);
+  const after = await inspect();
+  if (after && !['inactive','failed'].includes(after.active ?? '')) throw new Error(`Schedule scope ${unit} remains active`);
+}
+
 /** One systemd user scope around a fixed argv. Descendants stay in the cgroup and die with it. */
-export function startOwnedScope(options: { command: readonly string[]; cwd: string; env: NodeJS.ProcessEnv; stdin: string | null; stdinPath?: string; unit: string }): OwnedScope {
+export function startOwnedScope(options: { command: readonly string[]; cwd: string; env: NodeJS.ProcessEnv; stdin: string | null; stdinPath?: string; unit: string; detached?: boolean }): OwnedScope {
   if (process.platform !== 'linux') throw new Error('Owned CLI scope requires Linux systemd user sessions');
   const handle = new EventEmitter() as OwnedScope;
   let invocation: string | undefined;
@@ -92,7 +123,7 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
     '--user', '--scope', '--collect', '--quiet', `--unit=${unit}`, `--working-directory=${options.cwd}`,
     '-p', 'MemoryHigh=8G', '-p', 'MemoryMax=10G', '-p', 'KillMode=control-group',
     '--', ...options.command,
-  ], { cwd: options.cwd, env: options.env, shell: false, windowsHide: true, stdio: [promptFd ?? 'pipe', 'pipe', 'pipe'] }) as ChildProcessWithoutNullStreams;
+  ], { cwd: options.cwd, env: options.env, shell: false, windowsHide: true, detached: options.detached ?? false, stdio: [promptFd ?? 'pipe', 'pipe', 'pipe'] }) as ChildProcessWithoutNullStreams;
   } finally { if(promptFd!==undefined)closeSync(promptFd); }
   (handle as { unit: string }).unit = unit;
   handle.pid = child.pid;
@@ -118,7 +149,7 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
     verifyInFlight = true;
     void showScope(unit).then(info => {
       if (verifyStopped) return;
-      if (info?.invocation) invocation ??= info.invocation;
+      if (info?.invocation) { invocation ??= info.invocation; handle.emit('identity', invocation); }
       if (info?.mainPid) handle.pid = info.mainPid;
       if (owns(unit, info, invocation, child.pid)) stopVerify();
     }).catch(() => { /* show failures stay inside this turn */ }).finally(() => { verifyInFlight = false; });
@@ -224,6 +255,17 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
     handle.emit('error', error);
     exitCode = exitCode ?? 1;
     afterStop('SIGKILL');
+  });
+  // systemd-run can exit while a background descendant still holds its pipes. Start
+  // cgroup cleanup on exit; only publish close after the streams themselves close.
+  if (options.detached) child.on('exit', (code, signal) => {
+    childClosed = true;
+    exitCode = code;
+    if (!exitSignal && signal) exitSignal = signal;
+    stopVerify();
+    void stop(cancelRequested ? exitSignal ?? 'SIGTERM' : 'SIGTERM').catch(error => {
+      handle.emit('error', error instanceof Error ? error : new Error(String(error)));
+    });
   });
   child.on('close', (code, signal) => {
     childClosed = true;

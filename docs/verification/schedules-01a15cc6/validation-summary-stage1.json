@@ -1,0 +1,145 @@
+{
+  "base": "c0287721cd192fa34080fac3ab8660959299fa57",
+  "view": "/tmp/weaver-schedules-y92cil8v/validation",
+  "dependencyChange": "croner@10.0.1 only; manifest +1 line / lock +20 lines",
+  "excludedParallelFeature": "IM source/contracts/RPC/dependencies/build-script edits not copied",
+  "typecheck": {
+    "ok": true
+  },
+  "build": {
+    "ok": true,
+    "renderer": true,
+    "cli": true,
+    "mockWorker": true,
+    "builtCliSchedulesHelp": true
+  },
+  "tests": {
+    "ok": true,
+    "total": 1144,
+    "passed": 1144,
+    "failed": 0,
+    "skipped": 0,
+    "filesTotal": 107,
+    "finalGroups": [
+      {
+        "group": "physical task root; all files except two FD files",
+        "passed": 1108,
+        "failed": 0
+      },
+      {
+        "group": "owner-launch-async FD alias",
+        "passed": 6,
+        "failed": 0
+      },
+      {
+        "group": "server-cli FD alias",
+        "passed": 30,
+        "failed": 0
+      }
+    ],
+    "environmentAdjustments": [
+      "First full npm test: 1118/1144 passed, 26 Unix socket path-length failures with nested test-tmp.",
+      "Full FD alias rerun: 1139/1144 passed; physical-vs-alias workspace canonical expectations and a 30ms concurrency timing assertion caused 5 failures.",
+      "Final file-disjoint groups use physical root normally, two long socket-path files use controller-owned FD alias; concurrency reduced to 4. All source assertions and endpoint safety checks unchanged."
+    ],
+    "allTestFilesAccounted": true,
+    "sourceUnmodifiedForTests": true
+  },
+  "diffCheck": {
+    "ok": true,
+    "nonbehavioralUpdate": "quota-schedule EOF blank line removed"
+  },
+  "liveCli": {
+    "checks": [
+      {
+        "name": "builtin quota exists and background refresh is disabled",
+        "ok": true
+      },
+      {
+        "name": "CRUD update, caller cwd, revision conflict, enable and disable",
+        "ok": true
+      },
+      {
+        "name": "disabled manual run, terminal success, paged summary, runId detail and stable commandId replay",
+        "ok": true,
+        "runId": "31fd3628-55f0-4b5c-9a7d-2ecd834f15cc"
+      },
+      {
+        "name": "script failure exitCode",
+        "ok": true
+      },
+      {
+        "name": "script timeout and cleanup",
+        "ok": true
+      },
+      {
+        "name": "targeted cancel rejects wrong run and cancels active script",
+        "ok": true
+      },
+      {
+        "name": "delete nonactive user schedule",
+        "ok": true
+      },
+      {
+        "name": "automatic trigger runs and disabling stops future triggers",
+        "ok": true
+      },
+      {
+        "name": "Agent creates root, tasks.start launches fixture owner host, cancel settles task/run",
+        "ok": true,
+        "taskId": "eb300c8e-4956-4de1-8ca7-d539d1b4bb2e",
+        "modelInference": false
+      },
+      {
+        "name": "service reopen preserves definitions, history and output",
+        "ok": true
+      },
+      {
+        "name": "two concurrent real CLI clients accept exactly one active script claim",
+        "ok": true,
+        "accepted": 1,
+        "rejectedCode": "INVALID_STATE"
+      }
+    ],
+    "persistence": {
+      "id": "cf3933f5-d798-4fea-86c8-a7679221ba44",
+      "name": "CLI persistence fixture",
+      "total": 1,
+      "runId": "55afb4af-e2bd-401c-8ddc-eb6b7008000e"
+    },
+    "workspace": "/tmp/weaver-schedules-y92cil8v/fixture-workspace",
+    "modelInference": false,
+    "validatedAt": "2026-10-21T06:01:05.321Z",
+    "reopenedAt": "2026-10-21T06:01:52.358Z"
+  },
+  "service": {
+    "url": "http://127.0.0.1:46235",
+    "port": 46235,
+    "pid": 79895,
+    "unit": "dev-weaver-schedules-01a15cc6.scope",
+    "cwd": "/tmp/weaver-schedules-y92cil8v/validation",
+    "dataDir": "/tmp/weaver-schedules-y92cil8v/acceptance-data",
+    "owner": "/root",
+    "consumer": "browser-acceptance + parent independent CLI verification",
+    "releaseWhen": "both consumers complete; parent stops exact scope then removes task-owned view/data",
+    "ownerHost": "fixture only; no model inference or real Herdr",
+    "startedAt": "2026-10-21T06:01:51.335Z",
+    "snapshotBase": "c0287721cd192fa34080fac3ab8660959299fa57",
+    "stage": "fixed UI acceptance snapshot before pending backend Pro fixes",
+    "backendReviewStatus": "4 confirmed P1 pending separate worker repair; not final product approval"
+  },
+  "limits": [
+    "Agent owner launcher/closer are fixtures; no real model inference or Herdr launch was performed.",
+    "Live Agent flow verified create/start/taskId/fixture host/cancel terminal, not a real inference result.",
+    "Browser interaction and visual acceptance are handed to the browser worker.",
+    "Retained service/view/data belong to this task and must be reclaimed by owner after browser + parent CLI consumers complete."
+  ],
+  "stage": "fixed snapshot before pending backend Pro fixes",
+  "knownBlockingBackendFindings": [
+    "recovering cancellation releases claim before cleanup confirmation",
+    "normal script scope query failure treated as cleaned",
+    "raw truncation before redaction can leak a known secret prefix",
+    "Agent abort path does not confirm cancel terminal state"
+  ],
+  "pendingTestEngineeringFinding": "3 tests hard-code task scratch root; repair assigned separately"
+}

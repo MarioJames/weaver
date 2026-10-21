@@ -1,0 +1,273 @@
+[
+  {
+    "label": "name",
+    "expectedId": "_r_m_-name",
+    "actual": {
+      "id": "_r_m_-name",
+      "role": null
+    }
+  },
+  {
+    "label": "cron",
+    "expectedId": "_r_m_-cron",
+    "actual": {
+      "id": "_r_m_-cron",
+      "role": null
+    }
+  },
+  {
+    "label": "timezone",
+    "expectedId": "_r_m_-timezone",
+    "actual": {
+      "id": "",
+      "role": "presentation"
+    }
+  },
+  {
+    "label": "goal",
+    "expectedId": "_r_m_-goal",
+    "actual": {
+      "id": "_r_m_-goal",
+      "role": null
+    }
+  },
+  {
+    "label": "profile",
+    "expectedId": "_r_m_-profile",
+    "actual": {
+      "id": "",
+      "role": "presentation"
+    }
+  },
+  {
+    "label": "criteria",
+    "expectedId": "_r_m_-criteria",
+    "actual": {
+      "id": "_r_m_-criteria",
+      "role": null
+    }
+  },
+  {
+    "label": "constraints",
+    "expectedId": "_r_m_-constraints",
+    "actual": {
+      "id": "_r_m_-constraints",
+      "role": null
+    }
+  },
+  {
+    "builtinInput": "0",
+    "actual": {
+      "alerts": [
+        "内置任务：由「设置」页「额度」分组同源管理名称、类型、脚本内容和删除都不在这里修改；这里的启停和间隔与「设置」页的额度开关同源。",
+        "两次刷新之间的分钟数，也是「设置」页「额度」的间隔：5–1440 分钟的整数（300–86400 秒，整分钟）。内置任务不接受 cron 表达式。"
+      ],
+      "inputs": [
+        {
+          "id": "_r_59_-name",
+          "type": "text",
+          "value": "额度自动刷新"
+        },
+        {
+          "id": "_r_59_-interval",
+          "type": "text",
+          "value": "0"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "0"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ]
+    }
+  },
+  {
+    "builtinInput": "-1",
+    "actual": {
+      "alerts": [
+        "内置任务：由「设置」页「额度」分组同源管理名称、类型、脚本内容和删除都不在这里修改；这里的启停和间隔与「设置」页的额度开关同源。",
+        "两次刷新之间的分钟数，也是「设置」页「额度」的间隔：5–1440 分钟的整数（300–86400 秒，整分钟）。内置任务不接受 cron 表达式。"
+      ],
+      "inputs": [
+        {
+          "id": "_r_59_-name",
+          "type": "text",
+          "value": "额度自动刷新"
+        },
+        {
+          "id": "_r_59_-interval",
+          "type": "text",
+          "value": "-1"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "-1"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ]
+    }
+  },
+  {
+    "builtinInput": "4",
+    "actual": {
+      "alerts": [
+        "内置任务：由「设置」页「额度」分组同源管理名称、类型、脚本内容和删除都不在这里修改；这里的启停和间隔与「设置」页的额度开关同源。",
+        "两次刷新之间的分钟数，也是「设置」页「额度」的间隔：5–1440 分钟的整数（300–86400 秒，整分钟）。内置任务不接受 cron 表达式。"
+      ],
+      "inputs": [
+        {
+          "id": "_r_59_-name",
+          "type": "text",
+          "value": "额度自动刷新"
+        },
+        {
+          "id": "_r_59_-interval",
+          "type": "text",
+          "value": "4"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "4"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ]
+    }
+  },
+  {
+    "builtinInput": "1441",
+    "actual": {
+      "alerts": [
+        "内置任务：由「设置」页「额度」分组同源管理名称、类型、脚本内容和删除都不在这里修改；这里的启停和间隔与「设置」页的额度开关同源。",
+        "两次刷新之间的分钟数，也是「设置」页「额度」的间隔：5–1440 分钟的整数（300–86400 秒，整分钟）。内置任务不接受 cron 表达式。"
+      ],
+      "inputs": [
+        {
+          "id": "_r_59_-name",
+          "type": "text",
+          "value": "额度自动刷新"
+        },
+        {
+          "id": "_r_59_-interval",
+          "type": "text",
+          "value": "1441"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "1441"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ]
+    }
+  },
+  {
+    "builtinInput": "5.5",
+    "actual": {
+      "alerts": [
+        "内置任务：由「设置」页「额度」分组同源管理名称、类型、脚本内容和删除都不在这里修改；这里的启停和间隔与「设置」页的额度开关同源。",
+        "两次刷新之间的分钟数，也是「设置」页「额度」的间隔：5–1440 分钟的整数（300–86400 秒，整分钟）。内置任务不接受 cron 表达式。"
+      ],
+      "inputs": [
+        {
+          "id": "_r_59_-name",
+          "type": "text",
+          "value": "额度自动刷新"
+        },
+        {
+          "id": "_r_59_-interval",
+          "type": "text",
+          "value": "5.5"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "5.5"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ]
+    }
+  },
+  {
+    "builtinInput": "",
+    "actual": {
+      "alerts": [
+        "内置任务：由「设置」页「额度」分组同源管理名称、类型、脚本内容和删除都不在这里修改；这里的启停和间隔与「设置」页的额度开关同源。",
+        "两次刷新之间的分钟数，也是「设置」页「额度」的间隔：5–1440 分钟的整数（300–86400 秒，整分钟）。内置任务不接受 cron 表达式。"
+      ],
+      "inputs": [
+        {
+          "id": "_r_59_-name",
+          "type": "text",
+          "value": "额度自动刷新"
+        },
+        {
+          "id": "_r_59_-interval",
+          "type": "text",
+          "value": ""
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "5.5"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ]
+    }
+  },
+  {
+    "savedBuiltin": {
+      "enabled": false,
+      "intervalMinutes": 25,
+      "lastRunAt": "2026-10-21T06:11:35.068Z",
+      "nextRunAt": null
+    }
+  },
+  {
+    "deleteCancelRetains": true
+  }
+]

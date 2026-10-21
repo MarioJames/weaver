@@ -1,0 +1,153 @@
+{
+  "oldHistory": {
+    "old": [
+      {
+        "exitCode": null,
+        "finishedAt": "2026-10-21T06:09:37.361Z",
+        "id": "75069b9f-2f63-45d0-8db7-2cea818d56b6",
+        "output": "browser-long\n",
+        "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+        "startedAt": "2026-10-21T06:09:33.640Z",
+        "status": "cancelled",
+        "trigger": "manual",
+        "truncated": false
+      },
+      {
+        "exitCode": 0,
+        "finishedAt": "2026-10-21T06:09:10.507Z",
+        "id": "ae579ffe-f246-49a8-b809-7eaa417666cd",
+        "output": "browser-ok\n",
+        "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+        "startedAt": "2026-10-21T06:09:08.924Z",
+        "status": "succeeded",
+        "trigger": "manual",
+        "truncated": false
+      }
+    ],
+    "total": 54
+  },
+  "oldUI": [
+    "已成功\n手动\n02:09\n→\n02:09\n退出码 0\n输出\nbrowser-ok\n\n收起，回到摘要"
+  ],
+  "successUI": [
+    "已成功\n手动\n03:29\n→\n03:29\n退出码 0\n输出\nbrowser-final-ok\n\n收起，回到摘要"
+  ],
+  "running": {
+    "finishedAt": null,
+    "id": "60b28033-ff28-47f0-a64e-9e4b531bfc21",
+    "output": "",
+    "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+    "startedAt": "2026-10-21T07:29:14.383Z",
+    "status": "running",
+    "trigger": "manual",
+    "truncated": false
+  },
+  "cancelled": {
+    "exitCode": null,
+    "finishedAt": "2026-10-21T07:29:16.724Z",
+    "id": "60b28033-ff28-47f0-a64e-9e4b531bfc21",
+    "output": "browser-final-long\n",
+    "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+    "startedAt": "2026-10-21T07:29:14.383Z",
+    "status": "cancelled",
+    "trigger": "manual",
+    "truncated": false
+  },
+  "successRun": {
+    "exitCode": 0,
+    "finishedAt": "2026-10-21T07:29:48.546Z",
+    "id": "e78f5a51-81b4-464a-b149-2d659f748c55",
+    "output": "browser-final-ok\n",
+    "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+    "startedAt": "2026-10-21T07:29:46.897Z",
+    "status": "succeeded",
+    "trigger": "manual",
+    "truncated": false
+  },
+  "agentTaskId": "1079680a-024d-4586-9c7b-fc4d45218637",
+  "agentDetailUI": {
+    "dialogs": [
+      "操作已完成。",
+      "已创建「browser-final-agent」。",
+      "任务详情\nbrowser-final-agent\n执行中\n取消任务\n概览\nPrompt\n要求 2\n时间线 3\n产物 0\n验收\n接续\n更新时间\n03:30\n父 Agent\ncodex_owner\n工作目录\n/tmp/weaver-schedules-y92cil8v/browser-workspace\n父 Agent · 在 Herdr 中运行\nAgent\nfixture-no-model\nHerdr 会话\nschedule-acceptance-fixture\n宿主工作区\nschedule-acceptance-fixture\n窗格\nschedule-acceptance-fixture:p1\n启动时间\n03:30\n子任务 · 0\n父 Agent 正在准备和拆分任务，子任务会自动显示在这里。"
+    ],
+    "url": "http://127.0.0.1:35955/#/tasks"
+  },
+  "agentTask": {
+    "id": "1079680a-024d-4586-9c7b-fc4d45218637",
+    "status": "running",
+    "title": "browser-final-agent",
+    "workspace": "/tmp/weaver-schedules-y92cil8v/browser-workspace"
+  },
+  "agentCancelledUI": "\"\n        - StaticText \"上次\"\n        - time\n          - StaticText \"03:18\"\n        - StaticText \"结果\"\n        - StaticText \"已成功\"\n        - LabelText\n          - StaticText \"启用 browser-final-agent\"\n        - switch \"启用 browser-final-agent\" [checked=false, ref=e50]\n        - StaticText \"browser-final-agent\"\n        - StaticText \"Agent\"\n        - StaticText \"已停用\"\n        - button \"立即运行 browser-final-agent\" [ref=e51]\n          - image\n          - StaticText \"运行\"\n        - button \"查看 browser-final-agent 的运行历史\" [ref=e52]\n          - image\n          - StaticText \"历史\"\n        - button \"编辑 browser-final-agent\" [ref=e53]\n          - image\n          - StaticText \"编辑\"\n        - button \"删除 browser-final-agent\" [ref=e54]\n          - image\n          - StaticText \"删除\"\n        - StaticText \"规则\"\n        - StaticText \"每 15 分钟\"\n        - StaticText \"目录\"\n        - StaticText \"/tmp/weaver-schedules-y92cil8v/browser-workspace\"\n        - StaticText \"下次\"\n        - time\n          - StaticText \"时间未知\"\n        - StaticText \"上次\"\n        - time\n          - StaticText \"03:30\"\n        - StaticText \"结果\"\n        - StaticText \"已取消\"\n    - generic\n      - region \"Notifications\" [ref=e55]\n      - region \"Notifications\" [ref=e56]\n      - region \"Notifications\" [ref=e57]\n      - region \"Notifications\" [ref=e58]\n      - region \"Notifications\" [ref=e59]\n      - region \"Notifications\" [ref=e60]\n      - dialog \"运行历史 · browser-final-agent\"\n        - generic\n          - heading \"运行历史 · browser-final-agent\" [level=2, ref=e67]\n          - button \"Close\" [ref=e68]\n          - region \"已取消的运行\" [ref=e69]\n            - StaticText \"已取消\"\n            - StaticText \"手动\"\n            - time\n              - StaticText \"03:30\"\n            - StaticText \"→\"\n            - time\n              - StaticText \"03:30\"\n            - generic\n              - StaticText \"任务 1079680a-024d-4586-9c7b-fc4d45218637\"\n            - button \"在任务页查看 1079680a-024d-4586-9c7b-fc4d45218637\" [ref=e70]\n              - image\n              - StaticText \"在任务页查看\"",
+  "finalDefinitions": [
+    {
+      "createdAt": "2026-10-21T06:08:05.133Z",
+      "enabled": false,
+      "id": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "kind": "script",
+      "lastRun": {
+        "exitCode": 0,
+        "finishedAt": "2026-10-21T07:29:48.546Z",
+        "id": "e78f5a51-81b4-464a-b149-2d659f748c55",
+        "output": "browser-final-ok\n",
+        "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+        "startedAt": "2026-10-21T07:29:46.897Z",
+        "status": "succeeded",
+        "trigger": "manual",
+        "truncated": false
+      },
+      "lastRunAt": "2026-10-21T07:29:46.897Z",
+      "name": "browser-script",
+      "nextRunAt": null,
+      "revision": 14,
+      "script": {
+        "command": "printf 'browser-final-ok\\n'",
+        "timeoutSeconds": 30
+      },
+      "timing": {
+        "mode": "interval",
+        "seconds": 901
+      },
+      "updatedAt": "2026-10-21T07:29:46.416Z",
+      "workspace": "/tmp/weaver-schedules-y92cil8v/browser-workspace"
+    },
+    {
+      "agent": {
+        "acceptanceCriteria": [
+          "Exact task association and cancellation"
+        ],
+        "constraints": [
+          "No real model or Herdr"
+        ],
+        "goal": "Verify final controlled Agent control flow",
+        "ownerProfileId": "codex_owner"
+      },
+      "createdAt": "2026-10-21T07:30:12.737Z",
+      "enabled": false,
+      "id": "4e8df156-547a-47a7-af44-0618b55d9932",
+      "kind": "agent",
+      "lastRun": {
+        "finishedAt": "2026-10-21T07:30:17.970Z",
+        "id": "d07b6693-49a6-4a26-831f-7b4d5b1f0d8b",
+        "output": "",
+        "scheduleId": "4e8df156-547a-47a7-af44-0618b55d9932",
+        "startedAt": "2026-10-21T07:30:13.346Z",
+        "status": "cancelled",
+        "taskId": "1079680a-024d-4586-9c7b-fc4d45218637",
+        "trigger": "manual",
+        "truncated": false
+      },
+      "lastRunAt": "2026-10-21T07:30:13.346Z",
+      "name": "browser-final-agent",
+      "nextRunAt": null,
+      "revision": 1,
+      "timing": {
+        "mode": "interval",
+        "seconds": 900
+      },
+      "updatedAt": "2026-10-21T07:30:12.737Z",
+      "workspace": "/tmp/weaver-schedules-y92cil8v/browser-workspace"
+    }
+  ]
+}

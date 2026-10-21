@@ -1,0 +1,364 @@
+{
+  "stage": "final integration verified; owner reports final Pro passed; service and disposable acceptance data released",
+  "base": "03dcc21bc56ce467d6b7ec795e91e6eac6cd6d96",
+  "sourceSnapshotTree": "62dfd75572e7c262258841932a80bc645337174f",
+  "patchSha256": "f2b8ab24d54b21f09b6cb184e88e1471af314b557b2d1222851065969dc0b675",
+  "backendPatchSha256": "6cf7bf360ada33246d4fb3363675797a766596c1f5f39831ee94b95e0b6448be",
+  "view": "/tmp/weaver-schedules-y92cil8v/validation-final",
+  "productPaths": [
+    "README.md",
+    "docs/agent-interface.md",
+    "package-lock.json",
+    "package.json",
+    "src/cli/catalog.ts",
+    "src/cli/input.ts",
+    "src/cli/parse.ts",
+    "src/main/adapters/cli/scope.ts",
+    "src/main/application/commands/registry.ts",
+    "src/main/commands.ts",
+    "src/main/quota/scheduler.ts",
+    "src/main/runtime.ts",
+    "src/main/schedules/input.ts",
+    "src/main/schedules/process.ts",
+    "src/main/schedules/service.ts",
+    "src/main/schedules/store.ts",
+    "src/main/transport/handlers.ts",
+    "src/renderer/api/commands.ts",
+    "src/renderer/app/App.tsx",
+    "src/renderer/features/schedules/ScheduleFormModal.tsx",
+    "src/renderer/features/schedules/ScheduleRunsDrawer.tsx",
+    "src/renderer/features/schedules/SchedulesPage.tsx",
+    "src/renderer/features/schedules/schedule-history.ts",
+    "src/renderer/features/schedules/schedule-mutations.ts",
+    "src/renderer/features/schedules/schedules-style.ts",
+    "src/renderer/features/schedules/schedules-view.ts",
+    "src/renderer/features/schedules/useSchedules.ts",
+    "src/renderer/features/tasks/TasksPage.tsx",
+    "src/shared/contracts/commands.ts",
+    "src/shared/contracts/schedules.ts",
+    "tests/cli/cli-schedules.test.ts",
+    "tests/main/commands.test.ts",
+    "tests/main/quota-schedule.test.ts",
+    "tests/main/schedules-recovery.test.ts",
+    "tests/main/schedules.test.ts",
+    "tests/renderer/renderer-command-intent.test.ts",
+    "tests/renderer/renderer-schedules-history.test.ts",
+    "tests/renderer/renderer-schedules.test.ts"
+  ],
+  "productFiles": 38,
+  "preservation": {
+    "latestCommittedPiAndTaskBoardIncluded": true,
+    "cliSharedUiFromFixedOldViewScheduleDeltaOnly": true,
+    "nonScheduleCatalogContentAndOrderEqualsLatestHEAD": true,
+    "uncommittedIMWorkerParallelPinsWebShutdownExcluded": true,
+    "dependencyChange": "croner@10.0.1 only; package +1 / lock +20"
+  },
+  "checks": {
+    "typecheck": true,
+    "build": true,
+    "builtCliMachineHelp": true,
+    "diffCheck": true,
+    "tests": {
+      "files": 112,
+      "total": 1202,
+      "passed": 1202,
+      "failed": 0,
+      "skipped": 0,
+      "groups": [
+        {
+          "name": "physical",
+          "counts": {
+            "tests": 1166,
+            "pass": 1166,
+            "fail": 0,
+            "skipped": 0
+          },
+          "fileCount": 110
+        },
+        {
+          "name": "short-path",
+          "counts": {
+            "tests": 36,
+            "pass": 36,
+            "fail": 0,
+            "skipped": 0
+          },
+          "fileCount": 2
+        }
+      ],
+      "fileSetsDisjointAndComplete": true,
+      "environment": "physical task-root TMPDIR normally; owner-launch-async + server-cli use temporary controller FD aliases to same task-owned test-tmp; concurrency 4; no test/safety assertions weakened"
+    }
+  },
+  "independentRedaction": {
+    "candidateProbeWasNotFinalAcceptance": true,
+    "beforeProcessSha256": "5b1c5ce40872483c60f74b4739e31f7e90e2bd8313a2d1ece9d9252d43e507ea",
+    "beforeUtf8Leaked": true,
+    "afterProcessSha256": "6e516d9252678c457880b2b50928d25e702dbb02205565eb2d18a00d0d4d0415",
+    "afterUtf8Leaked": false,
+    "afterUtf8ReplacementCharacterPresent": false,
+    "cases": [
+      {
+        "case": "ascii-repeated-raw-tail",
+        "exitCode": 0,
+        "name": "ascii-repeated-raw-tail",
+        "status": "succeeded",
+        "outputBytes": 10,
+        "outputWithinLimit": true,
+        "truncated": true,
+        "leakedSyntheticPrefix": false,
+        "replacementCharacterPresent": false,
+        "cutMidUtf8": false,
+        "syntheticSecretBytes": 123,
+        "rawBytes": 73800,
+        "captureLimit": 65659,
+        "exceedsGeneric131072Bound": false
+      },
+      {
+        "case": "utf8-mid-codepoint-raw-tail",
+        "exitCode": 0,
+        "name": "utf8-mid-codepoint-raw-tail",
+        "status": "succeeded",
+        "outputBytes": 10,
+        "outputWithinLimit": true,
+        "truncated": true,
+        "leakedSyntheticPrefix": false,
+        "replacementCharacterPresent": false,
+        "cutMidUtf8": true,
+        "syntheticSecretBytes": 119,
+        "rawBytes": 83300,
+        "captureLimit": 65655,
+        "exceedsGeneric131072Bound": false
+      },
+      {
+        "case": "large-secret-over-context-bound",
+        "exitCode": 0,
+        "name": "large-secret-over-context-bound",
+        "status": "succeeded",
+        "outputBytes": 10,
+        "outputWithinLimit": true,
+        "truncated": true,
+        "leakedSyntheticPrefix": false,
+        "replacementCharacterPresent": false,
+        "cutMidUtf8": false,
+        "syntheticSecretBytes": 90001,
+        "rawBytes": 360004,
+        "captureLimit": 155537,
+        "exceedsGeneric131072Bound": true
+      }
+    ],
+    "syntheticOnlyNoRealCredentialsReadOrPrinted": true,
+    "reusedOnLatestBaseBecauseProductProcessHashUnchanged": true
+  },
+  "priorUpgradeStage8429": {
+    "beforeCount": 5,
+    "afterCount": 5,
+    "allPriorIdsAndDefinitionsRetained": true,
+    "base": "8429249277c3fa73505fd23f1bbb6e164f7a9c7a",
+    "dataDir": "/tmp/weaver-schedules-y92cil8v/acceptance-data",
+    "cleared": false,
+    "priorRunId": "55afb4af-e2bd-401c-8ddc-eb6b7008000e",
+    "priorCompleteOutputRetained": true
+  },
+  "priorFullCliStage8429": {
+    "checks": [
+      {
+        "name": "builtin quota exists and background refresh is disabled",
+        "ok": true
+      },
+      {
+        "name": "CRUD update, caller cwd, revision conflict, enable and disable",
+        "ok": true
+      },
+      {
+        "name": "disabled manual run, terminal success, paged summary, runId detail and stable commandId replay",
+        "ok": true,
+        "runId": "483847d4-dfb3-444f-9d68-001b3a49c4de"
+      },
+      {
+        "name": "script failure exitCode",
+        "ok": true
+      },
+      {
+        "name": "script timeout and cleanup",
+        "ok": true
+      },
+      {
+        "name": "targeted cancel rejects wrong run and cancels active script",
+        "ok": true
+      },
+      {
+        "name": "delete nonactive user schedule",
+        "ok": true
+      },
+      {
+        "name": "automatic trigger runs and disabling stops future triggers",
+        "ok": true
+      },
+      {
+        "name": "Agent creates root, tasks.start launches fixture owner host, cancel settles task/run",
+        "ok": true,
+        "taskId": "59fbf31c-a358-45ee-9970-b9ea4d7b110b",
+        "modelInference": false
+      },
+      {
+        "name": "service reopen preserves definitions, history and output",
+        "ok": true
+      },
+      {
+        "name": "two concurrent real CLI clients accept exactly one active script claim",
+        "ok": true,
+        "accepted": 1,
+        "rejectedCode": "INVALID_STATE"
+      }
+    ],
+    "persistence": {
+      "id": "bc9195b8-a578-4c2a-a7e5-670893887f3e",
+      "name": "CLI persistence fixture",
+      "total": 1,
+      "runId": "847cdc61-3f09-4089-8613-8d680cfa4346"
+    },
+    "workspace": "/tmp/weaver-schedules-y92cil8v/fixture-workspace",
+    "modelInference": false,
+    "validatedAt": "2026-10-21T07:18:21.883Z",
+    "reopenedAt": "2026-10-21T07:18:53.860Z",
+    "integrationBase": "8429249277c3fa73505fd23f1bbb6e164f7a9c7a"
+  },
+  "latestBaseSmoke": {
+    "base": "03dcc21bc56ce467d6b7ec795e91e6eac6cd6d96",
+    "checks": [
+      {
+        "check": "all prior nonempty DB definitions survive latest committed-base upgrade",
+        "ok": true,
+        "beforeCount": 8,
+        "afterCount": 8
+      },
+      {
+        "check": "prior exact runId full output and terminal status survive upgrade",
+        "ok": true,
+        "runId": "847cdc61-3f09-4089-8613-8d680cfa4346"
+      },
+      {
+        "check": "policy loads upgraded worker parallel schema; fixture account probes stay disabled",
+        "ok": true
+      },
+      {
+        "check": "latest base real script CRUD/enable/disable/run/history/stable receipt smoke",
+        "ok": true
+      },
+      {
+        "check": "latest worker-parallel base Agent root/tasks.start/fixture owner/cancel terminal smoke",
+        "ok": true,
+        "taskId": "388d0c11-74c7-4bdc-84f0-c7bd5718a547",
+        "modelInference": false
+      }
+    ],
+    "preservedDataDir": "/tmp/weaver-schedules-y92cil8v/acceptance-data",
+    "cleared": false,
+    "modelInference": false
+  },
+  "faScan": {
+    "rawVerdict": "needs-review",
+    "findingCount": 12,
+    "ownerReview": {
+      "base": "03dcc21bc56ce467d6b7ec795e91e6eac6cd6d96",
+      "sourceDigest": "34ab89694be5efbc421247ed5d1835563e336c56172e3eda0bf2abacea99b8d5",
+      "scannerActualExitCode": 0,
+      "rawVerdict": "needs-review",
+      "rawFindingCount": 12,
+      "ownerReviewed": true,
+      "nonBlocking": true,
+      "reason": "12项全部为seed-deep-import warning/candidate；规则明确深度本身不是硬性违规。项目tsconfig无paths/alias，vite/package无alias、exports/imports入口，沿用既有相对导入，不为候选新建配置。",
+      "evidence": {
+        "typecheckPassed": true,
+        "buildPassed": true,
+        "latestBaseRealScriptAndAgentSmokePassed": true,
+        "scannerRawUnmodified": true
+      },
+      "reviewScope": "只认定这些导入候选为已人工审查非阻断；不把raw needs-review改为零命中或替代browser验收"
+    }
+  },
+  "service": {
+    "url": "http://127.0.0.1:35955",
+    "port": 35955,
+    "pid": 425623,
+    "unit": "dev-weaver-schedules-01a15cc6.scope",
+    "cwd": "/tmp/weaver-schedules-y92cil8v/validation-final",
+    "dataDir": "/tmp/weaver-schedules-y92cil8v/acceptance-data",
+    "owner": "/root",
+    "consumer": "none; service released",
+    "releaseWhen": "completed by owner",
+    "snapshotBase": "03dcc21bc56ce467d6b7ec795e91e6eac6cd6d96",
+    "stage": "stopped and verified absent",
+    "ownerHost": "fixture only; no model inference or real Herdr",
+    "startedAt": "2026-10-21T07:26:28.551Z",
+    "running": false,
+    "patchSha256": "f2b8ab24d54b21f09b6cb184e88e1471af314b557b2d1222851065969dc0b675",
+    "sourceSnapshotTree": "62dfd75572e7c262258841932a80bc645337174f",
+    "snapshotManifestSha256": "859c482cd3885dd0ead450af62999d344f00063cdfedac6353ad5b81b1b3e866",
+    "processReleased": true,
+    "unitState": [
+      "LoadState=not-found",
+      "ActiveState=inactive",
+      "SubState=dead"
+    ],
+    "historicalUrlOnly": true
+  },
+  "limits": [
+    "Agent launcher/closer were controlled fixtures: actual tasks.create/start/taskId/cancel terminal verified, no model inference or real Herdr launch.",
+    "Script execution/recovery requires Linux systemd user sessions.",
+    "Final browser interaction evidence belongs to the browser worker; no browser operation was performed by this worker."
+  ],
+  "retention": {
+    "owner": "/root",
+    "consumers": [
+      "parent exact commit verification and Weaver receipt handoff"
+    ],
+    "releaseWhen": "commit verified and Weaver receipts recorded",
+    "oldView": "/tmp/weaver-schedules-y92cil8v/validation",
+    "finalView": "/tmp/weaver-schedules-y92cil8v/validation-final",
+    "dataDir": "/tmp/weaver-schedules-y92cil8v/acceptance-data",
+    "dataRemoved": true,
+    "disposableDirectoriesRemoved": [
+      "acceptance-data",
+      "fixture-workspace",
+      "browser-workspace"
+    ],
+    "browserProfileAbsent": true,
+    "retainedDependency": "final-view for exact verified Git commit; source/diagnostic evidence for task handoff"
+  },
+  "previousIntegrationStage": {
+    "base": "8429249277c3fa73505fd23f1bbb6e164f7a9c7a",
+    "sourceSnapshotTree": "92e5cd81525fb1c6d2d8018ed03090b31c8b385c",
+    "testsPassed": 1185,
+    "path": "/tmp/weaver-schedules-y92cil8v/stage-final-8429",
+    "isFinalVersion": false
+  },
+  "resourceClosure": {
+    "serviceUnit": "dev-weaver-schedules-01a15cc6.scope",
+    "servicePid": 425623,
+    "processReleased": true,
+    "unitState": [
+      "LoadState=not-found",
+      "ActiveState=inactive",
+      "SubState=dead"
+    ],
+    "scheduleScopesRemaining": 0,
+    "disposableDirectoriesRemoved": [
+      "acceptance-data",
+      "fixture-workspace",
+      "browser-workspace"
+    ],
+    "browserProfileAbsent": true,
+    "realDevelopmentAndBusinessDataTouched": false,
+    "retainedOwner": "/root",
+    "retainedDependency": "final-view for exact verified Git commit; source/diagnostic evidence for task handoff",
+    "releaseWhen": "commit verified and Weaver receipts recorded",
+    "receiptPath": "/tmp/weaver-schedules-y92cil8v/owner-resource-close.json",
+    "workerReadOnlyVerified": {
+      "unitNotFoundInactiveDead": true,
+      "pidAbsent": true,
+      "allThreeDisposableDirectoriesAbsent": true
+    }
+  }
+}

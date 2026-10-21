@@ -9,9 +9,9 @@ export type DispatchNext =
  | {action:'run_subagent';model:string;effort:string;prompt:string;then:string}
 
 /** Logical commands that change state; each needs a commandId and returns a receipt. */
-export const WRITE_COMMANDS = ['owners.attach','owners.spawn','owners.describe','owners.switch','owners.launch','owners.continuation.configure','tasks.create','tasks.start','tasks.update','tasks.complete','tasks.describe','tasks.retry','tasks.cancel','packages.create','workers.spawn','workers.complete','results.deliver','results.ack','reviews.submit','engines.unblock'] as const;
+export const WRITE_COMMANDS = ['owners.attach','owners.spawn','owners.describe','owners.switch','owners.launch','owners.continuation.configure','tasks.create','tasks.start','tasks.update','tasks.complete','tasks.describe','tasks.retry','tasks.cancel','packages.create','workers.spawn','workers.complete','results.deliver','results.ack','reviews.submit','engines.unblock','schedules.create','schedules.update','schedules.enable','schedules.disable','schedules.delete','schedules.run','schedules.cancel'] as const;
 /** Logical commands that only read. */
-export const READ_COMMANDS = ['workspaces.list','capabilities.get','sync.snapshot','sync.status','owners.list','owners.get','owners.continuation.get','tasks.get','tasks.list','tasks.events','tasks.results','tasks.health','artifacts.read','packages.get','operations.get','observability.get','observability.export','engines.health','engines.penalty'] as const;
+export const READ_COMMANDS = ['workspaces.list','capabilities.get','sync.snapshot','sync.status','owners.list','owners.get','owners.continuation.get','tasks.get','tasks.list','tasks.events','tasks.results','tasks.health','artifacts.read','packages.get','operations.get','observability.get','observability.export','engines.health','engines.penalty','schedules.list','schedules.get','schedules.runs'] as const;
 /** CLI-only polling commands built on tasks.get, tasks.events and tasks.health; the server has no command for them. */
 export const POLL_COMMANDS = ['tasks.wait', 'tasks.watch'] as const;
 export type WriteCommand = typeof WRITE_COMMANDS[number];

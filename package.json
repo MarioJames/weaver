@@ -24,6 +24,7 @@
     "@lobehub/ui": "^5.64.4",
     "antd": "^6.6.6",
     "antd-style": "^4.1.0",
+    "croner": "10.0.1",
     "lucide-react": "^1.59.0",
     "motion": "^12.43.0",
     "react": "^19.3.1",

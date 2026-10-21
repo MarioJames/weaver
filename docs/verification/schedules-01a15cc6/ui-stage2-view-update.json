@@ -1,0 +1,9 @@
+{
+  "path": "src/renderer/features/schedules/ScheduleFormModal.tsx",
+  "before": "8623ea036e9f4a8f1358180610397f67714d350fdf67a56c19c8bd185d7475ac",
+  "after": "3eea0d6cefc8c697082f22153d87c7c69bda55635ae7b664fc5dd3675640c83b",
+  "sourceMarker": "ui-a11y-result.md",
+  "typecheckPassed": true,
+  "fullTestsAndBuildRepeated": false,
+  "note": "Only FormModal source updated under paused browser; existing 1144-test/build results are UI-stage1 evidence. Backend remains before pending Pro fixes."
+}

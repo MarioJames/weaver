@@ -1,0 +1,44 @@
+[
+  {
+    "field": "timezone",
+    "expanded": {
+      "control": [
+        {
+          "expanded": "false",
+          "id": "_r_i_"
+        },
+        {
+          "expanded": "true",
+          "id": "_r_m_-timezone"
+        },
+        {
+          "expanded": "false",
+          "id": "_r_m_-profile"
+        }
+      ],
+      "listbox": true
+    },
+    "focusAfterEscape": "_r_m_-timezone"
+  },
+  {
+    "field": "profile",
+    "expanded": {
+      "control": [
+        {
+          "expanded": "false",
+          "id": "_r_i_"
+        },
+        {
+          "expanded": "false",
+          "id": "_r_m_-timezone"
+        },
+        {
+          "expanded": "true",
+          "id": "_r_m_-profile"
+        }
+      ],
+      "listbox": true
+    },
+    "focusAfterEscape": "_r_m_-profile"
+  }
+]

@@ -31,6 +31,16 @@ export const CLI_CATALOG: CatalogCommand[] = [
   cmd('capabilities.get', { usage: 'capabilities | capabilities get' }),
   cmd('sync.snapshot', { usage: 'sync snapshot' }),
   cmd('sync.status', { inputFields: {"required": {}, "optional": {"after": "integer"}}, usage: 'sync status [--input <json>]' }),
+  cmd('schedules.list', { inputFields: { required: {}, optional: { kind: 'script | agent', enabled: 'boolean' } }, usage: 'schedules list [--input <json>]' }),
+  cmd('schedules.get', { inputFields: { required: { scheduleId: 'UUID' }, optional: {} }, usage: 'schedules get --schedule-id <UUID>' }),
+  cmd('schedules.create', { inputFields: { required: { name: 'string', kind: 'script | agent', timing: '{mode: interval, seconds: 1–31536000} | {mode: cron, expression: 5/6 fields, timezone: IANA}' }, optional: { enabled: 'boolean', workspace: 'nonempty path; omitted uses caller cwd', script: '{command: shell command, timeoutSeconds: 1–86400}; required for script', agent: '{goal, ownerProfileId, acceptanceCriteria?: string[], constraints?: string[]}; required for agent' }, notes: 'Creates a user schedule; builtin is reserved. Explicit scripts execute with the Weaver service account permissions.' }, usage: 'schedules create --input <json> --command-id <id>' }),
+  cmd('schedules.update', { inputFields: { required: { scheduleId: 'UUID', expectedRevision: 'integer', patch: 'partial schedule input; kind cannot change' }, optional: {}, notes: 'Builtin schedules allow enabled/timing only. While running, only enabled may change.' }, usage: 'schedules update --schedule-id <UUID> --expected-revision <integer> --input <json> --command-id <id>' }),
+  cmd('schedules.delete', { inputFields: { required: { scheduleId: 'UUID', expectedRevision: 'integer' }, optional: {}, notes: 'Builtin and active schedules cannot be deleted.' }, usage: 'schedules delete --schedule-id <UUID> --expected-revision <integer> --command-id <id>' }),
+  cmd('schedules.enable', { inputFields: { required: { scheduleId: 'UUID', expectedRevision: 'integer' }, optional: {} }, usage: 'schedules enable --schedule-id <UUID> --expected-revision <integer> --command-id <id>' }),
+  cmd('schedules.disable', { inputFields: { required: { scheduleId: 'UUID', expectedRevision: 'integer' }, optional: {}, notes: 'Stops future triggers; an active run continues.' }, usage: 'schedules disable --schedule-id <UUID> --expected-revision <integer> --command-id <id>' }),
+  cmd('schedules.run', { inputFields: { required: { scheduleId: 'UUID' }, optional: { expectedRevision: 'integer' }, notes: 'Returns running, not success. Disabled schedules may run manually; active schedules cannot overlap.' }, usage: 'schedules run --schedule-id <UUID> [--expected-revision <integer>] --command-id <id>' }),
+  cmd('schedules.cancel', { inputFields: { required: { scheduleId: 'UUID', runId: 'UUID of the active run' }, optional: {}, notes: 'Cancels only the named run: terminates a script process group or calls tasks.cancel for an Agent.' }, usage: 'schedules cancel --schedule-id <UUID> --input <json> --command-id <id>' }),
+  cmd('schedules.runs', { inputFields: { required: { scheduleId: 'UUID' }, optional: { offset: 'nonnegative integer', limit: 'bounded positive integer', runId: 'UUID; fetch one run with full bounded output' }, notes: 'Returns {runs,total}, newest first with output summaries. Use runId for one complete run: {runs:[run],total:1}. Agent runs include taskId when available; summaries keep paged responses within IPC limits.' }, usage: 'schedules runs --schedule-id <UUID> [--input <json>]' }),
   cmd('owners.list', { usage: 'owners list' }),
   cmd('owners.get', { inputFields: {"required": {"ownerId": "UUID"}, "optional": {}}, usage: 'owners get --input <json>' }),
   cmd('owners.continuation.get', { inputFields: {"required": {"taskId": "UUID"}, "optional": {}}, usage: 'owners continuation get --task-id <id>' }),
@@ -93,6 +103,7 @@ export function catalogCommand(words: string[]): CatalogCommand | undefined {
 }
 
 export const CLI_VALUE_OPTIONS = {
+  '--schedule-id': 'Schedule UUID; schedules get/update/delete/enable/disable/run/cancel/runs only',
   '--field': 'Scalar response path; non-streaming read commands only; exclusive with --output/--json',
   '--expected-revision': 'Nonnegative safe integer; only commands with expectedRevision input',
   '--manifest-digest': 'Result digest; results ack and reviews submit',
@@ -105,7 +116,7 @@ const catalogHelp = CLI_CATALOG.map(item => `  ${item.usage}`).join('\n');
 export const CLI_HELP = `Weaver
 
   weaver web [--port <0-65535>] [--data-dir <path>] [--no-open] [--dev] [--output json|jsonl|text]
-  weaver <command> [--data-dir <path>] [--output json|jsonl|text] [--input <file|->] [--command-id <id>] [--task-id <id>] [--for <seconds>] [--engine <id>] [--worker <id>] [--cancel]
+  weaver <command> [--data-dir <path>] [--output json|jsonl|text] [--input <file|->] [--command-id <id>] [--task-id <id>] [--schedule-id <UUID>] [--for <seconds>] [--engine <id>] [--worker <id>] [--cancel]
   weaver skills install [--agent claude-code,codex] [--dir <skills-root>] [--link] [--force] [--output json|text]
   weaver server <status|start|stop|install|uninstall> [--port <0-65535>] [--data-dir <path>] [--output json|text] [--force] [--timeout <seconds>]
   weaver --skill prints the bundled agents-weaver SKILL.md
@@ -113,6 +124,8 @@ export const CLI_HELP = `Weaver
 weaver web runs the Weaver service in the foreground: loopback HTTP on 127.0.0.1 and the authenticated Unix CLI socket. Closing a browser does not stop tasks. Ctrl+C stops new work and cancels workers this process started. Task and policy data in weaver.db is kept. Default data directory: $XDG_DATA_HOME/weaver or ~/.local/share/weaver.
 
 If a client command reports APP_NOT_RUNNING, start: weaver server start
+
+--schedule-id <UUID> fills scheduleId on schedules get/update/delete/enable/disable/run/cancel/runs only. Conflicting --input values, repeated flags and invalid UUIDs are rejected. Supply runId for schedules cancel or schedules runs detail in --input. All schedules commands also accept dotted names (for example schedules.runs).
 
 --field <response.path> reads one scalar from a successful non-streaming read response, e.g. tasks get --field data.revision or tasks results --field data.manifestDigest. Strings are written literally; numbers, booleans and null use JSON spelling, followed by one newline. Missing or non-scalar fields fail. It cannot be combined with --output/--json. Failed commands keep the error envelope and nonzero exit code. Always check exit status before using a captured field.
 

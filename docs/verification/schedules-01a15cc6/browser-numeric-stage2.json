@@ -1,0 +1,422 @@
+[
+  {
+    "name": "间隔秒数",
+    "input": "0",
+    "actual": {
+      "inputs": [
+        {
+          "id": "_r_2e_-name",
+          "type": "text",
+          "value": "browser-script"
+        },
+        {
+          "id": "_r_2e_-interval",
+          "type": "text",
+          "value": "0"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "0"
+        },
+        {
+          "id": "_r_2e_-timeout",
+          "type": "text",
+          "value": "30"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "30"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ],
+      "text": "编辑定时任务\n名称\n*\n类型\n*\n类型创建后不可更改。\n脚本\nAgent\n时间规则\n*\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n固定间隔\ncron 表达式\n间隔秒数\n*\n\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n\n工作目录\n*\n执行时所在的项目目录。请选择 Weaver 所在机器上已存在的绝对路径目录。\n/tmp/weaver-schedules-y92cil8v/browser-workspace\n执行脚本\n*\n在本机系统 shell 中执行显式命令，适合备份、清理、巡检等固定动作。命令由 Weaver 服务账号运行，可以像普通程序一样调用 weaver CLI 等本机可执行文件。\n超时秒数\n*\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n启用\n停用后不再按时间规则自动触发；仍能在这里或列表里手动执行。\n取消\n保存修改"
+    }
+  },
+  {
+    "name": "间隔秒数",
+    "input": "-1",
+    "actual": {
+      "inputs": [
+        {
+          "id": "_r_2e_-name",
+          "type": "text",
+          "value": "browser-script"
+        },
+        {
+          "id": "_r_2e_-interval",
+          "type": "text",
+          "value": "-1"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "-1"
+        },
+        {
+          "id": "_r_2e_-timeout",
+          "type": "text",
+          "value": "30"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "30"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ],
+      "text": "编辑定时任务\n名称\n*\n类型\n*\n类型创建后不可更改。\n脚本\nAgent\n时间规则\n*\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n固定间隔\ncron 表达式\n间隔秒数\n*\n\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n\n工作目录\n*\n执行时所在的项目目录。请选择 Weaver 所在机器上已存在的绝对路径目录。\n/tmp/weaver-schedules-y92cil8v/browser-workspace\n执行脚本\n*\n在本机系统 shell 中执行显式命令，适合备份、清理、巡检等固定动作。命令由 Weaver 服务账号运行，可以像普通程序一样调用 weaver CLI 等本机可执行文件。\n超时秒数\n*\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n启用\n停用后不再按时间规则自动触发；仍能在这里或列表里手动执行。\n取消\n保存修改"
+    }
+  },
+  {
+    "name": "间隔秒数",
+    "input": "31536001",
+    "actual": {
+      "inputs": [
+        {
+          "id": "_r_2e_-name",
+          "type": "text",
+          "value": "browser-script"
+        },
+        {
+          "id": "_r_2e_-interval",
+          "type": "text",
+          "value": "31536001"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "31536001"
+        },
+        {
+          "id": "_r_2e_-timeout",
+          "type": "text",
+          "value": "30"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "30"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ],
+      "text": "编辑定时任务\n名称\n*\n类型\n*\n类型创建后不可更改。\n脚本\nAgent\n时间规则\n*\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n固定间隔\ncron 表达式\n间隔秒数\n*\n\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n\n工作目录\n*\n执行时所在的项目目录。请选择 Weaver 所在机器上已存在的绝对路径目录。\n/tmp/weaver-schedules-y92cil8v/browser-workspace\n执行脚本\n*\n在本机系统 shell 中执行显式命令，适合备份、清理、巡检等固定动作。命令由 Weaver 服务账号运行，可以像普通程序一样调用 weaver CLI 等本机可执行文件。\n超时秒数\n*\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n启用\n停用后不再按时间规则自动触发；仍能在这里或列表里手动执行。\n取消\n保存修改"
+    }
+  },
+  {
+    "name": "间隔秒数",
+    "input": "1.5",
+    "actual": {
+      "inputs": [
+        {
+          "id": "_r_2e_-name",
+          "type": "text",
+          "value": "browser-script"
+        },
+        {
+          "id": "_r_2e_-interval",
+          "type": "text",
+          "value": "1.5"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "1.5"
+        },
+        {
+          "id": "_r_2e_-timeout",
+          "type": "text",
+          "value": "30"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "30"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ],
+      "text": "编辑定时任务\n名称\n*\n类型\n*\n类型创建后不可更改。\n脚本\nAgent\n时间规则\n*\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n固定间隔\ncron 表达式\n间隔秒数\n*\n\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n\n工作目录\n*\n执行时所在的项目目录。请选择 Weaver 所在机器上已存在的绝对路径目录。\n/tmp/weaver-schedules-y92cil8v/browser-workspace\n执行脚本\n*\n在本机系统 shell 中执行显式命令，适合备份、清理、巡检等固定动作。命令由 Weaver 服务账号运行，可以像普通程序一样调用 weaver CLI 等本机可执行文件。\n超时秒数\n*\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n启用\n停用后不再按时间规则自动触发；仍能在这里或列表里手动执行。\n取消\n保存修改"
+    }
+  },
+  {
+    "name": "间隔秒数",
+    "input": "",
+    "actual": {
+      "inputs": [
+        {
+          "id": "_r_2e_-name",
+          "type": "text",
+          "value": "browser-script"
+        },
+        {
+          "id": "_r_2e_-interval",
+          "type": "text",
+          "value": ""
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "1.5"
+        },
+        {
+          "id": "_r_2e_-timeout",
+          "type": "text",
+          "value": "30"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "30"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ],
+      "text": "编辑定时任务\n名称\n*\n类型\n*\n类型创建后不可更改。\n脚本\nAgent\n时间规则\n*\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n固定间隔\ncron 表达式\n间隔秒数\n*\n\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n\n工作目录\n*\n执行时所在的项目目录。请选择 Weaver 所在机器上已存在的绝对路径目录。\n/tmp/weaver-schedules-y92cil8v/browser-workspace\n执行脚本\n*\n在本机系统 shell 中执行显式命令，适合备份、清理、巡检等固定动作。命令由 Weaver 服务账号运行，可以像普通程序一样调用 weaver CLI 等本机可执行文件。\n超时秒数\n*\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n启用\n停用后不再按时间规则自动触发；仍能在这里或列表里手动执行。\n取消\n保存修改"
+    }
+  },
+  {
+    "name": "超时秒数 单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。",
+    "input": "0",
+    "actual": {
+      "inputs": [
+        {
+          "id": "_r_2e_-name",
+          "type": "text",
+          "value": "browser-script"
+        },
+        {
+          "id": "_r_2e_-interval",
+          "type": "text",
+          "value": "900"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "900"
+        },
+        {
+          "id": "_r_2e_-timeout",
+          "type": "text",
+          "value": "0"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "0"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ],
+      "text": "编辑定时任务\n名称\n*\n类型\n*\n类型创建后不可更改。\n脚本\nAgent\n时间规则\n*\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n固定间隔\ncron 表达式\n间隔秒数\n*\n工作目录\n*\n执行时所在的项目目录。请选择 Weaver 所在机器上已存在的绝对路径目录。\n/tmp/weaver-schedules-y92cil8v/browser-workspace\n执行脚本\n*\n在本机系统 shell 中执行显式命令，适合备份、清理、巡检等固定动作。命令由 Weaver 服务账号运行，可以像普通程序一样调用 weaver CLI 等本机可执行文件。\n超时秒数\n*\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n\n启用\n停用后不再按时间规则自动触发；仍能在这里或列表里手动执行。\n取消\n保存修改"
+    }
+  },
+  {
+    "name": "超时秒数 单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。",
+    "input": "-1",
+    "actual": {
+      "inputs": [
+        {
+          "id": "_r_2e_-name",
+          "type": "text",
+          "value": "browser-script"
+        },
+        {
+          "id": "_r_2e_-interval",
+          "type": "text",
+          "value": "900"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "900"
+        },
+        {
+          "id": "_r_2e_-timeout",
+          "type": "text",
+          "value": "-1"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "-1"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ],
+      "text": "编辑定时任务\n名称\n*\n类型\n*\n类型创建后不可更改。\n脚本\nAgent\n时间规则\n*\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n固定间隔\ncron 表达式\n间隔秒数\n*\n工作目录\n*\n执行时所在的项目目录。请选择 Weaver 所在机器上已存在的绝对路径目录。\n/tmp/weaver-schedules-y92cil8v/browser-workspace\n执行脚本\n*\n在本机系统 shell 中执行显式命令，适合备份、清理、巡检等固定动作。命令由 Weaver 服务账号运行，可以像普通程序一样调用 weaver CLI 等本机可执行文件。\n超时秒数\n*\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n\n启用\n停用后不再按时间规则自动触发；仍能在这里或列表里手动执行。\n取消\n保存修改"
+    }
+  },
+  {
+    "name": "超时秒数 单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。",
+    "input": "86401",
+    "actual": {
+      "inputs": [
+        {
+          "id": "_r_2e_-name",
+          "type": "text",
+          "value": "browser-script"
+        },
+        {
+          "id": "_r_2e_-interval",
+          "type": "text",
+          "value": "900"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "900"
+        },
+        {
+          "id": "_r_2e_-timeout",
+          "type": "text",
+          "value": "86401"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "86401"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ],
+      "text": "编辑定时任务\n名称\n*\n类型\n*\n类型创建后不可更改。\n脚本\nAgent\n时间规则\n*\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n固定间隔\ncron 表达式\n间隔秒数\n*\n工作目录\n*\n执行时所在的项目目录。请选择 Weaver 所在机器上已存在的绝对路径目录。\n/tmp/weaver-schedules-y92cil8v/browser-workspace\n执行脚本\n*\n在本机系统 shell 中执行显式命令，适合备份、清理、巡检等固定动作。命令由 Weaver 服务账号运行，可以像普通程序一样调用 weaver CLI 等本机可执行文件。\n超时秒数\n*\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n\n启用\n停用后不再按时间规则自动触发；仍能在这里或列表里手动执行。\n取消\n保存修改"
+    }
+  },
+  {
+    "name": "超时秒数 单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。",
+    "input": "1.5",
+    "actual": {
+      "inputs": [
+        {
+          "id": "_r_2e_-name",
+          "type": "text",
+          "value": "browser-script"
+        },
+        {
+          "id": "_r_2e_-interval",
+          "type": "text",
+          "value": "900"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "900"
+        },
+        {
+          "id": "_r_2e_-timeout",
+          "type": "text",
+          "value": "1.5"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "1.5"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ],
+      "text": "编辑定时任务\n名称\n*\n类型\n*\n类型创建后不可更改。\n脚本\nAgent\n时间规则\n*\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n固定间隔\ncron 表达式\n间隔秒数\n*\n工作目录\n*\n执行时所在的项目目录。请选择 Weaver 所在机器上已存在的绝对路径目录。\n/tmp/weaver-schedules-y92cil8v/browser-workspace\n执行脚本\n*\n在本机系统 shell 中执行显式命令，适合备份、清理、巡检等固定动作。命令由 Weaver 服务账号运行，可以像普通程序一样调用 weaver CLI 等本机可执行文件。\n超时秒数\n*\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n\n启用\n停用后不再按时间规则自动触发；仍能在这里或列表里手动执行。\n取消\n保存修改"
+    }
+  },
+  {
+    "name": "超时秒数 单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。",
+    "input": "",
+    "actual": {
+      "inputs": [
+        {
+          "id": "_r_2e_-name",
+          "type": "text",
+          "value": "browser-script"
+        },
+        {
+          "id": "_r_2e_-interval",
+          "type": "text",
+          "value": "900"
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "900"
+        },
+        {
+          "id": "_r_2e_-timeout",
+          "type": "text",
+          "value": ""
+        },
+        {
+          "id": "",
+          "type": "number",
+          "value": "1.5"
+        },
+        {
+          "id": "",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "save": [
+        true
+      ],
+      "text": "编辑定时任务\n名称\n*\n类型\n*\n类型创建后不可更改。\n脚本\nAgent\n时间规则\n*\n两次触发之间间隔的秒数，1–31536000 之间的整数。\n固定间隔\ncron 表达式\n间隔秒数\n*\n工作目录\n*\n执行时所在的项目目录。请选择 Weaver 所在机器上已存在的绝对路径目录。\n/tmp/weaver-schedules-y92cil8v/browser-workspace\n执行脚本\n*\n在本机系统 shell 中执行显式命令，适合备份、清理、巡检等固定动作。命令由 Weaver 服务账号运行，可以像普通程序一样调用 weaver CLI 等本机可执行文件。\n超时秒数\n*\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n\n单次执行的最长秒数，1–86400 之间的整数；超时后本次运行的进程会被终止。\n\n启用\n停用后不再按时间规则自动触发；仍能在这里或列表里手动执行。\n取消\n保存修改"
+    }
+  }
+]

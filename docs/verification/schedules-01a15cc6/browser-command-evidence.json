@@ -1,0 +1,337 @@
+[
+  {
+    "command": "schedules.create",
+    "commandId": "ac0f6e60-8061-4945-81d6-b618c3746f86",
+    "args": {
+      "name": "browser-script",
+      "kind": "script",
+      "enabled": false,
+      "timing": {
+        "mode": "interval",
+        "seconds": 900
+      },
+      "workspace": "/tmp/weaver-schedules-y92cil8v/browser-workspace",
+      "script": {
+        "command": "printf 'browser-ok\\n'",
+        "timeoutSeconds": 3600
+      }
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.update",
+    "commandId": "0f9eb21e-5e0c-4dd6-ab43-26e7270991c3",
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "expectedRevision": 1,
+      "patch": {
+        "name": "browser-draft-stale",
+        "kind": "script",
+        "enabled": false,
+        "timing": {
+          "mode": "interval",
+          "seconds": 900
+        },
+        "workspace": "/tmp/weaver-schedules-y92cil8v/browser-workspace",
+        "script": {
+          "command": "printf browser-draft",
+          "timeoutSeconds": 3600
+        }
+      }
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.update",
+    "commandId": "da451518-9e27-40d4-bc92-2b80690106a0",
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "expectedRevision": 2,
+      "patch": {
+        "name": "browser-old-draft",
+        "kind": "script",
+        "enabled": false,
+        "timing": {
+          "mode": "interval",
+          "seconds": 900
+        },
+        "workspace": "/tmp/weaver-schedules-y92cil8v/browser-workspace",
+        "script": {
+          "command": "printf browser-old-draft",
+          "timeoutSeconds": 3600
+        }
+      }
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.update",
+    "commandId": "eac2b4e2-691f-46e0-b86a-31a464a51373",
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "expectedRevision": 3,
+      "patch": {
+        "name": "browser-script",
+        "kind": "script",
+        "enabled": false,
+        "timing": {
+          "mode": "interval",
+          "seconds": 900
+        },
+        "workspace": "/tmp/weaver-schedules-y92cil8v/browser-workspace",
+        "script": {
+          "command": "printf 'browser-ok\\n'",
+          "timeoutSeconds": 3600
+        }
+      }
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.enable",
+    "commandId": "e85b2e1e-38da-485f-a20e-c9b1bd701014",
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "expectedRevision": 4
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.disable",
+    "commandId": "064391a3-50d1-40ea-b107-ae4d1b7c312c",
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "expectedRevision": 5
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.run",
+    "commandId": "6b148312-efd6-46ec-a120-5092cfc79566",
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "expectedRevision": 6
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.runs",
+    "commandId": null,
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "runId": "ae579ffe-f246-49a8-b809-7eaa417666cd"
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.update",
+    "commandId": "0a0f1e0d-f25d-46ff-b620-6e7f41b3d4a7",
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "expectedRevision": 6,
+      "patch": {
+        "name": "browser-script",
+        "kind": "script",
+        "enabled": false,
+        "timing": {
+          "mode": "interval",
+          "seconds": 900
+        },
+        "workspace": "/tmp/weaver-schedules-y92cil8v/browser-workspace",
+        "script": {
+          "command": "printf 'browser-long\\n'; sleep 120",
+          "timeoutSeconds": 3600
+        }
+      }
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.enable",
+    "commandId": "71f6e421-4df2-46a5-8ba9-2bbfee1135d6",
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "expectedRevision": 7
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.run",
+    "commandId": "403c2282-acaa-4a79-aaa2-bc9891800d74",
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "expectedRevision": 8
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.update",
+    "commandId": "49e08ed2-c35a-479b-b42c-0c23732ab769",
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "expectedRevision": 8,
+      "patch": {
+        "enabled": false
+      }
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.cancel",
+    "commandId": "f0737f6f-c596-48f4-bef0-7321d7d60cd1",
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "runId": "75069b9f-2f63-45d0-8db7-2cea818d56b6"
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.create",
+    "commandId": "0f8478fe-a847-4d25-a806-cf2f23eea669",
+    "args": {
+      "name": "browser-agent",
+      "kind": "agent",
+      "enabled": false,
+      "timing": {
+        "mode": "cron",
+        "expression": "0 0 30 2 *",
+        "timezone": "America/New_York"
+      },
+      "workspace": "/tmp/weaver-schedules-y92cil8v/browser-workspace",
+      "agent": {
+        "goal": "browser controlled Agent flow",
+        "ownerProfileId": "codex_owner",
+        "acceptanceCriteria": [
+          "browser fixture criteria"
+        ],
+        "constraints": [
+          "No model inference"
+        ]
+      }
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.create",
+    "commandId": "f7016fe4-d23e-40f2-bb6a-7e0881484767",
+    "args": {
+      "name": "browser-agent",
+      "kind": "agent",
+      "enabled": false,
+      "timing": {
+        "mode": "cron",
+        "expression": "0 9 * * *",
+        "timezone": "America/New_York"
+      },
+      "workspace": "/tmp/weaver-schedules-y92cil8v/browser-workspace",
+      "agent": {
+        "goal": "browser controlled Agent flow",
+        "ownerProfileId": "codex_owner",
+        "acceptanceCriteria": [
+          "browser fixture criteria"
+        ],
+        "constraints": [
+          "No model inference"
+        ]
+      }
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.run",
+    "commandId": "6bcde726-cd88-4574-aac2-bb77cda92385",
+    "args": {
+      "scheduleId": "e6bbc2a5-a6e8-4224-a6c0-dca059ff2057",
+      "expectedRevision": 1
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.update",
+    "commandId": "87af334e-fc40-474c-ab8a-cdd88bee1af4",
+    "args": {
+      "scheduleId": "b9f2049f-b32a-4b0e-a469-85808427b7df",
+      "expectedRevision": 1,
+      "patch": {
+        "timing": {
+          "mode": "interval",
+          "seconds": 1200
+        },
+        "enabled": true
+      }
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.disable",
+    "commandId": "4ea5e737-9772-4c40-a3e4-e8eff6361122",
+    "args": {
+      "scheduleId": "b9f2049f-b32a-4b0e-a469-85808427b7df",
+      "expectedRevision": 2
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.run",
+    "commandId": "4c38cf12-9e47-4f20-ad17-1a2929a298ed",
+    "args": {
+      "scheduleId": "b9f2049f-b32a-4b0e-a469-85808427b7df",
+      "expectedRevision": 3
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.delete",
+    "commandId": "11ac3204-4e43-4909-ae6c-4c61b2758836",
+    "args": {
+      "scheduleId": "e6bbc2a5-a6e8-4224-a6c0-dca059ff2057",
+      "expectedRevision": 1
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.delete",
+    "commandId": "11ac3204-4e43-4909-ae6c-4c61b2758836",
+    "args": {
+      "scheduleId": "e6bbc2a5-a6e8-4224-a6c0-dca059ff2057",
+      "expectedRevision": 1
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.runs",
+    "commandId": null,
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "runId": "ae579ffe-f246-49a8-b809-7eaa417666cd"
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.runs",
+    "commandId": null,
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "runId": "75069b9f-2f63-45d0-8db7-2cea818d56b6"
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.run",
+    "commandId": "a661cd31-2a2f-45ec-980d-a4a936a336b4",
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "expectedRevision": 10
+    },
+    "status": 200
+  },
+  {
+    "command": "schedules.run",
+    "commandId": "a661cd31-2a2f-45ec-980d-a4a936a336b4",
+    "args": {
+      "scheduleId": "68f3cb5a-d029-49fe-a33b-0d257bd247fb",
+      "expectedRevision": 10
+    },
+    "status": 200
+  }
+]

@@ -96,9 +96,72 @@ RPC 动词（method-wrapped，目录条目带 `rpc:{method,arity}`）：`policy 
 
 本地 wait/watch：`tasks wait --task-id` 与 `tasks watch --task-id` 的 `--for` 都是 1–600 **秒**，省略时两条命令共用同一个缺省 `min(600 秒, herdr.max_wait_minutes × 60 秒)`（先把分钟换算成秒，再压到 600 秒上限），读不到策略时退回 30 秒；缺省 `max_wait_minutes` 为 15，于是缺省等待 600 秒。两者轮询 `tasks get`，任务一进入终态就写出那份快照并以 0 退出；`tasks wait` 遇到 health 为 `stalled` 时也以 0 提前返回，带 `reason:'stalled'`、health 和重试/取消提示，`watch` 仅在 text/jsonl 提示卡住转变并继续观察；`watch` 另外增量拉 `tasks events`，事件只在 `--output jsonl|text` 下逐行输出。它们只是轮询，不是第二调度器；超时按 `TIMEOUT` 失败退出，退出不取消任务。`herdr.max_wait_minutes` 是「父 Agent 查看间隔上限」这一个设置，Weaver 从不把它当 子 Agent 的执行 kill 时限——真实执行不会因为到这个分钟数就被停止（见 [architecture](architecture.md)）。
 
+### 定时任务命令
+
+全部沿用逻辑 command 信封，不增加 RPC 动词；多词命令和 `schedules.get` 等点号形式等价，支持 `--output json|jsonl|text`。`--schedule-id <UUID>` 仅用于 get/update/delete/enable/disable/run/cancel/runs；也可将 scheduleId 放进 JSON，两个入口值不一致时拒绝。`--expected-revision` 与 JSON 的 expectedRevision 同义且冲突时拒绝。写操作用稳定 commandId 重放原回执；revision 冲突后先重新 get，再用新 commandId 提交新操作。
+
+| 命令 | args 与结果 |
+| --- | --- |
+| `schedules.list` | `{kind?:'script'\|'agent',enabled?:boolean}` → `{schedules}` |
+| `schedules.get` | `{scheduleId}` → definition（id、revision、timing、nextRunAt、activeRunId、lastRun 等） |
+| `schedules.create` | `{name,kind,timing,enabled?,workspace?,script?,agent?}` → definition；script/agent 按 kind 必填，builtin 禁止伪造 |
+| `schedules.update` | `{scheduleId,expectedRevision,patch}` → definition；kind 不可改，运行中只改 enabled，内置只改 enabled/timing |
+| `schedules.enable` / `schedules.disable` | `{scheduleId,expectedRevision}` → definition；停用不取消当前运行 |
+| `schedules.delete` | `{scheduleId,expectedRevision}` → `{deleted:true,scheduleId}`；活跃或内置记录禁止删除 |
+| `schedules.run` | `{scheduleId,expectedRevision?}` → running 的 run；停用时也可手动运行，活跃时拒绝重叠 |
+| `schedules.cancel` | `{scheduleId,runId}` → run；只取消匹配的活跃运行，script 终止进程组，Agent 走 tasks.cancel |
+| `schedules.runs` | `{scheduleId,offset?,limit?,runId?}` → `{runs,total}`；普通分页返回新到旧摘要，带 runId 返回 `{runs:[完整run],total:1}` |
+
+可复制脚本例子（省略 workspace 时使用调用方 cwd；相对路径也从调用方解析，更新记录不会补入 cwd）：
+
+```sh
+weaver schedules create --command-id script-schedule-create --input - <<'JSON'
+{"name":"每小时工作区检查","kind":"script","enabled":true,"timing":{"mode":"interval","seconds":3600},"script":{"command":"git status --short","timeoutSeconds":60}}
+JSON
+weaver schedules list --input '{"kind":"script","enabled":true}' --output json
+```
+
+Agent 例子：先通过 `weaver policy get` 选有效父 Agent profile，替换 `your-owner-profile` 后执行。每次执行创建独立 root，并用 tasks.start 启动父 Agent 链路。
+
+```sh
+weaver schedules create --command-id agent-schedule-create --input - <<'JSON'
+{"name":"工作日检查","kind":"agent","enabled":true,"timing":{"mode":"cron","expression":"0 9 * * 1-5","timezone":"Asia/Shanghai"},"agent":{"goal":"检查工作区并给出有证据的状态汇报，不推送代码","ownerProfileId":"your-owner-profile","acceptanceCriteria":["记录检查结果和实际验证"],"constraints":["保留已有修改"]}}
+JSON
+```
+
+读取创建结果的 `id` 与 `revision` 后可执行以下命令（替换尖括号占位；每次新的写操作使用新的 commandId）：
+
+```sh
+weaver schedules get --schedule-id <UUID> --output json
+weaver schedules update --schedule-id <UUID> --expected-revision <revision> --command-id <stable-id> --input '{"patch":{"timing":{"mode":"interval","seconds":7200}}}'
+weaver schedules disable --schedule-id <UUID> --expected-revision <revision> --command-id <stable-id>
+weaver schedules enable --schedule-id <UUID> --expected-revision <revision> --command-id <stable-id>
+weaver schedules run --schedule-id <UUID> --command-id <stable-id>
+weaver schedules runs --schedule-id <UUID> --input '{"offset":0,"limit":20}' --output jsonl
+weaver schedules runs --schedule-id <UUID> --input '{"runId":"<run-UUID>"}' --output json
+weaver schedules cancel --schedule-id <UUID> --input '{"runId":"<active-run-UUID>"}' --command-id <stable-id>
+weaver schedules delete --schedule-id <UUID> --expected-revision <revision> --command-id <stable-id>
+```
+
+运行列表先分页取 id，再用同一 `schedules.runs` 命令携带 runId 读取该次完整输出。普通分页和 list/get 的 lastRun 只含输出摘要，避免多条日志累计超过 IPC 的 1 MiB 单帧上限；单条详情仍受输出上限约束，检查 truncated 字段。
+
+网页共享 helper 的第 4 参数可传本次 mutation 的稳定 commandId：`command(name, args, true, commandId)`。调用方在结果不确定时保留 ID 与参数快照，通过 `operations.get` 核对原回执；helper 不自动重试 mutation，错误同时保留 code/retryable 属性和既有消息格式。
+
+直接 command 的 JSON 请求也可用 `weaver --input request.json`：
+
+```json
+{"apiVersion":"weaver.v1","commandId":"schedule-update-1","command":"schedules.update","args":{"scheduleId":"00000000-0000-4000-8000-000000000001","expectedRevision":1,"patch":{"enabled":false}}}
+```
+
+时间规则：interval 为 1–31536000 秒；cron 是 5/6 段表达式，必须带有效 IANA timezone，不接受 Date 字符串。到期先持久化 claim 再执行；仅在服务运行时执行，同一记录不重叠。重启时，没有活跃运行的已启用记录将错过的触发最多合并执行一次，不逐次补跑。旧活跃脚本先按持久化身份核实所属进程已结束或回收进程，再记为 interrupted 并释放 claim；其忙期间（含停机）错过的触发跳过。无法核实身份时保持活跃并显示恢复错误，不能绕过该保护启动重叠运行。run 的 `running` 只是已接受，不是执行成功；历史状态包括 running/succeeded/failed/interrupted/skipped/cancelled。Agent run 的 taskId 可用 `tasks get --task-id` 跟踪，必须等 root 终态才判定成功/失败。内置 quota.refresh 复用已有额度刷新，policy quota 设置是唯一配置来源，quota get 的 schedule 来自同一调度记录。
+
+脚本 `{command,timeoutSeconds}` 的 timeoutSeconds 为 1–86400，按服务 OS shell、服务账户权限运行显式命令，没有任意内置 RPC 选择器。自定义脚本执行和安全恢复当前要求 Linux 与可用的 systemd 用户会话，其他平台会明确失败。停用只停止未来触发，需要终止当前运行时显式 cancel；取消结果以查询状态为准。
+
+定时任务定义最多 100 条（包括内置任务），每条保留最近 100 次运行。单次 stdout 与 stderr 合并输出上限为 64 KiB，超限设置 truncated；普通分页摘要也可能设置 truncated，判断完整输出是否被截断应读取带 runId 的单次详情。历史包含输出与错误，不应在命令中打印密钥；它按上述上限留存，不是永久审计档案。
+
 ### 3.1 原生账户额度
 
-`quota get` → `getQuota`（arity 0），只返回 `{records,schedule}`（最近一次观测存于 `weaver.db`，重启后仍可读），不读认证文件、不联网、不写策略；`schedule` 为 `{enabled,intervalMinutes,lastRunAt,nextRunAt}`，反映定时刷新的已保存设置与进程内运行时间。首次读取三家都为 `unknown`，`checkedAt/observedAt:null`、`stale:true`。`quota refresh` → `refreshQuota`（arity 1），先探测选定 provider，再将自有阻断合并到当前最新的策略，返回 `{records,snapshot,policyChanged}`。它是 mutation，机器帮助明确标注会同步策略阻断且不做推理。
+`quota get` → `getQuota`（arity 0），只返回 `{records,schedule}`（最近一次观测存于 `weaver.db`，重启后仍可读），不读认证文件、不联网、不写策略；`schedule` 为 `{enabled,intervalMinutes,lastRunAt,nextRunAt}`，反映同一持久化定时任务的已保存设置与运行时间。首次读取三家都为 `unknown`，`checkedAt/observedAt:null`、`stale:true`。`quota refresh` → `refreshQuota`（arity 1），先探测选定 provider，再将自有阻断合并到当前最新的策略，返回 `{records,snapshot,policyChanged}`。它是 mutation，机器帮助明确标注会同步策略阻断且不做推理。
 
 ```sh
 weaver quota get --output json

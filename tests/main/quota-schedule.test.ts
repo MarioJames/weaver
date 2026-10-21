@@ -7,9 +7,9 @@ import { defaultConfig, validateConfig } from '../../src/main/policy/routing';
 import { quotaRefreshEnabled, quotaSettings } from '../../src/shared/policy/settings';
 import { PolicyStore } from '../../src/main/policy/store';
 import { applyQuotaSnapshot, quotaRefreshTargets } from '../../src/main/policy/quota';
-import { QuotaScheduler } from '../../src/main/quota/scheduler';
 import type { EngineQuotaRecord, QuotaEngine } from '../../src/shared/contracts/quota';
 
+const ROOT=process.env.ACCEPTANCE_TMPDIR??tmpdir();
 const now = Date.parse('2030-01-01T00:00:00Z');
 
 test('only paid quota engines refresh by default, and settings default to a 15 minute schedule', () => {
@@ -52,7 +52,7 @@ function exhausted(engine: QuotaEngine): EngineQuotaRecord {
 }
 
 test('an engine that does not refresh quota is never auto-blocked', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'wv-qs-'));
+  const dir = await mkdtemp(join(ROOT, 'wv-qs-'));
   try {
     const policy = new PolicyStore(join(dir,'weaver.db'), () => now);
     const current = policy.snapshot();
@@ -62,71 +62,4 @@ test('an engine that does not refresh quota is never auto-blocked', async () => 
     const result = applyQuotaSnapshot(policy, { records: [exhausted('codex')] }, {}, now);
     assert.deepEqual(result.snapshot.blocks.map(block => block.engine), ['codex_alias']);
   } finally { await rm(dir, { recursive: true, force: true }); }
-});
-
-test('the scheduler refreshes due targets once per interval and follows the saved switch', async () => {
-  const config = defaultConfig();
-  let clock = now;
-  const calls: string[] = [];
-  let release: () => void = () => {};
-  let hold: Promise<void> | undefined;
-  const scheduler = new QuotaScheduler({ config: () => config, now: () => clock, refresh: async engine => { calls.push(engine); if (hold) await hold; } });
-  assert.deepEqual(scheduler.status(), { enabled: true, intervalMinutes: 15, lastRunAt: null, nextRunAt: new Date(now).toISOString() });
-  await scheduler.tick();
-  assert.deepEqual(calls, ['codex', 'claude']);
-  assert.equal(scheduler.status().nextRunAt, new Date(now + 15 * 60_000).toISOString());
-  clock += 14 * 60_000;
-  await scheduler.tick();
-  assert.equal(calls.length, 2);
-  clock += 60_000;
-  hold = new Promise(resolve => { release = resolve; });
-  const first = scheduler.tick();
-  const overlapping = scheduler.tick();
-  release();
-  await Promise.all([first, overlapping]);
-  assert.deepEqual(calls, ['codex', 'claude', 'codex', 'claude']);
-  hold = undefined;
-  config.quota = { auto_refresh: false, interval_minutes: 15 };
-  clock += 60 * 60_000;
-  await scheduler.tick();
-  assert.equal(calls.length, 4);
-  assert.equal(scheduler.status().nextRunAt, null);
-});
-
-test('a failed engine refresh does not stop the remaining targets', async () => {
-  const config = defaultConfig();
-  const calls: string[] = [];
-  const errors: unknown[] = [];
-  const scheduler = new QuotaScheduler({ config: () => config, now: () => now, log: error => errors.push(error), refresh: async engine => { calls.push(engine); if (engine === 'claude') throw new Error('offline'); } });
-  await scheduler.tick();
-  assert.deepEqual(calls, ['codex', 'claude']);
-  assert.equal(errors.length, 1);
-});
-
-test('after stop() the scheduler refreshes nothing: a manual tick is a no-op and a run in flight skips its remaining targets', async () => {
-  const config = defaultConfig();
-  let clock = now;
-  const calls: string[] = [];
-  let release: () => void = () => {};
-  const hold = new Promise<void>(resolve => { release = resolve; });
-  let started: () => void = () => {};
-  const refreshing = new Promise<void>(resolve => { started = resolve; });
-  const scheduler = new QuotaScheduler({ config: () => config, now: () => clock, refresh: async engine => { calls.push(engine); started(); await hold; } });
-  // Stopped while the first target is still refreshing: stop() waits for it, the second target is never started.
-  const running = scheduler.tick();
-  await refreshing;
-  const stopping = scheduler.stop();
-  release();
-  await Promise.all([running, stopping]);
-  assert.deepEqual(calls, ['codex'], 'the remaining targets are skipped once the scheduler is stopped');
-  // A manual tick after the stop, with the interval long over, still refreshes nothing.
-  clock += 60 * 60_000;
-  await scheduler.tick();
-  await scheduler.tick();
-  assert.deepEqual(calls, ['codex']);
-  // start() is what brings it back.
-  scheduler.start(60_000);
-  await scheduler.tick();
-  assert.deepEqual(calls, ['codex', 'codex', 'claude']);
-  await scheduler.stop();
 });

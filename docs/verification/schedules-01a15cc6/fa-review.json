@@ -1,0 +1,17 @@
+{
+  "base": "03dcc21bc56ce467d6b7ec795e91e6eac6cd6d96",
+  "sourceDigest": "34ab89694be5efbc421247ed5d1835563e336c56172e3eda0bf2abacea99b8d5",
+  "scannerActualExitCode": 0,
+  "rawVerdict": "needs-review",
+  "rawFindingCount": 12,
+  "ownerReviewed": true,
+  "nonBlocking": true,
+  "reason": "12项全部为seed-deep-import warning/candidate；规则明确深度本身不是硬性违规。项目tsconfig无paths/alias，vite/package无alias、exports/imports入口，沿用既有相对导入，不为候选新建配置。",
+  "evidence": {
+    "typecheckPassed": true,
+    "buildPassed": true,
+    "latestBaseRealScriptAndAgentSmokePassed": true,
+    "scannerRawUnmodified": true
+  },
+  "reviewScope": "只认定这些导入候选为已人工审查非阻断；不把raw needs-review改为零命中或替代browser验收"
+}

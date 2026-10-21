@@ -17,7 +17,14 @@ import { TaskBoard } from './TaskBoard';
 import { TaskDetail } from './TaskDetail';
 import type { useWorkbench } from './useWorkbench';
 
-export function TasksPage({ work, ownerKind, freeChannel }: { work: ReturnType<typeof useWorkbench>; ownerKind?: (ownerId?: string) => string | undefined; freeChannel?: (workerId?: string) => boolean }) {
+export function TasksPage({ work, ownerKind, freeChannel, requestedTaskId, onRequestedTaskArrived }: {
+  work: ReturnType<typeof useWorkbench>;
+  ownerKind?: (ownerId?: string) => string | undefined;
+  freeChannel?: (workerId?: string) => boolean;
+  /** A cross-page request (schedules history) opens its detail once the task reaches the list. */
+  requestedTaskId?: string;
+  onRequestedTaskArrived?: () => void;
+}) {
   const [filters, setFilters] = useState(readTaskFilters);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -47,6 +54,13 @@ export function TasksPage({ work, ownerKind, freeChannel }: { work: ReturnType<t
   }, [task?.id, task?.revision, task?.updatedAt, detailAttempt]);
   const fullTask = detail?.id === task?.id ? detail : undefined;
   useEffect(() => { setEditing(false); }, [task?.id]);
+  // Keep the ask until the task itself arrives (scheduler history can link ahead of a full list),
+  // then open its detail without regard to whatever filter is currently showing.
+  useEffect(() => {
+    if (!requestedTaskId || !tasks.some(item => item.id === requestedTaskId)) return;
+    setSelected(requestedTaskId);
+    onRequestedTaskArrived?.();
+  }, [requestedTaskId, tasks, onRequestedTaskArrived]);
   const now = Date.now();
   const archived = archivedTasks(tasks, now).length;
   return <>
