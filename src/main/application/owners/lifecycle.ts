@@ -116,6 +116,7 @@ export class OwnerLifecycle {
   const task=this.records.task(a);this.records.revise(task,a);
   const restart=task.executionRole==='owner'&&task.status==='failed'&&!task.ownerHost;
   if((task.status!=='queued'&&!restart)||task.parentTaskId||task.dispatch||task.packageId||task.scheduled)fail('INVALID_STATE','Only an unfrozen queued root task may start its owner');
+  if(!task.workspace)fail('INVALID_STATE','Set a workspace before starting the root task');
   if(!task.ownerId)fail('INVALID_STATE','Root task must be bound to an owner profile');
   const owner=this.records.owner(task.ownerId);const snapshot=this.policy.snapshot();const profile=snapshot.config.owners[owner.profileId];
   if(snapshot.owners[owner.profileId]?.status!=='available'||!profile)fail('POLICY_DENIED','Owner profile is unavailable');

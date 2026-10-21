@@ -4,13 +4,14 @@ import type { Task, WorkPackage } from '../../../shared/contracts/tasks';
 import { PENDING_TASK_TITLE, object, parseId, parseTaskInput, parseWorkerRecord, text } from '../../../shared/validation';
 import { event } from '../../domain/tasks';
 import type { TaskManager } from '../../manager';
+import type { PolicyStore } from '../../policy/store';
 import { CommandError, fail } from '../commands/errors';
 import type { CommandArgs } from '../commands/types';
 import { publicTask, terminal, type TaskRecords } from './records';
 
 /** Task state changes an owner or worker asks for: create, describe, freeze a package, report, complete and cancel. */
 export class Mutations {
- constructor(private readonly manager:TaskManager,private readonly records:TaskRecords,
+ constructor(private readonly manager:TaskManager,private readonly records:TaskRecords,private readonly policy:PolicyStore,
   private readonly spawnOwner:(a:CommandArgs)=>LogicalOwner,private readonly closeCancelledRoot:(task:Task)=>void){}
  /** Share native report validation between owner roots and native child workers. */
  completeReport(task:Task,a:Record<string,unknown>):unknown {
@@ -43,6 +44,23 @@ export class Mutations {
     task.title=title;task.acceptanceCriteria=criteria;
     event(task,'lifecycle','Owner generated task title and acceptance criteria');this.records.put(task);return publicTask(task);
    }
+ update(a:CommandArgs):unknown{return this.manager.store.transaction(()=>{
+    const task=this.records.task(a);
+    if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');
+    if(task.parentTaskId||task.status!=='queued'||task.executionRole==='owner'||task.scheduled||task.packageId||task.dispatch||task.ownerHost)fail('INVALID_STATE','Only an unstarted root task draft can be edited');
+    this.records.revise(task,a);
+    const instruction=a.instruction??a.goal;
+    if(instruction!==undefined)task.instruction=text(instruction,'instruction',16000);
+    if(a.workspace===null)delete task.workspace;
+    else if(a.workspace!==undefined){const workspace=text(a.workspace,'workspace',2000);if(!workspace.startsWith('/'))fail('INVALID_REQUEST','workspace must be an absolute path');task.workspace=workspace;}
+    if(a.acceptanceCriteria!==undefined){if(!Array.isArray(a.acceptanceCriteria)||a.acceptanceCriteria.length>30)fail('INVALID_REQUEST','acceptanceCriteria must be an array of at most 30 items');task.acceptanceCriteria=(a.acceptanceCriteria as unknown[]).length?(a.acceptanceCriteria as unknown[]).map(value=>text(value,'acceptance criterion',1000).trim()):undefined;}
+    if(a.ownerProfileId!==undefined){
+     const profileId=text(a.ownerProfileId,'ownerProfileId',120);
+     if(!this.policy.snapshot().config.owners[profileId])fail('INVALID_REQUEST',`Owner profile ${profileId} is missing from the policy`);
+     if(this.records.owner(task.ownerId).profileId!==profileId){const spawned=this.spawnOwner({profileId,name:'Task owner'}) as LogicalOwner;task.ownerId=spawned.id;task.ownerEpoch=0;task.ownerLastActivityAt=new Date().toISOString();}
+    }
+    event(task,'lifecycle','Draft edited before start');this.records.put(task);return publicTask(task);
+   });}
  packagesCreate(a:CommandArgs):unknown{
     const task=this.records.task(a);if(task.executionRole==='owner')fail('INVALID_STATE','Freeze packages on child tasks, not the owner root');if(task.title===PENDING_TASK_TITLE)fail('INVALID_STATE','Owner must describe the task before freezing a package');this.records.revise(task,a);if(task.status!=='queued')fail('INVALID_STATE','Only queued tasks accept a work package');if(task.packageId)fail('INVALID_STATE','Task already has a frozen package');
     const strings=(v:unknown,label:string)=>{if(!Array.isArray(v)||v.length<1||v.length>30)fail('INVALID_REQUEST',`Provide 1–30 ${label}`);return (v as unknown[]).map(x=>text(x,label,1000));};

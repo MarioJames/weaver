@@ -84,20 +84,20 @@ test('cancelling a running root explains the cascade; other tasks get no prompt'
   assert.equal(rootCancelNotice(child('c1', 'running'), tasks), undefined);
 });
 
-test('the composer offers 仅创建 beside the primary 创建并开始', () => {
+test('the composer offers 存为草稿 beside the primary 创建并开始', () => {
   const html = markup(React.createElement(TaskComposer, { disabled: false, draft: { goal: '', workspace: '', profile: '' }, onDraft: () => {}, onCreate: async () => true }));
   const buttons = [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]);
-  const create = buttons.find(button => button.includes('仅创建'));
+  const create = buttons.find(button => button.includes('存为草稿'));
   const start = buttons.find(button => button.includes('创建并开始'));
   assert.ok(create && start);
   assert.match(create, /type="button"/);
   assert.match(start, /type="submit"/);
   assert.ok(buttons.indexOf(create) < buttons.indexOf(start));
   const busy = markup(React.createElement(TaskComposer, { disabled: true, draft: { goal: 'g', workspace: '/w', profile: 'p' }, onDraft: () => {}, onCreate: async () => true }));
-  for (const label of ['仅创建', '创建并开始']) assert.match([...busy.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]).find(button => button.includes(label)) ?? '', /disabled/);
+  for (const label of ['存为草稿', '创建并开始']) assert.match([...busy.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]).find(button => button.includes(label)) ?? '', /disabled/);
 });
 
-test('仅创建 only creates and selects; 创建并开始 also starts, and a failed start never creates twice', async () => {
+test('存为草稿 only creates and selects; 创建并开始 also starts, and a failed start never creates twice', async () => {
   const calls: string[] = [];
   const api = (failStart = false) => ({
     create: async () => { calls.push('create'); return { id: 'new1' }; },

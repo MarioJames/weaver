@@ -1,9 +1,11 @@
 import { createStaticStyles } from 'antd-style';
 
 export const styles = createStaticStyles(({ css, cssVar }) => ({
+  /** Wide: the action column sits beside the heading; narrow (drawer ≤ 480px): the buttons wrap to a row below the title instead of squeezing it. */
   header: css`
+    container-type: inline-size;
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
     gap: ${cssVar.marginSM};
@@ -14,6 +16,10 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     gap: ${cssVar.marginXS};
     min-inline-size: 0;
     flex: 1;
+
+    @container (max-width: 480px) {
+      flex-basis: 100%;
+    }
   `,
   actions: css`
     display: flex;
@@ -22,6 +28,13 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     align-items: flex-end;
     gap: ${cssVar.marginXS};
     button { font: inherit; }
+
+    @container (max-width: 480px) {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-start;
+    }
   `,
   markdown: css`
     min-inline-size: 0;

@@ -6,11 +6,12 @@ import { Button, Drawer, Skeleton } from '@lobehub/ui/base-ui';
 import { command } from '../../api/commands';
 import type { OwnerInstance } from '../../../shared/contracts/owners';
 import type { Task } from '../../../shared/contracts/tasks';
-import { createTask } from './task-create';
-import { recentWorkspaces, withOwnerProfiles } from './task-view';
+import { createTask, notifySaveDraftFailure, taskUpdateArgs, updateTask } from './task-create';
+import { ownerProfileOf, recentWorkspaces, withOwnerProfiles } from './task-view';
 import { archivedTasks } from './task-archive';
 import { readTaskFilters } from './task-persistence';
 import { ArchiveDrawer } from './ArchiveDrawer';
+import { EditTaskDialog } from './EditTaskDialog';
 import { NewTaskDialog } from './NewTaskDialog';
 import { TaskBoard } from './TaskBoard';
 import { TaskDetail } from './TaskDetail';
@@ -19,6 +20,7 @@ import type { useWorkbench } from './useWorkbench';
 export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWorkbench>; ownerKind?: (ownerId?: string) => string | undefined }) {
   const [filters, setFilters] = useState(readTaskFilters);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [selected, setSelected] = useState<string>();
   const detailTitleRef = useRef<HTMLSpanElement>(null);
@@ -44,6 +46,7 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
     return () => { current = false; };
   }, [task?.id, task?.revision, task?.updatedAt, detailAttempt]);
   const fullTask = detail?.id === task?.id ? detail : undefined;
+  useEffect(() => { setEditing(false); }, [task?.id]);
   const now = Date.now();
   const archived = archivedTasks(tasks, now).length;
   return <>
@@ -56,10 +59,17 @@ export function TasksPage({ work, ownerKind }: { work: ReturnType<typeof useWork
     <Drawer open={!!task} title={<span ref={detailTitleRef} tabIndex={-1}>任务详情</span>} afterOpenChange={open => { if (open) detailTitleRef.current?.focus({ preventScroll: true }); }} placement="right" width="min(960px, 92vw)" onClose={() => setSelected(undefined)}>
       {task && !fullTask && <div role="status" aria-label="正在加载任务详情"><Skeleton animated /></div>}
       {task && fullTask && <TaskDetail key={task.id} task={{...fullTask, owner: task.owner}} tasks={tasks} onSelect={setSelected} busy={work.busy || !work.caps} action={work.action} ownerKind={ownerKind}
-        onStart={id => void work.action(() => window.weaver.startTask(id))}
+        onStart={id => void work.action(() => window.weaver.startTask(id))} onEdit={() => setEditing(true)}
         onCancel={id => void work.action(() => window.weaver.cancelTask(id))}
         onRetry={id => void work.action(async () => { const next = await command<{ id: string }>('tasks.retry', { taskId: id }, true); setSelected(next.id); })} />}
     </Drawer>
+    {task && fullTask && <EditTaskDialog open={editing} task={fullTask} profile={ownerProfileOf(task, owners)} busy={work.busy} recentWorkspaces={recentWorkspaces(tasks, 5)} close={() => setEditing(false)}
+      /** Saving uses the revision read when the dialog opened, and failures report on their own overlay instead of the generic control-plane error. */
+      save={(input, start, expectedRevision) => work.action(() => updateTask(taskUpdateArgs({ id: fullTask.id, revision: expectedRevision }, input, ownerProfileOf(task, owners)), start, {
+        update: args => command('tasks.update', args, true),
+        start: id => window.weaver.startTask(id),
+        startFailed: (id, error) => notifyError(error, '草稿已保存，启动失败', { label: '重试启动', run: () => { void work.action(() => window.weaver.startTask(id)); } }),
+      }), notifySaveDraftFailure)} />}
     <NewTaskDialog open={creating} busy={work.busy} recentWorkspaces={recentWorkspaces(tasks, 5)} close={() => setCreating(false)} onClosed={() => newTaskRef.current?.focus()}
       create={(input, start) => work.action(() => createTask(input, start, {
         create: value => command<{ id: string }>('tasks.create', { ...value }, true),

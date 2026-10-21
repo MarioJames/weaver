@@ -59,6 +59,21 @@ test('direct and copied legacy URLs resolve to the same page', () => {
   } finally { if (previous) Object.defineProperty(globalThis, 'window', previous); else Reflect.deleteProperty(globalThis, 'window'); }
 });
 
+test('the detail header stacks the action row below the title when narrow, wide layout unchanged', () => {
+  const source = readFileSync(new URL('../../src/renderer/features/tasks/task-detail-style.ts', import.meta.url), 'utf8');
+  const block = (key: string) => source.slice(source.indexOf(`${key}: css\``), source.indexOf(`${key}: css\``) + source.slice(source.indexOf(`${key}: css\``)).indexOf('`,') + 1);
+  const header = block('header');
+  // The header is its own inline-size container; wide keeps the actions beside the heading (wrap only as a fallback).
+  assert.match(header, /container-type: inline-size/);
+  assert.match(header, /flex-wrap: wrap/);
+  assert.doesNotMatch(header, /@container/);
+  const heading = block('heading');
+  assert.match(heading, /@container \(max-width: 480px\)\s*\{\s*flex-basis: 100%;/);
+  const actions = block('actions');
+  assert.match(actions, /@container \(max-width: 480px\)\s*\{\s*flex-direction: row;/);
+  assert.match(actions, /flex-wrap: wrap/);
+});
+
 test('accepted detail omits retry and counts constraints with acceptance criteria', async () => {
   const { TaskDetail } = await import('../../src/renderer/features/tasks/TaskDetail');
   const task = { id: 'accepted', title: '已验收任务', instruction: '检查', owner: { name: 'parent', transport: 'herdr-visible', session: 's', pane: 'p' }, status: 'completed', reviewState: 'accepted', constraints: ['约束一', '约束二'], acceptanceCriteria: ['标准'], events: [], artifacts: [], progress: 100, createdAt: '2026-10-19T12:00:00Z', updatedAt: '2026-10-19T12:00:00Z' } as const;

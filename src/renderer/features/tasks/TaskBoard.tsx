@@ -6,7 +6,7 @@ import { ChevronDown, ChevronRight, ChevronUp, Clock, Folder, Loader2, X } from 
 import type { Task } from '../../../shared/contracts/tasks';
 import { displayLog } from './log-view';
 import type { FilterDimension, FilterOption, TaskSelection, TaskTimeRange } from './task-filters';
-import { childSummary, childSummaryLabel, dispatchKind } from './task-view';
+import { childSummary, childSummaryLabel, dispatchKind, taskTitle } from './task-view';
 import { cardFooter } from './task-footer';
 import { TASK_COLUMNS, boardRows, columnize, isOpenTask, workspaceGroups } from './task-columns';
 import { nonArchived } from './task-archive';
@@ -127,7 +127,7 @@ export function TaskFacets({ board, all = board, selection, collapsed, now, owne
     {FILTER_DIMENSIONS.map(dimension => <FacetRow key={dimension} label={filterLabels[dimension]} size={options[dimension].length}>
       {options[dimension].map(option => <FacetChip key={option.value} checked={selection[dimension].includes(option.value)} label={option.label} count={option.count}
         tone={dimension === 'status' ? DISPLAY_TONES[option.value as DisplayStatus] : undefined}
-        icon={optionIcon(dimension, option, ownerKind)} title={dimension === 'workspace' ? option.value : dimension === 'owner' ? option.title : undefined}
+        icon={optionIcon(dimension, option, ownerKind)} title={dimension === 'workspace' ? option.value || undefined : dimension === 'owner' ? option.title : undefined}
         onClick={() => onChange({ ...selection, [dimension]: toggleOption(selection[dimension], option.value) })} />)}
     </FacetRow>)}
     <div className={taskStyles.facetSelected}>
@@ -188,7 +188,7 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, filte
         {task.executionRole === 'owner' && <Tag className={taskStyles.cardTag} size="small">父 Agent</Tag>}
         {task.parentTaskId && <Tag className={taskStyles.cardTag} size="small">子任务</Tag>}
         {task.dispatch?.worker && <Tag className={taskStyles.cardTag} title={task.dispatch.worker} size="small" icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
-        <strong className={taskStyles.cardTitleText}>{task.title}</strong>
+        <strong className={taskStyles.cardTitleText}>{taskTitle(task)}</strong>
       </span>
       <span className={taskStyles.cardStatus}>
         <Tag size="small" color={tag.color} icon={tag.spin ? spinner : displayStatus(task) === 'scheduled' ? <Icon icon={Clock} size="small" /> : undefined}>{tag.label}</Tag>

@@ -6,7 +6,7 @@ import { Drawer, Table, Tag, Text } from '@lobehub/ui/base-ui';
 import type { SelectProps, TableColumnsType } from '@lobehub/ui/base-ui';
 import type { Task } from '../../../shared/contracts/tasks';
 import type { FilterDimension, TaskSelection } from './task-filters';
-import { dispatchKind, ownerLabel, projectLabel, taskOwnerId } from './task-view';
+import { dispatchKind, ownerLabel, projectLabel, taskOwnerId, taskTitle } from './task-view';
 import { ARCHIVE_PAGE_SIZES, ARCHIVE_PAGE_SIZE, ARCHIVE_PAGINATION_BAR, ARCHIVE_SIZE_CHANGER_LABEL, ARCHIVE_TABLE_WIDTH, applyArchivePage, archivePageSizeOptions, archiveScrollY, archiveTotalLabel, archivedTasks, clampArchivePage, resetArchivePage } from './task-archive';
 import type { ArchivePager } from './task-archive';
 import { TIME_RANGES, archiveRows, facetOptions, filterAriaLabel, filterLabels, foldedTriggerValue } from './task-filters';
@@ -48,7 +48,7 @@ function useArchiveHeights(): [React.Ref<HTMLDivElement>, { available: number | 
 /** What the archive table shows per owner: who ran the work and which agent did it. */
 export function archiveColumns(ownerKind?: (ownerId?: string) => string | undefined, now: number = Date.now()): TableColumnsType<Task> {
   return [
-    { title: '任务', dataIndex: 'title', key: 'title', width: 220, render: (_, task) => <Text strong className={taskStyles.archiveCell} title={task.title}>{task.title}</Text> },
+    { title: '任务', dataIndex: 'title', key: 'title', width: 220, render: (_, task) => <Text strong className={taskStyles.archiveCell} title={taskTitle(task)}>{taskTitle(task)}</Text> },
     {
       title: '父 Agent → 子 Agent',
       key: 'agents',

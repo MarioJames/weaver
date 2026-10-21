@@ -190,3 +190,17 @@ test('the card title uses one text flow with the sub agent tag before the title'
   const source = styles.cardTitle;
   assert.ok(source.length > 0);
 });
+
+test('tasks without a workspace answer for one 未指定工作目录 option that filters them', () => {
+  const draft: Task = { ...make('f', 'queued', 'o1', 'w1', '/p/alpha', hoursAgo(0.3)), workspace: undefined, dispatch: undefined };
+  const pool = [...tasks, draft];
+  const options = filterOptions(pool, 'workspace', sel({}), now);
+  assert.deepEqual(options.filter(option => option.value === '').map(option => [option.label, option.count]), [['未指定工作目录', 1]]);
+  assert.deepEqual(applyTaskFilters(pool, sel({ workspace: [''] }), undefined, now).map(task => task.id), ['f']);
+  assert.deepEqual(applyTaskFilters(pool, sel({ workspace: ['/p/alpha'] }), undefined, now).map(task => task.id), ['a', 'c']);
+  // The empty value can never collide with a real absolute path, and a saved '' choice survives while such a task exists.
+  storage({ [TASK_FILTERS_KEY]: JSON.stringify({ time: 'all', workspace: [''] }) }, () => {
+    assert.deepEqual(resolveSelection(readTaskFilters(), pool, now).workspace, ['']);
+  });
+  assert.match(board(sel({}), { tasks: pool }), /未指定工作目录/);
+});

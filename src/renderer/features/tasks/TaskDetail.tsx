@@ -7,7 +7,7 @@ import { TaskAgents } from './TaskAgents';
 import type { Task } from '../../../shared/contracts/tasks';
 import { displayLog, redactLog, timelineActive, toneColor } from './log-view';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../../format/status-colors';
-import { isActive, rootCancelNotice } from './task-view';
+import { isActive, isDraft, rootCancelNotice, taskTitle } from './task-view';
 import { styles } from '../../ui/styles';
 import { AgentFacts } from './AgentFacts';
 import { ArtifactsPanel } from './ArtifactsPanel';
@@ -18,7 +18,7 @@ import { TaskTextBlock } from './TaskTextBlock';
 import { styles as detailStyles } from './task-detail-style';
 
 const queueLabels = { waiting_for_capacity: '等待执行槽位', policy_blocked: '当前策略阻止派发', frozen_route_changed: '已冻结路由发生变化', workspace_changed: '工作目录发生变化', launch_blocked: '执行启动受阻' };
-export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, ownerKind, tasks = [], onSelect }: { tasks?: Task[]; onSelect?: (id: string) => void; task?: Task; busy: boolean; onStart: (id: string) => void; onCancel: (id: string) => void; action: (fn: () => Promise<unknown>) => Promise<boolean>; onRetry?: (id: string) => void; ownerKind?: (ownerId?: string) => string | undefined }) {
+export function TaskDetail({ task, busy, onStart, onEdit, onCancel, action, onRetry, ownerKind, tasks = [], onSelect }: { tasks?: Task[]; onSelect?: (id: string) => void; task?: Task; busy: boolean; onStart: (id: string) => void; onEdit?: (id: string) => void; onCancel: (id: string) => void; action: (fn: () => Promise<unknown>) => Promise<boolean>; onRetry?: (id: string) => void; ownerKind?: (ownerId?: string) => string | undefined }) {
   const [tab, setTab] = useState('overview');
   const [askCancel, setAskCancel] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -44,6 +44,8 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
   if (!task) return <Empty title="选择一项任务" description="创建或导入后，执行、交接和验收都留在同一条记录里。" />;
   const retryLaunch = task.executionRole === 'owner' && task.status === 'failed' && !task.ownerHost;
   const canStart = !task.parentTaskId && ((task.status === 'queued' && !task.scheduled) || retryLaunch);
+  const draft = isDraft(task);
+  const needsWorkspace = draft && !task.workspace?.trim();
   const latest = task.events.at(-1);
   const failure = [...task.events].reverse().find(event => event.kind === 'error');
   const status = displayStatus(task);
@@ -56,14 +58,16 @@ export function TaskDetail({ task, busy, onStart, onCancel, action, onRetry, own
   return <section ref={panel} tabIndex={-1} aria-label="任务详情" className={styles.stack}>
     <div className={detailStyles.header}>
       <div className={detailStyles.heading}>
-        <Text className={styles.wrap} style={{ fontSize: 18, fontWeight: 600 }}>{task.title}</Text>
+        <Text className={styles.wrap} style={{ fontSize: 18, fontWeight: 600 }}>{taskTitle(task)}</Text>
         <div className={styles.row}>
           <Tag className={detailStyles.statusTag} variant="solid" color={toneColor(DISPLAY_TONES[status])} icon={timelineActive(task.status) ? <Icon icon={Loader2} spin size="small" /> : undefined}>{DISPLAY_LABELS[status]}</Tag>
         </div>
+        {needsWorkspace && <Text type="secondary">先编辑补充目标项目目录，才能开始执行。</Text>}
       </div>
       <div className={detailStyles.actions}>
         {task.status === 'completed' && (!task.reviewState || task.reviewState === 'pending') && <Button type="primary" disabled={busy} onClick={() => { setTab('review'); setReviewOpen(true); }}>手动验收</Button>}
-        {canStart && <Button type="primary" disabled={busy} onClick={() => onStart(task.id)}>{retryLaunch ? '重试启动父 Agent' : '开始执行'}</Button>}
+        {draft && onEdit && <Button disabled={busy} onClick={() => onEdit(task.id)}>编辑</Button>}
+        {canStart && <Button type="primary" disabled={busy || needsWorkspace} onClick={() => onStart(task.id)}>{retryLaunch ? '重试启动父 Agent' : '开始执行'}</Button>}
         {isActive(task) && <Button disabled={busy || task.status === 'cancelling'} onClick={() => cancelNotice ? setAskCancel(true) : onCancel(task.id)}>{task.status === 'cancelling' ? '正在停止…' : '取消任务'}</Button>}
         {task.executionRole !== 'owner' && !isActive(task) && task.reviewState !== 'accepted' && onRetry && <Button disabled={busy} onClick={() => onRetry(task.id)}>新建重试任务</Button>}
       </div>

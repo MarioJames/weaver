@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { redactLog, selectEvents, exportEvents, displayLog } from '../../src/renderer/features/tasks/log-view';
+import { redactLog, displayLog } from '../../src/renderer/features/tasks/log-view';
 test('log redaction removes common credential formats',()=>{const value='Bearer ABCDEFG token=hidden password="secretpass" https://user:pw@example.com sk-abcdefghijklmnop ghp_abcdefghijklmnop';const redacted=redactLog(value);for(const secret of ['ABCDEFG','hidden','secretpass','user:pw','abcdefghijklmnop'])assert.equal(redacted.includes(secret),false);assert.match(redacted,/REDACTED/);});
-test('private key bodies are excluded from export',()=>{const events=[{id:'e',at:'2026-10-18T00:00:00Z',kind:'log' as const,message:'-----BEGIN PRIVATE KEY-----\nsensitivebody\n-----END PRIVATE KEY-----'}];const content=exportEvents('t',events);assert.doesNotMatch(content,/sensitivebody/);assert.match(content,/\[REDACTED\]/);});
-test('kind and text filters operate on redacted display',()=>{const events=[{id:'a',at:'now',kind:'log' as const,message:'token=hidden hello'},{id:'b',at:'now',kind:'error' as const,message:'hello'}];assert.equal(selectEvents(events,'log','hello').length,1);assert.equal(selectEvents(events,'all','hidden').length,0);});
 
 
-test('fixed lifecycle and tool messages have Chinese display labels and preserve original exports', () => {
+test('fixed lifecycle and tool messages have Chinese display labels', () => {
   const cases = [
     ['Frozen work package created', '已冻结工作包'],
+    ['Draft edited before start', '已在启动前编辑草稿'],
+    ['Owner generated task title and acceptance criteria', '父 Agent 已生成任务标题和验收标准'],
     ['Launching codex in /work', '正在启动 codex，工作目录：/work'],
     ['Policy selected worker; launching codex in /work; engines excluded because they failed earlier in this retry chain: pi', '策略已选择子 Agent worker，正在 /work 启动 codex；因在本次重试链中曾失败而排除的引擎：pi'],
     ['Policy selected worker; explicit mock-jsonl provider; engines excluded because they failed earlier in this retry chain: pi', '策略已选择子 Agent worker，使用显式模拟执行；因在本次重试链中曾失败而排除的引擎：pi'],
@@ -32,6 +32,5 @@ test('fixed lifecycle and tool messages have Chinese display labels and preserve
   ];
   for (const [source, label] of cases) {
     assert.equal(displayLog(source), label);
-    assert.equal(JSON.parse(exportEvents('t', [{ id: 'e', at: '', kind: 'lifecycle', message: source }])).events[0].message, source);
   }
 });

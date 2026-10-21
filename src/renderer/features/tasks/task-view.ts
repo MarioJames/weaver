@@ -1,8 +1,33 @@
 import type { OwnerInstance } from '../../../shared/contracts/owners';
 import type { Config } from '../../../shared/contracts/policy';
 import type { Task } from '../../../shared/contracts/tasks';
+import { PENDING_TASK_TITLE } from '../../../shared/validation';
 export type TaskFilter = 'all' | 'active' | 'review' | 'closed';
 export function isActive(task: Task): boolean { return ['queued', 'running', 'cancelling'].includes(task.status); }
+/** A draft is a root task nobody has started: still editable, with nothing frozen or dispatched yet. Mirrors the server's tasks.update rule. */
+export function isDraft(task: Task): boolean {
+  return !task.parentTaskId && task.status === 'queued' && task.executionRole !== 'owner' && !task.scheduled && !task.packageId && !task.dispatch && !task.ownerHost;
+}
+const TITLE_MAX = 60;
+const MARKDOWN_PREFIX = /^(?:(?:#{1,6}|[-*+]|\d+[.)])(?:\s+|$)|>\s*)+/;
+const DECORATION_ONLY = /^(?:[-*_=]{3,}|`{3,}.*)$/;
+/** What a task is called on screen: the real title, or until the parent Agent names it the first line of the goal. */
+export function taskTitle(task: Pick<Task, 'id' | 'title' | 'instruction'>): string {
+  if (task.title !== PENDING_TASK_TITLE) return task.title;
+  for (const raw of (task.instruction ?? '').split('\n')) {
+    const line = raw.trim();
+    if (DECORATION_ONLY.test(line)) continue;
+    const text = line.replace(MARKDOWN_PREFIX, '').trim();
+    if (!text) continue;
+    const chars = Array.from(text);
+    return chars.length > TITLE_MAX ? `${chars.slice(0, TITLE_MAX).join('')}…` : text;
+  }
+  return `任务 ${task.id.slice(0, 8)}`;
+}
+/** The policy profile a task's owner instance runs under; '' when the instance is not among the known owners. */
+export function ownerProfileOf(task: Pick<Task, 'ownerId'>, owners: Pick<OwnerInstance, 'id' | 'profileId'>[]): string {
+  return (task.ownerId && owners.find(owner => owner.id === task.ownerId)?.profileId) || '';
+}
 export const UNASSIGNED_OWNER = '未指定父 Agent';
 /** Placeholder assigned to per-task throwaway instances. */
 const PLACEHOLDER_OWNER = 'Task owner';

@@ -44,7 +44,7 @@ export class CommandHandler {
    const results=new Results(manager,records,ownerHost);
    const owners=new OwnerLifecycle(manager,policy,records,this.continuation,ownerHost,this.runner,isDraining);
    const queries=new Queries(manager,policy,records,diagnostics,{transportStatus:()=>this.transportStatus,herdrPresent},task=>dispatch.nextFor(task));
-   const mutations=new Mutations(manager,records,a=>owners.register('owners.spawn',a),task=>owners.closeCancelledRoot(task));
+   const mutations=new Mutations(manager,records,policy,a=>owners.register('owners.spawn',a),task=>owners.closeCancelledRoot(task));
    this.coordinator=new Coordinator(manager,policy,records,dispatch,applyVendorBlocks,taskId=>{results.deliver({taskId});},isDraining);
    this.gateway=new CommandGateway(manager,this.runner,createRegistry({queries,mutations,results,owners,dispatch,retries}),isDraining);
    manager.listeners.add(()=>this.pump());

@@ -37,11 +37,10 @@ export function workspaceGroups(tasks: Task[]): { workspace: string; label: stri
 }
 /** One line of a column once its workspace groups are flattened: a group heading or a card. Only the lines near the viewport are mounted. */
 export type BoardRow = { key: string; kind: 'heading'; label: string; title: string; count: number } | { key: string; kind: 'card'; task: Task };
-/** Groups flattened into one row sequence; a single group needs no heading, exactly as before. */
+/** Groups flattened into one row sequence; every group gets a heading (even a single one), since cards no longer show the workspace. */
 export function boardRows(groups: { workspace: string; label: string; tasks: Task[] }[]): BoardRow[] {
-  const headings = groups.length > 1;
   return groups.flatMap(group => [
-    ...(headings ? [{ key: `group:${group.workspace}`, kind: 'heading' as const, label: group.label, title: group.workspace || group.label, count: group.tasks.length }] : []),
+    { key: `group:${group.workspace}`, kind: 'heading' as const, label: group.label, title: group.workspace || group.label, count: group.tasks.length },
     ...group.tasks.map(task => ({ key: task.id, kind: 'card' as const, task })),
   ]);
 }

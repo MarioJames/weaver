@@ -30,6 +30,15 @@ export const composerStyles = createStaticStyles(({ css, cssVar }) => ({
     border: 0;
     > * { inline-size: 100%; min-inline-size: 0; }
   `,
+  /** The chosen path plus, when allowed, a clear entry beside it: the directory button takes the remaining width. */
+  directoryRow: css`
+    display: flex;
+    align-items: center;
+    gap: ${cssVar.marginXXS};
+    min-inline-size: 0;
+
+    > :first-child { flex: 1 1 auto; min-inline-size: 0; }
+  `,
   /** The chosen path reads like the inputs around it: from the start edge, one line, the rest ellipsized. */
   directoryButton: css`
     justify-content: flex-start;
@@ -41,6 +50,13 @@ export const composerStyles = createStaticStyles(({ css, cssVar }) => ({
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+  `,
+  /** The clear entry is an icon-only square: as tall as the directory button and exactly as wide. */
+  directoryClear: css`
+    flex: none;
+    aspect-ratio: 1;
+    padding-inline: 0;
+    padding-block: 0;
   `,
   directoryBrowser: css`
     display: flex;

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ChevronRight, Folder, FolderOpen } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronRight, Folder, FolderOpen, X } from 'lucide-react';
 import { Button, Modal, Text } from '@lobehub/ui/base-ui';
 import { Icon } from '@lobehub/ui';
 import { command } from '../../api/commands';
@@ -10,11 +10,18 @@ interface DirectoryListing { path: string; parent: string | null; directories: {
 
 const baseName = (path: string): string => path.replace(/\/+$/, '').split('/').pop() || path;
 
+/** Clearing only empties the field: the picker modal never opens from it and the next save sends workspace null. */
+export function clearWorkspace(onChange: (path: string) => void): void { onChange(''); }
+
+/** After clearing, keyboard focus moves back to the directory button instead of dropping to body. */
+export function focusDirectoryPicker(button: HTMLElement | null): void { button?.focus(); }
+
 /**
  * Choose the project directory on the service host (a web file input cannot supply an absolute server path):
  * the directories earlier tasks already work in come first, then a browser for any other folder.
+ * With `allowClear` a filled directory gains a clear entry beside it: drafts may leave the directory open.
  */
-export function WorkspacePicker({ value, disabled, recent = [], onChange }: { value: string; disabled: boolean; recent?: string[]; onChange: (path: string) => void }) {
+export function WorkspacePicker({ value, disabled, allowClear = false, recent = [], onChange }: { value: string; disabled: boolean; allowClear?: boolean; recent?: string[]; onChange: (path: string) => void }) {
   const [open, setOpen] = useState(false);
   const [path, setPath] = useState<string>();
   const [listing, setListing] = useState<DirectoryListing>();
@@ -22,6 +29,7 @@ export function WorkspacePicker({ value, disabled, recent = [], onChange }: { va
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [checking, setChecking] = useState('');
+  const directoryButtonRef = useRef<HTMLButtonElement>(null);
   useNotifyError(error, '目录读取失败', { label: '重试', run: () => setAttempt(value => value + 1) });
   useEffect(() => {
     if (!open) return;
@@ -43,7 +51,10 @@ export function WorkspacePicker({ value, disabled, recent = [], onChange }: { va
     finally { setChecking(''); }
   }
   return <>
-    <Button block className={composerStyles.directoryButton} title={value || undefined} disabled={disabled} aria-label="选择目标项目目录" icon={value ? FolderOpen : Folder} onClick={() => { setPath(value || undefined); setOpen(true); }}>{value || '选择项目文件夹'}</Button>
+    <div className={composerStyles.directoryRow}>
+      <Button ref={directoryButtonRef} block className={composerStyles.directoryButton} title={value || undefined} disabled={disabled} aria-label="选择目标项目目录" icon={value ? FolderOpen : Folder} onClick={() => { setPath(value || undefined); setOpen(true); }}>{value || '选择项目文件夹'}</Button>
+      {allowClear && !!value && <Button htmlType="button" className={composerStyles.directoryClear} disabled={disabled} title="清除目标项目目录" aria-label="清除目标项目目录" icon={X} onClick={() => { clearWorkspace(onChange); focusDirectoryPicker(directoryButtonRef.current); }} />}
+    </div>
     <Modal open={open} title="选择目标项目目录" width={560} onCancel={() => setOpen(false)} footer={<Button type="primary" disabled={loading || !!error || !listing || disabled} onClick={() => { if (listing) { onChange(listing.path); setOpen(false); } }}>选择此目录</Button>}>
       <div className={composerStyles.directoryBrowser}>
         {recent.length > 0 && <section aria-label="已有工作区" className={composerStyles.directorySection}>

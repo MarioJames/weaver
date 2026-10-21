@@ -68,7 +68,8 @@ export function taskOption(task: Task, dimension: FilterDimension): { value: str
   }
   if (dimension === 'workspace') {
     const workspace = task.workspace;
-    return workspace ? { value: workspace, label: workspaceLabel(workspace) } : undefined;
+    // A draft without a directory still answers for the workspace row: one 未指定工作目录 chip. Its value '' can never collide with a real absolute path.
+    return { value: workspace ?? '', label: workspaceLabel(workspace ?? '') };
   }
   const worker = task.dispatch?.worker;
   return worker ? { value: worker, label: worker } : undefined;

@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { TaskEvent } from '../../src/shared/contracts/tasks';
-import { condenseEvents, eventBadge, filterCondensed, formatDuration, isTimelineNoise, normalizeToolName, relativeTime, timelineActive, toolSteps } from '../../src/renderer/features/tasks/log-view';
+import { condenseEvents, eventBadge, filterCondensed, isTimelineNoise, normalizeToolName, relativeTime, timelineActive } from '../../src/renderer/features/tasks/log-view';
 import { styles as eventStyles } from '../../src/renderer/features/tasks/events-style';
 import { EventsPanel } from '../../src/renderer/features/tasks/EventsPanel';
 
@@ -129,11 +129,10 @@ test('condensed timeline renders step summaries and keeps hidden raw chatter col
     event('5', 'result', 'done summary'),
   ];
   const html = markup(React.createElement(EventsPanel, { events, taskId: 't' }));
-  assert.match(html, /精简/);
-  assert.match(html, /全部/);
+  assert.doesNotMatch(html, /精简|全部|事件类型|导出已筛选日志/);
   assert.match(html, /执行了 1 个步骤/);
   assert.match(html, />Bash 1</);
-  assert.match(html, /aria-expanded="false"/);
+  assert.doesNotMatch(html, /aria-expanded|<button[^>]*步骤|步骤明细|原始事件|lucide-chevron/);
   assert.doesNotMatch(html, /tool started bash/);
   assert.match(html, /策略已选择子 Agent codex，正在启动/);
   assert.match(html, />执行中</);
@@ -141,16 +140,17 @@ test('condensed timeline renders step summaries and keeps hidden raw chatter col
   assert.doesNotMatch(html, /已加载 \d+ 条/);
 });
 
-test('all-events mode keeps today view with export note and load control', () => {
+test('timeline is always condensed: no mode switch, kind filter, export or raw rows, and no stored mode', () => {
   const original = (globalThis as Record<string, unknown>).localStorage;
-  (globalThis as Record<string, unknown>).localStorage = { getItem: () => 'all', setItem: () => {} };
+  const reads: string[] = [];
+  (globalThis as Record<string, unknown>).localStorage = { getItem: (key: string) => { reads.push(key); return 'all'; }, setItem: () => { reads.push('set'); } };
   try {
     const events = [event('1', 'log', 'tool started bash'), event('2', 'lifecycle', 'Task queued.')];
     const html = markup(React.createElement(EventsPanel, { events, taskId: 't' }));
-    assert.match(html, /已加载 2 条 · 导出会遮盖常见凭据格式/);
-    assert.match(html, /事件类型/);
-    assert.doesNotMatch(html, /执行了 \d+ 个步骤/);
-    assert.match(html, /调用工具 bash/);
+    assert.match(html, /执行了 1 个步骤/);
+    assert.match(html, /搜索已加载事件/);
+    assert.doesNotMatch(html, /已加载 \d+ 条|导出|事件类型|调用工具 bash/);
+    assert.equal(reads.includes('weaver-timeline-mode'), false);
   } finally {
     (globalThis as Record<string, unknown>).localStorage = original;
   }
@@ -204,19 +204,20 @@ test('lifecycle steps carry status tags, outcomes carry outlined outcome tags', 
   assert.equal(eventBadge(event('9', 'lifecycle', 'Frozen work package created')), undefined);
 });
 
-test('tool steps pair started notes with finished or failed notes and time them', () => {
-  const steps = toolSteps([
+test('a merged steps node is a static summary: count, tool tags and time, no button, expansion or call details', () => {
+  const events = [
     event('1', 'log', 'tool started bash', 0),
-    event('2', 'log', 'tool started read', 1),
-    event('3', 'log', 'tool finished read', 2),
-    event('4', 'log', 'tool failed bash', 5),
-    event('5', 'log', 'tool finished grep', 6),
-    event('6', 'progress', 'owned scope started', 6),
-  ]);
-  assert.deepEqual(steps.map(step => [step.name, step.durationMs, step.failed]), [['Bash', 5000, true], ['Read', 1000, false], ['Grep', undefined, false]]);
-  assert.equal(formatDuration(500), '<1s');
-  assert.equal(formatDuration(5000), '5s');
-  assert.equal(formatDuration(125000), '2m05s');
+    event('2', 'log', 'tool finished bash', 2),
+    event('3', 'log', 'tool started read', 3),
+    event('4', 'log', 'tool failed read', 4),
+  ];
+  const html = markup(React.createElement(EventsPanel, { events, taskId: 't', active: true }));
+  assert.match(html, /执行了 2 个步骤/);
+  assert.match(html, />Bash 1</);
+  assert.match(html, />Read 1</);
+  assert.match(html, /<time[^>]*dateTime=/);
+  assert.match(html, /lucide-loader/);
+  assert.doesNotMatch(html, /<button|aria-expanded|步骤明细|原始事件|<ul|lucide-chevron/);
 });
 
 test('timeline is a vertical list of nodes with relative time and an absolute-time tooltip', () => {

@@ -79,7 +79,7 @@ test('inactive execution cards keep the first row status alone and the second ro
   assert.match(card({ ...base, createdAt: yesterday }), /<time[^>]*>10-17 [0-9]{2}:[0-9]{2}<\/time> 创建/);
 });
 
-test('workspace groups use task workspace, sort by newest task and omit headings for a single group', () => {
+test('workspace groups use task workspace, sort by newest task and always show headings, even for a single group', () => {
   const tasks = [
     { ...base, id: 'old-alpha', title: 'ALPHA_OLD', updatedAt: '2026-10-18T09:00:00Z' },
     { ...base, id: 'beta', title: 'BETA', workspace: '/projects/beta', updatedAt: '2026-10-18T10:00:00Z' },
@@ -91,8 +91,10 @@ test('workspace groups use task workspace, sort by newest task and omit headings
   assert.match(html, /<h3[^>]*title="\/projects\/beta"/);
   assert.ok(html.indexOf('ALPHA_NEW') < html.indexOf('ALPHA_OLD'));
   assert.ok(html.indexOf('ALPHA_OLD') < html.indexOf('>BETA<'));
-  assert.equal((html.match(/<h3/g) ?? []).length, 2);
-  assert.doesNotMatch(board([base]), /<h3/);
+  const running = html.slice(html.indexOf('data-status-column="running"') + 1).split(/data-status-column=/)[0];
+  assert.equal((running.match(/<h3/g) ?? []).length, 2);
+  const single = board([base]);
+  assert.match(single, /<h3[^>]*title="\/projects\/alpha"[\s\S]*?alpha[\s\S]*?>1<\/span>/);
 });
 
 test('all four status columns group independently and the closed column remains folded by default', () => {

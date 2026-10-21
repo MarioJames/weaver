@@ -28,7 +28,7 @@ function crowd(count: number, directories = 5, hoursAgo = 30): Task[] {
   }));
 }
 
-test('column rows flatten workspace groups into a heading plus its cards, and a single group needs no heading', () => {
+test('column rows flatten workspace groups into a heading plus its cards, and a single group still gets a heading', () => {
   const tasks = crowd(12, 3);
   const rows = boardRows(workspaceGroups(tasks));
   assert.equal(rows.length, 12 + 3);
@@ -37,8 +37,13 @@ test('column rows flatten workspace groups into a heading plus its cards, and a 
   const heading = rows[0];
   assert.ok(heading.kind === 'heading' && heading.count === 4 && heading.label.startsWith('dir-') && heading.title.startsWith('/projects/dir-'));
   const single = boardRows(workspaceGroups(crowd(7, 1)));
-  assert.equal(single.length, 7);
-  assert.ok(single.every(row => row.kind === 'card'));
+  assert.equal(single.length, 7 + 1);
+  const singleHeading = single[0];
+  assert.ok(singleHeading.kind === 'heading' && singleHeading.count === 7 && singleHeading.label === 'dir-0' && singleHeading.title === '/projects/dir-0');
+  assert.ok(single.slice(1).every(row => row.kind === 'card'));
+  const unnamed = boardRows(workspaceGroups([{} as Task]));
+  const unnamedHeading = unnamed[0];
+  assert.ok(unnamedHeading.kind === 'heading' && unnamedHeading.label === '未指定工作目录' && unnamedHeading.title === '未指定工作目录' && unnamedHeading.count === 1);
   assert.deepEqual(boardRows([]), []);
 });
 

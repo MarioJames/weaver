@@ -1,7 +1,7 @@
 import { Button, Descriptions, Tag, Text } from '@lobehub/ui/base-ui';
 import type { Task } from '../../../shared/contracts/tasks';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../../format/status-colors';
-import { dispatchKind, isActive, taskOwnerId } from './task-view';
+import { dispatchKind, isActive, taskOwnerId, taskTitle } from './task-view';
 import { AgentLabel } from '../../ui/EngineIcon';
 import { TimeText } from '../../ui/TimeText';
 import { styles } from './task-agents-style';
@@ -11,7 +11,7 @@ export function TaskAgents({ task, tasks, onSelect, ownerKind }: { task: Task; t
   const parent = tasks.find(item => item.id === task.parentTaskId);
   if (task.parentTaskId) return <section className={styles.section} aria-label="所属任务">
     <Text type="secondary">父任务</Text>
-    <Button type="text" outdent="start" disabled={!parent || !onSelect} onClick={() => onSelect?.(task.parentTaskId!)}>{parent?.title ?? task.parentTaskId}</Button>
+    <Button type="text" outdent="start" disabled={!parent || !onSelect} onClick={() => onSelect?.(task.parentTaskId!)}>{parent ? taskTitle(parent) : task.parentTaskId}</Button>
   </section>;
   if (task.executionRole !== 'owner') return null;
   const children = tasks.filter(item => item.parentTaskId === task.id);
@@ -29,7 +29,7 @@ export function TaskAgents({ task, tasks, onSelect, ownerKind }: { task: Task; t
     {children.length ? <ul className={styles.children}>{children.map(child => {
       const status = displayStatus(child);
       return <li key={child.id} className={styles.child}>
-        <Button type="text" outdent="start" className={styles.link} disabled={!onSelect} onClick={() => onSelect?.(child.id)}>{child.title}</Button>
+        <Button type="text" outdent="start" className={styles.link} disabled={!onSelect} onClick={() => onSelect?.(child.id)}>{taskTitle(child)}</Button>
         <span className={styles.meta}>
           <Tag size="small" color={DISPLAY_TONES[status]}>{DISPLAY_LABELS[status]}</Tag>
           {child.dispatch?.worker ? <AgentLabel kind={dispatchKind(child)} name={child.dispatch.worker} /> : <Text type="secondary">{isActive(child) ? '等待派发子 Agent' : '未派发给子 Agent'}</Text>}

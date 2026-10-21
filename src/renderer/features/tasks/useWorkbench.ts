@@ -26,10 +26,10 @@ export function useWorkbench() {
   const timer=setInterval(invalidate,15000);window.addEventListener('focus',invalidate);const visible=()=>{if(document.visibilityState==='visible')invalidate();};document.addEventListener('visibilitychange',visible);
   return()=>{mounted.current=false;channel.dispose();unsubscribe();clearInterval(timer);window.removeEventListener('focus',invalidate);document.removeEventListener('visibilitychange',visible);};
  },[connect]);
- const action=useCallback(async(fn:()=>Promise<unknown>)=>{
+ const action=useCallback(async(fn:()=>Promise<unknown>,onActionError?:(error:unknown)=>void)=>{
   if(locked.current)return false;locked.current=true;setBusy(true);setError('');
   try{await fn();void sync.current?.refresh().catch(()=>{});return true;}
-  catch(error){if(mounted.current){ if(!isTransientError(error)){setError(String(error));} }void sync.current?.refresh().catch(()=>{});return false;}
+  catch(error){if(mounted.current){ if(onActionError)onActionError(error);else if(!isTransientError(error)){setError(String(error));} }void sync.current?.refresh().catch(()=>{});return false;}
   finally{locked.current=false;if(mounted.current)setBusy(false);}
  },[]);
  return{tasks,caps,error,loading,busy,refresh:connect,action,dismissError:()=>setError('')};

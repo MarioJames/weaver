@@ -35,6 +35,7 @@ export function createRegistry(u: CommandUnits): CommandRegistry {
    'tasks.complete': a => u.mutations.complete(a),
    'tasks.describe': a => u.mutations.describe(a),
    'tasks.retry': a => u.retries.retry(a),
+   'tasks.update': a => u.mutations.update(a),
    'tasks.get': a => u.queries.taskGet(a),
    'tasks.list': a => u.queries.taskList(a),
    'tasks.events': a => u.queries.taskEvents(a),

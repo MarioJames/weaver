@@ -3,13 +3,6 @@ import { redactSecrets } from '../../../shared/redact';
 import { DISPLAY_LABELS, DISPLAY_TONES, type DisplayStatus, type StatusTone } from '../../format/status-colors';
 /** Best-effort display redaction with the one shared rule set. Never claim this catches every secret. */
 export function redactLog(value: string): string { return redactSecrets(value); }
-export function selectEvents(events: TaskEvent[], kind: string, query: string): TaskEvent[] {
- const needle=query.trim().toLocaleLowerCase();
- return events.filter(event=>(kind==='all'||event.kind===kind)&&(!needle||redactLog(event.message).toLocaleLowerCase().includes(needle)));
-}
-export function exportEvents(taskId: string, events: TaskEvent[]): string {
-  return JSON.stringify({schema:'weaver.event-export.v1',taskId,redaction:'best-effort; review before sharing',events:events.map(event=>({...event,message:redactLog(event.message)}))},null,2);
-}
 
 const NOISE_LOG = /^(?:tool|file_change) (?:started|finished|failed)\b/;
 const STEP_ONLY_PROGRESS = [/^owned scope started$/, /^opencode step started$/, /^codex thread started$/, /^(?:[a-z0-9_.:-]+ )?session started$/i];
@@ -126,39 +119,6 @@ export function eventBadge(event: TaskEvent): EventBadge | undefined {
   return status ? { label: DISPLAY_LABELS[status], tone: DISPLAY_TONES[status], outcome: false } : undefined;
 }
 
-/** One tool call inside a merged step run. */
-export interface ToolStep { id: string; name: string; at: string; durationMs?: number; failed: boolean }
-
-/** Pair started notes with their finished/failed note (same tool, oldest first) into one row per call. */
-export function toolSteps(events: TaskEvent[]): ToolStep[] {
-  const steps: ToolStep[] = [];
-  const open = new Map<string, ToolStep[]>();
-  for (const event of events) {
-    if (event.kind !== 'log') continue;
-    const match = TOOL_NOTE.exec(event.message);
-    if (!match) continue;
-    const name = normalizeToolName(match[2].trim());
-    if (match[1] === 'started') {
-      const step: ToolStep = { id: event.id, name, at: event.at, failed: false };
-      steps.push(step);
-      open.set(name, [...(open.get(name) ?? []), step]);
-      continue;
-    }
-    const step = open.get(name)?.shift();
-    const failed = match[1] === 'failed';
-    if (step) { step.durationMs = Math.max(0, new Date(event.at).getTime() - new Date(step.at).getTime()); step.failed = failed; }
-    else steps.push({ id: event.id, name, at: event.at, failed });
-  }
-  return steps;
-}
-
-export function formatDuration(ms: number): string {
-  if (!Number.isFinite(ms) || ms < 1000) return '<1s';
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  return `${Math.floor(seconds / 60)}m${String(seconds % 60).padStart(2, '0')}s`;
-}
-
 /** Tag color preset of a status tone; the neutral tone uses the Tag default. */
 export function toneColor(tone: StatusTone): string | undefined { return tone === 'default' ? undefined : tone; }
 
@@ -166,6 +126,8 @@ export function toneColor(tone: StatusTone): string | undefined { return tone ==
 export function displayLog(value: string): string {
   return redactLog(value)
     .replace(/^Frozen work package created$/, '已冻结工作包')
+    .replace(/^Draft edited before start$/, '已在启动前编辑草稿')
+    .replace(/^Owner generated task title and acceptance criteria$/, '父 Agent 已生成任务标题和验收标准')
     .replace(/^Result receipt acknowledged; acceptance unchanged$/, '已确认收到结果，验收状态未变')
     .replace(/^Dispatch admitted to queue; waiting for an execution slot$/, '派发已进入队列，等待执行名额')
     .replace(/^Worker exited successfully; output is ready for owner review$/, '子 Agent 已成功退出，等待父 Agent 验收')
