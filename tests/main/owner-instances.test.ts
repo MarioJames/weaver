@@ -258,3 +258,57 @@ test('every owner summary keeps the identity needed to tell two instances apart'
     assert.equal(caps.maxParallel, Object.values(f.policy.snapshot().config.owners).filter(owner => owner.enabled).reduce((sum: number, owner) => sum + owner.max_parallel, 0));
   } finally { await f.close(); }
 });
+
+test('attach takes an optional title and a repeat attach updates it only when a new one is sent', async () => {
+  const f = setup();
+  try {
+    const bare = f.attach('Pane A', 'session-a');
+    assert.equal(bare.title, undefined, 'a titleless attach registers no title');
+    const titled = f.call('owners.attach', { name: 'Pane A', profileId: 'codex_owner', session: 'session-a', title: '  Refactor the owner store  ' }) as LogicalOwner;
+    assert.equal(titled.id, bare.id, 'the title does not make it another instance');
+    assert.equal(titled.title, 'Refactor the owner store', 'the title is trimmed');
+    // A repeat attach without title keeps the stored value; name semantics and dedupe are unchanged.
+    assert.equal(f.call('owners.attach', { name: 'Pane A', profileId: 'codex_owner', session: 'session-a' }).title, 'Refactor the owner store');
+    assert.equal(f.owners().length, 1);
+    assert.equal(f.call('owners.attach', { name: 'Pane A', profileId: 'codex_owner', session: 'session-a', title: 'Second topic' }).title, 'Second topic');
+    assert.equal(f.owners()[0].name, 'Pane A');
+    assert.equal(f.owners()[0].session, 'session-a');
+    // A malformed title never reaches the stored instance.
+    const rejected = f.raw('owners.attach', { name: 'Pane A', profileId: 'codex_owner', session: 'session-a', title: '' });
+    assert.equal(rejected.error?.code, 'INVALID_REQUEST');
+    assert.equal(f.owners()[0].title, 'Second topic');
+  } finally { await f.close(); }
+});
+
+test('owners describe sets one instance title, validates it and replays its receipt', async () => {
+  const f = setup();
+  try {
+    const a = f.attach('Pane A', 'session-a');
+    f.attach('Pane B', 'session-b');
+    const updated = f.call('owners.describe', { ownerId: a.id, title: '  Board title  ' }) as LogicalOwner & { runningTaskCount: number };
+    assert.equal(updated.title, 'Board title', 'the title is trimmed');
+    assert.equal(updated.session, 'session-a', 'describe moves nothing but the title');
+    assert.equal(updated.runningTaskCount, 0);
+    assert.equal(f.owners().find(owner => owner.id === a.id)?.title, 'Board title');
+    assert.equal(f.owners().find(owner => owner.name === 'Pane B')?.title, undefined, 'another instance is untouched');
+    assert.equal(f.instances().find(owner => owner.id === a.id)?.title, 'Board title', 'owners list returns the title');
+    // A mock fixture instance is described the same way.
+    const mock = f.call('owners.spawn', { name: 'demo', profileId: 'codex_owner', provider: 'mock' }) as LogicalOwner;
+    assert.equal(f.call('owners.describe', { ownerId: mock.id, title: 'Mock topic' }).title, 'Mock topic');
+    // Unknown ownerId fails exactly like owners get; bad titles are INVALID_REQUEST naming the field.
+    assert.equal(f.raw('owners.describe', { ownerId: randomUUID(), title: 'Nope' }).error?.code, 'NOT_FOUND');
+    assert.equal(f.raw('owners.get', { ownerId: randomUUID() }).error?.code, 'NOT_FOUND');
+    for (const bad of ['', '   ', 'x'.repeat(121)]) {
+      const rejected = f.raw('owners.describe', { ownerId: a.id, title: bad });
+      assert.equal(rejected.error?.code, 'INVALID_REQUEST');
+      assert.match(rejected.error?.message ?? '', /title/);
+    }
+    assert.equal(f.call('owners.get', { ownerId: a.id }).title, 'Board title', 'a rejected describe changed nothing');
+    // The same command ID with the same arguments returns the original receipt.
+    const commandId = randomUUID();
+    const first = f.raw('owners.describe', { ownerId: a.id, title: 'Replayed' }, commandId);
+    assert.equal(first.ok, true);
+    assert.deepEqual(f.raw('owners.describe', { ownerId: a.id, title: 'Replayed' }, commandId), first);
+    assert.equal(f.call('owners.get', { ownerId: a.id }).title, 'Replayed');
+  } finally { await f.close(); }
+});

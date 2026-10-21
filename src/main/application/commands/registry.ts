@@ -28,6 +28,7 @@ export function createRegistry(u: CommandUnits): CommandRegistry {
    'owners.get': a => u.owners.get(a),
    'owners.attach': a => u.owners.register('owners.attach', a),
    'owners.spawn': a => u.owners.register('owners.spawn', a),
+   'owners.describe': a => u.owners.describe(a),
    'owners.continuation.get': a => u.owners.continuationGet(a),
    'owners.continuation.configure': a => u.owners.continuationConfigure(a),
    'tasks.create': a => u.mutations.create(a),

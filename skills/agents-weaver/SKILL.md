@@ -40,6 +40,8 @@ Use JSON files or `--input -` with a quoted heredoc for request bodies containin
    ```
 
    `name` = `<Host> · <workspace dir name> · <HH:MM session start>`; `session` = `$CODEX_THREAD_ID` when set, else `$HERDR_PANE_ID` when set, else the absolute workspace path; the `--command-id` stays the same for the whole session, so a lost reply re-issued with it returns the same owner. Keep the returned `id` and use it as `ownerId` in every task below; if you lost it, `weaver owners list` and take the entry with the same name/session — never fall back to `ownerProfileId`, which registers a new throwaway owner for that one task.
+
+   Once this session's main task is clear, give the instance a readable board title: `weaver owners describe --input '{"ownerId":"<id>","title":"<short specific topic>"}' --command-id <stable-id>`. Match the host session title when one exists, and update the title whenever the main task changes. A parent Agent root started from the Weaver page needs no title — the board shows its root task title.
 5. `weaver policy preview --input '{"owner":"<profile>"}'` shows the route Weaver would pick right now, without launching anything.
 
 ## UI root tasks

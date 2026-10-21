@@ -114,7 +114,7 @@ test('command help and root catalog are machine-readable and expose digest and r
  assert.equal(catalog.length,CLI_CATALOG.length);for(const item of catalog)assert.ok(item.inputFields);
 });
 
-const logical = [['tasks','health'],['engines','health'],['engines','penalty'],['engines','unblock'],['owners','launch']];
+const logical = [['tasks','health'],['engines','health'],['engines','penalty'],['engines','unblock'],['owners','launch'],['owners','describe']];
 
 test('new logical commands are catalogued, parseable in both forms and in help',()=>{
  for(const words of logical){
@@ -129,6 +129,15 @@ test('new logical commands are catalogued, parseable in both forms and in help',
  assert.match(CLI_HELP,/tasks retry returns the linked task already dispatched/);
  // The help says what an owner gets, not which component decides it.
  assert.doesNotMatch(CLI_HELP,/the server decides|the CLI never/);
+});
+
+test('owners describe is catalogued as a mutation with required ownerId and title',()=>{
+ const row=CLI_CATALOG.find(item=>item.command==='owners.describe');
+ assert.ok(row);assert.equal(row!.mutation,true);
+ assert.deepEqual(Object.keys(row!.inputFields!.required).sort(),['ownerId','title']);
+ assert.deepEqual(Object.keys(row!.inputFields!.optional??{}),[]);
+ assert.match(row!.usage,/owners describe/);
+ assert.match(CLI_HELP,/owners describe sets or updates one instance's title/);
 });
 
 test('text output carries the next step a dispatch or retry handed back',()=>{

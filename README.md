@@ -141,6 +141,8 @@ weaver tasks wait --task-id <taskId>
 ```
 
 ```json
+#    Once the main task is clear, set its board title (update on change):
+#    weaver owners describe --input '{"ownerId":"<id>","title":"..."}' --command-id <stable-id>
 owner.json
 {
   "profileId": "codex_owner",

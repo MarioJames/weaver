@@ -20,6 +20,17 @@ Use, in order: the task root the caller provided, else `ACCEPTANCE_TMPDIR`, else
 
 `name` is `<Host> · <workspace dir name> · <HH:MM session start>`; `session` is `$CODEX_THREAD_ID`, else `$HERDR_PANE_ID`, else the absolute workspace path. The reply `data.id` is this session's owner id, and `data` also echoes `name`/`profileId`. Attach is metadata only (`verified: false`) — it never contacts your host. Re-issue with the same `--command-id` and identical input to get the original receipt back; if that comes back `COMMAND_INDETERMINATE`, read `weaver owners list` and take the entry with the same name/session instead of registering a second owner.
 
+`weaver owners describe --input describe.json --command-id describe-001` — once the session's main task is clear, set its board title (and again whenever the main task changes):
+
+```json
+{
+  "ownerId": "<id returned by the preflight attach>",
+  "title": "Short specific topic of the current main task"
+}
+```
+
+`title` is 1–120 characters after trimming; an empty or over-long title is rejected as `INVALID_REQUEST`. The reply `data` is the updated instance including `runningTaskCount`. Only `title` changes: name, session, host evidence and state stay as registered. A repeat attach with `title` updates it too; without `title` the stored value is kept. A parent Agent root started from the Weaver page needs no title — the board shows its root task title.
+
 `weaver tasks create --input request.json --command-id create-001`:
 
 ```json

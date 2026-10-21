@@ -31,22 +31,31 @@ export class OwnerLifecycle {
  list(a:CommandArgs):unknown{return {owners:this.ownerInstances()};}
  get(a:CommandArgs):unknown{const owner=this.records.owner(a.ownerId);return {...owner,runningTaskCount:this.runningOn(owner)};}
  continuationGet(a:CommandArgs):unknown{return this.continuation.get(parseId(a.taskId,'task ID'));}
+ /** Renames one instance for the web board; only the title moves, host, session and state stay as registered. */
+ describe(a:CommandArgs):unknown{
+  const title=text(a.title,'title',120).trim();
+  const owner=this.records.owner(a.ownerId);
+  owner.title=title;this.manager.store.putOwner(owner);
+  return {...owner,runningTaskCount:this.runningOn(owner)};
+ }
  continuationConfigure(a:CommandArgs):unknown{if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');return this.continuation.configure(parseId(a.taskId,'task ID'),a.expectedRevision as number,a.idleRotationMinutes as number|null);}
  register(command:'owners.attach'|'owners.spawn',a:CommandArgs):LogicalOwner{
     const mode=command==='owners.spawn'&&a.provider==='mock'?'mock':'manual';if(a.provider!==undefined&&a.provider!=='mock')fail('CAPABILITY_UNAVAILABLE','This process does not spawn an owner model');
     // Inputs are validated before the registry is read, so a malformed request can never reach an existing instance.
     const profileId=text(a.profileId,'profileId',120);const name=text(a.name,'name',120);
+    const title=a.title===undefined?undefined:text(a.title,'title',120).trim();
     const session=a.session===undefined?'external-cli':text(a.session,'session',120);
     const pane=a.pane===undefined?'unverified':text(a.pane,'pane',120);
     const owners=this.manager.store.listOwners();
     // The profile is the policy role; this caller's profile + name + session is one instance of it. A repeat attach is that same durable registration.
     if(command==='owners.attach'&&mode==='manual'){
      const attached=owners.find(owner=>sameOwnerInstance(owner,{profileId,name,session}));
-     if(attached)return attached;
+     if(attached){if(title!==undefined){attached.title=title;this.manager.store.putOwner(attached);}return attached;}
     }
     // Admission and limits decide whether a new instance may be created; a duplicate has nothing to admit.
     if(this.policy.snapshot().owners[profileId]?.status!=='available')fail('POLICY_DENIED','Owner profile is unavailable');
     const owner:LogicalOwner={id:randomUUID(),name,profileId,mode,state:mode==='mock'?'ready':'attached',createdAt:new Date().toISOString(),...(mode==='manual'?{session}:{})};
+    if(title!==undefined)owner.title=title;
     if(mode==='mock'){if(a.session!==undefined||a.pane!==undefined)fail('INVALID_REQUEST','Logical registration has no session or pane');owner.host=this.ownerHost.spawn({ownerId:owner.id,name:owner.name,profileId});}
     else owner.host=this.ownerHost.attach({ownerId:owner.id,name:owner.name,profileId,session,pane});
     this.manager.store.putOwner(owner);return owner;
