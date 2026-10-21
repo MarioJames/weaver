@@ -215,7 +215,7 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
             <div className={engineStyles.cardFoot}>
               <div className={styles.spread}>
                 <Text>主动刷新额度</Text>
-                <Tooltip title={isQuotaKind(kind) ? '按设置页的间隔自动刷新；额度耗尽时自动暂停派发，恢复后自动解除。' : '这个引擎没有额度接口。'}>
+                <Tooltip title={kind === 'opencode' ? '定时刷新 Go 套餐窗口，实际限额按对应模型反馈处理；不会因套餐窗口耗尽暂停整个引擎。' : isQuotaKind(kind) ? '按设置页的间隔自动刷新；额度耗尽时自动暂停派发，恢复后自动解除。' : '这个引擎没有额度接口。'}>
                   <span><NamedSwitch aria-label={`${entry.id} 主动刷新额度`} size="small" checked={record ? quotaRefreshEnabled(record) : false} disabled={!record || !isQuotaKind(kind) || busyId !== ''} onChange={checked => void setEngine(entry.id, { quota_refresh: checked })} /></span>
                 </Tooltip>
               </div>

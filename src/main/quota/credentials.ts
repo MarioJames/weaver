@@ -20,7 +20,7 @@ export class QuotaFailure extends Error {
 export class QuotaRenewalPending extends QuotaFailure {
   constructor(readonly account: string) { super('unknown', '原生访问令牌已到期，等待原生 CLI 续期后再读取'); }
 }
-export interface NativeCredential { token: string; accountId?: string; fingerprint: string; account: string }
+export interface NativeCredential { token: string; accountId?: string; fingerprint: string; account: string; opencodeKind?: 'api' | 'console'; orgId?: string; origin?: string }
 
 export async function readObject(file: string): Promise<JsonObject> {
   let handle;
@@ -60,8 +60,53 @@ function jwtExpiry(token: string): number | null {
   } catch { return null; }
 }
 
+/**
+ * OpenCode credential priority follows the real native login: the currently active
+ * Console account in opencode.db (SQLite, read-only) wins over a possibly stale
+ * Go API key left in auth.json. A present-but-unusable Console state never falls
+ * back to the file key, so two accounts are never silently mixed. Only when there
+ * is no active Console login does the verified API-key file path apply.
+ * Reads only, never refreshes, switches accounts, or writes credentials.
+ */
+async function readOpenCodeCredential(env: NodeJS.ProcessEnv, now: number): Promise<NativeCredential> {
+  const { readOpenCodeConsole } = await import('./opencode-console');
+  const consoleLogin = readOpenCodeConsole(env, now);
+  if (consoleLogin) {
+    return {
+      token: consoleLogin.token,
+      fingerprint: consoleLogin.fingerprint,
+      account: consoleLogin.account,
+      opencodeKind: 'console',
+      orgId: consoleLogin.orgId,
+      origin: consoleLogin.origin,
+    };
+  }
+  const home = env.HOME || homedir();
+  const dataDir = env.XDG_DATA_HOME && env.XDG_DATA_HOME.trim() !== '' ? env.XDG_DATA_HOME : path.join(home, '.local', 'share');
+  let root: JsonObject;
+  try {
+    root = await readObject(path.join(dataDir, 'opencode', 'auth.json'));
+  } catch (error) {
+    if (error instanceof QuotaFailure && error.status === 'unauthenticated') {
+      throw new QuotaFailure('unsupported', '尚未连接 OpenCode Go 订阅，无 Go 套餐额度可读；免费模型与按量余额没有官方只读额度接口');
+    }
+    throw error;
+  }
+  const providerId = object(root['opencode-go']) !== undefined ? 'opencode-go' : object(root.opencode) !== undefined ? 'opencode' : undefined;
+  const entry = providerId !== undefined ? object(root[providerId]) : undefined;
+  if (entry === undefined) {
+    throw new QuotaFailure('unsupported', '尚未连接 OpenCode Go 订阅，无 Go 套餐额度可读；免费模型与按量余额没有官方只读额度接口');
+  }
+  if (entry.type !== 'api') throw new QuotaFailure('unsupported', 'OpenCode 当前登录方式没有 Go 套餐额度可读；连接 OpenCode Go 订阅后可查看套餐窗口');
+  const token = nonempty(entry.key);
+  if (!token) throw new QuotaFailure('unsupported', 'OpenCode Go API key 缺失或不可用，无法读取 Go 套餐额度');
+  const account = createHash('sha256').update('opencode').update('\0').update(providerId!).digest('hex');
+  return { token, fingerprint: createHash('sha256').update(account).update('\0').update(token).digest('hex'), account, opencodeKind: 'api' };
+}
+
 /** Reads only the current native session; never refreshes, switches accounts, or writes credentials. */
 export async function readNativeCredential(engine: QuotaEngine, env: NodeJS.ProcessEnv, now: number): Promise<NativeCredential> {
+  if (engine === 'opencode') return readOpenCodeCredential(env, now);
   const home = env.HOME || homedir();
   const file = engine === 'codex' ? path.join(env.CODEX_HOME || path.join(home, '.codex'), 'auth.json')
     : engine === 'claude' ? path.join(env.CLAUDE_CONFIG_DIR || path.join(home, '.claude'), '.credentials.json')

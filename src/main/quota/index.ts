@@ -1,9 +1,10 @@
 import type { EngineQuotaRecord, QuotaEngine, QuotaRefreshInput, QuotaSnapshot, QuotaStatus } from '../../shared/contracts/quota';
 import { QUOTA_FRESH_MS } from '../../shared/contracts/quota';
 import { VERSION } from '../../shared/version';
-import { QuotaFailure, QuotaRenewalPending, readNativeCredential, type NativeCredential } from './credentials';
+import { QuotaFailure, QuotaRenewalPending, object, readNativeCredential, type NativeCredential } from './credentials';
 import { THIRD_PARTY_DETAIL } from '../../shared/contracts/quota';
-import { normalizeUsage, PROVIDERS } from './providers';
+import { normalizeConsoleStatus, normalizeUsage, PROVIDERS } from './providers';
+import { OPENCODE_CONSOLE_ORIGIN } from './opencode-console';
 import { usesThirdPartyProvider } from './third-party';
 import { QUOTA_ENGINES as ENGINES } from '../domain/quota-engines';
 import type { QuotaPersistence, QuotaSnapshotStore } from '../storage/quota-snapshot';
@@ -120,9 +121,10 @@ export class QuotaProber {
     let abort!: () => void;
     const interrupted = new Promise<never>((_, reject) => { abort = () => reject(new QuotaFailure('error', this.closed ? '额度探测已关闭' : '额度接口请求超时')); controller.signal.addEventListener('abort', abort, { once: true }); });
     let fingerprint: string | undefined;
+    let kind: 'console' | 'api' | undefined;
     const started = this.clock().getTime();
     try {
-      const result = await Promise.race([this.probe(engine, controller.signal, value => { fingerprint = value; }), interrupted]);
+      const result = await Promise.race([this.probe(engine, controller.signal, (value, probedKind) => { fingerprint = value; kind = probedKind; }), interrupted]);
       if (result && !this.closed) { this.records.set(engine, result); this.persist(); }
     } catch (error) {
       if (this.closed) return;
@@ -135,7 +137,8 @@ export class QuotaProber {
         const sameAccount = this.lastAccounts.get(engine) === failure.account;
         const observation = sameAccount && OBSERVED.includes(previous.status) ? previous : undefined;
         this.records.set(engine, {
-          ...initial(engine), status: observation?.status ?? 'unknown',
+          // Retaining the same account's observation keeps its real source too.
+          ...initial(engine), source: sameAccount ? previous.source : initial(engine).source, status: observation?.status ?? 'unknown',
           ...(observation?.statusBasis ? { statusBasis: observation.statusBasis } : {}),
           checkedAt: new Date(started).toISOString(),
           observedAt: sameAccount ? previous.observedAt : null,
@@ -145,8 +148,13 @@ export class QuotaProber {
         return;
       }
       const sameCredential = fingerprint !== undefined && fingerprint === this.fingerprints.get(engine);
+      // A stale retention keeps the real source of the observation; an identified
+      // credential labels even its first failure with the correct source.
+      const identified = engine === 'opencode' && kind !== undefined
+        ? kind === 'console' ? PROVIDERS.opencodeConsole.source : PROVIDERS.opencode.source
+        : undefined;
       this.records.set(engine, {
-        ...initial(engine), status: failure.status, checkedAt: new Date(started).toISOString(),
+        ...initial(engine), source: identified ?? (sameCredential ? previous.source : initial(engine).source), status: failure.status, checkedAt: new Date(started).toISOString(),
         observedAt: sameCredential ? previous.observedAt : null,
         windows: sameCredential ? previous.windows : [], stale: true, detail: failure.message,
         retryAt: cooldown,
@@ -159,12 +167,12 @@ export class QuotaProber {
     }
   }
 
-  private async probe(engine: QuotaEngine, signal: AbortSignal, identify: (fingerprint: string) => void): Promise<EngineQuotaRecord | undefined> {
+  private async probe(engine: QuotaEngine, signal: AbortSignal, identify: (fingerprint: string, opencodeKind?: 'console' | 'api') => void): Promise<EngineQuotaRecord | undefined> {
     const now = this.clock().getTime();
     // The native endpoint reports the subscription, not the provider the CLI is actually switched to; do not read or show it.
     if (await usesThirdPartyProvider(engine, this.env)) throw new QuotaFailure('unsupported', THIRD_PARTY_DETAIL);
     const credential = await readNativeCredential(engine, this.env, now);
-    identify(credential.fingerprint);
+    identify(credential.fingerprint, credential.opencodeKind);
     if (signal.aborted || this.closed) throw new QuotaFailure('error', '额度探测已取消');
     this.lastAccounts.set(engine, credential.account);
     if (this.fingerprints.get(engine) !== credential.fingerprint) {
@@ -183,28 +191,105 @@ export class QuotaProber {
     const payload = await this.request(engine, credential, signal);
     if (signal.aborted || this.closed) throw new QuotaFailure('error', '额度探测已取消');
     const checkedAt = this.clock().toISOString();
-    const measurement = normalizeUsage(engine, payload, this.clock().getTime());
+    const isConsole = engine === 'opencode' && credential.opencodeKind === 'console';
+    const measurement = isConsole ? normalizeConsoleStatus(payload) : normalizeUsage(engine, payload, this.clock().getTime());
     // Supplier-controlled model/product strings must not echo a known native credential.
-    const secrets = [credential.token, credential.accountId].filter((value): value is string => !!value);
+    const secrets = [credential.token, credential.accountId, credential.orgId].filter((value): value is string => !!value);
     measurement.windows = measurement.windows.map((row, index) => row.model && secrets.some(secret => row.model!.includes(secret)) || secrets.some(secret => row.label.includes(secret))
       ? { ...row, id: `${engine}:redacted:${index}`, label: '额度窗口', scope: row.scope === 'model' ? 'unknown' : row.scope, model: null }
       : row);
-    return { engine, source: PROVIDERS[engine].source, ...measurement, checkedAt, observedAt: checkedAt, stale: false, retryAt: new Date(this.nextRequests.get(engine)!).toISOString() };
+    const source = isConsole ? PROVIDERS.opencodeConsole.source : PROVIDERS[engine].source;
+    return { engine, source, ...measurement, checkedAt, observedAt: checkedAt, stale: false, retryAt: new Date(this.nextRequests.get(engine)!).toISOString() };
+  }
+
+  /**
+   * Only a bounded official EntitlementError marks OpenCode unsupported (valid key without a
+   * Go subscription). Any other 403 (edge/WAF, oversized or non-JSON body) stays a plain error.
+   * Body text never surfaces in the record.
+   */
+  private async isEntitlementError(response: Response, signal: AbortSignal): Promise<boolean> {
+    const reader = response.body?.getReader();
+    if (!reader) return false;
+    const cancel = () => { void reader.cancel().catch(() => undefined); };
+    signal.addEventListener('abort', cancel, { once: true });
+    try {
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > MAX_BODY_BYTES) return false;
+        chunks.push(value);
+      }
+      const payload = object(JSON.parse(Buffer.concat(chunks, size).toString('utf8')));
+      return object(payload?.error)?.type === 'EntitlementError';
+    } catch { return false; }
+    finally { signal.removeEventListener('abort', cancel); cancel(); }
   }
 
   private async request(engine: QuotaEngine, credential: NativeCredential, signal: AbortSignal): Promise<unknown> {
+    const isConsole = engine === 'opencode' && credential.opencodeKind === 'console';
+    if (isConsole) return this.requestConsole(credential, signal);
     const headers: Record<string, string> = { Authorization: `Bearer ${credential.token}`, Accept: 'application/json', 'User-Agent': `Weaver/${VERSION}` };
     if (engine === 'codex') headers['ChatGPT-Account-Id'] = credential.accountId!;
     if (engine === 'claude') headers['anthropic-beta'] = 'oauth-2025-04-20';
     if (engine === 'grok') headers['x-xai-token-auth'] = 'xai-grok-cli';
-    const response = await this.fetcher(PROVIDERS[engine].url, { method: 'GET', headers, signal, redirect: 'error', credentials: 'omit', cache: 'no-store' });
-    if (response.redirected) { void response.body?.cancel().catch(() => undefined); throw new QuotaFailure('error', '额度接口拒绝重定向'); }
-    if (!response.ok) {
-      void response.body?.cancel().catch(() => undefined);
-      if (response.status === 401 || response.status === 403) throw new QuotaFailure('unauthenticated', '原生登录无效或无权读取额度，请在对应工具中确认登录');
-      if (response.status === 429) throw new QuotaFailure('error', '额度探测接口限流，请稍后重试', retryAfter(response.headers.get('Retry-After'), this.clock().getTime()));
+    const response = await this.fetchResponse(PROVIDERS[engine].url, headers, signal);
+    if (engine === 'opencode' && response.status === 403) {
+      if (await this.isEntitlementError(response, signal)) throw new QuotaFailure('unsupported', '当前 key 没有 Go 订阅，无法读取 Go 套餐窗口；免费模型与按量余额没有官方只读额度接口');
       throw new QuotaFailure('error', '额度接口暂时不可用');
     }
+    if (!response.ok) {
+      throw this.statusFailure(response, '原生登录无效或无权读取额度，请在对应工具中确认登录');
+    }
+    return this.readJson(response, signal);
+  }
+
+  /**
+   * Active Console login only: the token is sent solely to its own verified origin
+   * (fixed official https://opencode.ai/console) at /api/go/status, never to the
+   * public default host, never with cookies, never following redirects. A 401 is a
+   * local login problem, a 403 is a scope/permission problem; neither falls back to
+   * another cached account or key. Error bodies never surface in the record.
+   */
+  private async requestConsole(credential: NativeCredential, signal: AbortSignal): Promise<unknown> {
+    if (credential.origin !== OPENCODE_CONSOLE_ORIGIN || !credential.orgId) {
+      throw new QuotaFailure('unsupported', '原生 Console 登录来源不受支持，不会发送凭据');
+    }
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${credential.token}`,
+      'x-org-id': credential.orgId,
+      'User-Agent': `Weaver/${VERSION}`,
+      Accept: 'application/json',
+    };
+    const response = await this.fetchResponse(PROVIDERS.opencodeConsole.url, headers, signal);
+    if (!response.ok) {
+      throw this.statusFailure(response, '原生 Console 登录无效，请在 OpenCode 中重新登录后手动刷新', true);
+    }
+    return this.readJson(response, signal);
+  }
+
+  /** Single shared GET path for every trusted native source; source-specific URL/headers/status semantics stay with the callers. */
+  private async fetchResponse(url: string, headers: Record<string, string>, signal: AbortSignal): Promise<Response> {
+    const response = await this.fetcher(url, { method: 'GET', headers, signal, redirect: 'error', credentials: 'omit', cache: 'no-store' });
+    if (response.redirected) { void response.body?.cancel().catch(() => undefined); throw new QuotaFailure('error', '额度接口拒绝重定向'); }
+    return response;
+  }
+
+  private statusFailure(response: Response, authDetail: string, consoleScope = false): QuotaFailure {
+    void response.body?.cancel().catch(() => undefined);
+    if (response.status === 401) throw new QuotaFailure('unauthenticated', authDetail);
+    if (response.status === 403) {
+      throw consoleScope
+        ? new QuotaFailure('unsupported', '当前 Console 登录无 Go 额度读取权限；免费模型与按量余额没有官方只读额度接口')
+        : new QuotaFailure('unauthenticated', authDetail);
+    }
+    if (response.status === 429) throw new QuotaFailure('error', '额度探测接口限流，请稍后重试', retryAfter(response.headers.get('Retry-After'), this.clock().getTime()));
+    throw new QuotaFailure('error', '额度接口暂时不可用');
+  }
+
+  private async readJson(response: Response, signal: AbortSignal): Promise<unknown> {
     const contentType = response.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase();
     if (!contentType || contentType !== 'application/json' && !contentType.endsWith('+json')) { void response.body?.cancel().catch(() => undefined); throw new QuotaFailure('error', '额度接口返回了非 JSON 数据'); }
     const reader = response.body?.getReader();

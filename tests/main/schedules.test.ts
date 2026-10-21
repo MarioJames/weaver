@@ -139,6 +139,18 @@ test('builtin projects policy save/rollback, block changes preserve cadence, out
  }finally{await service?.stop();await f.close();}
 });
 
+test('builtin quota run refreshes an explicitly enabled OpenCode target through the same refresh path',async()=>{
+ const f=setup();let service:ScheduleService|undefined;try{
+  const calls:string[]=[];
+  const record=(engine:QuotaEngine):EngineQuotaRecord=>({engine,status:engine==='opencode'?'unsupported':'exhausted',source:'fixture',checkedAt:new Date(AT).toISOString(),observedAt:engine==='opencode'?null:new Date(AT).toISOString(),stale:engine==='opencode',windows:[],detail:'fixture',retryAt:null});
+  service=new ScheduleService({store:f.store,policy:f.policy,now:()=>AT,notify:()=>{},createTask:()=>{},command:()=>({apiVersion:'weaver.v1',ok:true}),refreshQuota:async engine=>{calls.push(engine);return {records:[record(engine)],snapshot:f.policy.snapshot(),policyChanged:false};}});
+  let snap=f.policy.snapshot();snap.config.engines.opencode.enabled=true;snap.config.engines.opencode.quota_refresh=true;f.policy.save({revision:snap.revision,config:snap.config,blocks:snap.blocks},{allowEngineEnable:true});
+  const builtin=service.list({}).schedules.find(d=>d.builtin)!;const run=service.run({scheduleId:builtin.id});await new Promise(r=>setTimeout(r,20));
+  assert.deepEqual(calls,['codex','claude','opencode']);
+  assert.equal(service.runs({scheduleId:builtin.id,runId:run.id}).runs[0].status,'failed','an unsupported Go observation keeps the existing fresh/failed outcome contract');
+ }finally{await service?.stop();await f.close();}
+});
+
 test('Agent recovery starts a bound queued root once and retains a live root across scheduler restart',async()=>{
  const f=setup();let recovered:ScheduleService|undefined;try{
   const d=f.create({kind:'agent',script:undefined,agent:{goal:'fixture',ownerProfileId:'codex_owner'}});

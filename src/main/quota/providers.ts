@@ -6,6 +6,8 @@ export const PROVIDERS = {
   codex: { source: 'codex_usage', url: 'https://chatgpt.com/backend-api/wham/usage' },
   claude: { source: 'claude_oauth_usage', url: 'https://api.anthropic.com/api/oauth/usage' },
   grok: { source: 'grok_cli_billing', url: 'https://cli-chat-proxy.grok.com/v1/billing?format=credits' },
+  opencode: { source: 'opencode_go_usage', url: 'https://opencode.ai/zen/go/v1/usage' },
+  opencodeConsole: { source: 'opencode_console_status', url: 'https://opencode.ai/console/api/go/status' },
 } as const;
 type Measurement = Pick<EngineQuotaRecord, 'status' | 'statusBasis' | 'windows' | 'detail'>;
 type Extra = 'available' | 'none' | 'unknown';
@@ -145,10 +147,95 @@ function grok(body: JsonObject, now: number): Measurement {
   return evaluate(windows, extra === 'available' ? 'unknown' : extra, now);
 }
 
+/**
+ * Official but undocumented Go subscription endpoint: 200 is {usage:{rolling,weekly,monthly}}
+ * with status ok|rate-limited, an integer percent and a server resetsAt. There is no balance,
+ * dollar amount, plan name or per-model split; extra usage beyond the plan is not reported.
+ * Unknown shapes fail closed to unknown; a rate-limited window is an exhausted Go plan window
+ * only, never a claim about balance, free models or other routes.
+ */
+function opencode(body: JsonObject): Measurement {
+  const usage = object(body.usage);
+  const windows: QuotaWindow[] = [];
+  const defs = [['rolling', 'OpenCode Go · 5 小时额度', 300], ['weekly', 'OpenCode Go · 每周额度', 10080], ['monthly', 'OpenCode Go · 每月额度', null]] as const;
+  for (const [key, label, duration] of defs) {
+    const slot = object(usage?.[key]);
+    if (!slot || slot.status !== 'ok' && slot.status !== 'rate-limited') return { status: 'unknown', windows: [], detail: 'Go 套餐窗口缺失，无法确认账户额度' };
+    if (typeof slot.percent !== 'number' || !Number.isFinite(slot.percent) || slot.percent < 0 || slot.percent > 100) return { status: 'unknown', windows: [], detail: 'Go 套餐窗口缺失，无法确认账户额度' };
+    const resetsAt = parseProviderTimestamp(slot.resetsAt);
+    if (resetsAt === null) return { status: 'unknown', windows: [], detail: 'Go 套餐窗口缺失，无法确认账户额度' };
+    windows.push({ id: `opencode:${key}`, label, scope: 'account', model: null, usedPercent: slot.percent, remainingPercent: 100 - slot.percent, resetsAt: new Date(resetsAt).toISOString(), durationMinutes: duration, used: null, total: null, remaining: null, unit: 'percent' });
+  }
+  const exhausted = windows.some((entry, index) => {
+    const raw = object(usage?.[defs[index][0]]);
+    return raw?.status === 'rate-limited' || entry.usedPercent! >= 100;
+  });
+  return exhausted
+    ? { status: 'exhausted', windows, detail: 'OpenCode Go 套餐窗口已耗尽；这仅指 Go 套餐窗口，不代表余额、免费模型或其他路线不可用。实际限额按对应模型反馈处理' }
+    : { status: 'available', windows, detail: '已读取 Go 套餐窗口；这不保证模型可以运行' };
+}
+
 /** Only safe quota fields are projected; account identifiers and raw response data never leave this module. */
 export function normalizeUsage(engine: QuotaEngine, payload: unknown, now: number): Measurement {
   const body = object(payload);
   if (!body) return { status: 'unknown', windows: [], detail: '额度响应缺少有效数据' };
   if ([body.limits, body.additional_rate_limits, object(body.config)?.productUsage].some(value => Array.isArray(value) && value.length > 100)) return { status: 'unknown', windows: [], detail: '额度响应包含过多窗口，无法确认账户额度' };
-  return engine === 'codex' ? codex(body, now) : engine === 'claude' ? claude(body, now) : grok(body, now);
+  return engine === 'codex' ? codex(body, now) : engine === 'claude' ? claude(body, now) : engine === 'grok' ? grok(body, now) : opencode(body);
+}
+
+const MICRO_MAX = 1_000_000_000_000_000_000n;
+function microCents(value: unknown): bigint | null {
+  if (typeof value === 'number') {
+    if (!Number.isSafeInteger(value) || value < 0 || value > 1_000_000_000_000_000) return null;
+    return BigInt(value);
+  }
+  if (typeof value !== 'string' || value.length === 0 || value.length > 24 || !/^\d+$/.test(value)) return null;
+  try {
+    const parsed = BigInt(value);
+    return parsed >= 0 && parsed <= MICRO_MAX ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Native Console shape: {access:{meters:{fiveHour,week,month:{usedMicroCents,limitMicroCents,resetsAt}}},useBalance?}.
+ * Meters are plan metering units, not dollars: only used/limit percentages are projected
+ * (used/total/remaining stay null, unit percent). Root identifiers such as
+ * subscriberUserId/paymentMethodId are never read. Missing or malformed windows fail
+ * closed to unknown; limit 0 is unknown, never exhausted; used over limit caps at 100
+ * and reports an exhausted plan window only.
+ */
+export function normalizeConsoleStatus(payload: unknown): Measurement {
+  const body = object(payload);
+  const meters = object(object(body?.access)?.meters);
+  const defs = [
+    ['fiveHour', 'opencode:rolling', 'OpenCode Go · 5 小时额度', 300],
+    ['week', 'opencode:weekly', 'OpenCode Go · 每周额度', 10080],
+    ['month', 'opencode:monthly', 'OpenCode Go · 每月额度', null],
+  ] as const;
+  const missing = { status: 'unknown' as const, windows: [], detail: 'Go 套餐窗口缺失，无法确认账户额度' };
+  if (!meters) return missing;
+  const windows: QuotaWindow[] = [];
+  for (const [key, id, label, duration] of defs) {
+    const slot = object(meters[key]);
+    if (!slot) return missing;
+    const used = microCents(slot.usedMicroCents);
+    const limit = microCents(slot.limitMicroCents);
+    if (used === null || limit === null || limit === 0n) return missing;
+    const resetsAt = parseProviderTimestamp(slot.resetsAt);
+    if (resetsAt === null) return missing;
+    const percent = used >= limit ? 100 : Number((used * 10000n) / limit) / 100;
+    if (!Number.isFinite(percent) || percent < 0 || percent > 100) return missing;
+    windows.push({
+      id, label, scope: 'account', model: null,
+      usedPercent: percent, remainingPercent: Math.max(0, 100 - percent),
+      resetsAt: new Date(resetsAt).toISOString(), durationMinutes: duration,
+      used: null, total: null, remaining: null, unit: 'percent',
+    });
+  }
+  const exhausted = windows.some(entry => entry.usedPercent! >= 100);
+  return exhausted
+    ? { status: 'exhausted', windows, detail: 'OpenCode Go 套餐窗口已耗尽；这仅指 Go 套餐窗口，不代表余额、免费模型或其他路线不可用。实际限额按对应模型反馈处理' }
+    : { status: 'available', windows, detail: '已读取 Go 套餐窗口；这不保证模型可以运行' };
 }

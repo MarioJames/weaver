@@ -21,12 +21,13 @@ function fixture(t: { after(fn: () => void | Promise<void>): void }) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const env = { HOME: root };
   const credential = (engine: QuotaEngine, body?: unknown) => {
-    const dir = join(root, engine === 'codex' ? '.codex' : engine === 'claude' ? '.claude' : '.grok');
+    const dir = join(root, engine === 'codex' ? '.codex' : engine === 'claude' ? '.claude' : engine === 'grok' ? '.grok' : join('.local', 'share', 'opencode'));
     mkdirSync(dir, { recursive: true });
     const file = join(dir, engine === 'claude' ? '.credentials.json' : 'auth.json');
     const defaults = engine === 'codex' ? { auth_mode: 'chatgpt', tokens: { access_token: token('secret-native'), account_id: 'account-secret', refresh_token: 'never-use' } }
       : engine === 'claude' ? { claudeAiOauth: { accessToken: 'secret-claude', expiresAt: start + 86400000, refreshToken: 'never-use' }, mcpOAuth: { accessToken: 'wrong-mcp-secret' } }
-        : { 'https://auth.x.ai::official-client': { auth_mode: 'oidc', key: 'secret-grok', expires_at: reset, refresh_token: 'never-use' } };
+        : engine === 'grok' ? { 'https://auth.x.ai::official-client': { auth_mode: 'oidc', key: 'secret-grok', expires_at: reset, refresh_token: 'never-use' } }
+          : { 'opencode-go': { type: 'api', key: 'secret-opencode' } };
     writeFileSync(file, JSON.stringify(body ?? defaults));
     return file;
   };
@@ -46,7 +47,7 @@ test('quota get starts unknown and never reads credentials or requests a provide
   const prober = new QuotaProber({ env, now: () => new Date(start), fetch: async () => { calls++; throw new Error('must not fetch'); } });
   t.after(() => prober.close());
   const snapshot = prober.get();
-  assert.deepEqual(snapshot.records.map(r => r.engine), ['codex', 'claude', 'grok']);
+  assert.deepEqual(snapshot.records.map(r => r.engine), ['codex', 'claude', 'grok', 'opencode']);
   assert.ok(snapshot.records.every(r => r.status === 'unknown' && r.stale && r.checkedAt === null && r.observedAt === null && r.windows.length === 0));
   snapshot.records[0].windows.push({} as never);
   assert.equal(prober.get().records[0].windows.length, 0);
@@ -84,7 +85,9 @@ test('all providers send only the fixed GET with their own native credential and
       assert.equal(h.get('x-xai-token-auth'), 'xai-grok-cli');
     }
   }
-  assert.ok(result.records.every(r => r.status === 'available' && !r.stale));
+  assert.deepEqual(result.records.map(r => r.engine), ['codex', 'claude', 'grok', 'opencode']);
+  assert.ok(result.records.slice(0, 3).every(r => r.status === 'available' && !r.stale));
+  assert.equal(result.records[3].status, 'unsupported', 'OpenCode without a Go login never reaches the official endpoint');
   assert.equal(result.records[0].windows[0].usedPercent, 0);
   assert.equal(result.records[0].windows[0].remainingPercent, 100);
   assert.equal(result.records[0].windows[0].durationMinutes, 300);
@@ -145,12 +148,13 @@ test('explicit account exhaustion requires known unavailable extras; missing num
   } });
   t.after(() => prober.close());
   const first = await prober.refresh({});
-  assert.ok(first.records.every(r => r.status === 'exhausted'));
+  assert.ok(first.records.filter(r => r.engine !== 'opencode').every(r => r.status === 'exhausted'));
+  assert.equal(first.records[3].status, 'unsupported');
   assert.equal(first.records[0].windows[0].usedPercent, 105);
   assert.equal(first.records[0].windows[0].remainingPercent, 0);
   now += 60001; missing = true;
   const second = await prober.refresh({});
-  assert.ok(second.records.every(r => r.status === 'unknown'));
+  assert.ok(second.records.filter(r => r.engine !== 'opencode').every(r => r.status === 'unknown'));
   assert.ok(second.records.every(r => r.windows.every(w => w.usedPercent === null)));
 });
 
@@ -289,6 +293,7 @@ test('native directory overrides stay local and malformed or non-official sessio
   const result = await prober.refresh({});
   assert.equal(calls, 2);
   assert.equal(result.records[0].status, 'available'); assert.equal(result.records[1].status, 'available'); assert.equal(result.records[2].status, 'unsupported');
+  assert.equal(result.records[3].status, 'unsupported', 'OpenCode without a Go login stays local');
 });
 
 test('independent Codex model allowance prevents a whole-engine exhaustion claim', async t => {
@@ -432,7 +437,7 @@ test('an expired access token the native CLI can renew keeps the last reading wi
   t.after(() => prober.close());
   const observed = (await prober.refresh({})).records;
   assert.equal(calls, 3);
-  assert.deepEqual(observed.map(r => [r.status, r.stale]), [['available', false], ['available', false], ['available', false]]);
+  assert.deepEqual(observed.map(r => [r.status, r.stale]), [['available', false], ['available', false], ['available', false], ['unsupported', true]]);
   for (const engine of ['codex', 'claude', 'grok'] as const) f.credential(engine, expiredCredential(engine, true));
   now += 60_001;
   const pending = (await prober.refresh({})).records;
@@ -455,7 +460,7 @@ test('a renewal wait without any earlier reading stays the ordinary no-data stat
   t.after(() => prober.close());
   const records = (await prober.refresh({})).records;
   assert.equal(calls, 0);
-  assert.deepEqual(records.map(r => [r.status, r.stale, r.windows.length, r.observedAt]), [['unknown', true, 0, null], ['unknown', true, 0, null], ['unknown', true, 0, null]]);
+  assert.deepEqual(records.map(r => [r.status, r.stale, r.windows.length, r.observedAt]), [['unknown', true, 0, null], ['unknown', true, 0, null], ['unknown', true, 0, null], ['unsupported', true, 0, null]]);
   assert.ok(records.every(r => !/登录|重新登录|确认/.test(r.detail)));
 });
 
@@ -471,7 +476,7 @@ test('an expired token with no refresh token is still a real logout that drops e
   now += 60_001;
   const records = (await prober.refresh({})).records;
   assert.equal(calls, 3, 'a logout must not reach the quota API either');
-  for (const record of records) {
+  for (const record of records.filter(r => r.engine !== 'opencode')) {
     assert.equal(record.status, 'unauthenticated');
     assert.equal(record.windows.length, 0);
     assert.equal(record.observedAt, null);
@@ -517,4 +522,176 @@ test('credential reading separates a renewably expired token from a logout and n
     f.credential(engine, expiredCredential(engine, false));
     await assert.rejects(() => readNativeCredential(engine, f.env, start), (error: unknown) => error instanceof QuotaFailure && !(error instanceof QuotaRenewalPending) && error.status === 'unauthenticated' && /登录/.test(error.message));
   }
+});
+
+const goSlot = (status: unknown, percent: unknown, resetsAt: unknown) => ({ status, percent, resetsAt });
+const goUsage = (rolling: unknown = goSlot('ok', 1, reset), weekly: unknown = goSlot('ok', 25, reset), monthly: unknown = goSlot('ok', 29, reset)) => ({ usage: { rolling, weekly, monthly } });
+
+test('OpenCode without a Go API key never reaches the official endpoint and names no logout', async t => {
+  const f = fixture(t);
+  let calls = 0;
+  const prober = new QuotaProber({ env: { ...f.env, OPENCODE_API_KEY: 'env-secret-must-not-send', OPENCODE_AUTH_CONTENT: 'env-content-must-not-send' }, now: () => new Date(start), fetch: async () => { calls++; return json(goUsage()); } });
+  t.after(() => prober.close());
+  // A missing file is not a logout: free models need no login at all.
+  let record = (await prober.refresh({ engine: 'opencode' })).records[3];
+  assert.equal(record.status, 'unsupported');
+  assert.equal(record.windows.length, 0);
+  assert.match(record.detail, /免费模型|Go/);
+  assert.doesNotMatch(record.detail, /登录|重新登录/);
+  assert.equal(calls, 0);
+  for (const body of [
+    { 'opencode-go': { type: 'oauth', access: 'oauth-secret', refresh: 'oauth-refresh' } },
+    { 'opencode-go': { type: 'wellknown', key: 'unknown-secret' } },
+    { 'opencode-go': { type: 'api', key: '' } },
+    { 'opencode-go': 'public' },
+    { opencode: { type: 'oauth', access: 'oauth-secret' } },
+  ]) {
+    f.credential('opencode', body);
+    record = (await prober.refresh({ engine: 'opencode' })).records[3];
+    assert.equal(record.status, 'unsupported', JSON.stringify(body));
+    assert.equal(record.windows.length, 0);
+    assert.equal(calls, 0);
+  }
+  assert.doesNotMatch(JSON.stringify(prober.get()), /env-secret|oauth-secret|unknown-secret/);
+});
+
+test('OpenCode prefers the opencode-go key, falls back to opencode and honors XDG_DATA_HOME', async t => {
+  const f = fixture(t);
+  f.credential('opencode', { 'opencode-go': { type: 'api', key: 'secret-go' }, opencode: { type: 'api', key: 'secret-plain' } });
+  const seen: string[] = [];
+  let now = start;
+  let prober = new QuotaProber({ env: f.env, now: () => new Date(now), fetch: async (_url, init) => { seen.push(new Headers(init!.headers).get('Authorization')!); return json(goUsage()); } });
+  t.after(() => prober.close());
+  assert.equal((await prober.refresh({ engine: 'opencode' })).records[3].status, 'available');
+  assert.deepEqual(seen, ['Bearer secret-go']);
+  f.credential('opencode', { opencode: { type: 'api', key: 'secret-plain' } });
+  now += 60001;
+  await prober.refresh({ engine: 'opencode' });
+  assert.deepEqual(seen, ['Bearer secret-go', 'Bearer secret-plain']);
+  await prober.close();
+  const xdg = join(f.root, 'xdg-data');
+  mkdirSync(join(xdg, 'opencode'), { recursive: true });
+  writeFileSync(join(xdg, 'opencode', 'auth.json'), JSON.stringify({ 'opencode-go': { type: 'api', key: 'secret-xdg' } }));
+  const xdgSeen: string[] = [];
+  const xdgProber = new QuotaProber({ env: { ...f.env, XDG_DATA_HOME: xdg }, now: () => new Date(start), fetch: async () => { xdgSeen.push('called'); return json(goUsage()); } });
+  t.after(() => xdgProber.close());
+  // HOME holds no fallback key here, so a request proves the XDG file was used.
+  rmSync(join(f.root, '.local'), { recursive: true, force: true });
+  assert.equal((await xdgProber.refresh({ engine: 'opencode' })).records[3].status, 'available');
+  assert.deepEqual(xdgSeen, ['called']);
+});
+
+test('OpenCode sends only the fixed official GET with the native key and projects safe windows', async t => {
+  const f = fixture(t);
+  f.credential('opencode');
+  const requests: Array<{ url: string; init: RequestInit }> = [];
+  const prober = new QuotaProber({ env: f.env, now: () => new Date(start), fetch: async (url, init) => { requests.push({ url: String(url), init: init! }); return json(goUsage()); } });
+  t.after(() => prober.close());
+  const record = (await prober.refresh({ engine: 'opencode' })).records[3];
+  assert.equal(record.source, 'opencode_go_usage');
+  assert.deepEqual(requests.map(r => r.url), ['https://opencode.ai/zen/go/v1/usage']);
+  const init = requests[0].init;
+  assert.equal(init.method, 'GET');
+  assert.equal(init.redirect, 'error');
+  assert.equal(init.body, undefined);
+  assert.equal(init.credentials, 'omit');
+  const headers = new Headers(init.headers);
+  assert.equal(headers.get('Authorization'), 'Bearer secret-opencode');
+  assert.equal(headers.get('ChatGPT-Account-Id'), null);
+  assert.equal(headers.get('anthropic-beta'), null);
+  assert.equal(headers.get('x-xai-token-auth'), null);
+  assert.equal(record.status, 'available');
+  assert.deepEqual(record.windows.map(w => [w.id, w.label, w.scope, w.model, w.usedPercent, w.remainingPercent, w.unit, w.durationMinutes]), [
+    ['opencode:rolling', 'OpenCode Go · 5 小时额度', 'account', null, 1, 99, 'percent', 300],
+    ['opencode:weekly', 'OpenCode Go · 每周额度', 'account', null, 25, 75, 'percent', 10080],
+    ['opencode:monthly', 'OpenCode Go · 每月额度', 'account', null, 29, 71, 'percent', null],
+  ]);
+  assert.ok(record.windows.every(w => w.resetsAt !== null && Date.parse(w.resetsAt) === Date.parse(reset) && w.used === null && w.total === null && w.remaining === null));
+  assert.doesNotMatch(JSON.stringify(record), /secret-opencode/);
+});
+
+test('OpenCode maps rate limits to an exhausted plan window and malformed shapes to unknown', async t => {
+  const f = fixture(t);
+  f.credential('opencode');
+  let now = start;
+  let body: unknown = goUsage(goSlot('rate-limited', 100, reset));
+  const prober = new QuotaProber({ env: f.env, now: () => new Date(now), fetch: async () => json(body) });
+  t.after(() => prober.close());
+  let record = (await prober.refresh({ engine: 'opencode' })).records[3];
+  assert.equal(record.status, 'exhausted');
+  assert.equal(record.windows.length, 3);
+  assert.match(record.detail, /仅指 Go 套餐窗口|不代表/);
+  assert.doesNotMatch(JSON.stringify(record), /USD|balance|credit/i);
+  now += 60001;
+  body = goUsage(goSlot('ok', 100, reset));
+  record = (await prober.refresh({ engine: 'opencode' })).records[3];
+  assert.equal(record.status, 'exhausted');
+  for (const malformed of [
+    { usage: { weekly: goSlot('ok', 25, reset), monthly: goSlot('ok', 29, reset) } },
+    goUsage(goSlot('paused', 10, reset)),
+    goUsage(goSlot('ok', -1, reset)),
+    goUsage(goSlot('ok', 101, reset)),
+    goUsage(goSlot('ok', NaN, reset)),
+    goUsage(goSlot('ok', 10, 'not-a-date')),
+    { usage: null },
+    {},
+  ]) {
+    now += 60001;
+    body = malformed;
+    record = (await prober.refresh({ engine: 'opencode' })).records[3];
+    assert.equal(record.status, 'unknown', JSON.stringify(malformed));
+    assert.equal(record.windows.length, 0, 'a partial or malformed Go plan never becomes an account reading');
+  }
+  // Unknown extra payload keys (older useBalance, balances) are ignored, never turned into dollars.
+  now += 60001;
+  body = { usage: { rolling: goSlot('ok', 10, reset), weekly: goSlot('ok', 10, reset), monthly: goSlot('ok', 10, reset) }, useBalance: true, balance: 12.5 };
+  record = (await prober.refresh({ engine: 'opencode' })).records[3];
+  assert.equal(record.status, 'available');
+  assert.ok(record.windows.every(w => w.unit === 'percent'));
+});
+
+test('OpenCode distinguishes missing subscriptions from edge errors and keeps auth failures safe', async t => {
+  const f = fixture(t);
+  f.credential('opencode');
+  let mode = 0;
+  let now = start;
+  let calls = 0;
+  const prober = new QuotaProber({ env: f.env, now: () => new Date(now), fetch: async () => {
+    calls++;
+    if (mode === 0) return json({ type: 'error', error: { type: 'AuthError', message: 'Unauthorized' } }, 401);
+    if (mode === 1) return json({ type: 'error', error: { type: 'EntitlementError', message: 'OpenCode Go subscription required.' } }, 403);
+    if (mode === 2) return json({ type: 'error', error: { type: 'OtherError', message: 'edge denied' } }, 403);
+    if (mode === 3) return new Response('forbidden page', { status: 403, headers: { 'Content-Type': 'text/html' } });
+    return json({ private: 'secret-response-body' }, 500);
+  } });
+  t.after(() => prober.close());
+  assert.equal((await prober.refresh({ engine: 'opencode' })).records[3].status, 'unauthenticated');
+  mode = 1; now += 60001;
+  let record = (await prober.refresh({ engine: 'opencode' })).records[3];
+  assert.equal(record.status, 'unsupported');
+  assert.match(record.detail, /没有 Go 订阅/);
+  mode = 2; now += 60001;
+  assert.equal((await prober.refresh({ engine: 'opencode' })).records[3].status, 'error', 'a non-EntitlementError 403 must not look like a missing subscription');
+  mode = 3; now += 60001;
+  assert.equal((await prober.refresh({ engine: 'opencode' })).records[3].status, 'error');
+  mode = 4; now += 60001;
+  record = (await prober.refresh({ engine: 'opencode' })).records[3];
+  assert.equal(record.status, 'error');
+  assert.doesNotMatch(JSON.stringify(record), /secret-response-body/);
+  assert.equal(calls, 5);
+});
+
+test('OpenCode credential reading separates accounts by provider id and never writes the file', async t => {
+  const f = fixture(t);
+  const file = f.credential('opencode');
+  const before = readFileSync(file, 'utf8');
+  const first = await readNativeCredential('opencode', f.env, start);
+  assert.equal(readFileSync(file, 'utf8'), before, 'Weaver only reads the native credential');
+  assert.match(first.token, /secret-opencode/);
+  assert.ok(/^[0-9a-f]{64}$/.test(first.fingerprint) && /^[0-9a-f]{64}$/.test(first.account));
+  assert.doesNotMatch(`${first.fingerprint}${first.account}`, /secret-opencode/);
+  assert.equal(first.accountId, undefined);
+  f.credential('opencode', { opencode: { type: 'api', key: 'secret-plain' } });
+  const second = await readNativeCredential('opencode', f.env, start);
+  assert.notEqual(second.account, first.account, 'different provider ids hash to different accounts');
 });

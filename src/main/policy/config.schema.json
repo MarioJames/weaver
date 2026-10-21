@@ -170,7 +170,7 @@
           ]
         },
         "quota_refresh": {
-          "description": "Whether scheduled quota refresh probes this engine and may auto-block it when the account quota is exhausted. Missing means on for codex, claude and grok, which have a quota probe, and off for every other kind.",
+          "description": "Whether scheduled quota refresh probes this engine and may auto-block it when the account quota is exhausted. Missing means on for codex, claude, grok and opencode, which have a quota probe, and off for every other kind. OpenCode Go plan windows are display-only and never auto-block the engine.",
           "type": "boolean"
         }
       }

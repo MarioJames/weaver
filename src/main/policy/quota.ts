@@ -7,8 +7,8 @@ import { isEngineBlock, quotaBlockBy } from '../../shared/policy/blocks';
 import { object } from '../../shared/validation';
 import { rpcForCommand } from '../../shared/contracts/rpc';
 
-const ENGINES: QuotaEngine[] = ['codex', 'claude', 'grok'];
-const LABELS: Record<QuotaEngine, string> = { codex: 'Codex', claude: 'Claude Code', grok: 'Grok' };
+const ENGINES: QuotaEngine[] = ['codex', 'claude', 'grok', 'opencode'];
+const LABELS: Record<QuotaEngine, string> = { codex: 'Codex', claude: 'Claude Code', grok: 'Grok', opencode: 'OpenCode Go' };
 export const QUOTA_CAPABILITIES = {
   engines: ENGINES,
   get: { command: 'quota.get', rpc: rpcForCommand('quota.get').method, network: false },
@@ -25,7 +25,7 @@ export function parseQuotaRefresh(value: unknown): QuotaRefreshInput {
   const raw = object(value);
   if (![Object.prototype, null].includes(Object.getPrototypeOf(raw)) || Reflect.ownKeys(raw).some(key => key !== 'engine')) throw new Error('Unknown quota refresh field');
   if (!Object.hasOwn(raw, 'engine')) return {};
-  if (typeof raw.engine !== 'string' || !ENGINES.includes(raw.engine as QuotaEngine)) throw new Error('Invalid quota engine; use codex, claude, or grok');
+  if (typeof raw.engine !== 'string' || !ENGINES.includes(raw.engine as QuotaEngine)) throw new Error('Invalid quota engine; use codex, claude, grok, or opencode');
   return { engine: raw.engine as QuotaEngine };
 }
 
@@ -55,6 +55,10 @@ export function applyQuotaSnapshot(store: PolicyStore, quota: QuotaSnapshot, inp
   const update = new PolicyBlockService(() => store).update(current => {
     let blocks = current.blocks;
     for (const record of quota.records) {
+      // OpenCode Go windows share the opencode kind with free and third-party routes, so a
+      // 100% Go plan window must not pause the whole engine. The record stays display-only;
+      // actual limits keep flowing through the existing vendor/model failure path.
+      if (record.engine === 'opencode') continue;
       if ((input.engine !== undefined && record.engine !== input.engine) || record.stale || !record.checkedAt || !record.observedAt) continue;
       if (record.status !== 'available' && record.status !== 'exhausted') continue;
       const source = quotaBlockBy(record.engine);

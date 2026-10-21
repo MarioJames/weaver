@@ -111,6 +111,7 @@ test('expired foreign engine blocks report an atomic conflict while active forei
 test('refresh input rejects unknown fields, prototype names and non-enumerated engines', () => {
   assert.deepEqual(parseQuotaRefresh({}), {});
   assert.deepEqual(parseQuotaRefresh({ engine: 'grok' }), { engine: 'grok' });
+  assert.deepEqual(parseQuotaRefresh({ engine: 'opencode' }), { engine: 'opencode' });
   for (const value of [null, [], 'codex', { engine: null }, { engine: '__proto__' }, { engine: 'constructor' }, { engine: 'toString' }, { url: 'https://example.test' }, JSON.parse('{"__proto__":{}}'), { commandId: 'x' }, { taskId: 'x' }]) {
     assert.throws(() => parseQuotaRefresh(value));
   }
@@ -152,7 +153,7 @@ test('public CLI supports optional input and all output formats; HTTP shares str
     const initial = await cli(f.dir, ['quota', 'get']);
     assert.equal(initial.status, 0, initial.stdout);
     const initialData = JSON.parse(initial.stdout).data;
-    assert.equal(initialData.records.length, 3);
+    assert.equal(initialData.records.length, 4);
     assert.ok(initialData.records.every((item: EngineQuotaRecord) => item.status === 'unknown' && item.checkedAt === null));
     assert.equal(requests, 0);
     const caps = JSON.parse((await cli(f.dir, ['capabilities'])).stdout).data;
@@ -317,7 +318,7 @@ test('live exhausted windows survive an older reset, then explicit Codex permiss
     clock += 60_001;
     const restored = await rpc(runtime, 'refreshQuota', [{}]);
     assert.equal(restored.status, 200);
-    assert.deepEqual(restored.json.result.records.filter((item: EngineQuotaRecord) => item.engine !== 'grok').map((item: EngineQuotaRecord) => item.status), ['available', 'available']);
+    assert.deepEqual(restored.json.result.records.filter((item: EngineQuotaRecord) => item.engine === 'codex' || item.engine === 'claude').map((item: EngineQuotaRecord) => item.status), ['available', 'available']);
     assert.equal(restored.json.result.policyChanged, true);
     assert.deepEqual(restored.json.result.snapshot.blocks, []);
   } finally { await runtime?.close(); await f.close(); }
@@ -410,6 +411,37 @@ test('an expired but renewable native token keeps the last published reading ins
     assert.equal(logout.json.result.records.find((item: EngineQuotaRecord) => item.engine === 'codex').status, 'unauthenticated');
     assert.match(JSON.stringify(logout.json.result.records), /登录/);
   } finally { await runtime?.close(); await f.close(); }
+});
+
+test('an OpenCode observation persists across restarts and manual refresh reuses the same prober', async () => {
+  const f = await fixture();
+  try {
+    const home = join(f.dir, 'home');
+    await mkdir(join(home, '.local', 'share', 'opencode'), { recursive: true });
+    await writeFile(join(home, '.local', 'share', 'opencode', 'auth.json'), JSON.stringify({ 'opencode-go': { type: 'api', key: 'persist-secret' } }));
+    const usage = { usage: { rolling: { status: 'ok', percent: 1, resetsAt: reset }, weekly: { status: 'ok', percent: 25, resetsAt: reset }, monthly: { status: 'ok', percent: 29, resetsAt: reset } } };
+    const db = new DatabaseSync(join(f.dir, 'weaver.db'));
+    migrate(db);
+    let requests = 0;
+    const first = new QuotaProber({ env: { HOME: home }, now: () => new Date(now), fetch: async () => { requests += 1; return Response.json(usage); }, snapshotStore: dbQuotaStore(db) });
+    const probed = await first.refresh({ engine: 'opencode' });
+    await first.close();
+    assert.equal(requests, 1);
+    const live = probed.records.find(item => item.engine === 'opencode')!;
+    assert.equal(live.status, 'available');
+    assert.deepEqual(live.windows.map(item => item.id), ['opencode:rolling', 'opencode:weekly', 'opencode:monthly']);
+    assert.doesNotMatch(JSON.stringify(live), /persist-secret/);
+    let afterRestart = 0;
+    const second = new QuotaProber({ env: { HOME: home }, now: () => new Date(now), fetch: async () => { afterRestart += 1; return Response.json(usage); }, snapshotStore: dbQuotaStore(db) });
+    const restored = second.get().records.find(item => item.engine === 'opencode')!;
+    assert.equal(afterRestart, 0, 'reading the stored snapshot costs no request');
+    assert.equal(restored.status, 'available');
+    assert.deepEqual(restored.windows, live.windows);
+    // The same prober serves a manual refresh and the scheduled targets without a new API.
+    assert.deepEqual((await second.refresh({ engine: 'opencode' })).records.find(item => item.engine === 'opencode')!.status, 'available');
+    await second.close();
+    db.close();
+  } finally { await f.close(); }
 });
 
 test('the quota snapshot is stored in weaver.db and a restarted prober reads it before probing anything', async () => {

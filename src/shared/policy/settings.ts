@@ -9,7 +9,7 @@ export const EFFORTS: Record<string, string[]> = {
   qodercli: ["auto", "none", "low", "medium", "high", "xhigh", "max", "ultracode"],
 };
 /** Kinds with a native account quota probe. Other kinds have no native quota probe; this does not imply a free route. */
-export const QUOTA_KINDS = ["codex", "claude", "grok"] as const;
+export const QUOTA_KINDS = ["codex", "claude", "grok", "opencode"] as const;
 export const hasQuotaProbe = (kind: string) => (QUOTA_KINDS as readonly string[]).includes(kind);
 /** Missing means on for kinds with a quota probe, off otherwise. */
 export function quotaRefreshEnabled(engine: Engine): boolean {

@@ -2,7 +2,7 @@ import type { PolicySnapshot } from './policy';
 
 export const QUOTA_FRESH_MS = 300_000;
 
-export type QuotaEngine = 'codex' | 'claude' | 'grok';
+export type QuotaEngine = 'codex' | 'claude' | 'grok' | 'opencode';
 export type QuotaStatus = 'available' | 'exhausted' | 'unknown' | 'unauthenticated' | 'unsupported' | 'error';
 
 export interface QuotaWindow {
