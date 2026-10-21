@@ -16,7 +16,7 @@ import { styles } from '../../ui/styles';
 import { Group, MinutesInput, Setting } from '../settings/SettingRows';
 import { settingsStyles } from '../settings/settings-style';
 import {
-  adoptServer, conflictNote, createRequestGate, draftOf, IDLE_RANGE, IM_ENGINE_KINDS, keepImDraft, modifiedEdit,
+  adoptServer, conflictNote, createRequestGate, draftOf, IDLE_RANGE, IM_ENGINE_KINDS, imModelDiscoveryEngine, keepImDraft, modifiedEdit,
   peekImDraft, savePlan, switchDraftEngine, workspaceListError, IM_WORKSPACE_LIMIT, type ImDraft, type ImEdit,
 } from './im-state';
 
@@ -260,6 +260,9 @@ export function ImSettings({ policy }: { policy: PolicyDraft }) {
   }, [config, values?.engine]);
   const selectedEngine = values?.engine ? config?.engines[values.engine] : undefined;
   const engineUsable = !!selectedEngine && selectedEngine.enabled && isImEngineKind(selectedEngine.kind);
+  // 模型发现只用目录 canonical id（别名按 kind 映射，如 ocode→opencode、pi_alt→pi、qoder kind→qoder）；
+  // 保存与运行仍用原 policy engine ID（values.engine）。
+  const discoveryEngine = values?.engine ? imModelDiscoveryEngine(values.engine, config) : '';
   const efforts = selectedEngine && isImEngineKind(selectedEngine.kind) ? imEngineEfforts(selectedEngine.kind) : undefined;
   const openCodeVariant = selectedEngine?.kind === 'opencode';
   const effortOptions = (efforts ?? []).map(value => ({ value, label: value, disabled: false }));
@@ -316,11 +319,11 @@ export function ImSettings({ policy }: { policy: PolicyDraft }) {
       <TextArea id={`${id}-openids`} aria-label="open_id 白名单，每行一个" value={values.openIdsText} placeholder={'ou_xxxxxxxxxxxxxxxx\n（每行一个）'} autoSize={{ minRows: 2, maxRows: 6 }} disabled={lockFields} style={{ inlineSize: '100%', maxInlineSize: 360 }} onChange={event => update({ openIdsText: event.target.value })} />
     </Setting>
     <Setting label="引擎" htmlFor={`${id}-engine`} desc="支持已启用的 Claude、Codex、OpenCode、Pi、Grok、Qoder；这里只控制 Bot 聊天，不依赖父 Agent 配置。" error={fieldErrors.engine || (values.engine && !engineUsable ? '已保存的引擎已失效、未启用或暂不支持，请重新选择。' : '')}>
-      <NamedSelect id={`${id}-engine`} aria-label="引擎" value={values.engine || undefined} options={engineOptions} style={{ inlineSize: '100%', maxInlineSize: 320 }} popupMatchSelectWidth={false} showSearch disabled={lockFields} placeholder="选择已启用的引擎" onChange={engine => { if (typeof engine === 'string') update(switchDraftEngine(values, engine, config)); }} />
+      <NamedSelect id={`${id}-engine`} aria-label="引擎" value={values.engine || undefined} options={engineOptions} style={{ inlineSize: '100%', maxInlineSize: 320 }} popupMatchSelectWidth={false} disabled={lockFields} placeholder="选择已启用的引擎" onChange={engine => { if (typeof engine === 'string') update(switchDraftEngine(values, engine, config)); }} />
     </Setting>
     <Setting label="模型" htmlFor={`${id}-model`} desc="从引擎提供的模型中选择，也可手动填写；切换引擎后需重新明确模型。" error={fieldErrors.model}>
       <fieldset disabled={lockFields} inert={lockFields} style={{ border: 0, padding: 0, margin: 0, minInlineSize: 0, inlineSize: '100%', maxInlineSize: 360 }}>
-        <ModelPicker id={`${id}-model`} label="模型" engine={engineUsable ? values.engine : ''} value={values.model} placeholder="例如：gpt-6.1-sol 或 claude-opus-5-5" onChange={model => { if (!lockFields) update({ model }); }} />
+        <ModelPicker id={`${id}-model`} label="模型" engine={engineUsable ? discoveryEngine : ''} value={values.model} placeholder="例如：gpt-6.1-sol 或 claude-opus-5-5" onChange={model => { if (!lockFields) update({ model }); }} />
       </fieldset>
     </Setting>
     <Setting label="思考力度" htmlFor={`${id}-effort`} desc={efforts ? 'Bot 独立使用的思考力度，默认 medium；保存后随模型一起生效。' : openCodeVariant ? 'OpenCode 的 variant 由模型定义，可直接填写；保存后随模型一起生效。' : '先选择一个支持飞书对话的引擎。'} error={fieldErrors.effort}>

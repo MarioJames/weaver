@@ -84,11 +84,33 @@ test('a failed or rejected fetch is reported and leaves the field usable', async
   await failed.settle();
   assert.deepEqual(failed.state.errors, ['模型列表获取失败:命令失败']);
   assert.equal(failed.state.loading, false);
+  assert.equal(failed.state.list?.status, 'failed');
   const rejected = harness(async () => { throw new Error('boom'); });
   rejected.session.sync('claude');
   await rejected.settle();
   assert.equal(rejected.state.errors.length, 1);
   assert.equal(rejected.state.loading, false);
+  assert.equal(rejected.state.list?.status, 'failed', 'a rejected list must not stay undefined (eternal loading)');
+  assert.match(rejected.state.list?.message ?? '', /boom/);
+});
+
+test('a rejected old-engine fetch cannot overwrite the new engine list', async () => {
+  const resolvers = new Map<string, (list: EngineModelList) => void>();
+  const rejecters = new Map<string, (error: unknown) => void>();
+  const h = harness(input => new Promise<EngineModelList>((resolve, reject) => {
+    resolvers.set(input.engine, resolve);
+    rejecters.set(input.engine, reject);
+  }));
+  h.session.sync('claude');
+  h.session.sync('codex');
+  resolvers.get('codex')!(listOf('codex', 'gpt'));
+  await h.settle();
+  rejecters.get('claude')!(new Error('late boom'));
+  await h.settle();
+  assert.equal(h.state.list?.engine, 'codex');
+  assert.deepEqual(h.state.list?.models, [{ id: 'gpt' }]);
+  assert.equal(h.state.loading, false);
+  assert.equal(h.state.errors.length, 0, 'the late old-engine rejection is fenced and never reported');
 });
 
 function markup(node: React.ReactNode) {

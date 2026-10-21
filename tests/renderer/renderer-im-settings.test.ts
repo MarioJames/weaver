@@ -8,7 +8,7 @@ import { defaultConfig } from '../../src/main/policy/routing';
 import type { ImConfig, ImSettingsSnapshot, ImStatus } from '../../src/shared/contracts/im';
 import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';
 import {
-  adoptServer, conflictNote, createRequestGate, draftOf, IM_ENGINE_KINDS, keepImDraft, modifiedEdit, peekImDraft, savePlan, switchDraftEngine, validateDraft,
+  adoptServer, conflictNote, createRequestGate, draftOf, IM_ENGINE_KINDS, imModelDiscoveryEngine, keepImDraft, modifiedEdit, peekImDraft, savePlan, switchDraftEngine, validateDraft,
   type ImDraft, type ImEdit, type ImRequestKind,
 } from '../../src/renderer/features/bots/im-state';
 import { EFFORTS } from '../../src/shared/policy/settings';
@@ -394,6 +394,19 @@ test('all six catalog engines are offered, validated per kind, and OpenCode keep
   assert.match(errors.engine ?? '', /尚未启用/);
   assert.equal(switchDraftEngine({ ...textOf(configOf()), effort: 'provider-x' }, 'opencode', policy).effort, 'provider-x');
   assert.equal(switchDraftEngine({ ...textOf(configOf()), effort: 'not a variant' }, 'opencode', policy).effort, 'medium');
+});
+
+test('policy alias engines resolve to the catalog id for model discovery while saves keep the alias', () => {
+  const policy = defaultConfig();
+  policy.engines.ocode = { enabled: true, kind: 'opencode', quota_refresh: false };
+  policy.engines.pi_alt = { enabled: true, kind: 'pi', quota_refresh: false };
+  policy.engines.qoder_alias = { enabled: true, kind: 'qodercli', quota_refresh: false };
+  assert.equal(imModelDiscoveryEngine('ocode', policy), 'opencode');
+  assert.equal(imModelDiscoveryEngine('pi_alt', policy), 'pi');
+  assert.equal(imModelDiscoveryEngine('qoder_alias', policy), 'qoder');
+  assert.equal(imModelDiscoveryEngine('qoder', policy), 'qoder', 'qoder kind qodercli maps to catalog qoder');
+  assert.equal(imModelDiscoveryEngine('claude', policy), 'claude');
+  assert.equal(imModelDiscoveryEngine('pi', policy), 'pi');
 });
 
 test('the reused model-list consumer uses public API only after engine selection and keeps manual model saves on failure', async () => {

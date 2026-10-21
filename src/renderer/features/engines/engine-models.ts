@@ -92,7 +92,12 @@ export class ModelListSession {
       this.sink.list(result);
       if (result.status === 'failed') this.sink.failed(result.message ?? '未获取到模型列表', '模型列表获取失败');
     } catch (error) {
-      if (this.generation === mine) this.sink.failed(error, '模型列表获取失败');
+      if (this.generation !== mine) return;
+      // RPC 抛错（如未知引擎的 INVALID_REQUEST）同样收束为失败态：不留 undefined 造成“永远获取中”，
+      // 旧请求晚到不覆盖新引擎；已输入模型与草稿保留，刷新可重试。
+      const message = error instanceof Error ? error.message : String(error);
+      this.sink.list({ engine, status: 'failed', source: '', models: [], message: message || '未获取到模型列表，请手动填写', fetchedAt: new Date().toISOString() });
+      this.sink.failed(error, '模型列表获取失败');
     } finally { if (this.generation === mine) this.sink.loading(false); }
   }
 }

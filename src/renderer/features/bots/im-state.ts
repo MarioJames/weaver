@@ -5,6 +5,7 @@
  */
 import type { ImConfig, ImSettingsSnapshot, SaveImSettingsInput } from '../../../shared/contracts/im';
 import type { Config } from '../../../shared/contracts/policy';
+import { ENGINE_CATALOG } from '../../../shared/engines';
 import { IM_EFFORT_PATTERN, IM_ENGINE_KINDS as IM_ENGINE_LIST, imEngineEffortAllowed, isImEngineKind } from '../../../shared/im-engines';
 
 /** 页面上可编辑的表单值。Secret 只留在内存草稿里，从不写 localStorage 或磁盘。 */
@@ -44,6 +45,21 @@ export function switchDraftEngine(draft: ImDraft, engine: string, config: Config
   if (engine === draft.engine) return { engine, model: draft.model, effort: draft.effort };
   const kind = config?.engines[engine]?.kind;
   return { engine, model: '', effort: isImEngineKind(kind) && imEngineEffortAllowed(kind, draft.effort) ? draft.effort : 'medium' };
+}
+
+/**
+ * 模型发现用的目录 ID：只把所选 policy 引擎的 kind 映射到现有目录项的 canonical id，
+ * 例如别名 ocode（kind opencode）用 opencode 目录，pi_alt（kind pi）用 pi 目录，
+ * Qoder 的 kind qodercli 对应目录 id qoder。仅用于模型列表发现；保存与运行仍用原 alias ID。
+ * 同 native kind 的引擎共用同一份模型缓存；切引擎仍按原 draft 规则清空模型。
+ */
+export function imModelDiscoveryEngine(engine: string, config: Config | undefined): string {
+  const kind = config?.engines[engine]?.kind;
+  if (typeof kind === 'string') {
+    const canonical = ENGINE_CATALOG.find(entry => entry.kind === kind)?.id;
+    if (canonical) return canonical;
+  }
+  return engine;
 }
 
 export function parseOpenIds(text: string): string[] {
