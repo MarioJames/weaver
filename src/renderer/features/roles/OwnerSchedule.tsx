@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { ActionIcon, Button, DropdownMenu, Tag, Text } from '@lobehub/ui/base-ui';
 import { Form } from '@lobehub/ui/base-ui/form';
-import { activeBlocks, availabilityOf } from '../../../shared/policy/availability';
+import { activeBlocks, availabilityOf, manualPauseOf } from '../../../shared/policy/availability';
 import { type Block, type Config, type Owner } from '../../../shared/contracts/policy';
 import { blockOf, blockText, pauseOfBlock } from '../probes/probe-view';
 import { DEFAULT_WEIGHT, WEIGHT_MAX, appendWorker, withWorkerWeight, withoutListedWorker, workerParallelText, workerWeight } from '../../policy/policy-edit';
@@ -12,21 +12,32 @@ import { FreeChannelTag } from '../../ui/FreeChannelTag';
 import { styles } from '../../ui/styles';
 import { scheduleStyles } from './owner-schedule-style';
 
-/** Why this worker's weight cannot be edited: a disabled worker or engine is never dispatched, so the saved weight stays as it is. Temporary blocks do not lock editing. */
-export function workerWeightLock(config: Config, workerId: string): { label: string; hint: string } | undefined {
+/**
+ * Why this worker's weight cannot be edited. A disabled worker or engine is never dispatched, and neither is a worker
+ * kept out by an exhausted quota or by any block without a release time: nobody lifts those but the user, so the saved
+ * weight stays as it is and applies again once dispatch is resumed. Blocks that lift themselves (a rate limit with its
+ * release time, a stall penalty, a probe's ban) do not lock editing.
+ */
+export function workerWeightLock(config: Config, workerId: string, blocks: Block[] = [], now: number = Date.now()): { label: string; hint: string; paused?: true } | undefined {
   const worker = config.workers[workerId];
   if (!worker) return undefined;
   if (!worker.enabled) return { label: '子 Agent 已停用', hint: '该子 Agent 已在「子 Agent」页停用，权重保持不变，重新启用后继续生效。' };
   if (!config.engines[worker.engine]?.enabled) return { label: '引擎已停用', hint: `引擎 ${worker.engine} 已停用，权重保持不变，重新启用后继续生效。` };
-  return undefined;
+  const pause = manualPauseOf(config, blocks, workerId, now);
+  if (!pause) return undefined;
+  const reason = pause.block.reason.replace(/\s+/g, ' ').trim() || '未说明原因';
+  const recovery = `没有自动解除时间；在引擎页或子 Agent 页点「恢复派发」，恢复后权重继续生效，已保存的权重保持不变。`;
+  return pause.kind === 'quota'
+    ? { label: '额度耗尽', hint: `${reason}。额度耗尽后${recovery}`, paused: true }
+    : { label: '已暂停 · 需手动恢复', hint: `${reason}。该暂停${recovery}`, paused: true };
 }
 
 /** Why dispatch would skip this worker right now, as a short tag. Colors come from the shared semantic scheme in format/tag-colors. */
 export function workerStatusTag(config: Config, blocks: Block[], workerId: string, weight: number): { label: string; color?: string; hint?: string; reason?: string } | undefined {
   const worker = config.workers[workerId];
   if (!worker) return { label: '引用不存在', color: tagColor('error') };
-  const lock = workerWeightLock(config, workerId);
-  if (lock) return lock;
+  const lock = workerWeightLock(config, workerId, blocks);
+  if (lock) return lock.paused ? { label: lock.label, hint: lock.hint, color: statusTagColor('warning') } : lock;
   if (weight === 0) return { label: '不派发' };
   const availability = availabilityOf(config, activeBlocks({ version: 1, blocks }, Date.now()), worker, workerId);
   if (availability.status !== 'blocked') return undefined;
@@ -60,9 +71,9 @@ export function OwnerScheduleFields({ config, blocks, record, savedRecord, updat
         <div className={scheduleStyles.columns}><Text className={scheduleStyles.heading}>权重</Text></div>
         {ordered.map(({ id, weight }) => {
         const status = workerStatusTag(config, blocks, id, weight);
-        const locked = workerWeightLock(config, id) !== undefined;
-        return <div key={id} className={`${scheduleStyles.listRow} ${scheduleStyles.row}`}>
-          <span className={`${styles.row} ${scheduleStyles.name}`} style={{ minInlineSize: 0 }}><Text className={styles.wrap}>{id}</Text>{config.workers[id]?.free_channel && <FreeChannelTag />}{workerParallelText(config.workers[id]) && <Tag size="small" color={tagColor('neutral')} title="该子 Agent 同时运行的任务数上限，超出的任务排队">{workerParallelText(config.workers[id])}</Tag>}{status && <Tag size="small" color={status.color} title={status.hint}>{status.label}</Tag>}{status?.reason && <span className={scheduleStyles.reason} title={status.reason}>{status.reason}</span>}</span>
+        const locked = workerWeightLock(config, id, blocks) !== undefined;
+        return <div key={id} data-locked={locked || undefined} className={`${scheduleStyles.listRow} ${scheduleStyles.row}`}>
+          <span className={`${styles.row} ${scheduleStyles.name}`} style={{ minInlineSize: 0 }}><Text className={styles.wrap} type={locked ? 'secondary' : undefined}>{id}</Text>{config.workers[id]?.free_channel && <FreeChannelTag />}{workerParallelText(config.workers[id]) && <Tag size="small" color={tagColor('neutral')} title="该子 Agent 同时运行的任务数上限，超出的任务排队">{workerParallelText(config.workers[id])}</Tag>}{status && <Tag size="small" color={status.color} title={status.hint}>{status.label}</Tag>}{status?.reason && <span className={scheduleStyles.reason} title={status.reason}>{status.reason}</span>}</span>
           <span className={scheduleStyles.controls}>
             <NamedInputNumber aria-label={`${id} 的权重`} size="small" disabled={locked} min={0} max={WEIGHT_MAX} step={1} precision={0} value={weight} style={{ inlineSize: 72 }} onChange={value => update(withWorkerWeight(record, id, typeof value === 'number' ? value : DEFAULT_WEIGHT))} />
             <span role="group" aria-label={`${id} 权重预设`} className={scheduleStyles.presets} data-locked={locked || undefined}>{PRESETS.map(preset => <Button key={preset.value} size="small" type="text" disabled={locked} aria-pressed={weight === preset.value} aria-label={`${id} ${preset.label}`} onClick={() => update(withWorkerWeight(record, id, preset.value))}>{preset.label}</Button>)}</span>

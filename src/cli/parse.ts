@@ -30,8 +30,8 @@ export interface CLIOptions {
 }
 /** The only commands --engine names; anything else is a wrong-command error. */
 const ENGINE_FLAG_COMMANDS = ['engines.penalty', 'engines.unblock', 'engines.models'];
-/** The only command the optional --worker names. */
-const WORKER_FLAG_COMMANDS = ['workers.probe'];
+/** The only commands --worker names. */
+const WORKER_FLAG_COMMANDS = ['workers.probe', 'workers.unblock'];
 export function positionals(argv: string[]): string[] {
   const words: string[] = [];
   for (let i = 0; i < argv.length; i++) {
@@ -100,7 +100,7 @@ export function parseCLI(argv: string[]): CLIOptions {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.scheduleId)) throw new LocalIPCError('INVALID_ARGUMENT', '--schedule-id must be a UUID');
   }
   if (options.engine !== undefined && !ENGINE_FLAG_COMMANDS.includes(options.command ?? '')) throw new LocalIPCError('INVALID_ARGUMENT', '--engine is only valid for engines penalty, engines unblock and engines models');
-  if (options.worker !== undefined && !WORKER_FLAG_COMMANDS.includes(options.command ?? '')) throw new LocalIPCError('INVALID_ARGUMENT', '--worker is only valid for workers probe');
+  if (options.worker !== undefined && !WORKER_FLAG_COMMANDS.includes(options.command ?? '')) throw new LocalIPCError('INVALID_ARGUMENT', '--worker is only valid for workers probe and workers unblock');
   if (options.cancel && options.command !== 'tasks.retry') throw new LocalIPCError('INVALID_ARGUMENT', '--cancel is only valid for tasks retry');
  if (options.refresh && options.command !== 'engines.models') throw new LocalIPCError('INVALID_ARGUMENT', '--refresh is only valid for engines models');
   const item = CLI_CATALOG.find(entry => entry.command === options.command);

@@ -114,7 +114,7 @@ test('command help and root catalog are machine-readable and expose digest and r
  assert.equal(catalog.length,CLI_CATALOG.length);for(const item of catalog)assert.ok(item.inputFields);
 });
 
-const logical = [['tasks','health'],['engines','health'],['engines','penalty'],['engines','unblock'],['owners','launch'],['owners','describe']];
+const logical = [['tasks','health'],['engines','health'],['engines','penalty'],['engines','unblock'],['workers','unblock'],['owners','launch'],['owners','describe']];
 
 test('new logical commands are catalogued, parseable in both forms and in help',()=>{
  for(const words of logical){
@@ -126,6 +126,7 @@ test('new logical commands are catalogued, parseable in both forms and in help',
  }
   assert.match(CLI_HELP,/\[--engine <id>\] \[--worker <id>\] \[--cancel\]/);
  assert.match(CLI_HELP,/engine <id> is the engine argument of engines penalty, engines unblock and engines models/);
+ assert.match(CLI_HELP,/worker <id> is the optional worker argument of workers probe and the required worker argument of workers unblock/);
  assert.match(CLI_HELP,/tasks retry returns the linked task already dispatched/);
  // The help says what an owner gets, not which component decides it.
  assert.doesNotMatch(CLI_HELP,/the server decides|the CLI never/);
@@ -169,6 +170,19 @@ test('flags become the frozen logical args and a mutation keeps the shared comma
  const generated=makeRequest(parseCLI(['engines','unblock','--engine','qoder']));
  assert.match(String(generated.commandId),/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
  assert.equal(makeRequest(parseCLI(['engines','unblock','--engine','qoder','--command-id','c-1'])).commandId,'c-1');
+ assert.deepEqual(makeRequest(parseCLI(['workers','unblock','--worker','codex_worker','--command-id','c-2'])).args,{worker:'codex_worker'});
+ assert.equal(makeRequest(parseCLI(['workers','unblock','--worker','codex_worker','--command-id','c-2'])).commandId,'c-2');
+ assert.throws(()=>makeRequest(parseCLI(['workers','unblock','--worker','codex_worker']),{worker:'other'}),/Input worker does not match CLI worker/);
+});
+
+test('--worker is refused on any command but workers probe and workers unblock, repeated or without a value',()=>{
+ for(const words of [['tasks','health','--task-id','t'],['engines','unblock','--engine','qoder'],['workers','spawn','--task-id','t'],['workers','complete','--task-id','t']]){
+  assert.throws(()=>parseCLI([...words,'--worker','codex_worker']),/--worker is only valid for workers probe and workers unblock/);
+ }
+ assert.equal(parseCLI(['workers','unblock','--worker','codex_worker']).worker,'codex_worker');
+ assert.equal(parseCLI(['workers','probe','--worker','codex_worker']).worker,'codex_worker');
+ assert.throws(()=>parseCLI(['workers','unblock','--worker','a','--worker','b']),/Duplicate option --worker/);
+ assert.throws(()=>parseCLI(['workers','unblock','--worker']),/Missing value for --worker/);
 });
 
 test('--engine and --cancel are refused on any other command, repeated or without a value',()=>{
@@ -202,11 +216,11 @@ test('a flag never overrides a different value already in the --input body or en
 
 test('help parses the new flags and reports an invalid pairing in the requested format',()=>{
  const run=(argv:string[])=>spawnSync(process.execPath,['--import','tsx','src/cli/main.ts',...argv],{encoding:'utf8'});
- for(const [argv,command,mutation] of [[['engines','penalty','--engine','qoder','--help','--output','json'],'engines.penalty',false],[['engines','unblock','--engine','qoder','--help','--output','json'],'engines.unblock',true]] as const){
+ for(const [argv,command,mutation] of [[['engines','penalty','--engine','qoder','--help','--output','json'],'engines.penalty',false],[['engines','unblock','--engine','qoder','--help','--output','json'],'engines.unblock',true],[['workers','unblock','--worker','codex_worker','--help','--output','json'],'workers.unblock',true]] as const){
   const result=run([...argv]);
   assert.equal(result.status,0,result.stderr);
   const item=JSON.parse(result.stdout).data;
-  assert.equal(item.command,command);assert.equal(item.mutation,mutation);assert.ok(item.inputFields.required.engine);
+  assert.equal(item.command,command);assert.equal(item.mutation,mutation);assert.ok(command==='workers.unblock'?item.inputFields.required.worker:item.inputFields.required.engine);
  }
  const launch=run(['owners','launch','--help','--output','json']);
  assert.equal(launch.status,0,launch.stderr);
@@ -232,6 +246,7 @@ test('the new commands reach the socket as logical envelopes, not method wrapper
    [['engines','health'],'engines.health',{}],
    [['engines','penalty','--engine','qoder'],'engines.penalty',{engine:'qoder'}],
    [['engines','unblock','--engine','qoder'],'engines.unblock',{engine:'qoder'}],
+   [['workers','unblock','--worker','codex_worker'],'workers.unblock',{worker:'codex_worker'}],
    [['tasks','retry','--task-id','task-1','--cancel'],'tasks.retry',{taskId:'task-1',cancel:true}],
    [['owners','launch','--task-id','task-1','--input','{"expectedRevision":3}'],'owners.launch',{expectedRevision:3,taskId:'task-1'}],
   ];

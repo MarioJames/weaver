@@ -240,14 +240,23 @@ export class FreeChannelProbeMonitor {
     if (this.dirty) this.flushState();
   }
 
+  /** The state half of the user's 「恢复派发」 for one worker: only this worker's question resets, and only if its block is gone. */
+  resetWorker(engine: string, worker: string): void {
+    const snapshot = this.options.policy().snapshot();
+    if (snapshot.config.workers[worker]?.engine !== engine) return;
+    this.closeOrphanedQuestions(snapshot, this.clock(), engine, worker);
+    if (this.dirty) this.flushState();
+  }
+
   /** Removing the block by hand is an explicit unblock: the whole question resets, the record stays. */
-  private closeOrphanedQuestions(snapshot: PolicySnapshot, now: number, engine?: string): void {
+  private closeOrphanedQuestions(snapshot: PolicySnapshot, now: number, engine?: string, only?: string): void {
     const active = activeBlocks({ version: 1, blocks: snapshot.blocks }, now);
     const config = snapshot.config;
     for (const [worker, item] of Object.entries(this.state.workers)) {
       if (!item.mode || !item.blockSince) continue;
       if (!freeProbeEligible(config, worker)) continue;
       if (engine !== undefined && config.workers[worker]?.engine !== engine) continue;
+      if (only !== undefined && worker !== only) continue;
       const route = probeRouteOf(config, worker);
       if (!route) continue;
       const by = modeBlockBy(item.mode);

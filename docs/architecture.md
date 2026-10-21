@@ -35,7 +35,7 @@ Weaver 是本地任务控制面，交付三件套：
           ├─ PolicyStore（weaver.db 的 policy_* 表）+ 纯路由 policy/routing.ts、路由预览 policy/preview.ts
           ├─ TaskStore（weaver.db，SQLite 事务）；槽位/事件规则 domain/tasks.ts，启动恢复 application/tasks/recovery.ts
           ├─ StallMonitor（src/main/stall.ts，60 秒一次采样/惩罚/恢复探测；CPU 读取 monitors/cpu.ts；状态经 storage/stall-state.ts 落 weaver.db 的 stall_* 表，free-channel 与额度观测的 SQLite 适配同在 src/main/storage/；监视器共用的小机制是 monitors/ladder.ts（阶梯起算、级别、重置窗口、供应商限流步进）与 monitors/lifecycle.ts（tick 合并、定时器、可中止探测、stop 围栏），不是监视器基类）
-          ├─ PolicyBlockService（src/main/policy/blocks.ts）：stall、免费渠道探测、供应商限流与额度四个来源，以及用户的引擎手动解除，对 policy blocks 的读—改—存（revision 冲突后重读重试）都经它。自动来源可经 `atomic()` 把 block 保存与配套监视器状态（阶梯、监视器行）在同一 SQLite 连接上的单个事务里提交，两者要么都落盘要么都不落盘（生产装配满足同连接；测试替身或异连接时退化为各自保存）；人工解除（`engines unblock`）是多步骤：先提交清块保存，随后复位 StallMonitor 阶梯与免费渠道未决问题——清块提交后即使 stall/free probe 复位失败也会通知调度恢复路由，stall 状态保存失败则留 dirty 由下次 tick 收敛；来源标记与归属/作用域谓词只定义在 src/shared/policy/blocks.ts
+          ├─ PolicyBlockService（src/main/policy/blocks.ts）：stall、免费渠道探测、供应商限流与额度四个来源，以及用户的引擎与子 Agent 手动解除，对 policy blocks 的读—改—存（revision 冲突后重读重试）都经它。自动来源可经 `atomic()` 把 block 保存与配套监视器状态（阶梯、监视器行）在同一 SQLite 连接上的单个事务里提交，两者要么都落盘要么都不落盘（生产装配满足同连接；测试替身或异连接时退化为各自保存）；人工解除（`engines unblock`）是多步骤：先提交清块保存，随后复位 StallMonitor 阶梯与免费渠道未决问题——清块提交后即使 stall/free probe 复位失败也会通知调度恢复路由，stall 状态保存失败则留 dirty 由下次 tick 收敛；来源标记与归属/作用域谓词只定义在 src/shared/policy/blocks.ts
           ├─ engines/{probe,control}.ts（PATH+--version 只读探测）
           ├─ engines/hello.ts（sayHi 最轻一次性调用：页面探测与惩罚恢复探测共用）
           ├─ owner-host.ts（Herdr 可见 owner 宿主，仅由 tasks.start（根任务首次启动/重启）与 owners.switch launch / owners.launch（接续宿主）显式调用）
@@ -57,7 +57,7 @@ src/
     migrate.ts            有序 SQLite 迁移（SCHEMA_VERSION=11，追加式）
     commands.ts           CommandHandler 门面：只装配应用层单元
     application/          用例层：commands/{gateway,registry,errors}、tasks/{queries,mutations,records,results,recovery}、
-                          scheduling/{coordinator,dispatch,retry,vendor-limits}、owners/lifecycle、engines/unblock
+                          scheduling/{coordinator,dispatch,retry,vendor-limits}、owners/lifecycle、engines/unblock、workers/unblock
     transport/handlers.ts 每个 RPC 方法一个 handler 的分派层
     rpc.ts                RPC 请求解析与 HTTP 状态码映射
     http.ts local-ipc.ts  两个传输适配器：loopback HTTP 与已认证 Unix socket 帧
@@ -161,6 +161,7 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 - 探测失败：立刻升一级并重写那条 block 的 reason（block 一直保持着引擎的排除资格，因此不需要重新 pump），连击清零。
 - 探测成功：只删自己那条 stall block，级别与 `lastTriggerAt` 原样留着，好让下一次触发直接进下一级；删失败就保持武装、下一 tick 再探。L3 要**连续三次**成功才自动解除，并在记录里留一条「自动恢复，请留意」，任何一次失败都把这串连击清零。
 - 手动解除（`engines unblock --engine <id>`）是应用层操作（`src/main/application/engines/unblock.ts`，不是监视器方法）：经 PolicyBlockService 清除所选引擎的全部 block（含人工、额度及 model 级），再让 StallMonitor 复位它的阶梯、期限与连击、让免费渠道探测复位该引擎下已失去 block 的未决问题；history、配置、其他引擎和任务事件保留。自动恢复仍只删除监控器自己的 stall block。刚解除或刚恢复的引擎在同一次 tick 里不会被再次惩罚。用户单独删掉策略里的 stall block 会复位相应阶梯，不会替它清除其他来源。
+- 子 Agent 解除（`workers unblock --worker <id>`，由用户决定）同为应用层操作（`src/main/application/workers/unblock.ts`）：先校验子 Agent 存在（未知为 `NOT_FOUND`，不写任何东西），再经 PolicyBlockService（`clearWorker`）删除所有 `block.worker` 等于它的 block（任意来源与 model）；引擎级「全部子 Agent 均被限流」供应商 block 只在去掉该子 Agent 的 block 后引擎已不再整体被封时才一并删除，手动或其他来源的引擎级 block、其他子 Agent 的 block 与供应商限流阶梯都保留。随后让免费渠道探测复位该子 Agent 的未决问题；stall 阶梯按引擎保存，只在该引擎已无 stall block 时复位；最后通知排队任务重新路由，步骤失败时已删除的 block 不回滚。
 - 惩罚只暂停引擎的派发资格：从不取消任务、从不杀进程；running 的任务继续跑完并照常回报。
 
 监控器每 60 秒 tick 一次，并发 tick 合并成在途那一次；只在 ready 窗口内写状态，await 采样与 await 探测之后都重新确认窗口仍然开着。期限、连击与记录落 `weaver.db` 的 `stall_*` 表（见 §3），重启后继续；`stop()` 中止在途探测并等当前 tick 收束，独立于服务 ready 回调也会阻止晚到的采样/探测写入，只有再次 `start()` 才恢复 tick；免费渠道探测与额度调度器同样：停止之后手动 tick、晚到的探测回答、手动探测都不再写库或策略，也不再启动新的探测或刷新（ready 回调为 true 或未提供都一样）。`taskHealth` 与引擎页/CLI 用的是**同一套**样本与分类器，不存在第二个判定者：`ended`（已完成/失败/取消，带最终 `taskStatus`）、`owner_starting`/`owner_running`（owner 根任务专属：`executionRole:'owner'` 的任务从不判 stalled，尚无 ownerHost 为 `owner_starting`、已有 ownerHost 为 `owner_running`）、`starting`（running real 尚无首个有效输出）、`stalled`（两条都满足）、`waiting_model`（静默 ≥5 分钟且 CPU 没有证明在忙，包含读不到的情况）、`working`（其余），非 running real 任务的 `silenceMs`/`cpuActive`/`cpuIdleMs` 保留为 `null` 而不是猜。`tasks.health`、`engines.health`、`engines.penalty`、`engines.unblock` 已接入同一 `CommandHandler`：health 返回不含 history 的摘要，penalty 返回单引擎完整保留记录，unblock 返回清理结果；缺监控器时返回 `CAPABILITY_UNAVAILABLE`。逐项命令语义见 [agent-interface](agent-interface.md#33-卡住健康与引擎惩罚命令)。

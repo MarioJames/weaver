@@ -69,6 +69,31 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
 // ---- escalation ----
 const stamp = (value: string) => Date.parse(value);
 export const ENGINE_ALL_BLOCKED_REASON = "该引擎全部子 Agent 均被限流/额度耗尽";
+/** The block that covers each enabled worker of the engine, or undefined when any of them is free (or the engine has none). `pool` holds live blocks only. */
+function coveringEnabledWorkers(config: Config, pool: Block[], engine: string): Block[] | undefined {
+  const workers = Object.entries(config.workers).filter(([, w]) => w.engine === engine && w.enabled);
+  if (!workers.length) return undefined;
+  const covering: Block[] = [];
+  for (const [id, worker] of workers) {
+    const hit = coveringBlock(pool, worker, id);
+    if (!hit) return undefined;
+    covering.push(hit);
+  }
+  return covering;
+}
+/**
+ * The user's 「恢复派发」 for one worker: every block naming it goes (any source, any model), and so does the
+ * whole-engine 「全部子 Agent 均被限流」 vendor block when the engine is no longer fully blocked without it. Other workers'
+ * blocks and whole-engine or model blocks from any other writer stay. Returns the same array when nothing goes.
+ */
+export function withoutWorkerBlocks(config: Config, blocks: Block[], engine: string, worker: string, now: number): { blocks: Block[]; removed: number } {
+  const kept = blocks.filter(b => b.worker !== worker);
+  const derived = kept.find(b => isEngineBlock(b, engine) && b.by === VENDOR_BLOCK_BY && b.reason === ENGINE_ALL_BLOCKED_REASON);
+  const rest = derived ? kept.filter(b => b !== derived) : kept;
+  const stillAllBlocked = derived !== undefined && coveringEnabledWorkers(config, rest.filter(b => isBlockActive(b, now)), engine) !== undefined;
+  const next = derived && !stillAllBlocked ? rest : kept;
+  return next.length === blocks.length ? { blocks, removed: 0 } : { blocks: next, removed: blocks.length - next.length };
+}
 /**
  * When every enabled worker of an engine is kept out by an active block, the engine itself is out: add one
  * whole-engine vendor block released at the earliest release_at among the blocks that cover those workers.
@@ -83,14 +108,8 @@ export function escalateEngineBlock(config: Config, blocks: Block[], engine: str
   if (blocks.some(b => wholeEngine(b) && live(b) && b.by !== VENDOR_BLOCK_BY)) return blocks;
   const own = blocks.find(b => wholeEngine(b) && live(b));
   const pool = blocks.filter(b => live(b) && b !== own);
-  const workers = Object.entries(config.workers).filter(([, w]) => w.engine === engine && w.enabled);
-  if (!workers.length) return blocks;
-  const covering: Block[] = [];
-  for (const [id, worker] of workers) {
-    const hit = coveringBlock(pool, worker, id);
-    if (!hit) return blocks;
-    covering.push(hit);
-  }
+  const covering = coveringEnabledWorkers(config, pool, engine);
+  if (!covering) return blocks;
   const releases = covering.flatMap(b => b.release_at ? [stamp(b.release_at)] : []);
   const release_at = releases.length ? new Date(Math.min(...releases)).toISOString() : undefined;
   const block: Block = { engine, reason: ENGINE_ALL_BLOCKED_REASON, since: own?.since ?? new Date(now).toISOString(), by: VENDOR_BLOCK_BY, ...(release_at ? { release_at } : {}) };

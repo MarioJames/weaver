@@ -335,6 +335,29 @@ test('the user unblock of an engine clears its probe blocks and resets its worke
   } finally { await h.monitor.stop(); h.cleanup(); }
 });
 
+test('the user unblock of one worker resets only that worker\'s open question, leaving its engine siblings and the record alone', async () => {
+  const h = await harness({ scripts: { qoder_worker: ['quota_plain'], opencode_worker: ['auth'] } });
+  try {
+    await h.step(10);
+    assert.equal(h.worker('qoder_worker').mode, 'quota');
+    assert.equal(h.worker('opencode_worker').mode, 'stall');
+    const history = h.state()!.history.length;
+    // The unblock removed this worker's block first; resetting a worker whose block is still there changes nothing.
+    h.monitor.resetWorker('qoder', 'qoder_worker');
+    assert.equal(h.worker('qoder_worker').mode, 'quota', 'the block still stands, so the question stays open');
+    const snapshot = h.policy.snapshot();
+    h.policy.save({ revision: snapshot.revision, config: snapshot.config, blocks: snapshot.blocks.filter(block => block.engine !== 'qoder') });
+    h.monitor.resetWorker('opencode', 'qoder_worker');
+    assert.equal(h.worker('qoder_worker').mode, 'quota', 'a worker named under the wrong engine is ignored');
+    h.monitor.resetWorker('qoder', 'qoder_worker');
+    assert.equal(h.worker('qoder_worker').mode, null);
+    assert.equal(h.worker('qoder_worker').nextProbeAt, null);
+    assert.equal(h.worker('opencode_worker').mode, 'stall', 'another worker\'s question is untouched');
+    assert.equal(h.state()!.history.length, history);
+    assert.equal(readFree(h.statePath).workers.qoder_worker!.mode, null, 'and the reset is persisted');
+  } finally { await h.monitor.stop(); h.cleanup(); }
+});
+
 test('probeNow validates its target, runs the named probe, and stop fences anything in flight', async () => {
   const h = await harness({ scripts: { qoder_worker: [] } });
   try {

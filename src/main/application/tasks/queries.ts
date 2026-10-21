@@ -12,6 +12,7 @@ import type { StallMonitor } from '../../stall';
 import { REAL_ENGINE_KINDS, listWorkspaceDirectories } from '../../workspace';
 import { fail } from '../commands/errors';
 import type { CommandArgs } from '../commands/types';
+import type { WorkerUnblockResult } from '../workers/unblock';
 import { publicTask, type TaskRecords } from './records';
 
 /** Scale hint, not an admission rule: admission is per owner instance, so this sum over enabled profiles caps nothing by itself. */
@@ -21,7 +22,7 @@ export function configuredParallel(policy: PolicyStore): number {
 /** The stall monitor is the only judge of silence, idle CPU and penalties, so the command face reads it
  * through the narrowest view that answers: one task's health and the engine status. The one explicit unblock is the
  * application operation that clears the blocks and resets the monitors, not a monitor method. */
-export type TaskDiagnostics = Pick<StallMonitor, 'taskHealth' | 'status'> & { unblock(engine: string): void };
+export type TaskDiagnostics = Pick<StallMonitor, 'taskHealth' | 'status'> & { unblock(engine: string): void; unblockWorker(worker: string): WorkerUnblockResult };
 /** What an owner sees per engine without the retained history: the same numbers the monitor armed its penalty with. */
 const engineSummary=(item: StallStatus['engines'][string]) => ({level:item.level,lastTriggerAt:item.lastTriggerAt,needsAttention:item.needsAttention,blocked:item.blocked,blockedUntil:item.blockedUntil,nextProbeAt:item.nextProbeAt,probeSuccesses:item.probeSuccesses});
 /** What the control plane can read without changing it: snapshots, task pages, traces, capabilities and the stall monitor's answers. */
@@ -84,6 +85,12 @@ export class Queries {
     const status=monitor.status();
     const after=status.engines[engine]!;
     return {engine,wasBlocked,cleared:engineSummary(after),retainedHistory:after.history,otherEngines:Object.fromEntries(Object.entries(status.engines).filter(([name])=>name!==engine).map(([name,item])=>[name,engineSummary(item)]))};
+   }
+ workersUnblock(a:CommandArgs):unknown{
+    // The worker table is checked before the monitors are asked, so a typo never reaches a policy write.
+    const worker=text(a.worker,'worker',120);
+    if(!Object.hasOwn(this.policy.snapshot().config.workers,worker))fail('NOT_FOUND',`Worker ${worker} is not configured`);
+    return this.monitor().unblockWorker(worker);
    }
  artifactRead(a:CommandArgs):unknown{const task=this.records.task(a);const artifactId=parseId(a.artifactId,'artifact ID');const artifact=task.artifacts.find(v=>v.id===artifactId);if(!artifact)fail('NOT_FOUND','Artifact not found');return artifact;}
  operationGet(a:CommandArgs):unknown{const id=text(a.commandId,'commandId',120);const receipt=this.manager.store.getReceipt(`local-demo:${id}`);if(!receipt)fail('NOT_FOUND','Command receipt not found');return {commandId:id,state:receipt!.response?'settled':'indeterminate',response:receipt!.response};}

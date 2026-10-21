@@ -7,10 +7,11 @@ import { ActionIcon, Button, Progress, Skeleton, Tag, Text, Tooltip } from '@lob
 import { ENGINE_CATALOG, catalogEntry, type EngineProbeRecord } from '../../../shared/engines';
 import type { EngineQuotaRecord, QuotaEngine, QuotaWindow } from '../../../shared/contracts/quota';
 import { QUOTA_KINDS, quotaRefreshEnabled } from '../../../shared/policy/settings';
-import { STALL_BLOCK_BY, VENDOR_BLOCK_BY, isEngineBlock, isQuotaBlockBy } from '../../../shared/policy/blocks';
+import { STALL_BLOCK_BY, VENDOR_BLOCK_BY, isQuotaBlock } from '../../../shared/policy/blocks';
 import { type Block, type Engine } from '../../../shared/contracts/policy';
 import { acceptQuotaPolicy, dateText, quotaPercentText, quotaProgressPercent, quotaRecordStale, quotaRecoveryText, quotaRetryMs, quotaStatusText, quotaNextUpdateMs, quotaCountText, quotaVisibleWindows, quotaThirdParty } from '../quota/quota-view';
 import type { PolicyDraft, PolicyUpdate } from '../../policy/usePolicyDraft';
+import { resumeWorker } from '../../policy/worker-resume';
 import type { StallEngineState, StallHistoryEntry, StallSnapshot } from '../../api/client';
 import type { EngineStallStatus } from '../../../shared/contracts/monitoring';
 import { styles } from '../../ui/styles';
@@ -178,6 +179,14 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
     } catch (error) { report(id, error); }
     finally { setBusyId(''); }
   }
+  /** A worker's own ban is lifted by the server (with what depends on it); a whole-engine or model ban is removed from the policy as before. */
+  async function resume(id: string, block: Block) {
+    if (!block.worker) { await change(id, doc => ({ ...doc, blocks: removeBlock(doc.blocks, block) })); return; }
+    if (busyId) return;
+    setBusyId(id);
+    try { if (await resumeWorker(block.worker, policy)) void stall.load(); }
+    finally { setBusyId(''); }
+  }
   const setEngine = (id: string, patch: Partial<Engine>) => change(id, doc => ({ ...doc, config: { ...doc.config, engines: { ...doc.config.engines, [id]: { ...doc.config.engines[id]!, ...patch } } } }));
   const saved = policy.snapshot?.config;
   const savedBlocks = policy.snapshot?.blocks ?? [];
@@ -202,7 +211,7 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
             <StallNotice state={stall.snapshot?.engines[entry.id]} now={stall.now} />
             {isQuotaKind(kind) ? <QuotaSummary engine={kind} record={quota.records.find(item => item.engine === kind)} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === kind ? quota.feedback : undefined} onRefresh={() => void quota.refresh(kind)} />
               : <Text type="secondary" className={styles.meta}>未提供原生额度接口。</Text>}
-            <BlockList blocks={engineBlocks} state={stall.snapshot?.engines[entry.id]} now={stall.now} disabled={busyId !== '' || !record} onRemove={block => void change(entry.id, doc => ({ ...doc, blocks: removeBlock(doc.blocks, block) }))} />
+            <BlockList blocks={engineBlocks} state={stall.snapshot?.engines[entry.id]} now={stall.now} disabled={busyId !== '' || !record} onRemove={block => void resume(entry.id, block)} />
             <div className={engineStyles.cardFoot}>
               <div className={styles.spread}>
                 <Text>主动刷新额度</Text>
@@ -226,8 +235,8 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
 export function engineBlockText(block: Block, now: number, state?: EngineBlockState) {
   const stall = block.by === STALL_BLOCK_BY;
   const category = stall ? `卡住惩罚${state?.level ? ` 第 ${state.level} 级` : ''}`
-    : isQuotaBlockBy(block.by) ? '额度耗尽'
-    : block.by === VENDOR_BLOCK_BY ? /^(?:额度耗尽|quota)|FreeUsageLimitError|GoUsageLimitError/i.test(block.reason) ? '额度耗尽' : '限流'
+    : isQuotaBlock(block) ? '额度耗尽'
+    : block.by === VENDOR_BLOCK_BY ? '限流'
     : '手动暂停';
   const fullReason = block.reason.replace(/\s+/g, ' ').trim();
   const plain = fullReason.replace(/^(?:限流|额度耗尽)：\s*/, '');
@@ -245,11 +254,6 @@ export function engineBlockText(block: Block, now: number, state?: EngineBlockSt
 /** Resume dispatch removes exactly one block: the one with the same engine, model and worker. Whole-engine, model and worker blocks of one engine are separate bans. */
 export function removeBlock(blocks: Block[], target: Block): Block[] {
   return blocks.filter(item => !(item.engine === target.engine && item.model === target.model && item.worker === target.worker));
-}
-
-/** Resuming one worker's dispatch also lifts the whole-engine vendor block that only stood because every worker of the engine was limited; bans from any other writer stay. */
-export function removeWorkerResume(blocks: Block[], target: Block): Block[] {
-  return removeBlock(blocks, target).filter(item => !(isEngineBlock(item, target.engine) && item.by === VENDOR_BLOCK_BY));
 }
 
 export function BlockList({ blocks, disabled, onRemove, now = Date.now(), state }: { blocks: Block[]; disabled: boolean; onRemove: (block: Block) => void; now?: number; state?: EngineBlockState }) {

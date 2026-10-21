@@ -15,6 +15,22 @@ export const QUOTA_BLOCK_PREFIX = 'weaver-quota:';
 export const quotaBlockBy = (kind: string): string => `${QUOTA_BLOCK_PREFIX}${kind}`;
 export const isQuotaBlockBy = (by: string | undefined): boolean => by?.startsWith(QUOTA_BLOCK_PREFIX) === true;
 
+/** What a block's reason says when the vendor reports an exhausted quota or balance: Weaver's own `额度耗尽：` prefix, a payment-required status or the free/go plan limit errors. */
+const QUOTA_REASON = /额度耗尽|余额|^quota|FreeUsageLimitError|GoUsageLimitError|\b402\b/i;
+/** Does this block pause the route because the quota or balance ran out? Quota markers say so, and so do vendor and hand-written blocks that name it in their reason. Stall penalties are about silence, never quota. */
+export const isQuotaBlock = (block: Pick<Block, 'by' | 'reason'>): boolean =>
+  block.by !== STALL_BLOCK_BY && (isQuotaBlockBy(block.by) || QUOTA_REASON.test(block.reason));
+/**
+ * Which blocks only a person lifts: an exhausted quota (it names no recovery of its own, and the probes cannot refill it)
+ * and any block without a release time. The stall penalty and the free-channel probe lift their own blocks with a
+ * passing probe, so they are never manual; a block that carries a release time (a rate limit) lifts itself.
+ */
+export function manualResumeKind(block: Pick<Block, 'by' | 'reason' | 'release_at'>): 'quota' | 'manual' | undefined {
+  if (block.by === STALL_BLOCK_BY || block.by === FREE_PROBE_BLOCK_BY) return undefined;
+  if (isQuotaBlock(block)) return 'quota';
+  return block.release_at ? undefined : 'manual';
+}
+
 /** Markers the free-channel probe treats as its own when it writes or lifts a route's block. */
 export const PROBE_OWNED_SOURCES: readonly string[] = [STALL_BLOCK_BY, VENDOR_BLOCK_BY, FREE_PROBE_BLOCK_BY];
 

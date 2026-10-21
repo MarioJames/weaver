@@ -35,7 +35,7 @@ CLI 直接用 `--input <file|->` 传 JSON（args 对象或完整信封均可；�
 ## 2. CLI 解析与输出
 
 - 命令名按已知目录解析（`engines set-enabled` 保留连字符）；`capabilities` 是 `capabilities.get` 的显式别名；嵌套动词为三词 `owners continuation get`，也可用带点合并形式 `owners.continuation get` 或全名单词形式 `owners.continuation.get`，均解析到同一目录命令。
-- 开关按命令收窄，不是一套全局参数：`--engine <id>` 只属于 `engines penalty` 与 `engines unblock`；`--cancel` 是无值开关，只属于 `tasks retry`；`--for <seconds>` 只属于本地 `tasks wait`/`tasks watch`，这两条也不接受 `--input`。用在别的命令上、重复给、缺值，或 `--input` 体里已经带了不同的同一个字段，都在发出请求前以 `INVALID_ARGUMENT` 拒绝（`Input engine does not match CLI engine` 等）。CLI 只把它们映射进请求 args——取消、复制包、派发都由服务端决定，CLI 自己不做。
+- 开关按命令收窄，不是一套全局参数：`--engine <id>` 只属于 `engines penalty` 与 `engines unblock`；`--worker <id>` 只属于 `workers probe` 与 `workers unblock`；`--cancel` 是无值开关，只属于 `tasks retry`；`--for <seconds>` 只属于本地 `tasks wait`/`tasks watch`，这两条也不接受 `--input`。用在别的命令上、重复给、缺值，或 `--input` 体里已经带了不同的同一个字段，都在发出请求前以 `INVALID_ARGUMENT` 拒绝（`Input engine does not match CLI engine` 等）。CLI 只把它们映射进请求 args——取消、复制包、派发都由服务端决定，CLI 自己不做。
 - 输出格式 `--output json|jsonl|text`，缺省 `json`：成功写一个完整 weaver.v1 信封。`jsonl` 每行一个 JSON 对象。`text` 是人性输出，不承诺机器稳定，agent 请用 json/jsonl；派发/重试含 wait 命令，native 则完整打印 model、effort、prompt 与 then，不能只按任务状态猜下一步。`--json` 是 `--output json` 别名，与 `--output` 组合一律拒绝。
 - 错误同格式：`{ok:false,error:{code,message,retryable}}`，无 stack；CLI 退出码 0=成功、1=否则。stdout 无额外闲聊；`weaver web` 缺省打印一行 URL，可用 `--output`/`--json` 转 JSON 就绪信封。
 - `--help` 列举目录，`weaver web --help` 单列 web 选项。`weaver --help --output json` 返回机器可读的 `data.catalog`；命令级帮助（例如 `weaver quota refresh --help --output json`）提供 `command`、`mutation`、`rpc`、`usage`、`inputFields`，无需运行中的控制面。
@@ -77,6 +77,7 @@ CLI 直接用 `--input <file|->` 传 JSON（args 对象或完整信封均可；�
 | `engines.health` | 无参 `{}`；只读全部引擎的惩罚级别、名义期限、待处理标记与卡住阻断摘要，不含 history，见 [3.3 卡住健康与引擎惩罚命令](#33-卡住健康与引擎惩罚命令) |
 | `engines.penalty` | `{engine}`（由 `--engine` 给出）；只读单个引擎的完整保留记录，返回 `{engine,...statusRecord}`，含 history |
 | `engines.unblock` | `{engine}`（由 `--engine` 给出）；写命令：清除所选引擎全部阻断并复位阶梯，保留历史、配置与其他引擎；不承诺引擎此刻可用 |
+| `workers.unblock` | `{worker}`（由 `--worker` 给出）；写命令，由用户决定、Agent 不得自行调用：只删除点名该子 Agent 的阻断（任意来源与 model）以及随之失效的引擎级「全部子 Agent 均被限流」供应商阻断，复位该子 Agent 的卡住与免费渠道探测状态，保留供应商限流阶梯、其他子 Agent 与手动/其他来源的引擎级阻断；返回 `{worker,engine,removed,wasBlocked}` |
 | `operations.get` | `{commandId}` |
 | `observability.get` / `observability.export` | `{taskId, kind?}`；export 返回 JSON 文本形式的完整 trace |
 
@@ -226,6 +227,8 @@ weaver quota refresh --help --output json
 **阶梯怎么走上走下**：一台引擎要**同一时刻有至少 2 个** stalled 任务才受罚（`quorum`），偶发一个不动路由。L1 暂停 5 分钟、L2 暂停 10 分钟、L3 只标 `needsAttention` 并每 10 分钟探测一次；同一引擎在 2 小时内重复触发就再往上一级，超过 2 小时安静级别才回到历史。惩罚写进策略的是 `by:"weaver-stall"` 的 engine 级阻断，**不带 `release_at`**：时间流逝永远不会自动解除它，`blockedUntil` 只是「到点该去探测」。L1/L2 到点、以及 L3 的每轮，都只发一次最轻的真实调用——取该引擎上第一个启用 worker 的 model/effort，走一次 子 Agent 可用性问候那条路（命令目录末尾那段 `sayHi` 说明），不产生任务、不占 worker 槽位。通过就只删自己这条阻断，`level` 与触发时间原样保留，于是下一次直接升一级；不通过就立刻升一级并重写阻断的理由。L3 要**连续 3 次**通过才自动恢复，恢复时在历史里记一条 `自动恢复，请留意`，任何一次失败都把连击清零。引擎被停用、或该引擎上找不到启用的 worker 时探测发不出去，同样按一次失败记录（`这台引擎没有可用的 子 Agent，无法探测。`）。整个过程**从不取消任务、从不杀进程**，它只让新派发绕开这台引擎；首个有效输出后不设总执行 deadline；启动阶段仍有 120 秒无输出失败检查。别的来源（人工、额度）已经在这台引擎上挂着 engine 级阻断时不再叠加惩罚；惩罚解除或自动恢复后会触发一次重新 pump，排队中的任务因此继续走。
 
 **人工解除（`engines unblock`，写命令 `{engine}`）**：删除所选引擎的**全部**策略阻断，包含人工、额度、model 级及监控器自己的条目；复位阶梯、连击和期限，保留历史、配置、其他引擎与任务事件。自动恢复仅删除自己写入的 stall block，两条路径权限范围不同。响应为 `{engine,wasBlocked,cleared,retainedHistory,otherEngines}`：`wasBlocked` 是解除前该引擎自己的 stall 阻断状态，不是所有来源的阻断或整体可用性；`cleared` 是复位后的摘要，`retainedHistory` 是保留记录，`otherEngines` 是其他引擎摘要。相同 commandId 同参回放收据，不重复解除。未知 engine 在任何写入前拒绝。解除后接着的一次 tick 不会立即再罚该引擎；下次新惩罚从 L1 起算。解除不证明认证、模型或当前可用性。
+
+**子 Agent 解除（`workers unblock`，写命令 `{worker}`，同样由用户决定）**：先校验子 Agent 存在（未知为 `NOT_FOUND`，不写任何东西），再删除所有 `block.worker` 等于该子 Agent 的阻断（任意来源、任意 model）；若其引擎上有 `weaver-vendor-limit` 的「该引擎全部子 Agent 均被限流/额度耗尽」引擎级阻断，且去掉该子 Agent 的阻断后引擎已不再整体被封，则一并删除。其他子 Agent 的阻断、手动或其他来源的引擎级阻断、供应商限流阶梯（vendor_worker_limits，2 小时无触发自动归零）都保留。随后复位该子 Agent 的免费渠道探测问题（按子 Agent 保存）；卡住阶梯按引擎保存，没有子 Agent 粒度，只在该引擎已无任何 `weaver-stall` 阻断时随之复位，仍有时保持不变。最后通知排队任务重新路由；步骤失败时已删除的阻断不回滚，其余步骤继续并汇总报错。响应 `{worker,engine,removed,wasBlocked}`：`removed` 含随之删除的引擎级阻断，`wasBlocked` 即 `removed>0`。相同 commandId 同参回放收到原回执。
 
 监控器 `stop()` 自身会隔离在途采样与恢复探测的晚到结果并等待 tick 收束，之后 `tick()` 不写入，只有再次 `start()` 才恢复；该约束独立于服务 ready 回调。重试链排除与当前策略阻断共同决定候选，详见上方接续重跑。
 

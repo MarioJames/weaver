@@ -53,6 +53,7 @@ function setup(options: SetupOptions = {}) {
     taskHealth: task => { calls.health++; return monitor.taskHealth(task); },
     status: () => monitor.status(),
     unblock: engine => { calls.unblock.push(engine); engineDiagnostics(policy, monitor).unblock(engine); },
+    unblockWorker: worker => engineDiagnostics(policy, monitor).unblockWorker(worker),
   };
   // The stall block each penalty was armed with, so the policy is the same authority the runtime uses.
   if (options.penalties) {

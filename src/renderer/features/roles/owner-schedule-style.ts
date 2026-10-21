@@ -22,6 +22,11 @@ export const scheduleStyles = createStaticStyles(({ css, cssVar }) => ({
     & + & {
       border-block-start: 1px solid ${cssVar.colorBorderSecondary};
     }
+
+    /* A locked row (disabled, or paused until the user resumes it) is greyed; its status tag keeps its color. */
+    &[data-locked] {
+      color: ${cssVar.colorTextTertiary};
+    }
   `,
   list: css`
     display: grid;

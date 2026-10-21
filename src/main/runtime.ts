@@ -13,6 +13,7 @@ import { RoutingWorkerAdapter } from './adapters/routing';
 import { MockWorkerAdapter } from './adapters/worker';
 import type { AsyncOwnerHost } from './application/commands/types';
 import { unblockEngine } from './application/engines/unblock';
+import { unblockWorker } from './application/workers/unblock';
 import type { TaskDiagnostics } from './application/tasks/queries';
 import { CommandHandler } from './commands';
 import { SECURITY_HEADERS, startHttpServer, type HttpRuntime } from './http';
@@ -229,12 +230,13 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       console.error(error instanceof Error ? error.message : 'Task history could not be saved');
     });
     // Health and penalties are this monitor's own answers, so the command face reads them from it rather than inventing them.
-    // The user's engine unblock clears the blocks through the policy service and then resets both monitors' state.
+    // The user's engine or worker unblock clears the blocks through the policy service and then resets both monitors' state.
     const unblockBlocks = new PolicyBlockService(() => policy!, { log: message => console.error(`Stall monitor: ${message}`), onChanged: () => commands?.pump() });
     const diagnostics: TaskDiagnostics = {
       taskHealth: task => stall!.taskHealth(task),
       status: () => stall!.status(),
       unblock: engine => unblockEngine({ blocks: unblockBlocks, stall: stall!, freeProbe: freeProbe! }, engine),
+      unblockWorker: worker => unblockWorker({ blocks: unblockBlocks, stall: stall!, freeProbe: freeProbe! }, worker),
     };
     commands = new CommandHandler(manager, policy, undefined, undefined, diagnostics, options.ownerHost, {refreshQuota:engine=>refreshQuota({engine})});
     commands.transportStatus = 'ready';

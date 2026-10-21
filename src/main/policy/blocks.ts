@@ -1,4 +1,5 @@
 import type { Block, PolicySnapshot } from '../../shared/contracts/policy';
+import { withoutWorkerBlocks } from './routing';
 import { sameConnection, type Transactional } from '../storage/transaction';
 
 /** What the service needs from the policy store; the real PolicyStore satisfies it, and so does a fake with just these two. */
@@ -81,6 +82,26 @@ export class PolicyBlockService {
       throw new Error(`Blocks for ${engine} could not be removed`);
     }
     return owned.length;
+  }
+
+  /**
+   * The user's 「恢复派发」 for exactly one worker: every block naming it goes, whoever wrote it and for whichever
+   * model, plus the whole-engine 「全部子 Agent 均被限流」 vendor block that no longer holds without it. Other workers'
+   * blocks and every other engine-level or model-level block stay. An unknown worker is rejected before anything is
+   * written. Returns the worker's engine and how many blocks were removed (the derived engine block included).
+   */
+  clearWorker(worker: string, options: UpdateOptions = {}): { engine: string; removed: number } {
+    const first = this.snapshot();
+    if (!Object.hasOwn(first.config.workers, worker)) throw new Error(`Unknown worker ${worker}`);
+    const engine = first.config.workers[worker]!.engine;
+    let removed = 0;
+    const result = this.update(current => {
+      const plan = withoutWorkerBlocks(current.config, current.blocks, current.config.workers[worker]?.engine ?? engine, worker, Date.now());
+      removed = plan.removed;
+      return plan.removed > 0 ? plan.blocks : undefined;
+    }, options);
+    if (!result.ok) throw new Error(`Blocks for worker ${worker} could not be removed`);
+    return { engine, removed };
   }
 
   /**

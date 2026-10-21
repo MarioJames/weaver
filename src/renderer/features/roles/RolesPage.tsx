@@ -18,7 +18,8 @@ import { type Availability, type Block, type Owner, type Worker } from '../../..
 import { blankOwner, blankWorker, removeRole, renameRole, roleDeleteImpact, roleIdError, syncRoleEditor, withWorkerParallel, workerParallelText, type RoleSection } from '../../policy/policy-edit';
 import { OwnerScheduleFields } from './OwnerSchedule';
 import { ModelPicker } from '../engines/ModelPicker';
-import { engineBlockText, removeWorkerResume } from '../engines/EnginesPage';
+import { engineBlockText, removeBlock } from '../engines/EnginesPage';
+import { resumeAction, resumeWorker } from '../../policy/worker-resume';
 import { FreeChannelTag } from '../../ui/FreeChannelTag';
 import { statusTagColor, tagColor } from '../../format/tag-colors';
 import { PolicyHeader } from '../../policy/PolicyHeader';
@@ -63,7 +64,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   const [idError, setIdError] = useState('');
   const [askDelete, setAskDelete] = useState(false);
   const [toggling, setToggling] = useState('');
-  const [resuming, setResuming] = useState(false);
+  const [resuming, setResuming] = useState('');
   const form = useForm();
   const fieldId = useId();
   const freeProbe = useFreeProbe(policy.snapshot?.revision);
@@ -104,12 +105,20 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
     catch (error) { notifyError(error, '保存失败'); }
     finally { setToggling(''); }
   }
-  /** Lifts the ban that keeps this worker out, plus the whole-engine vendor ban that depended on it, on top of the saved policy. */
-  async function resume(target: Block) {
-    setResuming(true);
-    try { await policy.commit(doc => ({ ...doc, blocks: removeWorkerResume(doc.blocks, target) })); }
-    catch (error) { notifyError(error, '恢复派发失败'); }
-    finally { setResuming(false); }
+  /**
+   * 「恢复派发」 for one worker: the shown ban decides the call (see resumeAction). The worker's own ban is lifted by the server
+   * together with the whole-engine ban that depended on it; a ban that reaches it through its engine or model is removed from the saved policy.
+   */
+  async function resume(id: string, target: Block) {
+    if (resuming) return;
+    setResuming(id);
+    try {
+      if (resumeAction(policy.snapshot?.blocks ?? [], id, target) === 'unblock') await resumeWorker(id, policy);
+      else {
+        try { await policy.commit(doc => ({ ...doc, blocks: removeBlock(doc.blocks, target) })); }
+        catch (error) { notifyError(error, '恢复派发失败'); }
+      }
+    } finally { setResuming(''); }
   }
   const impact = current ? roleDeleteImpact(config, section, current) : undefined;
   const savedWorker = section === 'workers' && current ? policy.snapshot?.config.workers[current] : undefined;
@@ -124,7 +133,8 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           const engineOn = config.engines[item.engine]?.enabled === true;
           const saved = policy.snapshot?.config[section][id];
           const cap = section === 'workers' ? workerParallelText(item as Worker) : undefined;
-          const note = roleNote(policy.snapshot?.[section][id], false, policy.snapshot && saved ? blockOf(policy.snapshot.blocks, saved, Date.now(), section === 'workers' ? id : undefined) : undefined);
+          const hit = policy.snapshot && saved ? blockOf(policy.snapshot.blocks, saved, Date.now(), section === 'workers' ? id : undefined) : undefined;
+          const note = roleNote(policy.snapshot?.[section][id], false, hit);
           return <div key={id} className={rolesStyles.roleItem} aria-current={id === current ? 'true' : undefined}>
             <NamedSwitch size="small" aria-label={`启用 ${id}`} checked={item.enabled} loading={toggling === id} disabled={!engineOn || !!toggling} title={engineOn ? undefined : `引擎 ${item.engine || '未选择'} 未启用，先在引擎页打开它`} onChange={checked => void toggle(id, checked)} />
             <button type="button" className={rolesStyles.roleButton} style={{ font: 'inherit' }} onClick={() => { acceptId(); setSelected(id); setPendingId(id); setIdError(''); scrollToEditor(); }}>
@@ -140,12 +150,13 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
                 ? <span className={rolesStyles.roleNote}><Tag size="small" color={note.tag.color}>{note.tag.label}</Tag><span className={`${styles.wrap} ${styles.meta} ${rolesStyles.warn}`}>{note.text}</span></span>
                 : <span className={`${styles.wrap} ${styles.meta} ${note.warning ? rolesStyles.warn : ''}`}>{note.text}</span>)}
             </button>
+            {section === 'workers' && hit && <Button size="small" type="text" icon={Play} className={rolesStyles.roleResume} aria-label={`恢复派发 ${id}`} loading={resuming === id} disabled={policy.busy || (!!resuming && resuming !== id)} onClick={() => void resume(id, hit)}>恢复派发</Button>}
           </div>;
         })}
       </nav>
       <div ref={editor} tabIndex={-1}><Surface padded>
         {!record || !current ? <Empty title={`还没有${name}`} description={`新建一个${name}，选择引擎和模型后保存。`} action={<Button icon={Plus} onClick={add}>新建{name}</Button>} /> : <Form form={form} layout="vertical" className={styles.stack}>
-          {pausedBy && <WorkerBlockNotice block={pausedBy} busy={resuming} disabled={policy.busy} onResume={() => void resume(pausedBy)} />}
+          {pausedBy && current && <WorkerBlockNotice block={pausedBy} busy={resuming === current} disabled={policy.busy || (!!resuming && resuming !== current)} onResume={() => void resume(current, pausedBy)} />}
           <div className={styles.spread}>
             <Text strong>{name} 配置</Text>
             <Button danger size="small" icon={Trash2} disabled={policy.busy} onClick={() => setAskDelete(true)}>删除</Button>

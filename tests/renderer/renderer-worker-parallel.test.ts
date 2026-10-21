@@ -10,7 +10,7 @@ import { VENDOR_BLOCK_BY } from '../../src/shared/policy/blocks';
 import { withWorkerParallel, workerParallelText } from '../../src/renderer/policy/policy-edit';
 import { RolesPage, WorkerBlockNotice, WorkerParallelField } from '../../src/renderer/features/roles/RolesPage';
 import { OwnerScheduleFields } from '../../src/renderer/features/roles/OwnerSchedule';
-import { BlockList, removeWorkerResume } from '../../src/renderer/features/engines/EnginesPage';
+import { BlockList } from '../../src/renderer/features/engines/EnginesPage';
 import { tagColor } from '../../src/renderer/format/tag-colors';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
 import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';
@@ -117,6 +117,21 @@ test('the sub-agent page lists 并发 ≤ N after the model and shows the resume
   assert.match(clear, /并发上限/);
 });
 
+test('a paused worker gets a resume text button in the list entry and in the editor notice, an available one gets neither', () => {
+  const config = defaultConfig();
+  const paused = markup(React.createElement(RolesPage, { section: 'workers', policy: draft(config, [{ engine: 'claude', worker: 'claude_worker', reason: '限流：Rate limit exceeded', since: '2026-10-19T00:00:00Z', by: VENDOR_BLOCK_BY, release_at: FUTURE }]) }));
+  assert.equal((paused.match(/aria-label="恢复派发 claude_worker"/g) ?? []).length, 1, 'one button in the list entry');
+  assert.equal((paused.match(/aria-label="恢复派发"/g) ?? []).length, 1, 'one in the notice of the selected worker');
+  const listButton = paused.match(/<button[^>]*aria-label="恢复派发 claude_worker"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? '';
+  assert.match(listButton.replace(/<[^>]*>/g, ''), /恢复派发/, 'visible text, not only an icon');
+  assert.doesNotMatch(listButton, /<[^>]*role="switch"/);
+  const clear = markup(React.createElement(RolesPage, { section: 'workers', policy: draft(config, []) }));
+  assert.doesNotMatch(clear, /恢复派发/);
+  // Parent agents never get one: a block reaches them through their engine, not through a worker.
+  const owners = markup(React.createElement(RolesPage, { section: 'owners', policy: draft(config, [{ engine: 'claude', worker: 'claude_worker', reason: 'x', since: '2026-10-19T00:00:00Z', by: 'manual' }]) }));
+  assert.doesNotMatch(owners, /aria-label="恢复派发/);
+});
+
 test('the pause notice names the reason and release time and its button calls resume once', () => {
   const calls: string[] = [];
   const block = vendorWorker('opencode_worker');
@@ -129,19 +144,6 @@ test('the pause notice names the reason and release time and its button calls re
   assert.deepEqual(calls, ['resume']);
   assert.match(markup(WorkerBlockNotice({ block: vendorEngine(), now: NOW, onResume: () => {} })), /整个引擎 opencode/);
   assert.match(markup(WorkerBlockNotice({ block: { ...vendorWorker('w'), release_at: undefined, by: 'manual' }, now: NOW, onResume: () => {} })), /需手动恢复/);
-});
-
-test('resuming one worker also lifts the engine-wide vendor ban that depended on it, and nothing else', () => {
-  const a = vendorWorker('opencode_worker');
-  const b = vendorWorker('opencode_twin');
-  const whole = vendorEngine();
-  const manualWhole = vendorEngine({ by: 'manual' });
-  const otherEngine = vendorEngine({ engine: 'pi' });
-  const modelBan = vendorEngine({ model: 'm1' });
-  const all = [a, b, whole, manualWhole, otherEngine, modelBan];
-  assert.deepEqual(removeWorkerResume(all, a), [b, manualWhole, otherEngine, modelBan]);
-  assert.deepEqual(removeWorkerResume([a, b], a), [b], 'without an engine ban only the worker ban goes');
-  assert.deepEqual(all, [a, b, whole, manualWhole, otherEngine, modelBan], 'the input list is not mutated');
 });
 
 test('every engine ban has a text button for resuming dispatch', () => {

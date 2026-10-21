@@ -254,6 +254,38 @@ test('engines unblock clears the engine block and its worker-level blocks and le
   } finally { await f.close(); }
 });
 
+test('workers.unblock lifts one worker and the all-limited engine block it held up, keeps the vendor ladder, and replays its receipt', async () => {
+  const f = setup();
+  try {
+    f.failed('codex_worker', 'codex', rate());
+    f.failed('codexb_worker', 'codex', rate());
+    await f.settle();
+    assert.equal(f.blocks().filter(block => block.engine === 'codex').length, 3, 'two worker blocks and the engine block they imply');
+    const ladder = JSON.stringify(f.store.listVendorLimits());
+    const commandId = randomUUID();
+    const unblock = (worker: string, id = commandId) => f.handler.handle({ apiVersion: 'weaver.v1', commandId: id, command: 'workers.unblock', args: { worker } });
+    const first = unblock('codex_worker');
+    assert.equal(first.ok, true, JSON.stringify(first));
+    assert.deepEqual(first.data, { worker: 'codex_worker', engine: 'codex', removed: 2, wasBlocked: true });
+    assert.deepEqual(f.blocks().map(block => [block.engine, block.worker]), [['codex', 'codexb_worker']], 'the sibling keeps its own ban');
+    assert.equal(f.policy.snapshot().workers.codex_worker!.status, 'available');
+    assert.equal(f.policy.snapshot().workers.codexb_worker!.status, 'blocked');
+    assert.equal(JSON.stringify(f.store.listVendorLimits()), ladder, 'the rate-limit ladder is not reset by an unblock');
+    // The same command ID replays the receipt; a different worker under it is a conflict.
+    const revision = f.policy.snapshot().revision;
+    assert.deepEqual(unblock('codex_worker').data, first.data);
+    assert.equal(unblock('codexb_worker').error?.code, 'IDEMPOTENCY_CONFLICT');
+    assert.equal(f.policy.snapshot().revision, revision);
+    // A fresh command on a worker with nothing to lift is a no-op.
+    assert.deepEqual(unblock('codex_worker', randomUUID()).data, { worker: 'codex_worker', engine: 'codex', removed: 0, wasBlocked: false });
+    assert.equal(f.policy.snapshot().revision, revision);
+    // An unknown worker is refused before any write; a missing one is an invalid request.
+    assert.equal(unblock('ghost', randomUUID()).error?.code, 'NOT_FOUND');
+    assert.equal(f.handler.handle({ apiVersion: 'weaver.v1', commandId: randomUUID(), command: 'workers.unblock', args: {} }).ok, false);
+    assert.equal(f.policy.snapshot().revision, revision);
+  } finally { await f.close(); }
+});
+
 test('disabling an engine that still has enabled owners and workers succeeds; they stop being scheduled and the config stays valid', async () => {
   const f = setup();
   try {

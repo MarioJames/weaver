@@ -154,7 +154,9 @@ test('parent schedule rows tell a temporary pause from exhausted free quota, wit
   const vendor = workerStatusTag(config, [blockFor('opencode_worker', VENDOR_BLOCK_BY, FUTURE)], 'opencode_worker', 5)!;
   assert.equal(vendor.label, '暂时不可用');
   // Other sources keep the plain label; a worker the block does not name is untouched.
-  assert.equal(workerStatusTag(config, [blockFor('qoder_worker', 'manual')], 'qoder_worker', 5)!.label, '已限制');
+  assert.equal(workerStatusTag(config, [blockFor('qoder_worker', 'manual', FUTURE)], 'qoder_worker', 5)!.label, '已限制');
+  // Without a release time nobody but the user lifts a manual block, so it is named as such and locks the weight.
+  assert.equal(workerStatusTag(config, [blockFor('qoder_worker', 'manual')], 'qoder_worker', 5)!.label, '已暂停 · 需手动恢复');
   assert.equal(workerStatusTag(config, [blockFor('qoder_worker', FREE_PROBE_BLOCK_BY)], 'opencode_worker', 5), undefined);
   assert.equal(blockOf([blockFor('qoder_worker', STALL_BLOCK_BY)], config.workers.opencode_worker), undefined);
 });

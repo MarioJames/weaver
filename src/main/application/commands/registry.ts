@@ -54,6 +54,7 @@ export function createRegistry(u: CommandUnits): CommandRegistry {
    'engines.health': a => u.queries.enginesHealth(a),
    'engines.penalty': a => u.queries.enginesPenalty(a),
    'engines.unblock': a => u.queries.enginesUnblock(a),
+   'workers.unblock': a => u.queries.workersUnblock(a),
    'results.deliver': a => u.results.deliver(a),
    'results.ack': a => u.results.settle('results.ack', a),
    'reviews.submit': a => u.results.settle('reviews.submit', a),

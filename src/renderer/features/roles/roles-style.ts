@@ -86,6 +86,12 @@ export const rolesStyles = createStaticStyles(({ css, cssVar, responsive }) => (
     align-items: center;
     min-inline-size: 0;
   `,
+  /** The list entry's text button for resuming a paused worker: its own row under the note, never beside the switch or the tags. */
+  roleResume: css`
+    grid-column: 2;
+    justify-self: start;
+    margin-inline-start: -8px;
+  `,
   /** A list entry's pause: its kind as a tag, then the reason; the reason moves under the tag when the pane is narrow. */
   roleNote: css`
     display: flex;

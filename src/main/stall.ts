@@ -277,6 +277,25 @@ export class StallMonitor {
     this.dirty = false;
   }
 
+  /**
+   * The state half of the user's 「恢复派发」 for one worker. The stall ladder is kept per engine, never per worker, so
+   * there is no worker row to reset: the engine's ladder starts over only when no stall block of that engine is left in
+   * the policy (the unblock just removed the last one), exactly as the next tick's reconcile would do it. While any
+   * stall block stays, the other workers of the engine are still under that penalty and the ladder is left alone.
+   */
+  resetWorker(engine: string, worker: string): void {
+    const snapshot = this.options.policy().snapshot();
+    if (snapshot.config.workers[worker]?.engine !== engine) return;
+    const stillHeld = activeBlocks({ version: 1, blocks: snapshot.blocks }, this.clock()).some(block => block.engine === engine && block.by === STALL_BLOCK_BY);
+    const penalty = this.state.engines[engine];
+    if (stillHeld || !penalty || !pending(penalty)) return;
+    this.state.engines[engine] = emptyPenalty();
+    this.held.add(engine);
+    this.dirty = true;
+    this.store.save(this.state);
+    this.dirty = false;
+  }
+
   /** Concurrent ticks collapse into the one in flight; after stop() nothing ticks again until start(). */
   tick(): Promise<void> {
     if (this.lifecycle.stopped) return Promise.resolve();

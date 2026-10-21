@@ -76,6 +76,7 @@ export function makeRequest(options: CLIOptions, input: unknown = {}): Record<st
   if (options.scheduleId !== undefined) mergeArg(envelope, 'scheduleId', options.scheduleId, 'schedule ID');
   if (options.taskId) mergeArg(envelope, 'taskId', options.taskId, 'task ID');
   if (options.engine !== undefined) mergeArg(envelope, 'engine', options.engine, 'engine');
+  if (options.worker !== undefined) mergeArg(envelope, 'worker', options.worker, 'worker');
   if (options.cancel) mergeArg(envelope, 'cancel', true, 'cancel');
  if (options.refresh) mergeArg(envelope, 'refresh', true, 'refresh');
   for (const key of ['expectedRevision', 'manifestDigest', 'decision', 'comment'] as const) {
