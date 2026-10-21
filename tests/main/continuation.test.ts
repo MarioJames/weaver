@@ -154,6 +154,18 @@ test('rootOwnerPrompt leads with the host-instruction preamble on its first line
  assert.equal(prompt.split('\n')[0],'你是 Weaver 根任务的父 Agent（owner），不是执行单个工作包的 worker。在遵循全局与项目指令的前提下，读取 agents-weaver 技能（未安装时运行 `weaver --skill`）并按以下流程执行。');
  assert.ok(!prompt.includes('先读取 agents-weaver'));
  assert.ok(!prompt.includes('herdr'));
+ assert.ok(prompt.includes('每个子任务结果一回来，立即读取并按其工作包自己的验收标准独立核验文件和必要测试，同一轮内 results ack、reviews submit，不等其他子任务、根任务整体核验、浏览器验收或外部审查；跨子任务的集成问题另开修正子任务。'));
+});
+test('handoffPrompt tells a root owner to review each child as soon as its result arrives',()=>{
+ const f=fixture();try {
+  const t=f.store.get(TASK_ID) as ContinuationTask;
+  t.executionRole='owner';
+  f.store.put(t);
+  const prompt=handoffPrompt(t,f.service.rotate(TASK_ID,0,'manual').contextPack!);
+  assert.equal(prompt.split('\n')[0].includes('在遵循全局与项目指令的前提下，读取 agents-weaver 技能'),true);
+  assert.ok(prompt.includes('每个子任务结果一回来即按其验收标准核验并 results ack、reviews submit，不等其他子任务或整体核验，集成问题另开修正子任务；根任务整体验收后再用 tasks complete 完成'));
+  assert.ok(!prompt.includes('逐项 reviews submit'));
+ }finally{f.close();}
 });
 test('handoffPrompt omits every section the pack and the task leave empty',()=>{
  const f=fixture();try {

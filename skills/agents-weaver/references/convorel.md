@@ -12,7 +12,7 @@ Applies only when `weaver policy get` shows `chatgpt_review: true`. When it is `
 Review decisions, not routine packages:
 
 1. **Before freezing a judgment package or a risky plan** (architecture, data migration, auth, concurrency, irreversible effects): review the plan you are about to dispatch, with the package scope and acceptance criteria.
-2. **Before accepting a worker result that crosses such a gate**: after your own diff review and checks, ask for a result review of the actual change against the goal; then `reviews submit`.
+2. **Before accepting a worker result that itself crosses such a gate** (the package's own change is architecture, data migration, auth, concurrency or irreversible): after your own diff review and checks, ask for a result review of the actual change against the goal; then `reviews submit`. Only such a child may wait for the external result review; routine children are reviewed as soon as their result is verified and never wait for it.
 3. **Before final delivery** of multi-package work with real architecture constraints: one result review comparing the delivered outcome with the goal.
 
 Mechanical and routine packages, copy/style edits and small changes in an established pattern do not trigger a review.

@@ -230,7 +230,7 @@ weaver results ack --task-id <taskId> --input ack.json --command-id ack-0731    
 weaver reviews submit --task-id <taskId> --input review.json --command-id review-0731
 ```
 
-`results.ack` and `reviews.submit` must reference the current `manifestDigest` and expected task revision; stale digests are rejected. For manual owners `results.deliver` is unavailable by design: there is no push channel, the owner pulls. A rejected review does not rerun silently: use the explicit retry command below.
+`results.ack` and `reviews.submit` must reference the current `manifestDigest` and expected task revision; stale digests are rejected. For manual owners `results.deliver` is unavailable by design: there is no push channel, the owner pulls. The owner reviews each child as soon as its result arrives, against that child's own criteria, and does not hold the submission for other children or the integrated check; integration problems go into a corrective child. A rejected review does not rerun silently: use the explicit retry command below.
 
 ```text
 ack:    { "expectedRevision": <read the current revision from tasks results / tasks get>,

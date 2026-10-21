@@ -89,6 +89,8 @@ Only a running native task accepts one report; cancelling ends the task without 
 
 ## Ack and review
 
+When a child's result arrives, read it, verify the real files and necessary tests against that package's own acceptance criteria, then ack and submit the review in the same turn (accepted or rejected). Do not postpone a decided review to wait for other children, the root's integrated check, browser acceptance or an external review. Cross-child integration problems and later findings go into a new corrective child; the root's overall acceptance and `tasks complete` stay last.
+
 - `weaver results ack --task-id <id> --input ack.json`: `{ "expectedRevision": <current>, "manifestDigest": <digest from tasks results> }` — receipt only; ack itself bumps the task revision.
 - `weaver reviews submit --task-id <id> --input review.json`: re-read the revision, then `{ "expectedRevision": <fresh>, "manifestDigest": <same digest>, "decision": "accepted" | "rejected", "comment": "what you verified yourself" }`. A revision copied from before the ack is already stale.
 
