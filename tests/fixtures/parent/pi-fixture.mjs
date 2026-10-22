@@ -92,6 +92,29 @@ async function runPrompt(frame) {
     emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: `部分${current}` } });
     return;
   }
+  if (scenario === 'progress' && current === 1) {
+    emit({ type: 'agent_start' });
+    emit({ type: 'turn_start' });
+    emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: '你好，' } });
+    // Provider-level tool block start, then the execution start of the same call:
+    // both carry the same native id, so only one progress event may fire.
+    emit({ type: 'message_update', assistantMessageEvent: { type: 'toolcall_start', contentIndex: 1, id: 'call-1', toolName: 'bash' } });
+    emit({ type: 'tool_execution_start', toolCallId: 'call-1', toolName: 'bash', args: { command: 'SECRET_CMD rm -rf /etc --token=SECRET_TOKEN' } });
+    emit({ type: 'tool_execution_start', toolCallId: 'call-1', toolName: 'bash', args: { command: 'SECRET_CMD' } });
+    emit({ type: 'tool_execution_update', toolCallId: 'call-1', toolName: 'bash', args: {}, partialResult: 'SECRET_PARTIAL' });
+    emit({ type: 'tool_execution_end', toolCallId: 'call-1', toolName: 'bash', result: 'SECRET_RESULT', isError: false });
+    // Nested tool call made by call-1: must never produce progress.
+    emit({ type: 'tool_execution_start', toolCallId: 'call-1/1', toolName: 'read', args: { path: '/etc/SECRET_NESTED' }, parentToolCallId: 'call-1' });
+    // Second top-level tool whose args carry secrets/paths: only the tool name may surface.
+    emit({ type: 'tool_execution_start', toolCallId: 'call-2', toolName: 'edit', args: { path: '/tmp/SECRET_PATH', input: 'SECRET_INPUT' } });
+    emit({ type: 'message_update', parentToolCallId: 'sub-1', assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: 'SECRET_SUBAGENT' } });
+    await sleep(20);
+    emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: '世界' } });
+    emit({ type: 'message_end', message: assistant([{ type: 'text', text: `最终回答${current}` }]) });
+    emit({ type: 'agent_end', messages: [], willRetry: false });
+    emit({ type: 'agent_settled', aborted: false });
+    return;
+  }
   if (scenario === 'retry-success' && current === 1) {
     emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: '你好，' } });
     emit({ type: 'message_end', message: assistant([{ type: 'text', text: 'transient fail' }], 'error', 'transient stream drop') });
@@ -160,6 +183,12 @@ async function handle(frame) {
     }
     respond(frame.id, 'abort', undefined);
     if (scenario === 'missing-terminal') return;
+    if (scenario === 'abort') {
+      // A late tool frame after cancellation was confirmed: the adapter must not
+      // report progress for it.
+      await sleep(10);
+      emit({ type: 'tool_execution_start', toolCallId: 'call-late', toolName: 'bash', args: { command: 'SECRET_LATE' } });
+    }
     await sleep(40);
     emit({ type: 'agent_settled', aborted: true });
     return;

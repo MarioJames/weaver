@@ -119,7 +119,17 @@ DSH 0.2.1-rc.2 已实测 `dsh --profile headless --help` 只提供 `--json` 与 
 
 ## 各引擎流式能力与进度行降级语义
 
-- **文字增量粒度**：Claude、Codex、OpenCode、Pi、Qoder 为逐 token（各协议的文本 delta 帧）；Grok 按 `agent_message_chunk` 文本块；DSH 按原生步骤提交整块到达（`text` 事件在 step commit 时来，不是逐 token）。有增量就实时补写卡片，只有终态就整块收口，这是 `turn()` 对所有引擎的统一行为。
-- **进度行**：流式卡片在正文之外可附带简短进度行，如「⏺ 调用工具：shell」「⏺ 阶段：步骤1」。目前只有 **DSH** 会产出：其原生 `tool_call` 的工具名与 `status` 的阶段名（开始/步骤N）经可选的 `onProgress` 通道上报，由 service 渲染进流式卡片；`thinking` 全文、工具参数/完整命令、工具结果、stderr 诊断一律不进入。
-- **进度行安全**：只含工具名/阶段名短标签；绝对路径只留最后一段文件名、凭据样式字符串经统一 `redactSecrets` 遮蔽、单行 ≤80 字符；自身上限 20 条/2000 字节，与答案（上限 20000 字节）叠加仍远小于卡片元素 30000 字符上限。最终收口 `setContent` 只用答案正文，进度行是临时提示，会被替换。
-- **统一降级**：协议上能拿到工具事件但尚未接入进度通道的引擎（当前为 Claude、Codex、OpenCode、Pi、Grok、Qoder）不产出进度行，行为与此前一致；不传 `onProgress` 的会话同样无进度行。进度行独占一行：service 在上一个字符不是换行时自动补一个换行再写进度行（含 filter 暂存未吐出的正文），正文与进度行之间不会粘连；补的换行计入进度行自身的字节预算，不计入答案的 `REPLY_BYTES` 限额判定（该限额保护的是最终答案正文，`parseReply(final)` 仍做字节校验；进度行有独立上限，不会绕过也不挤占）。100ms/100 字符节流、30000 字符元素上限、stop 菜单中止、delivery 失效与重连语义均不变；中止后进度回调不再进入卡片。
+- **文字增量粒度**：七引擎统一走 `turn()` 的实时补写（有增量就补写，只有终态就整块收口），但增量粒度受各原生协议限制，无法统一：
+
+  | 引擎 | 文字增量粒度 | 进度行标签来源 |
+  | --- | --- | --- |
+  | Claude | 逐 token（文本 delta 帧） | `tool_use` 块的 `name` |
+  | Codex | 逐 token（文本 delta 帧） | `item`/`started` 事件经闭名单映射的工具名（shell/edit/web_search/mcp 等） |
+  | OpenCode | 逐 token（文本 delta 帧） | `ToolPart` 的 `tool` |
+  | Pi | 逐 token（文本 delta 帧） | `tool_execution_start`/`toolcall_start` 的 `toolName` |
+  | Grok | 按 `agent_message_chunk` 文本块 | `tool_call` 的 `kind` 枚举（不读 `title`） |
+  | Qoder | 逐 token（文本 delta 帧） | `tool_use` 块的 `name` |
+  | DSH | 按原生步骤提交整块（`text` 事件在 step commit 时来，不是逐 token） | `tool_call` 的 `tool` |
+- **统一进度语义**：七个引擎都会产出进度行。每轮只发一次 `{kind:'stage', name:'开始'}`，每个顶层工具调用只发一次 `{kind:'tool', name:<工具名/类型标签>}`（按原生调用 id 去重，嵌套子 Agent 的工具不发）；不发其他 stage。进度事件经可选的 `onProgress` 通道上报，由 service 渲染进流式卡片，如「⏺ 调用工具：shell」「⏺ 阶段：开始」；`thinking` 全文、工具参数/完整命令、工具结果、stderr 诊断一律不进入。不传 `onProgress` 的会话无进度行，行为与此前一致；隐藏的身份回合（`finalAssistantOnly`）同样不发进度。
+- **进度行传递**：生产路径上进度经后台宿主进程的 `progress` 帧传回（只带短标签，宿主侧截断到 64 字符），再由 service 渲染；中止后到达的进度一律丢弃，不进入卡片。
+- **进度行安全**：标签只取工具名/类型字段，不含参数与路径；绝对路径只留最后一段文件名、凭据样式字符串经统一 `redactSecrets` 遮蔽、标签 ≤32 字符、单行 ≤80 字符；自身上限 20 条/2000 字节，与答案（上限 20000 字节）叠加仍远小于卡片元素 30000 字符上限。最终收口 `setContent` 只用答案正文，进度行是临时提示，会被替换。

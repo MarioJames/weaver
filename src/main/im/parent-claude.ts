@@ -11,6 +11,8 @@ import {
   ParentAgentError,
   ConfirmedParentCancellation,
   type ParentAgentSession,
+  type ParentAgentSendOptions,
+  type ParentProgressEvent,
   type PreparedParentAgent,
   type ParentProcess,
   type ParentProcessLauncher,
@@ -47,6 +49,9 @@ interface ActiveTurn {
   terminal?: boolean;
   streamMessageId?: string;
   onDelta?: (chunk: string) => void;
+  onProgress?: (event: ParentProgressEvent) => void;
+  startAnnounced: boolean;
+  readonly seenToolIds: Set<string>;
   boundary: PublicTextBoundary;
   resolve?: (value: string) => void;
   reject?: (error: Error) => void;
@@ -150,6 +155,29 @@ export class ClaudeParentSession implements ParentAgentSession {
     return parts.length ? `: ${parts.join('; ')}` : '';
   }
 
+  private emitProgress(active: ActiveTurn, event: ParentProgressEvent): void {
+    if (active.settled || active.cancelError) return;
+    const callback = active.onProgress;
+    if (!callback) return;
+    try { callback(event); }
+    catch { /* progress is best effort; the text turn owns failure reporting */ }
+  }
+
+  private announceStart(active: ActiveTurn): void {
+    if (active.startAnnounced) return;
+    active.startAnnounced = true;
+    this.emitProgress(active, { kind: 'stage', name: '开始' });
+  }
+
+  private announceTool(active: ActiveTurn, block: Record<string, unknown>): void {
+    const id = block.id;
+    const name = block.name;
+    if (typeof id !== 'string' || !id || typeof name !== 'string' || !name.trim()) return;
+    if (active.seenToolIds.has(id)) return;
+    active.seenToolIds.add(id);
+    this.emitProgress(active, { kind: 'tool', name });
+  }
+
   private write(frame: Record<string, unknown>): void {
     if (this.exited) throw parentError('engine', 'claude CLI has exited');
     if (this.closed) throw parentError('closed', 'claude parent session is closed');
@@ -169,6 +197,7 @@ export class ClaudeParentSession implements ParentAgentSession {
       if (!active.settled) {
         active.settled = true;
         active.onDelta = undefined;
+        active.onProgress = undefined;
         active.reject?.(error);
       }
     }
@@ -277,6 +306,7 @@ export class ClaudeParentSession implements ParentAgentSession {
     const active = this.active;
     if (!active || active.settled || active.cancelError) return;
     if (event?.type === 'message_start') {
+      this.announceStart(active);
       const message = event.message as Record<string, unknown> | undefined;
       const id = message?.id;
       this.streamCursorId = typeof id === 'string' ? id : undefined;
@@ -289,8 +319,15 @@ export class ClaudeParentSession implements ParentAgentSession {
       return;
     }
     if ((frame.api_message_id ?? this.streamCursorId) !== active.streamMessageId) return;
+    if (event?.type === 'content_block_start') {
+      this.announceStart(active);
+      const block = event.content_block as Record<string, unknown> | undefined;
+      if (block?.type === 'tool_use') this.announceTool(active, block);
+      return;
+    }
     if (event?.type === 'message_stop') { active.streamMessageId = undefined; return; }
     if (event?.type !== 'content_block_delta' || !active.streamMessageId) return;
+    this.announceStart(active);
     const delta = event.delta as Record<string, unknown> | undefined;
     if (delta?.type !== 'text_delta' || typeof delta.text !== 'string' || !delta.text) return;
     if (!active.onDelta) return;
@@ -356,6 +393,7 @@ export class ClaudeParentSession implements ParentAgentSession {
     if (this.active !== active || active.settled || active.cancelError) return;
     active.cancelError = error;
     active.onDelta = undefined;
+    active.onProgress = undefined;
     active.timer.cancel();
     active.timer = startTimer(this.waits.closeMs, 'claude interrupt terminal', failure => this.failSession(failure));
     void this.requestControl('interrupt', this.waits.closeMs, 'claude interrupt').then(() => {
@@ -377,6 +415,7 @@ export class ClaudeParentSession implements ParentAgentSession {
     if (active.settled) return;
     active.settled = true;
     active.onDelta = undefined;
+    active.onProgress = undefined;
     if (typeof outcome === 'string') active.resolve?.(outcome);
     else active.reject?.(outcome);
   }
@@ -388,19 +427,24 @@ export class ClaudeParentSession implements ParentAgentSession {
     if (error.reason === 'protocol') void this.close().catch(() => { /* teardown failures surface through close */ });
   }
 
-  async send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void): Promise<string> {
+  async send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void, options?: ParentAgentSendOptions): Promise<string> {
     if (typeof text !== 'string' || !text.trim() || text.length > PARENT_TEXT_MAX) throw parentError('invalid_input', `send text must be 1–${PARENT_TEXT_MAX} characters`);
     if (signal?.aborted) throw abortReason(signal);
     if (this.closed) throw parentError('closed', 'claude parent session is closed');
     if (this.exited) throw parentError('engine', `claude CLI has exited${this.failureDetail()}`);
     if (this.active) throw parentError('engine', 'another send is still in progress on this session');
     if (!this.sessionId) throw parentError('protocol', 'claude session was not started');
+    const finalOnly = options?.finalAssistantOnly === true;
+    const onProgress = finalOnly ? undefined : options?.onProgress;
     const active: ActiveTurn = {
       uuid: randomUUID(),
       timer: { cancel: () => undefined },
       settled: false,
+      startAnnounced: false,
+      seenToolIds: new Set(),
       boundary: new PublicTextBoundary(),
       ...(onDelta ? { onDelta } : {}),
+      ...(onProgress ? { onProgress } : {}),
     };
     const promise = new Promise<string>((resolve, reject) => {
       active.resolve = resolve;
@@ -427,6 +471,7 @@ export class ClaudeParentSession implements ParentAgentSession {
         active.timer.cancel();
         active.settled = true;
         active.onDelta = undefined;
+        active.onProgress = undefined;
         active.reject?.(error instanceof Error ? error : parentError('engine', String(error)));
       }
       if (signal) signal.removeEventListener('abort', onAbort);

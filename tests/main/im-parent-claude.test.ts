@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ConfirmedParentCancellation, createParentAgent as baseCreateParentAgent, type ParentAgentSession } from '../../src/main/im/parent-agent';
+import { ConfirmedParentCancellation, createParentAgent as baseCreateParentAgent, type ParentAgentSession, type ParentProgressEvent } from '../../src/main/im/parent-agent';
 
 const sessions = new Set<ParentAgentSession>();
 const createParentAgent: typeof baseCreateParentAgent = async (...args) => {
@@ -268,3 +268,87 @@ for (const scenario of ['callback-failed', 'exit-mid-turn']) {
     } finally { await teardown(harness); }
   });
 }
+
+test('claude emits one start per turn and one progress line per top-level tool only', async () => {
+  const harness = setup('progress', 'progress');
+  try {
+    const session = await createParentAgent(input(harness));
+    const first: ParentProgressEvent[] = [];
+    assert.equal(await session.send('第一轮', undefined, undefined, { onProgress: event => first.push(event) }), '最终回答1');
+    assert.deepEqual(first, [
+      { kind: 'stage', name: '开始' },
+      { kind: 'tool', name: 'Bash' },
+      { kind: 'tool', name: 'Grep' },
+    ]);
+    const serialized = JSON.stringify(first);
+    for (const secret of ['SECRET', '/home', 'command', 'pattern']) assert.ok(!serialized.includes(secret), serialized);
+
+    const second: ParentProgressEvent[] = [];
+    assert.equal(await session.send('第二轮', undefined, undefined, { onProgress: event => second.push(event) }), '最终回答2');
+    assert.deepEqual(second, [
+      { kind: 'stage', name: '开始' },
+      { kind: 'tool', name: 'Write' },
+      { kind: 'tool', name: 'Edit' },
+    ]);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('claude emits no progress without onProgress or on hidden identity turns', async () => {
+  const harness = setup('progress-opt', 'progress');
+  try {
+    const session = await createParentAgent(input(harness));
+    const deltas: string[] = [];
+    assert.equal(await session.send('第一轮', undefined, chunk => deltas.push(chunk)), '最终回答1');
+    assert.deepEqual(deltas, ['回答一']);
+
+    const hidden: ParentProgressEvent[] = [];
+    const hiddenDeltas: string[] = [];
+    assert.equal(await session.send('身份确认', undefined, chunk => hiddenDeltas.push(chunk), {
+      finalAssistantOnly: true,
+      onProgress: event => hidden.push(event),
+    }), '最终回答2');
+    assert.deepEqual(hidden, []);
+    assert.deepEqual(hiddenDeltas, ['回答二']);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('claude progress callback failures never affect the text turn', async () => {
+  const harness = setup('progress-throw', 'progress');
+  try {
+    const session = await createParentAgent(input(harness));
+    const deltas: string[] = [];
+    let calls = 0;
+    const final = await session.send('第一轮', undefined, chunk => deltas.push(chunk), {
+      onProgress: () => { calls++; throw new Error('progress callback failed'); },
+    });
+    assert.equal(final, '最终回答1');
+    assert.deepEqual(deltas, ['回答一']);
+    assert.equal(calls, 3);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('claude stops emitting progress after abort and never reports late tool frames', async () => {
+  const harness = setup('progress-abort', 'progress-abort');
+  try {
+    const session = await createParentAgent(input(harness));
+    const progress: ParentProgressEvent[] = [];
+    const controller = new AbortController();
+    const pending = session.send('取消', controller.signal, () => controller.abort(), {
+      onProgress: event => {
+        progress.push(event);
+        if (event.kind === 'tool') controller.abort();
+      },
+    });
+    await assert.rejects(pending, error => error instanceof ConfirmedParentCancellation && error.name === 'AbortError');
+    const settled = [...progress];
+    await new Promise(resolve => setTimeout(resolve, 200));
+    assert.deepEqual(progress, settled);
+    assert.ok(progress.some(event => event.name === 'EarlyTool'));
+    assert.ok(!progress.some(event => event.name === 'LateTool'));
+    assert.equal(progress.filter(event => event.kind === 'stage').length, 1);
+    await session.close();
+  } finally { await teardown(harness); }
+});

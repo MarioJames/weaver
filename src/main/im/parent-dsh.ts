@@ -36,9 +36,10 @@ import { PublicTextBoundary } from './public-text';
  * `tool_result`, `status` details, stderr diagnostics and protocol errors stay inside
  * this module. The stream is the native projection: committed text arrives when a step
  * commits, not per token. When the caller passes `ParentAgentSendOptions.onProgress`,
- * `tool_call` tool names and `status` phase names are additionally reported as short
- * sanitized progress labels (never arguments, commands, thinking text or paths);
- * without `onProgress` the behavior is exactly the previous text-only one.
+ * the native turn-start status and top-level `tool_call` tool names are additionally
+ * reported as short sanitized progress labels (never step numbers, arguments, commands,
+ * thinking text or paths); without `onProgress` the behavior is exactly the previous
+ * text-only one.
  *
  * Model, effort and the unattended permission posture ride the same private `--patch` overlay as
  * the existing worker launcher: `deepseek-official`, `workspace-write`, `ask`, and the local
@@ -69,6 +70,7 @@ interface ActiveTurn {
   onDelta?: (chunk: string) => void;
   onProgress?: (event: ParentProgressEvent) => void;
   boundary: PublicTextBoundary;
+  seenToolCallIds: Set<string>;
   process?: ParentProcess;
   pid?: number;
   groupOwned: boolean;
@@ -212,15 +214,8 @@ export class DshParentSession implements ParentAgentSession {
       case 'status': {
         const phase = typeof frame.phase === 'string' ? frame.phase : '';
         if (phase === 'step_start') active.boundary.noteBoundary();
-        // Stage progress: only the stage name (turn start / step number), never body text or args.
+        // Stage progress: only the turn-start signal. Step numbers/thinking never emit.
         if (phase === 'turn_start') this.emitProgress(active, { kind: 'stage', name: '开始' });
-        else if (phase === 'step_start') {
-          const step = frame.step;
-          this.emitProgress(active, {
-            kind: 'stage',
-            name: typeof step === 'number' && Number.isFinite(step) ? `步骤${step}` : '执行',
-          });
-        }
         if (phase === 'turn_end') {
           const reason = frame.reason;
           if (reason && typeof reason === 'object' && !Array.isArray(reason)) {
@@ -264,11 +259,17 @@ export class DshParentSession implements ParentAgentSession {
         return;
       case 'tool_call': {
         // Tool progress: only the short tool-name label; `input` (args/full commands) and results never forward.
+        // One event per top-level tool call at start, deduped by native call id; nested calls never emit.
         if (active.cancelError || active.failure) return;
+        if (frame.parentCallId != null || frame.parent_call_id != null || frame.parent_tool_use_id != null || frame.parentId != null) return;
         const tool = frame.tool;
-        if (typeof tool === 'string' && tool.trim()) {
-          this.emitProgress(active, { kind: 'tool', name: tool });
+        if (typeof tool !== 'string' || !tool.trim()) return;
+        const callId = typeof frame.callId === 'string' && frame.callId ? frame.callId : typeof frame.call_id === 'string' && frame.call_id ? frame.call_id : undefined;
+        if (callId !== undefined) {
+          if (active.seenToolCallIds.has(callId)) return;
+          active.seenToolCallIds.add(callId);
         }
+        this.emitProgress(active, { kind: 'tool', name: tool });
         return;
       }
       default:
@@ -531,6 +532,7 @@ export class DshParentSession implements ParentAgentSession {
       released: false,
       timer: { cancel: () => undefined },
       boundary: new PublicTextBoundary(),
+      seenToolCallIds: new Set(),
       groupOwned: false,
       knownTree: new Map(),
       closeSignal,
@@ -541,7 +543,7 @@ export class DshParentSession implements ParentAgentSession {
       nativeAborted: false,
       stderrTail: [],
       ...(!finalOnly && onDelta ? { onDelta } : {}),
-      ...(onProgress ? { onProgress } : {}),
+      ...(!finalOnly && onProgress ? { onProgress } : {}),
     };
     const promise = new Promise<string>((res, rej) => { resolve = res; reject = rej; });
     active.resolve = resolve;

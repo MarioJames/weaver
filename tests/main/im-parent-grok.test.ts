@@ -148,6 +148,62 @@ test('grok gives each chat/user its own resident process and context', async () 
   } finally { await teardown(harness); }
 });
 
+test('grok reports unified progress: stage once plus one event per top-level tool kind', async () => {
+  const harness = setup('progress', 'progress');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 2000, closeMs: 700 });
+    sessions.add(session);
+    const deltas: string[] = [];
+    const progress: Array<{ kind: string; name: string }> = [];
+    assert.equal(await session.send('第一轮', undefined, chunk => deltas.push(chunk), { onProgress: event => progress.push(event) }), '回答1');
+    assert.deepEqual(deltas, ['回答', '1']);
+    assert.deepEqual(progress, [
+      { kind: 'stage', name: '开始' },
+      { kind: 'tool', name: 'execute' },
+      { kind: 'tool', name: 'read' },
+    ]);
+    const leaked = JSON.stringify(progress);
+    for (const secret of ['SECRET_CMD', 'SECRET_TOKEN', 'SECRET_THOUGHT', 'SECRET_PLAN', 'SECRET_FOREIGN_TOOL', 'SECRET_PATH', 'SECRET_PW', '/etc/']) {
+      assert.ok(!leaked.includes(secret), `progress leaked ${secret}: ${leaked}`);
+    }
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('grok progress stays silent without onProgress or with finalAssistantOnly; throwing onProgress keeps the text turn', async () => {
+  const harness = setup('progress-silent', 'progress');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 2000, closeMs: 700 });
+    sessions.add(session);
+    const silent: string[] = [];
+    assert.equal(await session.send('无回调', undefined, chunk => silent.push(chunk)), '回答1');
+    assert.deepEqual(silent, ['回答', '1']);
+    const hidden: Array<{ kind: string; name: string }> = [];
+    assert.equal(await session.send('隐藏轮', undefined, undefined, { finalAssistantOnly: true, onProgress: event => hidden.push(event) }), '回答2');
+    assert.deepEqual(hidden, [], 'finalAssistantOnly must not emit progress');
+    const throwing: string[] = [];
+    assert.equal(await session.send('抛错回调', undefined, chunk => throwing.push(chunk), { onProgress: () => { throw new Error('progress boom'); } }), '回答3');
+    assert.deepEqual(throwing, ['回答3']);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('grok never reports progress for tool frames arriving after abort', async () => {
+  const harness = setup('progress-abort', 'abort');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 2000, closeMs: 700 });
+    sessions.add(session);
+    const controller = new AbortController();
+    const progress: Array<{ kind: string; name: string }> = [];
+    const pending = session.send('取消', controller.signal, () => controller.abort(), { onProgress: event => progress.push(event) });
+    await assert.rejects(pending, error => error instanceof ConfirmedParentCancellation && error.name === 'AbortError');
+    // The first session/update legitimately proves the turn started; the tool frame that
+    // arrives after cancellation must not emit.
+    assert.deepEqual(progress, [{ kind: 'stage', name: '开始' }], `late tool frame must not emit: ${JSON.stringify(progress)}`);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
 test('grok argv uses ACP stdio and never adds multi-root or always-approve', async () => {
   const harness = setup('args', 'default');
   try {

@@ -78,7 +78,7 @@ async function teardownDsh(harness: { dir: string; previousPath: string }) {
   rmSync(harness.dir, { recursive: true, force: true });
 }
 
-test('dsh 对工具调用与阶段事件产出进度，thinking/参数/结果不进入进度', async () => {
+test('dsh 对工具调用与开始事件产出进度，thinking/参数/结果与步骤号不进入进度', async () => {
   const harness = setupDsh('default');
   try {
     const { spawn } = await import('node:child_process');
@@ -100,17 +100,47 @@ test('dsh 对工具调用与阶段事件产出进度，thinking/参数/结果不
     const final = await session.send('第一轮', undefined, chunk => deltas.push(chunk), { onProgress: event => progress.push(event) });
     assert.equal(final, '你好，世界');
     assert.deepEqual(deltas, ['你好，', '世界']);
+    // 统一进度语义：只发 turn_start「开始」与顶层 tool_call；步骤号/执行 stage 不再出现。
     assert.deepEqual(progress, [
       { kind: 'stage', name: '开始' },
-      { kind: 'stage', name: '步骤1' },
       { kind: 'tool', name: 'bash' },
     ]);
+    assert.ok(!progress.some(event => event.kind === 'stage' && event.name !== '开始'), JSON.stringify(progress));
     // thinking 全文、工具参数、工具结果绝不进入进度事件。
     assert.ok(!JSON.stringify(progress).includes('SECRET'), JSON.stringify(progress));
     const lines = progress.map(event => formatParentProgress(event)!);
     assert.ok(lines.every(line => [...line].length <= PROGRESS_LINE_MAX_CHARS));
     assert.ok(lines.join('\n').includes('⏺ 调用工具：bash'));
     assert.ok(!lines.join('\n').includes('SECRET_TOOL'));
+    await session.close();
+  } finally { await teardownDsh(harness); }
+});
+
+test('dsh 同一 callId 的重复 tool_call 只发一次进度', async () => {
+  const harness = setupDsh('dup-tool');
+  try {
+    const { spawn } = await import('node:child_process');
+    const session = await createParentAgent({
+      engineKind: 'dsh',
+      model: 'deepseek-flash',
+      effort: 'high',
+      workspace: harness.workspace,
+      instructions: 'progress fixture only',
+    }, {
+      launch: (command, cwd, extra) => spawn(command[0], command.slice(1), {
+        cwd, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...extra },
+      }),
+      startupMs: 3000, turnMs: 5000, closeMs: 1000,
+    });
+    dshSessions.add(session);
+    const progress: ParentProgressEvent[] = [];
+    assert.equal(await session.send('第一轮', undefined, undefined, { onProgress: event => progress.push(event) }), '你好，世界');
+    assert.deepEqual(progress, [
+      { kind: 'stage', name: '开始' },
+      { kind: 'tool', name: 'bash' },
+      { kind: 'tool', name: 'read' },
+    ]);
+    assert.ok(!JSON.stringify(progress).includes('SECRET'), JSON.stringify(progress));
     await session.close();
   } finally { await teardownDsh(harness); }
 });

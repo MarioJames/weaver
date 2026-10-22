@@ -34,6 +34,22 @@ function result(subtype, text, uuid, overrides = {}) {
   return { type: 'result', subtype, duration_ms: 10, duration_api_ms: 5, is_error: subtype !== 'success', num_turns: 1, result: text, stop_reason: null, uuid, session_id: sessionId, ...overrides };
 }
 
+function messageStart(current) {
+  emit({ type: 'stream_event', session_id: sessionId, parent_tool_use_id: null, uuid: `msg-${current}`, event: { type: 'message_start', message: { id: `msg-${current}`, role: 'assistant', model } } });
+}
+
+function streamTool(id, name, { parent = null, input = {}, extra = {} } = {}) {
+  emit({ type: 'stream_event', session_id: sessionId, parent_tool_use_id: parent, uuid: `msg-${turn}`, event: { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id, name, input, ...extra } } });
+}
+
+function streamToolInput(partial, parent = null) {
+  emit({ type: 'stream_event', session_id: sessionId, parent_tool_use_id: parent, uuid: `msg-${turn}`, event: { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: partial } } });
+}
+
+function streamToolStop() {
+  emit({ type: 'stream_event', session_id: sessionId, parent_tool_use_id: null, uuid: `msg-${turn}`, event: { type: 'content_block_stop', index: 1 } });
+}
+
 async function streamTurn(frame) {
   // Hidden Master identity turn: bypass turn/marker so existing expectations stay intact.
   try {
@@ -54,6 +70,26 @@ async function streamTurn(frame) {
   const current = ++turn;
   currentTurn = current;
   log({ pid: process.pid, turn: current });
+  if (scenario === 'progress') {
+    messageStart(current);
+    const first = current === 1 ? 'Bash' : 'Write';
+    const second = current === 1 ? 'Grep' : 'Edit';
+    streamTool(`toolu-progress-${current}-1`, first, { input: { command: 'cat /home/user/SECRET_COMMAND' } });
+    // Same native call id repeated: the adapter must not report it twice.
+    streamTool(`toolu-progress-${current}-1`, first, { input: { command: 'duplicate SECRET_COMMAND' } });
+    // Nested subagent tool: parent_tool_use_id is set, so no progress may be emitted.
+    streamTool(`toolu-progress-${current}-nested`, 'Read', { parent: 'subagent-1', input: { file_path: '/home/user/SECRET_SUBAGENT_PATH' } });
+    streamToolInput('{"command":"SECRET_TOOL_JSON"}');
+    streamToolStop();
+    // Sensitive title/description/input must never become the progress label.
+    streamTool(`toolu-progress-${current}-2`, second, {
+      input: { pattern: 'SECRET_PATTERN', path: '/home/user/SECRET_PATH' },
+      extra: { title: 'SECRET_TITLE', description: 'SECRET_DESCRIPTION' },
+    });
+  }
+  if (scenario === 'abort' && current === 1) {
+    streamTool('toolu-abort-early', 'EarlyTool', { input: { command: 'SECRET_EARLY' } });
+  }
   // Native 1.1.75 reports auth/quota/provider failures as an is_error result before any
   // public delta; the zero-delta shape must settle instead of waiting for turn timeout.
   if (scenario === 'auth') {
@@ -164,6 +200,8 @@ async function handle(frame) {
     }
     if (scenario === 'abort') {
       await sleep(30);
+      // A tool frame after the interrupt request must never reach progress.
+      streamTool('toolu-abort-late', 'LateTool', { input: { command: 'SECRET_LATE' } });
       emit(result('error_during_execution', '', 'result-abort', { errors: ['turn aborted'] }));
     }
     return;

@@ -199,6 +199,61 @@ test('pi gives each chat/user its own resident process and context', async () =>
   } finally { await teardown(harness); }
 });
 
+test('pi reports unified progress: stage once plus one event per top-level tool', async () => {
+  const harness = setup('progress', 'progress');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 2000, closeMs: 800 });
+    sessions.add(session);
+    const deltas: string[] = [];
+    const progress: Array<{ kind: string; name: string }> = [];
+    assert.equal(await session.send('第一轮', undefined, chunk => deltas.push(chunk), { onProgress: event => progress.push(event) }), '最终回答1');
+    assert.deepEqual(deltas, ['你好，', '世界']);
+    assert.deepEqual(progress, [
+      { kind: 'stage', name: '开始' },
+      { kind: 'tool', name: 'bash' },
+      { kind: 'tool', name: 'edit' },
+    ]);
+    const leaked = JSON.stringify(progress);
+    for (const secret of ['SECRET_CMD', 'SECRET_TOKEN', 'SECRET_PARTIAL', 'SECRET_RESULT', 'SECRET_NESTED', 'SECRET_SUBAGENT', 'SECRET_INPUT', 'SECRET_PATH']) {
+      assert.ok(!leaked.includes(secret), `progress leaked ${secret}: ${leaked}`);
+    }
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('pi progress stays silent without onProgress, with finalAssistantOnly, or after abort; throwing onProgress keeps the text turn', async () => {
+  const harness = setup('progress-silent', 'progress');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 2000, closeMs: 800 });
+    sessions.add(session);
+    const silent: string[] = [];
+    assert.equal(await session.send('无回调', undefined, chunk => silent.push(chunk)), '最终回答1');
+    assert.deepEqual(silent, ['你好，', '世界']);
+    const hidden: Array<{ kind: string; name: string }> = [];
+    const hiddenDeltas: string[] = [];
+    assert.equal(await session.send('隐藏轮', undefined, chunk => hiddenDeltas.push(chunk), { finalAssistantOnly: true, onProgress: event => hidden.push(event) }), '最终回答2');
+    assert.deepEqual(hidden, [], 'finalAssistantOnly must not emit progress');
+    const throwing: string[] = [];
+    assert.equal(await session.send('抛错回调', undefined, chunk => throwing.push(chunk), { onProgress: () => { throw new Error('progress boom'); } }), '最终回答3');
+    assert.deepEqual(throwing, ['你好，', '世界']);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('pi never reports progress for tool frames arriving after abort', async () => {
+  const harness = setup('progress-abort', 'abort');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 2000, closeMs: 800 });
+    sessions.add(session);
+    const controller = new AbortController();
+    const progress: Array<{ kind: string; name: string }> = [];
+    const pending = session.send('取消', controller.signal, () => controller.abort(), { onProgress: event => progress.push(event) });
+    await assert.rejects(pending, error => error instanceof ConfirmedParentCancellation && error.name === 'AbortError');
+    assert.deepEqual(progress, [{ kind: 'stage', name: '开始' }], `late tool frame must not emit: ${JSON.stringify(progress)}`);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
 test('pi argv keeps native permissions and never adds approve, bypass or extension removal', async () => {
   const harness = setup('args', 'default');
   try {

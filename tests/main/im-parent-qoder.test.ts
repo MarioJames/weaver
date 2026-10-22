@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ConfirmedParentCancellation, ParentAgentError, createParentAgent, type ParentAgentSession, type ParentProcessLauncher } from '../../src/main/im/parent-agent';
+import { ConfirmedParentCancellation, ParentAgentError, createParentAgent, type ParentAgentSession, type ParentProcessLauncher, type ParentProgressEvent } from '../../src/main/im/parent-agent';
 
 const FIXTURE = new URL('../fixtures/parent/qoder-fixture.mjs', import.meta.url).pathname;
 const sessions = new Set<ParentAgentSession>();
@@ -246,5 +246,93 @@ test('qoder argv uses the public stream-json protocol, native permissions and --
     assert.equal(snapshot.argv[snapshot.argv.indexOf('--add-dir') + 1], harness.extra);
     assert.ok(!snapshot.argv.includes('bypass_permissions'));
     assert.ok(!snapshot.argv.includes('--permission-mode'));
+  } finally { await teardown(harness); }
+});
+
+test('qoder emits one start per turn and one progress line per top-level tool only', async () => {
+  const harness = setup('progress', 'progress');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 3000, closeMs: 700 });
+    sessions.add(session);
+    const first: ParentProgressEvent[] = [];
+    assert.equal(await session.send('第一轮', undefined, undefined, { onProgress: event => first.push(event) }), '最终回答1');
+    assert.deepEqual(first, [
+      { kind: 'stage', name: '开始' },
+      { kind: 'tool', name: 'Bash' },
+      { kind: 'tool', name: 'Grep' },
+    ]);
+    const serialized = JSON.stringify(first);
+    for (const secret of ['SECRET', '/home', 'command', 'pattern']) assert.ok(!serialized.includes(secret), serialized);
+
+    const second: ParentProgressEvent[] = [];
+    assert.equal(await session.send('第二轮', undefined, undefined, { onProgress: event => second.push(event) }), '最终回答2');
+    assert.deepEqual(second, [
+      { kind: 'stage', name: '开始' },
+      { kind: 'tool', name: 'Write' },
+      { kind: 'tool', name: 'Edit' },
+    ]);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('qoder emits no progress without onProgress or on hidden identity turns', async () => {
+  const harness = setup('progress-opt', 'progress');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 3000, closeMs: 700 });
+    sessions.add(session);
+    const deltas: string[] = [];
+    assert.equal(await session.send('第一轮', undefined, chunk => deltas.push(chunk)), '最终回答1');
+    assert.deepEqual(deltas, ['回答1']);
+
+    const hidden: ParentProgressEvent[] = [];
+    const hiddenDeltas: string[] = [];
+    assert.equal(await session.send('身份确认', undefined, chunk => hiddenDeltas.push(chunk), {
+      finalAssistantOnly: true,
+      onProgress: event => hidden.push(event),
+    }), '最终回答2');
+    assert.deepEqual(hidden, []);
+    assert.deepEqual(hiddenDeltas, ['回答2']);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('qoder progress callback failures never affect the text turn', async () => {
+  const harness = setup('progress-throw', 'progress');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 3000, closeMs: 700 });
+    sessions.add(session);
+    const deltas: string[] = [];
+    let calls = 0;
+    const final = await session.send('第一轮', undefined, chunk => deltas.push(chunk), {
+      onProgress: () => { calls++; throw new Error('progress callback failed'); },
+    });
+    assert.equal(final, '最终回答1');
+    assert.deepEqual(deltas, ['回答1']);
+    assert.equal(calls, 3);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('qoder stops emitting progress after abort and never reports late tool frames', async () => {
+  const harness = setup('abort-progress', 'abort');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 3000, turnMs: 3000, closeMs: 900 });
+    sessions.add(session);
+    const progress: ParentProgressEvent[] = [];
+    const controller = new AbortController();
+    const pending = session.send('取消', controller.signal, () => controller.abort(), {
+      onProgress: event => {
+        progress.push(event);
+        if (event.kind === 'tool') controller.abort();
+      },
+    });
+    await assert.rejects(pending, error => error instanceof ConfirmedParentCancellation && error.name === 'AbortError');
+    const settled = [...progress];
+    await new Promise(resolve => setTimeout(resolve, 200));
+    assert.deepEqual(progress, settled);
+    assert.ok(progress.some(event => event.name === 'EarlyTool'));
+    assert.ok(!progress.some(event => event.name === 'LateTool'));
+    assert.equal(progress.filter(event => event.kind === 'stage').length, 1);
+    await session.close();
   } finally { await teardown(harness); }
 });

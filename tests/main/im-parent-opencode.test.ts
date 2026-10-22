@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ConfirmedParentCancellation, ParentAgentError, createParentAgent, type ParentAgentSession, type ParentProcessLauncher } from '../../src/main/im/parent-agent';
+import { ConfirmedParentCancellation, ParentAgentError, createParentAgent, type ParentAgentSession, type ParentProcessLauncher, type ParentProgressEvent } from '../../src/main/im/parent-agent';
 import { imInstructions, imMasterIdentityPrompt } from '../../src/main/im/bootstrap';
 import { isMasterReadyText } from '../../src/main/im/parent-identity';
 
@@ -503,4 +503,93 @@ test('opencode split progress plus terminal marker: default aggregate fails stri
     assert.ok(!terminal.includes('接线完成'));
     await session.close();
   } finally { await teardown(only); }
+});
+
+test('opencode emits one start and one progress per top-level tool with native names only', async () => {
+  const harness = setup('progress', 'progress');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 800 });
+    sessions.add(session);
+    const deltas: string[] = [];
+    const progress: ParentProgressEvent[] = [];
+    const text = await session.send('进度', undefined, chunk => deltas.push(chunk), { onProgress: event => progress.push(event) });
+    assert.equal(text, '进度完成');
+    assert.deepEqual(deltas, ['进度', '完成']);
+    assert.deepEqual(progress, [
+      { kind: 'stage', name: '开始' },
+      { kind: 'tool', name: 'bash' },
+      { kind: 'tool', name: 'read' },
+    ]);
+    assert.equal(progress.filter(event => event.kind === 'stage').length, 1, 'start must fire exactly once even after an assistant rebind');
+    const serialized = JSON.stringify(progress);
+    for (const secret of ['SECRET_TOOL_TOKEN', 'SECRET_PATH', 'SECRET_TOOL_TITLE', 'SECRET_TOOL_OUTPUT', 'SECRET_FILE', 'SECRET_SUBTASK', 'SECRET_CHILD', 'SECRET_PATTERN']) {
+      assert.ok(!serialized.includes(secret), `${secret} leaked into progress: ${serialized}`);
+    }
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('opencode without onProgress keeps the previous text-only behavior', async () => {
+  const harness = setup('progress-plain', 'progress');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 800 });
+    sessions.add(session);
+    const deltas: string[] = [];
+    assert.equal(await session.send('进度', undefined, chunk => deltas.push(chunk)), '进度完成');
+    assert.deepEqual(deltas, ['进度', '完成']);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('opencode finalAssistantOnly turns emit no progress', async () => {
+  const harness = setup('progress-final-only', 'progress');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 800 });
+    sessions.add(session);
+    const deltas: string[] = [];
+    const progress: ParentProgressEvent[] = [];
+    const text = await session.send('进度', undefined, chunk => deltas.push(chunk), { finalAssistantOnly: true, onProgress: event => progress.push(event) });
+    assert.equal(text, '进度完成');
+    assert.deepEqual(deltas, []);
+    assert.deepEqual(progress, []);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('opencode swallows onProgress errors and still resolves the text turn', async () => {
+  const harness = setup('progress-throw', 'progress');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 800 });
+    sessions.add(session);
+    const deltas: string[] = [];
+    let calls = 0;
+    const text = await session.send('进度', undefined, chunk => deltas.push(chunk), { onProgress: () => { calls += 1; throw new Error('progress callback boom'); } });
+    assert.ok(calls >= 3, 'every native progress event was still delivered to the callback');
+    assert.equal(text, '进度完成');
+    assert.deepEqual(deltas, ['进度', '完成']);
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('opencode stops calling onProgress after abort and ignores late native tool frames', async () => {
+  const harness = setup('progress-abort', 'progress-abort');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 900 });
+    sessions.add(session);
+    const progress: ParentProgressEvent[] = [];
+    const controller = new AbortController();
+    const pending = session.send('取消进度', controller.signal, undefined, {
+      onProgress: event => { progress.push(event); if (event.kind === 'tool') controller.abort(); },
+    });
+    await assert.rejects(pending, error => error instanceof ConfirmedParentCancellation && error.name === 'AbortError');
+    assert.deepEqual(progress, [
+      { kind: 'stage', name: '开始' },
+      { kind: 'tool', name: 'bash' },
+    ]);
+    const seen = progress.length;
+    await new Promise(resolve => setTimeout(resolve, 120));
+    assert.equal(progress.length, seen, 'no progress may be emitted after the cancellation settles');
+    assert.ok(!progress.some(event => event.name === 'grep'), 'the post-abort tool frame must not surface');
+    await session.close();
+  } finally { await teardown(harness); }
 });

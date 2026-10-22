@@ -4,7 +4,7 @@ import { createServer, type Socket } from 'node:net';
 import { join, isAbsolute } from 'node:path';
 import { embeddedApp } from '../embedded';
 import type { AsyncRunner } from '../owner-host';
-import { abortReason, ConfirmedParentCancellation, ParentTurnNotSubmitted, parentEnv, parentError, prepareParentAgentInput, PARENT_TEXT_MAX, type ParentAgentFailureReason, type ParentAgentInput, type ParentAgentSession } from './parent-agent';
+import { abortReason, ConfirmedParentCancellation, ParentTurnNotSubmitted, parentEnv, parentError, prepareParentAgentInput, PARENT_TEXT_MAX, type ParentAgentFailureReason, type ParentAgentInput, type ParentAgentSendOptions, type ParentAgentSession, type ParentProgressEvent } from './parent-agent';
 import { hostWire, type HostFrame } from './parent-host-wire';
 import { HOST_STARTUP_MS } from './parent-identity';
 import { bootIdentity, cleanupHostRecord, inspectHostUnit, processStart, readHostRecords, resourceError, resourceRun, saveHostRecord, type HostRecord } from './parent-host-resources';
@@ -75,7 +75,7 @@ export async function createBackgroundParentAgent(input: ParentAgentInput, optio
   let signalUnavailable!: () => void;
   const unavailable = new Promise<void>(resolve => { signalUnavailable = resolve; });
   let nextId = 1;
-  let active: { id: number; cancelRequested?: boolean; submitted?: boolean; delta?: (text: string) => void; resolve(text: string): void; reject(error: Error): void; detach(): void; timer: ReturnType<typeof setTimeout> } | undefined;
+  let active: { id: number; cancelRequested?: boolean; submitted?: boolean; delta?: (text: string) => void; onProgress?: (event: ParentProgressEvent) => void; resolve(text: string): void; reject(error: Error): void; detach(): void; timer: ReturnType<typeof setTimeout> } | undefined;
   let readyResolve!: () => void, readyReject!: (error: Error) => void;
   const ready = new Promise<void>((resolve, reject) => { readyResolve = resolve; readyReject = reject; });
   // Attach immediately so launch failures cannot create an unhandled ready rejection.
@@ -136,9 +136,20 @@ export async function createBackgroundParentAgent(input: ParentAgentInput, optio
         return;
       }
       if (frame.type === 'not-submitted' && (turn.submitted || !turn.cancelRequested) || frame.type === 'cancelled' && (!turn.submitted || !turn.cancelRequested)) { lost(); return; }
-      if ((frame.type === 'delta' || frame.type === 'result' || frame.type === 'error') && !turn.submitted) { lost(); return; }
+      if ((frame.type === 'delta' || frame.type === 'progress' || frame.type === 'result' || frame.type === 'error') && !turn.submitted) { lost(); return; }
       if (frame.type === 'delta' && typeof frame.text === 'string') {
         try { turn.delta?.(frame.text); } catch { lost(); }
+        return;
+      }
+      if (frame.type === 'progress') {
+        if (frame.kind !== 'tool' && frame.kind !== 'stage') { lost(); return; }
+        if (typeof frame.name !== 'string') { lost(); return; }
+        // Abort discards progress symmetrically with delta clearing; a throwing
+        // progress callback is swallowed and never faults the text turn.
+        if (turn.cancelRequested) return;
+        const callback = turn.onProgress;
+        if (!callback) return;
+        try { callback({ kind: frame.kind, name: frame.name }); } catch { /* progress is best effort */ }
         return;
       }
       if (!['result', 'cancelled', 'not-submitted', 'error'].includes(frame.type)) { lost(); return; }
@@ -163,15 +174,15 @@ export async function createBackgroundParentAgent(input: ParentAgentInput, optio
   };
   const session: ParentAgentSession = {
     unavailable,
-    async send(text, signal, onDelta) {
+    async send(text, signal, onDelta, options?: ParentAgentSendOptions) {
       if (typeof text !== 'string' || !text.trim() || text.length > PARENT_TEXT_MAX) throw parentError('invalid_input', 'Invalid parent message');
       if (signal?.aborted) throw abortReason(signal);
       if (closing || unavailableNow || !wire) throw parentError('closed', 'Bot host is unavailable');
       if (active) throw parentError('engine', 'Another parent turn is active');
       const id = nextId++;
       return new Promise<string>((resolve, reject) => {
-        const abort = () => { if (active?.id !== id) return; active.delta = undefined; active.cancelRequested = true; try { wire!.send({ type: 'abort', id }); } catch { lost(); } };
-        active = { id, delta: onDelta, resolve, reject, detach: () => signal?.removeEventListener('abort', abort), timer: setTimeout(lost, 16 * 60_000) };
+        const abort = () => { if (active?.id !== id) return; active.delta = undefined; active.onProgress = undefined; active.cancelRequested = true; try { wire!.send({ type: 'abort', id }); } catch { lost(); } };
+        active = { id, delta: onDelta, onProgress: options?.onProgress, resolve, reject, detach: () => signal?.removeEventListener('abort', abort), timer: setTimeout(lost, 16 * 60_000) };
         signal?.addEventListener('abort', abort, { once: true });
         try { wire!.send({ type: 'prepare', id, text }); if (signal?.aborted) abort(); } catch { lost(); }
       });

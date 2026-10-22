@@ -11,10 +11,12 @@ import {
   startTimer,
   ParentAgentError,
   ConfirmedParentCancellation,
+  type ParentAgentSendOptions,
   type ParentAgentSession,
-  type PreparedParentAgent,
   type ParentProcess,
   type ParentProcessLauncher,
+  type ParentProgressEvent,
+  type PreparedParentAgent,
 } from './parent-agent';
 
 /**
@@ -54,6 +56,9 @@ interface ActiveTurn {
   errorText?: string;
   finalText?: string;
   onDelta?: (chunk: string) => void;
+  onProgress?: (event: ParentProgressEvent) => void;
+  progressStageSent?: boolean;
+  seenTools?: Set<string>;
   resolve?: (value: string) => void;
   reject?: (error: Error) => void;
   boundary: PublicTextBoundary;
@@ -197,7 +202,7 @@ export class PiParentSession implements ParentAgentSession {
     this.active = undefined;
     if (active) {
       active.timer.cancel();
-      if (!active.settled) { active.settled = true; active.onDelta = undefined; active.reject?.(error); }
+      if (!active.settled) { active.settled = true; active.onDelta = undefined; active.onProgress = undefined; active.reject?.(error); }
     }
   }
 
@@ -221,7 +226,9 @@ export class PiParentSession implements ParentAgentSession {
     const type = frame.type;
     if (type === 'response') { this.handleResponse(frame); return; }
     if (type === 'extension_ui_request') { this.handleExtensionUi(frame); return; }
-    if (type === 'agent_start') { if (this.active) this.active.running = true; return; }
+    if (type === 'agent_start') { if (this.active) this.active.running = true; this.emitStageOnce(this.active, frame); return; }
+    if (type === 'turn_start') { this.emitStageOnce(this.active, frame); return; }
+    if (type === 'tool_execution_start') { this.handleToolExecutionStart(frame); return; }
     if (type === 'message_update') { this.handleMessageUpdate(frame); return; }
     if (type === 'message_end') { this.handleMessageEnd(frame); return; }
     if (type === 'auto_retry_end') {
@@ -278,11 +285,61 @@ export class PiParentSession implements ParentAgentSession {
     return active;
   }
 
+  /**
+   * Best-effort progress channel: only the native tool name / turn-start signal leaves
+   * this module as a short label. Thinking deltas, tool arguments, tool results, stderr
+   * and subagent frames never enter onProgress; callback errors are swallowed and never
+   * affect the text turn. Without onProgress every path below is a no-op, so the text
+   * behavior stays byte-identical to the pre-progress one.
+   */
+  private emitProgress(active: ActiveTurn, event: ParentProgressEvent): void {
+    if (active.settled || active.cancelError) return;
+    const callback = active.onProgress;
+    if (!callback) return;
+    try { callback(event); }
+    catch { /* progress is best effort; the text turn owns failure reporting */ }
+  }
+
+  /** First agent_start/turn_start of the accepted turn proves Pi started this round. */
+  private emitStageOnce(active: ActiveTurn | undefined, frame: Record<string, unknown>): void {
+    if (!active || active.settled || active.cancelError) return;
+    if (!active.onProgress || active.progressStageSent) return;
+    if (frame.parentToolCallId != null || frame.parentToolUseId != null) return;
+    active.progressStageSent = true;
+    this.emitProgress(active, { kind: 'stage', name: '开始' });
+  }
+
+  /** One progress event per top-level native tool call, keyed by its native call id. */
+  private emitToolOnce(active: ActiveTurn, id: unknown, name: unknown, frame: Record<string, unknown>): void {
+    if (!active.onProgress) return;
+    if (frame.parentToolCallId != null || frame.parentToolUseId != null) return;
+    if (typeof id !== 'string' || !id || typeof name !== 'string' || !name.trim()) return;
+    active.seenTools ??= new Set();
+    if (active.seenTools.has(id)) return;
+    active.seenTools.add(id);
+    this.emitProgress(active, { kind: 'tool', name });
+  }
+
+  private handleToolExecutionStart(frame: Record<string, unknown>): void {
+    const active = this.activeRunning();
+    if (!active || !active.onProgress) return;
+    // tool_execution_start carries { toolCallId, toolName, args }; nested calls made
+    // through ctx.executeTool() repeat here with a top-level parentToolCallId.
+    this.emitToolOnce(active, frame.toolCallId, frame.toolName, frame);
+  }
+
   private handleMessageUpdate(frame: Record<string, unknown>): void {
     const active = this.activeRunning();
     if (!active) return;
     if (frame.parentToolCallId != null) return;
     const update = frame.assistantMessageEvent as Record<string, unknown> | undefined;
+    if (update?.type === 'toolcall_start') {
+      // Provider-level tool block start on the wire ({ id, toolName }); shares the native
+      // call id with the later tool_execution_start, so the shared set dedups to one event.
+      if (frame.parentToolUseId != null || update.parentToolCallId != null) return;
+      if (active.onProgress) this.emitToolOnce(active, update.id, update.toolName, frame);
+      return;
+    }
     if (update?.type !== 'text_delta' || typeof update.delta !== 'string' || !update.delta) return;
     if (frame.parentToolUseId != null || update.parentToolCallId != null) return;
     if (!active.onDelta) return;
@@ -357,6 +414,7 @@ export class PiParentSession implements ParentAgentSession {
     if (active.settled) return;
     active.settled = true;
     active.onDelta = undefined;
+    active.onProgress = undefined;
     if (typeof outcome === 'string') active.resolve?.(outcome);
     else active.reject?.(outcome);
   }
@@ -365,6 +423,7 @@ export class PiParentSession implements ParentAgentSession {
     if (this.active !== active || active.settled || active.cancelError) return;
     active.cancelError = error;
     active.onDelta = undefined;
+    active.onProgress = undefined;
     active.timer.cancel();
     active.timer = startTimer(this.waits.closeMs, 'pi abort terminal', failure => this.failSession(failure));
     void this.command('abort', {}, this.waits.closeMs, 'pi abort').then(() => {
@@ -373,13 +432,15 @@ export class PiParentSession implements ParentAgentSession {
     }, failure => { if (this.active === active) this.failSession(failure); });
   }
 
-  async send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void): Promise<string> {
+  async send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void, options?: ParentAgentSendOptions): Promise<string> {
     if (typeof text !== 'string' || !text.trim() || text.length > PARENT_TEXT_MAX) throw parentError('invalid_input', `send text must be 1–${PARENT_TEXT_MAX} characters`);
     if (signal?.aborted) throw abortReason(signal);
     if (this.closed) throw parentError('closed', 'pi parent session is closed');
     if (this.exited) throw parentError('engine', `pi CLI has exited${this.failureDetail()}`);
     if (this.active) throw parentError('engine', 'another send is still in progress on this session');
     if (!this.sessionId) throw parentError('protocol', 'pi session was not started');
+    // The hidden identity round never reports progress; user turns keep onProgress.
+    const onProgress = options?.finalAssistantOnly === true ? undefined : options?.onProgress;
     const active: ActiveTurn = {
       // The prompt bytes are written synchronously below; a fast fixture may emit its first events
       // and the terminal before the command response microtask runs.
@@ -389,6 +450,7 @@ export class PiParentSession implements ParentAgentSession {
       timer: { cancel: () => undefined },
       boundary: new PublicTextBoundary(),
       ...(onDelta ? { onDelta } : {}),
+      ...(onProgress ? { onProgress } : {}),
     };
     const promise = new Promise<string>((resolve, reject) => { active.resolve = resolve; active.reject = reject; });
     const onAbort = () => { if (!active.settled) this.cancelTurn(active, abortReason(signal!)); };

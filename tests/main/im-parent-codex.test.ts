@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ConfirmedParentCancellation, createParentAgent, type ParentAgentInternals, type ParentAgentSession } from '../../src/main/im/parent-agent';
+import { ConfirmedParentCancellation, createParentAgent, type ParentAgentInternals, type ParentAgentSession, type ParentProgressEvent } from '../../src/main/im/parent-agent';
 
 const FIXTURE = new URL('../fixtures/parent/codex-fixture.mjs', import.meta.url).pathname;
 
@@ -308,4 +308,89 @@ test('codex startup rejection closes its resident process', async () => {
   const harness = setup('startup-failed', 'startup-failed');
   try { await assert.rejects(createParentAgent(input(harness)), /rejected|initialize failed/); }
   finally { teardown(harness); }
+});
+
+test('codex emits unified progress: stage once and each top-level tool once', async () => {
+  const harness = setup('progress', 'progress');
+  try {
+    await withSession(harness, async session => {
+      const deltas: string[] = [];
+      const progress: ParentProgressEvent[] = [];
+      const answer = await session.send('问题', undefined, chunk => deltas.push(chunk), { onProgress: event => progress.push(event) });
+      assert.equal(answer, '进度答案');
+      assert.deepEqual(deltas, ['进度答案']);
+      assert.deepEqual(progress, [
+        { kind: 'stage', name: '开始' },
+        { kind: 'tool', name: 'shell' },
+        { kind: 'tool', name: 'edit' },
+        { kind: 'tool', name: 'web_search' },
+        { kind: 'tool', name: 'read_file' },
+        { kind: 'tool', name: 'dyn_search' },
+      ]);
+      // Tool arguments, commands, paths, queries, thinking and results never enter progress.
+      const leaked = JSON.stringify(progress);
+      for (const secret of ['hunter2', 'SECRET', '/home/user', 'secret-tool', 'token.txt', 'rm -rf', 'spawnAgent', 'thr-sub']) {
+        assert.ok(!leaked.includes(secret), `progress leaked ${secret}: ${leaked}`);
+      }
+      // A second turn re-emits the stage once with a fresh per-turn tool set.
+      const progress2: ParentProgressEvent[] = [];
+      assert.equal(await session.send('再问', undefined, undefined, { onProgress: event => progress2.push(event) }), '回答2');
+      assert.deepEqual(progress2, [{ kind: 'stage', name: '开始' }]);
+    });
+  } finally { teardown(harness); }
+});
+
+test('codex without onProgress behaves exactly as before', async () => {
+  const harness = setup('progress-noopt', 'progress');
+  try {
+    await withSession(harness, async session => {
+      const deltas: string[] = [];
+      assert.equal(await session.send('问题', undefined, chunk => deltas.push(chunk)), '进度答案');
+      assert.deepEqual(deltas, ['进度答案']);
+    });
+  } finally { teardown(harness); }
+});
+
+test('codex finalAssistantOnly suppresses progress but keeps the answer', async () => {
+  const harness = setup('progress-final', 'progress');
+  try {
+    await withSession(harness, async session => {
+      const progress: ParentProgressEvent[] = [];
+      const answer = await session.send('问题', undefined, undefined, { finalAssistantOnly: true, onProgress: event => progress.push(event) });
+      assert.equal(answer, '进度答案');
+      assert.deepEqual(progress, []);
+    });
+  } finally { teardown(harness); }
+});
+
+test('codex abort stops progress after the abort and settles as cancelled', async () => {
+  const harness = setup('progress-abort', 'progress');
+  try {
+    const session = await createParentAgent(input(harness));
+    try {
+      const controller = new AbortController();
+      const progress: ParentProgressEvent[] = [];
+      const pending = session.send('问题', controller.signal, undefined, {
+        onProgress: event => { progress.push(event); controller.abort(); },
+      });
+      await assert.rejects(pending, error => error instanceof ConfirmedParentCancellation && error.name === 'AbortError');
+      assert.deepEqual(progress, [{ kind: 'stage', name: '开始' }]);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      assert.equal(progress.length, 1, `late tool frames emitted after abort: ${JSON.stringify(progress)}`);
+    } finally { await session.close(); }
+  } finally { teardown(harness); }
+});
+
+test('codex swallows onProgress errors and still returns the turn text', async () => {
+  const harness = setup('progress-throw', 'progress');
+  try {
+    await withSession(harness, async session => {
+      const deltas: string[] = [];
+      const answer = await session.send('问题', undefined, chunk => deltas.push(chunk), {
+        onProgress: () => { throw new Error('progress consumer exploded'); },
+      });
+      assert.equal(answer, '进度答案');
+      assert.deepEqual(deltas, ['进度答案']);
+    });
+  } finally { teardown(harness); }
 });

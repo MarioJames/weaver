@@ -30,6 +30,40 @@ function streamDelta(text, extraSession, apiMessageId = `msg-${currentUuid}`) {
   });
 }
 
+function streamTool(id, name, { parent = null, input = {}, extra = {} } = {}) {
+  emit({
+    type: 'stream_event',
+    api_message_id: `msg-${currentUuid}`,
+    session_id: sessionId,
+    parent_tool_use_id: parent,
+    event: {
+      type: 'content_block_start',
+      index: 1,
+      content_block: { type: 'tool_use', id, name, input, ...extra },
+    },
+  });
+}
+
+function streamToolInput(partial, parent = null) {
+  emit({
+    type: 'stream_event',
+    api_message_id: `msg-${currentUuid}`,
+    session_id: sessionId,
+    parent_tool_use_id: parent,
+    event: { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: partial } },
+  });
+}
+
+function streamToolStop() {
+  emit({
+    type: 'stream_event',
+    api_message_id: `msg-${currentUuid}`,
+    session_id: sessionId,
+    parent_tool_use_id: null,
+    event: { type: 'content_block_stop', index: 1 },
+  });
+}
+
 function noisyStreamEvents() {
   emit({ type: 'stream_event', session_id: sessionId, parent_tool_use_id: null, event: { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'SECRET_THINKING' } } });
   emit({ type: 'stream_event', session_id: sessionId, parent_tool_use_id: null, event: { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{"SECRET_TOOL_JSON":1}' } } });
@@ -64,6 +98,38 @@ async function runTurn(uuid, current) {
       streamDelta('继续 ');
       result(uuid, { result: '最终回答' });
       return;
+    }
+    case 'progress:1': {
+      streamTool('toolu-progress-1', 'Bash', { input: { command: 'cat /home/user/SECRET_COMMAND' } });
+      // Same native call id repeated: the adapter must not report it twice.
+      streamTool('toolu-progress-1', 'Bash', { input: { command: 'duplicate SECRET_COMMAND' } });
+      // Nested subagent tool: parent_tool_use_id is set, so no progress may be emitted.
+      streamTool('toolu-progress-nested', 'Read', { parent: 'subagent-1', input: { file_path: '/home/user/SECRET_SUBAGENT_PATH' } });
+      streamToolInput('{"command":"SECRET_TOOL_JSON"}');
+      streamToolStop();
+      // Sensitive title/description/input must never become the progress label.
+      streamTool('toolu-progress-2', 'Grep', {
+        input: { pattern: 'SECRET_PATTERN', path: '/home/user/SECRET_PATH' },
+        extra: { title: 'SECRET_TITLE', description: 'SECRET_DESCRIPTION' },
+      });
+      streamDelta('回答一');
+      await sleep(20);
+      result(uuid, { result: '最终回答1' });
+      return;
+    }
+    case 'progress:2': {
+      streamTool('toolu-progress-3', 'Write', { input: { file_path: '/home/user/SECRET_PATH_2', content: 'SECRET_CONTENT' } });
+      streamTool('toolu-progress-nested-2', 'Edit', { parent: 'subagent-2', input: { old_string: 'SECRET_OLD' } });
+      streamTool('toolu-progress-4', 'Edit', { input: { old_string: 'SECRET_OLD_2' }, extra: { description: 'SECRET_DESCRIPTION_2' } });
+      streamDelta('回答二');
+      await sleep(20);
+      result(uuid, { result: '最终回答2' });
+      return;
+    }
+    case 'progress-abort:1': {
+      streamTool('toolu-progress-early', 'EarlyTool', { input: { command: 'SECRET_EARLY' } });
+      streamDelta('将被中止 ');
+      break;
     }
     case 'error:1': {
       streamDelta('失败前 ');
@@ -142,6 +208,8 @@ async function handleFrame(frame) {
     if (scenario === 'late-ack') setTimeout(ack, 180); else ack();
     if (scenario === 'missing-terminal') return;
     setTimeout(() => {
+      // A tool frame after the interrupt request must never reach progress.
+      if (scenario === 'progress-abort') streamTool('toolu-progress-late', 'LateTool', { input: { command: 'SECRET_LATE' } });
       result(uuid, { subtype: 'error_during_execution', is_error: true, result: '', errors: ['turn aborted by interrupt'] });
       if (marker) appendFileSync(marker, `${JSON.stringify({ interrupted: uuid })}\n`);
       setTimeout(() => { messageStart(uuid); streamDelta('OLD', undefined, `msg-${uuid}`); result(uuid, { result: 'OLD' }); }, 20);

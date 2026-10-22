@@ -9,10 +9,12 @@ import {
   startTimer,
   ParentAgentError,
   ConfirmedParentCancellation,
+  type ParentAgentSendOptions,
   type ParentAgentSession,
-  type PreparedParentAgent,
   type ParentProcess,
   type ParentProcessLauncher,
+  type ParentProgressEvent,
+  type PreparedParentAgent,
 } from './parent-agent';
 
 /**
@@ -49,6 +51,9 @@ interface ActiveTurn {
   deltaText: string;
   declineNote?: string;
   onDelta?: (chunk: string) => void;
+  onProgress?: (event: ParentProgressEvent) => void;
+  progressStageSent?: boolean;
+  seenTools?: Set<string>;
   resolve?: (value: string) => void;
   reject?: (error: Error) => void;
 }
@@ -211,7 +216,7 @@ export class GrokParentSession implements ParentAgentSession {
     this.active = undefined;
     if (active) {
       active.timer.cancel();
-      if (!active.settled) { active.settled = true; active.onDelta = undefined; active.reject?.(error); }
+      if (!active.settled) { active.settled = true; active.onDelta = undefined; active.onProgress = undefined; active.reject?.(error); }
     }
   }
 
@@ -278,12 +283,59 @@ export class GrokParentSession implements ParentAgentSession {
     this.respondError(id, `Weaver IM parent session does not support grok client request ${method}`);
   }
 
+  /**
+   * Best-effort progress channel: only the ACP tool kind enum and the turn-start
+   * signal leave this module as short labels. Thought chunks, plans, titles (which
+   * often contain full commands and paths), rawInput/rawOutput and tool results
+   * never enter onProgress; callback errors are swallowed and never affect the text
+   * turn. Without onProgress every path below is a no-op, so the text behavior stays
+   * byte-identical to the pre-progress one.
+   */
+  private emitProgress(active: ActiveTurn, event: ParentProgressEvent): void {
+    if (active.settled || active.cancelError) return;
+    const callback = active.onProgress;
+    if (!callback) return;
+    try { callback(event); }
+    catch { /* progress is best effort; the text turn owns failure reporting */ }
+  }
+
+  /**
+   * ACP has no turn_start/agent_start event, so the first session/update of the
+   * accepted turn is the earliest observable proof that this round started.
+   */
+  private emitStageOnce(active: ActiveTurn): void {
+    if (active.progressStageSent) return;
+    active.progressStageSent = true;
+    this.emitProgress(active, { kind: 'stage', name: '开始' });
+  }
+
+  /**
+   * One progress event per top-level native tool call, keyed by its native call id.
+   * Only the ACP kind enum (read/edit/delete/move/search/execute/think/fetch/other)
+   * is used as the label; title/rawInput/rawOutput are never read here. Updates and
+   * completions of the same call (tool_call_update or a repeated tool_call) dedup to
+   * the first sighting.
+   */
+  private emitToolOnce(active: ActiveTurn, update: Record<string, unknown>): void {
+    if (!active.onProgress) return;
+    if (update.parentToolCallId != null || update.parentToolUseId != null) return;
+    const id = update.toolCallId;
+    const kind = update.kind;
+    if (typeof id !== 'string' || !id || typeof kind !== 'string' || !kind.trim()) return;
+    active.seenTools ??= new Set();
+    if (active.seenTools.has(id)) return;
+    active.seenTools.add(id);
+    this.emitProgress(active, { kind: 'tool', name: kind });
+  }
+
   private handleNotification(method: string, params: Record<string, unknown> | undefined): void {
     if (method !== 'session/update') return;
     if (!params || params.sessionId !== this.sessionId) return;
     const active = this.active;
     if (!active || active.settled || active.cancelError) return;
+    this.emitStageOnce(active);
     const update = params.update as Record<string, unknown> | undefined;
+    if (update?.sessionUpdate === 'tool_call') this.emitToolOnce(active, update);
     if (update?.sessionUpdate !== 'agent_message_chunk') return;
     const content = update.content as Record<string, unknown> | undefined;
     if (content?.type !== 'text' || typeof content.text !== 'string' || !content.text) return;
@@ -300,6 +352,7 @@ export class GrokParentSession implements ParentAgentSession {
     if (active.settled) return;
     active.settled = true;
     active.onDelta = undefined;
+    active.onProgress = undefined;
     if (typeof outcome === 'string') active.resolve?.(outcome);
     else active.reject?.(outcome);
   }
@@ -308,24 +361,28 @@ export class GrokParentSession implements ParentAgentSession {
     if (this.active !== active || active.settled || active.cancelError) return;
     active.cancelError = error;
     active.onDelta = undefined;
+    active.onProgress = undefined;
     active.timer.cancel();
     active.timer = startTimer(this.waits.closeMs, 'grok cancel terminal', failure => this.failSession(failure));
     try { this.write({ jsonrpc: '2.0', method: 'session/cancel', params: { sessionId: this.sessionId } }); }
     catch (failure) { this.failSession(failure instanceof ParentAgentError ? failure : parentError('engine', String(failure))); }
   }
 
-  async send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void): Promise<string> {
+  async send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void, options?: ParentAgentSendOptions): Promise<string> {
     if (typeof text !== 'string' || !text.trim() || text.length > PARENT_TEXT_MAX) throw parentError('invalid_input', `send text must be 1–${PARENT_TEXT_MAX} characters`);
     if (signal?.aborted) throw abortReason(signal);
     if (this.closed) throw parentError('closed', 'grok parent session is closed');
     if (this.exited) throw parentError('engine', `grok agent has exited${this.failureDetail()}`);
     if (this.active) throw parentError('engine', 'another send is still in progress on this session');
     if (!this.sessionId) throw parentError('protocol', 'grok session was not started');
+    // The hidden identity round never reports progress; user turns keep onProgress.
+    const onProgress = options?.finalAssistantOnly === true ? undefined : options?.onProgress;
     const active: ActiveTurn = {
       settled: false,
       timer: { cancel: () => undefined },
       deltaText: '',
       ...(onDelta ? { onDelta } : {}),
+      ...(onProgress ? { onProgress } : {}),
     };
     const promise = new Promise<string>((resolve, reject) => { active.resolve = resolve; active.reject = reject; });
     const onAbort = () => { if (!active.settled) this.cancelTurn(active, abortReason(signal!)); };

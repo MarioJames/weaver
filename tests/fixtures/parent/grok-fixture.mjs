@@ -43,6 +43,29 @@ async function startPrompt(id, params) {
   const current = ++turn;
   pendingPrompt = { id, current, cancelled: false };
   log({ pid: process.pid, turn: current, prompt: params?.prompt?.[0]?.text });
+  if (scenario === 'progress' && current === 1) {
+    const toolCall = (toolCallId, kind, status, title, extra = {}) => ({
+      jsonrpc: '2.0', method: 'session/update',
+      params: { sessionId, update: { sessionUpdate: 'tool_call', toolCallId, kind, status, title, content: [], locations: [], ...extra } },
+    });
+    // First session/update of the accepted turn: proves the turn started.
+    emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '回答' } } } });
+    // Top-level tool: only the ACP kind enum may surface, never title/rawInput.
+    emit(toolCall('tool-1', 'execute', 'in_progress', 'SECRET rm -rf /etc --token=SECRET_TOKEN', { rawInput: { command: 'SECRET_CMD' } }));
+    // Same call reported again (update + completion): must not re-emit.
+    emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call_update', toolCallId: 'tool-1', status: 'in_progress', content: [] } } });
+    emit(toolCall('tool-1', 'execute', 'completed', 'SECRET rm -rf /etc', { rawOutput: { lines: 1 } }));
+    emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'SECRET_THOUGHT' } } } });
+    emit(toolCall('tool-2', 'read', 'in_progress', '/etc/SECRET_PATH --password=SECRET_PW', { rawInput: { path: '/etc/SECRET_PATH' } }));
+    // Another agent's tool activity on a foreign session: never emits.
+    emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'foreign-session', update: { sessionUpdate: 'tool_call', toolCallId: 'tool-x', kind: 'delete', status: 'in_progress', title: 'SECRET_FOREIGN_TOOL' } } });
+    emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'plan', entries: [{ content: 'SECRET_PLAN', priority: 'high', status: 'in_progress' }] } } });
+    emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '1' } } } });
+    await sleep(20);
+    pendingPrompt = undefined;
+    respond(id, { stopReason: 'end_turn' });
+    return;
+  }
   emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: `回答${current}` } } } });
   emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'SECRET_THOUGHT' } } } });
   emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call', title: 'SECRET_TOOL' } } });
@@ -115,6 +138,10 @@ async function handle(frame) {
     if (!pending) return;
     pending.cancelled = true;
     if (scenario === 'missing-cancel-response') return;
+    if (scenario === 'abort') {
+      // A late tool frame after cancellation: the adapter must not report progress for it.
+      emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call', toolCallId: 'tool-late', kind: 'execute', status: 'in_progress', title: 'SECRET_LATE' } } });
+    }
     await sleep(30);
     pendingPrompt = undefined;
     respond(pending.id, { stopReason: scenario === 'cancel-race' ? 'end_turn' : 'cancelled' });

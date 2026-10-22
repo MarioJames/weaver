@@ -216,6 +216,35 @@ function runTurn(frame) {
       setTimeout(() => complete('completed'), 3000);
       return;
     }
+    case 'progress:1': {
+      // Unified-progress shape probe: real ThreadItem union members per
+      // `codex app-server generate-json-schema` (0.163.0). Tool frames carry
+      // sensitive command/arguments/paths/queries that must never enter onProgress;
+      // sub-agent orchestration (subAgentActivity, collabAgentToolCall) and
+      // reasoning/result frames must not emit either; the repeated tool-shell
+      // start proves per-id dedupe.
+      respond(frame.id, { turn: { id: turnId, status: 'inProgress', items: [] } });
+      void (async () => {
+        start();
+        const t0 = Date.now();
+        const started = item => emit({ method: 'item/started', params: { threadId, turnId, startedAtMs: t0, item } });
+        started({ type: 'commandExecution', id: 'tool-shell', command: 'cat /home/user/.config/secret-tool --password=hunter2', commandActions: [], cwd: '/home/user/secret', status: 'inProgress' });
+        started({ type: 'fileChange', id: 'tool-edit', changes: [{ diff: 'SECRET_DIFF hunter2', kind: { type: 'add' }, path: '/home/user/secret/token.txt' }], status: 'inProgress' });
+        started({ type: 'commandExecution', id: 'tool-shell', command: 'cat /home/user/.config/secret-tool --password=hunter2', commandActions: [], cwd: '/home/user/secret', status: 'inProgress' });
+        started({ type: 'subAgentActivity', id: 'sub-1', agentPath: 'specialist', agentThreadId: 'thr-sub-1', kind: 'started' });
+        started({ type: 'collabAgentToolCall', id: 'collab-1', agentsStates: {}, receiverThreadIds: ['thr-sub-1'], senderThreadId: threadId, status: 'inProgress', tool: 'spawnAgent' });
+        started({ type: 'reasoning', id: 'rsn-1', summary: ['SECRET_REASONING hunter2'] });
+        started({ type: 'webSearch', id: 'tool-web', query: 'SECRET QUERY hunter2' });
+        started({ type: 'mcpToolCall', id: 'tool-mcp', server: 'SECRET_SERVER', tool: 'read_file', arguments: { path: '/home/user/secret/token.txt', token: 'hunter2' }, status: 'inProgress' });
+        started({ type: 'dynamicToolCall', id: 'tool-dyn', tool: 'dyn_search', arguments: { q: 'SECRET hunter2' }, status: 'inProgress' });
+        emit({ method: 'item/completed', params: { threadId, turnId, item: { type: 'commandExecution', id: 'tool-shell', command: 'cat /home/user/.config/secret-tool --password=hunter2', commandActions: [], cwd: '/home/user/secret', status: 'completed', aggregatedOutput: 'SECRET_OUTPUT hunter2' } } });
+        emit({ method: 'item/agentMessage/delta', params: { threadId, turnId, itemId: 'it-2', delta: '进度答案' } });
+        emit({ method: 'item/completed', params: { threadId, turnId, item: agentItem('it-2', '进度答案', 'final_answer') } });
+        await sleep(40);
+        complete('completed');
+      })();
+      return;
+    }
     default:
       finishNormally(`回答${turnCounter}`);
   }

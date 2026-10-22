@@ -15,6 +15,7 @@ import {
   ConfirmedParentCancellation,
   type ParentAgentSession,
   type ParentAgentSendOptions,
+  type ParentProgressEvent,
   type PreparedParentAgent,
   type ParentProcess,
   type ParentProcessLauncher,
@@ -42,6 +43,12 @@ import {
  * it. Cumulative `part.updated` snapshots subtract the already-streamed suffix, and a divergent
  * snapshot fails closed. Buffered updates replay with their original type/flags, never rebuilt
  * as public text.
+ * When the caller passes `ParentAgentSendOptions.onProgress`, one `开始` stage is reported when
+ * the first current-turn assistant message binds, and each top-level native `type: "tool"` part
+ * reports its `tool` name once per `callID`; tool state (input/title/output/metadata), reasoning
+ * and results never enter progress, and nested subagent calls stay in their own child session.
+ * Without `onProgress` the text behavior is exactly the previous one; hidden final-only turns
+ * never emit progress.
  * `session.idle` alone settles nothing: a success turn also needs the newest current-turn
  * assistant message fetched from the authoritative message list to show a native terminal, and
  * a cancellation needs the bound message to show a native stop after the abort ACK plus
@@ -89,6 +96,9 @@ interface ActiveTurn {
   cancelError?: Error;
   error?: ParentAgentError;
   onDelta?: (chunk: string) => void;
+  onProgress?: (event: ParentProgressEvent) => void;
+  /** Native top-level tool call ids already reported this turn. */
+  tools: Set<string>;
   resolve?: (value: string) => void;
   reject?: (error: Error) => void;
   boundary: PublicTextBoundary;
@@ -438,6 +448,42 @@ export class OpenCodeParentSession implements ParentAgentSession {
     return sessionId === this.sessionId;
   }
 
+  /**
+   * Best-effort progress channel: only native short labels leave this module.
+   * Tool state input/title/output/metadata, reasoning text and errors never enter
+   * `name`; callback failures are swallowed so the text turn keeps its own outcome.
+   */
+  private emitProgress(active: ActiveTurn, event: ParentProgressEvent): void {
+    if (this.active !== active || active.settled || active.cancelError) return;
+    const callback = active.onProgress;
+    if (!callback) return;
+    try { callback(event); }
+    catch { /* progress is best effort; the text turn owns failure reporting */ }
+  }
+
+  private emitTurnStart(active: ActiveTurn): void {
+    this.emitProgress(active, { kind: 'stage', name: '开始' });
+  }
+
+  /**
+   * Native `message.part.updated` ToolPart: `tool` is the bounded tool-name label and
+   * `callID` is the native call identity. Only the first observation of a top-level call
+   * emits; incremental updates, completion and results are intentionally ignored. Nested
+   * subagent calls live in their own native child session and never reach the bound
+   * current-turn assistant here (the caller already enforced session/message attribution).
+   */
+  private handleToolProgress(active: ActiveTurn, part: Record<string, unknown>): void {
+    if (part.type !== 'tool' || active.settled || active.cancelError) return;
+    const tool = typeof part.tool === 'string' ? part.tool.trim() : '';
+    if (!tool) return;
+    const callID = typeof part.callID === 'string' && part.callID
+      ? part.callID
+      : typeof part.id === 'string' ? part.id : '';
+    if (!callID || active.tools.has(callID)) return;
+    active.tools.add(callID);
+    this.emitProgress(active, { kind: 'tool', name: tool });
+  }
+
   private handleMessageUpdated(props: Record<string, unknown>): void {
     if (!this.sessionMatches(props)) return;
     const info = props.info as Record<string, unknown> | undefined;
@@ -448,6 +494,9 @@ export class OpenCodeParentSession implements ParentAgentSession {
     if (!id.startsWith('msg')) return;
     if (!active.assistantMessageID) {
       active.assistantMessageID = id;
+      // The first event attributable to this turn's assistant message is the earliest native
+      // confirmation that the turn is running; emit the single start stage before any part.
+      this.emitTurnStart(active);
       this.replayBuffered(id);
     } else if (active.assistantMessageID !== id) {
       // A later tool step starts a new assistant message under the same prompt message.
@@ -593,6 +642,7 @@ export class OpenCodeParentSession implements ParentAgentSession {
     const messageID = typeof part.messageID === 'string' ? part.messageID : '';
     const partID = typeof part.id === 'string' ? part.id : '';
     if (!messageID || !partID) return;
+    if (part.type === 'tool') this.handleToolProgress(active, part);
     const isPublic = part.type === 'text' && part.synthetic !== true && part.ignored !== true;
     const key = this.partKey(messageID, partID);
     const known = this.partKinds.get(key);
@@ -855,6 +905,7 @@ export class OpenCodeParentSession implements ParentAgentSession {
     if (active.settled) return;
     active.settled = true;
     active.onDelta = undefined;
+    active.onProgress = undefined;
     if (typeof outcome === 'string') active.resolve?.(outcome);
     else active.reject?.(outcome);
   }
@@ -863,6 +914,7 @@ export class OpenCodeParentSession implements ParentAgentSession {
     if (this.active !== active || active.settled || active.cancelError) return;
     active.cancelError = error;
     active.onDelta = undefined;
+    active.onProgress = undefined;
     active.timer.cancel();
     active.timer = startTimer(this.waits.closeMs, 'opencode abort terminal', failure => this.failSession(failure));
     if (active.promptAccepted) this.issueAbort(active);
@@ -929,7 +981,7 @@ export class OpenCodeParentSession implements ParentAgentSession {
     this.resetTurnState();
     if (active) {
       active.timer.cancel();
-      if (!active.settled) { active.settled = true; active.onDelta = undefined; active.reject?.(error); }
+      if (!active.settled) { active.settled = true; active.onDelta = undefined; active.onProgress = undefined; active.reject?.(error); }
     }
   }
 
@@ -953,16 +1005,19 @@ export class OpenCodeParentSession implements ParentAgentSession {
     const promptMessageID = `msg_${randomUUID().replaceAll('-', '')}`;
     this.resetTurnState();
     const finalOnly = options?.finalAssistantOnly === true;
+    const onProgress = options?.onProgress;
     const active: ActiveTurn = {
       promptMessageID,
       promptAccepted: false,
       finalOnly,
       settled: false,
       timer: { cancel: () => undefined },
+      tools: new Set<string>(),
       boundary: new PublicTextBoundary(),
       // The internal identity check resolves only the terminal message and never streams
-      // public deltas; user turns keep the normal attributed stream.
+      // public deltas or progress; user turns keep the normal attributed stream.
       ...(!finalOnly && onDelta ? { onDelta } : {}),
+      ...(!finalOnly && onProgress ? { onProgress } : {}),
     };
     const promise = new Promise<string>((resolve, reject) => { active.resolve = resolve; active.reject = reject; });
     const onAbort = () => { if (!active.settled) this.cancelTurn(active, abortReason(signal!)); };

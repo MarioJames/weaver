@@ -337,6 +337,55 @@ async function runTurn(frame, prompt) {
     event('session.idle', { sessionID: sessionId });
     return;
   }
+  if (scenario === 'progress' || scenario === 'progress-abort') {
+    // Native 1.19.3 Part shapes (installed @opencode-ai/sdk types.gen.d.ts): ToolPart is
+    // {id,sessionID,messageID,type:"tool",callID,tool,state}; StepStartPart is {type:"step-start"}.
+    // Only `tool` is a public label: state.input/title/output/metadata carry SECRET_* canaries.
+    // A subagent runs in its own native child session, so its tool part has a foreign
+    // sessionID; a `subtask` part is a separate Part type, not a ToolPart.
+    const stepID = `prt_step_${current}`;
+    const bashPart = `prt_tool_bash_${current}`;
+    const bashCall = `call_${current}_bash`;
+    const readPart = `prt_tool_read_${current}`;
+    const readCall = `call_${current}_read`;
+    const toolState = (status, input) => ({ status, input, ...(status === 'completed' ? { output: 'SECRET_TOOL_OUTPUT', title: 'SECRET_TOOL_TITLE', metadata: { path: '/home/test/SECRET_PATH' }, time: { start: Date.now(), end: Date.now() } } : status === 'running' ? { title: 'SECRET_TOOL_TITLE', metadata: { path: '/home/test/SECRET_PATH' }, time: { start: Date.now() } } : { raw: 'SECRET_RAW' }) });
+    active = { turn: current, promptID, assistantID };
+    event('message.updated', { sessionID: sessionId, info: assistantInfoOpen(assistantID, promptID) });
+    event('message.part.updated', { sessionID: sessionId, part: { id: stepID, sessionID: sessionId, messageID: assistantID, type: 'step-start' } });
+    event('message.part.updated', { sessionID: sessionId, part: { id: bashPart, sessionID: sessionId, messageID: assistantID, type: 'tool', callID: bashCall, tool: 'bash', state: toolState('pending', { command: 'curl -H "Authorization: Bearer SECRET_TOOL_TOKEN" https://example.test/SECRET_PATH' }) } });
+    event('message.part.updated', { sessionID: sessionId, part: { id: bashPart, sessionID: sessionId, messageID: assistantID, type: 'tool', callID: bashCall, tool: 'bash', state: toolState('running', { command: 'cat /home/test/SECRET_PATH' }) } });
+    event('message.part.updated', { sessionID: sessionId, part: { id: bashPart, sessionID: sessionId, messageID: assistantID, type: 'tool', callID: bashCall, tool: 'bash', state: toolState('completed', { command: 'cat /home/test/SECRET_PATH' }) } });
+    event('message.part.updated', { sessionID: sessionId, part: { id: readPart, sessionID: sessionId, messageID: assistantID, type: 'tool', callID: readCall, tool: 'read', state: toolState('pending', { filePath: '/home/test/SECRET_FILE' }) } });
+    event('message.part.updated', { sessionID: sessionId, part: { id: readPart, sessionID: sessionId, messageID: assistantID, type: 'tool', callID: readCall, tool: 'read', state: toolState('completed', { filePath: '/home/test/SECRET_FILE' }) } });
+    // Nested subagent tool part: native child session, must not be attributed to this turn.
+    event('message.part.updated', { sessionID: 'ses_fixture_child', part: { id: `prt_child_${current}`, sessionID: 'ses_fixture_child', messageID: 'msg_child', type: 'tool', callID: `call_child_${current}`, tool: 'webfetch', state: toolState('pending', { url: 'https://example.test/SECRET_CHILD' }) } });
+    // A subtask Part names its subagent; it is not a ToolPart and never emits progress.
+    event('message.part.updated', { sessionID: sessionId, part: { id: `prt_subtask_${current}`, sessionID: sessionId, messageID: assistantID, type: 'subtask', agent: 'explore', description: 'SECRET_SUBTASK_DESCRIPTION', prompt: 'SECRET_SUBTASK_PROMPT' } });
+    // A tool part on a different message of this session is not the bound current-turn assistant.
+    event('message.part.updated', { sessionID: sessionId, part: { id: `prt_foreign_tool_${current}`, sessionID: sessionId, messageID: 'msg_foreign', type: 'tool', callID: `call_foreign_${current}`, tool: 'grep', state: toolState('pending', { pattern: 'SECRET_PATTERN' }) } });
+    if (scenario === 'progress-abort') return; // the abort reply drives the native terminal
+    event('message.updated', { sessionID: sessionId, info: assistantInfo(assistantID, promptID, undefined, 'tool-calls') });
+    await sleep(10);
+    const secondID = `msg_a${current}_final`;
+    const finalPart = `prt_${current}_final`;
+    event('message.updated', { sessionID: sessionId, info: assistantInfoOpen(secondID, promptID) });
+    event('message.part.updated', { sessionID: sessionId, part: { id: `prt_step_final_${current}`, sessionID: sessionId, messageID: secondID, type: 'step-start' } });
+    event('message.part.updated', { sessionID: sessionId, part: { id: finalPart, sessionID: sessionId, messageID: secondID, type: 'text', text: '' } });
+    event('message.part.delta', { sessionID: sessionId, messageID: secondID, partID: finalPart, field: 'text', delta: '进度' });
+    event('message.part.delta', { sessionID: sessionId, messageID: secondID, partID: finalPart, field: 'text', delta: '完成' });
+    event('message.part.updated', { sessionID: sessionId, part: { id: finalPart, sessionID: sessionId, messageID: secondID, type: 'text', text: '进度完成' } });
+    messages = [
+      { info: assistantInfo(assistantID, promptID, undefined, 'tool-calls'), parts: [
+        { id: stepID, sessionID: sessionId, messageID: assistantID, type: 'step-start' },
+        { id: bashPart, sessionID: sessionId, messageID: assistantID, type: 'tool', callID: bashCall, tool: 'bash', state: toolState('completed', { command: 'cat /home/test/SECRET_PATH' }) },
+        { id: readPart, sessionID: sessionId, messageID: assistantID, type: 'tool', callID: readCall, tool: 'read', state: toolState('completed', { filePath: '/home/test/SECRET_FILE' }) },
+        { id: `prt_subtask_${current}`, sessionID: sessionId, messageID: assistantID, type: 'subtask', agent: 'explore', description: 'SECRET_SUBTASK_DESCRIPTION', prompt: 'SECRET_SUBTASK_PROMPT' },
+      ] },
+      messageEntry(secondID, promptID, [{ id: finalPart, sessionID: sessionId, messageID: secondID, type: 'text', text: '进度完成' }]),
+    ];
+    event('session.idle', { sessionID: sessionId });
+    return;
+  }
   if (scenario === 'auth') {
     event('session.error', { sessionID: sessionId, error: { name: 'ProviderAuthError', data: { providerID: 'fixture-provider', message: 'not authenticated' } } });
     return;
@@ -442,6 +491,18 @@ const server = createServer(async (req, res) => {
       const error = { name: 'MessageAbortedError', data: { message: 'aborted' } };
       const aid = active.assistantID;
       messages = [{ info: { ...assistantInfoOpen(aid, active.promptID), error }, parts: [{ id: 'prt_abort', sessionID: sessionId, messageID: aid, type: 'text', text: 'PARTIAL-' }] }];
+      setTimeout(() => {
+        event('message.updated', { sessionID: sessionId, info: { ...assistantInfoOpen(aid, active.promptID), error } });
+        event('session.idle', { sessionID: sessionId });
+      }, 20);
+    }
+    if (scenario === 'progress-abort' && active) {
+      // A post-abort tool frame for the same bound message must never reach onProgress: the
+      // adapter clears the callback on cancellation and ignores events while cancelError is set.
+      event('message.part.updated', { sessionID: sessionId, part: { id: `prt_tool_late_${active.turn}`, sessionID: sessionId, messageID: active.assistantID, type: 'tool', callID: `call_late_${active.turn}`, tool: 'grep', state: { status: 'pending', input: { pattern: 'SECRET_PATTERN' }, raw: 'SECRET_RAW' } } });
+      const error = { name: 'MessageAbortedError', data: { message: 'aborted' } };
+      const aid = active.assistantID;
+      messages = [{ info: { ...assistantInfoOpen(aid, active.promptID), error }, parts: [] }];
       setTimeout(() => {
         event('message.updated', { sessionID: sessionId, info: { ...assistantInfoOpen(aid, active.promptID), error } });
         event('session.idle', { sessionID: sessionId });

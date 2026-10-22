@@ -185,6 +185,17 @@ export async function runParentHost(args: readonly string[]): Promise<number> {
       turn.submitted = true;
       const pending = session.send(turn.text, turn.abort.signal, delta => {
         if (!stopping && active === turn && !turn.abort.signal.aborted) wire.send({ type: 'delta', id: turn.id, text: delta });
+      }, {
+        onProgress: event => {
+          if (stopping || active !== turn || turn.abort.signal.aborted) return;
+          const kind = event?.kind;
+          if (kind !== 'tool' && kind !== 'stage') return;
+          if (typeof event?.name !== 'string') return;
+          // Bound the wire frame: only a short label crosses the host boundary.
+          const name = event.name.slice(0, 64);
+          if (!name) return;
+          try { wire.send({ type: 'progress', id: turn.id, kind, name }); } catch { /* socket loss owns the failure */ }
+        },
       });
       inFlight = pending;
       void pending.then(text => {

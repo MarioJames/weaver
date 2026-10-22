@@ -126,6 +126,32 @@ async function run(task) {
     return;
   }
 
+  if (scenario === 'dup-tool') {
+    emit({ type: 'status', phase: 'step_start', turn: 1, step: 1 });
+    emit({ type: 'thinking', text: 'SECRET_THINKING' });
+    emit({ type: 'tool_call', callId: 'call-1', tool: 'bash', input: { command: 'SECRET_TOOL' } });
+    emit({ type: 'tool_call', callId: 'call-1', tool: 'bash', input: { command: 'SECRET_TOOL_DUP' } });
+    emit({ type: 'tool_call', callId: 'call-2', tool: 'read', input: { path: 'SECRET_PATH' } });
+    emit({ type: 'text', text: '你好，' });
+    emit({ type: 'tool_result', callId: 'call-1', status: 'completed', result: 'SECRET_TOOL_RESULT' });
+    await sleep(5);
+    emit({ type: 'text', text: '世界' });
+    emit({ type: 'status', phase: 'step_end', turn: 1, step: 1 });
+    completed('你好，世界');
+    return;
+  }
+
+  if (scenario === 'long-tool') {
+    emit({ type: 'status', phase: 'step_start', turn: 1, step: 1 });
+    emit({ type: 'tool_call', callId: 'call-long', tool: 'x'.repeat(200), input: { command: 'SECRET_TOOL' } });
+    emit({ type: 'text', text: '你好，' });
+    await sleep(5);
+    emit({ type: 'text', text: '世界' });
+    emit({ type: 'status', phase: 'step_end', turn: 1, step: 1 });
+    completed('你好，世界');
+    return;
+  }
+
   emit({ type: 'status', phase: 'step_start', turn: 1, step: 1 });
   emit({ type: 'thinking', text: 'SECRET_THINKING' });
   emit({ type: 'tool_call', callId: 'call-1', tool: 'bash', input: { command: 'SECRET_TOOL' } });

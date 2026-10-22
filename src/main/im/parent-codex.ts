@@ -10,7 +10,9 @@ import {
   startTimer,
   ParentAgentError,
   ConfirmedParentCancellation,
+  type ParentAgentSendOptions,
   type ParentAgentSession,
+  type ParentProgressEvent,
   type PreparedParentAgent,
   type ParentProcess,
   type ParentProcessLauncher,
@@ -29,6 +31,11 @@ import {
  * is returned; commentary, reasoning and tool output never leave this module. Server approval
  * and input requests are answered with an explicit decline so a turn can never hang on a
  * permission prompt.
+ *
+ * When the caller passes `ParentAgentSendOptions.onProgress`, the native `turn/started`
+ * signal is additionally reported once as `{ kind: 'stage', name: '开始' }` and every
+ * top-level tool `item/started` once per item id as `{ kind: 'tool', name: <short label> }`;
+ * without `onProgress` the behavior is exactly the previous text-only one.
  */
 
 const DENY_NOTE = 'Codex requested tool approval or client input that the Weaver IM parent session must not grant. The request was denied; grant the permission in the local Codex config and retry.';
@@ -50,6 +57,9 @@ interface ActiveTurn {
   terminal?: Record<string, unknown>;
   declineReason?: string;
   onDelta?: (chunk: string) => void;
+  onProgress?: (event: ParentProgressEvent) => void;
+  progressStageSent?: boolean;
+  progressToolIds?: Set<string>;
   resolve?: (value: string) => void;
   reject?: (error: Error) => void;
   finalText?: string;
@@ -260,6 +270,8 @@ export class CodexParentSession implements ParentAgentSession {
       if (!active.settled) {
         active.settled = true;
         active.onDelta = undefined;
+        active.onProgress = undefined;
+        active.progressToolIds = undefined;
         active.reject?.(error);
       }
     }
@@ -355,7 +367,19 @@ export class CodexParentSession implements ParentAgentSession {
     if (turnId !== active.turnId) return;
     switch (method) {
       case 'turn/started': {
-        const turn = params?.turn as Record<string, unknown> | undefined;
+        this.emitStageOnce(active);
+        return;
+      }
+      case 'item/started': {
+        const item = params?.item as Record<string, unknown> | undefined;
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return;
+        const label = this.progressToolLabel(item);
+        if (label === undefined) return;
+        const seen = active.progressToolIds ??= new Set<string>();
+        const id = item.id as string;
+        if (seen.has(id)) return;
+        seen.add(id);
+        this.emitProgress(active, { kind: 'tool', name: label });
         return;
       }
       case 'item/agentMessage/delta': {
@@ -397,6 +421,50 @@ export class CodexParentSession implements ParentAgentSession {
     }
   }
 
+  /**
+   * Best-effort progress channel: only short tool/stage labels leave this module.
+   * Tool arguments, full commands, file-change diffs/paths, search queries, thinking
+   * text, tool results and stderr never enter onProgress; callback errors are swallowed
+   * and never affect the text turn.
+   */
+  private emitProgress(active: ActiveTurn, event: ParentProgressEvent): void {
+    if (active.settled || active.cancelError) return;
+    const callback = active.onProgress;
+    if (!callback) return;
+    try { callback(event); }
+    catch { /* progress is best effort; the text turn owns failure reporting */ }
+  }
+
+  /** The native `turn/started` (or the authoritative `turn/start` response) fires `开始` exactly once per turn. */
+  private emitStageOnce(active: ActiveTurn): void {
+    if (active.progressStageSent) return;
+    active.progressStageSent = true;
+    this.emitProgress(active, { kind: 'stage', name: '开始' });
+  }
+
+  /**
+   * Short tool label for an `item/started` item. Only the tool type enum and — for
+   * MCP/dynamic calls — the tool-name field are read; command, changes, arguments,
+   * query, results, paths and every other field never leave this function. The closed
+   * whitelist excludes sub-agent orchestration (`subAgentActivity`,
+   * `collabAgentToolCall`), assistant/reasoning content and every other non-tool type,
+   * so nested tools never emit. Items without a usable id are skipped (no dedupe key).
+   */
+  private progressToolLabel(item: Record<string, unknown>): string | undefined {
+    if (typeof item.id !== 'string' || !item.id) return undefined;
+    switch (item.type) {
+      case 'commandExecution': return 'shell';
+      case 'fileChange': return 'edit';
+      case 'webSearch': return 'web_search';
+      case 'mcpToolCall':
+      case 'dynamicToolCall': {
+        const tool = item.tool;
+        return typeof tool === 'string' && tool.trim() ? tool : undefined;
+      }
+      default: return undefined;
+    }
+  }
+
   private forwardDelta(active: ActiveTurn, chunk: string): void {
     const callback = active.onDelta;
     if (!callback) return;
@@ -420,6 +488,8 @@ export class CodexParentSession implements ParentAgentSession {
     active.timer.cancel();
     active.settled = true;
     active.onDelta = undefined;
+    active.onProgress = undefined;
+    active.progressToolIds = undefined;
     if (active.cancelError) { active.reject?.(new ConfirmedParentCancellation()); return; }
     const status = turn?.status;
     if (status === 'completed') {
@@ -462,6 +532,7 @@ export class CodexParentSession implements ParentAgentSession {
     if (this.active !== active || active.settled || active.cancelError) return;
     active.cancelError = error;
     active.onDelta = undefined;
+    active.onProgress = undefined;
     active.timer.cancel();
     active.timer = startTimer(this.waits.closeMs, 'codex interrupt terminal', failure => this.failSession(failure));
     this.interruptActive(active);
@@ -476,19 +547,22 @@ export class CodexParentSession implements ParentAgentSession {
     }, error => { if (this.active === active) this.failSession(error); });
   }
 
-  async send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void): Promise<string> {
+  async send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void, options?: ParentAgentSendOptions): Promise<string> {
     if (typeof text !== 'string' || !text.trim() || text.length > PARENT_TEXT_MAX) throw parentError('invalid_input', `send text must be 1–${PARENT_TEXT_MAX} characters`);
     if (signal?.aborted) throw abortReason(signal);
     if (this.closed) throw parentError('closed', 'codex parent session is closed');
     if (this.exited) throw parentError('engine', `codex app-server has exited${this.failureDetail()}`);
     if (this.active) throw parentError('engine', 'another send is still in progress on this session');
     if (typeof this.threadId !== 'string') throw parentError('protocol', 'codex session was not started');
+    // The hidden identity turn resolves only terminal text and never reports progress.
+    const finalOnly = options?.finalAssistantOnly === true;
     const active: ActiveTurn = {
       threadId: this.threadId,
       timer: { cancel: () => undefined },
       settled: false,
       boundary: new PublicTextBoundary(),
       ...(onDelta ? { onDelta } : {}),
+      ...(options?.onProgress && !finalOnly ? { onProgress: options.onProgress } : {}),
     };
     const promise = new Promise<string>((resolve, reject) => {
       active.resolve = resolve;
@@ -515,6 +589,9 @@ export class CodexParentSession implements ParentAgentSession {
           throw parentError('protocol', 'codex turn/start response did not include a valid new turn id');
         }
         active.turnId = turnId;
+        // The authoritative acceptance already confirms the turn began; the native
+        // `turn/started` notification (possibly already buffered) cannot double-emit.
+        this.emitStageOnce(active);
         const frames = this.preBindFrames.get(turnId) ?? [];
         this.preBindFrames.clear();
         this.interruptActive(active);
