@@ -376,6 +376,8 @@ test('opencode later tool assistants under the same prompt never truncate or lea
     assert.ok(text.includes('最终'), `final text must include the newest assistant tail, got ${JSON.stringify(text)}`);
     assert.ok(!text.includes('SECRET'), 'reasoning/tool parts must never leak into the public text');
     assert.ok(!deltas.join('').includes('SECRET'), 'streamed deltas must never leak reasoning/tool parts');
+    // 同一 prompt 下新 assistant 消息的公开文本与之前段落之间补段落分隔。
+    assert.deepEqual(deltas, ['中间-', '\n\n最终']);
     await session.close();
   } finally { await teardown(harness); }
 });

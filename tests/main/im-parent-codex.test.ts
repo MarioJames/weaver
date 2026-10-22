@@ -87,6 +87,8 @@ test('codex parent session keeps one process across turns and streams only the f
       assert.equal(resolved, false);
       assert.equal(await pending, '回答1');
       assert.ok(deltas.join('').includes('进度: '));
+      // 同一 turn 内不同 agentMessage item 之间补段落分隔，同一 item 内分片连续。
+      assert.deepEqual(deltas, ['进度: ', '\n\n回答1']);
       // The second turn runs in the same process and sees the same thread context.
       const secondDeltas: string[] = [];
       assert.equal(await session.send('第二轮', undefined, chunk => secondDeltas.push(chunk)), '回答2');

@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { createServer } from 'node:net';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { decodeLines } from '../adapters/cli/scope';
+import { PublicTextBoundary } from './public-text';
 import {
   abortReason,
   clipPublicText,
@@ -88,6 +89,7 @@ interface ActiveTurn {
   onDelta?: (chunk: string) => void;
   resolve?: (value: string) => void;
   reject?: (error: Error) => void;
+  boundary: PublicTextBoundary;
 }
 
 interface BufferedPart {
@@ -396,6 +398,8 @@ export class OpenCodeParentSession implements ParentAgentSession {
       // A later tool step starts a new assistant message under the same prompt message.
       // Never keep the first intermediate assistant as the forever final: rebind to the
       // newest current-turn assistant so deltas and the final fetch follow the live tail.
+      // 流式侧：新 assistant 消息的公开文本与之前段落之间补段落分隔（首段与空段除外）。
+      active.boundary.noteBoundary();
       active.assistantMessageID = id;
       this.replayBuffered(id);
     }
@@ -507,7 +511,7 @@ export class OpenCodeParentSession implements ParentAgentSession {
     active.sawPart = true;
     this.parts.set(row.partID, (this.parts.get(row.partID) ?? '') + text);
     if (!active.onDelta) return;
-    try { active.onDelta(text); }
+    try { active.onDelta(active.boundary.format(text)); }
     catch (error) { this.failSession(parentError('engine', error instanceof Error ? error.message : String(error))); }
   }
 
@@ -564,7 +568,7 @@ export class OpenCodeParentSession implements ParentAgentSession {
       const suffix = text.slice(previous.length);
       this.parts.set(partID, text);
       if (suffix && active.onDelta) {
-        try { active.onDelta(suffix); }
+        try { active.onDelta(active.boundary.format(suffix)); }
         catch (error) { this.failSession(parentError('engine', error instanceof Error ? error.message : String(error))); }
       }
       return;
@@ -895,6 +899,7 @@ export class OpenCodeParentSession implements ParentAgentSession {
       promptAccepted: false,
       settled: false,
       timer: { cancel: () => undefined },
+      boundary: new PublicTextBoundary(),
       ...(onDelta ? { onDelta } : {}),
     };
     const promise = new Promise<string>((resolve, reject) => { active.resolve = resolve; active.reject = reject; });

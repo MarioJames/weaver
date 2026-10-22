@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { decodeLines } from '../adapters/cli/scope';
+import { PublicTextBoundary } from './public-text';
 import {
   abortReason,
   clipPublicText,
@@ -46,6 +47,7 @@ interface ActiveTurn {
   terminal?: boolean;
   streamMessageId?: string;
   onDelta?: (chunk: string) => void;
+  boundary: PublicTextBoundary;
   resolve?: (value: string) => void;
   reject?: (error: Error) => void;
   declineNote?: string;
@@ -280,6 +282,9 @@ export class ClaudeParentSession implements ParentAgentSession {
       this.streamCursorId = typeof id === 'string' ? id : undefined;
       if (typeof id !== 'string' || this.seenMessageIds.has(id)) return;
       active.streamMessageId = id;
+      // 新的独立 assistant 消息：如本轮已输出过可见文本，下一段公开 delta 前补段落分隔。
+      // 首段、重复 id 与空段不产生分隔；同一消息内 token 原样连接。
+      active.boundary.noteBoundary();
       if (typeof id === 'string') this.seenMessageIds.add(id);
       return;
     }
@@ -290,7 +295,7 @@ export class ClaudeParentSession implements ParentAgentSession {
     if (delta?.type !== 'text_delta' || typeof delta.text !== 'string' || !delta.text) return;
     if (!active.onDelta) return;
     try {
-      active.onDelta(delta.text);
+      active.onDelta(active.boundary.format(delta.text));
     } catch (error) {
       this.failSession(parentError('engine', error instanceof Error ? error.message : String(error)));
     }
@@ -394,6 +399,7 @@ export class ClaudeParentSession implements ParentAgentSession {
       uuid: randomUUID(),
       timer: { cancel: () => undefined },
       settled: false,
+      boundary: new PublicTextBoundary(),
       ...(onDelta ? { onDelta } : {}),
     };
     const promise = new Promise<string>((resolve, reject) => {

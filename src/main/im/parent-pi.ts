@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { decodeLines } from '../adapters/cli/scope';
+import { PublicTextBoundary } from './public-text';
 import {
   abortReason,
   clipPublicText,
@@ -55,6 +56,7 @@ interface ActiveTurn {
   onDelta?: (chunk: string) => void;
   resolve?: (value: string) => void;
   reject?: (error: Error) => void;
+  boundary: PublicTextBoundary;
 }
 
 export interface PiParentWaits {
@@ -284,7 +286,7 @@ export class PiParentSession implements ParentAgentSession {
     if (update?.type !== 'text_delta' || typeof update.delta !== 'string' || !update.delta) return;
     if (frame.parentToolUseId != null || update.parentToolCallId != null) return;
     if (!active.onDelta) return;
-    try { active.onDelta(update.delta); }
+    try { active.onDelta(active.boundary.format(update.delta)); }
     catch (error) { this.failSession(parentError('engine', error instanceof Error ? error.message : String(error))); }
   }
 
@@ -306,6 +308,9 @@ export class PiParentSession implements ParentAgentSession {
       .join('');
     if (text) {
       active.finalText = text;
+      // 已完成的 assistant 消息是段落边界：下一段公开文本前补段落分隔。
+      // 失败尝试（errorMessage/stopReason 错误）直接返回，不挂起边界，保证重试续写不断开。
+      active.boundary.noteBoundary();
       // A successful attempt supersedes an earlier failed attempt of the same turn:
       // native auto-retry emits the failed message_end first, then the recovered
       // message_end (plus auto_retry_end success:true) before agent_settled.
@@ -382,6 +387,7 @@ export class PiParentSession implements ParentAgentSession {
       running: false,
       settled: false,
       timer: { cancel: () => undefined },
+      boundary: new PublicTextBoundary(),
       ...(onDelta ? { onDelta } : {}),
     };
     const promise = new Promise<string>((resolve, reject) => { active.resolve = resolve; active.reject = reject; });

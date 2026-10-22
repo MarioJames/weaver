@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { decodeLines } from '../adapters/cli/scope';
+import { PublicTextBoundary } from './public-text';
 import {
   abortReason,
   clipPublicText,
@@ -53,6 +54,8 @@ interface ActiveTurn {
   reject?: (error: Error) => void;
   finalText?: string;
   lastPlain?: string;
+  streamItemId?: string;
+  boundary: PublicTextBoundary;
 }
 
 export interface CodexParentWaits {
@@ -356,7 +359,16 @@ export class CodexParentSession implements ParentAgentSession {
         return;
       }
       case 'item/agentMessage/delta': {
-        if (typeof params?.delta === 'string' && params.delta && active.onDelta && !active.cancelError) this.forwardDelta(active, params.delta);
+        if (typeof params?.delta === 'string' && params.delta && active.onDelta && !active.cancelError) {
+          // 独立 agentMessage item 切换时补段落分隔；同一 item 内 token 原样连接。
+          // 无 itemId 的帧视为传输分片，不做边界判断。
+          const itemId = typeof params?.itemId === 'string' && params.itemId ? params.itemId : undefined;
+          if (itemId && active.streamItemId !== itemId) {
+            if (active.streamItemId !== undefined) active.boundary.noteBoundary();
+            active.streamItemId = itemId;
+          }
+          this.forwardDelta(active, params.delta);
+        }
         return;
       }
       case 'item/completed': {
@@ -389,7 +401,7 @@ export class CodexParentSession implements ParentAgentSession {
     const callback = active.onDelta;
     if (!callback) return;
     try {
-      callback(chunk);
+      callback(active.boundary.format(chunk));
     } catch (error) {
       this.failSession(parentError('engine', error instanceof Error ? error.message : String(error)));
     }
@@ -475,6 +487,7 @@ export class CodexParentSession implements ParentAgentSession {
       threadId: this.threadId,
       timer: { cancel: () => undefined },
       settled: false,
+      boundary: new PublicTextBoundary(),
       ...(onDelta ? { onDelta } : {}),
     };
     const promise = new Promise<string>((resolve, reject) => {
