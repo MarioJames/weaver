@@ -82,17 +82,20 @@ test('notify bursts coalesce; changes during a pump schedule another turn; manua
  }finally{await handler.drain();store.close();rmSync(dir,{recursive:true,force:true});}
 });
 
-test('durable command intent and running state are visible to a second connection before a spawn effect',async()=>{
+test('durable dispatch acceptance is visible to a second connection before the pump starts a worker',async()=>{
  const dir=mkdtempSync(join(tmpdir(),'weaver-intent-'));const store=new TaskStore(join(dir,'weaver.db'));let inspected=false;
  const manager=new TaskManager(store,{id:'mock-jsonl',start:task=>{
-  const observer=new TaskStore(store.path);try{assert.ok(observer.getReceipt('local-demo:spawn-proof')?.hash);assert.equal(observer.getReceipt('local-demo:spawn-proof')?.response,undefined);assert.equal(observer.get(task.id).status,'running');assert.equal(observer.get(task.id).run?.pid,undefined);inspected=true;}finally{observer.close();}
+  const observer=new TaskStore(store.path);try{assert.ok(observer.getReceipt('local-demo:spawn-proof')?.hash);assert.ok((observer.getReceipt('local-demo:spawn-proof') as {accepted?:unknown}|undefined)?.accepted);assert.equal(observer.get(task.id).status,'running');assert.equal(observer.get(task.id).run?.pid,undefined);inspected=true;}finally{observer.close();}
   throw Error('fixture spawn failure');
  }});
  const handler=new CommandHandler(manager,new PolicyStore(join(dir,'weaver.db')));
  try {
   const task=manager.create(input);
   const result=handler.handle({apiVersion:'weaver.v1',commandId:'spawn-proof',command:'workers.spawn',args:{taskId:task.id,provider:'mock-jsonl'}});
-  assert.equal(result.ok,true,JSON.stringify(result));assert.equal(inspected,true);assert.equal(store.get(task.id).status,'failed');assert.deepEqual(store.getReceipt('local-demo:spawn-proof')?.response,JSON.parse(JSON.stringify(result)));
+  assert.equal(result.ok,true,JSON.stringify(result));assert.equal((result.data as Task).status,'queued');assert.equal((result.data as Task).scheduled,true);
+  const observer=new TaskStore(store.path);try{assert.ok(observer.getReceipt('local-demo:spawn-proof')?.hash);assert.ok(observer.get(task.id).packageId);assert.equal(observer.get(task.id).dispatch?.execution,'mock');}finally{observer.close();}
+  await turn();await turn();
+  assert.equal(inspected,true);assert.equal(store.get(task.id).status,'failed');assert.deepEqual(store.getReceipt('local-demo:spawn-proof')?.response,JSON.parse(JSON.stringify(result)));
  }finally{await handler.drain();store.close();rmSync(dir,{recursive:true,force:true});}
 });
 

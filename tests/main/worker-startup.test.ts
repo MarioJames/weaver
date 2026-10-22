@@ -58,15 +58,7 @@ test('vendor limit fails before exit and preserves diagnostic on close',()=>{
  assert.equal(h.store.get(h.id).events.filter(e=>e.kind==='error').length,1);
  }finally{h.cleanup();}
 });
-test('first-output wait resolves false at its bounded wait, true on valid output',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});const h=harness();try{
- const waiting=h.manager.waitForFirstOutput(h.id);t.mock.timers.tick(10000);assert.equal(await waiting,false);
- const started=h.manager.waitForFirstOutput(h.id);h.child.emit('first-output',new Date().toISOString());assert.equal(await started,true);
- h.child.emit('close',42,null);
- }finally{h.cleanup();t.mock.timers.reset();}
-});
-
-test('commands wait for actual output, retain next and publish failure results',async()=>{
+test('dispatch is accepted before start and the pump owns the launch',async()=>{
  const {CommandHandler}=await import('../../src/main/commands');const {PolicyStore}=await import('../../src/main/policy/store');const {randomUUID}=await import('node:crypto');
  const h=harness();h.child.emit('close',42,null);
  const children:ReturnType<typeof harness>['child'][]=[];
@@ -75,11 +67,17 @@ test('commands wait for actual output, retain next and publish failure results',
  const request=(command:string,args:Record<string,unknown>)=>({apiVersion:'weaver.v1',commandId:randomUUID(),command,args});
  try{
  const task=manager.create({title:'async',instruction:'fake',workspace:h.dir,owner:{name:'o',transport:'herdr-visible',session:'s',pane:'p'}});
- const response=handler.handleAsync(request('workers.spawn',{taskId:task.id,owner:'claude_owner',worker:'codex_worker'}));
- let settled=false;response.then(()=>settled=true);await Promise.resolve();assert.equal(settled,false);assert.equal(children.length,1);
- children[0].emit('first-output',new Date().toISOString());
- const result=await response;assert.equal(result.ok,true,JSON.stringify(result));assert.equal((result.data as any).started,true);assert.equal((result.data as any).next.action,'wait');
- children[0].stderr.write('No input provided via stdin\n');children[0].emit('close',42,null);
+ const result=await handler.handleAsync(request('workers.spawn',{taskId:task.id,owner:'claude_owner',worker:'codex_worker'}));
+ assert.equal(result.ok,true,JSON.stringify(result));
+ assert.equal((result.data as any).status,'queued');
+ assert.equal((result.data as any).started,false);
+ assert.deepEqual((result.data as any).next,{action:'wait',command:`weaver tasks wait --task-id ${task.id}`});
+ assert.equal(children.length,0,'dispatch itself starts no process');
+ const deadline=Date.now()+2000;
+ while(children.length===0&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,5));
+ assert.equal(children.length,1,'the pump starts the admitted task');
+ children[0]!.emit('first-output',new Date().toISOString());
+ children[0]!.stderr.write('No input provided via stdin\n');children[0]!.emit('close',42,null);
  const manifest=handler.handle(request('tasks.results',{taskId:task.id}));assert.equal((manifest.data as any).failure.kind,'vendor');assert.equal((manifest.data as any).failure.exitCode,42);
  }finally{handler.draining=true;h.cleanup();}
 });

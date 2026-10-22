@@ -31,7 +31,7 @@ const infoOf = (over: Partial<ServerInfo> = {}): ServerInfo => ({
   pid: 4242, url: 'http://127.0.0.1:4737', port: 4737, dataDir: '/data', version: '0.1.0',
   startedAt: '2026-01-01T00:00:00.000Z', runningWorkers: 0, managedBy: null, ...over,
 });
-const argsOf = (over: Partial<ServerArgs> = {}): ServerArgs => ({ action: 'status', port: 4737, dataDir: '/data', output: 'json', force: false, timeoutMs: 5_000, ...over });
+const argsOf = (over: Partial<ServerArgs> = {}): ServerArgs => ({ action: 'status', port: 4737, dataDir: '/data', output: 'json', force: false, cancelWorkers: false, timeoutMs: 5_000, ...over });
 const data = (envelope: Envelope) => envelope.data as Record<string, unknown>;
 
 /** A serverEnv that never touches systemctl, launchd, a real home, or a real clock. */
@@ -188,14 +188,15 @@ test('weaver web reuses a running service instead of starting a second instance'
 test('parseServer fills defaults and validates every flag', () => {
   const { env } = fake();
   assert.deepEqual(parseServer(['server', 'status'], ['server', 'status'], env), argsOf({ action: 'status', dataDir: resolve(join(env.home, 'default')), timeoutMs: 20_000 }));
-  const parsed = parseServer(['server', 'stop', '--port', '0', '--data-dir', 'relative', '--timeout', '3', '--force', '--output', 'text'], ['server', 'stop'], env);
+  const parsed = parseServer(['server', 'stop', '--port', '0', '--data-dir', 'relative', '--timeout', '3', '--force', '--cancel-workers', '--output', 'text'], ['server', 'stop'], env);
   assert.equal(parsed.port, 0);
   assert.equal(parsed.dataDir, resolve('relative'));
   assert.equal(parsed.timeoutMs, 3_000, '--timeout is seconds');
   assert.equal(parsed.force, true);
+  assert.equal(parsed.cancelWorkers, true);
   assert.equal(parsed.output, 'text');
-  assert.equal(parseServer(['server', 'install', '--output', 'json'], ['server', 'install'], env).timeoutMs, 20_000);
-  for (const argv of [['server'], ['server', 'restart'], ['server', 'status', '--output', 'yaml'], ['server', 'status', 'extra'], ['server', 'status', '--port', 'x'], ['server', 'status', '--port', '70000'], ['server', 'status', '--timeout', '0'], ['server', 'status', '--nope'], ['server', 'status', '--port'], ['server', 'status', '--force', '--force']]) {
+  assert.equal(parseServer(['server', 'stop'], ['server', 'stop'], env).cancelWorkers, false);
+  for (const argv of [['server'], ['server', 'restart'], ['server', 'status', '--output', 'yaml'], ['server', 'status', 'extra'], ['server', 'status', '--port', 'x'], ['server', 'status', '--port', '70000'], ['server', 'status', '--timeout', '0'], ['server', 'status', '--nope'], ['server', 'status', '--port'], ['server', 'status', '--force', '--force'], ['server', 'status', '--cancel-workers', '--cancel-workers']]) {
     assert.throws(() => parseServer(argv, argv.filter(word => !word.startsWith('--')), env), (error: { code: string }) => error.code === 'INVALID_ARGUMENT', argv.join(' '));
   }
 });
@@ -286,18 +287,69 @@ test('a child that never becomes ready gives SERVER_START_TIMEOUT', async () => 
 
 // ---------------------------------------------------------------- stop
 
-test('stop refuses while workers run unless --force', async () => {
-  const busy = fake({ probes: [okData(infoOf({ runningWorkers: 2 }))] });
-  const refused = await serverStop(busy.env, argsOf({ action: 'stop' }));
-  assert.equal(refused.error?.code, 'SERVER_BUSY');
-  assert.match(refused.error?.message ?? '', /2 workers are still running/);
-  assert.equal(busy.killed.length, 0, 'nothing is signalled');
-
-  const forced = fake({ probes: [okData(infoOf({ runningWorkers: 1 })), stopped] });
-  const result = await serverStop(forced.env, argsOf({ action: 'stop', force: true }));
+test('stop no longer refuses while workers run; they keep running and reattach', async () => {
+  const busy = fake({ probes: [okData(infoOf({ runningWorkers: 2 })), stopped] });
+  const result = await serverStop(busy.env, argsOf({ action: 'stop' }));
   assert.equal(result.ok, true, JSON.stringify(result.error));
-  assert.deepEqual(forced.killed, [4242]);
-  assert.deepEqual(data(result), { status: 'stopped', pid: 4242 });
+  assert.deepEqual(busy.killed, [4242], 'the server is still signalled');
+  assert.deepEqual(data(result), { status: 'stopped', pid: 4242, workers: 2, note: '2 workers keep running and reattach automatically after restart.' });
+
+  const single = fake({ probes: [okData(infoOf({ runningWorkers: 1 })), stopped] });
+  assert.deepEqual(data(await serverStop(single.env, argsOf({ action: 'stop' }))), { status: 'stopped', pid: 4242, workers: 1, note: '1 worker keeps running and reattach automatically after restart.' });
+});
+
+test('stop --cancel-workers cancels real workers with stable command IDs before signalling', async () => {
+  type Listed = { id: string; status: string; run?: { execution: string }; dispatch?: { execution: string } };
+  const real: Listed = { id: '11111111-1111-4111-8111-111111111111', status: 'running', run: { execution: 'real' } };
+  const cancelling: Listed = { id: '22222222-2222-4222-8222-222222222222', status: 'cancelling', dispatch: { execution: 'mock' } };
+  const native: Listed = { id: '33333333-3333-4333-8333-333333333333', status: 'running', dispatch: { execution: 'native' } };
+  const remaining = new Map([[real.id, real], [cancelling.id, cancelling]]);
+  const commandIds: string[] = [];
+  let signalled = false;
+  const { env, killed } = fake({
+    probes: [stopped],
+    extra: {
+      kill: () => { signalled = true; killed.push(4242); },
+      request: async (_dataDir: string, payload: unknown) => {
+        const method = (payload as { method?: string }).method;
+        if (method === 'serverInfo') {
+          if (signalled) throw new LocalIPCError('APP_NOT_RUNNING', 'Weaver is not running; run weaver server start');
+          return okData(infoOf({ runningWorkers: remaining.size }));
+        }
+        if (method === 'listTasks') return okData([...remaining.values(), native]);
+        if (method === 'command') {
+          const body = (payload as { args?: unknown[] }).args?.[0] as { commandId?: string; command?: string; args?: { taskId?: string } };
+          assert.equal(body.command, 'tasks.cancel');
+          commandIds.push(String(body.commandId));
+          remaining.delete(String(body.args?.taskId));
+          return okData({ cancelled: true });
+        }
+        throw new Error(`unexpected method ${String(method)}`);
+      },
+    },
+  });
+  const result = await serverStop(env, argsOf({ action: 'stop', cancelWorkers: true }));
+  assert.equal(result.ok, true, JSON.stringify(result.error));
+  assert.deepEqual(commandIds, [`server-stop-cancel-${real.id}`, `server-stop-cancel-${cancelling.id}`], 'native runs are never cancelled');
+  assert.deepEqual(killed, [4242], 'SIGTERM follows the drain');
+  assert.deepEqual(data(result), { status: 'stopped', pid: 4242, cancelledWorkers: 2 });
+});
+
+test('stop --cancel-workers times out without signalling when workers do not drain', async () => {
+  const stuck = fake({
+    extra: {
+      request: async (_dataDir: string, payload: unknown) => {
+        const method = (payload as { method?: string }).method;
+        if (method === 'listTasks') return okData([{ id: '11111111-1111-4111-8111-111111111111', status: 'running', run: { execution: 'real' } }]);
+        if (method === 'command') return okData({ cancelled: true });
+        return okData(infoOf({ runningWorkers: 1 }));
+      },
+    },
+  });
+  const result = await serverStop(stuck.env, argsOf({ action: 'stop', cancelWorkers: true, timeoutMs: 2_500 }));
+  assert.equal(result.error?.code, 'SERVER_CANCEL_TIMEOUT');
+  assert.match(result.error?.message ?? '', /SIGTERM was not sent/);
+  assert.deepEqual(stuck.killed, [], 'nothing is signalled on drain timeout');
 });
 
 test('stop signals the reported pid and waits for it to go away', async () => {
@@ -476,17 +528,46 @@ test('uninstall disables and removes the unit weaver installed, leaving a runnin
   assert.equal(foreign.runs.length, 0);
 });
 
-test('uninstall on macOS refuses while workers run unless --force', async () => {
-  const { env } = fake({ platform: 'darwin', probes: [okData(infoOf({ runningWorkers: 3, managedBy: 'launchd' }))] });
+test('uninstall on macOS leaves running workers alone but still removes the service', async () => {
+  const running3 = okData(infoOf({ runningWorkers: 3, managedBy: 'launchd' }));
+  const { env } = fake({ platform: 'darwin', probes: [running3, running3, stopped] });
   await serverInstall(env, argsOf({ action: 'install' }));
   const busy = await serverUninstall(env, argsOf({ action: 'uninstall' }));
-  assert.equal(busy.error?.code, 'SERVER_BUSY');
-  assert.match(busy.error?.message ?? '', /3 workers/);
-  assert.equal(existsSync(plistPath(env)), true);
+  assert.equal(busy.ok, true, JSON.stringify(busy.error));
+  assert.deepEqual(data(busy), { installed: false, manager: 'launchd', path: plistPath(env), running: false, workers: 3, note: '3 workers keep running and reattach automatically after restart.' });
+  assert.equal(existsSync(plistPath(env)), false, 'the plist is still removed');
+});
 
-  const forced = await serverUninstall(env, argsOf({ action: 'uninstall', force: true }));
-  assert.equal(forced.ok, true, JSON.stringify(forced.error));
+test('uninstall on macOS --cancel-workers drains before bootout', async () => {
+  const remaining = new Map([['11111111-1111-4111-8111-111111111111', { id: '11111111-1111-4111-8111-111111111111', status: 'running', run: { execution: 'real' } }]]);
+  const commandIds: string[] = [];
+  let gone = false;
+  const { env, runs } = fake({
+    platform: 'darwin',
+    run: (file, args) => { if (args.includes('bootout')) gone = true; return { code: 0, stdout: '', stderr: '' }; },
+    extra: {
+      request: async (_dataDir: string, payload: unknown) => {
+        const method = (payload as { method?: string }).method;
+        if (method === 'serverInfo') {
+          if (gone) throw new LocalIPCError('APP_NOT_RUNNING', 'Weaver is not running; run weaver server start');
+          return okData(infoOf({ runningWorkers: remaining.size, managedBy: 'launchd' as const }));
+        }
+        if (method === 'listTasks') return okData([...remaining.values()]);
+        const body = (payload as { args?: unknown[] }).args?.[0] as { commandId?: string; args?: { taskId?: string } };
+        commandIds.push(String(body.commandId));
+        remaining.delete(String(body.args?.taskId));
+        return okData({ cancelled: true });
+      },
+    },
+  });
+  await serverInstall(env, argsOf({ action: 'install' }));
+  runs.length = 0;
+  const result = await serverUninstall(env, argsOf({ action: 'uninstall', cancelWorkers: true }));
+  assert.equal(result.ok, true, JSON.stringify(result.error));
+  assert.deepEqual(commandIds, ['server-stop-cancel-11111111-1111-4111-8111-111111111111']);
+  assert.ok(ran(runs, 'launchctl', 'bootout', `gui/1000/${LAUNCHD_LABEL}`), JSON.stringify(runs));
   assert.equal(existsSync(plistPath(env)), false);
+  assert.equal(data(result).running, false);
 });
 
 test('uninstall on macOS boots the service out and removes the plist', async () => {

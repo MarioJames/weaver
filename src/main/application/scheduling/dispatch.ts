@@ -5,20 +5,21 @@ import type { Task, WorkPackage } from '../../../shared/contracts/tasks';
 import { PENDING_TASK_TITLE, text } from '../../../shared/validation';
 import { workerInstruction } from '../../adapters/instruction';
 import type { ContinuationService } from '../../continuation';
-import { event, slotGroupCount, slotGroupFor, slotGroupName } from '../../domain/tasks';
+import { event, occupiesSlot, slotGroupCount, slotGroupFor, slotGroupName } from '../../domain/tasks';
 import type { TaskManager } from '../../manager';
 import { EXCLUDED_ENGINE_REASON, EXCLUDED_WORKER_REASON } from '../../policy/routing';
 import { previewRoute } from '../../policy/preview';
 import type { PolicyStore } from '../../policy/store';
 import { absoluteExistingWorkspace, isRealEngineKind, workspaceIdentity } from '../../workspace';
 import { fail } from '../commands/errors';
+import { acceptCommandResult } from '../commands/gateway';
 import { publicTask, type TaskRecords } from '../tasks/records';
 import { chainWorkers } from './retry';
 
-/** Running tasks per worker across every owner: the load that weighted dispatch balances. */
+/** Tasks holding a worker across every owner: the load that weighted dispatch balances. */
 export function workerLoad(tasks: Task[]): Record<string, number> {
  const load: Record<string, number> = {};
- for (const task of tasks) if ((task.status === 'running' || task.status === 'cancelling') && task.dispatch?.worker) load[task.dispatch.worker] = (load[task.dispatch.worker] ?? 0) + 1;
+ for (const task of tasks) if (occupiesSlot(task) && task.dispatch?.worker) load[task.dispatch.worker] = (load[task.dispatch.worker] ?? 0) + 1;
  return load;
 }
 /** Routes, freezes and admits one queued task and hands the owner the single next step. */
@@ -88,36 +89,55 @@ export class Dispatcher {
   const next=this.nextFor(task);
   return {...publicTask(task),started:task.dispatch?.execution==='real'?!!task.run?.firstOutputAt:task.status==='running',...(next?{next}:{}),...(excludedWorkers.length?{excludedWorkers}:{})};
  }
- /**
-  * Route, freeze and admit one queued task, then hand the owner the single next step. workers.spawn calls it
-  * directly and tasks.retry calls it for the linked child, so a retry never grows a second launcher.
-  * forcedWorkers names a chain worker the task cannot see yet: the attempt --cancel abandoned but whose
-  * worker is still cancelling.
-  */
- dispatchTask(command:string,a:Record<string,unknown>,forcedWorkers:string[]=[]):unknown {
-  let task=this.records.task(a);this.records.revise(task,a);if(task.parentTaskId&&this.manager.store.get(task.parentTaskId).status!=='running')fail('INVALID_STATE','Parent root is no longer running');if(task.executionRole==='owner')fail('INVALID_STATE','Dispatch child tasks, not the owner root');if(task.status!=='queued')fail('INVALID_STATE','Only queued tasks may dispatch');
-  if(task.title===PENDING_TASK_TITLE)fail('INVALID_STATE','Owner must generate title and acceptance criteria with tasks.describe before dispatch');
-  if(a.provider!==undefined&&a.provider!=='mock-jsonl')fail('CAPABILITY_UNAVAILABLE',`Provider ${String(a.provider)} is not available`);
-  if(a.packageId!==undefined&&a.packageId!==task.packageId)fail('REVISION_CONFLICT','Package does not belong to task');
-  if(task.scheduled)fail('INVALID_STATE','Task already scheduled');
-  const logical=task.ownerId?this.records.owner(task.ownerId):undefined;
-  const owner=text(a.owner??logical?.profileId??Object.keys(this.policy.snapshot().config.owners)[0],'owner profile',120);
-  if(logical&&owner!==logical.profileId)fail('POLICY_DENIED','Task owner profile cannot be changed at dispatch');
-  const excludedWorkers=chainWorkers(this.manager.store,task);
-  for(const worker of forcedWorkers)if(!excludedWorkers.includes(worker))excludedWorkers.push(worker);
-  const running=slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,owner));
-  const route=this.routeOf(owner,running,[],a.worker,excludedWorkers);
-  const decision=this.decideExecution(route.engine,a.provider,task,this.policy.snapshot().config.owners[route.owner]?.engine);
-  const pendingPackage:WorkPackage=task.packageId?this.manager.store.getPackage(task.packageId!)!:{id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:[decision.workspace??task.workspace??'Explicit mock fixture'],acceptanceCriteria:task.acceptanceCriteria?.length?task.acceptanceCriteria:[decision.execution==='mock'?'Mock output returned for owner review':'Provider result returned for owner review'],createdAt:new Date().toISOString()};
-  if(!pendingPackage||pendingPackage.taskId!==task.id)fail('INVALID_REQUEST','Frozen work package is missing');
-  // Real launch and native handoff freeze the same instruction, so it must fit before any state changes.
-  if(decision.execution!=='mock')workerInstruction({...task,workspace:decision.workspace??task.workspace},pendingPackage);
-  this.prepareOwnerActivity(command,a);task=this.records.task(a);
-  if(decision.workspace)task.workspace=decision.workspace;
-  if(!task.packageId){this.manager.store.transaction(()=>{this.manager.store.putPackage(pendingPackage);task.packageId=pendingPackage.id;this.records.put(task);});}
-  task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,...(decision.execution==='real'?{workspaceIdentity:workspaceIdentity(decision.workspace)}:{})}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
-  const selected=decision.execution==='real'?`Policy selected ${route.worker}; launching ${decision.engineKind} in ${decision.workspace}`:decision.execution==='native'?`Policy selected ${route.worker} on the owner's engine; the owner runs it with its built-in subagent tool (${route.model}, ${route.effort})`:`Policy selected ${route.worker}; explicit mock-jsonl provider`;
-  event(task,'lifecycle',`${selected}${excludedWorkers.length?`; workers excluded because they ${EXCLUDED_WORKER_REASON}: ${excludedWorkers.join(', ')}`:''}`);
-  if(!route.capacityAvailable){task.scheduled=true;task.queueReason={code:'waiting_for_capacity',message:this.queueWaitText(task.ownerId,route)};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.records.put(task);return this.dispatchResponse(task,excludedWorkers);}this.records.put(task);return this.dispatchResponse(this.manager.start(task.id,route.maxParallel),excludedWorkers);
- }
+  /**
+   * Persists one durable admission inside the caller's transaction: the package (when not frozen yet), the
+   * frozen route, scheduled=true, the queue reason and the lifecycle events. Real and mock work is started
+   * later by the pump; native work is only registered here because it creates no process.
+   */
+  accept(task:Task,route:RoutePreview,decision:ReturnType<Dispatcher['decideExecution']>,pendingPackage:WorkPackage,excludedWorkers:string[]):{task:Task;response:unknown} {
+   if(!task.packageId){this.manager.store.putPackage(pendingPackage);task.packageId=pendingPackage.id;}
+   if(decision.workspace)task.workspace=decision.workspace;
+   task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,...(decision.execution==='real'?{workspaceIdentity:workspaceIdentity(decision.workspace)}:{})}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
+   const selected=decision.execution==='real'?`Policy selected ${route.worker}; launching ${decision.engineKind} in ${decision.workspace}`:decision.execution==='native'?`Policy selected ${route.worker} on the owner's engine; the owner runs it with its built-in subagent tool (${route.model}, ${route.effort})`:`Policy selected ${route.worker}; explicit mock-jsonl provider`;
+   event(task,'lifecycle',`${selected}${excludedWorkers.length?`; workers excluded because they ${EXCLUDED_WORKER_REASON}: ${excludedWorkers.join(', ')}`:''}`);
+   task.scheduled=true;
+   if(route.capacityAvailable)task.queueReason={code:'waiting_for_capacity',message:'Dispatch admitted; waiting for the scheduler to start it.'};
+   else{task.queueReason={code:'waiting_for_capacity',message:this.queueWaitText(task.ownerId,route)};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');}
+   this.records.put(task);
+   const accepted=decision.execution==='native'&&route.capacityAvailable?this.manager.start(task.id,route.maxParallel):this.manager.store.get(task.id);
+   const response=this.dispatchResponse(accepted,excludedWorkers);
+   // The accepted result shares this transaction, so a crash before the gateway writes its response
+   // can replay the operation without executing it again.
+   acceptCommandResult(response);
+   return {task:accepted,response};
+  }
+  /**
+   * Route, freeze and admit one queued task, then hand the owner the single next step. workers.spawn calls it
+   * directly; tasks.retry commits the same admission in its own transaction. forcedWorkers names a chain worker
+   * the task cannot see yet: the attempt --cancel abandoned but whose worker is still cancelling.
+   */
+  dispatchTask(command:string,a:Record<string,unknown>,forcedWorkers:string[]=[]):unknown {
+   let task=this.records.task(a);this.records.revise(task,a);if(task.parentTaskId&&this.manager.store.get(task.parentTaskId).status!=='running')fail('INVALID_STATE','Parent root is no longer running');if(task.executionRole==='owner')fail('INVALID_STATE','Dispatch child tasks, not the owner root');if(task.status!=='queued')fail('INVALID_STATE','Only queued tasks may dispatch');
+   if(task.title===PENDING_TASK_TITLE)fail('INVALID_STATE','Owner must generate title and acceptance criteria with tasks.describe before dispatch');
+   if(a.provider!==undefined&&a.provider!=='mock-jsonl')fail('CAPABILITY_UNAVAILABLE',`Provider ${String(a.provider)} is not available`);
+   if(a.packageId!==undefined&&a.packageId!==task.packageId)fail('REVISION_CONFLICT','Package does not belong to task');
+   if(task.scheduled)fail('INVALID_STATE','Task already scheduled');
+   const logical=task.ownerId?this.records.owner(task.ownerId):undefined;
+   const owner=text(a.owner??logical?.profileId??Object.keys(this.policy.snapshot().config.owners)[0],'owner profile',120);
+   if(logical&&owner!==logical.profileId)fail('POLICY_DENIED','Task owner profile cannot be changed at dispatch');
+   const excludedWorkers=chainWorkers(this.manager.store,task);
+   for(const worker of forcedWorkers)if(!excludedWorkers.includes(worker))excludedWorkers.push(worker);
+   const running=slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,owner));
+   const route=this.routeOf(owner,running,[],a.worker,excludedWorkers);
+   const decision=this.decideExecution(route.engine,a.provider,task,this.policy.snapshot().config.owners[route.owner]?.engine);
+   const pendingPackage:WorkPackage=task.packageId?this.manager.store.getPackage(task.packageId!)!:{id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:[decision.workspace??task.workspace??'Explicit mock fixture'],acceptanceCriteria:task.acceptanceCriteria?.length?task.acceptanceCriteria:[decision.execution==='mock'?'Mock output returned for owner review':'Provider result returned for owner review'],createdAt:new Date().toISOString()};
+   if(!pendingPackage||pendingPackage.taskId!==task.id)fail('INVALID_REQUEST','Frozen work package is missing');
+   // Real launch and native handoff freeze the same instruction, so it must fit before any state changes.
+   if(decision.execution!=='mock')workerInstruction({...task,workspace:decision.workspace??task.workspace},pendingPackage);
+   this.prepareOwnerActivity(command,a);task=this.records.task(a);
+   const accepted=this.manager.store.transaction(()=>this.accept(task,route,decision,pendingPackage,excludedWorkers));
+   // The coordinator pump is the only starter for real and mock work, and it must run after COMMIT.
+   this.manager.notify();
+   return accepted.response;
+  }
 }

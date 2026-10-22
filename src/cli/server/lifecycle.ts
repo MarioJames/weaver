@@ -147,16 +147,77 @@ export async function serverStop(env: ServerEnv, args: ServerArgs): Promise<Enve
   if (current.state === 'stopped') return succeed({ status: 'stopped', alreadyStopped: true });
   if (current.state === 'error') return failure(current.code, current.message);
   const { pid, runningWorkers } = current.info;
-  if (runningWorkers > 0 && !args.force) return failure('SERVER_BUSY', `${runningWorkers} ${runningWorkers === 1 ? 'worker is' : 'workers are'} still running and stopping cancels them. Pass --force to stop anyway.`);
+  let cancelledWorkers: number | undefined;
+  let deadline = env.now() + args.timeoutMs;
+  if (args.cancelWorkers) {
+    const drained = await cancelWorkersAndDrain(env, args, deadline);
+    if (!drained.ok) return drained;
+    cancelledWorkers = (drained.data as { cancelledWorkers: number }).cancelledWorkers;
+  }
   if (!Number.isInteger(pid) || pid <= 0 || pid === env.pid) return failure('SERVER_STOP_FAILED', `Refusing to signal server pid ${pid}.`);
   try { env.kill(pid); } catch (error) { return failure('SERVER_STOP_FAILED', `Could not signal pid ${pid}: ${text(error)}`); }
-  const deadline = env.now() + args.timeoutMs;
   for (;;) {
     const probe = await probeServer(env, args.dataDir);
-    if (probe.state === 'stopped') return succeed({ status: 'stopped', pid });
+    if (probe.state === 'stopped') {
+      if (cancelledWorkers !== undefined) return succeed({ status: 'stopped', pid, cancelledWorkers });
+      if (runningWorkers > 0) return succeed({ status: 'stopped', pid, workers: runningWorkers, note: `${runningWorkers} ${runningWorkers === 1 ? 'worker keeps' : 'workers keep'} running and reattach automatically after restart.` });
+      return succeed({ status: 'stopped', pid });
+    }
     if (env.now() + POLL_MS >= deadline) return failure('SERVER_STOP_TIMEOUT', `Weaver was still running ${Math.round(args.timeoutMs / 1000)}s after SIGTERM to pid ${pid}.`);
     await env.sleep(POLL_MS);
   }
+}
+
+/**
+ * `--cancel-workers`: list running/cancelling tasks over local IPC, cancel each one with a
+ * stable command-id (`server-stop-cancel-<taskId>`, so a retry replays the same receipt via
+ * `operations get` instead of cancelling twice), then poll until no real (non-native) worker
+ * remains. Never signals the server; a timeout or IPC error returns before any SIGTERM.
+ */
+async function cancelWorkersAndDrain(env: ServerEnv, args: ServerArgs, deadline: number): Promise<Envelope> {
+  const requested = new Set<string>();
+  for (;;) {
+    if (deadline - env.now() <= 0) return drainTimeout(args, -1);
+    const budget = Math.max(1, Math.min(deadline - env.now(), 5_000));
+    let listed: Envelope;
+    try { listed = await env.request(args.dataDir, { method: 'listTasks', args: [] }, budget); }
+    catch (error) { return failure(error instanceof LocalIPCError ? error.code : 'TRANSPORT_ERROR', `Could not list running workers before stopping: ${text(error)}`); }
+    if (listed.ok !== true) return failure(listed.error?.code ?? 'INTERNAL_ERROR', listed.error?.message ?? 'Could not list running workers before stopping');
+    const active = realActiveWorkers(listed.data);
+    if (active.length === 0) return succeed({ cancelledWorkers: requested.size });
+    for (const taskId of active) {
+      if (requested.has(taskId)) continue;
+      requested.add(taskId);
+      try {
+        await env.request(args.dataDir, {
+          method: 'command',
+          args: [{ apiVersion: 'weaver.v1', commandId: `server-stop-cancel-${taskId}`, command: 'tasks.cancel', args: { taskId } }],
+        }, budget);
+      } catch { /* A task that ends mid-drain needs no cancel; the poll below decides. */ }
+    }
+    if (deadline - env.now() <= 0) return drainTimeout(args, active.length);
+    await env.sleep(POLL_MS);
+  }
+}
+
+/** Running/cancelling tasks that own a real worker process; native runs belong to the owner, not the server. */
+function realActiveWorkers(data: unknown): string[] {
+  if (!Array.isArray(data)) return [];
+  const ids: string[] = [];
+  for (const item of data) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const task = item as { id?: unknown; status?: unknown; run?: { execution?: unknown }; dispatch?: { execution?: unknown } };
+    if (typeof task.id !== 'string' || (task.status !== 'running' && task.status !== 'cancelling')) continue;
+    const execution = typeof task.run?.execution === 'string' ? task.run.execution : typeof task.dispatch?.execution === 'string' ? task.dispatch.execution : 'mock';
+    if (execution === 'native') continue;
+    ids.push(task.id);
+  }
+  return ids;
+}
+
+function drainTimeout(args: ServerArgs, workers: number): Envelope {
+  const detail = workers >= 0 ? `${workers} ${workers === 1 ? 'worker is' : 'workers are'} still running` : 'workers did not drain in time';
+  return failure('SERVER_CANCEL_TIMEOUT', `${detail} after ${Math.round(args.timeoutMs / 1000)}s; SIGTERM was not sent. Retry with a longer --timeout once the workers finish.`);
 }
 
 function writeUnit(path: string, content: string): void {
@@ -213,10 +274,15 @@ export async function serverUninstall(env: ServerEnv, args: ServerArgs): Promise
   const existing = readFileOrNull(layout.path);
   if (existing === undefined) return succeed({ installed: false, manager: layout.manager, path: layout.path });
   if (!marked(existing)) return succeed({ installed: false, manager: layout.manager, path: layout.path, note: 'That file was not installed by weaver and was left in place.' });
+  let leftoverWorkers = 0;
   if (layout.manager === 'launchd') {
     const current = await probeServer(env, args.dataDir);
-    const workers = current.state === 'running' ? current.info.runningWorkers : 0;
-    if (workers > 0 && !args.force) return failure('SERVER_BUSY', `${workers} ${workers === 1 ? 'worker is' : 'workers are'} running under ${LAUNCHD_LABEL}. Pass --force to remove the service anyway.`);
+    leftoverWorkers = current.state === 'running' ? current.info.runningWorkers : 0;
+    if (args.cancelWorkers && leftoverWorkers > 0) {
+      const drained = await cancelWorkersAndDrain(env, args, env.now() + args.timeoutMs);
+      if (!drained.ok) return drained;
+      leftoverWorkers = 0;
+    }
     const result = await env.run('launchctl', ['bootout', `gui/${env.uid}/${LAUNCHD_LABEL}`]);
     if (result.code !== 0) return failure('SERVER_UNINSTALL_FAILED', `launchctl bootout gui/${env.uid}/${LAUNCHD_LABEL} failed: ${runText(result)}`);
   } else {
@@ -230,5 +296,6 @@ export async function serverUninstall(env: ServerEnv, args: ServerArgs): Promise
     if (reload.code !== 0) return failure('SERVER_UNINSTALL_FAILED', `systemctl --user daemon-reload failed: ${runText(reload)}`);
   }
   const running = await probeServer(env, args.dataDir);
+  if (leftoverWorkers > 0) return succeed({ installed: false, manager: layout.manager, path: layout.path, running: running.state === 'running', workers: leftoverWorkers, note: `${leftoverWorkers} ${leftoverWorkers === 1 ? 'worker keeps' : 'workers keep'} running and reattach automatically after restart.` });
   return succeed({ installed: false, manager: layout.manager, path: layout.path, running: running.state === 'running' });
 }

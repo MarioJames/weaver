@@ -4,11 +4,12 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_VERSION } from '../shared/contracts/commands';
 import { startCliAgent } from './adapters/cli/index';
+import { startCliRun } from './adapters/cli/run';
 import { createParentAgent } from './im/parent-agent';
 import { HelloJobs, sayHi } from './engines/hello';
 import { EngineModelLister } from './engines/models';
 import { createPiModelCheck } from './engines/pi-model-check';
-import { guardPiLaunch } from './adapters/cli/pi-guard';
+import { guardPiLaunch, guardPiRun } from './adapters/cli/pi-guard';
 import { FreeChannelProbeMonitor } from './free-channel';
 import { embeddedApp } from './embedded';
 import { RoutingWorkerAdapter } from './adapters/routing';
@@ -35,7 +36,8 @@ import { dbFreeProbeStore } from './storage/free-probe-state';
 import { dbQuotaStore } from './storage/quota-snapshot';
 import { dbStallStore } from './storage/stall-state';
 import { dbVendorLadder } from './storage/vendor-limits';
-import { recoverInterruptedTasks } from './application/tasks/recovery';
+import { reattach } from './application/tasks/reattach';
+import { acquireInstanceLock, type InstanceLock } from './instance-lock';
 import { createViteOptimizerTracker, settleViteCache, TempJanitor } from './janitor';
 import { dbJanitorStore } from './storage/janitor-runs';
 import { janitorSettings } from '../shared/policy/settings';
@@ -200,12 +202,16 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     }
   }
 
-  const ipc = await startLocalIPC(dataDir, request => handleIpc(request));
+  let ipc: { close(): Promise<void> } | undefined;
+  let lock: InstanceLock | undefined;
   let resolveDone: () => void = () => {};
   const done = new Promise<void>(resolve => { resolveDone = resolve; });
   let closed = false;
   const runtime: WeaverRuntime = { url: '', port: 0, done, close };
   try {
+    // The lock is the singleton authority: take it before opening the database or publishing discovery.
+    lock = await acquireInstanceLock(dataDir);
+    ipc = await startLocalIPC(dataDir, request => handleIpc(request), { lockHeld: true });
     http = await startHttpServer({
       port: options.port ?? 0,
       staticRoot: options.dev || (embedded && !options.rendererRoot) ? undefined : rendererRoot,
@@ -227,7 +233,6 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       call,
     });
     store = new TaskStore(join(dataDir, 'weaver.db'));
-    recoverInterruptedTasks(store);
     policy = new PolicyStore(store.db);
     janitor = new TempJanitor({
       tmpRoot: options.janitor?.tmpRoot,
@@ -267,10 +272,21 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       onBlocksChanged: () => commands?.pump(),
       log: message => console.error(`Free channel probe: ${message}`),
     });
-    const workers = new RoutingWorkerAdapter(new MockWorkerAdapter(process.execPath, workerScript), guardPiLaunch(startCliAgent, checkPiModel), join(dataDir, 'agent-state'), id => store!.getPackage(id));
+    const workers = new RoutingWorkerAdapter(
+      new MockWorkerAdapter(process.execPath, workerScript),
+      guardPiLaunch(startCliAgent, checkPiModel),
+      join(dataDir, 'agent-state'),
+      id => store!.getPackage(id),
+      guardPiRun(startCliRun, checkPiModel, () => manager?.launchGateOpen === true),
+    );
     manager = new TaskManager(store, workers, () => {}, undefined, error => {
       console.error(error instanceof Error ? error.message : 'Task history could not be saved');
+    }, () => {
+      // Commit-time invalidation: readers see the durable row, and any delivery a pump starts happens after COMMIT.
+      commands?.pump();
     });
+    // Reattach runs before the command pump or schedules exist, so no new attempt can overlap a recovered run.
+    await reattach(manager);
     // Health and penalties are this monitor's own answers, so the command face reads them from it rather than inventing them.
     // The user's engine or worker unblock clears the blocks through the policy service and then resets both monitors' state.
     const unblockBlocks = new PolicyBlockService(() => policy!, { log: message => console.error(`Stall monitor: ${message}`), onChanged: () => commands?.pump() });
@@ -282,8 +298,8 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     };
     commands = new CommandHandler(manager, policy, undefined, undefined, diagnostics, options.ownerHost, {refreshQuota:(engine:QuotaEngine)=>refreshQuota({engine}),dataDir,startCli:startCliAgent,parentFactory:createParentAgent,checkPiModel});
     commands.transportStatus = 'ready';
-    ready = true;
     await commands.schedules.start();
+    ready = true;
     stall.start();
     freeProbe.start();
     runtime.port = http.port;
@@ -294,15 +310,22 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     return runtime;
   } catch (error) {
     ready = false;
-    await commands?.drain().catch(() => {});
-    await im?.close().catch(() => {});
-    await quotaProber?.close().catch(() => {});
+    draining = true;
     janitor?.stop();
+    await im?.close().catch(() => {});
+    await commands?.drain().catch(() => {});
+    await stall?.stop().catch(() => {});
+    await freeProbe?.stop().catch(() => {});
+    await quotaProber?.close().catch(() => {});
+    greetings.abort();
+    await Promise.allSettled([...inflight]);
+    try { await manager?.shutdown(); } catch (cleanupError) { console.error(cleanupError instanceof Error ? cleanupError.message : 'shutdown failed'); }
+    try { store?.close(); } catch { /* Preserve the initialization error. */ }
     await vite?.close().catch(() => {});
     await settleViteCache(options.dev ? join(dataDir, 'vite') : undefined, { tracker: optimizerTracker, log: message => console.error(`Dev cache: ${message}`) }).catch(error => console.error(`Dev cache: ${error instanceof Error ? error.message : String(error)}`));
     await http?.close().catch(() => {});
-    await ipc.close().catch(() => {});
-    try { store?.close(); } catch { /* Preserve the initialization error. */ }
+    await ipc?.close().catch(() => {});
+    await lock?.release().catch(() => {});
     resolveDone();
     throw error;
   }
@@ -328,7 +351,9 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     await vite?.close().catch(() => {});
     await settleViteCache(options.dev ? join(dataDir, 'vite') : undefined, { tracker: optimizerTracker, log: message => console.error(`Dev cache: ${message}`) }).catch(error => console.error(`Dev cache: ${error instanceof Error ? error.message : String(error)}`));
     await http?.close().catch(() => {});
-    await ipc.close().catch(() => {});
+    await ipc?.close().catch(() => {});
+    // The lock is released last: it covers every pending write, the database close and endpoint cleanup.
+    await lock?.release().catch(error => console.error(error instanceof Error ? error.message : 'instance lock release failed'));
     resolveDone();
     if (imCloseFailure) throw imCloseFailure;
   }

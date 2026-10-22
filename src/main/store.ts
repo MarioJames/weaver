@@ -17,8 +17,12 @@ export class TaskStore {
  private pending=new Map<string,Task>();
  private sequence=0;
  private flushTimer?:NodeJS.Timeout;
+ private commitListeners=new Set<() => void>();
  private closed=false;
  get revision():number{return this.sequence;}
+ /** Runs after a real COMMIT succeeds: never on rollback, never for a nested savepoint, including timer-driven flush commits. */
+ onCommit(listener:() => void):() => void {this.commitListeners.add(listener);return ()=>{this.commitListeners.delete(listener);};}
+ private emitCommit():void {for(const listener of [...this.commitListeners])listener();}
  constructor(source:string, private checkpoint?:()=>void) {
   mkdirSync(dirname(source),{recursive:true});
   this.path=source;
@@ -62,6 +66,7 @@ export class TaskStore {
    }finally{this.inTransaction=false;}
   },restore);
   this.sequence++;this.pending.clear();clearTimeout(this.flushTimer);this.flushTimer=undefined;
+  this.emitCommit();
   return result;
  }
  private writeTask(task:Task):void {
@@ -76,25 +81,38 @@ export class TaskStore {
  }
  get(id:string):Task {
   const pending=this.pending.get(id);if(pending)return structuredClone(pending);
+  return this.getCommitted(id);
+ }
+ /** The durable row only: pending stream records are invisible here, so this is what external readers may see. */
+ getCommitted(id:string):Task {
   const body=this.readRecord<Omit<Task,'events'|'artifacts'>>('tasks',id);if(!body)throw new Error('Task not found');
   return {...body,events:this.db.prepare('SELECT body FROM task_events WHERE task_id=? ORDER BY position').all(id).map(row=>JSON.parse(String(row.body))),artifacts:this.db.prepare('SELECT body,content FROM artifacts WHERE task_id=? ORDER BY position').all(id).map(row=>({...JSON.parse(String(row.body)),content:String(row.content)}))};
  }
  /** Control-plane scans do not read historical events or artifact contents. */
  listHeads():Task[] {
-  const tasks=this.readRecords<Task>('tasks').map(task=>({...task,events:[],artifacts:[]}));
+  const tasks=[...this.listHeadsCommitted()].reverse();
   const map=new Map(tasks.map(task=>[task.id,task]));
   for(const [id,task] of this.pending) {const {events,artifacts,...body}=task;map.set(id,structuredClone({...body,events:[],artifacts:[]}));}
   return [...map.values()].reverse();
+ }
+ /** Durable heads only: no pending merge, so this is what external readers may see. */
+ listHeadsCommitted():Task[] {
+  return this.readRecords<Task>('tasks').map(task=>({...task,events:[],artifacts:[]})).reverse();
  }
  list():Task[]{return this.listHeads().map(task=>this.get(task.id));}
  listSummaries():TaskSummary[]{return this.listHeads().map(head=>{
   const pending=this.pending.get(head.id);
   if(pending){const {events,artifacts,...body}=pending;return structuredClone({...body,events:events.slice(-3),eventCount:events.length,artifacts:artifacts.map(({content,...meta})=>meta)});}
+  return this.summarizeCommitted(head);
+ });}
+ /** Durable summaries only: no pending merge, so this is what external readers may see. */
+ listSummariesCommitted():TaskSummary[]{return this.listHeadsCommitted().map(head=>this.summarizeCommitted(head));}
+ private summarizeCommitted(head:Task):TaskSummary{
   const events=this.db.prepare('SELECT body FROM task_events WHERE task_id=? ORDER BY position DESC LIMIT 3').all(head.id).reverse().map(row=>JSON.parse(String(row.body)));
   const count=Number(this.db.prepare('SELECT count(*) AS n FROM task_events WHERE task_id=?').get(head.id)!.n);
   const artifacts=this.db.prepare('SELECT body FROM artifacts WHERE task_id=? ORDER BY position').all(head.id).map(row=>JSON.parse(String(row.body)));
   return {...head,events,eventCount:count,artifacts};
- });}
+ }
  put(task:Task,durability:'sync'|'stream'='sync',onError:(error:unknown)=>void=console.error):void {
   const value=structuredClone(task);
   if(durability==='stream'&&!this.inTransaction){this.pending.set(task.id,value);this.sequence++;this.scheduleFlush(onError);return;}

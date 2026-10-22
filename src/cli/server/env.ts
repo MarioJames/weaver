@@ -20,7 +20,7 @@ export interface ServerInfo {
 }
 export interface ServiceState { installed: boolean; manager: 'systemd' | 'launchd' | null; path: string }
 export interface RunResult { code: number | null; stdout: string; stderr: string }
-export interface ServerArgs { action: ServerAction; port: number; dataDir: string; output: OutputFormat; force: boolean; timeoutMs: number }
+export interface ServerArgs { action: ServerAction; port: number; dataDir: string; output: OutputFormat; force: boolean; cancelWorkers: boolean; timeoutMs: number }
 
 /** Everything this module reaches outside itself, so tests never touch systemctl, launchd, or a real home. */
 export interface ServerEnv {

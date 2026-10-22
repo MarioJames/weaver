@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startLocalIPC } from '../../src/main/local-ipc';
+import { acquireInstanceLock } from '../../src/main/instance-lock';
 import { startCliAgent } from '../../src/main/adapters/cli/index';
 import { startRuntime, type WeaverRuntime } from '../../src/main/runtime';
 import { ENGINE_CATALOG, EXECUTION_BOUNDARY } from '../../src/shared/engines';
@@ -201,13 +202,37 @@ test('second web invocation does not open or recover live task state', async t =
   const dataDir = await mkdtemp(join(tmpdir(), 'wv-lock-'));
   const taskPath = join(dataDir,'weaver.db');
   await writeFile(taskPath, '{');
-  let lock: Awaited<ReturnType<typeof startLocalIPC>> | undefined;
+  let lock: Awaited<ReturnType<typeof acquireInstanceLock>> | undefined;
   try {
-    try { lock = await startLocalIPC(dataDir, () => ({ apiVersion: 'weaver.v1', commandId: null, ok: false, error: { code: 'APP_STARTING', message: 'busy', retryable: true } })); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === 'EPERM') { t.skip('Sandbox denies Unix socket listen (EPERM); no bypass attempted'); return; } throw error; }
-    await assert.rejects(startRuntime({ dataDir, port: 0, open: false }), { code: 'ENDPOINT_EXISTS' });
+    lock = await acquireInstanceLock(dataDir);
+    await assert.rejects(startRuntime({ dataDir, port: 0, open: false }), { code: 'INSTANCE_LOCKED' });
     assert.equal(await readFile(taskPath, 'utf8'), '{');
-  } finally { await lock?.close(); await rm(dataDir, { recursive: true, force: true }); }
+  } finally { await lock?.release(); await rm(dataDir, { recursive: true, force: true }); }
+});
+
+test('initialization failure releases the instance lock and leaves no late writer', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'wv-init-fail-'));
+  const taskPath = join(dataDir, 'weaver.db');
+  const damaged = 'this is not a database file at all, just text';
+  await writeFile(taskPath, damaged);
+  try {
+    await assert.rejects(startRuntime({ dataDir, port: 0, open: false }), /Could not initialize Weaver SQLite store/);
+    await new Promise(resolve => setTimeout(resolve, 600));
+    assert.equal(await readFile(taskPath, 'utf8'), damaged);
+    const lock = await acquireInstanceLock(dataDir);
+    await lock.release();
+    await assert.rejects(readFile(join(dataDir, 'control.v1.json'), 'utf8'));
+  } finally { await rm(dataDir, { recursive: true, force: true }); }
+});
+
+test('normal close releases the instance lock after the endpoint is gone', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'wv-lock-release-'));
+  try {
+    const held = await startRuntime({ dataDir, port: 0, open: false });
+    await held.close();
+    const lock = await acquireInstanceLock(dataDir);
+    await lock.release();
+  } finally { await rm(dataDir, { recursive: true, force: true }); }
 });
 
 test('failed HTTP bind releases only this attempt', async t => {
@@ -290,7 +315,9 @@ test('headless CLI can create, dispatch, review, and leaving does not cancel wor
     assert.equal(spawned.json.data.dispatch.maxWaitMinutes, 15);
     assert.equal(spawned.json.data.run?.timeoutMs, undefined);
     assert.equal(spawned.status, 0, spawned.stdout + spawned.stderr);
-    assert.equal(spawned.json.data.status === 'running' || spawned.json.data.status === 'completed', true);
+    assert.equal(spawned.json.data.status, 'queued');
+    assert.equal(spawned.json.data.scheduled, true);
+    assert.equal(spawned.json.data.started, false);
     let finished: any;
     const deadline = Date.now() + 8000;
     while (Date.now() < deadline) {

@@ -52,15 +52,6 @@ test('a vendor retry time longer than the ladder step wins for rate limits and q
 test('terminal task health reports ended with its final status',()=>{
  const f=fixture();try{const monitor=new StallMonitor({tasks:()=>f.store.list(),policy:()=>f.policy,stateStore:stallStoreAt(join(f.dir,'state.db'))});for(const status of ['failed','completed','cancelled'] as const){const task=f.create();task.status=status;assert.equal(monitor.taskHealth(task).state,'ended');assert.equal(monitor.taskHealth(task).taskStatus,status);}}finally{f.close();}
 });
-for(const command of ['workers.spawn','tasks.retry'])test(`${command} subtracts slow launcher time from first-output IPC budget`,async t=>{
- t.mock.timers.enable({apis:['Date','setTimeout'],now:Date.parse('2030-01-01T00:00:00Z')});const f=fixture(()=>t.mock.timers.tick(3000));try{
- const task=f.create();if(command==='tasks.retry'){task.status='failed';f.store.put(task);}
- const response=f.handler.handleAsync(f.request(command,{taskId:task.id,owner:'claude_owner',...(command==='workers.spawn'?{worker:'codex_worker'}:{})}));let result:any;response.then(value=>result=value);await Promise.resolve();assert.equal(result,undefined);
- t.mock.timers.tick(4999);await Promise.resolve();assert.equal(result,undefined);
- t.mock.timers.tick(1);await new Promise(resolve=>setImmediate(resolve));assert.ok(result,'response settled within the 8 second budget');const final:any=await response;assert.equal(final.ok,true,JSON.stringify(final));assert.equal(final.data.started,false);assert.equal(final.data.status,'running');assert.equal(final.data.next.action,'wait');
- }finally{f.close();t.mock.timers.reset();}
-});
-
 test('OpenCode free usage retrying in 14h41m persists its deadline without an early ladder release', async t => {
  const now=Date.parse('2030-01-01T00:00:00Z');t.mock.timers.enable({apis:['Date'],now});const f=fixture();
  try {

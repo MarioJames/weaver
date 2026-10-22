@@ -1,14 +1,21 @@
-import { API_VERSION, isWriteCommand, type CommandResponse } from '../../../shared/contracts/commands';
+import { API_VERSION, isWriteCommand, type CommandReceipt, type CommandResponse } from '../../../shared/contracts/commands';
 import type { Task } from '../../../shared/contracts/tasks';
 import { object, parseId, text } from '../../../shared/validation';
 import { ContinuationError } from '../../continuation';
 import type { TaskManager } from '../../manager';
 import { closeOwnerHost, closeOwnerHostAsync, launchOwner, launchOwnerAsync, type OwnerLaunchResult } from '../../owner-host';
 import { OwnerIdentity, ownerReceiptKey, setOwnerScope } from '../../owners/identity';
-import { digest, publicTask } from '../tasks/records';
+import { digest } from '../tasks/records';
 import { CommandError, fail } from './errors';
 import type { CommandRegistry, FlowCommand, SyncCommand } from './registry';
 import type { AsyncOwnerHost, CommandFlow } from './types';
+
+/** Receipt JSON may also carry the result committed with an accepted operation (B11). */
+type StoredReceipt = CommandReceipt & { accepted?: CommandResponse };
+interface AcceptanceSink { commit(data: unknown): void }
+let acceptanceSink: AcceptanceSink | undefined;
+/** Dispatch and retry commit their result through the gateway's active receipt in the same transaction. */
+export function acceptCommandResult(data: unknown): void { acceptanceSink?.commit(data); }
 
 /** Runs the external effects a command flow asks for, synchronously or asynchronously, and tracks the asynchronous jobs so drain can abort and await them. */
 export class EffectRunner {
@@ -20,8 +27,7 @@ export class EffectRunner {
   while(!step.done){
    let host:OwnerLaunchResult|undefined;
    try {
-    if(step.value.kind==='first-output'){ /* Synchronous internal callers receive the current snapshot. RPC uses handleAsync. */ }
-    else if(step.value.kind==='close')closeOwnerHost(step.value.host);
+    if(step.value.kind==='close')closeOwnerHost(step.value.host);
     else host=this.hostLauncher(step.value.input);
    }catch(error){step=flow.throw(error);continue;}
    step=flow.next(host);
@@ -45,14 +51,12 @@ export class EffectRunner {
   job.then(settled,settled);return job;
  }
  private async driveAsync(flow:CommandFlow<CommandResponse>,signal:AbortSignal):Promise<CommandResponse>{
-  const deadline=Date.now()+8000;
   let step=flow.next();
   while(!step.done){
    let host:OwnerLaunchResult|undefined;
    try {
     const effect=step.value;
-    if(effect.kind==='first-output')await this.manager.waitForFirstOutput(effect.taskId,Math.max(0,deadline-Date.now()));
-    else if(effect.kind==='close')await (this.asyncHost.closer??closeOwnerHostAsync)(effect.host);
+    if(effect.kind==='close')await (this.asyncHost.closer??closeOwnerHostAsync)(effect.host);
     else host=await (this.asyncHost.launcher??(this.hostLauncher===launchOwner?launchOwnerAsync:async input=>this.hostLauncher(input)))({...effect.input,signal});
    }catch(error){step=flow.throw(error);continue;}
    step=flow.next(host);
@@ -112,22 +116,27 @@ export class CommandGateway {
    if(authenticated){this.scopeOwner(command,args,authenticated);setOwnerScope(args,authenticated);}
    if(isWriteCommand(command)) {
     if(!commandId)fail('INVALID_REQUEST','Mutation requires commandId');
-    receiptKey=authenticated?ownerReceiptKey(authenticated,commandId!):`local-demo:${commandId}`;const hash=digest({command,args});const old=this.manager.store.getReceipt(receiptKey);
-    if(old) {if(old.hash!==hash)fail('IDEMPOTENCY_CONFLICT','commandId already used for different arguments');if(old.response)return old.response;fail('COMMAND_INDETERMINATE','Previous command was interrupted. Inspect tasks/owners before issuing a new command; no automatic replay was performed.');}
+    receiptKey=authenticated?ownerReceiptKey(authenticated,commandId!):`local-demo:${commandId}`;const hash=digest({command,args});const old=this.manager.store.getReceipt(receiptKey) as StoredReceipt|undefined;
+    if(old) {if(old.hash!==hash)fail('IDEMPOTENCY_CONFLICT','commandId already used for different arguments');if(old.response)return old.response;if(old.accepted){this.finish(receiptKey,old.accepted);return old.accepted;}fail('COMMAND_INDETERMINATE','Previous command was interrupted. Inspect tasks/owners before issuing a new command; no automatic replay was performed.');}
     // Durable intent first: a crash can block a retry, but cannot silently repeat a spawn.
     this.manager.store.putReceipt(receiptKey,{hash});
    }
-   let data=Object.hasOwn(this.registry.flow,command)?yield* this.registry.flow[command as FlowCommand](args):this.run(command,args);
-   if((command==='workers.spawn'||command==='tasks.retry') && data && typeof data==='object' && 'id' in data){
-    const snapshot=data as Task; if(snapshot.dispatch?.execution==='real'&&snapshot.status==='running'){
-     yield {kind:'first-output',taskId:snapshot.id};
-     data={...data,...publicTask(this.manager.store.get(snapshot.id)),started:!!this.manager.store.get(snapshot.id).run?.firstOutputAt};
-    }
-   }
+   let data:unknown;
+   const acceptance=Boolean(receiptKey)&&(command==='workers.spawn'||command==='tasks.retry');
+   const previousSink=acceptanceSink;
+   if(acceptance)acceptanceSink={commit:value=>{
+    const receipt=this.manager.store.getReceipt(receiptKey!) as StoredReceipt|undefined;if(!receipt)return;
+    const accepted:CommandResponse={apiVersion:API_VERSION,commandId,ok:true,data:value};
+    const stored:StoredReceipt={...receipt,accepted};
+    this.manager.store.putReceipt(receiptKey!,stored);
+   }};
+   try{data=Object.hasOwn(this.registry.flow,command)?yield* this.registry.flow[command as FlowCommand](args):this.run(command,args);}finally{if(acceptance)acceptanceSink=previousSink;}
    const response:CommandResponse={apiVersion:API_VERSION,commandId,ok:true,data};
    effected=true;if(isWriteCommand(command))this.manager.notify();if(receiptKey)this.finish(receiptKey,response);return response;
   }catch(error){
    if(effected)return {apiVersion:API_VERSION,commandId,ok:false,error:{code:'COMMAND_INDETERMINATE',message:'Command applied but receipt persistence failed; inspect current state before retrying',retryable:false}};
+   // An acceptance already committed is the operation's result even if a post-COMMIT effect failed.
+   if(receiptKey){const receipt=this.manager.store.getReceipt(receiptKey) as StoredReceipt|undefined;if(receipt?.accepted&&!receipt.response){try{this.finish(receiptKey,receipt.accepted);}catch{/* replay can settle it later */}return receipt.accepted;}}
    const response:CommandResponse={apiVersion:API_VERSION,commandId,ok:false,error:{code:error instanceof CommandError||error instanceof ContinuationError?error.code:'INVALID_REQUEST',message:error instanceof Error?error.message:'Command failed',retryable:false}};
    // Never replace a prior receipt on conflict or overwrite an incomplete durable intent.
    if(receiptKey && !['IDEMPOTENCY_CONFLICT','COMMAND_INDETERMINATE'].includes(response.error!.code)) {

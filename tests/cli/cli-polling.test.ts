@@ -84,7 +84,7 @@ test('tasks wait without --for reads the policy before its first poll',async()=>
  }
 });
 
-test('the omitted --for is max_wait_minutes×60 with 30 as the fallback',async()=>{
+test('the omitted --for is max_wait_minutes×60 with 30 as the fallback and no cap',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'wv-poll-'));
  const app=await startLocalIPC(directory,(request:any)=>request.method==='getPolicy'
   ?ok({config:{herdr:{max_wait_minutes:4}}}):ok({status:'ignored'}));
@@ -92,9 +92,9 @@ test('the omitted --for is max_wait_minutes×60 with 30 as the fallback',async()
   assert.equal(await defaultForSeconds(directory),240);
   assert.equal(await defaultForSeconds(justDataDir()),30,'an unreachable endpoint falls back to 30');
   await app.close();
-  for(const [minutes,seconds] of [[15,900],[40,2400],[1440,86400]] as const){
+  for(const [minutes,seconds] of [[11,660],[15,900],[40,2400],[1440,86400]] as const){
    const policy=await startLocalIPC(directory,()=>ok({config:{herdr:{max_wait_minutes:minutes}}}));
-   try{assert.equal(await defaultForSeconds(directory),seconds,`${minutes} minutes waits ${seconds}`);}finally{await policy.close();}
+   try{assert.equal(await defaultForSeconds(directory),seconds,`${minutes} minutes waits ${seconds} with no cap`);}finally{await policy.close();}
   }
   const err=await startLocalIPC(directory,()=>({apiVersion:'weaver.v1',ok:false,error:{code:'PERSISTENCE_ERROR',message:'Policy',retryable:false}}));
   try{assert.equal(await defaultForSeconds(directory),30);}finally{await err.close();}
@@ -117,7 +117,7 @@ test('the omitted --for falls back to 30 when getPolicy never answers',async t=>
 
 function justDataDir(): string { return join(tmpdir(), 'wv-poll-gone', 'absent'); }
 
-test('an explicit --for is honoured without a policy read and keeps the 1..86400 validation',async()=>{
+test('an explicit --for is honoured without a policy read and accepts any positive whole number',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'wv-poll-'));
  const calls:string[]=[];
  const app=await startLocalIPC(directory,(request:any)=>{
@@ -131,12 +131,14 @@ test('an explicit --for is honoured without a policy read and keeps the 1..86400
   assert.equal(await runCLI(['tasks','wait','--task-id','task','--for','1','--output','json','--data-dir',directory]),0);
   assert.equal(JSON.parse(output).data.status,'completed');
   output='';
-  assert.equal(await runCLI(['tasks','wait','--task-id','task','--for','86400','--output','json','--data-dir',directory]),0);
+  assert.equal(await runCLI(['tasks','wait','--task-id','task','--for','100000','--output','json','--data-dir',directory]),0);
   assert.equal(JSON.parse(output).data.status,'completed');
   assert.deepEqual(calls,['tasks.get','tasks.get'],'an explicit --for never reads the policy');
   assert.equal(parseCLI(['tasks','wait','--task-id','task','--for','1']).forSeconds,1);
+  assert.equal(parseCLI(['tasks','wait','--task-id','task','--for','600']).forSeconds,600);
   assert.equal(parseCLI(['tasks','wait','--task-id','task','--for','86400']).forSeconds,86400);
-  for(const invalid of ['0','86401','x'])assert.throws(()=>parseCLI(['tasks','wait','--task-id','task','--for',invalid]),(error:{code:string})=>error.code==='INVALID_ARGUMENT');
+  assert.equal(parseCLI(['tasks','wait','--task-id','task','--for','100000']).forSeconds,100000,'there is no upper bound');
+  for(const invalid of ['0','x'])assert.throws(()=>parseCLI(['tasks','wait','--task-id','task','--for',invalid]),(error:{code:string})=>error.code==='INVALID_ARGUMENT');
  }finally{
   process.stdout.write=original;await app.close();await rm(directory,{recursive:true,force:true});
  }

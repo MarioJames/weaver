@@ -22,7 +22,7 @@ export function chainWorkers(store:TaskManager['store'],task:Task):string[] {
   return workers;
  }
 /** The dispatch steps a retry reuses, so a retry never grows a second launcher. */
-type RetryDispatch = Pick<Dispatcher,'routeOf'|'decideExecution'|'dispatchTask'>;
+type RetryDispatch = Pick<Dispatcher,'routeOf'|'decideExecution'|'accept'>;
 export class Retries {
  constructor(private readonly manager:TaskManager,private readonly policy:PolicyStore,private readonly records:TaskRecords,
   private readonly dispatch:RetryDispatch,private readonly applyVendorBlocks:()=>void){}
@@ -132,24 +132,27 @@ export class Retries {
   const instruction=this.retryInstruction(original,this.chainRoot(original).instruction);
   if(instruction.length>16000)fail('INVALID_REQUEST',`The retried instruction would be ${instruction.length} characters, over the 16000 task limit; shorten the original goal before retrying. Nothing was cancelled or created.`);
   // The package is only a value here, so the child is frozen under the original scope and criteria before any write.
-  const probeId=randomUUID();
-  const pkg:WorkPackage={id:randomUUID(),taskId:probeId,revision:1,instruction,createdAt:new Date().toISOString(),
+  const replacementId=randomUUID();
+  const pkg:WorkPackage={id:randomUUID(),taskId:replacementId,revision:1,instruction,createdAt:new Date().toISOString(),
    scope:frozen?[...frozen.scope]:[decision.workspace??original.workspace??'Explicit mock fixture'],
    acceptanceCriteria:frozen?[...frozen.acceptanceCriteria]:(original.acceptanceCriteria?.length?original.acceptanceCriteria:[decision.execution==='mock'?'Mock output returned for owner review':'Provider result returned for owner review'])};
-  if(decision.execution!=='mock')workerInstruction({...original,id:probeId,instruction,dispatch:undefined,workspace:decision.workspace??original.workspace},pkg);
-  if(willCancel)this.manager.cancel(original.id);
-  const created=this.manager.store.transaction(()=>{
-   const task=this.manager.create({title:original.title,instruction,owner:original.owner,workspace:original.workspace,acceptanceCriteria:original.acceptanceCriteria,constraints:original.constraints});
-   const linked={...pkg,taskId:task.id};
-   this.manager.store.putPackage(linked);
-   task.ownerId=original.ownerId;if(original.parentTaskId)task.parentTaskId=original.parentTaskId;task.retryOf=original.id;task.packageId=linked.id;
+  if(decision.execution!=='mock')workerInstruction({...original,id:replacementId,instruction,dispatch:undefined,workspace:decision.workspace??original.workspace},pkg);
+  // One transaction owns the whole intent: cancellation, replacement, package, retry link, timeline and admission.
+  const accepted=this.manager.store.transaction(()=>{
+   if(willCancel)this.manager.requestCancel(original.id);
+   const task=this.manager.create({title:original.title,instruction,owner:original.owner,workspace:original.workspace,acceptanceCriteria:original.acceptanceCriteria,constraints:original.constraints},replacementId);
+   this.manager.store.putPackage(pkg);
+   task.ownerId=original.ownerId;if(original.parentTaskId)task.parentTaskId=original.parentTaskId;task.retryOf=original.id;task.packageId=pkg.id;
    event(task,'lifecycle',`Linked as a retry of task ${original.id.slice(0,8)} and frozen with its package`);
    this.records.put(task);
-   return this.manager.store.get(task.id);
+   const linkedFrom=this.manager.store.get(original.id);
+   event(linkedFrom,'lifecycle',`Retried as task ${task.id.slice(0,8)}; workers excluded for the chain: ${excludedWorkers.length?excludedWorkers.join(', '):'none'}`);
+   this.records.put(linkedFrom);
+   return this.dispatch.accept(task,route,decision,pkg,excludedWorkers);
   });
-  const linkedFrom=this.manager.store.get(original.id);
-  event(linkedFrom,'lifecycle',`Retried as task ${created.id.slice(0,8)}; workers excluded for the chain: ${excludedWorkers.length?excludedWorkers.join(', '):'none'}`);
-  this.records.put(linkedFrom);
-  return this.dispatch.dispatchTask('workers.spawn',{taskId:created.id,...(provider?{provider}:{})},excludedWorkers);
+  // External termination and the single launch point run only after the intent COMMIT.
+  if(willCancel)this.manager.enforceTermination(original.id);
+  this.manager.notify();
+  return accepted.response;
  }
 }

@@ -1,8 +1,9 @@
-import { openSync, closeSync, readdirSync } from 'node:fs';
+import { openSync, closeSync, readdirSync, readlinkSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { readFileSync } from 'node:fs';
+import { PassThrough, Readable as ReadableImpl } from 'node:stream';
+import { readFileSync, statSync } from 'node:fs';
 import type { Readable, Writable } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
 import { isRealEngineKind } from '../../workspace';
@@ -14,12 +15,76 @@ const TERM_GRACE_MS = 1500;
 export interface OwnedScope extends EventEmitter {
   readonly unit: string;
   pid?: number;
+  /**
+   * Pipe-mode child streams. In file mode (§3.1) the service holds no read
+   * end; these are inert already-ended streams carrying no data. Consumers
+   * must read the log files instead. Kept required so existing pipe-mode
+   * callers are unaffected.
+   */
   stdout: Readable;
   stderr: Readable;
   /** Writable child stdin; only present when startOwnedScope was called with keepStdinOpen. */
   stdin?: Writable;
   kill(signal?: NodeJS.Signals): boolean;
+  /**
+   * Detach without signalling the scope: stop internal timers/polling,
+   * unref the ChildProcess (and any stdio pipe handles) and release them so
+   * the service event loop can empty, remove listeners, and never emit again.
+   * The worker scope itself keeps running.
+   */
+  detach(): void;
 }
+
+/** File-mode log anchors for startOwnedScope (§3.1): pre-created log FDs whose
+ * fstat identity was persisted before spawn. The parent closes its own FD
+ * copies right after spawn; the shell keeps the write FDs for its lifetime. */
+export interface FileScopeFiles {
+  stdoutFd: number;
+  stderrFd: number;
+  exitPath: string;
+  exitTmpPath: string;
+  runId: string;
+  nonce: string;
+}
+
+/**
+ * Fixed sh wrapper (§3.2). The engine runs as a background job with stdin
+ * explicitly preserved (`"$@" 0<&0 <&8 8<&- &`); the shell never execs the
+ * engine, only installs no-op traps, loops `wait` until the real engine status
+ * is observed, then publishes the exit record with tmp+rename. runId/nonce and
+ * paths arrive via environment (WEAVER_RUN_ID/WEAVER_RUN_NONCE/
+ * WEAVER_EXIT_FILE/WEAVER_EXIT_TMP), never interpolated into the script.
+ * The pre-saved fd 8 carries the real stdin on every POSIX sh (dash assigns
+ * /dev/null to an async command's fd 0 before applying redirections); it is
+ * closed in the engine (`8<&-`) so it never leaks to the engine process, and
+ * the shell's own copy is closed right after the background start.
+ */
+export const FILE_SCOPE_SHELL_SCRIPT = [
+  "trap ':' TERM INT HUP",
+  // Anchor stdin before backgrounding: dash assigns /dev/null to an async
+  // command's fd 0 before applying redirections, so a bare `0<&0` would only
+  // duplicate /dev/null there (bash tolerates it). The pre-saved fd 8
+  // carries the real stdin on every POSIX sh; `0<&0` is kept per spec.
+  'exec 8<&0',
+  '"$@" 0<&0 <&8 8<&- &',
+  'child=$!',
+  'exec 8<&-',
+  'code=0',
+  'while :; do',
+  '  wait $child && { code=$?; break; } || code=$?',
+  '  if kill -0 $child 2>/dev/null; then',
+  '    continue',
+  '  else',
+  '    wait $child 2>/dev/null',
+  '    status=$?',
+  '    [ $status -ne 127 ] && code=$status',
+  '    break',
+  '  fi',
+  'done',
+  'printf \'{"runId":"%s","nonce":"%s","pid":%s,"code":%s,"signal":null,"at":"%s"}\\n\' "$WEAVER_RUN_ID" "$WEAVER_RUN_NONCE" "$child" "$code" "$(date -u +%FT%TZ)" > "$WEAVER_EXIT_TMP"',
+  'mv -f "$WEAVER_EXIT_TMP" "$WEAVER_EXIT_FILE"',
+  'exit $code',
+].join('\n');
 
 interface ScopeInfo {
   id?: string;
@@ -64,6 +129,12 @@ async function showScope(unit: string): Promise<ScopeInfo | undefined> {
 function cgroup(pid: number | undefined): string {
   if (!pid) return '';
   try { return readFileSync(`/proc/${pid}/cgroup`, 'utf8'); } catch { return ''; }
+}
+
+/** Test seam: unit tests inject a fake ChildProcess without touching systemd. */
+let spawnImplForTests: typeof spawn | undefined;
+export function __setSpawnImplForTests(fn: typeof spawn | undefined): void {
+  spawnImplForTests = fn;
 }
 
 function owns(unit: string, info: ScopeInfo | undefined, invocation: string | undefined, pid: number | undefined): boolean {
@@ -143,10 +214,10 @@ function userScope(path: string): boolean {
  * never an unrelated process that happens to share the scope.
  */
 export async function cleanupEscapedDescendants(rootPid: number | undefined, ownUnit: string, remembered: ReadonlyMap<number, string> = new Map()): Promise<EscapedCleanup> {
-  if (!rootPid || process.platform !== 'linux') return { units: [], pids: [] };
+  if (process.platform !== 'linux' || (!rootPid && remembered.size === 0)) return { units: [], pids: [] };
   const table = readProcessSnapshots();
   const own = ownUnit.replace(/\.scope$/, '');
-  const tree = processTree(rootPid, table).filter(process => process.pid !== rootPid);
+  const tree = rootPid ? processTree(rootPid, table).filter(process => process.pid !== rootPid) : [];
   const paths = new Map(table.map(process => [process.pid, cgroupPath(process.pid)]));
   const units = new Map<string, number[]>();
   const loose = new Set<number>();
@@ -194,9 +265,243 @@ export async function cleanupEscapedDescendants(rootPid: number | undefined, own
   return cleaned;
 }
 
+/**
+ * Remember descendants that already moved to a foreign user scope while the
+ * worker root is still reachable. Reattached runs have no Sweep timer from
+ * startOwnedScope, so they keep this map themselves for the final cleanup.
+ */
+export function rememberEscapedDescendants(rootPid: number | undefined, ownUnit: string, into: Map<number, string>): void {
+  if (!rootPid || process.platform !== 'linux') return;
+  try {
+    const table = readProcessSnapshots();
+    const own = ownUnit.replace(/\.scope$/, '');
+    for (const process of processTree(rootPid, table)) {
+      if (process.pid === rootPid) continue;
+      const path = cgroupPath(process.pid);
+      const foreign = unitOfCgroup(path ?? null);
+      if (foreign && foreign !== own && path && userScope(path)) into.set(process.pid, foreign);
+    }
+  } catch { /* the next sweep or the live tree at stop covers it */ }
+}
+
+/** Three-state scope inspection (§11.2): present / absent / unknown.
+ * Mirrors the inspect precedent inside recoverOwnedScope: LoadState=not-found
+ * is absent; systemctl failure/timeout/empty output/missing fields are
+ * unknown and must never be folded into absent. */
+export type ScopeInspection =
+  | { state: 'present'; active: string; invocation?: string; cgroup?: string }
+  | { state: 'absent' }
+  | { state: 'unknown'; error: string };
+
+async function showForInspect(unit: string): Promise<{ code: number; stdout: string; stderr: string }> {
+  return systemctl(['show', `${unit}.scope`, '-p', 'Id', '-p', 'LoadState', '-p', 'ActiveState', '-p', 'InvocationID', '-p', 'ControlGroup', '--no-pager']);
+}
+
+export async function inspectScope(unit: string): Promise<ScopeInspection> {
+  if (process.platform !== 'linux') return { state: 'unknown', error: 'Owned CLI scope requires Linux systemd user sessions' };
+  let result: { code: number; stdout: string; stderr: string };
+  try {
+    result = await showForInspect(unit);
+  } catch (error) {
+    return { state: 'unknown', error: `systemctl show ${unit}.scope failed: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  if (/^LoadState=not-found$/m.test(result.stdout)) return { state: 'absent' };
+  if (result.code !== 0 || !result.stdout.trim()) {
+    return { state: 'unknown', error: `systemctl show ${unit}.scope failed (code ${result.code}): ${(result.stderr || result.stdout).trim().slice(0, 500)}` };
+  }
+  const info = parseShow(result.stdout);
+  if (info.id !== `${unit}.scope`) return { state: 'unknown', error: `Scope ${unit} identity changed; manual ownership inspection required` };
+  if (!info.active) return { state: 'unknown', error: `Cannot inspect scope ${unit}; ActiveState is missing` };
+  return { state: 'present', active: info.active, ...(info.invocation ? { invocation: info.invocation } : {}), ...(info.cgroup ? { cgroup: info.cgroup } : {}) };
+}
+
+/** True launcher scan shared with recoverOwnedScope: exact `--unit=<unit>`
+ * systemd-run processes still alive in /proc. */
+function findScopeLauncher(unit: string): boolean {
+  try {
+    for (const entry of readdirSync('/proc')) {
+      if (!/^\d+$/.test(entry)) continue;
+      try {
+        const argv = readFileSync(`/proc/${entry}/cmdline`, 'utf8').split('\0');
+        if (argv[0]?.split('/').at(-1) === 'systemd-run' && argv.includes(`--unit=${unit}`)) return true;
+      } catch {
+        /* Process may have exited while enumerating. */
+      }
+    }
+  } catch {
+    /* /proc unreadable counts as inconclusive; caller treats via inspect. */
+  }
+  return false;
+}
+
+/**
+ * Convergent absence check (§11.2-9): inspect → /proc launcher scan →
+ * inspect. Returns true only when both inspections are absent with no
+ * launcher in between; any unknown yields 'unknown'.
+ */
+export async function confirmScopeAbsent(unit: string): Promise<boolean | 'unknown'> {
+  const first = await inspectScope(unit);
+  if (first.state === 'unknown') return 'unknown';
+  if (first.state === 'present') return false;
+  if (findScopeLauncher(unit)) return false;
+  const second = await inspectScope(unit);
+  if (second.state === 'unknown') return 'unknown';
+  if (second.state === 'present') return false;
+  return true;
+}
+
+function readStarttime(pid: number): string | undefined {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const afterComm = stat.slice(stat.lastIndexOf(')') + 1).trim().split(/\s+/);
+    // Fields after comm: state(1) ppid(2) ... starttime is #22 overall,
+    // i.e. index 19 after comm.
+    return afterComm[19];
+  } catch {
+    return undefined;
+  }
+}
+
+function fdAccessWritable(flagsLine: string): boolean {
+  const match = /^flags:\s*([0-7]+)/m.exec(flagsLine);
+  if (!match) return false;
+  const accmode = parseInt(match[1]!, 8) & 0o3;
+  return accmode === 0o1 || accmode === 0o2;
+}
+
+function cgroupPids(cgroup: string): number[] {
+  // ControlGroup looks like `0::/user.slice/...`; map onto /sys/fs/cgroup.
+  const rel = cgroup.includes('::') ? cgroup.slice(cgroup.indexOf('::') + 2) : cgroup;
+  const root = `/sys/fs/cgroup${rel.startsWith('/') ? rel : `/${rel}`}`;
+  const pids: number[] = [];
+  const stack = [root];
+  while (stack.length > 0) {
+    const dir = stack.pop()!;
+    let entries: string[];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const full = `${dir}/${entry}`;
+      if (entry === 'cgroup.procs') {
+        try {
+          for (const line of readFileSync(full, 'utf8').split('\n')) {
+            if (/^\d+$/.test(line.trim())) pids.push(Number(line.trim()));
+          }
+        } catch {
+          /* cgroup may vanish mid-scan */
+        }
+      } else if (entry !== '.' && entry !== '..') {
+        try {
+          if (statSync(full).isDirectory()) stack.push(full);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+  return pids;
+}
+
+/**
+ * Positive-only FD evidence (§11.4): look for the run's unique log inode
+ * held writable inside the expected unit's cgroup (including sub-cgroups).
+ * PID starttime guards against reuse; InvocationID is read before and after
+ * and must match. A hit returns that InvocationID; anything else (including
+ * "not found") returns undefined and proves nothing about liveness.
+ */
+export async function findFdEvidence(
+  unit: string,
+  identity: { stdout: { dev: number; ino: number }; stderr: { dev: number; ino: number } },
+): Promise<string | undefined> {
+  if (process.platform !== 'linux') return undefined;
+  const before = await inspectScope(unit);
+  if (before.state !== 'present' || !before.invocation || !before.cgroup) return undefined;
+  const match = (dev: number, ino: number): boolean =>
+    (dev === identity.stdout.dev && ino === identity.stdout.ino) || (dev === identity.stderr.dev && ino === identity.stderr.ino);
+  type Hit = { pid: number; fd: number; starttime: string };
+  let hit: Hit | undefined;
+  for (const pid of cgroupPids(before.cgroup)) {
+    let fds: string[];
+    try {
+      fds = readdirSync(`/proc/${pid}/fd`);
+    } catch {
+      continue;
+    }
+    for (const name of fds) {
+      if (!/^\d+$/.test(name)) continue;
+      const link = `/proc/${pid}/fd/${name}`;
+      let st: { dev: number; ino: number };
+      try {
+        st = statSync(link);
+      } catch {
+        continue;
+      }
+      if (!match(st.dev, st.ino)) continue;
+      let fdinfo: string;
+      try {
+        fdinfo = readFileSync(`/proc/${pid}/fdinfo/${name}`, 'utf8');
+      } catch {
+        continue;
+      }
+      if (!fdAccessWritable(fdinfo)) continue;
+      const starttime = readStarttime(pid);
+      if (starttime === undefined) continue;
+      hit = { pid, fd: Number(name), starttime };
+      break;
+    }
+    if (hit) break;
+  }
+  if (!hit) return undefined;
+  const after = await inspectScope(unit);
+  if (after.state !== 'present' || after.invocation !== before.invocation) return undefined;
+  // Re-verify the same process still holds the same file: starttime guards
+  // PID reuse, fstat guards fd recycling.
+  if (readStarttime(hit.pid) !== hit.starttime) return undefined;
+  try {
+    const st = statSync(`/proc/${hit.pid}/fd/${hit.fd}`);
+    if (!match(st.dev, st.ino)) return undefined;
+  } catch {
+    return undefined;
+  }
+  return after.invocation;
+}
+
+export type KillOwnedScopeResult = { ok: true } | { ok: false; reason: string; detail?: string };
+
+/**
+ * Kill primitive for file-mode scopes (§9.4 support): refuse unless the scope
+ * is present with a matching invocation; unknown inspection refuses without
+ * acting. SIGKILL is followed by stop; other signals only kill the cgroup.
+ */
+export async function killOwnedScope(unit: string, invocation: string | undefined, signal: NodeJS.Signals): Promise<KillOwnedScopeResult> {
+  if (process.platform !== 'linux') return { ok: false, reason: 'unsupported-platform' };
+  const info = await inspectScope(unit);
+  if (info.state === 'absent') return { ok: false, reason: 'absent' };
+  if (info.state === 'unknown') return { ok: false, reason: 'unknown', detail: info.error };
+  if (!invocation || info.invocation !== invocation) {
+    return { ok: false, reason: 'invocation-mismatch', detail: `expected ${invocation ?? '<missing>'}, scope has ${info.invocation ?? '<missing>'}` };
+  }
+  const killed = await systemctl(['kill', '-s', signal, '--kill-whom=all', `${unit}.scope`]);
+  if (killed.code !== 0) {
+    return { ok: false, reason: 'kill-failed', detail: (killed.stderr || killed.stdout).trim().slice(0, 500) };
+  }
+  if (signal === 'SIGKILL') {
+    const stopped = await systemctl(['stop', `${unit}.scope`]);
+    if (stopped.code !== 0) {
+      return { ok: false, reason: 'stop-failed', detail: (stopped.stderr || stopped.stdout).trim().slice(0, 500) };
+    }
+  }
+  return { ok: true };
+}
+
 /** One systemd user scope around a fixed argv. Descendants stay in the cgroup and die with it. */
-export function startOwnedScope(options: { command: readonly string[]; cwd: string; env: NodeJS.ProcessEnv; stdin: string | null; stdinPath?: string; unit: string; keepStdinOpen?: boolean; detached?: boolean }): OwnedScope {
+export function startOwnedScope(options: { command: readonly string[]; cwd: string; env: NodeJS.ProcessEnv; stdin: string | null; stdinPath?: string; unit: string; keepStdinOpen?: boolean; detached?: boolean; files?: FileScopeFiles }): OwnedScope {
   if (options.keepStdinOpen && (options.stdin !== null || options.stdinPath !== undefined)) throw new Error('keepStdinOpen requires stdin: null and no stdinPath');
+  if (options.files && options.keepStdinOpen) throw new Error('File-mode scope does not support keepStdinOpen');
+  if (options.files && options.stdin !== null && options.stdinPath === undefined) throw new Error('File-mode scope requires stdin from a prompt file or null');
   if (process.platform !== 'linux') throw new Error('Owned CLI scope requires Linux systemd user sessions');
   const handle = new EventEmitter() as OwnedScope;
   let invocation: string | undefined;
@@ -208,38 +513,50 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
   let exitCode: number | null = null;
   let exitSignal: NodeJS.Signals | null = null;
   let closed = false;
+  let detached = false;
   let stopPromise: Promise<void> | undefined;
   const unit = options.unit;
+  const files = options.files;
   let promptFd: number | undefined;
   try { if(options.stdinPath)promptFd=openSync(options.stdinPath,'r'); } catch(error) { throw new Error(`Prompt delivery failed: ${String(error)}`); }
+  // File mode wraps the engine in the fixed sh shell (§3.2); runId/nonce and
+  // paths travel via environment, never interpolated into the script string.
+  const scopeEnv: NodeJS.ProcessEnv = files
+    ? { ...options.env, WEAVER_RUN_ID: files.runId, WEAVER_RUN_NONCE: files.nonce, WEAVER_EXIT_FILE: files.exitPath, WEAVER_EXIT_TMP: files.exitTmpPath }
+    : options.env;
+  const scopeCommand: readonly string[] = files ? ['sh', '-c', FILE_SCOPE_SHELL_SCRIPT, 'sh', ...options.command] : options.command;
   let child: ChildProcessWithoutNullStreams;
-  try { child = spawn('systemd-run', [
+  const spawnFn = spawnImplForTests ?? spawn;
+  try { child = spawnFn('systemd-run', [
     '--user', '--scope', '--collect', '--quiet', `--unit=${unit}`, `--working-directory=${options.cwd}`,
     '-p', 'MemoryHigh=8G', '-p', 'MemoryMax=10G', '-p', 'KillMode=control-group',
-    '--', ...options.command,
-  ], { cwd: options.cwd, env: options.env, shell: false, windowsHide: true, detached: options.detached ?? false, stdio: [promptFd ?? 'pipe', 'pipe', 'pipe'] }) as ChildProcessWithoutNullStreams;
-  } finally { if(promptFd!==undefined)closeSync(promptFd); }
+    '--', ...scopeCommand,
+  ], { cwd: options.cwd, env: scopeEnv, shell: false, windowsHide: true, detached: options.detached ?? false, stdio: [promptFd ?? (files ? 'ignore' : 'pipe'), files ? files.stdoutFd : 'pipe', files ? files.stderrFd : 'pipe'] }) as ChildProcessWithoutNullStreams;
+  } finally {
+    if(promptFd!==undefined)closeSync(promptFd);
+    // The child holds its own duplicates of the log FDs; close our copies so
+    // the service never retains a write end and EOF/unlink behave correctly.
+    if(files){ try{closeSync(files.stdoutFd);}catch{/* already closed */} try{closeSync(files.stderrFd);}catch{/* already closed */} }
+  }
   (handle as { unit: string }).unit = unit;
   handle.pid = child.pid;
-  handle.stdout = child.stdout;
-  handle.stderr = child.stderr;
+  if (files) {
+    // No pipe read ends exist in file mode; expose inert already-ended
+    // streams so the handle shape stays stable for pipe-mode callers.
+    const inert = (): Readable => new ReadableImpl({ read() { this.push(null); } });
+    handle.stdout = inert();
+    handle.stderr = inert();
+  } else {
+    handle.stdout = child.stdout;
+    handle.stderr = child.stderr;
+  }
   // Remember foreign scopes while the process tree is still reachable: a command can outlive its vendor CLI.
   const rememberedEscapes = new Map<number, string>();
-  const rememberEscapes = () => {
-    if (process.platform !== 'linux' || !child.pid) return;
-    try {
-      const table = readProcessSnapshots();
-      for (const process of processTree(child.pid, table)) {
-        if (process.pid === child.pid) continue;
-        const path = cgroupPath(process.pid);
-        const foreign = unitOfCgroup(path ?? null);
-        if (foreign && foreign !== unit.replace(/\.scope$/, '') && path && userScope(path)) rememberedEscapes.set(process.pid, foreign);
-      }
-    } catch { /* the next sweep or the live tree at stop covers it */ }
-  };
+  const rememberEscapes = () => rememberEscapedDescendants(child.pid, unit, rememberedEscapes);
   const escapedTimer = setInterval(rememberEscapes, 3000);
   escapedTimer.unref?.();
   if (promptFd !== undefined) { /* inherited read-only prompt file */ }
+  else if (files) { /* file mode: stdin is the prompt fd or ignore; nothing to write */ }
   else if (options.keepStdinOpen) {
     handle.stdin = child.stdin;
     child.stdin.on('error', error => handle.emit('error', new Error(`Scope stdin failed: ${error.message}`)));
@@ -253,18 +570,21 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
   let verifyInFlight = false;
   let verifyTimer: ReturnType<typeof setInterval> | undefined;
   let verifyDeadline: ReturnType<typeof setTimeout> | undefined;
+  let verifyImmediate: NodeJS.Immediate | undefined;
   const stopVerify = () => {
     verifyStopped = true;
     if (verifyTimer) clearInterval(verifyTimer);
     if (verifyDeadline) clearTimeout(verifyDeadline);
+    verifyTimer = undefined;
+    verifyDeadline = undefined;
   };
   const verify = () => {
-    if (verifyStopped || verifyInFlight) return;
+    if (detached || verifyStopped || verifyInFlight) return;
     verifyInFlight = true;
     void showScope(unit).then(info => {
-      if (verifyStopped) return;
+      if (detached || verifyStopped) return;
       if (info?.invocation) { invocation ??= info.invocation; handle.emit('identity', invocation); }
-      if (info?.mainPid) handle.pid = info.mainPid;
+      if (info?.mainPid && info.mainPid !== handle.pid) handle.emit('pid', (handle.pid = info.mainPid));
       // Keep observing until the manager has published InvocationID: an early
       // activation frame can already match the unit name without an identity.
       if (owns(unit, info, invocation, child.pid) && info?.invocation) stopVerify();
@@ -273,10 +593,10 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
   verifyTimer = setInterval(verify, 50);
   // Let every constructor listener attach before the first asynchronous observation;
   // a systemd scope can otherwise start and finish inside one fast turn.
-  setImmediate(verify);
+  verifyImmediate = setImmediate(verify);
   const live = (info: ScopeInfo | undefined): boolean => info?.active === 'active' || info?.active === 'activating' || info?.active === 'deactivating';
   const finish = () => {
-    if (closed) return;
+    if (closed || detached) return;
     closed = true;
     clearInterval(escapedTimer);
     stopVerify();
@@ -354,13 +674,14 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
     return stopPromise;
   };
   const afterStop = (signal: NodeJS.Signals) => {
+    if (detached) return;
     void stop(signal).then(() => finish()).catch(error => {
       const message = error instanceof Error ? error.message : String(error);
-      if (!/still active/.test(message)) handle.emit('error', error instanceof Error ? error : new Error(message));
+      if (!detached && !/still active/.test(message)) handle.emit('error', error instanceof Error ? error : new Error(message));
     });
   };
   verifyDeadline = setTimeout(() => {
-    if (verifyStopped || closed || child.exitCode !== null || exitCode !== null) {
+    if (detached || verifyStopped || closed || child.exitCode !== null || exitCode !== null) {
       stopVerify();
       return;
     }
@@ -370,22 +691,53 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
       handle.emit('error', new Error(`CLI scope ${unit} did not own the launched process`));
       void stop('SIGKILL').catch(error => {
         const message = error instanceof Error ? error.message : String(error);
-        if (!/still active/.test(message)) handle.emit('error', error instanceof Error ? error : new Error(message));
+        if (!detached && !/still active/.test(message)) handle.emit('error', error instanceof Error ? error : new Error(message));
       });
     }
   }, VERIFY_MS);
   handle.kill = signal => {
     const requested = signal ?? 'SIGTERM';
-    if (closed || (cancelRequested && (requested !== 'SIGKILL' || forceKill))) return false;
+    if (detached || closed || (cancelRequested && (requested !== 'SIGKILL' || forceKill))) return false;
     cancelRequested = true;
     exitSignal = requested;
     void stop(exitSignal).catch(error => {
       const message = error instanceof Error ? error.message : String(error);
-      if (!/still active/.test(message)) handle.emit('error', error instanceof Error ? error : new Error(message));
+      if (!detached && !/still active/.test(message)) handle.emit('error', error instanceof Error ? error : new Error(message));
     });
     return true;
   };
+  handle.detach = () => {
+    if (detached) return;
+    detached = true;
+    clearInterval(escapedTimer);
+    stopVerify();
+    if (verifyImmediate !== undefined) {
+      clearImmediate(verifyImmediate);
+      verifyImmediate = undefined;
+    }
+    // Release stdio pipe handles without signalling the worker, then unref
+    // the launcher handle itself so a detached run never keeps the loop alive.
+    try { (child.stdout as unknown as { unref?: () => void } | null)?.unref?.(); } catch { /* ignore */ }
+    try { (child.stderr as unknown as { unref?: () => void } | null)?.unref?.(); } catch { /* ignore */ }
+    try { (child.stdin as unknown as { unref?: () => void } | null)?.unref?.(); } catch { /* ignore */ }
+    try { child.unref(); } catch { /* ignore */ }
+    try { (child.stdout as unknown as { removeAllListeners?: () => void } | null)?.removeAllListeners?.(); } catch { /* ignore */ }
+    try { (child.stderr as unknown as { removeAllListeners?: () => void } | null)?.removeAllListeners?.(); } catch { /* ignore */ }
+    try { (child.stdin as unknown as { removeAllListeners?: () => void } | null)?.removeAllListeners?.(); } catch { /* ignore */ }
+    try { child.removeAllListeners('exit'); } catch { /* ignore */ }
+    try { child.removeAllListeners('close'); } catch { /* ignore */ }
+    try { child.removeAllListeners('error'); } catch { /* ignore */ }
+    // Destroy parent-side streams (file mode: inert; pipe mode: read ends).
+    // Child listeners are already removed so this emits nothing on the child.
+    try { (child.stdout as unknown as { destroy?: () => void } | null)?.destroy?.(); } catch { /* ignore */ }
+    try { (child.stderr as unknown as { destroy?: () => void } | null)?.destroy?.(); } catch { /* ignore */ }
+    try { (handle.stdout as unknown as { destroy?: () => void })?.destroy?.(); } catch { /* ignore */ }
+    try { (handle.stderr as unknown as { destroy?: () => void })?.destroy?.(); } catch { /* ignore */ }
+    try { (handle.stdin as unknown as { destroy?: () => void })?.destroy?.(); } catch { /* ignore */ }
+    handle.removeAllListeners();
+  };
   child.on('error', error => {
+    if (detached) return;
     stopVerify();
     handle.emit('error', error);
     exitCode = exitCode ?? 1;
@@ -398,16 +750,18 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
   // still publishes the final event only after the streams drain and the scope
   // is reclaimed; output is never destroyed to force an earlier close.
   child.on('exit', (code, signal) => {
+    if (detached) return;
     childClosed = true;
     exitCode = code;
     if (!exitSignal && signal) exitSignal = signal;
     stopVerify();
     void stop(cancelRequested ? exitSignal ?? 'SIGTERM' : 'SIGTERM').catch(error => {
       const message = error instanceof Error ? error.message : String(error);
-      if (!/still active/.test(message)) handle.emit('error', error instanceof Error ? error : new Error(message));
+      if (!detached && !/still active/.test(message)) handle.emit('error', error instanceof Error ? error : new Error(message));
     });
   });
   child.on('close', (code, signal) => {
+    if (detached) return;
     childClosed = true;
     exitCode = code;
     if (!exitSignal && signal) exitSignal = signal;

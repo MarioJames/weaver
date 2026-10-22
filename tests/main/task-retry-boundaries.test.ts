@@ -87,7 +87,8 @@ for (const frozen of [true, false]) for (const active of [false, true]) {
       const retried=response.data as Task;
       assert.equal(retried.retryOf,original.id);
       assert.equal(metadataOf(f.store).packages.length,1001);
-      assert.equal(f.children.length,launches+1);
+      const started=Date.now()+2000;while(f.children.length<launches+1&&Date.now()<started)await new Promise(resolve=>setTimeout(resolve,5));
+      assert.equal(f.children.length,launches+1,'the pump starts the committed replacement');
       assert.deepEqual(f.store.get(original.id).artifacts,task.artifacts,'partial work survives retry');
       assert.equal(f.store.get(original.id).status,active?'cancelling':'completed');
       if(frozen)assert.deepEqual(f.store.getPackage(retried.packageId!)!.scope,pkg.scope);

@@ -74,6 +74,8 @@ test('field reads and file-backed review round-trip unicode, newlines and quotes
 });
 
 test('failed responses are never projected into success-looking scalar output', async () => {
+  // Let the runner flush its own completion event before this test captures stdout.
+  await new Promise(resolve => setImmediate(resolve));
   const original = process.stdout.write;
   let output = '';
   try {

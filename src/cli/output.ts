@@ -39,6 +39,7 @@ function renderData(data: unknown): string {
   }
   if (typeof record.status === 'string' && typeof record.title === 'string') {
     const lines = [`${record.id ?? ''} ${record.status} ${record.title}`.trim()];
+    if (record.reason === 'handoff') lines.push(`task ${record.taskId ?? record.id ?? 'unknown'} attempt ${record.attemptId ?? 'unknown'}`);
     if (record.next && typeof record.next === 'object') lines.push(...renderNext(record.next as Record<string, unknown>));
     if (Array.isArray(record.excludedWorkers) && record.excludedWorkers.length) lines.push(`excluded workers: ${record.excludedWorkers.join(', ')}`);
     return lines.join('\n');

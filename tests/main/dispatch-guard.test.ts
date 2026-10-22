@@ -106,10 +106,12 @@ test('real dispatch freezes an existing absolute workspace and does not launch w
     assert.equal(spawned.data.dispatch.execution, 'real');
     assert.equal(spawned.data.dispatch.workspace, realpathSync(workspace));
     assert.equal(spawned.data.dispatch.model, 'gpt-6.1-sol');
-    assert.equal(spawned.data.run.adapter, 'codex');
+    assert.equal(spawned.data.status, 'queued');
+    assert.equal(spawned.data.started, false);
     assert.equal(spawned.data.dispatch.maxWaitMinutes, 15);
-    assert.equal(spawned.data.run.timeoutMs, undefined);
     assert.equal(f.mockStarts(), 0);
+    assert.equal(f.seen.length, 0, 'dispatch alone starts nothing');
+    await new Promise(resolve => setImmediate(resolve));
     assert.equal(f.seen[0].engine, 'codex');
     assert.equal(f.seen[0].workspace, realpathSync(workspace));
     assert.equal(f.seen[0].role, 'worker');
@@ -124,6 +126,8 @@ test('real dispatch freezes an existing absolute workspace and does not launch w
     assert.equal(done.status, 'completed');
     assert.equal(done.dispatch?.worker, 'codex_worker');
     assert.equal(done.dispatch?.model, 'gpt-6.1-sol');
+    assert.equal(done.run?.adapter, 'codex');
+    assert.equal((done.run as { timeoutMs?: unknown } | undefined)?.timeoutMs, undefined);
   } finally { await f.close(); rmSync(workspace, { recursive: true, force: true }); }
 });
 
@@ -135,10 +139,11 @@ test('a real run outlives its frozen wait bound and the mock test hook; only the
     assert.equal(spawned.ok, true, JSON.stringify(spawned));
     assert.equal(spawned.data.dispatch.execution, 'real');
     assert.equal(spawned.data.dispatch.maxWaitMinutes, 15);
-    assert.equal(spawned.data.run.timeoutMs, undefined);
+    assert.equal(spawned.data.status, 'queued');
     await new Promise(resolve => setTimeout(resolve, 400));
     const running = f.store.get(created.data.id);
     assert.equal(running.status, 'running');
+    assert.equal((running.run as { timeoutMs?: unknown } | undefined)?.timeoutMs, undefined);
     assert.equal(running.events.some(e => e.kind === 'error'), false);
     assert.equal(f.seen.length, 1);
     assert.equal(f.raw('tasks.cancel', { taskId: created.data.id }).data.status, 'cancelling');
@@ -191,6 +196,7 @@ test('a lower max_parallel blocks the next start and does not stop work already 
     const firstId = (first.data as { id: string }).id;
     const secondId = (second.data as { id: string }).id;
     assert.equal(spawn(firstId).ok, true);
+    await new Promise<void>(resolve=>setImmediate(resolve));
     assert.equal(store.get(firstId).status, 'running');
     assert.equal(store.get(firstId).dispatch?.maxParallel, 1);
     const queued = spawn(secondId);
@@ -267,8 +273,9 @@ test('requested and observed provider facts survive completion and reload, bound
  });try{
   const created=f.raw('tasks.create',{title:'Evidence',instruction:'inspect fixture',owner,workspace:f.dir});
   const spawned=f.raw('workers.spawn',{taskId:created.data.id,owner:'claude_owner',worker:'codex_worker'});assert.equal(spawned.ok,true,JSON.stringify(spawned));
-  await new Promise(resolve=>setImmediate(resolve));
-  const task=f.store.get(created.data.id);assert.equal(task.status,'completed');assert.equal(task.dispatch?.model,'gpt-6.1-sol');
+  const deadline=Date.now()+3000;let task=f.store.get(created.data.id);
+  while(task.status!=='completed'&&Date.now()<deadline){await new Promise(resolve=>setTimeout(resolve,15));task=f.store.get(created.data.id);}
+  assert.equal(task.status,'completed');assert.equal(task.dispatch?.model,'gpt-6.1-sol');
   assert.equal(task.run?.scopeUnit,'weaver-cli-codex-owned-fixture');assert.equal(task.run?.evidence?.vendorModel,'reported-model');assert.equal(task.run?.evidence?.terminal,'success');assert.equal(task.run?.evidence?.vendorSessionId?.length,512);
   const trace=f.raw('observability.get',{taskId:task.id}).data;assert.equal(trace.run.evidence.vendorModel,'reported-model');assert.equal(trace.run.scopeUnit,task.run?.scopeUnit);
   const reopened=new TaskStore(f.store.path);assert.deepEqual(reopened.get(task.id).run?.evidence,task.run?.evidence);assert.equal(f.raw('tasks.get',{taskId:task.id}).data.run.pid,undefined);

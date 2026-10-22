@@ -137,7 +137,7 @@
       "additionalProperties": false,
       "properties": {
         "max_wait_minutes": {
-          "description": "Retained upstream wait preference, unused by current Weaver runtime.",
+          "description": "Decides the default timeout of tasks wait/watch when --for is omitted: the command waits max_wait_minutes × 60 seconds. It does not impose an execution deadline.",
           "type": "integer",
           "minimum": 1
         },

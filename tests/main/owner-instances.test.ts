@@ -159,12 +159,14 @@ test('two instances of one profile hold their own slots through admission, queue
     const a = f.attach('Pane A', 'session-a');
     const b = f.attach('Pane B', 'session-b');
     const [a1, a2, b1] = [f.taskOn(a.id, 'A first'), f.taskOn(a.id, 'A second'), f.taskOn(b.id, 'B first')];
-    assert.equal(f.dispatch(a1).status, 'running');
+    assert.equal(f.dispatch(a1).status, 'queued', 'admission is durable before the pump starts it');
+    await f.waitFor(a1.id, 'running');
     const waiting = f.dispatch(a2);
     assert.equal(waiting.status, 'queued');
     assert.equal(waiting.scheduled, true, 'instance A is full');
     assert.match(waiting.queueReason?.message ?? '', /^Owner instance Pane A of profile codex_owner is at its current concurrency limit \(1\)/);
-    assert.equal(f.dispatch(b1).status, 'running', 'A being full says nothing about B');
+    assert.equal(f.dispatch(b1).status, 'queued', 'A being full says nothing about B');
+    await f.waitFor(b1.id, 'running');
     assert.deepEqual(f.instances().map(owner => [owner.name, owner.runningTaskCount]), [['Pane A', 1], ['Pane B', 1]]);
     f.call('tasks.cancel', { taskId: a1.id });
     assert.equal((await f.waitFor(a2.id, 'running')).status, 'running', 'the released slot goes to the same instance');
@@ -177,9 +179,14 @@ test('an unbound legacy task keeps its own profile group and never spends an att
   const f = setup();
   try {
     f.parallel(1);
-    assert.equal(f.dispatch(f.legacyTask('Legacy first'), 'codex_owner').status, 'running');
+    const legacyFirst = f.legacyTask('Legacy first');
+    f.dispatch(legacyFirst, 'codex_owner');
+    await f.waitFor(legacyFirst.id, 'running');
     const attached = f.attach('Pane A', 'session-a');
-    assert.equal(f.dispatch(f.taskOn(attached.id, 'Bound first')).status, 'running', 'a profile-level legacy run does not fill the instance');
+    const boundFirst = f.taskOn(attached.id, 'Bound first');
+    f.dispatch(boundFirst);
+    await f.waitFor(boundFirst.id, 'running');
+    assert.equal(f.store.get(boundFirst.id).status, 'running', 'a profile-level legacy run does not fill the instance');
     assert.equal(f.dispatch(f.legacyTask('Legacy second'), 'codex_owner').scheduled, true, 'legacy work still shares one profile group');
     assert.deepEqual(f.instances().map(owner => owner.runningTaskCount), [1]);
     assert.equal(f.dispatch(f.taskOn(attached.id, 'Bound second')).scheduled, true, 'the instance limit still binds its own work');
@@ -195,11 +202,13 @@ test('weighted worker load stays global across owner instances', async () => {
     f.policy.save({ revision: s.revision, config: s.config, blocks: [] });
     const a = f.attach('Pane A', 'session-a');
     const b = f.attach('Pane B', 'session-b');
-    assert.equal(f.dispatch(f.taskOn(a.id)).dispatch.worker, 'codex_worker', 'an idle instance starts at the higher-weight worker');
-    const onB = f.dispatch(f.taskOn(b.id)).dispatch;
-    assert.equal(onB.worker, 'codex_alt_worker', 'instance B sees instance A load and takes the free worker');
+    const onA = f.taskOn(a.id); f.dispatch(onA); await f.waitFor(onA.id, 'running');
+    assert.equal(f.store.get(onA.id).dispatch?.worker, 'codex_worker', 'an idle instance starts at the higher-weight worker');
+    const onB = f.taskOn(b.id); f.dispatch(onB); await f.waitFor(onB.id, 'running');
+    assert.equal(f.store.get(onB.id).dispatch?.worker, 'codex_alt_worker', 'instance B sees instance A load and takes the free worker');
     assert.deepEqual(workerLoad(f.store.list()), { codex_worker: 1, codex_alt_worker: 1 });
-    assert.equal(f.dispatch(f.taskOn(a.id)).dispatch.worker, 'codex_worker', 'the least loaded worker wins regardless of which instance holds the other run');
+    const third = f.taskOn(a.id); f.dispatch(third); await f.waitFor(third.id, 'running');
+    assert.equal(f.store.get(third.id).dispatch?.worker, 'codex_worker', 'the least loaded worker wins regardless of which instance holds the other run');
     assert.deepEqual(workerLoad(f.store.list()), { codex_worker: 2, codex_alt_worker: 1 });
   } finally { await f.close(); }
 });
@@ -210,8 +219,9 @@ test('runningTaskCount counts running and cancelling work bound to that instance
     f.parallel(2);
     const a = f.attach('Pane A', 'session-a');
     f.attach('Pane B', 'session-b');
-    const busy = f.dispatch(f.taskOn(a.id, 'Running'));
-    const stopping = f.dispatch(f.taskOn(a.id, 'Stopping'));
+    const busyTask = f.taskOn(a.id, 'Running'); f.dispatch(busyTask); await f.waitFor(busyTask.id, 'running');
+    const stoppingTask = f.taskOn(a.id, 'Stopping'); f.dispatch(stoppingTask); await f.waitFor(stoppingTask.id, 'running');
+    const busy = f.store.get(busyTask.id); const stopping = f.store.get(stoppingTask.id);
     assert.deepEqual([busy.status, stopping.status], ['running', 'running']);
     const cancelled = f.call('tasks.cancel', { taskId: stopping.id });
     assert.equal(cancelled.status, 'cancelling');
@@ -230,7 +240,8 @@ test('queued and terminal work hold no slot of their instance', async () => {
   try {
     f.parallel(1);
     const a = f.attach('Pane A', 'session-a');
-    const busy = f.dispatch(f.taskOn(a.id, 'Busy'));
+    const busyTask = f.taskOn(a.id, 'Busy'); f.dispatch(busyTask); await f.waitFor(busyTask.id, 'running');
+    const busy = f.store.get(busyTask.id);
     const waiting = f.dispatch(f.taskOn(a.id, 'Waiting'));
     assert.equal(waiting.scheduled, true);
     assert.equal(f.instances().find(owner => owner.id === a.id)?.runningTaskCount, 1, 'the scheduled task holds no slot');

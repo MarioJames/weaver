@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { LocalIPCError } from '../main/local-ipc';
 import { CLI_CATALOG, catalogCommand } from './catalog';
 import type { OutputFormat } from './output';
+import { isReconnectCommand } from './reconnect';
 
 export const DEFAULT_WEB_PORT = 4737;
 export function defaultDataDir(): string {
@@ -17,6 +18,8 @@ export interface CLIOptions {
   dataDir: string;
   output: OutputFormat;
   forSeconds?: number;
+  reconnectGraceSeconds?: number;
+  reconnectMaxIntervalSeconds?: number;
   engine?: string;
   worker?: string;
   cancel?: boolean;
@@ -39,7 +42,7 @@ export function positionals(argv: string[]): string[] {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg.startsWith('--')) { words.push(arg); continue; }
-    if (['--input', '--command-id', '--data-dir', '--task-id', '--schedule-id', '--port', '--output', '--for', '--agent', '--dir', '--timeout', '--engine', '--worker', '--field', '--expected-revision', '--manifest-digest', '--decision', '--comment', '--comment-file', '--owner-file'].includes(arg)) i++;
+    if (['--input', '--command-id', '--data-dir', '--task-id', '--schedule-id', '--port', '--output', '--for', '--reconnect-grace', '--reconnect-max-interval-s', '--agent', '--dir', '--timeout', '--engine', '--worker', '--field', '--expected-revision', '--manifest-digest', '--decision', '--comment', '--comment-file', '--owner-file'].includes(arg)) i++;
   }
   return words;
 }
@@ -72,8 +75,20 @@ export function parseCLI(argv: string[]): CLIOptions {
     if (arg === '--output') { output = takeOutput(argv, ++i).format; continue; }
     if (arg === '--for') {
       const value = argv[++i];
-      if (!value || !/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 86400) throw new LocalIPCError('INVALID_ARGUMENT', '--for must be a whole number of seconds from 1 through 86400');
+      if (!value || !/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < 1) throw new LocalIPCError('INVALID_ARGUMENT', '--for must be a whole number of seconds of at least 1');
       options.forSeconds = Number(value);
+      continue;
+    }
+    if (arg === '--reconnect-grace') {
+      const value = argv[++i];
+      if (!value || !/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) throw new LocalIPCError('INVALID_ARGUMENT', '--reconnect-grace must be a whole number of seconds of at least 0');
+      options.reconnectGraceSeconds = Number(value);
+      continue;
+    }
+    if (arg === '--reconnect-max-interval-s') {
+      const value = argv[++i];
+      if (!value || !/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < 1) throw new LocalIPCError('INVALID_ARGUMENT', '--reconnect-max-interval-s must be a whole number of seconds of at least 1');
+      options.reconnectMaxIntervalSeconds = Number(value);
       continue;
     }
     if (arg === '--expected-revision') {
@@ -98,6 +113,8 @@ export function parseCLI(argv: string[]): CLIOptions {
   if (!options.command && !options.input) throw new LocalIPCError('INVALID_ARGUMENT', 'A command or --input envelope is required');
   if (options.input && CLI_CATALOG.find(item => item.command === options.command)?.local) throw new LocalIPCError('INVALID_ARGUMENT', 'tasks wait/watch do not accept --input; use --task-id and --for');
   if (options.forSeconds !== undefined && !CLI_CATALOG.find(item => item.command === options.command)?.local) throw new LocalIPCError('INVALID_ARGUMENT', '--for is only valid for tasks wait and tasks watch');
+  if ((options.reconnectGraceSeconds !== undefined || options.reconnectMaxIntervalSeconds !== undefined) &&
+    options.command !== undefined && !isReconnectCommand(options.command)) throw new LocalIPCError('INVALID_ARGUMENT', '--reconnect-grace and --reconnect-max-interval-s are only valid for tasks get, tasks wait, tasks watch, tasks events and tasks health');
   if (options.scheduleId !== undefined) {
     if (!['schedules.get', 'schedules.update', 'schedules.delete', 'schedules.enable', 'schedules.disable', 'schedules.run', 'schedules.cancel', 'schedules.runs'].includes(options.command ?? '')) throw new LocalIPCError('INVALID_ARGUMENT', '--schedule-id is only valid for schedules get/update/delete/enable/disable/run/cancel/runs');
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.scheduleId)) throw new LocalIPCError('INVALID_ARGUMENT', '--schedule-id must be a UUID');

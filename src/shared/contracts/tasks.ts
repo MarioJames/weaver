@@ -37,8 +37,38 @@ export interface AgentRun {
   engine?: string; model?: string; effort?: string; workspace?: string;
   scopeUnit?: string; evidence?: CliAgentEvidence;
   pid?: number; firstOutputAt?: string; startedAt?: string; endedAt?: string; exitCode?: number | null;
+  /** Startup permission commit time: absent means the run is still preparing and never allowed to spawn. */
+  launchPermittedAt?: string;
+  /** Scope attribution: the systemd InvocationID persisted once the identity event lands. */
+  scopeInvocation?: string;
+  /** Service-side only log/exit locations under stateDir. */
+  stateDir?: string;
+  logs?: { stdout: string; stderr: string; exit: string; exitTmp?: string };
+  /** Pre-spawn fstat of the log files; the anchor for FD-based attribution. */
+  logIdentity?: { stdout: { dev: number; ino: number }; stderr: { dev: number; ino: number } };
+  /** 32hex binding for the exit file and FD evidence. */
+  nonce?: string;
+  /** Committed replay cursor: byte offsets plus the applied normalized-record count. */
+  replay?: { stdoutOffset: number; stderrOffset: number; appliedRecords: number };
+  /** Finish-batch commit time: the idempotency mark that skips finish replay on reattach. */
+  finalizedAt?: string;
+  /** Absolute termination deadline fixed at the first termination request; never extended on restart. */
+  killAfter?: string;
+  /** Termination stage, only moves forward. */
+  terminationPhase?: 'term' | 'kill';
+  cancelRequestedAt?: string;
+  cancelSignal?: string;
+  /** Absolute no-output deadline (startedAt + 120s); not renewed across restarts. */
+  noOutputDeadline?: string;
+  vendorError?: string;
+  retryAt?: string;
+  stderrTail?: string;
+  resultSummary?: string;
+  logTruncated?: boolean;
+  /** Recovery-pending marker, visible to UI/CLI with a reason. */
+  recovery?: { state: 'pending'; reason: string; since: string };
 }
-export interface TaskFailure { kind: 'early_exit'|'no_output'|'rate_limit'|'quota'|'auth'|'vendor'|'cancelled'|'other'; message: string; exitCode?: number; stderrTail?: string; vendorError?: string; retryAt?: string }
+export interface TaskFailure { kind: 'early_exit'|'no_output'|'rate_limit'|'quota'|'auth'|'vendor'|'cancelled'|'other'|'unknown_outcome'; message: string; exitCode?: number; stderrTail?: string; vendorError?: string; retryAt?: string }
 export interface Task extends TaskInput { executionRole?: 'owner'; parentTaskId?: string; title: string; failure?: TaskFailure; ownerEpoch?: number; ownerLastActivityAt?: string; continuationPolicy?: ContinuationPolicy; continuationHistory?: HandoffRecord[]; contextPack?: ContextPack; ownerHost?: TaskOwnerHost; revision?: number; scheduled?: boolean; queueReason?: { code: 'waiting_for_capacity' | 'policy_blocked' | 'frozen_route_changed' | 'workspace_changed' | 'launch_blocked'; message: string }; retryOf?: string; ownerId?: string; packageId?: string; acknowledged?: boolean; reviewState?: 'pending' | 'accepted' | 'rejected'; reviewComment?: string; /** Design-change replacement: the sibling child (same parentTaskId) that takes over this cancelled task. */ supersededBy?: string; /** Why the superseding sibling takes over (1–500 chars). */ supersededReason?: string; dispatch?: TaskDispatch; id: string; createdAt: string; updatedAt: string; status: TaskStatus; progress: number; events: TaskEvent[]; artifacts: Artifact[]; run?: AgentRun; summary?: string }
 export type WorkerRecord =
  | { type: 'log'; message: string }

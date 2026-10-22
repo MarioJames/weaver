@@ -12,10 +12,10 @@ import { digest, terminal, type TaskRecords } from './records';
 export class Results {
  constructor(private readonly manager:TaskManager,private readonly records:TaskRecords,
   private readonly ownerHost:Pick<MockOwnerHostAdapter,'deliverResult'|'acknowledge'>){}
- manifest(task:Task){if(!terminal(task))fail('RESULT_NOT_READY','Execution has not reached a terminal state');const manifest={taskId:task.id,attemptId:task.run?.id??null,packageId:task.packageId??null,execution:task.status,summary:task.summary??null,artifacts:task.artifacts.map(a=>({id:a.id,name:a.name,mediaType:a.mediaType,sha256:createHash('sha256').update(a.content).digest('hex')})),exitCode:task.run?.exitCode??null,...(task.failure?{failure:task.failure}:{})};return {...manifest,manifestDigest:digest(manifest),delivery:task.acknowledged?'acknowledged':'pending',acceptance:task.reviewState??'pending'};}
- results(a:CommandArgs):unknown{return this.manifest(this.records.task(a));}
- deliver(a:CommandArgs):unknown{
-    const task=this.records.task(a);const manifest=this.manifest(task);if(!task.ownerId)fail('CAPABILITY_UNAVAILABLE','Task has no logical owner');const owner=this.records.owner(task.ownerId);if(owner.mode!=='mock')fail('CAPABILITY_UNAVAILABLE','Manual owner delivery is not connected');
+  manifest(task:Task){if(!terminal(task))fail('RESULT_NOT_READY','Execution has not reached a terminal state');if(task.run?.launchPermittedAt!=null&&!task.run.finalizedAt)fail('RESULT_NOT_READY','Result is not finalized yet');const manifest={taskId:task.id,attemptId:task.run?.id??null,packageId:task.packageId??null,execution:task.status,summary:task.summary??null,artifacts:task.artifacts.map(a=>({id:a.id,name:a.name,mediaType:a.mediaType,sha256:createHash('sha256').update(a.content).digest('hex')})),exitCode:task.run?.exitCode??null,...(task.failure?{failure:task.failure}:{})};return {...manifest,manifestDigest:digest(manifest),delivery:task.acknowledged?'acknowledged':'pending',acceptance:task.reviewState??'pending'};}
+  results(a:CommandArgs):unknown{return this.manifest(this.records.committedTask(a));}
+  deliver(a:CommandArgs):unknown{
+     const task=this.records.committedTask(a);const manifest=this.manifest(task);if(!task.ownerId)fail('CAPABILITY_UNAVAILABLE','Task has no logical owner');const owner=this.records.owner(task.ownerId);if(owner.mode!=='mock')fail('CAPABILITY_UNAVAILABLE','Manual owner delivery is not connected');
     const existing=(owner.messages??[]).find(m=>m.taskId===task.id&&m.manifestDigest===manifest.manifestDigest);if(existing)return existing;
     const message=this.ownerHost.deliverResult(owner.id,{taskId:task.id,manifestDigest:manifest.manifestDigest});owner.messages=[...(owner.messages??[]),message];this.manager.store.putOwner(owner);return message;
    }

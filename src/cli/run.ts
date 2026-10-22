@@ -1,5 +1,5 @@
 import { writeSync } from 'node:fs';
-import { failure, LocalIPCError } from '../main/local-ipc';
+import { failure, LocalIPCError, requestTimeoutMs } from '../main/local-ipc';
 import { VERSION } from '../shared/version';
 import { CLI_CATALOG, CLI_HELP, CLI_VALUE_OPTIONS, catalogCommand } from './catalog';
 import { sendRequest } from './client';
@@ -10,6 +10,7 @@ import { requestedOutput, responseField, writeEnvelope, type OutputFormat } from
 import { readOwnerCredential } from './owner-identity';
 import { DEFAULT_WEB_PORT, defaultDataDir, parseCLI, positionals } from './parse';
 import { pollTask, type PollRuntime } from './poll-task';
+import { isReconnectCommand, reconnectPolicy, sendReadRequest } from './reconnect';
 import { runServer, SERVER_HELP } from './server/commands';
 import { serverEnv, type Envelope } from './server/env';
 import { sourceSkill } from './skills';
@@ -72,8 +73,23 @@ export async function runCLI(argv: string[], pollRuntime: Partial<PollRuntime> =
       return await pollTask(options, item.local, pollRuntime, ownerAuth);
     }
     const request = await buildRequest(options, item, ownerAuth);
+    if ((options.reconnectGraceSeconds !== undefined || options.reconnectMaxIntervalSeconds !== undefined) &&
+      !isReconnectCommand(String(request.command ?? ''))) throw new LocalIPCError('INVALID_ARGUMENT', '--reconnect-grace and --reconnect-max-interval-s are only valid for tasks get, tasks wait, tasks watch, tasks events and tasks health');
     if (!item?.rpc) commandId = typeof request.commandId === 'string' ? request.commandId : undefined;
-    const response = await (pollRuntime.request ?? sendRequest)(options.dataDir, request) as { ok: boolean };
+    const send = pollRuntime.request ?? sendRequest;
+    // Only reads replay across a restart; a mutation can be reconciled through operations get instead.
+    const response = typeof request.command === 'string' && isReconnectCommand(request.command)
+      ? await sendReadRequest(options.dataDir, request, {
+          policy: reconnectPolicy(options),
+          timeoutMs: requestTimeoutMs(request),
+          runtime: {
+            now: pollRuntime.now ?? Date.now,
+            sleep: pollRuntime.sleep ?? (milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))),
+            report: pollRuntime.stderr ?? ((text: string) => { process.stderr.write(text + '\n'); }),
+          },
+          request: send,
+        }) as { ok: boolean }
+      : await send(options.dataDir, request) as { ok: boolean };
     if (options.field && response.ok) process.stdout.write(responseField(response, options.field) + '\n');
     else writeEnvelope(options.output, response);
     return response.ok ? 0 : 1;

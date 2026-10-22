@@ -29,7 +29,7 @@
 1. launcher 模块已加载（`capabilities.realExecution:true`；加载失败 → `CAPABILITY_UNAVAILABLE`，无回退）。
 2. workspace 必须是已存在的绝对路径：省略时 `tasks create` 用 CLI 调用方 cwd 补齐，显式相对路径相对调用方解析；服务端不会拿自己的仓库填空。真实派发把 workspace 与 `workspaceIdentity` 冻结进 dispatch，泵复核期间若失效记 `workspace_changed`。
 3. 引擎/角色/配额/pin 当前有效：路由改变（worker/engine/kind/model/effort 或 kind 不符）、容量不足、配额 block 都会记 `queueReason`（`policy_blocked / waiting_for_capacity / frozen_route_changed / workspace_changed / launch_blocked`），除供应商限流/额度阻断会将排队任务路由到其他可用引擎外，排队路由不被默默改派或换引擎。
-4. `herdr.max_wait_minutes`（1–1440）是 父 Agent 对同一 子 Agent 两次检查之间的最长间隔：等待只用 `weaver tasks wait --task-id`（不带 `--for` 时等待 `max_wait_minutes × 60 秒`，策略读不到时为 30 秒，任务一结束就返回；显式 `--for` 为 1–86400 秒），超过后由 父 Agent 决定继续等待、取消或收回；该设置不构成执行时限；真实执行仍有启动阶段 120 秒无输出失败检查。
+4. `herdr.max_wait_minutes`（1–1440）是 父 Agent 对同一 子 Agent 两次检查之间的最长间隔：等待只用 `weaver tasks wait --task-id`（不带 `--for` 时等待 `max_wait_minutes × 60 秒`，策略读不到时为 30 秒，任务一结束就返回；显式 `--for` 接受任意不小于 1 的整数秒，没有上限；服务暂时不可用时在 `--reconnect-grace`（默认 60 秒）内自动重连），超过后由 父 Agent 决定继续等待、取消或收回；该设置不构成执行时限；真实执行仍有启动阶段 120 秒无输出失败检查。
 5. 认证复用各引擎自身本机配置；Weaver 从不复制/改写/打印密钥，也没有 global 工具安装。启动用受管 user scope 包裹进程（Linux/systemd 主机上每个 launch 一个唯一 scope），子进程随 scope 收尾。
 
 固定 argv builder（真实核实的调用形态）：

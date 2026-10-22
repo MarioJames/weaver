@@ -1,6 +1,6 @@
 import { createServer, connect, type Socket } from 'node:net';
 import { constants } from 'node:fs';
-import { chmod, lstat, mkdir, open, rm, unlink } from 'node:fs/promises';
+import { chmod, lstat, mkdir, open, readFile, rename, rm, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 
@@ -125,8 +125,69 @@ async function staleEndpoint(base: string, discoveryPath: string): Promise<Stale
  * ENDPOINT_EXISTS. Only an endpoint whose own socket is refused or missing is provably left over
  * by a dead process, so that discovery file and instance directory are cleared once and startup
  * continues.
+ *
+ * Discovery is published atomically (same-directory temp file, full write, fsync, rename), so a
+ * reader only ever sees the previous complete file or the new complete file -- never an empty or
+ * half-written one. The discovery file is therefore never used as a process lock; the singleton
+ * guarantee comes from the caller-held instance lock (src/main/instance-lock.ts).
+ *
+ * options.lockHeld tells startup that the caller already holds that singleton lock. Only then may
+ * a leftover discovery that cannot be parsed (empty/corrupt) or that points at an older instance
+ * be archived (renamed to a timestamped .corrupt/.superseded backup, never deleted outright) and
+ * replaced. Without the lock the conservative behavior is kept: only a parseable, provably dead
+ * endpoint is cleaned, anything else fails with ENDPOINT_EXISTS.
  */
-export async function startLocalIPC(userData: string, handle: (request: unknown) => unknown): Promise<{ close(): Promise<void> }> {
+export interface StartLocalIPCOptions {
+  lockHeld?: boolean;
+  /** Test hook: invoked with the temp path after it is fully written+fsynced, before rename. */
+  __beforeRename?: (tmpPath: string) => void;
+}
+
+function corruptStamp(): string {
+  return new Date().toISOString().replace(/[:.]/g, '-');
+}
+
+function discoveryLayout(base: string, value: unknown): { instanceId: string; directory: string } | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+  const record = value as Record<string, unknown>;
+  if (record.version !== 1 || typeof record.instanceId !== 'string' || !/^[a-f0-9]{32}$/.test(record.instanceId) ||
+      typeof record.socketPath !== 'string' || typeof record.tokenPath !== 'string') return;
+  const directory = join(base, `control-${record.instanceId}`);
+  if (record.socketPath !== join(directory, 'ipc.sock') || record.tokenPath !== join(directory, 'token')) return;
+  return { instanceId: record.instanceId, directory };
+}
+
+/**
+ * Archive a leftover discovery file the stale-probe path cannot handle (unparseable, or pointing
+ * at an older instance while the caller holds the singleton lock). The file is renamed to a
+ * timestamped backup, never deleted, so an interrupted publish always leaves evidence behind.
+ */
+async function archiveLegacyDiscovery(base: string, discoveryPath: string): Promise<void> {
+  let parsed: unknown;
+  try { parsed = JSON.parse(await readFile(discoveryPath, 'utf8')); } catch { parsed = undefined; }
+  const layout = discoveryLayout(base, parsed);
+  const suffix = layout ? 'superseded' : 'corrupt';
+  const backup = `${discoveryPath}.${suffix}-${corruptStamp()}`;
+  try {
+    await rename(discoveryPath, backup);
+  } catch {
+    // A racing publisher may have removed it already; otherwise drop the residue so the
+    // lock holder (the singleton authority) can still publish.
+    await rm(discoveryPath, { recursive: true, force: true });
+    return;
+  }
+  if (layout) await rm(layout.directory, { recursive: true, force: true });
+}
+
+/** Best-effort directory fsync so the rename outlives a crash. Never fails startup. */
+async function fsyncDir(path: string): Promise<void> {
+  try {
+    const handle = await open(path, constants.O_RDONLY);
+    try { await handle.sync(); } finally { await handle.close(); }
+  } catch { /* best effort */ }
+}
+
+export async function startLocalIPC(userData: string, handle: (request: unknown) => unknown, options?: StartLocalIPCOptions): Promise<{ close(): Promise<void> }> {
   if (process.platform === 'win32') throw new LocalIPCError('UNSUPPORTED_PLATFORM', 'Local CLI transport requires Unix filesystem permissions');
   const base = resolve(userData);
   await mkdir(base, { recursive: true, mode: 0o700 });
@@ -140,6 +201,13 @@ export async function startLocalIPC(userData: string, handle: (request: unknown)
     const now = await lstat(discoveryPath).catch(() => undefined);
     if (now && now.ino === stale.ino && now.dev === stale.dev) await unlink(discoveryPath).catch(() => {});
     await rm(stale.directory, { recursive: true, force: true });
+  } else {
+    const leftover = await lstat(discoveryPath).then(() => true).catch(() => false);
+    if (leftover) {
+      if (!options?.lockHeld)
+        throw new LocalIPCError('ENDPOINT_EXISTS', 'Discovery already exists; another app or a stale endpoint must be resolved before startup');
+      await archiveLegacyDiscovery(base, discoveryPath);
+    }
   }
   const instanceId = randomBytes(16).toString('hex');
   const directory = join(base, `control-${instanceId}`);
@@ -190,6 +258,7 @@ export async function startLocalIPC(userData: string, handle: (request: unknown)
     });
   });
   server.maxConnections = 32;
+  let tmpPath: string | undefined;
   async function cleanup() {
     if (published) {
       try {
@@ -210,16 +279,29 @@ export async function startLocalIPC(userData: string, handle: (request: unknown)
     });
     server.on('error', () => {});
     await chmod(socketPath, 0o600);
-    const file = await open(discoveryPath, 'wx', 0o600);
+    // Atomic publish: the complete payload is written to a same-directory temp file and fsynced
+    // before a single rename makes it visible. Readers only ever observe the previous complete
+    // file or the new complete file; no empty placeholder is ever exposed (and no 'wx' create is
+    // used as a lock -- singleton authority comes from the caller-held instance lock).
+    const tmpName = `control.v1.json.tmp-${process.pid}-${randomBytes(8).toString('hex')}`;
+    tmpPath = join(base, tmpName);
+    const payload = JSON.stringify({ version: 1, instanceId, socketPath, tokenPath } satisfies Discovery);
+    const tmp = await open(tmpPath, 'w', 0o600);
     try {
-      const info = await file.stat(); published = { ino: info.ino, dev: info.dev };
-      await file.writeFile(JSON.stringify({ version: 1, instanceId, socketPath, tokenPath } satisfies Discovery));
-      await file.sync();
-    } finally { await file.close(); }
+      await tmp.writeFile(payload);
+      await tmp.sync();
+    } finally { await tmp.close(); }
+    await chmod(tmpPath, 0o600);
+    options?.__beforeRename?.(tmpPath);
+    await rename(tmpPath, discoveryPath);
+    await fsyncDir(base);
+    const now = await lstat(discoveryPath);
+    published = { ino: now.ino, dev: now.dev };
   } catch (error) {
     for (const client of clients) client.destroy();
     if (server.listening) await new Promise<void>(resolve => server.close(() => resolve()));
     await cleanup();
+    if (tmpPath) await rm(tmpPath, { force: true }).catch(() => {});
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new LocalIPCError('ENDPOINT_EXISTS', 'Discovery already exists; another app or a stale endpoint must be resolved before startup');
     throw error;
   }

@@ -38,8 +38,8 @@ export class Queries {
  status(a:CommandArgs):unknown{return {revision:this.manager.store.revision,changed:a.after!==this.manager.store.revision,recovery:'refresh sync.snapshot; push invalidation is not a durable event stream'};}
  capabilities(a:CommandArgs):unknown{return {apiVersion:API_VERSION,cliTransport:this.environment.transportStatus(),authentication:'ephemeral-local-trusted-user-demo',ownerScopedAuthorization:false,ownerSpawn:this.environment.herdrPresent()?'herdr':'logical-registration',manualAttach:'metadata-only',ownerModelSpawned:false,attachmentVerified:false,authenticated:false,modelUsable:false,workerProviders:this.manager.canLaunchReal?['mock-jsonl',...REAL_ENGINE_KINDS]:['mock-jsonl'],realExecution:this.manager.canLaunchReal,mcp:false,maxParallel:configuredParallel(this.policy),capacity:{unit:'owner-instance',aggregate:'sum of enabled owner profile max_parallel',admission:'Each attached owner instance holds its own profile max_parallel slots, so maxParallel is a scale hint, not a profile-wide or global cap.'},policyAdmission:true,quota:QUOTA_CAPABILITIES,commands:[...READ_COMMANDS,...WRITE_COMMANDS],limits:{eventsPerPage:100},durability:'durable intent before effect; interrupted commands require reconciliation, not automatic replay'};}
  workspaces(a:CommandArgs):unknown{return listWorkspaceDirectories(a.path);}
- taskGet(a:CommandArgs):unknown{
-    const task=this.records.task(a);
+  taskGet(a:CommandArgs):unknown{
+     const task=this.records.committedTask(a);
     // A running native task is the owner's own subagent, so its instruction is recoverable here even if the spawn response was lost.
     const next=task.status==='running'&&task.dispatch?.execution==='native'?this.nextFor(task):undefined;
     return {...publicTask(task),...(next?{next}:{})};
@@ -47,11 +47,11 @@ export class Queries {
  taskList(a:CommandArgs):unknown{
     const offset=a.offset??0;const limit=a.limit??25;if(!Number.isSafeInteger(offset)||Number(offset)<0||!Number.isSafeInteger(limit)||Number(limit)<1||Number(limit)>100)fail('INVALID_REQUEST','Invalid pagination');
     if(a.parentTaskId!==undefined)parseId(a.parentTaskId,'parent task ID');
-    const all=this.manager.store.listSummaries().filter(t=>(a.ownerId===undefined||t.ownerId===a.ownerId)&&(a.parentTaskId===undefined||t.parentTaskId===a.parentTaskId));const tasks=all.slice(Number(offset),Number(offset)+Number(limit)).map(t=>{const {events,artifacts,...summary}=publicTask(t);return {...summary,artifactCount:artifacts.length};});return {tasks,nextOffset:Number(offset)+tasks.length<all.length?Number(offset)+tasks.length:null};
+     const all=this.manager.store.listSummariesCommitted().filter(t=>(a.ownerId===undefined||t.ownerId===a.ownerId)&&(a.parentTaskId===undefined||t.parentTaskId===a.parentTaskId));const tasks=all.slice(Number(offset),Number(offset)+Number(limit)).map(t=>{const {events,artifacts,...summary}=publicTask(t);return {...summary,artifactCount:artifacts.length};});return {tasks,nextOffset:Number(offset)+tasks.length<all.length?Number(offset)+tasks.length:null};
    }
  packageGet(a:CommandArgs):unknown{const pkg=this.manager.store.getPackage(parseId(a.packageId,'package ID'));if(!pkg)fail('NOT_FOUND','Package not found');return pkg;}
- taskEvents(a:CommandArgs):unknown{
-    const task=this.records.task(a);const limit=a.limit??50;if(!Number.isInteger(limit)||Number(limit)<1||Number(limit)>100)fail('INVALID_REQUEST','Event limit must be 1–100');let start=0;
+  taskEvents(a:CommandArgs):unknown{
+     const task=this.records.committedTask(a);const limit=a.limit??50;if(!Number.isInteger(limit)||Number(limit)<1||Number(limit)>100)fail('INVALID_REQUEST','Event limit must be 1–100');let start=0;
     if(a.after!==undefined){const i=task.events.findIndex(e=>e.id===a.after);if(i<0)fail('CURSOR_EXPIRED','Cursor not retained; refresh task snapshot');start=i+1;}
     const events=task.events.slice(start,start+Number(limit));return {events,nextCursor:events.at(-1)?.id??a.after??null,hasMore:start+events.length<task.events.length};
    }

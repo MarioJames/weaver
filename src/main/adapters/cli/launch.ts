@@ -168,11 +168,7 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
     this.scope = startOwnedScope({ command: prepared.argv, cwd: prepared.workspace, env, stdin: prepared.stdin, ...(prepared.stdin!==null?{stdinPath:prepared.promptPath}:{}), unit: prepared.unit });
     this.scope.on('identity', (invocation: string) => this.emit('identity', invocation));
     this.pid = this.scope.pid;
-    this.emitRecords([
-      { type: 'log', message: `Launching ${prepared.engine} with requested model ${prepared.model}` },
-      { type: 'log', message: permissionNote(prepared.engine) },
-      { type: 'progress', percent: 10, message: 'owned scope started' },
-    ]);
+    this.emitRecords(launcherRecords(prepared));
     this.scope.stdout.on('data', (chunk: Buffer) => {
       // Transport volume includes ignored vendor token snapshots. Only frame
       // size and retained normalized evidence are budgets; this is telemetry.
@@ -259,11 +255,20 @@ function permissionNote(engine: RealEngineKind): string {
   }
 }
 
-function redactRecord(record: WorkerRecord): WorkerRecord {
+export function redactRecord(record: WorkerRecord): WorkerRecord {
   if (record.type === 'log') return { type: 'log', message: clip(redactSecrets(record.message), 8000) };
   if (record.type === 'progress') return { type: 'progress', percent: record.percent, message: clip(redactSecrets(record.message), 8000) };
   if (record.type === 'artifact') return { ...record, content: clip(redactSecrets(record.content), 32000) };
   return { type: 'result', summary: clip(redactSecrets(record.summary), 8000) };
+}
+
+/** The three launcher records every run starts with (pipe and file mode share them). */
+export function launcherRecords(input: { engine: RealEngineKind; model: string }): WorkerRecord[] {
+  return [
+    { type: 'log', message: `Launching ${input.engine} with requested model ${input.model}` },
+    { type: 'log', message: permissionNote(input.engine) },
+    { type: 'progress', percent: 10, message: 'owned scope started' },
+  ];
 }
 
 /** Start one real CLI in its own systemd user scope. Rejects invalid input before launch.

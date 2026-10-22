@@ -1,8 +1,12 @@
 import { connect } from 'node:net';
 import { LocalIPCError, MAX_FRAME_BYTES, readDiscovery, requestTimeoutMs } from '../main/local-ipc';
 
+export interface SendRequestOptions {
+  /** Reports the discovery instance this attempt authenticated against, for rotation detection. */
+  onEndpoint?: (instanceId: string) => void;
+}
 /** One request over the authenticated Unix socket of the running service in `dataDir`. */
-export async function sendRequest(dataDir: string, request: unknown, timeoutMs = requestTimeoutMs(request)): Promise<unknown> {
+export async function sendRequest(dataDir: string, request: unknown, timeoutMs = requestTimeoutMs(request), options: SendRequestOptions = {}): Promise<unknown> {
   const deadline = Date.now() + Math.min(requestTimeoutMs(request), timeoutMs);
   if(timeoutMs <= 0) throw new LocalIPCError('TIMEOUT', 'Bounded wait deadline reached');
   let endpoint: Awaited<ReturnType<typeof readDiscovery>>;
@@ -12,6 +16,7 @@ export async function sendRequest(dataDir: string, request: unknown, timeoutMs =
     if (error instanceof LocalIPCError) throw error;
     throw new LocalIPCError('UNSAFE_ENDPOINT', 'Could not safely read the app endpoint');
   }
+  options.onEndpoint?.(endpoint.discovery.instanceId);
   const remaining = deadline - Date.now();
   if(remaining <= 0) throw new LocalIPCError('TIMEOUT', 'Bounded wait deadline reached');
   const frame = JSON.stringify({ version: 1, token: endpoint.token, request }) + '\n';
