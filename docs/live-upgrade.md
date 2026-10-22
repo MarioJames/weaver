@@ -1,8 +1,8 @@
 # Weaver 服务随时升级/重启设计方案（live-upgrade）
 
 > 目标读者：weaver 服务端开发者。目标：在任意时刻停机升级或重启 weaver 服务（`systemctl --user restart weaver.service`、二进制替换、崩溃），运行中的任务 worker 不中断、结果只交付一次。
-> 事实依据：本方案的现状描述以两份只读事实报告为准——报告 A `docs/verification/live-upgrade/process-inventory.md`（服务进程/链路/停机行为）与报告 B `docs/verification/live-upgrade/run-pipeline-reattach.md`（normalizer 可重放性、manager 运行态、systemd scope 实验）；两轮外部审查原文见同目录 `chatgpt-review-r1.md`、`chatgpt-review-r2.md`；源码引用均用 `路径:行号` 标注，行号以基线 `b3bcd2b` 检出为准，已逐项核对。
-> 本轮修订（v3）：同一 Convorel 任务第二轮审查（ChatGPT Pro，结论未通过，源码基线 `b3bcd2b`）的 R1–R3 经 owner 对照基线源码逐条核实成立，全部采纳；审查意见二中的锁顺序（统一为先锁后开库）、致命优先级作用域、real spawn 返回时机与 UI 延迟取舍，以及可选补强（flock 不变量、三个针对性切点）一并采纳；owner 自查小项（乱码、`wait` 取码、§17-#13/#15/#23 改写、失效引用、附录字段）同步修正。按审查轮次上限（每个决策版本最多 2 轮），v3 由 owner 最终决定，未再提交第三轮外部复审；R1–R3 均采用审查方给出的修正方向。逐条映射见文末“修订记录：v2 → v3”。v2 修订历史保留在文末。
+> 事实依据：本方案的现状描述以两份只读事实报告为准——报告 A `docs/verification/live-upgrade/process-inventory.md`（服务进程/链路/停机行为）与报告 B `docs/verification/live-upgrade/run-pipeline-reattach.md`（normalizer 可重放性、manager 运行态、systemd scope 实验）；三轮外部审查原文见同目录 `chatgpt-review-r1.md`、`chatgpt-review-r2.md` 与 `docs/verification/live-upgrade/chatgpt-review-r3.md`；源码引用均用 `路径:行号` 标注，行号以基线 `b3bcd2b` 检出为准，已逐项核对。
+> 本轮修订（v3）：同一 Convorel 任务第二轮审查（ChatGPT Pro，结论未通过，源码基线 `b3bcd2b`）的 R1–R3 经 owner 对照基线源码逐条核实成立，全部采纳；审查意见二中的锁顺序（统一为先锁后开库）、致命优先级作用域、real spawn 返回时机与 UI 延迟取舍，以及可选补强（flock 不变量、三个针对性切点）一并采纳；owner 自查小项（乱码、`wait` 取码、§17-#13/#15/#23 改写、失效引用、附录字段）同步修正。应用户要求继续复审，第三轮对 commit `2ea5b1d` 给出“通过”，确认可作为 P1 实现依据、前两轮阻断项均已关闭、无新阻断；该轮为静态方案复审，未执行测试或真实 systemd 演练（实现验收仍按 §17）。逐条映射见文末“修订记录：v2 → v3”与“修订记录：v3 → v3.1”。v2 修订历史保留在文末。
 
 ## 0. 目标与结论（先说结论）
 
@@ -498,7 +498,7 @@ reattach 加入后，`startRuntime` 的 startup catch（`src/main/runtime.ts:261
 补充规则：
 
 - **deactivating** 按“仍活”处理，走第 3 条（继续原阶段），不按“已结束”收尾。
-- **读到 EOF 不等于结束**：文件暂时读到 EOF 只是 tailer 调度状态，不构成运行结束；结束只由“合法 exit + 后代清理 + 最终 EOF + 收尾事务”（§6.2）构成。
+- **读到 EOF 不等于结束**：暂时读到 EOF 不构成运行结束证明。成功收尾要求本 run 的合法退出记录、后代清理、最终 EOF 与收尾事务（§6.2）；确认 launcher/scope 均已停止但缺少合法 exit 时，按第 5 条的持久意图或 `unknown_outcome` 失败收尾。
 - **从未启动的判定**（第 9 条后半）：唯一判据是**启动许可 `run.launchPermittedAt` 未提交**——run 仍处 preparing 阶段（如被停机门中止的 pi 预检，§4.4），且所有启动路径都必须先提交该许可（§4.2），之后才允许 spawn；未提交即证明外部进程从未被允许启动，可安全回 `queued + scheduled`，由统一 pump 启动（§16-P1/B11），不标 failed。**单加 prepared 意图字段不能区分提交后是否真的执行过**，因此许可提交之后的窗口不做自动回队：一旦 `launchPermittedAt` 已提交，绝不因零日志/无 exit/无 launcher 自动重新排队——存在性或归属未确定 → 恢复待定；确认无仍可能注册的 launcher 且 scope 已停止 → 缺合法 exit 的运行按取消/失败意图收尾，无意图则以“执行结果未知”（failure kind `unknown_outcome`，见附录）失败收尾，重试由 owner 显式操作（`tasks retry`）。
 - **恢复待定**（`run.recovery='pending'` 一类状态）对 UI/CLI 可见（`tasks.get` 展示 `recovery` 字段与原因事件），并说明人工处置方法：核验 scope 归属（`systemctl show` + InvocationID 比对）→ 若确认为孤儿 scope，手动 `systemctl stop` 后将任务置 failed 并重试；若 scope 属于本 run，等待周期重试自动接回；禁止直接删日志/释放占用。
 
@@ -618,7 +618,7 @@ reattach 加入后，`startRuntime` 的 startup catch（`src/main/runtime.ts:261
 - `src/main/application/tasks/queries.ts:53-56`：`tasks.events` 只发已提交事件（§6.5）。
 - `src/main/application/tasks/results.ts:15-24`：manifest 收尾事务提交前 `RESULT_NOT_READY`、提交后冻结（§11.1；R2：terminal 与结果可读同条件，`tasks wait/watch` 以业务终态 + `finalizedAt` 双提交为 terminal，见 §14.2）。
 - `src/main/local-ipc.ts:100-148,205-218`：单例锁 + discovery 原子发布（§10.4）。
-- `src/main/application/scheduling/dispatch.ts:111-122`：已接纳 dispatch 落可恢复待启动阶段——`package`、`dispatch`、`scheduled=true` **同事务提交**，由统一 pump 启动，**不再在 dispatch 调用栈里直接 `manager.start`**（`src/main/application/scheduling/coordinator.ts:38-43` 的 pump 是唯一启动点）。**有容量的 native dispatch**：在持久接纳的同一事务内完成 `manager.start` 的 native 登记（native 只登记运行状态、不启动外部进程，无孤儿风险，基线 `manager.ts:62`），`workers spawn` 仍直接返回 `next.run_subagent`，保持现有协议。**需排队的 native**（以及响应丢失、重连路径）：`tasks wait` 发现已提交快照为 running native 时以 `reason='handoff'` 返回 `run_subagent` 指令；handoff 绑定 `taskId + attemptId`，重复读取返回同一 attempt 的指令；owner 尚未启动该 attempt 才调用内建 subagent，已有执行句柄则继续等待原执行，不重复启动（§14.2）。这同时修复基线排队 native 的既有交接缺口（基线 `poll-task.ts:62` 只看 terminal、`dispatch.ts:79`、`queries.ts:44`）。
+- `src/main/application/scheduling/dispatch.ts:111-122`：已接纳 dispatch 落可恢复待启动阶段——`package`、`dispatch`、`scheduled=true` **同事务提交**。需要创建外部进程的 worker，由 pump 在接纳事务提交后启动（`src/main/application/scheduling/coordinator.ts:38-43` 的 pump 是外部 worker 的唯一启动点）；**有容量的 native dispatch** 可在接纳事务内完成 `manager.start` 的 native 运行登记（只登记运行状态、不启动外部进程，无孤儿风险，基线 `manager.ts:62`），并在提交后返回 owner 执行指令，`workers spawn` 仍直接返回 `next.run_subagent`，保持现有协议。**需排队的 native**（以及响应丢失、重连路径）：`tasks wait` 发现已提交快照为 running native 时以 `reason='handoff'` 返回 `run_subagent` 指令；handoff 绑定 `taskId + attemptId`，重复读取返回同一 attempt 的指令；owner 尚未启动该 attempt 才调用内建 subagent，已有执行句柄则继续等待原执行，不重复启动（§14.2）。这同时修复基线排队 native 的既有交接缺口（基线 `poll-task.ts:62` 只看 terminal、`dispatch.ts:79`、`queries.ts:44`）。
 - `src/main/application/commands/gateway.ts:122`：统一 pump 后 dispatch 先返回 queued，`snapshot.dispatch?.execution==='real' && snapshot.status==='running'` 的 first-output 分支不再进入；`workers spawn` 返回的是**持久接纳**，`started:false` 可为正常状态——文档锁定“接纳成功 ≠ 已实际启动”的区别，实际执行状态随后由 pump 推进（native 交接见上条 §14.2）。
 - `src/main/application/scheduling/coordinator.ts:38-77`：pump 扫描待启动阶段 + 启动前重接门禁（§10.3：reattach 完成前不启动）。
 - `src/main/application/scheduling/retry.ts:111-154`：原任务取消意图 + 稳定 replacement ID（`randomUUID` 预生成，`:135` 的 `probeId` 模式转正）+ package + `retryOf` 关联 + 待派发意图 + operation/task/attempt ID **同事务提交**，外部 kill/spawn 在提交后执行；重启后按原 operation/task/attempt ID 推进，不重复创建。
@@ -775,7 +775,7 @@ dispatch/retry 的持久意图状态放在现有 SQLite 的 task（`dispatch/sch
 
 ## 修订记录：v2 → v3
 
-- 来源：同一 Convorel 任务第二轮审查（ChatGPT Pro，结论**未通过**，源码基线 `b3bcd2b`，工作树其他会话改动未计入）。R1–R3 经 owner 对照基线源码逐条核实成立，全部采纳；审查意见二.1（UI 延迟取舍）/二.2（锁顺序）/二.3（优先级作用域）/二.4（real spawn 返回时机）采纳；可选补强（flock 不变量、三个切点）采纳。按审查轮次上限（每个决策版本最多 2 轮），v3 由 owner 最终决定，**未再提交第三轮外部复审**；R1–R3 均采用审查方给出的修正方向。
+- 来源：同一 Convorel 任务第二轮审查（ChatGPT Pro，结论**未通过**，源码基线 `b3bcd2b`，工作树其他会话改动未计入）。R1–R3 经 owner 对照基线源码逐条核实成立，全部采纳；审查意见二.1（UI 延迟取舍）/二.2（锁顺序）/二.3（优先级作用域）/二.4（real spawn 返回时机）采纳；可选补强（flock 不变量、三个切点）采纳；R1–R3 均采用审查方给出的修正方向。应用户要求继续复审，第三轮对 commit `2ea5b1d` 给出“通过”，确认可作为 P1 实现依据、前两轮阻断项均已关闭、无新阻断；该轮为静态方案复审，未执行测试或真实 systemd 演练（实现验收仍按 §17）。
 - R1（§4.2/§4.3/§4.4、§11.2 第 5/9/10 条及“从未启动的判定”、§3.4、§17-#31、附录）：引入 `run.launchPermittedAt`（`beforeSpawn` 事务与 unit/nonce/logIdentity 同提交，提交前为 preparing，提交后才允许 spawn）；只有许可未提交的 run 可安全回 `queued + scheduled`；许可已提交后绝不因零日志/无 exit/无 launcher 自动重排（存在性或归属未定 → 恢复待定；确认无 launcher 且 scope 已停 → 按意图收尾，无意图以 `unknown_outcome` 失败收尾，重试显式操作）；launcher/scope 检查收敛（inspect → `/proc` 扫描 → 再 inspect，两次 absent 且中间无 launcher，基线 `scope.ts:111` 为先例，不复用扫描前 not-found）；写明单加 prepared 字段不能区分提交后是否真执行。
 - R2（§11.1 新增正文、§14.2 引用、§16-P1 `results.ts`/`poll-task.ts` 改动点）：新文件生命周期真实 run 以业务终态 + `run.finalizedAt` 双提交为 `wait/watch` terminal 条件；失败已提交但终止/收尾未完成继续等待（stopping/recovery pending），截止按 timeout 返回；native/mock 按各自完成条件，升级前已完成历史记录保留原含义；`retry --cancel` 快速替代语义保留。
 - R3（§16-P1 dispatch 段 + `gateway.ts:122` 改动点、§14.2、§17-#33）：有容量 native dispatch 在持久接纳同一事务内完成 `manager.start` native 登记（无外部进程、无孤儿风险），`workers spawn` 仍直接返回 `next.run_subagent`；排队 native（及响应丢失、重连路径）由 `tasks wait` 以 `reason='handoff'` 交回 `run_subagent`（绑定 taskId + attemptId，重复读取同一指令，已有执行句柄不重复启动），修复基线排队 native 交接缺口（`poll-task.ts:62`、`dispatch.ts:79`、`queries.ts:44`）；real 的 `workers spawn` 统一 pump 后返回持久接纳，`started:false` 可为正常状态（`gateway.ts:122` first-output 分支不再进入）。
@@ -784,3 +784,11 @@ dispatch/retry 的持久意图状态放在现有 SQLite 的 task（`dispatch/sch
 - 二.1/二.4（§6.5、§16-P1 `gateway.ts:122`）：UI 增加约一个 500ms flush 周期的显示延迟是取舍而非回归；实现须覆盖 UI 的 list/get 入口，定时 flush 的实际 COMMIT 也要触发通知。
 - 可选补强（§10.4、§17-#31/#32/#33）：flock 锁 FD 为 CLOEXEC、不进入 worker stdio/保留 FD、锁文件不 unlink 重建，“控制面死亡自动解锁”前提是没有存活继承副本，列为实现验收条件；§17 新增三个切点（许可已提交无日志/exit 不得重跑；failed 已提交未 finalized 时 wait 不返回 terminal；排队 native 交回同一 attempt 的 handoff），均标明目标文件。
 - owner 自查小项：§11.4 一处西里尔字母乱码改为“（一致性）”并全文明码检查；§3.2 伪代码改为 kill -0 失败后再执行一次 `wait $child` 取真实退出状态；§17-#13 改为“恢复待定 + 无 kill 调用”（不是 failed）、#15 改为“`launchPermittedAt` 未提交 → 回 `queued + scheduled`；已提交但无证据 → 待定或 `unknown_outcome`，不触碰 scope”，并全文检查 §3.4/§4.3 等与 §11.2 表矛盾的表述；修复失效引用（不存在的旧 7.5 节引用改指 §7.2 与 §18 第 6 项，旧回滚引用改指 §15.3，旧四窗口引用改指 §17.2，旧快照引用改指 §18 第 4 项）并全文检查其余 § 引用；附录字段表补 `launchPermittedAt`、`unknown_outcome`；§0 结论与 §16-P1 改动点同步。
+
+---
+
+## 修订记录：v3 → v3.1
+
+- 来源：第三轮外部审查（ChatGPT Pro，Convorel 任务 `weaver-live-upgrade-1022`）对 commit `2ea5b1d` 的 v3 给出**通过**，原文 `docs/verification/live-upgrade/chatgpt-review-r3.md`。该轮为静态方案复审，未执行测试或真实 systemd 演练；实现验收仍按 §17。
+- 可选改进 1（§11.2 补充规则）：将“合法 exit”限定为成功收尾条件——暂时读到 EOF 不构成运行结束证明；成功收尾要求本 run 的合法退出记录、后代清理、最终 EOF 与收尾事务；确认 launcher/scope 均已停止但缺少合法 exit 时，按第 5 条的持久意图或 `unknown_outcome` 失败收尾。
+- 可选改进 2（§16-P1 dispatch 改动点）：将 pump 的启动点范围限定为需要创建外部进程的 worker——由 pump 在接纳事务提交后启动；有容量的 native 可在接纳事务内完成运行登记，并在提交后返回 owner 执行指令。
