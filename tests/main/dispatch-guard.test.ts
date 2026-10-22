@@ -366,7 +366,7 @@ function addCodexWorker(f:ReturnType<typeof setup>):void {
  f.policy.save({revision:s.revision,config:s.config,blocks:[]});
 }
 
-test('a retry routes away from the engine that failed it and dispatches the linked child in one call',async()=>{
+test('a retry routes away from the worker that failed it and dispatches the linked child in one call',async()=>{
  const f=setup(()=>successProcess());
  try{
   addCodexWorker(f);
@@ -377,13 +377,14 @@ test('a retry routes away from the engine that failed it and dispatches the link
   // One owner action: the linked child is routed and dispatched by the same command, with no second call.
   assert.equal(retry.data.retryOf,first);
   assert.equal(retry.data.status,'running','tasks.retry dispatches the child it just created');
-  assert.deepEqual(retry.data.excludedEngines,['codex']);
+  assert.deepEqual(retry.data.excludedWorkers,['codex_alt_worker']);
+  assert.equal(retry.data.excludedEngines,undefined);
   assert.equal(retry.data.dispatch.engine,'claude');
   assert.equal(retry.data.dispatch.execution,'native');
   assert.equal(f.seen.length,0,'a native handoff launches no process');
   const note=f.store.get(retry.data.id).events.find(e=>e.message.startsWith('Policy selected'))!;
-  assert.match(note.message,/failed earlier in this retry chain/);
-  assert.match(note.message,/codex/);
+  assert.match(note.message,/workers excluded because they failed earlier in this retry chain/);
+  assert.match(note.message,/codex_alt_worker/);
   // The child is frozen with its own package: the original scope and criteria, the chain note, then the original goal.
   assert.notEqual(retry.data.packageId,originalPackage);
   const child=f.raw('packages.get',{packageId:retry.data.packageId}).data;
@@ -409,7 +410,7 @@ test('a retry routes away from the engine that failed it and dispatches the link
  }finally{await f.close();}
 });
 
-test('a completed attempt leaves its engine on the table while a cancelled one closes it to the chain',async()=>{
+test('a completed worker stays on the table while a cancelled worker is closed to the chain',async()=>{
  const f=setup(()=>successProcess());
  try{
   addCodexWorker(f);
@@ -420,15 +421,15 @@ test('a completed attempt leaves its engine on the table while a cancelled one c
   const spawned=f.raw('workers.spawn',{taskId:reuseChild.id,owner:'claude_owner',worker:'codex_alt_worker'});
   assert.equal(spawned.ok,true,JSON.stringify(spawned));
   assert.equal(spawned.data.dispatch.engine,'codex');
-  assert.equal(spawned.data.excludedEngines,undefined);
+  assert.equal(spawned.data.excludedWorkers,undefined);
   const launched=f.seen.length;
-  // A cancelled chain entry closes its engine to the whole chain, an explicit worker choice included.
+  // A cancelled chain entry closes its worker to the whole chain, an explicit worker choice included.
   const cancelled=attempt(f,'codex','cancelled');
   const refuse=f.raw('tasks.create',{title:'Refused',instruction:'fixture',owner,workspace:f.dir});
   const refusedChild=f.store.get(refuse.data.id);refusedChild.retryOf=cancelled;f.store.put(refusedChild);
   const rejected=f.raw('workers.spawn',{taskId:refusedChild.id,owner:'claude_owner',worker:'codex_alt_worker'});
-  assert.equal(rejected.error?.code,'NO_ALTERNATIVE_ENGINE');
-  assert.match(rejected.error?.message??'',/^NO_ALTERNATIVE_ENGINE/);
+  assert.equal(rejected.error?.code,'NO_ALTERNATIVE_WORKER');
+  assert.match(rejected.error?.message??'',/^NO_ALTERNATIVE_WORKER/);
   assert.match(rejected.error?.message??'',/codex_alt_worker/);
   assert.equal(f.store.get(refusedChild.id).status,'queued');
   assert.equal(f.store.get(refusedChild.id).dispatch,undefined);
@@ -436,18 +437,18 @@ test('a completed attempt leaves its engine on the table while a cancelled one c
  }finally{await f.close();}
 });
 
-test('a chain with no engine left is refused by the retry itself before anything is created',async()=>{
+test('a chain with no worker left is refused by the retry itself before anything is created',async()=>{
  const f=setup(()=>successProcess());
  try{
   addCodexWorker(f);
   const cancelled=attempt(f,'codex','cancelled');
-  // Two levels: the chain closes every engine its parent and grandparent tried.
+  // Two levels: the chain closes every worker its parent and grandparent ran on.
   const second=attempt(f,'claude','failed',cancelled);
   const tasks=f.store.list().length;const events=f.store.get(second).events.length;
   const blocked=f.raw('tasks.retry',{taskId:second});
-  assert.equal(blocked.error?.code,'NO_ALTERNATIVE_ENGINE');
-  assert.match(blocked.error?.message??'',/^NO_ALTERNATIVE_ENGINE/);
-  for(const engine of ['claude','codex'])assert.ok(blocked.error?.message?.includes(engine),engine);
+  assert.equal(blocked.error?.code,'NO_ALTERNATIVE_WORKER');
+  assert.match(blocked.error?.message??'',/^NO_ALTERNATIVE_WORKER/);
+  for(const worker of ['claude_worker','codex_alt_worker'])assert.ok(blocked.error?.message?.includes(worker),worker);
   assert.equal(f.store.list().length,tasks,'a retry that cannot route creates no child');
   assert.equal(f.store.get(second).status,'failed');
   assert.equal(f.store.get(second).events.length,events,'the failed attempt is left exactly as it was');

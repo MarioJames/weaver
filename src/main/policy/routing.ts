@@ -149,6 +149,8 @@ function requireOwner(config: Config, blocks: Block[], id: string, what = "owner
 }
 /** Why an engine never comes back for this task: the owner's earlier attempt on it did not succeed. */
 export const EXCLUDED_ENGINE_REASON = "failed earlier in this retry chain";
+/** Why a worker never comes back for this task: the owner's earlier attempt on it did not succeed. */
+export const EXCLUDED_WORKER_REASON = "failed earlier in this retry chain";
 /** Why a worker was passed over only because the policy caps its own concurrency: n running against a cap of max. */
 export const WORKER_CAPACITY_REASON = "并发已满";
 /** A worker's concurrency cap: a positive integer, or nothing when it carries none. */
@@ -164,8 +166,7 @@ export const workerCapacityText = (running: number, limit: number): string => `$
  * A worker with a max_parallel runs at most that many tasks at once across every owner; a worker at its cap is
  * skipped as 并发已满（n/max）, so the choice falls to another worker. When
  * every worker that could take the task is at its cap, the least-overloaded one is still selected and the
- * queue waits on its next free slot. A worker on an excluded engine is never selected, so a retry always
- * changes engine.
+ * queue waits on its next free slot. A worker excluded by ID or by its engine is never selected.
  */
 export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOptions): Dispatch {
   const owner = requireOwner(config, blocks, opts.owner);
@@ -175,8 +176,8 @@ export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOpti
   if (opts.worker) {
     const worker = Object.hasOwn(config.workers,opts.worker) ? config.workers[opts.worker] : undefined;
     if (!worker) throw new PolicyError(`unknown worker ${opts.worker}`);
+    if (excludedWorkers.has(opts.worker)) throw new PolicyError(`NO_ALTERNATIVE_WORKER: worker ${opts.worker} ${EXCLUDED_WORKER_REASON} (excluded: ${[...excludedWorkers].join(", ")})`, [{ path: `$.owners.${opts.owner}.workers`, message: `${opts.worker}: ${EXCLUDED_WORKER_REASON}` }]);
     if (excluded.has(worker.engine)) throw new PolicyError(`NO_ALTERNATIVE_ENGINE: worker ${opts.worker} runs on engine ${worker.engine}, which ${EXCLUDED_ENGINE_REASON} (excluded: ${[...excluded].join(", ")})`, [{ path: `$.owners.${opts.owner}.workers`, message: `${opts.worker}: ${EXCLUDED_ENGINE_REASON}` }]);
-    if (excludedWorkers.has(opts.worker)) throw new PolicyError(`worker ${opts.worker} unavailable: excluded for this dispatch`);
     const a = availabilityOf(config, blocks, worker, opts.worker);
     if (a.status !== "available") throw new PolicyError(`worker ${opts.worker} unavailable: ${describeUnavailable(a)}`);
     if (effectiveWeight(owner, opts.worker) === 0) throw new PolicyError(`worker ${opts.worker} unavailable: priority weight 0`);
@@ -199,7 +200,8 @@ export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOpti
       : cap !== undefined ? workerCapacityText(c.running, cap)
       : "available";
   };
-  const usable = candidates.filter(c => c.weight > 0 && c.availability.status === "available" && !excludedWorkers.has(c.id));
+  const available = candidates.filter(c => c.weight > 0 && c.availability.status === "available");
+  const usable = available.filter(c => !excludedWorkers.has(c.id));
   // (a+1)/wa < (b+1)/wb, compared without division.
   const eligible = usable.filter(c => !excluded.has(c.engine) && !atCap(c))
     .sort((a, b) => (a.running + 1) * b.weight - (b.running + 1) * a.weight || b.weight - a.weight || a.index - b.index);
@@ -217,6 +219,7 @@ export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOpti
       const detail = usable.map(c => `${c.id}: ${EXCLUDED_ENGINE_REASON}`).join("; ");
       throw new PolicyError(`NO_ALTERNATIVE_ENGINE: every available worker for owner ${opts.owner} is on an excluded engine (excluded: ${[...excluded].join(", ")}): ${detail}`, usable.map(c => ({ path: `$.owners.${opts.owner}.workers`, message: `${c.id}: ${EXCLUDED_ENGINE_REASON}` })));
     }
+    if (available.length) throw new PolicyError(`NO_ALTERNATIVE_WORKER: every available worker for owner ${opts.owner} ${EXCLUDED_WORKER_REASON} (excluded: ${[...excludedWorkers].join(", ")}): ${available.map(c => `${c.id}: ${EXCLUDED_WORKER_REASON}`).join("; ")}`, available.map(c => ({ path: `$.owners.${opts.owner}.workers`, message: `${c.id}: ${EXCLUDED_WORKER_REASON}` })));
     const detail = candidates.map(c => `${c.id}: ${reason(c)}`).join("; ");
     throw new PolicyError(`no available worker for owner ${opts.owner}${detail ? `: ${detail}` : ""}`, candidates.map(c => ({ path: `$.owners.${opts.owner}.workers`, message: `${c.id}: ${reason(c)}` })));
   }

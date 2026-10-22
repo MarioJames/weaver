@@ -118,9 +118,9 @@ src/
 
 路由基于 policy 配置（`engines`/`owners`/`workers`/`herdr` + `blocks`）：
 
-- `resolveDispatch` 在 owner.workers 里按权重做**全局负载最少化**：可用候选（worker 启用、引擎启用、无生效 block、权重 >0、引擎未被本次重试链排除）中，比较 `(running + 1) / weight`，最小者胜出；并列先取权重更高者，再按 owner.workers 列表顺序。这里的 `running` 是全局数：所有 owner 下 `running`+`cancelling` 的任务数之和（`workerLoad()` 扫全表），跟任务绑在哪个 owner 实例无关。空闲时这个比较退化为按权重试用，有负载时按权重比例分摊。比较用交叉相乘，不做除法。
-- `worker_weights`：整数 0..10，缺省 5；0 表示永不调度该 worker，显式指定 worker 也不能绕过权重 0，也不能绕过被排除引擎（后者报 `NO_ALTERNATIVE_ENGINE`）。所有权键必须在该 owner 的 workers 列表里。
-- 重试链排除：此前在链上 failed/cancelled/cancelling 的尝试的引擎进 `excludeEngines`；当前 `cancel:true` 放弃的尝试即使仍在 cancelling、仍占槽，也排除其引擎。completed 尝试的引擎仍可入选，因此不保证每次重试都换引擎。链上候选全被排除时，在取消原任务或创建子任务前明确报 `NO_ALTERNATIVE_ENGINE` 并保留原状；不排除无关任务的引擎。
+- `resolveDispatch` 在 owner.workers 里按权重做**全局负载最少化**：可用候选（worker 启用、引擎启用、无生效 block、权重 >0、worker 未被本次重试链排除、引擎未被引擎级改派排除）中，比较 `(running + 1) / weight`，最小者胜出；并列先取权重更高者，再按 owner.workers 列表顺序。这里的 `running` 是全局数：所有 owner 下 `running`+`cancelling` 的任务数之和（`workerLoad()` 扫全表），跟任务绑在哪个 owner 实例无关。空闲时这个比较退化为按权重试用，有负载时按权重比例分摊。比较用交叉相乘，不做除法。
+- `worker_weights`：整数 0..10，缺省 5；0 表示永不调度该 worker，显式指定 worker 也不能绕过权重 0，也不能绕过被排除 worker（`NO_ALTERNATIVE_WORKER`）或被排除引擎（`NO_ALTERNATIVE_ENGINE`）。所有权键必须在该 owner 的 workers 列表里。
+- 重试链排除：此前在链上 failed/cancelled/cancelling 的尝试按 `dispatch.worker` 进 `excludeWorkers`；当前 `cancel:true` 放弃的 worker 即使仍在 cancelling、仍占槽，也排除。completed worker 仍可入选，同引擎的其他 worker 可以接手，因此重试不要求换引擎。链上候选全被排除时，在取消原任务或创建子任务前明确报 `NO_ALTERNATIVE_WORKER` 并保留原状；不排除无关任务的 worker。队列因 worker/engine 级 vendor block 改派时同样遵守重试链回避，engine 级 block 的改派继续使用通用 `excludeEngines`。
 - 配额 block 按引擎/model 精确匹配，绝对时间戳 `release_at` 到期后失效，其余手动解除。运行时供应商限流/额度错误优先封被派发的那个 worker（`by:"weaver-vendor-limit"` 的 worker 级 block）；该引擎所有启用 worker 都已被封时升级为 engine 级 block（`src/main/policy/routing.ts` 的 `escalateEngineBlock`，`release_at` 取覆盖这些 worker 的 block 中最早者）；派发时无法确定 worker（或派发的 worker 不属于该引擎）则直接按 engine 封（`src/main/application/scheduling/vendor-limits.ts`）。reason 为短说明（如 `限流：Rate limit exceeded…`）；同一 worker（无法确定 worker 时按引擎）2 小时内重复限流按 10 → 30 → 60 分钟递增，安静满 2 小时重置，供应商给出更晚的 retryAt 时取更晚时间；阶梯只有 `vendor_worker_limits` 这一份，派发失败与免费渠道探测的限流共用它。块与阶梯在同一个 SQLite 事务里提交（stall、免费渠道探测、供应商三条路径），事务中途失败则两者都不落盘、内存快照也不前进，同一失败再次处理只升一级；探测与网络等待留在事务之外。额度错误无重试时间则持续到手动解除。
 - 准入与派发同一 resolve 函数：`policy preview` 只读（`dispatch:"preview"`、`execution:"disabled"`）不执行；`workers.spawn` 实际校验 workspace/provider/容量后按结果 start 或入队。页面走的 `previewRoute` 由服务端当场补上同一份全局负载，所以预览显示的选择就是此刻派发会走的选择。
 - 并发按 **owner 实例**的 `profile.max_parallel`：槽位分组是 `instance:<ownerId>`，任务绑定 `ownerId` 时竞争的就是那个确切实例自己的额度；没有 `ownerId` 的遗留任务单独共用 `profile:<profileId>` 组。同一 profile 的多个实例各占各的额度，A 会话排满不影响 B 会话开工。容量在 `workers.spawn`、pump 复核和 `manager.start()` 启动前三处都查，超限一律入队而不是抢占。
@@ -134,7 +134,7 @@ src/
 - 派发响应除任务快照外还带 `next`——父 Agent 照它做一步即可，不需要理解引擎：非 native（real/mock）和还没拿到容量的排队任务是 `{action:'wait', command:'weaver tasks wait --task-id <id>'}`；已 running 的 native 任务是 `{action:'run_subagent', model, effort, prompt, then}`，`prompt` 与真实 worker 拿到的角色指令逐字相同（`workerInstruction`），`then` 是回报命令 `weaver workers complete --task-id <id> --input report.json`。`tasks.get` 对 running 的 native 任务同样给出 `next`，所以 spawn 回复丢了也能找回那份指令。
 - pump 复核当前资格/容量/配额/pin/workspace：route 改变（含 kind 不符）、容量不足、workspace 失效或 launch 失败都会给 `task.queueReason`（有界 message，仅变化落盘），代码取 `waiting_for_capacity/policy_blocked/frozen_route_changed/workspace_changed/launch_blocked`。除供应商限流/额度阻断外，冻结路由不会被默默改派或跨引擎替换；`by:"weaver-vendor-limit"` 的生效阻断会让排队任务重新选择其他可用引擎，已失败尝试仍需显式重试。
 - 取消：queued 直接转 cancelled；running 先 `cancelling` 再等待本进程拥有的 worker 子进程退出（SIGTERM → 1.5s SIGKILL）。取消/文件损坏不删除已有 history 与事件。
-- `tasks.retry` 是单次自动派发：先完成路由、worker 能力、workspace、指令长度（≤16000）、冻结包存在性等全部预检，再按需取消原尝试并原子创建带 `retryOf` 的新任务与新冻结包。原任务有冻结包也会创建一个新包；不再受 JSON 存储的总数上限限制。复制 owner/workspace/constraints 与冻结 scope/criteria，指令只加一份上次尝试与读取 git diff/部分产出的接续说明，再接链根的原始目标，避免逐代堆叠前缀；复用 `workers.spawn` 同一派发路径，直接返回任务、`next` 与非空的 `excludedEngines`。显式 mock 保持 mock，real 不回退 mock；写命令拒绝仍保留可回放收据。
+- `tasks.retry` 是单次自动派发：先完成路由、worker 能力、workspace、指令长度（≤16000）、冻结包存在性等全部预检，再按需取消原尝试并原子创建带 `retryOf` 的新任务与新冻结包。原任务有冻结包也会创建一个新包；不再受 JSON 存储的总数上限限制。复制 owner/workspace/constraints 与冻结 scope/criteria，指令只加一份上次尝试与读取 git diff/部分产出的接续说明，再接链根的原始目标，避免逐代堆叠前缀；复用 `workers.spawn` 同一派发路径，直接返回任务、`next` 与非空的 `excludedWorkers`。显式 mock 保持 mock，real 不回退 mock；写命令拒绝仍保留可回放收据。
 
 ## 5. 真实 worker 执行（src/main/adapters/cli）
 

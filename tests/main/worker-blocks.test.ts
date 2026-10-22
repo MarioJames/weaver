@@ -215,25 +215,48 @@ test('a queued task frozen to a worker-blocked worker is rerouted to its sibling
   } finally { await f.close(); }
 });
 
-test('after a rate-limit failure tasks retry still chooses another worker on the same engine; other failures still exclude the engine', async () => {
+test('a vendor reroute keeps the retry chain out and never returns to a failed worker', async () => {
+  const f = setup();
+  try {
+    const chain = f.failed('codexb_worker', 'codex', { kind: 'other', message: 'boom' });
+    const task = f.create();
+    task.retryOf = chain.id;
+    task.dispatch = f.route('codex_worker', 'codex');
+    task.scheduled = true;
+    task.status = 'queued';
+    f.store.put(task);
+    const snapshot = f.policy.snapshot();
+    const hold: Block = { engine: 'codex', worker: 'codex_worker', reason: '限流：test', since: new Date().toISOString(), by: VENDOR, release_at: new Date(Date.now() + 10 * MINUTE).toISOString() };
+    f.policy.save({ revision: snapshot.revision, config: snapshot.config, blocks: [hold] });
+    await f.settle();
+    const moved = f.store.get(task.id);
+    assert.equal(moved.dispatch?.worker, 'opencode_worker', 'codexb_worker is in the retry chain and stays excluded');
+    assert.equal(moved.dispatch?.engine, 'opencode');
+    assert.ok(moved.events.some(item => /Vendor limit rerouted queued worker to opencode \(opencode_worker\)/.test(item.message)));
+  } finally { await f.close(); }
+});
+
+test('after a rate-limit failure tasks retry still chooses another worker on the same engine; other failures exclude only that worker', async () => {
   const f = setup();
   try {
     const limited = f.failed('codex_worker', 'codex', rate());
     const retry = f.call('tasks.retry', { taskId: limited.id });
     assert.equal(retry.dispatch.worker, 'codexb_worker');
     assert.equal(retry.dispatch.engine, 'codex');
+    assert.deepEqual(retry.excludedWorkers, ['codex_worker']);
     assert.equal(retry.excludedEngines, undefined, 'the rate-limited engine is not excluded');
     assert.ok(f.blocks().some(block => block.worker === 'codex_worker'), 'the retry already saw the worker block');
-    // The chain walks on: a rate limit on the retry's own worker still does not exclude the engine.
+    // The chain walks on: the second worker is now blocked too, so only the other engine is left.
     const second = f.store.get(retry.id);
     second.status = 'failed'; second.failure = rate(); f.store.put(second);
     const again = f.call('tasks.retry', { taskId: second.id });
     assert.equal(again.dispatch.engine, 'opencode', 'both codex workers are blocked, so only the other engine is left');
-    // Any other failure keeps the engine excluded.
+    assert.deepEqual(new Set(again.excludedWorkers), new Set(['codex_worker', 'codexb_worker']));
+    // Any other failure excludes only the worker that ran it.
     const other = f.failed('codexb_worker', 'codex', { kind: 'other', message: 'boom' });
     const third = f.call('tasks.retry', { taskId: other.id });
     assert.equal(third.dispatch.engine, 'opencode');
-    assert.deepEqual(third.excludedEngines, ['codex']);
+    assert.deepEqual(third.excludedWorkers, ['codexb_worker']);
   } finally { await f.close(); }
 });
 

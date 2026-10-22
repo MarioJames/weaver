@@ -170,6 +170,25 @@ test('excluded engines are skipped with their reason and load balancing still wo
  const weighted=all(); weighted.owners.claude_owner.worker_weights={claude_worker:0,qoder_worker:10,opencode_worker:10,grok_worker:10};
  assert.deepEqual(resolveDispatch(weighted,[],{owner:'claude_owner',excludeEngines:['claude']}).skipped,[{worker:'claude_worker',reason:'priority weight 0'}]);
 });
+test('excluded workers are skipped by ID and a sibling on the same engine can take over',()=>{
+ const c=all(); c.owners.claude_owner.worker_weights={claude_worker:10,qoder_worker:8,opencode_worker:6,grok_worker:4};
+ const moved=resolveDispatch(c,[],{owner:'claude_owner',excludeWorkers:['claude_worker']});
+ assert.equal(moved.worker,'qoder_worker');
+ assert.deepEqual(moved.skipped![0],{worker:'claude_worker',reason:'excluded for this dispatch'});
+ const same=structuredClone(c);
+ same.workers.claude_alt_worker={enabled:true,engine:'claude',model:'sonnet',effort:'high'};
+ same.owners.claude_owner.workers=['claude_worker','claude_alt_worker'];
+ same.owners.claude_owner.worker_weights={claude_worker:10,claude_alt_worker:8};
+ const sibling=resolveDispatch(same,[],{owner:'claude_owner',excludeWorkers:['claude_worker']});
+ assert.equal(sibling.worker,'claude_alt_worker');
+ assert.equal(sibling.engine,'claude','excluding a worker does not exclude its engine');
+ const named=grab(()=>resolveDispatch(c,[],{owner:'claude_owner',worker:'claude_worker',excludeWorkers:['claude_worker']}));
+ assert.ok(named.startsWith('NO_ALTERNATIVE_WORKER'),named);
+ assert.match(named,/claude_worker/);
+ const closed=grab(()=>resolveDispatch(c,[],{owner:'claude_owner',excludeWorkers:['claude_worker','qoder_worker','opencode_worker','grok_worker']}));
+ assert.ok(closed.startsWith('NO_ALTERNATIVE_WORKER'),closed);
+ for(const worker of ['claude_worker','qoder_worker','opencode_worker','grok_worker'])assert.ok(closed.includes(worker),worker);
+});
 test('an explicit worker on an excluded engine and an exhausted chain both refuse to dispatch',()=>{
  const c=all();
  const named=grab(()=>resolveDispatch(c,[],{owner:'claude_owner',worker:'claude_worker',excludeEngines:['claude']}));
@@ -191,6 +210,10 @@ test('preview takes excluded engines and rejects a malformed list',()=>fixture((
  assert.ok(grab(()=>preview(store,{owner:'claude_owner',excludeEngines:['claude','opencode']})).startsWith('NO_ALTERNATIVE_ENGINE'));
  for(const bad of ['claude',[1],Array(51).fill('claude'),['']]) assert.throws(()=>preview(store,{owner:'claude_owner',excludeEngines:bad}),/excluded engine/);
  assert.equal(preview(store,{owner:'claude_owner',excludeEngines:[]}).worker,'claude_worker');
+ assert.equal(preview(store,{owner:'claude_owner',excludeWorkers:['claude_worker']}).worker,'opencode_worker');
+ assert.ok(grab(()=>preview(store,{owner:'claude_owner',excludeWorkers:['claude_worker','opencode_worker']})).startsWith('NO_ALTERNATIVE_WORKER'));
+ for(const bad of ['claude_worker',[1],Array(201).fill('claude_worker'),['']]) assert.throws(()=>preview(store,{owner:'claude_owner',excludeWorkers:bad}),/excluded worker/);
+ assert.equal(preview(store,{owner:'claude_owner',excludeWorkers:[]}).worker,'claude_worker');
  assert.throws(()=>preview(store,{owner:'claude_owner',excludeEngines:['claude'],argv:['unsafe']}),/Unknown/);
 }));
 test('omitted weight is 5 and weights above 10 are rejected',()=>{

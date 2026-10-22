@@ -142,11 +142,11 @@ test('owners describe is catalogued as a mutation with required ownerId and titl
 });
 
 test('text output carries the next step a dispatch or retry handed back',()=>{
- const waited={id:'t-1',status:'running',title:'Held',dispatch:{engine:'claude'},next:{action:'wait',command:'weaver tasks wait --task-id t-1'},excludedEngines:['codex']};
+ const waited={id:'t-1',status:'running',title:'Held',dispatch:{engine:'claude'},next:{action:'wait',command:'weaver tasks wait --task-id t-1'},excludedWorkers:['codex_alt_worker']};
  const text=renderEnvelope('text',{apiVersion:'weaver.v1',ok:true,data:waited});
  assert.equal(text.split('\n')[0],'t-1 running Held');
  assert.match(text,/^next: weaver tasks wait --task-id t-1$/m);
- assert.match(text,/^excluded engines: codex$/m);
+ assert.match(text,/^excluded workers: codex_alt_worker$/m);
  const native={id:'t-2',status:'running',title:'Native',next:{action:'run_subagent',model:'sonnet',effort:'high',prompt:'FULL INSTRUCTION\nsecond line',then:'weaver workers complete --task-id t-2 --input report.json'}};
  const handoff=renderEnvelope('text',{apiVersion:'weaver.v1',ok:true,data:native});
  assert.match(handoff,/^t-2 running Native$/m);

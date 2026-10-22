@@ -8,6 +8,7 @@ import { redactContext } from '../../redact-context';
 import { assertFrozenWorkspace, workspaceIdentity } from '../../workspace';
 import { terminal, type TaskRecords } from '../tasks/records';
 import type { Dispatcher } from './dispatch';
+import { chainWorkers } from './retry';
 import { workerLoad } from './dispatch';
 
 /** Admits queued work as capacity and policy allow: the one place that starts scheduled tasks. */
@@ -49,7 +50,9 @@ export class Coordinator {
     const workerBlocked=!engineBlocked&&vendorBlocks.some(block=>block.worker===frozen.worker);
     if(engineBlocked||workerBlocked){
       if(frozen.execution==='real'){phase='workspace_changed';assertFrozenWorkspace(frozen);phase='policy_blocked';}
-      const reroute=this.dispatch.routeOf(frozen.owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner)),engineBlocked?[frozen.engine]:[],undefined,workerBlocked?[frozen.worker]:[]);
+      const excludedWorkers=chainWorkers(this.manager.store,task);
+      if(workerBlocked&&!excludedWorkers.includes(frozen.worker))excludedWorkers.push(frozen.worker);
+      const reroute=this.dispatch.routeOf(frozen.owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner)),engineBlocked?[frozen.engine]:[],undefined,excludedWorkers);
       const decision=this.dispatch.decideExecution(reroute.engine,undefined,{...task,workspace:frozen.workspace??task.workspace},this.policy.snapshot().config.owners[reroute.owner]?.engine);
       task.dispatch={...frozen,worker:reroute.worker,engine:reroute.engine,model:reroute.model,effort:reroute.effort,execution:decision.execution,adapter:decision.adapter,engineKind:decision.engineKind,maxParallel:reroute.maxParallel,...(decision.workspace?{workspace:decision.workspace,workspaceIdentity:workspaceIdentity(decision.workspace)}:{})};
       event(task,'lifecycle',`Vendor limit rerouted queued worker to ${reroute.engine} (${reroute.worker})`);this.records.put(task);this.pump();continue;

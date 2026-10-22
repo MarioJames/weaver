@@ -21,7 +21,7 @@ function renderData(data: unknown): string {
   if (typeof record.status === 'string' && typeof record.title === 'string') {
     const lines = [`${record.id ?? ''} ${record.status} ${record.title}`.trim()];
     if (record.next && typeof record.next === 'object') lines.push(...renderNext(record.next as Record<string, unknown>));
-    if (Array.isArray(record.excludedEngines) && record.excludedEngines.length) lines.push(`excluded engines: ${record.excludedEngines.join(', ')}`);
+    if (Array.isArray(record.excludedWorkers) && record.excludedWorkers.length) lines.push(`excluded workers: ${record.excludedWorkers.join(', ')}`);
     return lines.join('\n');
   }
   if (Array.isArray(record.tasks)) return record.tasks.map(item => renderData(item)).join('\n') || 'No tasks';

@@ -7,13 +7,13 @@ import { workerInstruction } from '../../adapters/instruction';
 import type { ContinuationService } from '../../continuation';
 import { event, slotGroupCount, slotGroupFor, slotGroupName } from '../../domain/tasks';
 import type { TaskManager } from '../../manager';
-import { EXCLUDED_ENGINE_REASON } from '../../policy/routing';
+import { EXCLUDED_ENGINE_REASON, EXCLUDED_WORKER_REASON } from '../../policy/routing';
 import { previewRoute } from '../../policy/preview';
 import type { PolicyStore } from '../../policy/store';
 import { absoluteExistingWorkspace, isRealEngineKind, workspaceIdentity } from '../../workspace';
 import { fail } from '../commands/errors';
 import { publicTask, type TaskRecords } from '../tasks/records';
-import { chainEngines } from './retry';
+import { chainWorkers } from './retry';
 
 /** Running tasks per worker across every owner: the load that weighted dispatch balances. */
 export function workerLoad(tasks: Task[]): Record<string, number> {
@@ -60,14 +60,15 @@ export class Dispatcher {
   if(!this.manager.canLaunchReal)fail('CAPABILITY_UNAVAILABLE',`Real launcher for ${kind} is not loaded. No mock provider was substituted.`);
   return {execution:'real',adapter:kind,engineKind:kind,workspace:absoluteExistingWorkspace(task.workspace),maxWaitMinutes:minutes};
  }
- /** Route one owner's work under the chain's excluded engines, keeping the refusal in the policy's own words. */
- routeOf(owner:string,running:number,excluded:string[],worker?:unknown,excludedWorkers:string[]=[]):RoutePreview {
+ /** Route one owner's work under excluded workers, or engines when a queued task is rerouted by an engine block. */
+ routeOf(owner:string,running:number,excludedEngines:string[],worker?:unknown,excludedWorkers:string[]=[]):RoutePreview {
   try {
    const live=this.policy.snapshot();
-   return previewRoute(live.config,live.blocks,Date.now(),{owner,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads()),...(worker!==undefined?{worker}:{}),...(excluded.length?{excludeEngines:excluded}:{}),...(excludedWorkers.length?{excludeWorkers:excludedWorkers}:{})});
+   return previewRoute(live.config,live.blocks,Date.now(),{owner,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads()),...(worker!==undefined?{worker}:{}),...(excludedEngines.length?{excludeEngines:excludedEngines}:{}),...(excludedWorkers.length?{excludeWorkers:excludedWorkers}:{})});
   } catch(error) {
    const message=error instanceof Error?error.message:String(error);
    if(message.startsWith('NO_ALTERNATIVE_ENGINE'))fail('NO_ALTERNATIVE_ENGINE',message);
+   if(message.startsWith('NO_ALTERNATIVE_WORKER'))fail('NO_ALTERNATIVE_WORKER',message);
    throw error;
   }
  }
@@ -82,18 +83,18 @@ export class Dispatcher {
   // Identical to the instruction a real worker is launched with, so heterogeneous workers get the same contract.
   return {action:'run_subagent',model:dispatch.model,effort:dispatch.effort,prompt:workerInstruction(task,pkg),then:`weaver workers complete --task-id ${task.id} --input report.json`};
  }
- /** Dispatch response: the task snapshot, the owner's next step, and the engines this retry chain excluded. */
- private dispatchResponse(task:Task,excluded:string[]) {
+ /** Dispatch response: the task snapshot, the owner's next step, and the workers this retry chain excluded. */
+ private dispatchResponse(task:Task,excludedWorkers:string[]) {
   const next=this.nextFor(task);
-  return {...publicTask(task),started:task.dispatch?.execution==='real'?!!task.run?.firstOutputAt:task.status==='running',...(next?{next}:{}),...(excluded.length?{excludedEngines:excluded}:{})};
+  return {...publicTask(task),started:task.dispatch?.execution==='real'?!!task.run?.firstOutputAt:task.status==='running',...(next?{next}:{}),...(excludedWorkers.length?{excludedWorkers}:{})};
  }
  /**
   * Route, freeze and admit one queued task, then hand the owner the single next step. workers.spawn calls it
   * directly and tasks.retry calls it for the linked child, so a retry never grows a second launcher.
-  * forcedEngines names an engine the chain cannot see yet: the attempt --cancel abandoned but whose worker
-  * is still cancelling.
+  * forcedWorkers names a chain worker the task cannot see yet: the attempt --cancel abandoned but whose
+  * worker is still cancelling.
   */
- dispatchTask(command:string,a:Record<string,unknown>,forcedEngines:string[]=[]):unknown {
+ dispatchTask(command:string,a:Record<string,unknown>,forcedWorkers:string[]=[]):unknown {
   let task=this.records.task(a);this.records.revise(task,a);if(task.parentTaskId&&this.manager.store.get(task.parentTaskId).status!=='running')fail('INVALID_STATE','Parent root is no longer running');if(task.executionRole==='owner')fail('INVALID_STATE','Dispatch child tasks, not the owner root');if(task.status!=='queued')fail('INVALID_STATE','Only queued tasks may dispatch');
   if(task.title===PENDING_TASK_TITLE)fail('INVALID_STATE','Owner must generate title and acceptance criteria with tasks.describe before dispatch');
   if(a.provider!==undefined&&a.provider!=='mock-jsonl')fail('CAPABILITY_UNAVAILABLE',`Provider ${String(a.provider)} is not available`);
@@ -102,10 +103,10 @@ export class Dispatcher {
   const logical=task.ownerId?this.records.owner(task.ownerId):undefined;
   const owner=text(a.owner??logical?.profileId??Object.keys(this.policy.snapshot().config.owners)[0],'owner profile',120);
   if(logical&&owner!==logical.profileId)fail('POLICY_DENIED','Task owner profile cannot be changed at dispatch');
-  const excluded=chainEngines(this.manager.store,task);
-  for(const engine of forcedEngines)if(!excluded.includes(engine))excluded.push(engine);
+  const excludedWorkers=chainWorkers(this.manager.store,task);
+  for(const worker of forcedWorkers)if(!excludedWorkers.includes(worker))excludedWorkers.push(worker);
   const running=slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,owner));
-  const route=this.routeOf(owner,running,excluded,a.worker);
+  const route=this.routeOf(owner,running,[],a.worker,excludedWorkers);
   const decision=this.decideExecution(route.engine,a.provider,task,this.policy.snapshot().config.owners[route.owner]?.engine);
   const pendingPackage:WorkPackage=task.packageId?this.manager.store.getPackage(task.packageId!)!:{id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:[decision.workspace??task.workspace??'Explicit mock fixture'],acceptanceCriteria:task.acceptanceCriteria?.length?task.acceptanceCriteria:[decision.execution==='mock'?'Mock output returned for owner review':'Provider result returned for owner review'],createdAt:new Date().toISOString()};
   if(!pendingPackage||pendingPackage.taskId!==task.id)fail('INVALID_REQUEST','Frozen work package is missing');
@@ -116,7 +117,7 @@ export class Dispatcher {
   if(!task.packageId){this.manager.store.transaction(()=>{this.manager.store.putPackage(pendingPackage);task.packageId=pendingPackage.id;this.records.put(task);});}
   task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,...(decision.execution==='real'?{workspaceIdentity:workspaceIdentity(decision.workspace)}:{})}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
   const selected=decision.execution==='real'?`Policy selected ${route.worker}; launching ${decision.engineKind} in ${decision.workspace}`:decision.execution==='native'?`Policy selected ${route.worker} on the owner's engine; the owner runs it with its built-in subagent tool (${route.model}, ${route.effort})`:`Policy selected ${route.worker}; explicit mock-jsonl provider`;
-  event(task,'lifecycle',`${selected}${excluded.length?`; engines excluded because they ${EXCLUDED_ENGINE_REASON}: ${excluded.join(', ')}`:''}`);
-  if(!route.capacityAvailable){task.scheduled=true;task.queueReason={code:'waiting_for_capacity',message:this.queueWaitText(task.ownerId,route)};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.records.put(task);return this.dispatchResponse(task,excluded);}this.records.put(task);return this.dispatchResponse(this.manager.start(task.id,route.maxParallel),excluded);
+  event(task,'lifecycle',`${selected}${excludedWorkers.length?`; workers excluded because they ${EXCLUDED_WORKER_REASON}: ${excludedWorkers.join(', ')}`:''}`);
+  if(!route.capacityAvailable){task.scheduled=true;task.queueReason={code:'waiting_for_capacity',message:this.queueWaitText(task.ownerId,route)};event(task,'lifecycle','Dispatch admitted to queue; waiting for an execution slot');this.records.put(task);return this.dispatchResponse(task,excludedWorkers);}this.records.put(task);return this.dispatchResponse(this.manager.start(task.id,route.maxParallel),excludedWorkers);
  }
 }

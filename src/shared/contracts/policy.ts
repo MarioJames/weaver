@@ -25,7 +25,7 @@ export interface Dispatch {
  /** The chosen worker's concurrency cap and the running count the choice used; present only when that worker carries a max_parallel. */
  workerCapacity?: {running:number; limit:number};
 }
-export interface RouteOptions { owner: string; worker?: string; /** Running tasks per worker, across all owners. */ workerLoad?: Record<string, number>; /** Engines whose attempt already failed or was cancelled earlier in this task's retry chain. */ excludeEngines?: string[]; /** Workers that must not be chosen, for example the one a queued task was frozen to before it was blocked. */ excludeWorkers?: string[] }
+export interface RouteOptions { owner: string; worker?: string; /** Running tasks per worker, across all owners. */ workerLoad?: Record<string, number>; /** Engines whose attempt already failed or was cancelled earlier in this task's retry chain, or an engine vendor block being rerouted. */ excludeEngines?: string[]; /** Workers excluded for this dispatch: failed attempts in a retry chain, or the one a queued task was frozen to before it was blocked. */ excludeWorkers?: string[] }
 export interface PolicySnapshot {
  revision: number; config: Config; blocks: Block[]; activeBlocks: Block[];
  owners: Record<string, Availability>; workers: Record<string, Availability>;

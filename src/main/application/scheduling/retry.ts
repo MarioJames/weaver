@@ -5,35 +5,34 @@ import { event, slotGroupCount, slotGroupFor } from '../../domain/tasks';
 import type { TaskManager } from '../../manager';
 import type { PolicyStore } from '../../policy/store';
 import { fail } from '../commands/errors';
-import { terminal, vendorLimited, type TaskRecords } from '../tasks/records';
+import { terminal, type TaskRecords } from '../tasks/records';
 import type { Dispatcher } from './dispatch';
 
- /** Engines of every earlier attempt in this task's retry chain that failed, cancelled or is still cancelling: a retry never returns to one. */
-export function chainEngines(store:TaskManager['store'],task:Task):string[] {
-  const engines:string[]=[];const seen=new Set<string>([task.id]);let id=task.retryOf;
+ /** Workers of every earlier attempt in this task's retry chain that failed, cancelled or is still cancelling: a retry never returns to one. */
+export function chainWorkers(store:TaskManager['store'],task:Task):string[] {
+  const workers:string[]=[];const seen=new Set<string>([task.id]);let id=task.retryOf;
   while(id&&!seen.has(id)){
    seen.add(id);
    let previous:Task;
    try{previous=store.get(id);}catch{break;}
-   const engine=previous.dispatch?.engine;
-   // A rate-limited attempt is already out through its worker's block; only the other failures put the engine in doubt.
-   if(engine&&!vendorLimited(previous)&&(previous.status==='failed'||previous.status==='cancelled'||previous.status==='cancelling')&&!engines.includes(engine))engines.push(engine);
+   const worker=previous.dispatch?.worker;
+   if(worker&&(previous.status==='failed'||previous.status==='cancelled'||previous.status==='cancelling')&&!workers.includes(worker))workers.push(worker);
    id=previous.retryOf;
   }
-  return engines;
+  return workers;
  }
 /** The dispatch steps a retry reuses, so a retry never grows a second launcher. */
 type RetryDispatch = Pick<Dispatcher,'routeOf'|'decideExecution'|'dispatchTask'>;
 export class Retries {
  constructor(private readonly manager:TaskManager,private readonly policy:PolicyStore,private readonly records:TaskRecords,
   private readonly dispatch:RetryDispatch,private readonly applyVendorBlocks:()=>void){}
- /** What a retry may not route back to: the chain's failures, and the engine of the attempt --cancel abandons
-  * even while its worker is still cancelling and holding the slot that made it. */
- private retryEngines(original:Task,cancel:boolean):string[] {
-  const excluded=chainEngines(this.manager.store,original);
-  const engine=original.dispatch?.engine;
-  const abandoned=(cancel&&!terminal(original))||(!vendorLimited(original)&&(original.status==='failed'||original.status==='cancelled'));
-  if(engine&&abandoned&&!excluded.includes(engine))excluded.push(engine);
+ /** What a retry may not route back to: the chain's failed workers, and the worker of the attempt --cancel abandons
+  * even while it is still cancelling and holding the slot that made it. */
+ private retryWorkers(original:Task,cancel:boolean):string[] {
+  const excluded=chainWorkers(this.manager.store,original);
+  const worker=original.dispatch?.worker;
+  const abandoned=(cancel&&!terminal(original))||original.status==='failed'||original.status==='cancelled';
+  if(worker&&abandoned&&!excluded.includes(worker))excluded.push(worker);
   return excluded;
  }
  /** The goal as its owner first wrote it. Walking to the chain root is what keeps one continuation note per
@@ -50,7 +49,7 @@ export class Retries {
  }
  /** The bounded note a retried attempt carries: what ran, how it ended, and to read the workspace back first. */
  private retryNote(previous:Task):string {
-  return `[Weaver retry] The previous attempt (task ${previous.id.slice(0,8)}) ran on ${previous.dispatch?.engine??'no engine'} and ended ${previous.status}. Before changing anything, inspect the current git diff and any partial output already in the workspace, then continue from what is there rather than repeating finished work. The goal below is the original instruction, unchanged.`;
+  return `[Weaver retry] The previous attempt (task ${previous.id.slice(0,8)}) ran on ${previous.dispatch?.worker??'no worker'} (${previous.dispatch?.engine??'no engine'}) and ended ${previous.status}. Before changing anything, inspect the current git diff and any partial output already in the workspace, then continue from what is there rather than repeating finished work. The goal below is the original instruction, unchanged.`;
  }
  /**
   * One owner action that runs a finished attempt again elsewhere and dispatches the linked child in the same call.
@@ -72,10 +71,10 @@ export class Retries {
   if(original.packageId&&!frozen)fail('NOT_FOUND','The original task names a frozen work package this store no longer retains');
   // The failure that ended the original may not have been turned into its worker block yet; the route must see it.
   this.applyVendorBlocks();
-  const excluded=this.retryEngines(original,cancel);
+  const excludedWorkers=this.retryWorkers(original,cancel);
   const logical=original.ownerId?this.records.owner(original.ownerId):undefined;
   const owner=logical?.profileId??Object.keys(this.policy.snapshot().config.owners)[0];
-  const route=this.dispatch.routeOf(owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(original.ownerId,owner)),excluded);
+  const route=this.dispatch.routeOf(owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(original.ownerId,owner)),[],undefined,excludedWorkers);
   // An explicit mock attempt stays a mock; a real one never falls back to a fixture because it failed.
   const provider=original.dispatch?.execution==='mock'?'mock-jsonl':undefined;
   const decision=this.dispatch.decideExecution(route.engine,provider,original,this.policy.snapshot().config.owners[route.owner]?.engine);
@@ -98,8 +97,8 @@ export class Retries {
    return this.manager.store.get(task.id);
   });
   const linkedFrom=this.manager.store.get(original.id);
-  event(linkedFrom,'lifecycle',`Retried as task ${created.id.slice(0,8)}; engines excluded for the chain: ${excluded.length?excluded.join(', '):'none'}`);
+  event(linkedFrom,'lifecycle',`Retried as task ${created.id.slice(0,8)}; workers excluded for the chain: ${excludedWorkers.length?excludedWorkers.join(', '):'none'}`);
   this.records.put(linkedFrom);
-  return this.dispatch.dispatchTask('workers.spawn',{taskId:created.id,...(provider?{provider}:{})},excluded);
+  return this.dispatch.dispatchTask('workers.spawn',{taskId:created.id,...(provider?{provider}:{})},excludedWorkers);
  }
 }

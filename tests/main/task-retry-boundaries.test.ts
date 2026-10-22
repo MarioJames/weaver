@@ -46,7 +46,14 @@ function setup(engines = ['qoder', 'codex', 'opencode']) {
     task.status = status === 'running' ? 'queued' : status; store.put(task);
     return status === 'running' ? manager.start(task.id) : store.get(task.id);
   };
-  return { dir, path, store, manager, children, handler, raw, call, create, route, attempt, close: async () => {
+  const addWorker = (id: string, engine: string, weight = 5) => {
+    const current = policy.snapshot();
+    current.config.workers[id] = { ...current.config.workers[`${engine}_worker`]!, model: `${engine}-alt`, enabled: true };
+    current.config.owners.codex_owner.workers.push(id);
+    current.config.owners.codex_owner.worker_weights = { ...current.config.owners.codex_owner.worker_weights, [id]: weight };
+    policy.save({ revision: current.revision, config: current.config, blocks: [] });
+  };
+  return { dir, path, store, manager, children, handler, raw, call, create, route, attempt, addWorker, close: async () => {
     handler.draining = true;
     for (const child of children) child.close();
     await manager.shutdown();
@@ -95,7 +102,31 @@ for (const frozen of [true, false]) for (const active of [false, true]) {
   });
 }
 
-test('a cancelling real ancestor remains excluded across three generations, while a completed engine remains eligible', async () => {
+test('a retry moves to a sibling worker on the engine that failed instead of leaving the engine', async () => {
+  const f = setup(['opencode', 'codex']);
+  try {
+    f.addWorker('opencode_alt_worker', 'opencode', 10);
+    const failed = f.attempt('opencode', 'failed');
+    const retry = f.call('tasks.retry', { taskId: failed.id });
+    assert.equal(retry.dispatch.engine, 'opencode');
+    assert.equal(retry.dispatch.worker, 'opencode_alt_worker');
+    assert.deepEqual(retry.excludedWorkers, ['opencode_worker']);
+    assert.equal(retry.excludedEngines, undefined, 'the failed engine is not excluded as a whole');
+  } finally { await f.close(); }
+});
+
+test('a completed attempt leaves its worker eligible to the retry', async () => {
+  const f = setup(['opencode', 'codex']);
+  try {
+    const completed = f.attempt('opencode', 'completed');
+    const retry = f.call('tasks.retry', { taskId: completed.id });
+    assert.equal(retry.dispatch.worker, 'opencode_worker');
+    assert.equal(retry.dispatch.engine, 'opencode');
+    assert.equal(retry.excludedWorkers, undefined);
+  } finally { await f.close(); }
+});
+
+test('a cancelling real ancestor remains excluded across three generations, while a completed worker remains eligible', async () => {
   const f = setup();
   try {
     const ancestor = f.attempt('qoder', 'running', undefined, 'real');
@@ -108,13 +139,15 @@ test('a cancelling real ancestor remains excluded across three generations, whil
     f.attempt('codex', 'running', undefined, 'real');
     const retry = f.call('tasks.retry', { taskId: original.id });
     assert.equal(retry.dispatch.engine, 'codex');
-    assert.deepEqual(new Set(retry.excludedEngines), new Set(['qoder', 'opencode']));
+    assert.equal(retry.dispatch.worker, 'codex_worker');
+    assert.deepEqual(new Set(retry.excludedWorkers), new Set(['qoder_worker', 'opencode_worker']));
+    assert.equal(retry.excludedEngines, undefined, 'completed codex is not excluded as an engine');
     assert.equal(f.store.get(ancestor.id).status, 'cancelling');
     assert.equal(f.store.get(middle.id).status, 'completed');
   } finally { await f.close(); }
 });
 
-test('no remaining engine refuses a later --cancel retry before touching its active attempt', async () => {
+test('no remaining worker refuses a later --cancel retry before touching its active attempt', async () => {
   const f = setup(['qoder', 'opencode']);
   try {
     const ancestor = f.attempt('qoder', 'running', undefined, 'real');
@@ -127,7 +160,8 @@ test('no remaining engine refuses a later --cancel retry before touching its act
     const signals = f.children.map(child => [...child.signals]);
     const response = f.raw('tasks.retry', { taskId: original.id, cancel: true });
     assert.equal(response.ok, false);
-    assert.equal(response.error?.code, 'NO_ALTERNATIVE_ENGINE');
+    assert.equal(response.error?.code, 'NO_ALTERNATIVE_WORKER');
+    assert.match(response.error?.message ?? '', /qoder_worker.*opencode_worker/);
     assert.deepEqual(f.store.list(), before);
     assert.deepEqual(metadataOf(f.store).packages, packages);
     assert.equal(f.children.length, launches);
@@ -147,6 +181,7 @@ test('a task written before proxies were removed still reads and retries; the re
     try { assert.equal(reopened.get(legacy.id).dispatch?.engine, 'qoder'); } finally { reopened.close(); }
     const retry = f.call('tasks.retry', { taskId: legacy.id });
     assert.equal(retry.dispatch.engine, 'codex');
+    assert.deepEqual(retry.excludedWorkers, ['qoder_worker']);
     assert.equal('proxy' in retry.dispatch, false, 'the retry is routed afresh and carries no proxy');
     assert.equal('proxy' in (f.store.get(retry.id).dispatch as object), false);
   } finally { await f.close(); }
