@@ -7,7 +7,7 @@ import { activeBlocks, availabilityOf } from '../../shared/policy/availability';
 import type { NormalizedMessage, CardActionEvent } from '@larksuite/channel';
 import { ImSettingsStore, publicImConfig, type StoredImConfig } from './settings';
 import { ImInbox } from './inbox';
-import { createHerdrParentAgent } from './parent-herdr';
+import { createBackgroundParentAgent } from './parent-background';
 import { ConfirmedParentCancellation, ParentTurnNotSubmitted, ParentAgentError, type ParentAgentFactory, type ParentAgentSession, type ParentAgentFailureReason, type ParentAgentInput } from './parent-agent';
 import { createImChannel, type ImChannelFactory, type ImChannel, type Delivery } from './channel';
 import { ImBootstrapBudgetError, imInstructions } from './bootstrap';
@@ -33,7 +33,7 @@ export class ImServiceError extends Error { constructor(readonly code: string) {
 interface Item { text: string }
 type ClaimResult = 'claimed' | 'duplicate' | 'persistence';
 type ParentOutcome = 'not-started' | 'not-submitted' | 'pending' | 'completed' | 'confirmed-cancellation' | 'failed';
-interface Session { closeRejected?: boolean; failed?: boolean; gen: number; used: boolean; rotation?: Promise<void>; key: string; chat: string; user: string; epoch: string; valid: boolean; queue: Item[]; busy: boolean; deadline: number; parent?: ParentAgentSession; launching?: Promise<ParentAgentSession>; turn?: { id: string; abort: AbortController; delivery: Delivery; cancelled?: boolean; parentOutcome: ParentOutcome }; timer?: ReturnType<typeof setTimeout>; job?: Promise<void>; closing?: Promise<void>; retire?: 'idle' | 'other' }
+interface Session { closeRejected?: boolean; failed?: boolean; gen: number; used: boolean; rotation?: Promise<void>; key: string; chat: string; user: string; epoch: string; valid: boolean; queue: Item[]; busy: boolean; deadline: number; parent?: ParentAgentSession; launching?: Promise<ParentAgentSession>; launchAbort?: AbortController; turn?: { id: string; abort: AbortController; delivery: Delivery; cancelled?: boolean; parentOutcome: ParentOutcome }; timer?: ReturnType<typeof setTimeout>; job?: Promise<void>; closing?: Promise<void>; retire?: 'idle' | 'other' }
 interface ActionBinding { session: Session; generation: number; messageId: string; actionId: string; message: string; expires: number; consumed: boolean }
 interface PendingWait { chat: string; user: string; gen: number; text: string; messageId: string; admittedAt: number; timer?: ReturnType<typeof setTimeout>; done: boolean }
 export interface ImServiceOptions { dataDir: string; policy(): PolicySnapshot; parentFactory?: ParentAgentFactory; channelFactory?: ImChannelFactory; now?: () => number; taskStatus?: () => string }
@@ -43,7 +43,12 @@ export class ImService {
   private readonly now: () => number;
   private channel?: ImChannel;
   private readonly retiringChannels = new Set<ImChannel>();
-  private generation = 0;
+  /** Agent/session generation: fences sessions, parents, queues, cards, pending waits and notices. */
+  private agentGen = 0;
+  /** Transport/channel generation: fences channel callbacks and WS lifecycle. */
+  private transportGen = 0;
+  /** transportGen value that owns the live channel object. */
+  private channelOwnerGen = -1;
   private fingerprint = '';
   /** Hash of channel identity (appId + secret). Never logged or persisted; only compared in memory. */
   private channelHash = '';
@@ -66,7 +71,7 @@ export class ImService {
     try { saved = this.settings.current(); } catch (error) { throw new ImServiceError(this.safeCode(error)); }
     return { revision: saved.revision, config: publicImConfig(saved.config), status: { ...this.status, agentState: this.agentState(), agentMessage: this.agentError ? ImService.agentMessageFor(this.agentReason) : undefined, activeSessions: this.sessionCount(), busySessions: [...this.sessions.values(), ...this.retiring].filter(s => s.busy).length } };
   }
-  start(): void { void this.reconnect().catch(() => this.fail()); }
+  start(): void { void this.reconnect().catch(() => this.failTransport()); }
   save(input: SaveImSettingsInput): Promise<ImSettingsSnapshot> {
     return this.lock(async () => {
       if (this.closed) throw new ImServiceError('IM_CLOSED');
@@ -75,45 +80,87 @@ export class ImService {
       if (config.enabled) this.route(config);
       try { this.settings.save(input); } catch (error) { throw new ImServiceError(this.safeCode(error)); }
       const next = this.settings.current().config;
-      // Enable/disable transitions always rebuild (disable fences immediately, enable builds standby).
+      // Enable/disable transitions always rebuild the full transport (disable fences immediately, enable builds standby).
       if (!old.enabled && !next.enabled) {
         // A failed disable cleanup leaves real residue behind; retry it instead of skipping.
-        if (this.hasResidual()) await this.restart(true);
+        if (this.hasResidual()) await this.restartTransport(true);
         return this.snapshot();
       }
-      if (old.enabled !== next.enabled) { await this.restart(true); return this.snapshot(); }
-      // Both enabled: compare the NEW effective runtime against the LIVE generation.
+      if (old.enabled !== next.enabled) { await this.restartTransport(true); return this.snapshot(); }
+      // Both enabled: compare the NEW effective runtime against the LIVE agent/transport.
       // Old-vs-new alone is unsound: a live policy change without reconcile resolves
       // both routes under the new policy and would hide drift from the running parent.
-      let sameLive = false;
+      let newFp = '';
+      let newHash = '';
+      let routable = true;
       try {
-        const newFp = this.route(next).fingerprint;
-        sameLive = newFp === this.fingerprint && ImService.channelHashOf(next) === this.channelHash;
-      } catch { sameLive = false; }
+        newFp = this.route(next).fingerprint;
+        newHash = ImService.channelHashOf(next);
+      } catch { routable = false; }
+      if (!routable) { await this.restartTransport(true); return this.snapshot(); }
+      const sameLive = newFp === this.fingerprint && newHash === this.channelHash;
       if (sameLive) {
         // Healthy no-op saves keep parent/epoch/thread/queue/cards. Faults still recover explicitly.
-        if (this.needsRecovery()) { await this.restart(true); return this.snapshot(); }
+        if (this.needsRecovery()) {
+          if (!this.transportHealthy()) await this.restartTransport(true);
+          else await this.restartAgents(true);
+          return this.snapshot();
+        }
         if (old.idleTimeoutMinutes !== next.idleTimeoutMinutes) this.retuneIdle(old.idleTimeoutMinutes, next.idleTimeoutMinutes);
         return this.snapshot();
       }
-      await this.restart(true); return this.snapshot();
+      // Credentials changed (or transport otherwise replaced) -> full channel rebuild,
+      // even if an old parent close later fails the old channel is still revoked.
+      if (newHash !== this.channelHash) { await this.restartTransport(true); return this.snapshot(); }
+      // Same transport credentials but agent runtime changed (engine/model/effort/
+      // workspaces/allowedOpenIds): reuse the healthy channel/WS, rebuild only agents.
+      if (!this.transportHealthy()) { await this.restartTransport(true); return this.snapshot(); }
+      await this.restartAgents(true); return this.snapshot();
     });
   }
-  reconnect(): Promise<ImSettingsSnapshot> { return this.lock(async () => { if (this.closed) throw new ImServiceError('IM_CLOSED'); await this.restart(true); return this.snapshot(); }); }
+  reconnect(): Promise<ImSettingsSnapshot> { return this.lock(async () => { if (this.closed) throw new ImServiceError('IM_CLOSED'); await this.restartTransport(true); return this.snapshot(); }); }
   reconcile(): Promise<void> {
     return this.lock(async () => {
       if (this.closed || !this.settings.current().config.enabled) return;
+      let fp = '';
+      let hash = '';
       try {
         const current = this.settings.current().config;
-        if (this.route(current).fingerprint === this.fingerprint && ImService.channelHashOf(current) === this.channelHash) return;
-      } catch { /* revoke stale generation before returning */ }
-      await this.restart();
+        fp = this.route(current).fingerprint;
+        hash = ImService.channelHashOf(current);
+      } catch {
+        // Route-only failure: a healthy same-credential WS stays connected; only
+        // agent admission/output is revoked and the old host is cleaned. Real
+        // transport failures keep their explicit failTransport path elsewhere.
+        if (this.channel && this.transportHealthy()) {
+          // Clear the live fingerprint so a later policy restore is seen as drift
+          // even if the old parent close also fails below.
+          this.fingerprint = '';
+          try { await this.restartAgents(); } catch { /* agent-only: precise refs kept, WS untouched */ }
+        } else {
+          try { await this.restartTransport(); } catch { /* fail-closed already marked */ }
+        }
+        return;
+      }
+      if (fp === this.fingerprint && hash === this.channelHash) return;
+      if (hash === this.channelHash && this.transportHealthy()) {
+        // Agent-only drift: a parent close failure must not escalate to a WS rebuild.
+        try { await this.restartAgents(); } catch { /* precise parent refs kept, connection untouched */ }
+      } else {
+        try { await this.restartTransport(); } catch { /* full cleanup failure already marked */ }
+      }
     });
   }
-  close(): Promise<void> { this.closed = true; ++this.generation; return this.lock(async () => { await this.release(true); this.status.connection = 'disabled'; this.clearAgentFailure(); }); }
+  close(): Promise<void> { this.closed = true; ++this.agentGen; ++this.transportGen; return this.lock(async () => { await this.releaseTransport(true); this.status.connection = 'disabled'; this.clearAgentFailure(); this.channelOwnerGen = -1; }); }
   private lock<T>(fn: () => Promise<T>): Promise<T> { const next = this.serial.then(fn, fn); this.serial = next.catch(() => {}); return next; }
   private safeCode(error: unknown): string { const code = (error as {code?:unknown})?.code; return typeof code === 'string' && /^IM_[A-Z_]+$/.test(code) ? code : 'IM_FAILED'; }
-  private fail(): void { this.status.message = SAFE; this.status.connection = 'error'; }
+  /** Transport-only failure: WS/HTTP boundary. Agent-only failures never touch connection. */
+  private failTransport(): void { this.status.message = SAFE; this.status.connection = 'error'; }
+  /** Healthy transport keeps the same WS object usable for agent-only rebuilds. */
+  private transportHealthy(): boolean { return !!this.channel && this.status.connection !== 'error'; }
+  private isLiveChannel(channel: ImChannel, cGen: number): boolean {
+    return !this.closed && this.channel === channel && this.transportGen === cGen && this.channelOwnerGen === cGen;
+  }
   /** Fixed safe agent text selected only by classified reason; unknown reasons stay SAFE. */
   private static agentMessageFor(reason: ParentAgentFailureReason | undefined): string {
     if (reason === 'engine_missing') return MISSING_BINARY_MESSAGE;
@@ -134,7 +181,7 @@ export class ImService {
    * generation, so a racing control loss does not hide the real failure reason.
    */
   private markAgentFailure(gen: number, reason: ParentAgentFailureReason): void {
-    if (this.closed || gen !== this.generation) return;
+    if (this.closed || gen !== this.agentGen) return;
     if (this.agentError) {
       if (this.agentReason === 'engine' && reason !== 'engine') {
         this.agentReason = reason;
@@ -206,29 +253,63 @@ export class ImService {
       return { input, roots, fingerprint: JSON.stringify([config.engine, input, config.allowedOpenIds]) };
     } catch { throw new ImServiceError('IM_CONFIG_UNAVAILABLE'); }
   }
-  private async restart(retryClose = false): Promise<void> {
-    ++this.generation; await this.release(retryClose); this.clearAgentFailure();
+  private async restartAgents(retryClose = false): Promise<void> {
+    ++this.agentGen;
+    await this.releaseAgents(retryClose);
+    this.clearAgentFailure();
+    const config = this.settings.current().config;
+    if (!config.enabled || this.closed) { this.fingerprint = ''; return; }
+    // Agent-only path requires a healthy live transport; otherwise the caller routes to full rebuild.
+    if (!this.transportHealthy()) { await this.restartTransport(retryClose); return; }
+    try { this.fingerprint = this.route(config).fingerprint; }
+    catch { this.fingerprint = ''; this.markAgentFailure(this.agentGen, 'engine'); return; }
+    const gen = this.agentGen;
+    // Reuse the same channel/WS: callbacks stay live and read the current agentGen on dispatch.
+    this.standby = this.createSession(gen);
+  }
+  private async restartTransport(retryClose = false): Promise<void> {
+    ++this.agentGen; ++this.transportGen;
+    await this.releaseTransport(retryClose);
+    this.clearAgentFailure();
     const config = this.settings.current().config;
     this.status = { ...this.status, connection: config.enabled ? 'connecting' : 'disabled', message: undefined };
-    if (!config.enabled || this.closed) { this.fingerprint = ''; this.channelHash = ''; return; }
-    try { this.fingerprint = this.route(config).fingerprint; this.channelHash = ImService.channelHashOf(config); } catch { this.markAgentFailure(this.generation, 'engine'); this.fail(); return; }
-    const gen = this.generation;
-    const current = () => !this.closed && this.generation === gen;
+    if (!config.enabled || this.closed) { this.fingerprint = ''; this.channelHash = ''; this.channelOwnerGen = -1; return; }
+    try { this.fingerprint = this.route(config).fingerprint; this.channelHash = ImService.channelHashOf(config); } catch { this.markAgentFailure(this.agentGen, 'engine'); this.failTransport(); return; }
+    const cGen = this.transportGen;
     const channel = (this.options.channelFactory ?? createImChannel)(config, {
-      message: message => { if (current()) this.message(message, gen); },
-      card: event => current() ? this.card(event, gen) : this.toast(false),
-      menu: event => { if (current()) this.menu(event, gen); },
-      error: () => { if (current()) this.fail(); },
-      connecting: () => { if (current()) this.status.connection = 'connecting'; },
-      connected: () => { if (current()) this.status.connection = 'connected'; },
+      // Retained channel callbacks must read the CURRENT agent generation on dispatch,
+      // never the captured old one, otherwise post-restart messages are swallowed.
+      // Replaced/closed old channels are fenced by transport generation + identity.
+      message: message => { if (this.isLiveChannel(channel, cGen)) this.message(message, this.agentGen); },
+      card: event => this.isLiveChannel(channel, cGen) ? this.card(event, this.agentGen) : this.toast(false),
+      menu: event => { if (this.isLiveChannel(channel, cGen)) this.menu(event, this.agentGen); },
+      error: () => { if (this.isLiveChannel(channel, cGen)) this.failTransport(); },
+      connecting: () => { if (this.isLiveChannel(channel, cGen)) this.status.connection = 'connecting'; },
+      connected: () => { if (this.isLiveChannel(channel, cGen)) this.status.connection = 'connected'; },
     });
     this.channel = channel;
+    this.channelOwnerGen = cGen;
+    const gen = this.agentGen;
     this.standby = this.createSession(gen);
     // Startup is intentionally asynchronous: local settings and HTTP remain available during a handshake.
-    void channel.connect().then(async () => { if (!current()) await channel.close(); else this.status.connection = 'connected'; }).catch(() => { if (current()) this.fail(); });
+    void channel.connect().then(async () => { if (!this.isLiveChannel(channel, cGen)) await channel.close(); else this.status.connection = 'connected'; }).catch(() => { if (this.isLiveChannel(channel, cGen)) this.failTransport(); });
   }
-  private async release(retryClose = false): Promise<void> {
-    const channel = this.channel; this.channel = undefined;
+  private async releaseAgents(retryClose = false): Promise<void> {
+    // Config/permissions are already persisted by save() before this runs, so
+    // revoking allowedOpenIds/workspaces fences old agents even if close fails.
+    this.pending.forEach(wait => { wait.done = true; clearTimeout(wait.timer); });
+    this.pending.clear();
+    const sessions = this.slots();
+    for (const session of sessions) this.invalidate(session);
+    this.actions.clear();
+    const jobs = sessions.map(s => this.closeSession(s, true, retryClose));
+    const results = await Promise.allSettled(jobs.map(job => this.boundedClose(job)));
+    // Agent-only failure keeps the healthy WS/connection; no new parent is created
+    // and new admissions stay fenced until an explicit retry closes the exact objects.
+    if (results.some(r => r.status === 'rejected')) { this.agentError = true; this.agentReason ??= 'engine'; this.status.agentMessage ??= ImService.agentMessageFor(this.agentReason); throw new ImServiceError('IM_CLOSE_FAILED'); }
+  }
+  private async releaseTransport(retryClose = false): Promise<void> {
+    const channel = this.channel; this.channel = undefined; this.channelOwnerGen = -1;
     if (channel) this.retiringChannels.add(channel);
     this.pending.forEach(wait => { wait.done = true; clearTimeout(wait.timer); });
     this.pending.clear();
@@ -237,10 +318,16 @@ export class ImService {
     this.actions.clear();
     const jobs = [...[...this.retiringChannels].map(async old => { await old.close(); this.retiringChannels.delete(old); }), ...sessions.map(s => this.closeSession(s, true, retryClose))];
     const results = await Promise.allSettled(jobs.map(job => this.boundedClose(job)));
-    if (results.some(r => r.status === 'rejected')) { this.agentError = true; this.agentReason ??= 'engine'; this.status.agentMessage ??= ImService.agentMessageFor(this.agentReason); this.fail(); throw new ImServiceError('IM_CLOSE_FAILED'); }
+    if (results.some(r => r.status === 'rejected')) { this.agentError = true; this.agentReason ??= 'engine'; this.status.agentMessage ??= ImService.agentMessageFor(this.agentReason); this.failTransport(); throw new ImServiceError('IM_CLOSE_FAILED'); }
   }
   private invalidate(session: Session, retire: 'idle' | 'other' = 'other'): void {
     session.retire = retire;
+    // Private startup cancellation: rebuilding or disabling during the extended identity
+    // budget must not wait out the full startup and then hit the 60s close timeout.
+    // Aborting the launch controller lets the default background factory revoke its socket
+    // and startup intent and reject pending readiness; custom factories receive the same
+    // signal option and may ignore it.
+    try { session.launchAbort?.abort(); } catch { /* already aborted */ }
     if (this.standby === session) this.standby = undefined;
     this.retiring.add(session);
     session.valid = false; session.queue = []; clearTimeout(session.timer); session.turn?.abort.abort(); session.turn?.delivery.abort.abort();
@@ -257,6 +344,7 @@ export class ImService {
     // Pending work always shares one confirmation. Only an explicit new recovery operation
     // may retry an already rejected close against the exact same retained parent identity.
     if (retryRejected && session.closeRejected) { session.closing = undefined; session.closeRejected = false; }
+    try { session.launchAbort?.abort(); } catch { /* already aborted */ }
     session.closing ??= (async () => { const parent = session.parent ?? await session.launching?.catch(() => undefined); await parent?.close(); })().catch(error => {
       session.closeRejected = true; session.failed = true; throw error;
     });
@@ -275,17 +363,26 @@ export class ImService {
     return 'ready';
   }
   private currentSlot(session: Session): boolean {
-    return !this.closed && session.gen === this.generation && session.valid && (this.standby === session || this.sessions.get(session.key) === session);
+    return !this.closed && session.gen === this.agentGen && session.valid && (this.standby === session || this.sessions.get(session.key) === session);
   }
   private createSession(gen: number, key = '', chat = '', user = ''): Session {
     const session: Session = { gen, used: false, key, chat, user, epoch: randomUUID(), valid: true, busy: false, queue: [], deadline: 0 };
     if (key) this.sessions.set(key, session); else this.standby = session;
+    const launchAbort = new AbortController();
+    session.launchAbort = launchAbort;
     session.launching = Promise.resolve().then(() => {
       const route = this.route(this.settings.current().config);
       // A queued start fenced before invoking the factory must not create a stale process.
       if (!this.currentSlot(session)) throw new ImServiceError('IM_STALE_START');
       const input = { ...route.input, instructions: imInstructions(this.options.dataDir, route.input.engineKind, session.epoch, route.roots) };
-      return this.options.parentFactory ? this.options.parentFactory(input) : createHerdrParentAgent(input, { dataDir: this.options.dataDir });
+      // The default background factory and custom injected factories both receive the
+      // private launch signal (options, never the serialized ParentAgentInput); custom
+      // factories keep working with one arg and may ignore cancellation. The signal lets a rebuild/disable during the
+      // extended identity budget revoke the socket/startup intent and close the exact owned
+      // host resource instead of waiting out startup plus the close timeout.
+      type CancellableFactory = ParentAgentFactory & ((input: ParentAgentInput, opts?: { signal?: AbortSignal }) => Promise<ParentAgentSession>);
+      if (this.options.parentFactory) return (this.options.parentFactory as CancellableFactory)(input, { signal: launchAbort.signal });
+      return createBackgroundParentAgent(input, { dataDir: this.options.dataDir, signal: launchAbort.signal });
     });
     void session.launching.then(parent => {
       session.parent = parent;
@@ -318,7 +415,7 @@ export class ImService {
   }
   private rotate(session: Session, gen: number): Promise<void> {
     session.rotation ??= this.boundedClose(this.closeSession(session, false)).then(() => {
-      if (this.closed || gen !== this.generation) return;
+      if (this.closed || gen !== this.agentGen) return;
       try { if (this.route(this.settings.current().config).fingerprint !== this.fingerprint) return; } catch { this.markAgentFailure(gen, 'engine'); return; }
       let replacement: Session | undefined;
       if (session.key) { if (!this.sessions.has(session.key)) replacement = this.createSession(gen, session.key, session.chat, session.user); }
@@ -344,17 +441,21 @@ export class ImService {
   }
   private admissible(user: string, gen: number): boolean {
     const config = this.settings.current().config;
-    if (this.closed || gen !== this.generation || !config.enabled || !config.allowedOpenIds.includes(user)) return false;
+    if (this.closed || gen !== this.agentGen || !config.enabled || !config.allowedOpenIds.includes(user)) return false;
+    // Fail-closed on incomplete close: no new admission until the exact objects are retried.
+    if (this.slots().some(s => s.failed || s.closeRejected)) return false;
     try { if (this.route(config).fingerprint === this.fingerprint) return true; } catch { /* fail closed */ }
-    // Immediately fence all old turns; serialized cleanup/reconnect follows.
-    ++this.generation; this.fingerprint = ''; void this.reconcile().catch(() => this.fail()); return false;
+    // Immediately fence all old agent turns; serialized cleanup/reconnect follows.
+    // Reconcile already marks its precise failure; an Agent-only close failure here
+    // must not be upgraded to a connection error (real transport faults fail explicitly).
+    ++this.agentGen; this.fingerprint = ''; void this.reconcile().catch(() => { this.markAgentFailure(this.agentGen, 'engine'); }); return false;
   }
   private claim(id: string): ClaimResult { try { return this.inbox.claim(id, this.now()) ? 'claimed' : 'duplicate'; } catch { return 'persistence'; } }
   private sessionCount(): number { return new Set([...this.sessions.keys(), ...[...this.retiring].map(s => s.key).filter(Boolean), ...this.pending.keys()]).size; }
   private capacity(session?: Session): boolean { return session ? session.valid && session.queue.length < 8 : !!this.standby || this.sessionCount() + this.slots().filter(s => !s.key).length < 16; }
   private notice(chat: string, text: string, gen: number): void {
-    if (gen !== this.generation || this.closed || !this.channel || this.notices >= 16) return;
-    this.notices++; void this.channel.send(chat, text).catch(() => { if (gen === this.generation && !this.closed) this.fail(); }).finally(() => { this.notices--; });
+    if (gen !== this.agentGen || this.closed || !this.channel || this.notices >= 16) return;
+    this.notices++; void this.channel.send(chat, text).catch(() => { if (gen === this.agentGen && !this.closed) this.failTransport(); }).finally(() => { this.notices--; });
   }
   private message(message: NormalizedMessage, gen: number): void {
     if (!this.admissible(message.senderId, gen)) return;
@@ -403,7 +504,7 @@ export class ImService {
     const wait: PendingWait = { chat, user, gen, text, messageId, admittedAt: this.now(), done: false };
     this.recordMessageAt(wait.admittedAt);
     this.pending.set(retired.key, wait);
-    wait.timer = setTimeout(() => { this.pending.delete(retired.key); if (!wait.done && wait.gen === this.generation && !this.closed) this.notice(wait.chat, WAIT_FAIL_NOTICE, wait.gen); wait.done = true; }, 60_000);
+    wait.timer = setTimeout(() => { this.pending.delete(retired.key); if (!wait.done && wait.gen === this.agentGen && !this.closed) this.notice(wait.chat, WAIT_FAIL_NOTICE, wait.gen); wait.done = true; }, 60_000);
     wait.timer.unref?.();
     void (retired.rotation ?? retired.closing)?.then(() => this.executeWait(retired.key, wait), () => { this.pending.delete(retired.key); clearTimeout(wait.timer); if (!wait.done) this.notice(wait.chat, WAIT_FAIL_NOTICE, wait.gen); wait.done = true; });
   }
@@ -412,7 +513,7 @@ export class ImService {
     if (wait.done) return;
     wait.done = true; clearTimeout(wait.timer);
     // Fenced claims (shutdown/policy/reconnect) are dropped without a late start, not executed.
-    if (this.closed || wait.gen !== this.generation || !this.admissible(wait.user, wait.gen) || this.sessions.get(key)?.used) return;
+    if (this.closed || wait.gen !== this.agentGen || !this.admissible(wait.user, wait.gen) || this.sessions.get(key)?.used) return;
     const session = this.acquireSession(key, wait.chat, wait.user, wait.gen);
     this.enqueue(session, wait.text, wait.gen, wait.admittedAt);
   }
@@ -440,7 +541,7 @@ export class ImService {
             // turn() has settled the parent send and SDK stream queue. Retire only this card,
             // then release the captured turn before allowing the already-claimed FIFO to continue.
             const cancelled = session.turn;
-            if (gen === this.generation && this.channel && this.admissible(session.user, gen)) {
+            if (gen === this.agentGen && this.channel && this.admissible(session.user, gen)) {
               await this.channel.retireCard(cancelled.delivery, () => this.admissible(session.user, gen));
             }
             if (session.turn === cancelled) session.turn = undefined;
@@ -454,7 +555,7 @@ export class ImService {
       // A racing `unavailable` observer may have invalidated first with a generic mark; the
       // in-flight turn's classified settlement still refines the same-generation reason via
       // markAgentFailure's generic-to-specific upgrade. Notices stay valid-gated to avoid doubles.
-      if (gen === this.generation && !this.closed) this.markAgentFailure(gen, this.reasonOf(error));
+      if (gen === this.agentGen && !this.closed) this.markAgentFailure(gen, this.reasonOf(error));
       if (this.valid(session, gen)) { this.notice(session.chat, TURN_FAIL_NOTICE, gen); }
       this.invalidate(session);
       await this.closeSession(session, false);

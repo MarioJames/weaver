@@ -8,9 +8,10 @@ import { dirname, join } from 'node:path';
 import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { hostWire, type HostFrame } from '../../src/main/im/parent-host-wire';
+import { IM_MASTER_READY_MARKER } from '../../src/main/im/bootstrap';
 
-async function until(predicate: () => boolean): Promise<void> {
-  const end = Date.now() + 4000;
+async function until(predicate: () => boolean, ms = 4000): Promise<void> {
+  const end = Date.now() + ms;
   while (!predicate()) { if (Date.now() > end) throw new Error('Host fixture timed out'); await new Promise(resolve => setTimeout(resolve, 5)); }
 }
 
@@ -313,6 +314,303 @@ test('opencode engine failure keeps the auth reason across the host boundary', {
     assert.ok(!JSON.stringify(error).includes('not authenticated'));
     wire.send({ type: 'close', id: 0 });
     await exit;
+  } finally {
+    child.stdin.end(); child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('opencode hidden identity turn gates ready: no delta before ready, marker never leaks', { timeout: 15000 }, async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-ident-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  copyFileSync(new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url), join(dir, 'opencode')); chmodSync(join(dir, 'opencode'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID();
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'opencode', model: 'fixture-provider/fixture-model', effort: 'high', workspace, instructions: 'Fixture only.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, OPENCODE_FIXTURE_MARKER: join(dir, 'marker') } });
+    await until(() => frames.some(frame => frame.type === 'ready'));
+    // The hidden identity turn must not emit any public delta/result frames on the wire.
+    assert.ok(!frames.some(frame => frame.type === 'delta'), 'identity turn stays hidden: no delta before ready');
+    assert.ok(!JSON.stringify(frames).includes(IM_MASTER_READY_MARKER), 'the ready marker never leaks onto the wire');
+    // First real user turn works only after ready, with its own text (not the marker).
+    wire.send({ type: 'prepare', id: 1, text: 'hello user' });
+    await until(() => frames.some(frame => frame.type === 'prepared' && frame.id === 1));
+    wire.send({ type: 'submit', id: 1 });
+    await until(() => frames.some(frame => frame.type === 'result' && frame.id === 1));
+    const result = frames.find(frame => frame.type === 'result' && frame.id === 1)!;
+    assert.match(String(result.text), /你好/);
+    assert.ok(!String(result.text).includes(IM_MASTER_READY_MARKER));
+    wire.send({ type: 'close', id: 0 });
+    await exit;
+    assert.equal(child.exitCode, 0);
+  } finally {
+    child.stdin.end(); child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('opencode identity marker mismatch fails as protocol without ready', { timeout: 15000 }, async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-ident-wrong-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  copyFileSync(new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url), join(dir, 'opencode')); chmodSync(join(dir, 'opencode'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID();
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'opencode', model: 'fixture-provider/fixture-model', effort: 'high', workspace, instructions: 'Fixture only.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, OPENCODE_FIXTURE_SCENARIO: 'identity-wrong', OPENCODE_FIXTURE_MARKER: join(dir, 'marker') } });
+    await until(() => frames.some(frame => frame.type === 'failed'));
+    assert.equal(frames.find(frame => frame.type === 'failed')!.reason, 'protocol');
+    assert.ok(!frames.some(frame => frame.type === 'ready'), 'a wrong marker must never fake ready');
+    await exit;
+  } finally {
+    child.stdin.end(); child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('opencode identity prefix with marker still fails as protocol without ready', { timeout: 15000 }, async () => {  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-ident-prefix-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  copyFileSync(new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url), join(dir, 'opencode')); chmodSync(join(dir, 'opencode'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID();
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'opencode', model: 'fixture-provider/fixture-model', effort: 'high', workspace, instructions: 'Fixture only.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, OPENCODE_FIXTURE_SCENARIO: 'identity-prefix', OPENCODE_FIXTURE_MARKER: join(dir, 'marker') } });
+    await until(() => frames.some(frame => frame.type === 'failed'));
+    assert.equal(frames.find(frame => frame.type === 'failed')!.reason, 'protocol');
+    assert.ok(!frames.some(frame => frame.type === 'ready'), 'a prefixed marker must never fake ready: strict equality only');
+    await exit;
+  } finally {
+    child.stdin.end(); child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('opencode identity auth failure keeps the auth reason without ready', { timeout: 15000 }, async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-ident-auth-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  copyFileSync(new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url), join(dir, 'opencode')); chmodSync(join(dir, 'opencode'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID();
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'opencode', model: 'fixture-provider/fixture-model', effort: 'high', workspace, instructions: 'Fixture only.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, OPENCODE_FIXTURE_SCENARIO: 'identity-auth', OPENCODE_FIXTURE_MARKER: join(dir, 'marker') } });
+    await until(() => frames.some(frame => frame.type === 'failed'));
+    assert.equal(frames.find(frame => frame.type === 'failed')!.reason, 'auth');
+    assert.ok(!frames.some(frame => frame.type === 'ready'), 'auth failure must never fake ready');
+    assert.ok(!JSON.stringify(frames).includes('not authenticated'));
+    await exit;
+  } finally {
+    child.stdin.end(); child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('opencode identity hang times out bounded as engine without ready', { timeout: 15000 }, async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-ident-hang-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  copyFileSync(new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url), join(dir, 'opencode')); chmodSync(join(dir, 'opencode'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID();
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  const started = Date.now();
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'opencode', model: 'fixture-provider/fixture-model', effort: 'high', workspace, instructions: 'Fixture only.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, OPENCODE_FIXTURE_SCENARIO: 'identity-hang', OPENCODE_FIXTURE_MARKER: join(dir, 'marker'), WEAVER_PARENT_IDENTITY_MS: '300' } });
+    await until(() => frames.some(frame => frame.type === 'failed'), 8000);
+    assert.equal(frames.find(frame => frame.type === 'failed')!.reason, 'engine');
+    assert.ok(!frames.some(frame => frame.type === 'ready'), 'a timed-out identity must never fake ready');
+    assert.ok(Date.now() - started < 8000, 'identity timeout stays bounded far below the 90s default');
+    await exit;
+  } finally {
+    child.stdin.end(); child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('prepare before identity ready is safely rejected without queuing', { timeout: 15000 }, async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-early-prep-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  copyFileSync(new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url), join(dir, 'opencode')); chmodSync(join(dir, 'opencode'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID();
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'opencode', model: 'fixture-provider/fixture-model', effort: 'high', workspace, instructions: 'Fixture only.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, OPENCODE_FIXTURE_SCENARIO: 'identity-hang', OPENCODE_FIXTURE_MARKER: join(dir, 'marker'), WEAVER_PARENT_IDENTITY_MS: '5000' } });
+    // A user prepare racing the hidden identity turn must not be queued or prepared.
+    wire.send({ type: 'prepare', id: 1, text: 'too early' });
+    await exit;
+    assert.ok(!frames.some(frame => frame.type === 'prepared'), 'early prepare must never be acknowledged');
+    assert.ok(!frames.some(frame => frame.type === 'ready'), 'early prepare must never fake ready');
+  } finally {
+    child.stdin.end(); child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test('close during identity startup aborts quickly without waiting the identity budget', { timeout: 15000 }, async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-ident-close-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  copyFileSync(new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url), join(dir, 'opencode')); chmodSync(join(dir, 'opencode'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID();
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  const started = Date.now();
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'opencode', model: 'fixture-provider/fixture-model', effort: 'high', workspace, instructions: 'Fixture only.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, OPENCODE_FIXTURE_SCENARIO: 'identity-hang', OPENCODE_FIXTURE_MARKER: join(dir, 'marker') } });
+    wire.send({ type: 'close', id: 0 });
+    await exit;
+    assert.equal(child.exitCode, 0);
+    assert.ok(!frames.some(frame => frame.type === 'ready'), 'close must win while identity is still in flight');
+    assert.ok(Date.now() - started < 8000, 'startup close stays fast instead of waiting the identity budget');
+    await assertFixtureReaped(join(dir, 'marker'), false);
+  } finally {
+    child.stdin.end(); child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('null stdin never shuts the host down: it still reaches ready and serves a turn', { timeout: 15000 }, async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-null-stdin-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  copyFileSync(new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url), join(dir, 'opencode')); chmodSync(join(dir, 'opencode'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID(), marker = join(dir, 'marker');
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  // StandardInput=null equivalent: stdin backed by /dev/null reports end/close at once.
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'opencode', model: 'fixture-provider/fixture-model', effort: 'high', workspace, instructions: 'Fixture only.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, OPENCODE_FIXTURE_MARKER: marker } });
+    await until(() => frames.some(frame => frame.type === 'ready'));
+    wire.send({ type: 'prepare', id: 1, text: 'hello user' });
+    await until(() => frames.some(frame => frame.type === 'prepared' && frame.id === 1));
+    wire.send({ type: 'submit', id: 1 });
+    await until(() => frames.some(frame => frame.type === 'result' && frame.id === 1));
+    wire.send({ type: 'close', id: 0 });
+    await exit;
+    assert.equal(child.exitCode, 0);
+    await assertFixtureReaped(marker, true);
+  } finally {
+    child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('close during an abort-ignoring identity send closes the session first and never fakes ready', { timeout: 15000 }, async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-ident-abort-hang-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  copyFileSync(new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url), join(dir, 'opencode')); chmodSync(join(dir, 'opencode'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID(), marker = join(dir, 'marker');
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    // identity-hang never answers the hidden turn and its abort ACK never
+    // settles: shutdown must close the engine session first and only give the
+    // hidden send a bounded grace, never the full identity budget.
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'opencode', model: 'fixture-provider/fixture-model', effort: 'high', workspace, instructions: 'Fixture only.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, OPENCODE_FIXTURE_SCENARIO: 'identity-hang', OPENCODE_FIXTURE_MARKER: marker, WEAVER_PARENT_IDENTITY_MS: '60000' } });
+    await until(() => { try { return readFileSync(marker, 'utf8').includes('spawnPid'); } catch { return false; } });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const started = Date.now();
+    wire.send({ type: 'close', id: 0 });
+    await exit;
+    assert.equal(child.exitCode, 0);
+    assert.ok(!frames.some(frame => frame.type === 'ready'), 'a late identity result must never fake ready');
+    assert.ok(Date.now() - started < 8000, 'shutdown closes the session instead of waiting the identity budget');
+    await assertFixtureReaped(marker, true);
+  } finally {
+    child.stdin.end(); child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('opencode split progress plus terminal marker still reaches ready through final-only', { timeout: 15000 }, async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-ident-split-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  copyFileSync(new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url), join(dir, 'opencode')); chmodSync(join(dir, 'opencode'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID(), marker = join(dir, 'marker');
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'opencode', model: 'fixture-provider/fixture-model', effort: 'high', workspace, instructions: 'Fixture only.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, OPENCODE_FIXTURE_SCENARIO: 'identity-split', OPENCODE_FIXTURE_MARKER: marker } });
+    await until(() => frames.some(frame => frame.type === 'ready'));
+    assert.ok(!frames.some(frame => frame.type === 'delta'), 'split identity turn stays hidden: no delta before ready');
+    assert.ok(!JSON.stringify(frames).includes(IM_MASTER_READY_MARKER), 'the ready marker never leaks onto the wire');
+    wire.send({ type: 'prepare', id: 1, text: 'hello user' });
+    await until(() => frames.some(frame => frame.type === 'prepared' && frame.id === 1));
+    wire.send({ type: 'submit', id: 1 });
+    await until(() => frames.some(frame => frame.type === 'result' && frame.id === 1));
+    wire.send({ type: 'close', id: 0 });
+    await exit;
+    assert.equal(child.exitCode, 0);
+    await assertFixtureReaped(marker, true);
   } finally {
     child.stdin.end(); child.kill('SIGKILL'); await exit;
     await new Promise<void>(resolve => server.close(() => resolve()));

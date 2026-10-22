@@ -26,6 +26,20 @@ function respond(id, result) { emit({ jsonrpc: '2.0', id, result }); }
 function fail(id, message) { emit({ jsonrpc: '2.0', id, error: { code: -32000, message } }); }
 
 async function startPrompt(id, params) {
+  // Hidden Master identity turn: bypass turn/marker so existing expectations stay intact.
+  try {
+    if (JSON.stringify(params ?? '').includes('WEAVER_MASTER_READY')) {
+      if (scenario === 'identity-hang') return;
+      if (scenario === 'identity-auth') { fail(id, 'authentication failed'); return; }
+      const text = scenario === 'identity-wrong' ? 'WRONG-MARKER' : 'WEAVER_MASTER_READY';
+      pendingPrompt = { id, current: 0, cancelled: false };
+      emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } } } });
+      await sleep(20);
+      pendingPrompt = undefined;
+      respond(id, { stopReason: 'end_turn' });
+      return;
+    }
+  } catch { /* fall through to the normal path */ }
   const current = ++turn;
   pendingPrompt = { id, current, cancelled: false };
   log({ pid: process.pid, turn: current, prompt: params?.prompt?.[0]?.text });

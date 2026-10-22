@@ -101,7 +101,8 @@ test('真实HTTP新engine save路径：pi/opencode可启用，同配置不重建
   assert.equal(rotated.status, 200); assert.equal(channels, 2); assert.equal(parents, 2); assert.equal(closes, 1);
   const opencode = await rpc('saveImSettings', [{ expectedRevision: 3, config: { ...keep, engine: 'ocode', effort: 'custom-variant' } }]);
   assert.equal(opencode.status, 200); assert.equal(opencode.body.result.config.effort, 'custom-variant');
-  assert.equal(channels, 3); assert.equal(parents, 3); assert.equal(closes, 2);
+  // Same credentials + healthy transport: engine change reuses the WS channel, rebuilds only the agent.
+  assert.equal(channels, 2); assert.equal(parents, 3); assert.equal(closes, 2);
   assert.ok(!JSON.stringify(opencode).includes('RUNTIME_PI_SECRET'));
 });
 test('IM close 失败仍关闭 HTTP/IPC 并完成 done，不伪装关闭成功',async t=>{

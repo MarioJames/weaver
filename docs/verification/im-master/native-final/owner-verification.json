@@ -1,0 +1,23 @@
+{
+  "checks": {
+    "answerHashMatches": true,
+    "referenceMatches": true,
+    "installedReferenceMatches": true,
+    "privateDirsAbsent": true,
+    "runtimePidGone": true,
+    "runtimePortClosed": true,
+    "noProcessesWithPrivateCwd": true,
+    "runtimeScopeGone": true,
+    "rawLedgerHashMatches": true,
+    "durableLedgerSemanticallyMatchesRaw": true
+  },
+  "pass": true,
+  "limitations": [
+    "Native final text was not separately extracted from the part table; exact ready is inferred from real factory success, strict marker source and independently passed native/host tests. Tool skill name was not retained; reference read target is recorded. No independent original host unit receipt retained; verified private cwd processes absent, factory registry removed, runtime scope and port released."
+  ],
+  "livePrivateCwds": [],
+  "durableLedgerSha256": "8cba964f6c34edb4aeab82063c9d882e1b7070578b6187cc1feb6ab81d8bee2c",
+  "rawLedgerSha256": "ac4f78f32b64dd704621b51c5ebf12ddb2d851a3caafe7c1e8a4de557c6b001f",
+  "ledgerNote": "Worker hash identifies original ledger bytes. Durable ledger is JSON reserialized; parsed entries match exactly.",
+  "nativePartFlagsNote": "partsCount/publicChars/exactMarker/containsMarker are unobserved extractor defaults, not evidence that the real terminal lacked text or marker."
+}

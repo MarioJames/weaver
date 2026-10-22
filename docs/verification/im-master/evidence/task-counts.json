@@ -1,0 +1,87 @@
+{
+ "pre_t1": 3,
+ "post_t1": 3,
+ "post_t2": 3,
+ "post_t3": 4,
+ "post_t4": 4,
+ "post_t5": 4,
+ "post_t3_tasks": [
+  {
+   "id_prefix": "86ff8961",
+   "title": "登录失败提示、订单 CSV、运行文档与健康检查回归",
+   "status": "running",
+   "instruction_prefix": "在 demo 项目完成同批四项需求：1）登录重试 3 次仍失败时给出明确的中文提"
+  },
+  {
+   "id_prefix": "0227cf69",
+   "title": "夹具任务 c",
+   "status": "queued",
+   "instruction_prefix": "observer fixture seed c (queued, not use"
+  },
+  {
+   "id_prefix": "740d97c2",
+   "title": "夹具任务 b",
+   "status": "queued",
+   "instruction_prefix": "observer fixture seed b (queued, not use"
+  },
+  {
+   "id_prefix": "d724c06d",
+   "title": "夹具任务 a",
+   "status": "queued",
+   "instruction_prefix": "observer fixture seed a (queued, not use"
+  }
+ ],
+ "post_t4_tasks": [
+  {
+   "id_prefix": "86ff8961",
+   "title": "登录失败提示、订单 CSV、运行文档与健康检查回归",
+   "status": "running",
+   "instruction_prefix": "在 demo 项目完成同批四项需求：1）登录重试 3 次仍失败时给出明确的中文提"
+  },
+  {
+   "id_prefix": "0227cf69",
+   "title": "夹具任务 c",
+   "status": "queued",
+   "instruction_prefix": "observer fixture seed c (queued, not use"
+  },
+  {
+   "id_prefix": "740d97c2",
+   "title": "夹具任务 b",
+   "status": "queued",
+   "instruction_prefix": "observer fixture seed b (queued, not use"
+  },
+  {
+   "id_prefix": "d724c06d",
+   "title": "夹具任务 a",
+   "status": "queued",
+   "instruction_prefix": "observer fixture seed a (queued, not use"
+  }
+ ],
+ "post_t5_tasks": [
+  {
+   "id_prefix": "86ff8961",
+   "title": "登录失败提示、订单 CSV、运行文档与健康检查回归",
+   "status": "running",
+   "instruction_prefix": "在 demo 项目完成同批四项需求：1）登录重试 3 次仍失败时给出明确的中文提"
+  },
+  {
+   "id_prefix": "0227cf69",
+   "title": "夹具任务 c",
+   "status": "queued",
+   "instruction_prefix": "observer fixture seed c (queued, not use"
+  },
+  {
+   "id_prefix": "740d97c2",
+   "title": "夹具任务 b",
+   "status": "queued",
+   "instruction_prefix": "observer fixture seed b (queued, not use"
+  },
+  {
+   "id_prefix": "d724c06d",
+   "title": "夹具任务 a",
+   "status": "queued",
+   "instruction_prefix": "observer fixture seed a (queued, not use"
+  }
+ ],
+ "note": "t3 roots 3->4 (+86ff8961 running, ownerProfileId claude_owner cross-engine, instruction retains CSV); t4 still 4, root instruction still CSV, no cancel/rebuild, Excel supplement NOT delivered; t5 still 4, policy rev2 all owners disabled"
+}

@@ -58,6 +58,66 @@ function completeAfterPermission(type, props) {
 }
 
 async function runTurn(frame, prompt) {
+  // Hidden Master identity turn: the host sends imMasterIdentityPrompt() once after native
+  // startup and only treats the trimmed WEAVER_MASTER_READY reply as ready. Identity turns
+  // bypass scenario counters and the main marker log so existing user-turn expectations
+  // (turn numbers, marker line counts) stay intact; dedicated identity-* scenarios drive
+  // failure-path tests without affecting normal user turns.
+  try {
+    if (JSON.stringify(prompt ?? '').includes('WEAVER_MASTER_READY')) {
+      const promptID = prompt.messageID;
+      const assistantID = 'msg_identity';
+      const partID = 'prt_identity_1';
+      await sleep(10);
+      if (scenario === 'identity-hang') return;
+      if (scenario === 'identity-auth') {
+        event('session.error', { sessionID: sessionId, error: { name: 'ProviderAuthError', data: { providerID: 'fixture-provider', message: 'not authenticated' } } });
+        return;
+      }
+      // Real 2026-10-22 native evidence: opencode-go/muse-spark-1.3-contributor
+      // accepts variant=xhigh (204) yet the hidden turn resolves with a narration
+      // prefix plus the marker. The strict host gate must still fail closed as
+      // protocol; a contains-check would fake ready and is forbidden.
+      // identity-split replays the corrected root cause: the progress paragraph lives
+      // in an intermediate tool-calls assistant while the true terminal assistant holds
+      // only the marker. Default aggregate keeps both paragraphs; final-only resolves
+      // the terminal message alone.
+      if (scenario === 'identity-split') {
+        const progressID = 'msg_identity_progress';
+        const progressPart = 'prt_identity_progress';
+        const progressText = '身份初始化中，接线完成。';
+        const progressInfo = { ...assistantInfo(progressID, promptID, undefined, 'tool-calls'), time: { created: Date.now(), completed: Date.now() } };
+        event('message.updated', { sessionID: sessionId, info: progressInfo });
+        event('message.part.updated', { sessionID: sessionId, part: { id: progressPart, sessionID: sessionId, messageID: progressID, type: 'text', text: '' } });
+        event('message.part.delta', { sessionID: sessionId, messageID: progressID, partID: progressPart, field: 'text', delta: progressText });
+        event('message.part.updated', { sessionID: sessionId, part: { id: progressPart, sessionID: sessionId, messageID: progressID, type: 'text', text: progressText } });
+        event('message.part.updated', { sessionID: sessionId, part: { id: 'prt_identity_tool', sessionID: sessionId, messageID: progressID, type: 'tool', tool: 'read', state: { status: 'completed' } } });
+        await sleep(20);
+        const finalText = 'WEAVER_MASTER_READY';
+        event('message.updated', { sessionID: sessionId, info: assistantInfo(assistantID, promptID) });
+        event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '' } });
+        event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID, field: 'text', delta: finalText });
+        event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: finalText } });
+        messages.push(
+          { info: progressInfo, parts: [
+            { id: progressPart, sessionID: sessionId, messageID: progressID, type: 'text', text: progressText },
+            { id: 'prt_identity_tool', sessionID: sessionId, messageID: progressID, type: 'tool', tool: 'read', state: { status: 'completed' } },
+          ] },
+          messageEntry(assistantID, promptID, [{ id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: finalText }]),
+        );
+        event('session.idle', { sessionID: sessionId });
+        return;
+      }
+      const text = scenario === 'identity-wrong' ? 'WRONG-MARKER' : scenario === 'identity-prefix' ? '身份初始化中，只输出就绪标记。WEAVER_MASTER_READY' : 'WEAVER_MASTER_READY';
+      event('message.updated', { sessionID: sessionId, info: assistantInfo(assistantID, promptID) });
+      event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text: '' } });
+      event('message.part.delta', { sessionID: sessionId, messageID: assistantID, partID, field: 'text', delta: text });
+      event('message.part.updated', { sessionID: sessionId, part: { id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text } });
+      messages.push(messageEntry(assistantID, promptID, [{ id: partID, sessionID: sessionId, messageID: assistantID, type: 'text', text }]));
+      event('session.idle', { sessionID: sessionId });
+      return;
+    }
+  } catch { /* fall through to the normal path */ }
   const current = ++turn;
   const assistantID = `msg_a${current}`;
   const partID = `prt_${current}_1`;

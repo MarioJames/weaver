@@ -35,6 +35,22 @@ function result(subtype, text, uuid, overrides = {}) {
 }
 
 async function streamTurn(frame) {
+  // Hidden Master identity turn: bypass turn/marker so existing expectations stay intact.
+  try {
+    if (JSON.stringify(frame).includes('WEAVER_MASTER_READY')) {
+      if (scenario === 'identity-hang') return;
+      if (scenario === 'identity-auth') {
+        emit(result('error_during_execution', '', 'result-identity', { errors: ['authentication failed: 401 unauthorized'], error_code: 105 }));
+        return;
+      }
+      const text = scenario === 'identity-wrong' ? 'WRONG-MARKER' : 'WEAVER_MASTER_READY';
+      emit({ type: 'stream_event', session_id: sessionId, parent_tool_use_id: null, uuid: 'evt-identity-1', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } } });
+      emit({ type: 'assistant', session_id: sessionId, parent_tool_use_id: null, message: { role: 'assistant', content: [{ type: 'text', text }] }, uuid: 'assistant-identity' });
+      await sleep(20);
+      emit(result('success', text, 'result-identity'));
+      return;
+    }
+  } catch { /* fall through to the normal path */ }
   const current = ++turn;
   currentTurn = current;
   log({ pid: process.pid, turn: current });

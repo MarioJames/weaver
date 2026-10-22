@@ -1,0 +1,69 @@
+{
+  "accepted": true,
+  "at": "2026-10-22T01:26:01.090387+00:00",
+  "checks": {
+    "ownerHostTests": 37,
+    "ownerRealSystemdTests": 12,
+    "ownerServiceRuntimeLaunchCancelTests": 59,
+    "isolatedNpmBuild": "passed"
+  },
+  "sourceHashes": {
+    "src/main/im/parent-background.ts": "30907e0434abfa77c0a9a8ee9e3910d9e76260a9e28da2c5b1b1bdc128097778",
+    "src/main/im/parent-host.ts": "1345ca92b9a59459624c5d7bc9c527d5dc31653f749c23c82c77f3364ae41972",
+    "src/main/im/parent-host-resources.ts": "5814adf01c2cde37b8621eb881ce67704859eff6d11dbb97dd7a6bf4c6cd8354",
+    "src/main/im/parent-identity.ts": "a4525f32a5b6b654bbef47b96114b5121287f7a3e4a5da59c8aeda485e649892",
+    "src/main/im/bootstrap.ts": "f164b33a3b453f5d776cf5b416cbf3bc87138872fb5c96a97446e5eb3d760e8b",
+    "src/main/im/service.ts": "4e809d37450fc21f7df3d3df5eb8478b4da816a26ec5ac8d82278784b84ff0dc"
+  },
+  "unitCleanup": [
+    {
+      "unit": "weaver-im-host-1bf5a4d7-bbfd-40cb-892e-7b4436d10d6f.service",
+      "loadState": "not-found",
+      "mainPid": 0
+    },
+    {
+      "unit": "weaver-im-host-4228e9ae-d47a-4656-8d05-f2756ef2c363.service",
+      "loadState": "not-found",
+      "mainPid": 0
+    },
+    {
+      "unit": "weaver-im-host-fbb4494b-4194-46b4-905e-0761912c132c.service",
+      "loadState": "not-found",
+      "mainPid": 0
+    },
+    {
+      "unit": "weaver-im-host-d910d5e9-d495-444d-a2d7-6c045b9caf8b.service",
+      "loadState": "not-found",
+      "mainPid": 0
+    },
+    {
+      "unit": "weaver-im-host-f2067468-15c8-412c-9537-15c067395b2e.service",
+      "loadState": "not-found",
+      "mainPid": 0
+    },
+    {
+      "unit": "weaver-im-host-0f5e0ce1-ce2f-4d7d-8b3c-5d7f58dfaf33.service",
+      "loadState": "not-found",
+      "mainPid": 0
+    },
+    {
+      "unit": "weaver-im-host-8b1a9c32-3df9-4aaa-af61-52898a47c0b1.service",
+      "loadState": "not-found",
+      "mainPid": 0
+    },
+    {
+      "unit": "weaver-im-host-92a2c674-2e3e-466e-9997-582993128247.service",
+      "loadState": "not-found",
+      "mainPid": 0
+    },
+    {
+      "unit": "weaver-im-host-8ce6e17a-9522-4170-85ac-042927e8bb0e.service",
+      "loadState": "not-found",
+      "mainPid": 0
+    }
+  ],
+  "oldProbeWorkspaces": {
+    "wGE": "workspace_not_found",
+    "wGF": "workspace_not_found"
+  }
+}

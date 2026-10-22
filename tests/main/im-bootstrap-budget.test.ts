@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { imInstructions, validateImInstructionBudget } from '../../src/main/im/bootstrap';
+import { IM_MASTER_READY_MARKER, imInstructions, imMasterIdentityPrompt, validateImInstructionBudget } from '../../src/main/im/bootstrap';
 import { PARENT_TEXT_MAX } from '../../src/main/im/limits';
 import { ImSettingsStore } from '../../src/main/im/settings';
 
@@ -52,7 +52,7 @@ test('all directories may be individually valid while the complete bootstrap is 
 });
 
 test('the actual quoted storage directory is counted before any save, and an in-budget list remains complete', () => {
-  const dataDir = join(root, ...Array.from({ length: 42 }, () => "'".repeat(90)));
+  const dataDir = join(root, ...Array.from({ length: 39 }, () => "'".repeat(100)));
   const store = new ImSettingsStore(dataDir);
   const absent = store.path;
   assert.ok(imInstructions(dataDir.replaceAll("'", 'x'), 'claude', epoch, [root]).length < PARENT_TEXT_MAX, 'the unescaped spelling would fit, so shell quoting is material');
@@ -67,24 +67,67 @@ test('the actual quoted storage directory is counted before any save, and an in-
   assert.ok(text.length <= PARENT_TEXT_MAX);
 });
 
-test('root launch instructions distinguish the immediate request receipt from observed owner-host readiness', () => {
-  const text = imInstructions('/fixture', 'codex', epoch, ['/projects/fake']);
-  assert.match(text, /tasks\.start.*受理/);
-  assert.match(text, /tasks\.get.*tasks\.events/);
-  assert.match(text, /ownerHost/);
-  assert.match(text, /启动失败/);
+test('system rules route entry Master to the single reference and keep the instance-specific wiring', () => {
+  const paths = ['/projects/fake', "/projects/项目 'quoted'"];
+  const text = imInstructions('/data', 'opencode', epoch, paths);
+  assert.match(text, /入口 Master/);
+  assert.match(text, /不是执行 owner/);
+  assert.match(text, /references\/master-guideline\.md/);
+  assert.ok(text.includes(`sessionRef=im:${epoch}`));
+  assert.ok(text.includes('engineKind=opencode'));
+  assert.ok(text.includes("weaver --data-dir '/data'"));
+  assert.ok(text.includes(JSON.stringify(paths)));
+  assert.match(text, /tasks\.create.*ownerProfileId.*workspace/);
+  assert.match(text, /tasks\.start/);
+  assert.match(text, /owners\.attach/);
+  assert.match(text, /跨\s*engine/);
+  assert.match(text, /白名单不是无限授权/);
+  assert.match(text, /项目读写与实际工作限定/);
+  assert.match(text, /环境接线.*不扩展项目访问授权/);
+  assert.match(text, /不读取凭据或其他项目/);
+  assert.match(text, /Markdown/);
+  assert.match(text, /<weaver-actions>/);
+  assert.match(text, /公开输出/);
+  // The full Markdown rules and the strict actions JSON example live in the reference only.
+  assert.ok(!text.includes('用**加粗**点到为止'));
+  assert.ok(!text.includes('{"actions":[{"label":"继续排查"'));
+  // The long scheduling procedure belongs to the reference, not to a second copy here.
+  assert.ok(!text.includes('tasks.start的立即ACK'));
+  assert.ok(!text.includes('同一批同一项目'));
 });
 
-test('同批同项目单root/复用已有任务/实时分页状态为产品政策', () => {
-  const text = imInstructions('/fixture', 'codex', epoch, ['/projects/fake']);
-  assert.match(text, /同一批.*同一项目.*一个root|只建一个root/);
-  assert.match(text, /拆child|child/);
-  assert.match(text, /复用|关联已有任务/);
-  assert.match(text, /tasks list|分页/);
-  assert.match(text, /root.*child|child.*root/);
-  assert.match(text, /running.*queued|queued.*running|review/);
+test('the fixed identity prompt is initialization-only and exposes the stable ready marker', () => {
+  const prompt = imMasterIdentityPrompt();
+  assert.equal(prompt, imMasterIdentityPrompt());
+  assert.ok(prompt.length < 500);
+  assert.equal(IM_MASTER_READY_MARKER, 'WEAVER_MASTER_READY');
+  assert.match(prompt, /agents-weaver/);
+  assert.match(prompt, /references\/master-guideline\.md/);
+  assert.match(prompt, /只做身份初始化/);
+  assert.match(prompt, /不执行实际工作/);
+  assert.match(prompt, /不创建 task\/owner/);
+  assert.match(prompt, /不调用 owners\.attach/);
+  assert.ok(prompt.includes(IM_MASTER_READY_MARKER));
+  assert.match(prompt, /保持待命/);
+  assert.match(prompt, /等待真实用户消息/);
 });
 
+test('the entry skill links the Master reference and the reference exists in the repository skill', () => {
+  const repositorySkill = readFileSync(new URL('../../skills/agents-weaver/SKILL.md', import.meta.url), 'utf8');
+  const repositoryReference = readFileSync(new URL('../../skills/agents-weaver/references/master-guideline.md', import.meta.url), 'utf8');
+  assert.match(repositorySkill, /references\/master-guideline\.md/);
+  assert.match(repositoryReference, /# Entry Master guideline/);
+  assert.match(repositoryReference, /owners\.attach/);
+  assert.match(repositoryReference, /ownerProfileId/);
+  assert.match(repositoryReference, /ownerHost/);
+  assert.match(repositoryReference, /## Public output/);
+  assert.match(repositoryReference, /blank line between paragraphs/);
+  assert.match(repositoryReference, /never a bare URL/);
+  assert.match(repositoryReference, /no HTML/i);
+  assert.ok(repositoryReference.includes('<weaver-actions>{"actions":[{"label":"继续排查"'));
+  assert.match(repositoryReference, /new-session/);
+  assert.match(repositoryReference, /grants no project access/);
+});
 
 test('save-time budget reserves the full UUID epoch and the longer supported engine kind', () => {
   const paths = ['/projects/fake'];

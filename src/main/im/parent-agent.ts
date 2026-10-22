@@ -26,10 +26,19 @@ export interface ParentAgentInput {
 }
 
 /** One persistent parent agent conversation. A session keeps the same engine process and context across sends. */
+export interface ParentAgentSendOptions {
+  /**
+   * Internal identity check only: resolve with the newest terminal assistant message's
+   * public text instead of the whole-turn aggregate. Never exposed over RPC/config;
+   * adapters without a native per-message final keep their existing behavior.
+   */
+  finalAssistantOnly?: boolean;
+}
+
 export interface ParentAgentSession {
   /** Resolves when control is unavailable; close still owns complete resource reclamation. */
   readonly unavailable?: Promise<void>;
-  send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void): Promise<string>;
+  send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void, options?: ParentAgentSendOptions): Promise<string>;
   close(): Promise<void>;
 }
 

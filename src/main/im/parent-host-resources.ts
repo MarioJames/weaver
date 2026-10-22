@@ -12,10 +12,25 @@ export function processStart(pid: number): string | undefined {
 export interface HostRecord {
   version: 1; epoch: string; unit: string; createdAt: string; ownerPid: number; ownerStart: string; boot: string;
   endpoint: string; label: string; launched: boolean;
+  /** Absent means the legacy Herdr lane lifecycle. 'background' skips Herdr lane/server actions only. */
+  launchMode?: 'background';
   server?: { socket: string; identity: string };
   allocating?: boolean; closing?: boolean;
   lane?: { workspaceId?: string; tabId?: string; paneId?: string; createdWorkspace: boolean };
   invocation?: string; cgroup?: string; mainPid?: number; mainStart?: string;
+}
+/**
+ * Validate the launch mode before any destructive action. Legacy records omit
+ * launchMode and keep exact Herdr lane/server cleanup. Background records must
+ * carry no legacy lane/server/allocating fields; anything else is untrusted
+ * and must never skip ownership checks.
+ */
+export function recordLaunchKind(record: HostRecord): 'background' | 'herdr' {
+  const mode: unknown = record.launchMode;
+  if (mode === undefined) return 'herdr';
+  if (mode !== 'background') throw resourceError();
+  if (record.lane !== undefined || record.server !== undefined || record.allocating) throw resourceError();
+  return 'background';
 }
 export function saveHostRecord(dir: string, record: HostRecord): void {
   atomicReplaceFile(join(dir, 'record.json'), JSON.stringify(record), resourceError);
@@ -62,6 +77,8 @@ export async function inspectHostUnit(record: HostRecord, runner?: AsyncRunner):
   return info;
 }
 async function closeLane(record: HostRecord, runner?: AsyncRunner): Promise<void> {
+  // Background mode has no Herdr surface by construction (validated above); skip without touching Herdr.
+  if (recordLaunchKind(record) === 'background') return;
   const lane = record.lane;
   if (!lane) { if (record.launched || record.allocating) throw resourceError(); return; }
   const kind = lane.tabId ? 'tab' : lane.createdWorkspace && lane.workspaceId ? 'workspace' : undefined;
@@ -81,6 +98,8 @@ async function closeLane(record: HostRecord, runner?: AsyncRunner): Promise<void
 }
 /** Stop only a verified invocation. Successful return proves the whole cgroup and exact owned lane are gone. */
 export async function cleanupHostRecord(dir: string, record: HostRecord, runner?: AsyncRunner): Promise<void> {
+  // Reject unknown or contradictory modes before mutating the journal or touching any resource.
+  recordLaunchKind(record);
   record.closing = true; saveHostRecord(dir, record);
   // Revoke pairing before touching the launch surface. A delayed service also has a socket condition.
   try {
@@ -121,6 +140,8 @@ export function readHostRecords(root: string): Array<{ dir: string; record: Host
     if (!entry.isDirectory() || entry.isSymbolicLink() || entry.uid !== process.getuid?.() || (entry.mode & 0o077) || !file.isFile() || file.isSymbolicLink() || file.uid !== entry.uid || (file.mode & 0o077) || file.size > 64 * 1024) throw resourceError();
     const record = JSON.parse(readFileSync(join(dir, 'record.json'), 'utf8')) as HostRecord;
     if (record.version !== 1 || record.epoch !== name || record.unit !== `weaver-im-host-${name}.service` || record.endpoint !== join(dir, 's') || !Number.isSafeInteger(record.ownerPid) || typeof record.ownerStart !== 'string') throw resourceError();
+    // Reject untrusted modes at read time so they can never be treated as skippable background history.
+    recordLaunchKind(record);
     return { dir, record };
   });
 }

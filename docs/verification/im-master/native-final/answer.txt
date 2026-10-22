@@ -1,0 +1,18 @@
+收到，只做只读查询，不派发工作。
+
+已拿到策略与实例状态，核对一条字段含义后答复。
+
+本轮只做了只读查询，未创建任务、未派发工作。
+
+当前实例可用于真实工程任务的 owner 有两个：
+
+- `claude_owner`：已启用、状态 `available`，引擎 `claude`，模型 `claude-opus-5-5`，预览路由到 `claude_worker`，容量可用
+- `codex_owner`：已启用、状态 `available`，引擎 `codex`，模型 `gpt-6-astra`，预览路由到 `codex_worker`，容量可用
+
+`pi_owner` 为 `disabled`，不可用。
+
+`owners list` 当前为空，`tasks list` 当前为空。这符合 Master 身份：Master 不 attach owner 实例，真实 root 通过 `ownerProfileId` 绑定上述 profile 之一启动。
+
+OpenCode 聊天不需要配置 `opencode_owner`。
+
+理由是策略里根本没有 `opencode_owner` 这个 profile，`opencode` 引擎为 `disabled`，`opencode_worker` 也为 `disabled`。按 Master 规范，Master 的聊天引擎不决定执行引擎，OpenCode Master 选现有的 `claude_owner` 或 `codex_owner` 属于正常的跨引擎路由；也不得为迎合聊天引擎而新建 owner profile 或改策略。

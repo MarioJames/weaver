@@ -504,7 +504,7 @@ test('Agent lifecycle is rendered independently of a connected Feishu transport'
     const html = markup(React.createElement(AgentStatus, { status: statusOf({ agentState, connection: 'connected', activeSessions: 0 }), controlId: 'reconnect' }));
     assert.match(html, new RegExp(`Agent 状态：${label}`));
     if (agentState === 'error') {
-      assert.match(html, /重新连接/);
+      assert.match(html, /重建连接与会话/);
       assert.doesNotMatch(html, /待命|Agent 已就绪/);
     }
   }
@@ -568,12 +568,12 @@ test('the Bot page offers the real IM channels through one tablist and renders o
   assert.ok(panelStart > 0, 'the selected channel has a tab panel');
   const panel = html.slice(panelStart);
   assert.match(panel, /data-bot-channel="feishu"/);
-  assert.match(panel, /独立选择已启用的引擎/);
+  assert.match(panel, /独立单聊的 Agent/);
   assert.match(panel, /正在读取飞书 IM 设置/);
   const section = panel.slice(panel.indexOf('data-bot-channel="feishu"'));
   const headerEnd = section.indexOf('</header>');
   assert.ok(headerEnd > 0, 'the channel explanation is a header at the top of the panel');
-  assert.ok(section.indexOf('独立选择已启用的引擎') < headerEnd, 'the old left group column explanation moved into the panel header');
+  assert.ok(section.indexOf('独立单聊的 Agent') < headerEnd, 'the old left group column explanation moved into the panel header');
   assert.ok(section.indexOf('正在读取飞书 IM 设置') > headerEnd, 'the rows follow the channel header instead of a left group column');
 });
 
@@ -647,5 +647,5 @@ test('the channel header shows only the description: no repeated channel title u
   assert.ok(headerEnd > headerStart);
   const header = html.slice(headerStart, headerEnd);
   assert.doesNotMatch(header, /飞书 IM/, 'the selected tab already names the channel; the header must not repeat it');
-  assert.match(header, /独立选择已启用的引擎/, 'the channel description stays in the header');
+  assert.match(header, /独立单聊的 Agent/, 'the channel description stays in the header');
 });

@@ -1,0 +1,253 @@
+{
+ "taskId": "66c0ccf7-d1e1-4b72-be0a-a2cb1ebc20a1",
+ "engine": "opencode",
+ "model": "opencode-go/muse-spark-1.3-contributor",
+ "effort": "xhigh",
+ "referenceSha256": "8c2644fe350fb36f190bcd76004683f14183446919952f41e704a379acab970c",
+ "installedSkillHasEntryMaster": true,
+ "factory": {
+  "readyMs": 9032,
+  "epoch": "redacted",
+  "workspace": "nf/demo",
+  "model": "opencode-go/muse-spark-1.3-contributor",
+  "effort": "xhigh",
+  "maxTime": 1792634504734
+ },
+ "runtime": {
+  "unit": "dev-weaver-master-native-mviwbdv6-8hx3",
+  "port": 37369,
+  "runtimePid": 317830,
+  "dataDir": "nf/d"
+ },
+ "policy": {
+  "preRev": 1,
+  "postRev": 1,
+  "ownersEnabled": {
+   "claude_owner": true,
+   "codex_owner": true,
+   "pi_owner": false
+  },
+  "workersEnabled": {
+   "claude_worker": true,
+   "codex_worker": true,
+   "grok_worker": false,
+   "qoder_worker": false,
+   "opencode_worker": false,
+   "pi_worker": false,
+   "dsh_worker": false
+  }
+ },
+ "tasks": {
+  "preCount": 0,
+  "postCount": 0
+ },
+ "ledger": {
+  "total": 8,
+  "attemptedWrites": 0,
+  "refused": 0,
+  "entries": [
+   {
+    "ts": "2026-10-22T02:01:53Z",
+    "refused": false,
+    "argv": [
+     "--data-dir",
+     "/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d",
+     "policy",
+     "get",
+     "--output",
+     "json"
+    ]
+   },
+   {
+    "ts": "2026-10-22T02:02:16Z",
+    "refused": false,
+    "argv": [
+     "--data-dir",
+     "/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d",
+     "policy",
+     "get",
+     "--output",
+     "json"
+    ]
+   },
+   {
+    "ts": "2026-10-22T02:03:28Z",
+    "refused": false,
+    "argv": [
+     "--data-dir",
+     "/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d",
+     "--version"
+    ]
+   },
+   {
+    "ts": "2026-10-22T02:03:28Z",
+    "refused": false,
+    "argv": [
+     "--data-dir",
+     "/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d",
+     "policy",
+     "get",
+     "--output",
+     "json"
+    ]
+   },
+   {
+    "ts": "2026-10-22T02:03:32Z",
+    "refused": false,
+    "argv": [
+     "--data-dir",
+     "/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d",
+     "owners",
+     "list",
+     "--output",
+     "json"
+    ]
+   },
+   {
+    "ts": "2026-10-22T02:03:32Z",
+    "refused": false,
+    "argv": [
+     "--data-dir",
+     "/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d",
+     "tasks",
+     "list",
+     "--output",
+     "json"
+    ]
+   },
+   {
+    "ts": "2026-10-22T02:03:39Z",
+    "refused": false,
+    "argv": [
+     "--data-dir",
+     "/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d",
+     "policy",
+     "preview",
+     "--input",
+     "{\"owner\":\"claude_owner\"}",
+     "--output",
+     "json"
+    ]
+   },
+   {
+    "ts": "2026-10-22T02:03:39Z",
+    "refused": false,
+    "argv": [
+     "--data-dir",
+     "/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d",
+     "policy",
+     "preview",
+     "--input",
+     "{\"owner\":\"codex_owner\"}",
+     "--output",
+     "json"
+    ]
+   }
+  ],
+  "hash": "ac4f78f32b64dd704621b51c5ebf12ddb2d851a3caafe7c1e8a4de557c6b001f"
+ },
+ "writeAnalysis": {
+  "attempted": [],
+  "refusedCount": 0
+ },
+ "native": {
+  "oursCount": 1,
+  "candidates": [
+   {
+    "id": "ses_e9ea6e03",
+    "model": "{\"id\":\"muse-spark-1.3-contributor\",\"providerID\":\"opencode-go\",\"variant\":\"xhigh\"}",
+    "agent": "build",
+    "created": 1792634593224,
+    "updated": 1792634600736,
+    "title": "入口Master身份初始化待命"
+   }
+  ],
+  "details": [
+   {
+    "session": "ses_e9ea6e03",
+    "msg": "msg_beb626294264",
+    "role": "user",
+    "parent": null,
+    "created": 1792634593279,
+    "completed": null,
+    "finish": null,
+    "hasError": false,
+    "partsCount": 0,
+    "tools": [],
+    "publicChars": 0,
+    "exactMarker": false,
+    "containsMarker": false
+   },
+   {
+    "session": "ses_e9ea6e03",
+    "msg": "msg_161592178001",
+    "role": "assistant",
+    "parent": "msg_beb626294264",
+    "created": 1792634593656,
+    "completed": 1792634597397,
+    "finish": "tool-calls",
+    "hasError": false,
+    "partsCount": 0,
+    "tools": [],
+    "publicChars": 0,
+    "exactMarker": false,
+    "containsMarker": false
+   },
+   {
+    "session": "ses_e9ea6e03",
+    "msg": "msg_161593018001",
+    "role": "assistant",
+    "parent": "msg_beb626294264",
+    "created": 1792634597400,
+    "completed": 1792634598935,
+    "finish": "tool-calls",
+    "hasError": false,
+    "partsCount": 0,
+    "tools": [],
+    "publicChars": 0,
+    "exactMarker": false,
+    "containsMarker": false
+   },
+   {
+    "session": "ses_e9ea6e03",
+    "msg": "msg_16159361a001",
+    "role": "assistant",
+    "parent": "msg_beb626294264",
+    "created": 1792634598938,
+    "completed": 1792634600731,
+    "finish": "stop",
+    "hasError": false,
+    "partsCount": 0,
+    "tools": [],
+    "publicChars": 0,
+    "exactMarker": false,
+    "containsMarker": false
+   }
+  ],
+  "toolMeta": {
+   "ses_e9ea...": [
+    {
+     "tool": "skill",
+     "filePath": null
+    },
+    {
+     "tool": "read",
+     "filePath": "/home/mocha/.agents/skills/agents-weaver/references/master-guideline.md"
+    }
+   ]
+  }
+ },
+ "nativeBeforeClose": {
+  "sessionIds": [
+   "ses_e9ea6e03"
+  ],
+  "count": 1,
+  "maxTime": 1792634504734,
+  "demoProj": "/tmp/weaver-bot-lifecycle-thgzzwqn/nf/demo"
+ },
+ "registryEmpty": true,
+ "answerLen": 695,
+ "answerHash": "3688f3d0a22dccfd9bb561d1e8ae32a2a967483468bc10f3beb8c862cbbc8aad",
+ "bundleHash": "b3748df7c0227aa22f63937f5532fc2d5a7755dc749ae1d2ca63620793ab0bc1",
+ "note": "Desensitized: no reasoning/tooloutput/env/auth/other-session text. Session/message IDs truncated. Part text not stored; only exactMarker flags and tool filePath to the two assets."
+}

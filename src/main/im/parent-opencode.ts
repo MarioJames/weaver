@@ -76,6 +76,7 @@ interface ActiveTurn {
   promptMessageID: string;
   promptAccepted: boolean;
   assistantMessageID?: string;
+  finalOnly: boolean;
   abortIssued?: boolean;
   abortAck?: boolean;
   idleSeen?: boolean;
@@ -110,6 +111,59 @@ interface PartQualification {
   messageID: string;
   partID: string;
   public: boolean;
+}
+
+function publicTextOfEntry(entry: Record<string, unknown>): string {
+  const parts = Array.isArray(entry.parts) ? entry.parts as Array<Record<string, unknown>> : [];
+  let out = '';
+  for (const part of parts) {
+    if (part?.type !== 'text' || part.synthetic === true || part.ignored === true) continue;
+    if (typeof part.text !== 'string') continue;
+    out += part.text;
+  }
+  return out;
+}
+
+function orderedByNativeTime(entries: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  return entries
+    .map((entry, index) => ({ entry, index }))
+    .sort((a, b) => {
+      const aTime = (a.entry.info as Record<string, unknown> | undefined)?.time as Record<string, unknown> | undefined;
+      const bTime = (b.entry.info as Record<string, unknown> | undefined)?.time as Record<string, unknown> | undefined;
+      const aCreated = typeof aTime?.created === 'number' ? aTime.created : 0;
+      const bCreated = typeof bTime?.created === 'number' ? bTime.created : 0;
+      if (aCreated !== bCreated) return aCreated - bCreated;
+      return a.index - b.index;
+    })
+    .map(row => row.entry);
+}
+
+function countEdgeNewlines(value: string, fromStart: boolean): number {
+  let count = 0;
+  if (fromStart) {
+    for (let i = 0; i < value.length && count < 2; i++) {
+      if (value[i] === '\n') count++;
+      else break;
+    }
+  } else {
+    for (let i = value.length - 1; i >= 0 && count < 2; i--) {
+      if (value[i] === '\n') count++;
+      else break;
+    }
+  }
+  return count;
+}
+
+function joinPublicSegments(segments: string[]): string {
+  const nonEmpty = segments.filter(segment => segment.length > 0);
+  if (!nonEmpty.length) return '';
+  let out = nonEmpty[0]!;
+  for (let i = 1; i < nonEmpty.length; i++) {
+    const next = nonEmpty[i]!;
+    const need = Math.max(0, 2 - countEdgeNewlines(out, false) - countEdgeNewlines(next, true));
+    out += '\n'.repeat(need) + next;
+  }
+  return out;
 }
 
 export interface OpenCodeParentWaits {
@@ -716,11 +770,14 @@ export class OpenCodeParentSession implements ParentAgentSession {
             // intermediate tool assistant stays completed with `finish: "tool-calls"` while the
             // turn continues, and a completed observation without an explicit finish proves
             // nothing, so `time.completed` alone never settles success.
-            const text = entries
-              .flatMap(entry => Array.isArray(entry.parts) ? entry.parts as Array<Record<string, unknown>> : [])
-              .filter(part => part?.type === 'text' && part.synthetic !== true && part.ignored !== true && typeof part.text === 'string')
-              .map(part => part.text as string)
-              .join('');
+            // Default user turns keep the whole-turn public aggregate, segmented by real
+            // assistant-message boundaries (blank line) with intra-message tokens verbatim and
+            // native-time stable order. The internal identity check instead resolves only the
+            // newest terminal message's public text so a progress prefix never leaks into the
+            // strict marker gate.
+            const text = active.finalOnly
+              ? publicTextOfEntry(latest)
+              : joinPublicSegments(orderedByNativeTime(entries).map(publicTextOfEntry));
             if (!text.trim()) throw parentError('protocol', 'opencode assistant message had no public text');
             if (active.cancelError) {
               active.finalizing = false;
@@ -881,7 +938,7 @@ export class OpenCodeParentSession implements ParentAgentSession {
     if (!this.closed) void this.close().catch(() => { /* close failures surface through unavailable */ });
   }
 
-  async send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void): Promise<string> {
+  async send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void, options?: { finalAssistantOnly?: boolean }): Promise<string> {
     if (typeof text !== 'string' || !text.trim() || text.length > PARENT_TEXT_MAX) throw parentError('invalid_input', `send text must be 1–${PARENT_TEXT_MAX} characters`);
     if (signal?.aborted) throw abortReason(signal);
     if (this.closed) throw parentError('closed', 'opencode parent session is closed');
@@ -894,13 +951,17 @@ export class OpenCodeParentSession implements ParentAgentSession {
     const modelID = this.prepared.model.slice(slash + 1);
     const promptMessageID = `msg_${randomUUID().replaceAll('-', '')}`;
     this.resetTurnState();
+    const finalOnly = options?.finalAssistantOnly === true;
     const active: ActiveTurn = {
       promptMessageID,
       promptAccepted: false,
+      finalOnly,
       settled: false,
       timer: { cancel: () => undefined },
       boundary: new PublicTextBoundary(),
-      ...(onDelta ? { onDelta } : {}),
+      // The internal identity check resolves only the terminal message and never streams
+      // public deltas; user turns keep the normal attributed stream.
+      ...(!finalOnly && onDelta ? { onDelta } : {}),
     };
     const promise = new Promise<string>((resolve, reject) => { active.resolve = resolve; active.reject = reject; });
     const onAbort = () => { if (!active.settled) this.cancelTurn(active, abortReason(signal!)); };

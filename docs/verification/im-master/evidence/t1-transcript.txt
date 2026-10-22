@@ -1,0 +1,24 @@
+› 身份初始化：先读 staged 技能 $ACCEPTANCE_SANDBOX/.agents/skills/agents-weaver
+  的 SKILL.md 和 references/master-guideline.md，再读 $ACCEPTANCE_SANDBOX/real-
+  fixture/master-context.md 的实例接线（Bot engine=opencode，用真实私有 CLI）。
+  只做初始化，不建 task/owner，不 owners.attach。完成后只输出
+  WEAVER_MASTER_READY 并待命。
+
+
+• 我会先读取指定的 staged 技能、主控指南和实例接线，仅完成初始化。
+
+• Ran pwd; printenv ACCEPTANCE_SANDBOX; cat "$ACCEPTANCE_SANDBOX/.agents/skills…
+  └   `operations get --command-id <id>`（回执不确定时先查再定，不要换新 ID 重…
+    - 实例 policy 仅 `claude_owner`/`codex_owner` 可用（以真实 `policy get` 为…
+      owner 启动回执是合成边界（只返回真实接口字段，不做 Herdr 操作），任务与操…
+    + 175 lines (^t to expand)
+
+• WEAVER_MASTER_READY
+
+  Worked for 9s • 9:08 PM
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol high · /tmp/acc-1-20261021-210355-aeefc9 · Context 96% left · 475…
+  ? for shortcuts                                     ⚠ 4 warnings · f2 to view

@@ -76,6 +76,34 @@ function agentItem(id, text, phase) {
 }
 
 function runTurn(frame) {
+  // Hidden Master identity turn: bypass turnCounter/marker so existing user-turn
+  // expectations stay intact. Dedicated identity-* scenarios drive failure tests.
+  try {
+    if (JSON.stringify(frame).includes('WEAVER_MASTER_READY')) {
+      const threadId = frame.params?.threadId ?? 'thr-fixture';
+      const turnId = 'turn-identity';
+      const id = frame.id;
+      if (scenario === 'identity-hang') return;
+      if (scenario === 'identity-auth') {
+        respond(id, { turn: { id: turnId, status: 'inProgress', items: [] } });
+        inFlightTurns.set(turnId, threadId);
+        emit({ method: 'turn/started', params: { threadId, turn: { id: turnId, status: 'inProgress', items: [] } } });
+        emit({ method: 'error', params: { threadId, turnId, error: { message: 'authentication failed: 401 unauthorized' }, willRetry: false } });
+        inFlightTurns.delete(turnId);
+        emit({ method: 'turn/completed', params: { threadId, turn: { id: turnId, status: 'failed' } } });
+        return;
+      }
+      const text = scenario === 'identity-wrong' ? 'WRONG-MARKER' : 'WEAVER_MASTER_READY';
+      respond(id, { turn: { id: turnId, status: 'inProgress', items: [] } });
+      inFlightTurns.set(turnId, threadId);
+      emit({ method: 'turn/started', params: { threadId, turn: { id: turnId, status: 'inProgress', items: [] } } });
+      emit({ method: 'item/agentMessage/delta', params: { threadId, turnId, itemId: 'it-identity', delta: text } });
+      emit({ method: 'item/completed', params: { threadId, turnId, item: agentItem('it-identity', text, 'final_answer') } });
+      inFlightTurns.delete(turnId);
+      emit({ method: 'turn/completed', params: { threadId, turn: { id: turnId, status: 'completed' } } });
+      return;
+    }
+  } catch { /* fall through to the normal path */ }
   const threadId = frame.params?.threadId ?? 'thr-fixture';
   const turnId = `turn-${++turnCounter}`;
   if (marker) appendFileSync(marker, `${JSON.stringify({ pid: process.pid, turn: turnCounter })}\n`);

@@ -1,0 +1,8 @@
+{"ts":"2026-10-22T02:01:53Z","refused":false,"argv":["--data-dir","/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d","policy","get","--output","json"]}
+{"ts":"2026-10-22T02:02:16Z","refused":false,"argv":["--data-dir","/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d","policy","get","--output","json"]}
+{"ts":"2026-10-22T02:03:28Z","refused":false,"argv":["--data-dir","/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d","--version"]}
+{"ts":"2026-10-22T02:03:28Z","refused":false,"argv":["--data-dir","/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d","policy","get","--output","json"]}
+{"ts":"2026-10-22T02:03:32Z","refused":false,"argv":["--data-dir","/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d","owners","list","--output","json"]}
+{"ts":"2026-10-22T02:03:32Z","refused":false,"argv":["--data-dir","/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d","tasks","list","--output","json"]}
+{"ts":"2026-10-22T02:03:39Z","refused":false,"argv":["--data-dir","/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d","policy","preview","--input","{\"owner\":\"claude_owner\"}","--output","json"]}
+{"ts":"2026-10-22T02:03:39Z","refused":false,"argv":["--data-dir","/tmp/weaver-bot-lifecycle-thgzzwqn/nf/d","policy","preview","--input","{\"owner\":\"codex_owner\"}","--output","json"]}

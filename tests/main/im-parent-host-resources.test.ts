@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { bootIdentity, cleanupHostRecord, inspectHostUnit, processStart, readHostRecords, saveHostRecord, type HostRecord } from '../../src/main/im/parent-host-resources';
-import { createHerdrParentAgent } from '../../src/main/im/parent-herdr';
+import { createBackgroundParentAgent } from '../../src/main/im/parent-background';
 import { ParentAgentError } from '../../src/main/im/parent-agent';
 import type { AsyncRunner } from '../../src/main/owner-host';
 
@@ -53,6 +53,105 @@ test('an unproven live main process cannot be claimed solely by a matching rando
 });
 
 
+function setupBackground() {
+  const root = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'resbg-'));
+  const epoch = randomUUID(), dir = join(root, epoch); mkdirSync(dir, { mode: 0o700 });
+  const record: HostRecord = { version: 1, epoch, unit: `weaver-im-host-${epoch}.service`, ownerPid: process.pid, ownerStart: processStart(process.pid)!, boot: bootIdentity(), endpoint: join(dir, 's'), createdAt: new Date().toISOString(), label: 'fixture-bg', launched: true, launchMode: 'background', invocation: 'expected-bg' };
+  saveHostRecord(dir, record);
+  return { root, dir, record };
+}
+
+test('background record recycles the exact unit with zero Herdr calls', async () => {
+  const h = setupBackground(); const calls: string[][] = []; const stops: string[][] = []; let shows = 0;
+  const runner: AsyncRunner = async ({ file, args }) => {
+    calls.push([file, ...args]);
+    if (file === 'systemctl' && args.includes('show')) {
+      shows++;
+      if (shows <= 2) return { code: 0, stdout: `Id=${h.record.unit}\nLoadState=loaded\nActiveState=active\nInvocationID=expected-bg\nMainPID=1\nControlGroup=/weaver-test-nonexistent-bg`, stderr: '' };
+      return { code: 0, stdout: 'LoadState=not-found\nActiveState=inactive', stderr: '' };
+    }
+    if (file === 'systemctl' && args.includes('stop')) { stops.push(args); return { code: 0, stdout: '', stderr: '' }; }
+    throw new Error(`unexpected external call: ${file} ${args.join(' ')}`);
+  };
+  try {
+    await cleanupHostRecord(h.dir, h.record, runner);
+    assert.ok(calls.every(call => call[0] !== 'herdr'), 'background cleanup must not touch Herdr');
+    assert.equal(stops.length, 1); assert.ok(stops[0].includes(h.record.unit));
+    assert.ok(!existsSync(h.dir));
+  } finally { rmSync(h.root, { recursive: true, force: true }); }
+});
+
+test('background record with a replaced invocation cannot signal the replacement', async () => {
+  const h = setupBackground(); const calls: string[][] = []; const stops: string[][] = [];
+  const runner: AsyncRunner = async ({ file, args }) => {
+    calls.push([file, ...args]);
+    if (file === 'systemctl' && args.includes('show')) return { code: 0, stdout: `Id=${h.record.unit}\nLoadState=loaded\nActiveState=active\nInvocationID=replacement\nMainPID=1\nControlGroup=/replacement`, stderr: '' };
+    if (file === 'systemctl' && args.includes('stop')) stops.push(args);
+    throw new Error('unexpected mutation');
+  };
+  try {
+    await assert.rejects(cleanupHostRecord(h.dir, h.record, runner), /ownership or cleanup/);
+    assert.ok(calls.every(call => call[0] !== 'herdr'));
+    assert.deepEqual(stops, []); assert.ok(existsSync(h.dir));
+  } finally { rmSync(h.root, { recursive: true }); }
+});
+
+test('unknown launch mode is rejected before any side effect', async () => {
+  const h = setup();
+  (h.record as unknown as Record<string, unknown>).launchMode = 'herdr-remote';
+  saveHostRecord(h.dir, h.record);
+  let calls = 0;
+  const runner: AsyncRunner = async () => { calls++; throw new Error('must not run'); };
+  try {
+    await assert.rejects(cleanupHostRecord(h.dir, h.record, runner), /ownership or cleanup/);
+    assert.equal(calls, 0); assert.ok(existsSync(h.dir));
+    const reread = JSON.parse(readFileSync(join(h.dir, 'record.json'), 'utf8')) as HostRecord;
+    assert.equal(reread.closing, undefined, 'rejected mode must not mutate the journal');
+  } finally { rmSync(h.root, { recursive: true }); }
+});
+
+test('background mode with legacy lane/server/allocating fields is rejected before any side effect', async () => {
+  const variants: Array<(record: HostRecord) => void> = [
+    record => { record.lane = { workspaceId: 'own-w', tabId: 'own-t', paneId: 'own-p', createdWorkspace: false }; },
+    record => { record.server = { socket: '/tmp/stale.sock', identity: 'stale' }; },
+    record => { record.launched = false; record.allocating = true; },
+  ];
+  for (const mutate of variants) {
+    const h = setupBackground(); mutate(h.record); saveHostRecord(h.dir, h.record);
+    let calls = 0;
+    const runner: AsyncRunner = async () => { calls++; throw new Error('must not run'); };
+    try {
+      await assert.rejects(cleanupHostRecord(h.dir, h.record, runner), /ownership or cleanup/);
+      assert.equal(calls, 0); assert.ok(existsSync(h.dir));
+      const reread = JSON.parse(readFileSync(join(h.dir, 'record.json'), 'utf8')) as HostRecord;
+      assert.equal(reread.closing, undefined, 'contradictory mode must not mutate the journal');
+    } finally { rmSync(h.root, { recursive: true }); }
+  }
+});
+
+test('legacy launched record without a lane still fails closed', async () => {
+  const h = setup(); delete h.record.lane; h.record.launched = true;
+  const runner: AsyncRunner = async () => ({ code: 0, stdout: 'LoadState=not-found\nActiveState=inactive', stderr: '' });
+  try { await assert.rejects(cleanupHostRecord(h.dir, h.record, runner), /ownership or cleanup/); assert.ok(existsSync(h.dir)); }
+  finally { rmSync(h.root, { recursive: true }); }
+});
+
+test('readHostRecords accepts background but rejects unknown or contradictory modes', async () => {
+  const good = setupBackground();
+  try { assert.equal(readHostRecords(good.root)[0].record.launchMode, 'background'); }
+  finally { rmSync(good.root, { recursive: true }); }
+  const badMode = setup();
+  (badMode.record as unknown as Record<string, unknown>).launchMode = 'herdr-remote';
+  saveHostRecord(badMode.dir, badMode.record);
+  try { assert.throws(() => readHostRecords(badMode.root), /ownership or cleanup/); }
+  finally { rmSync(badMode.root, { recursive: true }); }
+  const mixed = setupBackground();
+  mixed.record.lane = { workspaceId: 'own-w', tabId: 'own-t', paneId: 'own-p', createdWorkspace: false };
+  saveHostRecord(mixed.dir, mixed.record);
+  try { assert.throws(() => readHostRecords(mixed.root), /ownership or cleanup/); }
+  finally { rmSync(mixed.root, { recursive: true }); }
+});
+
 test('overlong private socket preflight remains invalid_input on retry and leaves no epoch directory', async () => {
   const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'pre-'));
   const dataDir = join(dir, 'long-'.repeat(12));
@@ -63,7 +162,7 @@ test('overlong private socket preflight remains invalid_input on retry and leave
   try {
     assert.ok(Buffer.byteLength(join(root, '0'.repeat(36), 's')) > 100);
     for (let attempt = 0; attempt < 2; attempt++) {
-      errors.push(await createHerdrParentAgent({ engineKind: 'codex', model: 'fixture', effort: 'low', workspace: dir, instructions: 'fixture only' }, { dataDir }, { runner }).then(() => undefined, error => error));
+      errors.push(await createBackgroundParentAgent({ engineKind: 'codex', model: 'fixture', effort: 'low', workspace: dir, instructions: 'fixture only' }, { dataDir }, { runner }).then(() => undefined, error => error));
       leftovers.push(readdirSync(root));
     }
     assert.equal(calls, 0, 'preflight must not invoke Herdr, systemd or the engine');

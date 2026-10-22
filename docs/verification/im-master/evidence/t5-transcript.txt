@@ -1,0 +1,24 @@
+› 【环境变更】平台管理员刚停掉所有可用执行 owner。请重查 policy 确认。然后：1…
+
+• 已重查 policy（revision 2）：claude_owner、codex_owner、pi_owner 全部为
+  disabled，当前没有可启动的执行 owner。
+
+  退出登录按钮尚未实施，也未新建或派发任务。 即使 Claude、Codex worker 仍显示可
+  用，也不能替代根执行 owner。按 Master 指南 (.agents/skills/agents-weaver/
+  references/master-guideline.md) 的明确限制：“never execute the root's work
+  yourself”，我不能自行改代码或擅自启用 owner；这项工作目前被执行配置阻塞。
+
+  执行引擎方面，Weaver 支持 Claude Code、Codex、OpenCode、Pi、Grok、Qoder、
+  DeepSeek Harness。当前根任务宿主启动支持 Claude Code 和 Codex；聊天入口使用
+  OpenCode，不限制执行方必须使用 OpenCode。
+
+  另外，原批次任务在实时列表中仍标为 running；owner 被禁用并不能证明既有任务已停
+  止。
+
+  Worked for 19s • 9:13 PM
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol high · /tmp/acc-1-20261021-210355-aeefc9 · Context 91% left · 475…
+  ? for shortcuts                                     ⚠ 4 warnings · f2 to view

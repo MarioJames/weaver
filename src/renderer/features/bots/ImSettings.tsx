@@ -33,7 +33,7 @@ const AGENT: Record<ImStatus['agentState'], { label: string; color: string; desc
   ready: { label: '待命', color: tagColor('success'), description: 'Agent 已就绪，可接收消息；尚无手机会话时也会保持待命。' },
   busy: { label: '回复中', color: tagColor('inProgress'), description: 'Agent 正在处理消息。' },
   closing: { label: '结束中', color: tagColor('inProgress'), description: '正在结束旧会话，请等待状态更新。' },
-  error: { label: '启动异常', color: tagColor('error'), description: '可点「重新连接」重试；有未保存修改时请先保存。' },
+  error: { label: '启动异常', color: tagColor('error'), description: '可点「重建连接与会话」重试；有未保存修改时请先保存。' },
 };
 
 /** Agent readiness comes only from the service lifecycle, independently of the Feishu connection. */
@@ -49,7 +49,7 @@ export function AgentStatus({ status, controlId, action }: { status: ImStatus; c
 const POLL_MS = IM_STABLE_POLL_MS;
 const TRANSITION_POLL_MS = IM_TRANSITION_POLL_MS;
 
-const CHANNEL_DESC = '独立选择已启用的引擎、模型和思考力度，与 Bot 单聊无需配置父 Agent。引擎、模型、力度或工作空间变化会重建连接并结束旧上下文。对话不生成任务卡片，实际工作仍按 Weaver 现有调度执行。';
+const CHANNEL_DESC = '每个 Bot 是独立单聊的 Agent，直接选用已启用的引擎、模型和思考力度。换引擎、模型、力度或工作空间会结束旧对话并重建 Agent，网络正常的飞书连接保持不断；后台运行不用开着终端标签页。普通聊天只在当前对话回复，不建任务；实际工作可跨引擎派发，仍走 Weaver 任务面板。';
 
 interface BotOption { value: string; label: string; disabled: boolean }
 
@@ -168,7 +168,7 @@ export function ImSettingsView({
           </BotSetting>
           <BotSetting
             label="保存" htmlFor={`${id}-save`}
-            desc="以上字段一起保存，保存后立即生效（含启停连接）；引擎、模型、力度或工作空间变化会重建连接并结束旧上下文。失败时草稿原样保留。未保存的修改切到其他页面后仍保留，回到本页继续编辑，只有保存成功或「放弃修改」会清掉它们。"
+            desc="以上字段一起保存，保存后立即生效（含启停连接）；引擎、模型、力度或工作空间变化会结束旧上下文并重建 Agent，健康且凭据相同的飞书连接保持，凭据或启停变化以及显式「重建连接与会话」会完整重建。失败时草稿原样保留。未保存的修改切到其他页面后仍保留，回到本页继续编辑，只有保存成功或「放弃修改」会清掉它们。"
             error={saveError}
           >
             <Button id={`${id}-save`} type="primary" size="small" loading={saving} disabled={!dirty || forceReading} onClick={onSave}>保存修改</Button>

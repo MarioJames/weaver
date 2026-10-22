@@ -113,7 +113,7 @@ async function runTurn(uuid, current) {
   }
 }
 
-function handleFrame(frame) {
+async function handleFrame(frame) {
   if (frame.type === 'control_response') {
     if (frame.response?.request_id === 'ctl-1') {
       appendFileSync(marker, `${JSON.stringify({ controlResponse: frame.response })}\n`);
@@ -149,6 +149,26 @@ function handleFrame(frame) {
     return;
   }
   if (frame.type === 'user' && frame.message?.role === 'user' && typeof frame.uuid === 'string') {
+    // Hidden Master identity turn: bypass counters/marker so existing user-turn
+    // expectations stay intact. Dedicated identity-* scenarios drive failure tests.
+    try {
+      if (JSON.stringify(frame).includes('WEAVER_MASTER_READY')) {
+        const uuid = frame.uuid;
+        currentUuid = uuid;
+        if (!messageCounter) emit({ type: 'system', subtype: 'init', session_id: sessionId, version: '2.1.304' });
+        messageStart(uuid);
+        if (scenario === 'identity-hang') return;
+        if (scenario === 'identity-auth') {
+          result(uuid, { subtype: 'error_during_execution', is_error: true, result: '', errors: ['authentication failed: 401 unauthorized'] });
+          return;
+        }
+        const text = scenario === 'identity-wrong' ? 'WRONG-MARKER' : 'WEAVER_MASTER_READY';
+        streamDelta(text);
+        await sleep(20);
+        result(uuid, { result: text });
+        return;
+      }
+    } catch { /* fall through to the normal path */ }
     if (!messageCounter) emit({ type: 'system', subtype: 'init', session_id: sessionId, version: '2.1.304' });
     currentUuid = frame.uuid;
     const current = ++messageCounter;

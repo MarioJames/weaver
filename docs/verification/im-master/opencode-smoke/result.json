@@ -1,0 +1,37 @@
+{
+ "engine": "opencode",
+ "model": "opencode-go/muse-spark-1.3-contributor",
+ "effort": "xhigh",
+ "verdict": "FAIL",
+ "stage": "factory-startup/protocol",
+ "detail": "createBackgroundParentAgent hidden identity failed twice with Bot host failed to start, reason protocol, elapsedMs ~8000; factory never ready; single read-only user turn never sent",
+ "excluded": [
+  "source hashes 6/6 match flag",
+  "private build from current source",
+  "installed skill/reference restored and cmp ok",
+  "private policy seeded claude/codex enabled, quota/freeprobe/IM disabled",
+  "manual opencode serve/health/session handshake ok in same demo dir"
+ ],
+ "hypothesis_not_concluded": "prompt_async variant=xhigh possibly rejected by provider (needs owner verification; no product/model change by worker)",
+ "writes": {
+  "wrapperLedgerCalls": 0,
+  "ownersCalls": 0,
+  "preTasks": 0,
+  "newTasks": 0,
+  "attemptedWrites": 0
+ },
+ "nativeSessions": {
+  "ours": 0,
+  "note": "window+directory query; diagnostic manual sessions (0 parts) deleted by exact ownership; others untouched"
+ },
+ "cleanup": {
+  "privateRuntimeScope": "stopped",
+  "taskBotUnits": 0,
+  "imHostRecords": 0,
+  "vendorSessionsOurs": 0,
+  "othersPreserved": true
+ },
+ "sourceHashesMatch": 6,
+ "report": "/tmp/weaver-bot-lifecycle-thgzzwqn/master-opencode-smoke.md",
+ "codexQa": "PASS round_425af14b97 aggregate ee65ec44e0d5e30bd5c32cd811c6d6fb8690c0d4f79233c6236645eea2310a96 (see ../real-acc-aggregate.json); independent of this smoke FAIL"
+}

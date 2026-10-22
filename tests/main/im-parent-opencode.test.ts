@@ -5,7 +5,8 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ConfirmedParentCancellation, ParentAgentError, createParentAgent, type ParentAgentSession, type ParentProcessLauncher } from '../../src/main/im/parent-agent';
-import { imInstructions } from '../../src/main/im/bootstrap';
+import { imInstructions, imMasterIdentityPrompt } from '../../src/main/im/bootstrap';
+import { isMasterReadyText } from '../../src/main/im/parent-identity';
 
 const FIXTURE = new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url).pathname;
 const sessions = new Set<ParentAgentSession>();
@@ -453,4 +454,53 @@ test('opencode synthetic and ignored text parts cannot stream or reach the final
     assert.ok(!text.includes('SECRET'), 'synthetic/ignored text must never reach the final text');
     await session.close();
   } finally { await teardown(harness); }
+});
+
+test('opencode default aggregates assistant boundaries with a blank line; final-only resolves the terminal alone', async () => {
+  const harness = setup('multi-final', 'multi-assistant');
+  try {
+    const first = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 800 });
+    sessions.add(first);
+    const deltas: string[] = [];
+    const text = await first.send('工具步骤', undefined, chunk => deltas.push(chunk));
+    assert.equal(text, '中间-\n\n最终');
+    assert.deepEqual(deltas, ['中间-', '\n\n最终']);
+    await first.close();
+  } finally { await teardown(harness); }
+  const split = setup('split-final', 'multi-assistant');
+  try {
+    const session = await createParentAgent(input(split), { launch, startupMs: 4000, turnMs: 3000, closeMs: 800 });
+    sessions.add(session);
+    const hidden: string[] = [];
+    const terminal = await session.send('工具步骤', undefined, chunk => hidden.push(chunk), { finalAssistantOnly: true });
+    assert.equal(terminal, '最终');
+    assert.deepEqual(hidden, [], 'final-only identity check streams no public delta');
+    await session.close();
+  } finally { await teardown(split); }
+});
+
+test('opencode split progress plus terminal marker: default aggregate fails strict, final-only passes it', async () => {
+  const harness = setup('identity-split-default', 'identity-split');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 800 });
+    sessions.add(session);
+    const raw = await session.send(imMasterIdentityPrompt());
+    assert.ok(raw.includes('WEAVER_MASTER_READY'));
+    assert.ok(raw.includes('身份初始化中，接线完成。'));
+    assert.ok(raw.includes('\n\n'), 'default keeps real assistant boundaries apart');
+    assert.equal(isMasterReadyText(raw), false, 'aggregated progress plus marker must still fail the strict gate');
+    await session.close();
+  } finally { await teardown(harness); }
+  const only = setup('identity-split-only', 'identity-split');
+  try {
+    const session = await createParentAgent(input(only), { launch, startupMs: 4000, turnMs: 3000, closeMs: 800 });
+    sessions.add(session);
+    const deltas: string[] = [];
+    const terminal = await session.send(imMasterIdentityPrompt(), undefined, chunk => deltas.push(chunk), { finalAssistantOnly: true });
+    assert.equal(terminal, 'WEAVER_MASTER_READY');
+    assert.equal(isMasterReadyText(terminal), true);
+    assert.deepEqual(deltas, [], 'hidden final-only check emits no public delta');
+    assert.ok(!terminal.includes('接线完成'));
+    await session.close();
+  } finally { await teardown(only); }
 });

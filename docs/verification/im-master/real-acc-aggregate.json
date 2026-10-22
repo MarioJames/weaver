@@ -1,0 +1,26 @@
+{
+ "asset": "agents-weaver",
+ "acceptance_id": "acc_1c1b22ab1a",
+ "current_asset_hash": "ee65ec44e0d5e30bd5c32cd811c6d6fb8690c0d4f79233c6236645eea2310a96",
+ "round": {
+  "id": "round_425af14b97",
+  "tag": "1-20261021-210355-aeefc9",
+  "mode": "hybrid",
+  "verdict": "PASS",
+  "stale": false,
+  "task_keys": [
+   "t1",
+   "t2",
+   "t3",
+   "t4",
+   "t5"
+  ],
+  "asset_hash": "ee65ec44e0d5e30bd5c32cd811c6d6fb8690c0d4f79233c6236645eea2310a96",
+  "started_at": "2026-10-21T21:03:55",
+  "ended_at": "2026-10-21T21:14:46",
+  "sandbox_removed": true
+ },
+ "report": "t1: staged SKILL+ref+context read from sandbox absolute paths (session log exec), WEAVER_MASTER_READY only, hold; 0 CLI calls (no ledger), tasks still 3 queued fixture roots.\nt2: live paginated list (help + 2 pages limit2 over 3 queued fixture roots), reported 3 roots/0 children queued, fixture seeds disclosed not hidden, 0 creates; tasks still 3. Note: per-item get/events not used in t2 (list carried status/parent fields); get/events covered in t3/t4.\nt3: single root 86ff8961 (roots 3->4), ownerProfileId claude_owner cross-engine (Bot opencode), absolute sandbox workspace, 5 criteria; start ACK then get/events confirmed real ownerHost receipt; honestly caveated synthetic boundary; no owners.*/policy edits.\nt4: reused running root from live get/events, operations get same command-ids both settled (no dup); --help verified update/describe limits; stated Excel supplement NOT delivered, no cancel/rebuild, no describe-as-update; tasks still 4, root goal still CSV.\nt5: re-checked policy live (rev2, all owners disabled), blocked real work (no create/start/attach/enable/self-execution), Q&A served, honestly noted disabled owners do not prove running task stopped; tasks still 4.",
+ "provenance": "official ACC history CLI (ACCEPTANCE_HOME=/tmp/weaver-bot-lifecycle-thgzzwqn/acc-home bun asset-validation/scripts/acc.ts history --asset agents-weaver); never read ACC SQLite directly",
+ "obsolete": "round_60053bc3ff fake-weaver PASS marked stale:true after asset hash change; no longer valid"
+}

@@ -5,12 +5,15 @@ description: "The default way to do development work when the `weaver` CLI is on
 
 # Agents Weaver
 
-Weaver is the scheduling authority for owner-led work on this machine: its saved policy picks the worker, engine, model and effort for a package; your host stays the owner. Do not run another scheduler, spawn worker CLIs yourself, or pick models outside the policy. Your host's built-in subagent tool runs only a dispatch marked `execution: "native"`.
+Weaver is the scheduling authority for owner-led work on this machine: its saved policy picks the worker, engine, model and effort for a package; the execution owner stays the owner. Do not run another scheduler, spawn worker CLIs yourself, or pick models outside the policy. Your host's built-in subagent tool runs only a dispatch marked `execution: "native"`.
 
 ## Roles
 
-- **You are the owner.** Understand the request, split it, freeze packages, dispatch, verify evidence, decide, and report to the user. Commits, pushes and user communication stay with you.
-- **A worker** runs one frozen package inside its read/write scope and never delegates, commits, pushes or talks to the user. If you were started as a worker, follow that contract and ignore the owner steps below.
+Decide the role from how you were started, not from the host engine.
+
+- **Entry Master** — a chat entry such as the Feishu Bot. At startup read [Master guideline](references/master-guideline.md) and follow it as the single home for Master behavior; skip the execution-owner preflight and dispatch flow below. The Master coordinates and reports but never implements or registers as an owner.
+- **Execution root owner** — a host session such as Claude Code or Codex that owns and executes a root, or a root agent started from the Weaver UI. Understand the request, split it, freeze packages, dispatch, verify evidence, decide, and report to the user. Commits, pushes and user communication stay with you.
+- **A worker** runs one frozen package inside its read/write scope and never delegates, commits, pushes or talks to the user. If you were started as a worker, follow that contract and ignore the owner and Master steps below.
 
 Dispatch every task through Weaver except a pure question — a small edit, test or doc is not a reason to skip. Do the work yourself only when the user explicitly asks; if `weaver` is missing or the service cannot start, say so, then work without delegation.
 
@@ -29,6 +32,8 @@ Read IDs, revisions and digests from responses instead of predicting them. For a
 Use JSON files or `--input -` with a quoted heredoc for request bodies containing Chinese text, newlines or quotes. Do not use `echo "$response" | ...` to parse JSON: zsh echo expands backslash escapes. If forwarding existing JSON is unavoidable, use `printf '%s\n' "$response"`. The [handoff reference](references/handoff.md#shell-safe-input-and-result-review) shows file/stdin input and ack/review without constructing JSON.
 
 ## Preflight (once per session)
+
+These steps apply to an execution root owner. An entry Master does not attach an owner or run this owner preflight: it follows [master-guideline](references/master-guideline.md) and starts roots with `ownerProfileId`.
 
 1. `weaver --version`. Missing: tell the user the install one-liner (`curl -fsSL https://raw.githubusercontent.com/MarioJames/weaver/main/install.sh | bash`) and work without delegation.
 2. `APP_NOT_RUNNING` from any command: run `weaver server start` (idempotent; it waits until the service answers). The service is shared by every session: never stop it and never kill its process, even if you started it — only the user stops it. Inside a Codex `workspace-write` sandbox, `TRANSPORT_ERROR` means the sandbox blocks the local socket: ask the user to allow `network_access` (`sandbox_workspace_write.network_access = true`); do not change their config yourself.

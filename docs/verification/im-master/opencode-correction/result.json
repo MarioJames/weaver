@@ -1,0 +1,38 @@
+{
+  "engine": "opencode",
+  "model": "opencode-go/muse-spark-1.3-contributor",
+  "effort": "xhigh",
+  "verdict": "FAIL",
+  "stage": "hidden-identity/marker-non-strict",
+  "detail": "Native createParentAgent handshake OK (~1.4-1.5s: health 200 healthy 1.19.3 + session create ses id); prompt_async accepted variant=xhigh (204, no 400); hidden identity send RESOLVES in ~5.6-7.7s with public text prefix + WEAVER_MASTER_READY (run1 rawLen 34 head 身份初始化中，只输出就绪标记。; run2 rawLen 77 head 身份初始化，按 Master 职责接线; strict private prompt run rawLen 104 English prefix). isMasterReadyText=false in all 3 real calls, so the correct host gate reports protocol without ready. Variant-rejection hypothesis DISPROVED; no transport/protocol bug in parent-opencode.ts. Strict equality must stay (contains-check forbidden).",
+  "variantHypothesis": "disproved: variant=xhigh accepted, turns proceed, model responds; failure is narration prefix, not 400/prompt_async rejection",
+  "nativePhases": {
+    "handshake": "ok ~1.4-1.5s",
+    "send": "resolve ~5.6s (34 chars), ~7.7s (77 chars), strict-prompt ~104 chars; all isMarker=false",
+    "close": "ok, exact session DELETE path, no shared db writes"
+  },
+  "strictPromptProbe": "even explicit only-18-ASCII-chars prompt still yields English narration prefix + marker; model/provider does not reliably emit marker-only output under current instructions",
+  "productChange": "none to src/main/im/parent-opencode.ts bootstrap/parent-host/parent-identity (transport correct; no hunk justified). Fixture + host test only: identity-prefix scenario (real 34-char sample) + strict-gate test asserting protocol without ready.",
+  "writes": {
+    "wrapperLedgerCalls": 0,
+    "ownersCalls": 0,
+    "attemptedWrites": 0
+  },
+  "cleanup": {
+    "nativeScopes": "dev-weaver-im-d9f94e08dbg/str closed, 0 units remain",
+    "orphanProbeServe": "killed pid 265282 (cwd probe-dir), others preserved",
+    "vendorSessions": "native sessions closed via exact DELETE; shared opencode.db untouched (no direct writes, no foreign session reads)",
+    "othersPreserved": true
+  },
+  "tests": {
+    "im-parent-host": "22/22 pass (incl new identity-prefix strict test)",
+    "im-parent-opencode": "23/23 pass",
+    "im-bootstrap-budget": "7/7 pass",
+    "typecheck": "pass"
+  },
+  "ownerOptions": [
+    "Keep strict marker gate (recommended): treat current model/effort as not cold-start ready; retry smoke only after owner-approved model/effort or instruction change, do not relax contains-check in product.",
+    "If owner wants marker compliance work, change ONLY the hidden identity wording via a reviewed bootstrap hunk and re-run this same native diag; never weaken isMasterReadyText to contains."
+  ],
+  "report": "/tmp/weaver-bot-lifecycle-thgzzwqn/im-opencode-correction.md"
+}

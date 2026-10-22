@@ -48,6 +48,28 @@ function assistant(content, stopReason = 'stop', errorMessage) {
 }
 
 async function runPrompt(frame) {
+  // Hidden Master identity turn: bypass turn/marker so existing user-turn expectations stay intact.
+  try {
+    if (JSON.stringify(frame).includes('WEAVER_MASTER_READY')) {
+      respond(frame.id, 'prompt', { disposition: 'started' });
+      if (scenario === 'identity-hang') return;
+      if (scenario === 'identity-auth') {
+        emit({ type: 'agent_start' });
+        emit({ type: 'message_end', message: assistant([{ type: 'text', text: 'auth failed' }], 'error', 'authentication failed: 401 unauthorized') });
+        emit({ type: 'agent_settled', aborted: false });
+        return;
+      }
+      const text = scenario === 'identity-wrong' ? 'WRONG-MARKER' : 'WEAVER_MASTER_READY';
+      emit({ type: 'agent_start' });
+      emit({ type: 'turn_start' });
+      emit({ type: 'message_start', message: assistant([], 'pending') });
+      emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: text } });
+      emit({ type: 'message_end', message: assistant([{ type: 'text', text }]) });
+      emit({ type: 'agent_end', messages: [], willRetry: false });
+      emit({ type: 'agent_settled', aborted: false });
+      return;
+    }
+  } catch { /* fall through to the normal path */ }
   const current = ++turn;
   log({ pid: process.pid, turn: current, prompt: frame.message });
   await sleep(5);

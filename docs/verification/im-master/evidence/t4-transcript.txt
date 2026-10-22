@@ -1,0 +1,24 @@
+› 刚才那批需求里导出 CSV 改成导出 Excel（xlsx），其他不变。还在原来那个任务下…
+    + 1 line (^t to expand)
+
+• 已确认原派发已成功提交，没有重复派发。我按原 command-id 查询了创建和启动操作，
+  均为 settled、ok: true；原任务 86ff8961-ba09-4e33-a3fb-57bfd6bd0bf1 当前仍为
+  running，并有宿主启动回执。该回执仍受此前说明的合成边界限制。
+
+  Excel（xlsx）变更尚未送达执行方，原任务仍记录 CSV。 已核实当前 CLI：tasks
+  update 只能修改未启动草稿；tasks describe 只能改标题和验收标准，不能向运行中的
+  owner 传递补充需求。
+
+  Master 指南 (.agents/skills/agents-weaver/references/master-guideline.md) 明确
+  规定：“there is currently no public CLI path that injects follow-up input into
+  a running owner”。因此本次未取消、重建或重新启动原任务，也未把元数据修改冒充需
+  求已送达；目前仍存在执行方按 CSV 实施的风险。
+  └ Tip: Coming back to a conversation? Use /recap to summarize it.
+
+  Worked for 28s • 9:12 PM
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol high · /tmp/acc-1-20261021-210355-aeefc9 · Context 92% left · 475…
+  ? for shortcuts                                     ⚠ 4 warnings · f2 to view

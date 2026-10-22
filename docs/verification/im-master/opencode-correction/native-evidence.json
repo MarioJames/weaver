@@ -1,0 +1,39 @@
+{
+  "note": "Task-private native diagnosis, same real model/effort/config as 2026-10-22 01:14UTC public read. Desensitized: protocol phase/path/status only, no credentials/auth/env/session bodies. Full reasoning/tool logs never stored.",
+  "run1": {
+    "t": "2026-10-22T01:3xUTC",
+    "handshakeElapsedMs": 1551,
+    "sendElapsedMs": 5642,
+    "rawLen": 34,
+    "isMarker": false,
+    "head40": "身份初始化中，只输出就绪标记。WEAVER_MASTER_READY",
+    "deltaCount": 3,
+    "deltaChars": 36,
+    "close": "ok total ~10776ms"
+  },
+  "run2": {
+    "handshakeElapsedMs": 1437,
+    "sendElapsedMs": 7723,
+    "rawLen": 77,
+    "trimmedLen": 77,
+    "isMarker": false,
+    "head40": "身份初始化，按 Master 职责接线。已加载 agents-weaver 技能",
+    "tail40": " 技能，正在读取 Master 行为规范。WEAVER_MASTER_READY",
+    "deltaCount": 4,
+    "deltaChars": 81,
+    "close": "ok total ~12762ms"
+  },
+  "strictPromptProbe": {
+    "promptLen": 210,
+    "handshake": "ok",
+    "rawLen": 104,
+    "isMarker": false,
+    "full": "Loading entry master guidelines.Reading master guideline to complete readiness check.WEAVER_MASTER_READY"
+  },
+  "docSchema": {
+    "source": "installed 1.19.3 /doc OpenAPI via local serve probe",
+    "prompt_async": "requestBody requires parts only; variant is optional plain string; 204 on accept, 400/404 on reject",
+    "conclusion": "variant=xhigh syntactically valid and semantically accepted (204, turn proceeds); no 400 observed in any native run"
+  },
+  "fixture": "identity-prefix scenario replays the real 34-char sample through the same native event flow (message.updated/part.updated/delta/idle) so the host strict gate is exercised without a model call"
+}

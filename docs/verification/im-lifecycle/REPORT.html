@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bot 生命周期浏览器验收报告（im-lifecycle）</title>
+<style>
+:root{color-scheme:light}
+body{font-family:system-ui,-apple-system,"Noto Sans SC","PingFang SC",sans-serif;max-width:960px;margin:0 auto;padding:16px;line-height:1.6;color:#1a1a1a}
+h1{font-size:22px}h2{font-size:18px;margin-top:28px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}
+.badge{display:inline-block;padding:1px 10px;border-radius:10px;font-size:13px;border:1px solid}
+.pass{color:#0a6b2a;border-color:#0a6b2a}.fail{color:#a31212;border-color:#a31212}
+.warnbox{background:#fff8e6;border:1px solid #d9a400;padding:8px 12px;font-size:14px}
+code{font-size:13px;word-break:break-all}
+img{max-width:100%;border:1px solid #ddd}
+details{margin:8px 0}summary{cursor:pointer;font-weight:bold}
+@media print{body{max-width:none}}
+</style>
+</head>
+<body>
+<h1>Bot 生命周期浏览器验收报告 <span class="badge pass">PASS</span></h1>
+<p>日期 2026-10-22（UTC）。被测 HEAD <code>5ae023f</code>。本报告可直接以 <code>file://</code> 打开阅读，无外部依赖。</p>
+<p><strong>先说结论：</strong>真浏览器改模型保存 → 真实 API/store/ImService 只换 Agent 不换 channel，
+starting 后约 3 秒经 1 秒轮询自主变待命，无需手动刷新；Agent 启动失败时飞书连接保持已连接，
+错误文案与按钮名准确；桌面及 390px 布局可读无溢出。
+<strong>本包不是真飞书、不是真实模型</strong>：唯一合成边界是外部 parent/channel 工厂与合成入站消息，
+详见“验证范围”。</p>
+
+<h2>验证范围（真实 vs 合成）</h2>
+<ul>
+<li>真实：任务模式 Chrome、私有构建 UI、<code>startRuntime</code> 私有实例、真实 HTTP
+<code>/api/rpc</code>（<code>getImSettings</code>/<code>saveImSettings</code> 未 mock）、真实 ImService 状态机与 store。</li>
+<li>合成（外部边界）：<code>parentFactory</code>（2500ms 启动延迟，可定点报 protocol 错误）、
+<code>channelFactory</code>（即时假连接）、经私有 fixture 端口注入的单聊入站消息。不读真实 AppSecret，不发消息，不执行模型。</li>
+<li>复用不重做：<code>im-polling.ts</code> 与 HEAD 无差异，<code>docs/verification/im-polling</code> 六项控制器证据继续有效；
+<code>ImSettings.tsx</code> 与 HEAD 差异仅 3 处文案（按钮名“重建连接与会话”、单聊 Agent 长说明、保存提示），逻辑零改动。</li>
+</ul>
+
+<h2>结果一览</h2>
+<table>
+<tr><th>#</th><th>验收项</th><th>状态</th><th>证据</th></tr>
+<tr><td>A</td><td>桌面 Bot 页：独立单聊说明、后台无需终端、跨引擎提示可读；m1 / 已连接 / 待命</td><td><span class="badge pass">通过</span></td><td><a href="A-desktop-initial.png">A-desktop-initial.png</a></td></tr>
+<tr><td>B</td><td>浏览器改 m1→m2 并保存：parents 1→2、parentCloses 1、channels 仍 1；starting→ready 全自动</td><td><span class="badge pass">通过</span></td><td><a href="B-starting-transition.png">starting</a> / <a href="B-ready-after-m2-save.png">ready</a></td></tr>
+<tr><td>B2</td><td>同一 live channel 合成入站 → 新 parent 回复，无新增 parent/channel</td><td><span class="badge pass">通过</span></td><td><a href="B-inject-replied.png">B-inject-replied.png</a></td></tr>
+<tr><td>C</td><td>fake parent 报 protocol 错误：仍已连接、启动异常、按钮名“重建连接与会话”、草稿保留、无假 ready</td><td><span class="badge pass">通过</span></td><td><a href="C-agent-error.png">C-agent-error.png</a></td></tr>
+<tr><td>D</td><td>390px 长说明/保存提示/Agent 反馈可读，无水平溢出无遮挡</td><td><span class="badge pass">通过</span></td><td><a href="D-390-top.png">上</a> / <a href="D-390-bottom.png">下</a></td></tr>
+</table>
+
+<h2>B 过渡时序（浏览器真实请求响应体，UTC）</h2>
+<table>
+<tr><th>时间</th><th>方法</th><th>revision</th><th>连接</th><th>Agent</th></tr>
+<tr><td>01:25:03.807</td><td>saveImSettings</td><td>2</td><td>已连接</td><td>启动中</td></tr>
+<tr><td>01:25:04.807</td><td>getImSettings</td><td>2</td><td>已连接</td><td>启动中</td></tr>
+<tr><td>01:25:05.808</td><td>getImSettings</td><td>2</td><td>已连接</td><td>启动中</td></tr>
+<tr><td>01:25:06.807</td><td>getImSettings</td><td>2</td><td>已连接</td><td>待命</td></tr>
+</table>
+<p>1.00 秒轮询节拍，全程未点“刷新状态”。HAR 106 请求全部 2xx，页面 console 0 条，网络错误 0。
+fixture 真实计数：B 后 parents=2、parentCloses=1、channels=1、channelCloses=0；
+入站后 parentSends=1、replies=1；C 后 parents=3、parentCloses=2、channels 仍 1。机器契约见
+<code>proof.json</code>。含合成假 secret 的 HAR/请求体原文未进 git，已随私有现场删除。</p>
+
+<h2>关键截图</h2>
+<details open><summary>A 桌面初始（m1 / 已连接 / 待命）</summary><img src="A-desktop-initial.png" alt="桌面 Bot 页初始状态"></details>
+<details><summary>B 启动中过渡（已连接 / 启动中，保存后约 1.5 秒）</summary><img src="B-starting-transition.png" alt="保存后启动中"></details>
+<details><summary>B 自动就绪（已连接 / 待命，未手动刷新）</summary><img src="B-ready-after-m2-save.png" alt="自动变待命"></details>
+<details><summary>C Agent 启动异常（仍已连接，按钮名准确）</summary><img src="C-agent-error.png" alt="启动异常"></details>
+<details><summary>D 390px 上 / 下（无溢出）</summary><img src="D-390-top.png" alt="390 上"><img src="D-390-bottom.png" alt="390 下"></details>
+
+<h2>过程中处置的 fake 边界问题（非产品 bug）</h2>
+<div class="warnbox">两次 turn 失败均由本包自有 fake 不完整导致，已对照产品代码定位并修复 fixture 后重验通过，
+不记为产品问题：(1) fake stream controller 缺 <code>append</code>；(2) fake <code>stream</code>
+返回拼接文本而非 <code>controller.messageId</code>，产品按 <code>result === messageId</code>
+判定投递（真实投递语义，fake 必须遵守）。</div>
+
+<h2>未解决项与限制</h2>
+<ul>
+<li>私有验证 server 进程在采证间隙静默退出 3 次（无 crash 日志；每次均为采证完成后）。
+scope 自动回收，端口确认释放，无证据丢失。退出原因未定位，若属产品运行时行为需另起包调查。</li>
+<li>30 秒稳态低频轮询沿用 im-polling 六项证据；更长稳态漂移不在本包范围。</li>
+<li>附带交付 tests/README.md Master 门禁单条（删临时“QA 正在更新”，恢复已验证约束到单一位置）。</li>
+</ul>
+
+<h2>资源释放</h2>
+<p>本任务 Chrome 已 close，profile 确认无占用后删除；scope <code>dev-weaver-im-final-lifecycle</code>
+无残留，端口已释放；任务私有现场（data/build/HAR/profile/脚本）已整体删除，仅保留本目录最小证据。
+共享服务、他人 Chrome、真实开发 DB、用户数据均未触碰。本包未提交、未推送；产品/测试代码零改动。</p>
+</body>
+</html>

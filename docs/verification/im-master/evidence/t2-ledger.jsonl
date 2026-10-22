@@ -1,0 +1,3 @@
+{"ts": "2026-10-22T01:09:08Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "list", "--help"]}
+{"ts": "2026-10-22T01:09:11Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "list", "--input", "-", "--output", "json"]}
+{"ts": "2026-10-22T01:09:14Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "list", "--input", "-", "--output", "json"]}

@@ -3,16 +3,16 @@ import { chmodSync, lstatSync, mkdirSync, realpathSync, rmdirSync } from 'node:f
 import { createServer, type Socket } from 'node:net';
 import { join, isAbsolute } from 'node:path';
 import { embeddedApp } from '../embedded';
-import { allocateHerdrLane, type AsyncRunner } from '../owner-host';
+import type { AsyncRunner } from '../owner-host';
 import { abortReason, ConfirmedParentCancellation, ParentTurnNotSubmitted, parentEnv, parentError, prepareParentAgentInput, PARENT_TEXT_MAX, type ParentAgentFailureReason, type ParentAgentInput, type ParentAgentSession } from './parent-agent';
 import { hostWire, type HostFrame } from './parent-host-wire';
-import { bootIdentity, cleanupHostRecord, herdrServer, inspectHostUnit, processStart, readHostRecords, resourceError, resourceRun, saveHostRecord, type HostRecord } from './parent-host-resources';
+import { HOST_STARTUP_MS } from './parent-identity';
+import { bootIdentity, cleanupHostRecord, inspectHostUnit, processStart, readHostRecords, resourceError, resourceRun, saveHostRecord, type HostRecord } from './parent-host-resources';
 
 interface HostInternals { runner?: AsyncRunner; hostCommand?: readonly string[]; startupMs?: number }
 const live = new Set<string>();
 const closingEpochs = new Set<string>();
 let recoveryQueue = Promise.resolve();
-const quote = (value: string) => `'${value.replace(/'/g, `'"'"'`)}'`;
 function privateDirectory(dir: string): void {
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   const info = lstatSync(dir);
@@ -34,10 +34,16 @@ function hostReason(value: unknown): ParentAgentFailureReason {
   return typeof value === 'string' && HOST_FAILURE_REASONS.has(value as ParentAgentFailureReason) ? value as ParentAgentFailureReason : 'engine';
 }
 
-/** Herdr is mandatory: no direct fallback. Only close() confirms full unit/tab reclamation. */
-export async function createHerdrParentAgent(input: ParentAgentInput, options: { dataDir: string }, internals: HostInternals = {}): Promise<ParentAgentSession> {
+/**
+ * Background is mandatory: the host always runs as a direct systemd user
+ * service, never through a Herdr lane or pane. No terminal or tab is kept.
+ * Only close() confirms full unit reclamation.
+ */
+export async function createBackgroundParentAgent(input: ParentAgentInput, options: { dataDir: string; signal?: AbortSignal }, internals: HostInternals = {}): Promise<ParentAgentSession> {
   const prepared = prepareParentAgentInput(input);
   if (!isAbsolute(options.dataDir) || /[\x00-\x1f\x7f]/.test(options.dataDir)) throw resourceError();
+  // A revoked startup intent never reaches recovery: no journal is touched and no process is created.
+  if (options.signal?.aborted) throw abortReason(options.signal);
   const root = join(options.dataDir, 'im-host');
   privateDirectory(root);
   // Serialize recovery and intent creation, while independent live sessions remain untouched.
@@ -45,6 +51,9 @@ export async function createHerdrParentAgent(input: ParentAgentInput, options: {
   let release!: () => void;
   recoveryQueue = new Promise<void>(resolve => { release = resolve; });
   await before;
+  // Recovery itself is cancellable: a revoke that arrived while orphaned journals
+  // were being reclaimed must not continue into a useless fresh launch.
+  if (options.signal?.aborted) { release(); throw abortReason(options.signal); }
   let dir = '', record!: HostRecord;
   try {
     for (const previous of readHostRecords(root)) {
@@ -57,7 +66,8 @@ export async function createHerdrParentAgent(input: ParentAgentInput, options: {
     const endpoint = join(dir, 's');
     if (Buffer.byteLength(endpoint) > 100) { rmdirSync(dir); throw parentError('invalid_input', 'Bot host private socket path is too long'); }
     const createdAt = new Date().toISOString();
-    record = { version: 1, epoch, unit: `weaver-im-host-${epoch}.service`, createdAt, ownerPid: process.pid, ownerStart: processStart(process.pid)!, boot: bootIdentity(), endpoint, label: botTitle(createdAt, prepared.engineKind), launched: false };
+    // New records are always background: no lane, no server, no allocating.
+    record = { version: 1, epoch, unit: `weaver-im-host-${epoch}.service`, createdAt, ownerPid: process.pid, ownerStart: processStart(process.pid)!, boot: bootIdentity(), endpoint, label: botTitle(createdAt, prepared.engineKind), launchMode: 'background', launched: false };
     saveHostRecord(dir, record); live.add(epoch);
   } finally { release(); }
 
@@ -70,14 +80,31 @@ export async function createHerdrParentAgent(input: ParentAgentInput, options: {
   const ready = new Promise<void>((resolve, reject) => { readyResolve = resolve; readyReject = reject; });
   // Attach immediately so launch failures cannot create an unhandled ready rejection.
   void ready.catch(() => {});
+  let readySettled = false;
+  const detachStartupSignal = () => options.signal?.removeEventListener('abort', onStartupAbort);
+  const noteReadySettled = () => { readySettled = true; detachStartupSignal(); };
+  const onStartupAbort = () => {
+    if (readySettled || closing || unavailableNow) return;
+    // Revoke the startup intent on private launch cancellation: reject pending readiness
+    // with the abort reason, tear down the socket, and let the outer catch close the exact
+    // owned host record. No replacement process is created; normal ready sends are unaffected.
+    noteReadySettled();
+    readyReject(abortReason(options.signal!));
+    lost();
+  };
   const lost = () => {
     if (unavailableNow) return;
     unavailableNow = true; signalUnavailable();
     const error = parentError('engine', 'Bot host control is unavailable');
     readyReject(error);
+    noteReadySettled();
     if (active) { const turn = active; active = undefined; clearTimeout(turn.timer); turn.detach(); turn.reject(error); }
     socket?.destroy();
   };
+  if (options.signal) {
+    if (options.signal.aborted) onStartupAbort();
+    else options.signal.addEventListener('abort', onStartupAbort, { once: true });
+  }
   const server = createServer(connection => {
     if (socket || closing || unavailableNow) { connection.destroy(); return; }
     socket = connection;
@@ -99,8 +126,8 @@ export async function createHerdrParentAgent(input: ParentAgentInput, options: {
         })().catch(lost);
         return;
       }
-      if (frame.type === 'ready' && frame.id === 0 && initialized) { initialized = false; readyResolve(); return; }
-      if (frame.type === 'failed' && frame.id === 0) { readyReject(parentError(hostReason(frame.reason), 'Bot host failed to start')); lost(); return; }
+      if (frame.type === 'ready' && frame.id === 0 && initialized) { initialized = false; readyResolve(); noteReadySettled(); return; }
+      if (frame.type === 'failed' && frame.id === 0) { readyReject(parentError(hostReason(frame.reason), 'Bot host failed to start')); noteReadySettled(); lost(); return; }
       const turn = active;
       if (!turn || frame.id !== turn.id) { if (frame.id >= nextId) lost(); return; } // Old turn frames cannot cross the slot boundary.
       if (frame.type === 'prepared') {
@@ -151,25 +178,31 @@ export async function createHerdrParentAgent(input: ParentAgentInput, options: {
     },
     close,
   };
-  const timer = setTimeout(lost, internals.startupMs ?? 30_000);
+  // Outer startup budget covers the native engine handshake plus the hidden Master
+  // identity turn, with a small margin. Tests override via internals.startupMs.
+  const timer = setTimeout(lost, internals.startupMs ?? HOST_STARTUP_MS);
   try {
     await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(record.endpoint, () => { chmodSync(record.endpoint, 0o600); resolve(); }); });
-    record.server = await herdrServer(internals.runner); saveHostRecord(dir, record);
-    record.allocating = true; saveHostRecord(dir, record);
-    record.lane = await allocateHerdrLane({ workspace: prepared.workspace, label: record.label, asyncRunner: internals.runner, receipt: lane => { record.lane = lane; saveHostRecord(dir, record); } });
-    saveHostRecord(dir, record);
-    record.allocating = false; record.launched = true; saveHostRecord(dir, record);
+    // A private launch cancellation that arrived before the host process was spawned
+    // revokes the startup intent without creating the process; later arrivals reject
+    // the pending readiness and the outer catch closes the exact owned resources.
+    if (options.signal?.aborted) throw abortReason(options.signal);
+    record.launched = true; saveHostRecord(dir, record);
+    // Direct background launch: no Herdr lane, pane or tab. StandardInput is null
+    // so the host never depends on a terminal; logs go to the journal. The socket
+    // ExecCondition keeps a delayed launch from starting after its record is gone.
     const command = [
-      'systemd-run', '--user', '--collect', `--unit=${record.unit}`, '--service-type=exec', '--pipe', '--wait',
-      '-p', `ExecCondition=/usr/bin/test -S ${JSON.stringify(record.endpoint.replace(/%/g, '%%').replace(/\$/g, () => '$$'))}`, '-p', 'ExitType=main', '-p', 'KillMode=control-group', '-p', 'Restart=no', '-p', 'RemainAfterExit=no', '-p', 'SendSIGKILL=yes', '-p', 'TimeoutStopSec=3s', '-p', 'MemoryHigh=8G', '-p', 'MemoryMax=10G', `--working-directory=${prepared.workspace}`, '--',
+      'systemd-run', '--user', '--collect', `--unit=${record.unit}`, '--service-type=exec',
+      '-p', `ExecCondition=/usr/bin/test -S ${JSON.stringify(record.endpoint.replace(/%/g, '%%').replace(/\$/g, () => '$$'))}`, '-p', 'StandardInput=null', '-p', 'StandardOutput=journal', '-p', 'StandardError=journal', '-p', 'ExitType=main', '-p', 'KillMode=control-group', '-p', 'Restart=no', '-p', 'RemainAfterExit=no', '-p', 'SendSIGKILL=yes', '-p', 'TimeoutStopSec=3s', '-p', 'MemoryHigh=8G', '-p', 'MemoryMax=10G', `--working-directory=${prepared.workspace}`, '--',
       ...(internals.hostCommand ?? hostCommand()), '__weaver-im-parent-host', record.endpoint, record.epoch,
     ];
-    const launched = await resourceRun('herdr', ['--session', 'default', 'pane', 'run', record.lane.paneId!, `exec ${command.map(quote).join(' ')}`], internals.runner);
-    if (launched.code !== 0 || /"error"\s*:/.test(launched.stdout)) throw resourceError();
+    const launched = await resourceRun('systemd-run', command.slice(1), internals.runner);
+    if (launched.code !== 0) throw resourceError();
     await ready;
+    noteReadySettled();
     return session;
   } catch (error) {
     await close();
     throw error;
-  } finally { clearTimeout(timer); }
+  } finally { clearTimeout(timer); detachStartupSignal(); }
 }

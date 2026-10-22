@@ -1,0 +1,20 @@
+{"ts": "2026-10-22T01:09:08Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "list", "--help"]}
+{"ts": "2026-10-22T01:09:11Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "list", "--input", "-", "--output", "json"]}
+{"ts": "2026-10-22T01:09:14Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "list", "--input", "-", "--output", "json"]}
+{"ts": "2026-10-22T01:10:22Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "create", "--help"]}
+{"ts": "2026-10-22T01:10:22Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "events", "--help"]}
+{"ts": "2026-10-22T01:10:22Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "start", "--help"]}
+{"ts": "2026-10-22T01:10:22Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "policy", "get", "--output", "json"]}
+{"ts": "2026-10-22T01:10:22Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "get", "--help"]}
+{"ts": "2026-10-22T01:10:46Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "create", "--input", "-", "--command-id", "demo-batch-four-create-20261022-01", "--output", "json"]}
+{"ts": "2026-10-22T01:10:49Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "start", "--task-id", "86ff8961-ba09-4e33-a3fb-57bfd6bd0bf1", "--command-id", "demo-batch-four-start-20261022-01", "--output", "json"]}
+{"ts": "2026-10-22T01:10:54Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "get", "--task-id", "86ff8961-ba09-4e33-a3fb-57bfd6bd0bf1", "--output", "json"]}
+{"ts": "2026-10-22T01:10:54Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "events", "--task-id", "86ff8961-ba09-4e33-a3fb-57bfd6bd0bf1", "--output", "json"]}
+{"ts": "2026-10-22T01:12:11Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "update", "--help"]}
+{"ts": "2026-10-22T01:12:11Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "operations", "get", "--help"]}
+{"ts": "2026-10-22T01:12:11Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "get", "--task-id", "86ff8961-ba09-4e33-a3fb-57bfd6bd0bf1", "--output", "json"]}
+{"ts": "2026-10-22T01:12:11Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "events", "--task-id", "86ff8961-ba09-4e33-a3fb-57bfd6bd0bf1", "--output", "json"]}
+{"ts": "2026-10-22T01:12:11Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "tasks", "describe", "--help"]}
+{"ts": "2026-10-22T01:12:11Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "--help"]}
+{"ts": "2026-10-22T01:12:17Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "operations", "get", "--command-id", "demo-batch-four-start-20261022-01", "--output", "json"]}
+{"ts": "2026-10-22T01:12:17Z", "refused": false, "argv": ["--data-dir", "$ACCEPTANCE_SANDBOX", "operations", "get", "--command-id", "demo-batch-four-create-20261022-01", "--output", "json"]}
