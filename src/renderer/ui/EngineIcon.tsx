@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import { Bot } from 'lucide-react';
-import { ClaudeCode, Codex, Grok, OpenCode, Pi, Qoder } from '@lobehub/icons';
+import { ClaudeCode, Codex, DeepSeek, Grok, OpenCode, Pi, Qoder } from '@lobehub/icons';
 import { styles } from './styles';
 
 type IconProps = { size?: number; 'aria-hidden'?: boolean | 'true' | 'false' };
@@ -12,6 +12,7 @@ const ENGINE_ICONS: Record<string, ComponentType<IconProps>> = {
   opencode: OpenCode,
   pi: Pi,
   grok: Grok,
+  dsh: DeepSeek.Color,
   qodercli: Qoder.Color,
   qoder: Qoder.Color,
 };

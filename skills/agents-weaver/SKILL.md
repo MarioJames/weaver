@@ -1,6 +1,6 @@
 ---
 name: agents-weaver
-description: "The default way to do development work when the `weaver` CLI is on PATH: you stay the owner and Weaver dispatches the work to worker agents on other engines (OpenCode, Pi, Grok, Codex, Qoder). Use it for implementation, refactors, migrations, tests, docs, research and verification; the size of a change is never a reason to skip. The only exceptions are a pure question, and doing the work yourself when the user explicitly asks."
+description: "The default way to do development work when the `weaver` CLI is on PATH: you stay the owner and Weaver dispatches the work to worker agents on other engines (OpenCode, Pi, Grok, Codex, Qoder, DeepSeek Harness). Use it for implementation, refactors, migrations, tests, docs, research and verification; the size of a change is never a reason to skip. The only exceptions are a pure question, and doing the work yourself when the user explicitly asks."
 ---
 
 # Agents Weaver

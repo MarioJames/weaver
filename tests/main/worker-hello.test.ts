@@ -61,6 +61,14 @@ test('replies are read from each CLI output format, with the vendor model when r
   assert.deepEqual([qoder.ok, qoder.reply, qoder.model], [true, 'Hi! 👋', undefined]);
 });
 
+test('dsh hello reads the object turn_end reason: completed succeeds, error reports code: message', async () => {
+  const ok = await probe('dsh', fake(['{"type":"session","sessionId":"session-1","cwd":"/tmp/x"}', '{"type":"status","phase":"turn_end","turn":1,"reason":{"kind":"completed"}}', '{"type":"final","text":"hi"}'].join('\n')));
+  assert.deepEqual([ok.ok, ok.reply], [true, 'hi']);
+  const failed = await probe('dsh', fake(['{"type":"session","sessionId":"session-2","cwd":"/tmp/x"}', '{"type":"status","phase":"turn_end","turn":1,"reason":{"kind":"error","error":{"code":"ACCOUNT_SIGN_IN_REQUIRED","message":"signed out"}}}', '{"type":"final","text":""}'].join('\n'), 1));
+  assert.equal(failed.ok, false);
+  assert.match(failed.error ?? '', /ACCOUNT_SIGN_IN_REQUIRED: signed out/);
+});
+
 test('a vendor error is reported with its own message', async () => {
   const grok = await probe('grok', fake(JSON.stringify({ type: 'error', message: 'Internal error: {\n  "message": "API error (status 402 Payment Required): Grok Build usage balance exhausted",\n  "http_status": 402\n}' }), 1, 'Error: Internal error'));
   assert.equal(grok.ok, false);

@@ -10,7 +10,7 @@ import CONFIG_SCHEMA from "./config.schema.json";
 import DEFAULT_CONFIG from "./config.default.json";
 lintSchema(CONFIG_SCHEMA);
 export const defaultConfig = (): Config => structuredClone(DEFAULT_CONFIG) as Config;
-const SUPPORTED_POLICY_KINDS = ["claude", "codex", "opencode", "qodercli", "grok", "pi"];
+const SUPPORTED_POLICY_KINDS = ["claude", "codex", "opencode", "qodercli", "grok", "pi", "dsh"];
 export const ENGINE_KINDS: string[] = CONFIG_SCHEMA.$defs?.engine?.properties?.kind?.enum ?? [];
 
 export class PolicyError extends Error {

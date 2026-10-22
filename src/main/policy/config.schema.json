@@ -126,7 +126,7 @@
       "$ref": "#/$defs/id"
     },
     "effort": {
-      "description": "Engine-native effort. Allowed set depends on the engine kind: claude low|medium|high|xhigh|max; codex low|medium|high|xhigh|max; grok none|minimal|low|medium|high|xhigh|max; pi off|minimal|low|medium|high|xhigh|max; other kinds (e.g. opencode, whose --variant is provider/model specific) any non-empty string. Checked by the script.",
+      "description": "Engine-native effort. Allowed set depends on the engine kind: claude low|medium|high|xhigh|max; codex low|medium|high|xhigh|max; grok none|minimal|low|medium|high|xhigh|max; pi off|minimal|low|medium|high|xhigh|max; dsh off|low|high|max; other kinds (e.g. opencode, whose --variant is provider/model specific) any non-empty string. Checked by the script.",
       "type": "string",
       "minLength": 1
     },
@@ -163,6 +163,7 @@
             "hermes",
             "kilo",
             "qodercli",
+            "dsh",
             "qwen",
             "letta",
             "maki",

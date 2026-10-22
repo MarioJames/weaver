@@ -11,6 +11,10 @@ const ENGINE_PATTERNS:Record<string,RegExp> = {
  qodercli:/usage limit|quota|credits/i, pi:/usage limit|quota|credits/i,
  grok:/balance|\b402\b/i, codex:/usage limit|you.?ve hit your limit|limit reached/i,
  claude:/usage limit|you.?ve hit your limit|limit reached/i,
+ // dsh turn-outside failures print `dsh: <CODE>: <message>`; RATE_LIMIT already matches the
+ // global rate pattern, QUOTA needs its own entry. AUTH and CONTEXT_WINDOW_EXCEEDED stay
+ // unclassified vendor failures surfaced with their own message.
+ dsh:/\bQUOTA\b/,
 };
 /** Extract OpenCode's quoted error field before showing it to people. Raw evidence stays in vendorError. */
 export function vendorMessage(message:string):string {

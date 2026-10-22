@@ -6,7 +6,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import type { WorkerRecord } from '../../../shared/contracts/tasks';
-import { buildLaunchSpec } from './argv';
+import { buildDshOverlayPatch, buildLaunchSpec } from './argv';
 import { createNormalizer } from './normalize';
 import { redactSecrets } from '../../../shared/redact';
 import { clip, createRedactedLineBuffer } from './redact';
@@ -14,7 +14,7 @@ import { decodeLines, startOwnedScope, type LineOverflow, type OwnedScope } from
 import type { CliAgentInput, ManagedAgentProcess } from './types';
 import type { CliAgentEvidence, RealEngineKind } from '../../../shared/contracts/tasks';
 
-const ENGINES = new Set<RealEngineKind>(['opencode', 'pi', 'grok', 'codex', 'qodercli']);
+const ENGINES = new Set<RealEngineKind>(['opencode', 'pi', 'grok', 'codex', 'qodercli', 'dsh']);
 const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/;
 const EFFORT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
 const STDERR_CAP = 24 * 1024;
@@ -40,6 +40,8 @@ export interface PreparedCliAgent {
   promptPath: string;
   /** Only pi keeps a per-run session directory; other engines have none. */
   sessionDir?: string;
+  /** Only dsh carries a per-run --patch overlay file; other engines have none. */
+  overlayPath?: string;
   unit: string;
 }
 
@@ -85,7 +87,7 @@ function existingDirectory(field: string, value: string): string {
 
 /** Validate input and write the private prompt. Does not start a process. */
 export function prepareCliAgentInput(input: CliAgentInput): PreparedCliAgent {
-  if (!ENGINES.has(input.engine)) fail('engine', 'Engine must be opencode, pi, grok, codex, or qodercli');
+  if (!ENGINES.has(input.engine)) fail('engine', 'Engine must be opencode, pi, grok, codex, qodercli, or dsh');
   if (typeof input.model !== 'string' || !MODEL.test(input.model) || input.model.includes('..')) fail('model', 'Model must be a bounded identifier');
   if (typeof input.effort !== 'string' || !EFFORT.test(input.effort)) fail('effort', 'Effort must be a bounded identifier');
   if (typeof input.instruction !== 'string' || !input.instruction.trim() || input.instruction.length > 16000) fail('instruction', 'Instruction must be 1–16000 characters');
@@ -100,16 +102,23 @@ export function prepareCliAgentInput(input: CliAgentInput): PreparedCliAgent {
   const promptPath = path.join(stateDir, `prompt-${id}.txt`);
   const sessionDir = path.join(stateDir, `pi-session-${id}`);
   const leaderSocket = path.join(stateDir, `leader-${id}.sock`);
+  // dsh reads model, reasoning effort and the permission posture from a patch-list
+  // overlay; it is written per run next to the prompt and carries no credentials.
+  const overlayPath = path.join(stateDir, `dsh-overlay-${id}.yml`);
   if (input.engine === 'pi') mkdirSync(sessionDir, { recursive: true, mode: 0o700 });
   writeFileSync(promptPath, input.instruction, { mode: 0o600 });
   chmodSync(promptPath, 0o600);
+  if (input.engine === 'dsh') {
+    writeFileSync(overlayPath, buildDshOverlayPatch(input.model, input.effort), { mode: 0o600 });
+    chmodSync(overlayPath, 0o600);
+  }
   let spec: ReturnType<typeof buildLaunchSpec>;
   try {
-    spec = buildLaunchSpec({ engine: input.engine, model: input.model, effort: input.effort, workspace, instruction: input.instruction, promptPath, sessionDir, leaderSocket });
+    spec = buildLaunchSpec({ engine: input.engine, model: input.model, effort: input.effort, workspace, instruction: input.instruction, promptPath, sessionDir, leaderSocket, overlayPath });
   } catch (error) {
     fail('effort', error instanceof Error ? error.message : 'Invalid effort');
   }
-  return { engine: input.engine, model: input.model, effort: input.effort, workspace, stateDir, instruction: input.instruction, role: input.role, argv: spec.argv, stdin: spec.stdin, promptPath, ...(input.engine === 'pi' ? { sessionDir } : {}), unit: `weaver-cli-${input.engine}-${id}` };
+  return { engine: input.engine, model: input.model, effort: input.effort, workspace, stateDir, instruction: input.instruction, role: input.role, argv: spec.argv, stdin: spec.stdin, promptPath, ...(input.engine === 'pi' ? { sessionDir } : {}), ...(input.engine === 'dsh' ? { overlayPath } : {}), unit: `weaver-cli-${input.engine}-${id}` };
 }
 
 class CliAgent extends EventEmitter implements ManagedAgentProcess {
@@ -245,6 +254,7 @@ function permissionNote(engine: RealEngineKind): string {
     case 'opencode': return 'opencode --auto approves permissions inside the CLI; it is not OS isolation';
     case 'pi': return 'pi --approve trusts project files for this run; it is not OS isolation';
     case 'qodercli': return 'qodercli permission mode bypass_permissions is a CLI policy, not OS filesystem isolation';
+    case 'dsh': return 'dsh runs workspace-write (file effects confined to the workspace) with ask approval that fails closed in headless; this is not OS isolation';
   }
 }
 

@@ -178,7 +178,7 @@ function serverHandlers(host: RpcHost): Handlers<'capabilities' | 'serverInfo'> 
   return {
     capabilities: active => ({
       worker: active.manager.canLaunchReal
-        ? 'Saved opencode, pi, grok, codex, and qodercli routes launch that engine. mock-jsonl runs only when requested. Failures do not fall back.'
+        ? 'Saved opencode, pi, grok, codex, qodercli, and dsh routes launch that engine. mock-jsonl runs only when requested. Failures do not fall back.'
         : 'mock-jsonl is the explicit test provider. A real route fails until the engine launcher is loaded and does not fall back to mock.',
       owner: 'Attachment is metadata only. owners.switch with launch and owners.launch start a visible Herdr owner on a claude or codex profile; a Herdr executable on PATH is neither a model run nor a login proof.',
       maxParallel: configuredParallel(active.policy),

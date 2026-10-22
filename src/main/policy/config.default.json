@@ -10,7 +10,8 @@
     "grok": { "enabled": false, "kind": "grok", "quota_refresh": true },
     "opencode": { "enabled": false, "kind": "opencode", "quota_refresh": false },
     "pi": { "enabled": false, "kind": "pi", "quota_refresh": false },
-    "qoder": { "enabled": false, "kind": "qodercli", "quota_refresh": false }
+    "qoder": { "enabled": false, "kind": "qodercli", "quota_refresh": false },
+    "dsh": { "enabled": false, "kind": "dsh", "quota_refresh": false }
   },
   "owners": {
     "claude_owner": {
@@ -44,7 +45,8 @@
     "grok_worker": { "enabled": false, "engine": "grok", "model": "grok-4.7", "effort": "high", "description": "Example Grok worker (grok-4.7)." },
     "qoder_worker": { "enabled": false, "engine": "qoder", "model": "Qwen3.8-Flash", "effort": "xhigh", "description": "Free worker (Qwen3.8-Flash via qodercli).", "free_channel": true },
     "opencode_worker": { "enabled": false, "engine": "opencode", "model": "opencode/glm-5.3-flash-free", "effort": "max", "description": "Free worker (glm-5.3-flash-free via opencode). Its TUI uses the variant remembered in ~/.local/state/opencode/model.json, which must match effort.", "free_channel": true },
-    "pi_worker": { "enabled": false, "engine": "pi", "model": "glm-5.3-flash", "effort": "high", "description": "Disabled Pi template (glm-5.3-flash). Enable the engine and this worker before dispatch." }
+    "pi_worker": { "enabled": false, "engine": "pi", "model": "glm-5.3-flash", "effort": "high", "description": "Disabled Pi template (glm-5.3-flash). Enable the engine and this worker before dispatch." },
+    "dsh_worker": { "enabled": false, "engine": "dsh", "model": "deepseek-flash", "effort": "high", "description": "DeepSeek Harness worker (deepseek-flash via dsh headless). Uses the DeepSeek API key saved in dsh settings or DEEPSEEK_API_KEY." }
   },
   "herdr": { "max_wait_minutes": 15 }
 }

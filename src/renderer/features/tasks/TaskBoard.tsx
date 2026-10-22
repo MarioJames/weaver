@@ -235,7 +235,7 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, freeC
         <span className={taskStyles.cardTitle}>
           {fresh && <Tag className={taskStyles.cardTag} size="small" color={tagColor('fresh')}>新</Tag>}
           {task.parentTaskId && <Tag className={taskStyles.cardTag} size="small" color={tagColor('childRole')}>子任务</Tag>}
-          {task.dispatch?.worker && <Tag className={taskStyles.cardTag} title={task.dispatch.worker} size="small" color={tagColor('neutral')} icon={<EngineIcon kind={dispatchKind(task)} />}>{task.dispatch.worker}</Tag>}
+          {task.dispatch?.worker && <Tag className={taskStyles.cardTag} title={task.dispatch.worker} size="small" color={tagColor('neutral')} icon={<EngineIcon kind={dispatchKind(task)} />}><span className={taskStyles.cardTagText}>{task.dispatch.worker}</span></Tag>}
           {task.dispatch?.worker && freeChannel?.(task.dispatch.worker) && <FreeChannelTag className={taskStyles.cardTag} title={`子 Agent ${task.dispatch.worker} 使用免费渠道`} />}
           <strong className={taskStyles.cardTitleText}>{taskTitle(task)}</strong>
         </span>

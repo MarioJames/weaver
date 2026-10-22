@@ -1,6 +1,6 @@
 import type { ContextPack, ContinuationPolicy, HandoffRecord } from './continuation';
 
-export type RealEngineKind = 'opencode' | 'pi' | 'grok' | 'codex' | 'qodercli';
+export type RealEngineKind = 'opencode' | 'pi' | 'grok' | 'codex' | 'qodercli' | 'dsh';
 
 /** Vendor facts actually present on the event stream. Absent fields stay unknown. */
 export interface CliAgentEvidence {

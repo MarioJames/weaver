@@ -342,10 +342,21 @@ export const taskStyles = createStaticStyles(({ css, cssVar }) => ({
     -webkit-line-clamp: 2;
     line-clamp: 2;
   `,
+  /** A long sub agent tag yields with an ellipsis and leaves the title room on the same line. */
   cardTag: css`
     margin-inline-end: 4px;
     min-inline-size: 0;
-    max-inline-size: 100%;
+    max-inline-size: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    > svg { flex: none; }
+  `,
+  /** The tag's flex item: the only part that shrinks, so the icon keeps its size and the name gets the ellipsis. */
+  cardTagText: css`
+    display: block;
+    min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -416,25 +427,42 @@ export const taskStyles = createStaticStyles(({ css, cssVar }) => ({
     min-inline-size: 0;
 
     @container (min-width: 300px) {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 4px;
+      align-items: baseline;
       white-space: nowrap;
     }
   `,
+  /** The time fragments and their verbs never give up room; only the parent name shrinks. */
   cardTail: css`
+    flex: none;
     white-space: nowrap;
   `,
   /** The dot closes the first part, so a wrapped second part starts clean on its own line instead of with a stray dot. */
   cardSep: css`
     white-space: nowrap;
   `,
+  /**
+   * The one footer part that gives way: a single ellipsized line, whole name on hover, icon untouched.
+   * Under 300px it is an inline-block in running text, so its cap reserves the leading 「由」 and its space:
+   * a long name can never start a new line alone and leave the prefix orphaned on the line above.
+   */
   cardParent: css`
     display: inline-block;
-    max-inline-size: 100%;
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    max-inline-size: calc(100% - 2em);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     vertical-align: bottom;
 
     > span { display: inline; }
+
+    @container (min-width: 300px) {
+      max-inline-size: 100%;
+    }
   `,
   taskCard: css`
     container-type: inline-size;

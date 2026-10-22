@@ -30,6 +30,8 @@ interface MutableEvidence extends NormalizerEvidence {
   failureDetail?: string;
   assistantClipped: boolean;
   clipped: Partial<Record<RetainedField, { limit: number; observedAtLeast: number }>>;
+  /** dsh callId → tool name for this run, bounded to avoid unbounded growth. */
+  dshTools?: Map<string, string>;
 }
 
 function record(type: 'log' | 'progress', message: string, percent?: number): WorkerRecord {
@@ -169,6 +171,7 @@ function accept(engine: RealEngineKind, state: MutableEvidence, event: Record<st
     case 'grok': return acceptGrok(state, event, markError);
     case 'codex': return acceptCodex(state, event, markError);
     case 'qodercli': return acceptQoder(state, event, markError);
+    case 'dsh': return acceptDsh(state, event, markError);
   }
 }
 
@@ -378,4 +381,100 @@ function acceptQoder(state: MutableEvidence, event: Record<string, unknown>, mar
     out.push(record('log', message));
   }
   return out;
+}
+
+/** Cap on the per-run dsh callId → tool map; the oldest entry is evicted past it. */
+const DSH_TOOL_MAP_MAX = 50;
+
+/**
+ * dsh turn_end reason is an object shaped like {kind:'completed'}, {kind:'aborted'} or
+ * {kind:'error',error:{code,message}} (dsh-headless json-stream projects turn/end verbatim,
+ * and the CLI exits 0 only when reason.kind is 'completed'). A bare string is
+ * accepted defensively for older fixtures.
+ */
+function dshTurnReason(reason: unknown): { kind: string; detail: string } {
+  const shape = asRecord(reason);
+  const kind = textOf(shape?.kind) || textOf(reason) || 'unknown';
+  if (kind === 'error') {
+    const error = asRecord(shape?.error);
+    const code = textOf(error?.code).trim();
+    const message = textOf(error?.message).trim();
+    return { kind, detail: [code, message].filter(part => part.length > 0).join(': ') || 'unknown dsh error' };
+  }
+  return { kind, detail: kind === 'unknown' ? 'unknown dsh error' : kind };
+}
+
+function rememberDshTool(state: MutableEvidence, callId: unknown, tool: unknown): void {
+  const id = textOf(callId);
+  const name = textOf(tool);
+  if (!id || !name) return;
+  let map = state.dshTools;
+  if (!map) { map = new Map(); state.dshTools = map; }
+  if (!map.has(id) && map.size >= DSH_TOOL_MAP_MAX) {
+    const oldest = map.keys().next();
+    if (!oldest.done) map.delete(oldest.value);
+  }
+  map.set(id, name);
+}
+
+/**
+ * dsh --json headless NDJSON: session, status (turn_start/step_start/step_end/turn_end),
+ * thinking, text, tool_call, tool_result, then final (success path) or error (turn-outside
+ * failure, no final). A failed in-turn run still ends with final (often empty) plus a
+ * non-completed turn_end reason and exit 1, so the turn_end reason is the failure signal.
+ * text/thinking carry committed chunks of the same answer final delivers losslessly, so only
+ * final becomes the result body; intermediate chunks stay out of the retained records.
+ */
+function acceptDsh(state: MutableEvidence, event: Record<string, unknown>, markError: () => void): WorkerRecord[] {
+  const out: WorkerRecord[] = [];
+  if (event.type === 'session') {
+    if (typeof event.sessionId === 'string') state.vendorSessionId = identifier(state, 'vendor_session_id', event.sessionId);
+    out.push(record('progress', 'dsh session started', 20));
+  } else if (event.type === 'status') {
+    const phase = textOf(event.phase);
+    if (phase === 'turn_start') out.push(record('progress', 'dsh turn started', 30));
+    else if (phase === 'step_end') {
+      const usage = asRecord(event.usage);
+      if (usage) rememberUsage(state, usage.input_tokens ?? usage.inputTokens ?? usage.prompt_tokens, usage.output_tokens ?? usage.outputTokens ?? usage.completion_tokens);
+    } else if (phase === 'turn_end') {
+      const turned = dshTurnReason(event.reason);
+      state.stopReason = stopReason(state, turned.kind);
+      if (turned.kind === 'completed') state.vendorTerminal = true;
+      else {
+        state.failure = turned.kind;
+        markError();
+        noteFailure(state, turned.detail);
+        out.push(record('log', state.failureDetail || 'unknown dsh error'));
+      }
+    }
+  } else if (event.type === 'tool_call') {
+    rememberDshTool(state, event.callId, event.tool);
+    const note = toolNote(event.tool, 'started');
+    if (note) out.push(note);
+  } else if (event.type === 'tool_result') {
+    // A tool-level error is ordinary agent flow; only the turn_end reason fails the run.
+    // tool_result carries no tool name, so resolve it through the tool_call map and
+    // never fall back to the callId; unknown calls get the generic wording.
+    const callId = textOf(event.callId);
+    const note = toolNote(callId ? state.dshTools?.get(callId) : undefined, event.status === 'error' ? 'failed' : 'finished');
+    if (note) out.push(note);
+  } else if (event.type === 'final') {
+    const text = textOf(event.text);
+    if (text.trim()) replaceAssistant(state, text);
+  } else if (event.type === 'error') {
+    state.failure = 'error';
+    markError();
+    const message = textOf(event.message) || 'dsh error';
+    noteFailure(state, message);
+    out.push(record('log', message));
+  }
+  return out;
+}
+
+/** The lossless final answer replaces any committed chunks; intermediate text/thinking events are never retained. */
+function replaceAssistant(state: MutableEvidence, text: string): void {
+  const safe = redactSecrets(text);
+  noteClipped(state, 'assistant_text', safe.length, ARTIFACT_MAX);
+  state.assistantClipped = safe.length > ARTIFACT_MAX;
+  state.assistantText = safe.length >= ARTIFACT_MAX ? safe.slice(-ARTIFACT_MAX) : safe;
 }

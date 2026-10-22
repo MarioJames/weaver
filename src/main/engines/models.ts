@@ -80,6 +80,16 @@ export function parseQoderModels(stdout: string): EngineModel[] {
   return unique(lines.slice(lines[0]?.toUpperCase() === 'MODEL' ? 1 : 0).filter(line => !/\s/.test(line)).map(line => ({ id: line })));
 }
 
+/**
+ * dsh has no list command; the composed config selects from the provider's advisory catalog
+ * (dsh-llm-deepseek README): text+image deepseek-flash alongside text-only deepseek-v4-pro,
+ * each with a 1,000,000-token context window.
+ */
+const DSH_KNOWN: EngineModel[] = [
+  { id: 'deepseek-flash', hint: '文本+图像 · 1M 上下文' },
+  { id: 'deepseek-v4-pro', hint: '纯文本 · 1M 上下文' },
+];
+
 const LISTERS: Record<string, ListCommand> = {
   opencode: { args: ['models'], source: 'opencode models', timeoutMs: 20_000, maxBytes: 256 * 1024, parse: parseOpencodeModels },
   pi: { args: ['--list-models'], source: 'pi --list-models', timeoutMs: 20_000, maxBytes: 256 * 1024, parse: parsePiModels },
@@ -165,6 +175,9 @@ export class EngineModelLister {
     delete env.ELECTRON_RUN_AS_NODE;
     if (entry.kind === 'claude') {
       return { ...base, status: 'ok', source: 'Claude Code 无列表命令，用内置名称与 settings.json 已配置的模型', models: await claudeKnownModels(env) };
+    }
+    if (entry.kind === 'dsh') {
+      return { ...base, status: 'ok', source: 'dsh 无列表命令，用内置的 deepseek-flash 与 deepseek-v4-pro', models: DSH_KNOWN };
     }
     const lister = LISTERS[entry.kind];
     if (!lister) return { ...base, status: 'unsupported', source: '', message: NO_LIST_MESSAGE };

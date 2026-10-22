@@ -7,6 +7,7 @@ export const EFFORTS: Record<string, string[]> = {
   grok: ["none", "minimal", "low", "medium", "high", "xhigh", "max"],
   pi: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
   qodercli: ["auto", "none", "low", "medium", "high", "xhigh", "max", "ultracode"],
+  dsh: ["off", "low", "high", "max"],
 };
 /** Kinds with a native account quota probe. Other kinds have no native quota probe; this does not imply a free route. */
 export const QUOTA_KINDS = ["codex", "claude", "grok", "opencode"] as const;

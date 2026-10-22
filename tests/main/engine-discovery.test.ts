@@ -13,9 +13,12 @@ import { applyEngineEnabled, parseEngineToggle } from '../../src/main/engines/co
 
 test('pi is a fixed catalog engine and only claude and codex advertise native subagents', () => {
   const pi = ENGINE_CATALOG.find(entry => entry.id === 'pi');
-  assert.equal(ENGINE_CATALOG.length, 6);
+  assert.equal(ENGINE_CATALOG.length, 7);
   assert.equal(pi?.kind, 'pi');
   assert.equal(pi?.command, 'pi');
+  const dsh = ENGINE_CATALOG.find(entry => entry.id === 'dsh');
+  assert.equal(dsh?.kind, 'dsh');
+  assert.equal(dsh?.command, 'dsh');
 });
 
 test('gemini is not offered by the catalog or the policy schema', () => {

@@ -1,10 +1,11 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
 import type { HelloInput, HelloJob, HelloResult } from '../../shared/engines';
 import type { PiModelCheck } from './pi-model-check';
+import { buildDshOverlayPatch } from '../adapters/cli/argv';
 
 const PROMPT = 'Reply with exactly: hi';
 const SYSTEM = 'You are a connectivity check. Reply with one short line. Never use tools.';
@@ -73,6 +74,42 @@ function parseOpencode(stdout: string): Parsed {
   return reply.trim() ? { reply } : { error };
 }
 
+/** dsh headless --json: session/status/thinking/text/tool events, then final; error without final on turn-outside failure.
+ * turn_end reason is an object {kind:'completed'} | {kind:'aborted'} |
+ * {kind:'error', error:{code, message}} (dsh-headless lib/json-stream-*.js ~line 230
+ * projects turn/end verbatim; lib/index.js lines 361-362 exits 0 only when
+ * reason.kind is 'completed'). A bare string is accepted defensively. */
+function dshTurnError(reason: unknown): string | undefined {
+  if (typeof reason === 'string') return reason === 'completed' ? undefined : reason;
+  if (reason && typeof reason === 'object') {
+    const kind = (reason as Record<string, unknown>).kind;
+    if (kind === 'completed') return undefined;
+    if (kind === 'aborted') return 'aborted';
+    if (kind === 'error') {
+      const error = (reason as Record<string, unknown>).error as Record<string, unknown> | undefined;
+      const code = typeof error?.code === 'string' ? error.code : '';
+      const message = typeof error?.message === 'string' ? error.message : '';
+      return [code, message].filter(part => part.length > 0).join(': ') || 'error';
+    }
+    return typeof kind === 'string' && kind ? kind : 'error';
+  }
+  return undefined;
+}
+
+function parseDsh(stdout: string): Parsed {
+  let reply = '';
+  let error: string | undefined;
+  for (const value of jsonLines(stdout)) {
+    if (value.type === 'final' && typeof value.text === 'string') reply = value.text;
+    else if (value.type === 'error' && typeof value.message === 'string') error = value.message;
+    else if (value.type === 'status' && value.phase === 'turn_end' && 'reason' in value) {
+      const detail = dshTurnError(value.reason);
+      if (detail) error = error ?? detail;
+    }
+  }
+  return reply.trim() ? { reply } : { error };
+}
+
 /** pi json mode: the last assistant message carries text, the vendor model, or an error stop. */
 function parsePi(stdout: string): Parsed {
   let last: Json | undefined;
@@ -96,7 +133,7 @@ function parsePi(stdout: string): Parsed {
  * one prompt, no tools, no MCP, no hooks/plugins/user settings where the CLI allows it, no saved session.
  * Worker execution keeps its own adapters; this is a reachability check only.
  */
-export const HELLO_ENGINES: Record<string, { command: string; argv: (model: string, effort: string) => string[]; parse: (stdout: string) => Parsed }> = {
+export const HELLO_ENGINES: Record<string, { command: string; argv: (model: string, effort: string, overlayPath?: string) => string[]; parse: (stdout: string) => Parsed }> = {
   claude: { command: 'claude', parse: parseResultObject, argv: (model, effort) => ['-p', PROMPT, '--model', model, '--effort', effort, '--output-format', 'json', '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--disable-slash-commands', '--system-prompt', SYSTEM, '--no-session-persistence'] },
   codex: { command: 'codex', parse: parseCodex, argv: (model, effort) => ['exec', '--json', '--ephemeral', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '--sandbox', 'read-only', '--model', model, '-c', `model_reasoning_effort="${effort}"`, PROMPT] },
   grok: { command: 'grok', parse: parseResultObject, argv: (model, effort) => ['-p', PROMPT, '-m', model, '--reasoning-effort', effort, '--output-format', 'json', '--max-turns', '1', '--disable-web-search', '--no-subagents', '--system-prompt-override', SYSTEM] },
@@ -104,6 +141,11 @@ export const HELLO_ENGINES: Record<string, { command: string; argv: (model: stri
   pi: { command: 'pi', parse: parsePi, argv: (model, effort) => ['-p', '--mode', 'json', '--model', model, '--thinking', effort, '--no-tools', '--no-mcp', '--no-extensions', '--no-skills', '--no-context-files', '--no-prompt-templates', '--no-themes', '--no-session', '--system-prompt', SYSTEM, PROMPT] },
   // qodercli reports every model as the placeholder "qfmodel", so its vendor model is not shown.
   qodercli: { command: 'qodercli', parse: stdout => ({ ...parseResultObject(stdout), model: undefined }), argv: (model, effort) => ['-p', PROMPT, '-m', model, '--reasoning-effort', effort, '-o', 'json', '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--system-prompt', SYSTEM, '--no-session-persistence'] },
+  // dsh headless has no --model/--effort switches: model and reasoning effort ride the same
+  // --patch overlay the formal run uses (deepseek-official + workspace-write/ask + the
+  // local credential service), written to the private scratch directory and removed with it.
+  // --patch is a launcher flag and precedes the headless app flag --json.
+  dsh: { command: 'dsh', parse: parseDsh, argv: (model, effort, overlayPath = '') => ['--profile', 'headless', '--patch', overlayPath, '--json', PROMPT] },
 };
 
 /** Structural child process; tests inject a fake. */
@@ -165,7 +207,17 @@ export function sayHi(route: HelloInput & { kind: string }, deps: { root: string
     let child: HelloProcess;
     try {
       mkdirSync(scratch, { recursive: true, mode: 0o700 });
-      child = (deps.spawn ?? spawnPrint)(engine.command, engine.argv(route.model, route.effort), scratch);
+      // dsh uses the same per-run overlay as a formal run so hello reads the same
+      // credential chain (stored file > launch env > project .env > home .env).
+      // The overlay lives inside the private scratch directory and is removed with it.
+      const argv = route.kind === 'dsh'
+        ? (() => {
+          const overlayPath = join(scratch, 'dsh-overlay.yml');
+          writeFileSync(overlayPath, buildDshOverlayPatch(route.model, route.effort), { mode: 0o600 });
+          return engine.argv(route.model, route.effort, overlayPath);
+        })()
+        : engine.argv(route.model, route.effort);
+      child = (deps.spawn ?? spawnPrint)(engine.command, argv, scratch);
     } catch (error) {
       cleanup();
       return Promise.resolve(done({ ok: false, error: error instanceof Error ? error.message : String(error) }));
