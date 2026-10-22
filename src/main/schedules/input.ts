@@ -1,5 +1,5 @@
 import { Cron } from 'croner';
-import type { ScheduleInput, ScheduleTiming } from '../../shared/contracts/schedules';
+import type { ScheduleAgent, ScheduleExecutor, ScheduleInput, ScheduleTiming } from '../../shared/contracts/schedules';
 import { isValidTimezone } from '../../shared/policy/settings';
 import { object, text } from '../../shared/validation';
 import { fail } from '../application/commands/errors';
@@ -28,10 +28,22 @@ export function timing(value:unknown):ScheduleTiming {
 export function nextRun(t:ScheduleTiming,now:number):string|null {
  return t.mode==='interval'?new Date(now+t.seconds*1000).toISOString():new Cron(t.expression,{timezone:t.timezone,paused:true}).nextRun(new Date(now))?.toISOString()??null;
 }
-function lines(value:unknown,name:string):string[]|undefined {
+/** An omitted or blank workspace deliberately leaves the startup directory unspecified; never substitute the server cwd. */
+function workspace(value:unknown):string|undefined {
  if(value===undefined)return undefined;
- if(!Array.isArray(value)||value.length>30)fail('INVALID_REQUEST',`${name} must have at most 30 items`);
- return (value as unknown[]).map(v=>text(v,name,1000));
+ if(typeof value!=='string')return fail('INVALID_REQUEST','workspace must be a string');
+ if(value.trim()==='')return undefined;
+ return absoluteExistingWorkspace(value);
+}
+function executor(value:unknown,policy:PolicyStore):ScheduleExecutor {
+ const a=object(value);exact(a,['role','profileId']);
+ const role=a.role;
+ if(role!=='owner'&&role!=='worker')return fail('INVALID_REQUEST','executor role must be owner or worker');
+ const profileId=text(a.profileId,'executor profileId',120),snapshot=policy.snapshot();
+ const profile=role==='owner'?snapshot.config.owners[profileId]:snapshot.config.workers[profileId];
+ const availability=role==='owner'?snapshot.owners[profileId]:snapshot.workers[profileId];
+ if(!profile||availability?.status!=='available')fail('POLICY_DENIED',`Agent requires an available ${role} profile: ${profileId}`);
+ return {role,profileId};
 }
 export const INPUT_KEYS=['name','kind','enabled','timing','workspace','script','agent'] as const;
 export function input(value:unknown,policy:PolicyStore):ScheduleInput & {enabled:boolean} {
@@ -40,16 +52,14 @@ export function input(value:unknown,policy:PolicyStore):ScheduleInput & {enabled
  if(!name)fail('INVALID_REQUEST','name cannot be empty');
  if(a.enabled!==undefined&&typeof a.enabled!=='boolean')fail('INVALID_REQUEST','enabled must be boolean');
  const enabled=a.enabled??true;
- const base={name,enabled:enabled as boolean,timing:timing(a.timing),workspace:absoluteExistingWorkspace(a.workspace)};
+ const base={name,enabled:enabled as boolean,timing:timing(a.timing),workspace:workspace(a.workspace)};
  if(a.kind==='script'){
   if(a.agent!==undefined)fail('INVALID_REQUEST','script schedule cannot contain agent');
   const s=object(a.script);exact(s,['command','timeoutSeconds']);
   return {...base,kind:'script',script:{command:text(s.command,'command',16000),timeoutSeconds:integer(s.timeoutSeconds,'timeoutSeconds',1,86400)}};
  }
  if(a.kind!=='agent'||a.script!==undefined)fail('INVALID_REQUEST','kind must be script or agent with matching configuration');
- const agent=object(a.agent);exact(agent,['goal','ownerProfileId','acceptanceCriteria','constraints']);
- const ownerProfileId=text(agent.ownerProfileId,'ownerProfileId',120),snapshot=policy.snapshot(),profile=snapshot.config.owners[ownerProfileId];
- const kind=profile&&snapshot.config.engines[profile.engine]?.kind;
- if(!profile||snapshot.owners[ownerProfileId]?.status!=='available'||!['claude','codex'].includes(kind))fail('POLICY_DENIED','Agent requires an available claude/codex owner profile');
- return {...base,kind:'agent',agent:{goal:text(agent.goal,'goal',16000),ownerProfileId,acceptanceCriteria:lines(agent.acceptanceCriteria,'acceptanceCriteria'),constraints:lines(agent.constraints,'constraints')}};
+ const agent=object(a.agent);exact(agent,['goal','executor']);
+ const parsed:ScheduleAgent={goal:text(agent.goal,'goal',16000),executor:executor(agent.executor,policy)};
+ return {...base,kind:'agent',agent:parsed};
 }

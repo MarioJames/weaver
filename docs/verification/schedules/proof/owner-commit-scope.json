@@ -1,0 +1,10 @@
+{
+  "baseHead": "7170c353f69c426d89ef3d2d82ff4a5e6a4e1dd0",
+  "source": "Verified final-schedules-source snapshot: base HEAD plus27task-owned changes, all36frozen hashes match",
+  "concurrentSharedFileEditsExcluded": [
+    "tasks.cancel metadata in src/cli/catalog.ts",
+    "tasks.cancel/tasks.complete prose in docs/agent-interface.md"
+  ],
+  "method": "Scoped helper commit from verified alternate worktree and temporary index; preserve concurrent actual worktree content and unrelated staged files",
+  "noPushOrDeploy": true
+}

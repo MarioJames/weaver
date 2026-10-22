@@ -1,0 +1,57 @@
+{
+ "deleted_schedule_markers": {
+  "demo_explicit_cwd": {
+   "pid": 613917,
+   "scenario": "success",
+   "status": "success",
+   "cwd": "/tmp/sf9db6a6/demo",
+   "at": "2026-10-22T02:44:31.644Z"
+  },
+  "neutral_cwd": {
+   "pid": 626225,
+   "scenario": "success",
+   "status": "success",
+   "cwd": "/tmp/sf9db6a6/dataDir/schedule-workspaces/c1fc3b7e-1738-4c75-9d14-28b2c823a8e7",
+   "at": "2026-10-22T02:45:08.064Z"
+  }
+ },
+ "deleted_schedule_final_worker_same_runs_transcribed": {
+  "run1": {
+   "status": "succeeded",
+   "trigger": "manual",
+   "exitCode": 0,
+   "truncated": false,
+   "taskId": null,
+   "output": "SYNTH-WORKER-OK isolated verification run ok",
+   "note": "history via webpage; activeRunId cleared; tasks.list total stayed 0"
+  },
+  "stored_definition_at_create": {
+   "id": "c1fc3b7e-1738-4c75-9d14-28b2c823a8e7",
+   "workspace_key_present": false,
+   "executor": {
+    "role": "worker",
+    "profileId": "same"
+   },
+   "revision": 1
+  },
+  "workspace_lifecycle": {
+   "rev2_explicit": "/tmp/sf9db6a6/demo",
+   "rev3_cleared_absent": true,
+   "rev4_explicit": "/tmp/sf9db6a6/demo",
+   "rev5_cleared_absent": true
+  },
+  "run2_explicit_cwd": {
+   "status": "succeeded",
+   "frozen_workspace": "/tmp/sf9db6a6/demo"
+  },
+  "run3_neutral_cwd": {
+   "status": "succeeded",
+   "frozen_workspace_absent": true
+  },
+  "delete": {
+   "result": "deleted",
+   "demo_marker_survived": true,
+   "neutral_marker_survived": true
+  }
+ }
+}

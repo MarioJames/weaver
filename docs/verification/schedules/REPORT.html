@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>schedules 浏览器行为验收 — 实际执行 PASS（6/6）</title>
+<style>
+body{font-family:system-ui,-apple-system,"Segoe UI",PingFang SC,Microsoft YaHei,sans-serif;margin:0 auto;max-width:1020px;padding:24px;color:#1a1a1a;line-height:1.65}
+h1{font-size:22px}h2{font-size:17px;margin-top:30px;border-bottom:1px solid #e5e5e5;padding-bottom:6px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border:1px solid #ccc;padding:8px;text-align:left;vertical-align:top}
+th{background:#f4f4f4}
+.badge{display:inline-block;padding:2px 12px;border-radius:10px;font-size:13px;border:1px solid #999}
+.pass{background:#e6f7e6;border-color:#237804}
+code{background:#f5f5f5;padding:1px 5px;border-radius:4px;font-size:13px;word-break:break-all}
+img{max-width:100%;border:1px solid #ddd;border-radius:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
+details{margin:8px 0}
+.small{font-size:13px;color:#555}
+@media print{.no-print{display:none}details{open:attr(open)}}
+</style>
+</head>
+<body>
+<h1>schedules 浏览器行为验收 — 实际执行结论</h1>
+<p><span class="badge pass">PASS · 6/6 项已在真浏览器执行通过</span></p>
+<p>任务 <code>9db6a6d2-ab93-4f53-9f45-1b33343d81cc</code> · 日期 2026-10-22（UTC）· 被测版本：冻结 manifest <code>owner-schedules-source-frozen.json</code>（<code>frozen=true</code>，36 文件），HEAD <code>7170c35</code>。开始与结束两次全量 sha256 核对均为 <strong>0 不一致</strong>，验收期间无产品源码并发修改（manifest 外的脏文件均为验证输出与此前已存在的非产品文件，mtime 均早于本任务）。上一轮 <code>1963141a</code> 的 prep-only 未执行报告已被本轮实际行为结果取代，其轮询记录移入 <code>proof/history/</code> 标为历史。</p>
+
+<h2>实际结论</h2>
+<ul>
+<li><strong>APP_URL</strong>（任务私有）：<code>http://127.0.0.1:44573</code>（确定性故障代理）→ 真实私有 runtime <code>http://127.0.0.1:38267</code>。两者均为本任务 systemd scope（8G/10G/control-group），已停止并验证释放。</li>
+<li>私有 runtime = 真实 <code>startRuntime</code>（真实 TaskStore / PolicyStore / CommandHandler / ScheduleService / HTTP + store），外部模型 CLI 为任务合成 <code>bin/codex</code>（走真实 default <code>startCli</code> + 真实 systemd scope），ownerHost 为 fake 收据边界（从未启动真实模型，未碰生产数据）。quota 探针短路为本地 <code>get</code>，free-channel 探测关闭，IM 的 parent/channel 工厂直接抛错。</li>
+<li>浏览器：任务模式独立 Chrome + 任务专属 profile（已关闭并删除），同一 session 全程操作；未指定 executablePath，未碰 CDP 9222 / 共享 Convorel / 默认 profile。控制台 0 消息；XHR/fetch 除故障开关有意注入的 <code>getPolicy</code> 500 外全部 200。</li>
+</ul>
+
+<h2>验收项（全部在 <code>/#/schedules</code> 真网页执行）</h2>
+<table>
+<tr><th>项</th><th>状态</th><th>实际证据</th></tr>
+<tr><td>1 新建 Agent 界面：父/子全量可搜，同 ID 按 role 区分并正确编码，不可用 disabled，表单仅任务目标（无 AC/约束），cwd 无必选，桌面 + 390 无横向溢出</td><td><span class="badge pass">PASS</span></td><td>下拉列出全部 11 配置；搜索 <code>same</code> 只剩父/子两项并分别选中（值 <code>owner:same</code> / <code>worker:same</code>）；不可用项全部 <code>disabled</code>；保存键在无效执行配置下保持禁用。<code>scrollWidth==clientWidth</code>：桌面 1280 与 390（含弹窗）均为 0 溢出。截图 <code>item1-executor-desktop/item1-list-390/item1-modal-390.png</code>。</td></tr>
+<tr><td>2 网页创建 worker 调度（cwd 留空）→ 真实 API/存储定义无 workspace、executor 正确 → 手动运行 → 历史 succeeded、active 解除、任务总数 0 新增</td><td><span class="badge pass">PASS</span></td><td>创建 <code>final-worker-same</code>（worker/same），存储定义无 <code>workspace</code> 键。网页运行后历史 <strong>已成功</strong>（manual，exit 0，输出 <code>SYNTH-WORKER-OK</code>），<code>activeRunId</code> 清除，<code>tasks.list</code> 总数保持 0。合成 marker 证明真实 <code>codex exec</code> 启动、prompt 绑定本私有实例、role/model/effort 映射正确、中性 cwd 为 <code>schedule-workspaces/&lt;id&gt;</code>。截图 <code>item2-history-desktop.png</code>，proof <code>item2-item3-transcribed.json</code>。</td></tr>
+<tr><td>3 编辑填私有 demo 目录 → allowClear 清空持久化 undefined → 运行走 neutral cwd、旧冻结执行保留原 path → 删除不带走业务输出</td><td><span class="badge pass">PASS</span></td><td>目录 picker 逐级选到 <code>/tmp/sf9db6a6/demo</code> 保存（rev2 store 有值）；allowClear 保存后存储键消失（rev3/5）；显式 cwd 运行 marker 落 demo，清空后运行 marker 落中性目录；删除调度后两处 marker 均保留，随后整根回收。截图 <code>item3-picker-desktop.png</code>。</td></tr>
+<tr><td>4 available parent（codex_owner）创建 owner 记录 → run 走 root/tasks.start + ownerHost receipt；worker 无 root 映射</td><td><span class="badge pass">PASS</span></td><td>存储 <code>executor={role:owner,profileId:codex_owner}</code>。网页运行后产生 root 任务 <code>4fe64333</code>（running），<code>owner-browser-verification.json</code> 保留了从本任务工具记录恢复的真接口 fake 收据（engineKind codex，<code>fixture-*</code> 合成内容）；worker 运行从不建任务，对比成立。随后网页取消 → 历史 <strong>已取消</strong>、claim 解除。未启动真实模型是唯一合成边界，已如实记录。截图 <code>item4-list-desktop.png</code>，proof <code>final-owner-runs.json / owner-browser-verification.json</code>。</td></tr>
+<tr><td>5 policy.get 故障 inline error + retry、草稿保留、无效 executor 禁提交、恢复后重拉保存；已删保存值回显禁改 execution；启停不受阻断</td><td><span class="badge pass">PASS</span></td><td>故障期弹窗内联 <code>POLICY_FAULT: synthetic policy.get failure</code> + 重试键，必填错误保持，创建禁用；填草稿后恢复故障点重试，草稿完整保留并可选创建。私有策略删除 <code>sched_worker</code> 后编辑回显 <code>已删除或不可用</code> + 禁止提交（列表启停仍可用）；恢复策略后回显消失可继续保存。截图 <code>item5-fault/item5-deleted-echo-desktop.png</code>，故障快照摘录见 <code>owner-browser-verification.json</code>（原始代理日志未保留）。</td></tr>
+<tr><td>6 长跑合成 CLI 网页取消 → 历史 cancelled/active 清；缺 native terminal → failed 有清晰原因（API 规范化退出码为 1）</td><td><span class="badge pass">PASS</span></td><td>long 场景运行出现真实 scope <code>weaver-cli-codex-cdee79fc.scope</code>（8G/10G/control-group）含 CLI 父子进程；网页停止后历史 <strong>已取消</strong>、进程全灭、scope 消失、marker 仅 1 行（无重放）。missing-terminal 场景历史 <strong>失败</strong>：<code>Worker failed (terminal missing, code 1)</code>，输出为空，不冒充成功。截图 <code>item6-running/cancelled/failed-desktop.png</code>，proof <code>final-worker-runs.json</code>。</td></tr>
+</table>
+
+<h2>合成边界（唯一非真实部分）</h2>
+<ul>
+<li>外部模型 CLI = 任务合成 <code>bin/codex</code>（success / missing-terminal / long 三场景 + marker/cwd 探针）；ownerHost = fake 收据。两者均只替代外部智能，不替代任何内部服务/DB/命令/scope 语义。</li>
+<li>故障开关只让 <code>getPolicy</code> 返回确定性 500，其余全部直通真实 runtime；无 <code>window.weaver</code> 伪造、无 quota/freeprobe/IM、无生产 DB/credentials、无真实模型工程任务。</li>
+<li>私有服务短期 run 成功不证明长期 daemon 寿命（已有 systemd 集成单独覆盖）。owner 运行因禁止真实模型而无法自然成功；本报告如实记录其映射证明 + 取消终态，未虚构成功。</li>
+</ul>
+
+<h2>资源清单与清理验证</h2>
+<ul>
+<li>新建：scope <code>dev-sched-final-svc / dev-sched-final-proxy</code>（8G/10G/control-group，已停止，unit/cgroup/PID/port 释放，PIDs 438821/457500 已死端口 38267/44573 已空）；任务浏览器已 closeprofile 已删；运行期 scope <code>weaver-cli-codex-cdee79fc</code> 已消失。</li>
+<li>删除：<code>/tmp/sf9db6a6</code> 整根（隔离 DB/workspace/demo/输出）、临时根内 <code>dataDir/rendererRoot/demo 内容/ctl marker+child/ready.json/运行日志/占位脚本</code>；借用：无共享服务（4737/4738 未碰）无真实数据无 profile 复用。</li>
+<li>保留：<code>docs/verification/schedules/REPORT.html</code>（本报告）、<code>proof/*.json（含恢复的 owner 收据和故障快照）+ history/</code>、<code>screenshots/*.png</code>；HAR/raw console 未产生且均不含 secrets。<code>artifact_errors</code>：无。</li>
+<li>未解决风险：无阻塞性风险；长期 daemon 寿命与真实模型行为不在本包范围内。</li>
+</ul>
+
+<h2>证据链接</h2>
+<div class="grid">
+<div><img src="screenshots/item2-history-desktop.png" alt="worker 运行历史已成功"><p class="small">worker 手动运行历史：已成功，输出 SYNTH-WORKER-OK。</p></div>
+<div><img src="screenshots/item6-failed-desktop.png" alt="失败历史与清晰原因"><p class="small">缺 terminal 失败历史：失败原因清晰，无成功冒充。</p></div>
+<div><img src="screenshots/item5-fault-desktop.png" alt="故障内联错误与重试"><p class="small">policy 故障：内联错误 + 重试，草稿保留。</p></div>
+<div><img src="screenshots/item1-modal-390.png" alt="390 弹窗无溢出"><p class="small">390 弹窗：无横向溢出，目标表单精简。</p></div>
+</div>
+<details><summary>其余截图与 proof</summary>
+<p class="small"><code>screenshots/item1-executor-desktop.png</code>（执行选项全量）、<code>item1-list-390.png</code>（列表 390 无溢出）、<code>item3-picker-desktop.png</code>（目录 picker 选定 demo）、<code>item4-list-desktop.png</code>（owner 已取消）、<code>item5-deleted-echo-desktop.png</code>（已删回显）、<code>item6-running/cancelled-desktop.png</code>（长跑与取消）。<code>proof/summary.json</code>（APP_URL/hash/计数/unit/映射/清理）、<code>final-*.json</code>（真实 API 快照）、<code>item2-item3-transcribed.json</code>（已删调度的转录观测 + marker 原文）。报告可直接 <code>file://</code> 打开。</p>
+</details>
+<p class="small">审阅注：部分已删除定时记录以标注转录的实际观察留证；原始 owner/代理日志已回收，独立审阅从本任务专属工具记录恢复了最小收据与故障提示摘录，未读取思考内容或无关会话。</p>
+</body>
+</html>

@@ -27,3 +27,14 @@ Before changing the Feishu bridge (`src/main/im/*`, `src/renderer/features/bots/
 - `tests/cli/cli-web-shutdown.test.ts` — signal/shutdown rejection handling and final exit status; read before changing CLI teardown.
 
 Regression constraints: all related fields save together; polling, navigation, conflicts and uncertain failures keep an active Secret/directory draft until explicit successful save or discard. Keep structural and Secret rules compatible between accepted writes and fresh loads, while live directory/bootstrap checks stay save/start checks so old configurations remain recoverable. Actual project roots/children are independent of the Bot's host journal and must not be cancelled by Bot rotation. Test data uses per-run `mkdtemp` beneath the supplied temporary root and `test.after`/`finally` cleanup, never a task-specific absolute path. Real HTTP/host Unix sockets need a sufficiently short owned temporary path; a path-length setup failure is neither a product behavior failure nor permission to weaken the socket bound. Keep real phone/host/model observations attributed and scoped: final delivery ACK timing is not first delta or phone RTT, and old phone results do not verify a new Herdr build.
+
+## Schedules: real-lifecycle project gate（唯一入口）
+
+定时任务的真实生命周期只认这一节；本节是可复用纠偏，不复制 IM Master 门禁、不改动其他门禁。凡宣称定时任务真实执行通过，必须同时满足以下全部约束，缺一即不记 PASS：
+
+- 禁止只 mock `startCli`/`recoverScope` 就宣称真实生命周期通过。必须用私有 TaskStore/runtime ＋合成外部 model CLI＋真实默认 systemd，走完整 claim→执行→作用域精确回收链路。
+- 必须覆盖：自然完成解除 active；缺 terminal 的零退出判失败（exit 0 ≠ 成功）；cancel/重启不重放；活跃 unit 缺 invocation 身份时不误杀；late launcher；已 collect 的成功做清理；私有 state/中性 cwd 的 symlink 边界（外部 mode 不变、业务输出保留）。
+- 只清理本任务资源（`finally`/stop 内）：不能停公共服务，不能删持久数据；删除任务不等删除业务文件。
+- 真实契约核对点见既有测试：`tests/main/schedules-input.test.ts`（仅 goal＋executor、同 role 分区、同名 id 不混、workspace 省略/空串/显式语义）、`tests/main/schedules-agent-execution.test.ts`（中性目录、显式目录、零退出失败、cancel/close 语义）、`tests/main/schedules-recovery.test.ts`（精确回收 fail-closed）、`tests/main/schedules-store-migration.test.ts`（旧定义原文并入 goal）、`tests/main/schedules.test.ts`（claim/重叠/内置约束）、`tests/cli/cli-schedules.test.ts` 与 `tests/cli/cli-catalog.test.ts`（CLI 不再替补 cwd、相对路径按调用方解析、update 空串清空直达服务端）、`tests/renderer/renderer-schedules.test.ts` 与 `tests/renderer/renderer-schedules-history.test.ts`（执行者选项来自实时 policy、不可用禁用、失败重试留草稿、可选 cwd 清空持久化）。
+- 集成覆盖须走同一条真实默认 systemd 链路（claim→执行→作用域精确回收）；尚无集成用例时不记 PASS，不以 markdown 链接引用不存在的文件。不搞实现 absence guard。
+- 浏览器侧另有门禁（全部 role 选择/禁用、policy 错误重试留草稿、可选 cwd 清空持久化、实际 worker run 历史），以浏览器验收为准，不在本节重复判定细节。

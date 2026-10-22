@@ -15,7 +15,7 @@ import { ScheduleRunsDrawer } from './ScheduleRunsDrawer';
 import { useSchedules } from './useSchedules';
 import { readMutationReceipt, ScheduleMutationGate, type UnconfirmedIntent } from './schedule-mutations';
 import {
-  BUILTIN_HINT, BUILTIN_LABEL, KIND_LABELS, RUN_LABELS, RUN_TONES, timingText,
+  BUILTIN_HINT, BUILTIN_LABEL, KIND_LABELS, RUN_LABELS, RUN_TONES, executorOfDefinition, executorText, timingText,
   isBuiltinQuota, isRunning,
 } from './schedules-view';
 import type { ScheduleDefinition } from '../../../shared/contracts/schedules';
@@ -83,6 +83,7 @@ function ScheduleRow({ schedule, now, busy, onToggle, onRun, onStop, onEdit, onH
 }) {
   const builtin = isBuiltinQuota(schedule);
   const lastRun = schedule.lastRun;
+  const executor = schedule.kind === 'agent' ? executorOfDefinition(schedule) : undefined;
   return <div className={schedulesStyles.row}>
     <div className={schedulesStyles.rowHead}>
       <NamedSwitch size="small" aria-label={`启用 ${schedule.name}`} checked={schedule.enabled} disabled={busy} onChange={checked => onToggle(schedule, checked)} />
@@ -96,6 +97,7 @@ function ScheduleRow({ schedule, now, busy, onToggle, onRun, onStop, onEdit, onH
     </div>
     <div className={schedulesStyles.meta}>
       <span className={schedulesStyles.metaItem}><span>规则</span><span>{timingText(schedule.timing)}</span></span>
+      {executor && <span className={schedulesStyles.metaItem}><span>执行</span><span>{executorText(executor)}</span></span>}
       {schedule.timing.mode === 'cron' && <span className={schedulesStyles.metaItem}><span>时区</span><span>{schedule.timing.timezone}</span></span>}
       {schedule.workspace && <span className={schedulesStyles.metaItem}><span>目录</span><span className={styles.wrap}>{schedule.workspace}</span></span>}
       <span className={schedulesStyles.metaItem}><span>下次</span><TimeText value={schedule.nextRunAt} now={now} /></span>
@@ -146,7 +148,8 @@ export function SchedulesPage({ onOpenTask, onPolicyChanged }: {
     (kind === 'all' || item.kind === kind)
     && (!query || item.name.toLowerCase().includes(query)
       || (item.script?.command ?? '').toLowerCase().includes(query)
-      || (item.agent?.goal ?? '').toLowerCase().includes(query)));
+      || (item.agent?.goal ?? '').toLowerCase().includes(query)
+      || (executorOfDefinition(item)?.profileId ?? '').toLowerCase().includes(query)));
   const notice: SchedulePendingNotice | undefined = pending ? {
     context: pending.context,
     reason: pending.reason,
@@ -205,7 +208,7 @@ export function SchedulesPage({ onOpenTask, onPolicyChanged }: {
     </div>;
   };
   return <>
-    <PageHeader title="定时任务" description="按时间规则自动执行脚本命令，或让独立的父 Agent 定时处理目标；运行结果保留在各自的历史里。" action={
+    <PageHeader title="定时任务" description="按时间规则自动执行脚本命令，或让所选执行 Agent 定时处理目标；运行结果保留在各自的历史里。" action={
       <Button ref={newButtonRef} type="primary" icon={Plus} disabled={paused} onClick={() => setCreating(true)}>新建定时任务</Button>
     } />
     <div className={schedulesStyles.page}>

@@ -1,0 +1,76 @@
+{
+  "taskId": "9db6a6d2-ab93-4f53-9f45-1b33343d81cc",
+  "state": "completed",
+  "sourceHashMismatches": [],
+  "receipt": {
+    "workerTaskId": "9db6a6d2-ab93-4f53-9f45-1b33343d81cc",
+    "vendorSessionIdentified": true,
+    "recoveredReceipts": [
+      {
+        "part": "prt_16180d277001",
+        "toolRecordCreatedAt": 1792637194871,
+        "source": "Read-only exact worker session tool output from cat of its own owner-launch.log; no reasoning or unrelated session content read",
+        "record": {
+          "ts": "2026-10-22T02:46:36.793Z",
+          "taskId": "4fe64333-2316-4361-8ac8-6d241f825bb5",
+          "engineKind": "codex",
+          "epoch": 0,
+          "receipt": {
+            "session": "fixture-4fe64333",
+            "workspaceId": "fixture-workspace",
+            "paneId": "fixture-pane",
+            "agentName": "fixture-owner-4fe64333-0"
+          }
+        }
+      }
+    ]
+  },
+  "policyFaultBrowserObservations": [
+    {
+      "part": "prt_16182edf9001",
+      "at": 1792637332985,
+      "source": "Exact worker tool output from browser snapshot/eval; projected policy-fault text only",
+      "lines": [
+        "- StaticText \"执行 Agent 配置读取失败：POLICY_FAULT: synthetic policy.get failure (fixture switch)\""
+      ]
+    }
+  ],
+  "cleanup": {
+    "units": [
+      {
+        "unit": "dev-sched-final-svc.scope",
+        "gone": true,
+        "inactive": true
+      },
+      {
+        "unit": "dev-sched-final-proxy.scope",
+        "gone": true,
+        "inactive": true
+      },
+      {
+        "unit": "weaver-cli-codex-cdee79fc.scope",
+        "gone": true,
+        "inactive": true
+      }
+    ],
+    "portsClosed": {
+      "38267": true,
+      "40691": true,
+      "44573": true
+    },
+    "pidsGone": {
+      "438821": true,
+      "441019": true,
+      "457500": true,
+      "742805": true,
+      "742819": true
+    },
+    "externalPrivateRootRemoved": true,
+    "profileRemoved": true
+  },
+  "limitations": [
+    "Model CLI and ownerHost are synthetic external boundaries; real application/API/store/scope were used.",
+    "Original raw owner/proxy log files were not retained. Receipt and policy-fault UI excerpts are recovered read-only from the exact worker tool transcript, not recreated as raw logs.",
+    "The worker used a short disposable data directory outside the single common root to meet the socket limit; this placement deviation is recorded and exact cleanup verified."
+  ]
+}

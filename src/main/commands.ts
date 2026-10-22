@@ -32,7 +32,7 @@ export class CommandHandler {
  private readonly continuation:ContinuationService;
   constructor(readonly manager:TaskManager,readonly policy:PolicyStore,
    hostLauncher: typeof launchOwner = launchOwner, herdrPresent: () => boolean = () => herdrOnPath(),
-   diagnostics?: TaskDiagnostics, asyncHost:AsyncOwnerHost = {}, scheduleOptions:Pick<ScheduleOptions,'refreshQuota'|'now'> = {}){
+   diagnostics?: TaskDiagnostics, asyncHost:AsyncOwnerHost = {}, scheduleOptions:Pick<ScheduleOptions,'refreshQuota'|'now'|'dataDir'|'startCli'|'parentFactory'|'checkPiModel'> = {}){
    const ownerHost=new MockOwnerHostAdapter();
    const isDraining=()=>this.draining;
    this.continuation=new ContinuationService(manager.store,ownerHost);

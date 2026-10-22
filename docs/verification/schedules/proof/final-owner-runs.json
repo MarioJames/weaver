@@ -1,0 +1,1 @@
+{"result":{"apiVersion":"weaver.v1","ok":true,"data":{"runs":[{"id":"11ede0ec-e409-4eb9-91c8-226876b4a7ff","scheduleId":"2d59c156-0cb3-4b45-a6eb-a480691d580a","trigger":"manual","status":"cancelled","startedAt":"2026-10-22T02:46:36.488Z","finishedAt":"2026-10-22T02:46:52.788Z","taskId":"4fe64333-2316-4361-8ac8-6d241f825bb5","output":"","truncated":false}],"total":1}}}

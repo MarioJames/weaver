@@ -1,0 +1,304 @@
+{
+  "tasks": [
+    {
+      "taskId": "10584c2a-03ca-40b8-ab78-0a6e4846e7de",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-3f7f8854",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "1686afd6-9441-4bb3-8e1d-bbd59b5adc2b",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-ec77e65d",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "1963141a-3a8e-49c8-b160-9bb8472ce85e",
+      "owned": true,
+      "status": "completed",
+      "review": "rejected",
+      "scope": "weaver-cli-opencode-5874f637",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "1e88028a-7350-46bb-bc87-8f55295d04c3",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-e44a4847",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "245488ea-6127-40ff-bac5-2af70cac4d76",
+      "owned": true,
+      "status": "completed",
+      "review": "rejected",
+      "scope": "weaver-cli-opencode-14e53fe4",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "2c90c542-a89c-40cd-aabc-b8ca3c673840",
+      "owned": true,
+      "status": "cancelled",
+      "review": "pending",
+      "scope": "weaver-cli-opencode-1fd225a4",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "328710ee-09f2-4412-a228-68128400f28f",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-73326070",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "32a18be6-5f8a-4a59-b2b9-a655f3398a8e",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-931792de",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "344d2a06-fefe-4818-b85e-8e4ce0ccce02",
+      "owned": true,
+      "status": "failed",
+      "review": "pending",
+      "scope": "weaver-cli-opencode-1fdb7b17",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "537109f0-160b-4e43-be9c-4807968ce19b",
+      "owned": true,
+      "status": "completed",
+      "review": "rejected",
+      "scope": "weaver-cli-opencode-88594673",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "541bdad0-7844-4fc7-87a4-370639749126",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-16bdb483",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "5fa3bfce-77cc-42b7-8831-ebfeb8eecedc",
+      "owned": true,
+      "status": "completed",
+      "review": "rejected",
+      "scope": "weaver-cli-opencode-3d6e56c2",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "65f3dc86-043e-4b1d-9ee8-03c033780312",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-7b40df9a",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "66525c22-5664-4754-b574-9c7a7df794ce",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-39529d90",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "66c0ccf7-d1e1-4b72-be0a-a2cb1ebc20a1",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-23d0c1a6",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "6af12728-586b-4f70-8652-ebe6d678304b",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-10a70400",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "6da5e286-8f26-4f5d-9614-ac327cac7710",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-f7c7ed4e",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "715bd2cb-1849-48c1-a989-248b52534371",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-b9a5d256",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "87f63ebf-a62f-4427-b650-3690635c8477",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-77276ece",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "88ddc0b6-6922-4695-b8e3-6175d73778b0",
+      "owned": true,
+      "status": "completed",
+      "review": "rejected",
+      "scope": "weaver-cli-opencode-61f0d62e",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "9d13705b-364d-4e67-9518-22876e28ee28",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-67142f16",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "9db6a6d2-ab93-4f53-9f45-1b33343d81cc",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-bc9e5e6b",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "9faf9b07-c978-4982-8b28-3ddb637a1788",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-4929fa43",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "c45e9cac-17f9-4d0a-8b97-0656184a119d",
+      "owned": true,
+      "status": "completed",
+      "review": "rejected",
+      "scope": "weaver-cli-opencode-e01bfab9",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "c85ea449-d13b-4903-b131-8204b135cb89",
+      "owned": true,
+      "status": "completed",
+      "review": "rejected",
+      "scope": "weaver-cli-opencode-4b468d69",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "cb808429-c5b5-47e7-bc29-13ff1f8e5903",
+      "owned": true,
+      "status": "completed",
+      "review": "accepted",
+      "scope": "weaver-cli-opencode-8b385051",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "d9f94e08-2543-4e11-897f-33a1ae52a24a",
+      "owned": true,
+      "status": "completed",
+      "review": "rejected",
+      "scope": "weaver-cli-opencode-0dd07dc9",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "dcc8f1b9-839a-4a61-823d-8965cf3e57b8",
+      "owned": true,
+      "status": "completed",
+      "review": "rejected",
+      "scope": "weaver-cli-opencode-419c29ce",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "ecd0427f-9a04-4f57-95a1-7418a76c1d5c",
+      "owned": true,
+      "status": "completed",
+      "review": "rejected",
+      "scope": "weaver-cli-opencode-0c40ff31",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "edc45ab4-2149-460d-9cfa-ceb9468ec3db",
+      "owned": true,
+      "status": "completed",
+      "review": "rejected",
+      "scope": "weaver-cli-opencode-9de05fee",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "ef36109c-c519-4ef1-a83b-1a5a5e1f2b6b",
+      "owned": true,
+      "status": "cancelled",
+      "review": "pending",
+      "scope": "weaver-cli-opencode-f97e28f1",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "f82f94b2-d3de-44d0-8c6d-6975743332b7",
+      "owned": true,
+      "status": "completed",
+      "review": "rejected",
+      "scope": "weaver-cli-opencode-2bb6ec2f",
+      "inactive": true,
+      "collected": true
+    },
+    {
+      "taskId": "fdf6a4c9-d79a-428d-b84c-c39c74c13e47",
+      "owned": true,
+      "status": "completed",
+      "review": "rejected",
+      "scope": "weaver-cli-opencode-02638fb6",
+      "inactive": true,
+      "collected": true
+    }
+  ],
+  "unclosedOwned": [],
+  "sharedWeaverStopped": false,
+  "persistentTaskHistoryRetained": true
+}

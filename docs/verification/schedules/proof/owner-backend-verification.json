@@ -1,0 +1,191 @@
+{
+  "scope": "Independent owner backend, renderer helper and build verification; real browser evidence is a separate report",
+  "source": {
+    "frozen": true,
+    "at": "2026-10-22T02:28:22.735815+00:00",
+    "head": "7170c353f69c426d89ef3d2d82ff4a5e6a4e1dd0",
+    "workspace": "/home/mocha/opensource/weaver",
+    "files": {
+      "docs/agent-interface.md": "fed089ff2de1427303d4548ab250a9164ef6bffe9d4eb83741a3c9260db0cd14",
+      "src/cli/catalog.ts": "eafe965b19c818dac24f94528969b25f6b2791711d3255d538a92a525c6e8960",
+      "src/cli/input.ts": "8ecd54f3232fefed20baefb821a6c161e8b25e52a6ed1d53ebd5dab868d9fc43",
+      "src/main/adapters/cli/launch.ts": "7e92fd5be02e342bf474cd669b36bd9e8c484830a242238b675d83d79accf949",
+      "src/main/adapters/cli/scope.ts": "d408bad73dfda2eaa367d0e32329ea39a30e8d73fd47ad39dc54b7a1dd5ac705",
+      "src/main/commands.ts": "a71dc252d9c884e3bbca1b3a062258b622f70df98bb671ba86c8e68fe13c3afd",
+      "src/main/runtime.ts": "1ca06b2cceb81d6b7b37a1dd037e8d3992913cd3db68d1d84e8460340b084f57",
+      "src/main/schedules/agent.ts": "4a26422dab8a058de5235f4e714fe1618b46d4e91df09f122fd674bc0d87d87e",
+      "src/main/schedules/input.ts": "5da4a892334952ab5a01335a896e78daa11e29d879499df8a8c623fa9f3056e7",
+      "src/main/schedules/process.ts": "31d5c602e51b4ce63afe2a90418a7e72ce24eccfa61b0336230a5ead51b3bb97",
+      "src/main/schedules/service.ts": "cc44411a7e631704ea27a908bc6de072f652b27bb7a6bd31b3b70ba16b924105",
+      "src/main/schedules/store.ts": "f9e935d6fb85d4dcf93ccc8524735ce9a19d1800d8c8ea41ebaa5c25529db1ec",
+      "src/renderer/features/schedules/ScheduleFormModal.tsx": "77888b87ac4d4267bf361315bded8593b80856f926752121cb990430829aacea",
+      "src/renderer/features/schedules/SchedulesPage.tsx": "b010b296e069f566f43402ffbd355b89df88933186f8a186f34532bf41a3716e",
+      "src/renderer/features/schedules/schedules-view.ts": "8851074663b079ebd044956dbc38c1e18c266c119153ecc1e5b0750cebc1bb33",
+      "src/shared/contracts/schedules.ts": "11f9ee37e1dc39ab808540cd3add4d0e0bcb7abf10ada2c38c4fe244b769d11e",
+      "tests/README.md": "7c342af53dc246346920ed5e30a215d7c5303d0e79a42ae0b87aa70d0cda5169",
+      "tests/cli/cli-catalog.test.ts": "e4f40a146a0776851bc4b1672c5ef4049a14c9013a366271de3949dd57ab0c4b",
+      "tests/cli/cli-schedules.test.ts": "2e2c85dfa678e98d68cd8b9d6edf86fe8e046bec01e2fe0ed536dcdacf6c546a",
+      "tests/main/schedules-agent-execution.test.ts": "29cfb41600ec5addd20e2c185f725a7340cd7268a68b2c8434717919b83de776",
+      "tests/main/schedules-input.test.ts": "6a0e361f65eee7719e40eb190db742ac6b91b7b2aa3fb0d6d6c1324e6940b727",
+      "tests/main/schedules-recovery.test.ts": "14377896f7b27d7585c8887fa206ccd395627fd4b5606768d0c8e2807ae664b4",
+      "tests/main/schedules-store-migration.test.ts": "82432c1d3b2e217b9b373b917dfacae64d1c27d6af9d8de4920138d688f19fbf",
+      "tests/main/schedules.test.ts": "4d313da7858288bd1894fda07c9b2419b40993d6128522d8b437feff5a86c4f5",
+      "tests/renderer/renderer-schedules.test.ts": "a1fbbd857cd451226f9ff0f0acded8e527b16b2d949d3477beaa5e8fdb71ec89",
+      "tests/integration/schedules-agent-scope.test.ts": "68e79676c26586b80302f3cc50bc634754bd3a00319767ee015e03899c145651",
+      "src/main/adapters/cli/pi-guard.ts": "90993a1869722754230bf1fe82ab75ca676ea324b01f4bfe6a108195f6662470",
+      "package.json": "7b2cf6e49b7fdc4b271fcbc4e7b961f44f6e2f22f05ae9a22ba2c5a57b7bdb75",
+      "package-lock.json": "37c88237877acc1ec22de73c5de576445a980254d899bcff93b3efb0ed83b43d",
+      "tsconfig.json": "6f51ebb041d9fe93383f0ceb43ab01f070dda924cd110c79d2ac6f1fca681aba",
+      "vite.config.ts": "3f3d0ad204268cc31c4e9dd0682d25722519d45832d9812c18ef0e0b978bb011",
+      "src/main/im/parent-agent.ts": "ded6a4961adccd2ee9b1e95f67915c3ca47453792c5ae1f692bb86245ebd6fd7",
+      "src/main/im/parent-claude.ts": "f37f41f5fa9d08c8d34f2607b67ddbc1629944f24a4b6856dea482abae9446b5",
+      "src/main/im/parent-codex.ts": "96cb3839366e3196e2e337ce172542876955b94e37acb982ccfc33f44639bb1d",
+      "src/main/im/parent-opencode.ts": "be44bda246d7711bf3676e00cc9eb154a9d1731b472590714f862f0ec6725ebb",
+      "src/main/im/parent-host.ts": "0ce1f1d3e87fde3d5753ac8e9ee8e61c34d4c6e503fc67498f4efadbc5ee76aa"
+    },
+    "checks": {
+      "ownerFinalTests": "53 pass 0fail 0skip; actual default systemd5 included",
+      "ownerCancelRepro": "green no sends after cancel",
+      "writer": "10584c2a completed accepted; no source writers remaining"
+    },
+    "note": "Browser now permitted to build private bundle and verify frozen actual UI/API. Owner continues read-only isolated build/verification and local commits only."
+  },
+  "tests": {
+    "command": "node --import tsx --test tests/main/schedules-agent-execution.test.ts tests/main/schedules-recovery.test.ts tests/integration/schedules-agent-scope.test.ts tests/renderer/renderer-schedules.test.ts tests/renderer/renderer-schedules-history.test.ts",
+    "count": 53,
+    "passed": 53,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0,
+    "realSystemdEnabled": true
+  },
+  "realCases": [
+    {
+      "at": "2026-10-22T02:27:17.138Z",
+      "case": "default-success",
+      "unit": "weaver-cli-codex-9cb7ec3d",
+      "invocation": "de292c5abe754cf1aeb76b3ad8c1fb80",
+      "fixtureExit": 0,
+      "status": "succeeded",
+      "exitCode": 0,
+      "output": "FIXTURE-OK",
+      "markerLines": 1,
+      "gone": "ControlGroup=\nMemoryHigh=infinity\nMemoryMax=infinity\nKillMode=control-group\nLoadState=not-found\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "at": "2026-10-22T02:27:17.390Z",
+      "case": "default-missing-terminal",
+      "unit": "weaver-cli-codex-1156bb86",
+      "invocation": "c67fb418cc074eafb569385f6b8b82e0",
+      "fixtureExit": 0,
+      "status": "failed",
+      "exitCode": 1,
+      "output": "",
+      "markerLines": 1,
+      "gone": "ControlGroup=\nMemoryHigh=infinity\nMemoryMax=infinity\nKillMode=control-group\nLoadState=not-found\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "at": "2026-10-22T02:27:19.080Z",
+      "case": "cancel",
+      "unit": "weaver-cli-codex-a18150e2",
+      "invocation": "b064e8b09fd841a1b769e52841d4077e",
+      "status": "cancelled",
+      "exitCode": 1,
+      "memoryHigh": "8589934592",
+      "memoryMax": "10737418240",
+      "killMode": "control-group",
+      "processAlive": false,
+      "childAlive": false,
+      "gone": "ControlGroup=\nMemoryHigh=infinity\nMemoryMax=infinity\nKillMode=control-group\nLoadState=not-found\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "at": "2026-10-22T02:27:19.321Z",
+      "case": "restart",
+      "unit": "weaver-cli-codex-bf695097",
+      "invocation": "ac5e7d283e4244d99692694b26f9ce36",
+      "status": "interrupted",
+      "markerLines": 1,
+      "gone": "ControlGroup=\nMemoryHigh=infinity\nMemoryMax=infinity\nKillMode=control-group\nLoadState=not-found\nActiveState=inactive\nInvocationID=\n"
+    },
+    {
+      "at": "2026-10-22T02:27:19.865Z",
+      "case": "identity",
+      "unit": "weaver-cli-codex-1ab58830",
+      "invocation": "6ca2f9c0ab334f0e9fddd6b119a033cd",
+      "missingInvocation": "refused",
+      "wrongInvocation": "refused",
+      "recovered": true,
+      "gone": "ControlGroup=\nMemoryHigh=infinity\nMemoryMax=infinity\nKillMode=control-group\nLoadState=not-found\nActiveState=inactive\nInvocationID=\n"
+    }
+  ],
+  "cancelRegression": {
+    "case": "cancel during deferred Claude initialization",
+    "statusAtCancel": "running",
+    "finalStatus": "cancelled",
+    "goalSendsAfterCancel": 0,
+    "closes": 1,
+    "passed": true
+  },
+  "cleanup": {
+    "units": [
+      {
+        "case": "default-success",
+        "unit": "weaver-cli-codex-9cb7ec3d",
+        "unitGone": true,
+        "inactive": true,
+        "cgroupEmpty": true
+      },
+      {
+        "case": "default-missing-terminal",
+        "unit": "weaver-cli-codex-1156bb86",
+        "unitGone": true,
+        "inactive": true,
+        "cgroupEmpty": true
+      },
+      {
+        "case": "cancel",
+        "unit": "weaver-cli-codex-a18150e2",
+        "unitGone": true,
+        "inactive": true,
+        "cgroupEmpty": true
+      },
+      {
+        "case": "restart",
+        "unit": "weaver-cli-codex-bf695097",
+        "unitGone": true,
+        "inactive": true,
+        "cgroupEmpty": true
+      },
+      {
+        "case": "identity",
+        "unit": "weaver-cli-codex-1ab58830",
+        "unitGone": true,
+        "inactive": true,
+        "cgroupEmpty": true
+      }
+    ],
+    "privateCwdProcesses": [],
+    "testRoots": {
+      "owner-final-tests": {
+        "exists": true,
+        "entries": 0
+      },
+      "owner-final-real": {
+        "exists": true,
+        "entries": 0
+      }
+    },
+    "passed": true
+  },
+  "build": {
+    "command": "npm run build",
+    "scope": "Fresh HEAD7170c35 archive plus27task-owned source/test changes, shared dependencies linked, output isolated",
+    "exitCode": 0,
+    "includesTypecheck": true
+  },
+  "limitations": [
+    "External schedule model executable and owner host are synthetic fixtures; no real engineering model task was run.",
+    "No push/deployment or shared service restart.",
+    "Real OpenCode Bot identity/cross-engine question is independently verified in im-master/native-final."
+  ]
+}

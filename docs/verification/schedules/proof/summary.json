@@ -1,0 +1,123 @@
+{
+  "taskId": "9db6a6d2-ab93-4f53-9f45-1b33343d81cc",
+  "result": "ALL_ACCEPTANCE_ITEMS_EXECUTED_PASS",
+  "appUrl": "http://127.0.0.1:44573 (task-private fault-injecting proxy; target runtime http://127.0.0.1:38267)",
+  "source": {
+    "head": "7170c353f69c426d89ef3d2d82ff4a5e6a4e1dd0",
+    "manifest": "/tmp/weaver-bot-lifecycle-thgzzwqn/owner-schedules-source-frozen.json",
+    "frozen": true,
+    "files": 36,
+    "start_mismatch": 0,
+    "end_mismatch": 0,
+    "concurrent_product_edits_during_acceptance": false
+  },
+  "runtime": {
+    "dataDir": "/tmp/sf9db6a6/dataDir (short task-private root: local-IPC socket budget)",
+    "pid": 438821,
+    "port": 38267,
+    "scope": "dev-sched-final-svc.scope (MemoryHigh=8G MemoryMax=10G KillMode=control-group, active then stopped)",
+    "quota": "prober refresh=get (no network)",
+    "im": "parentFactory/channelFactory throw (no real model, no connect)",
+    "free_probe": "disabled via policy",
+    "quota_auto_refresh": false
+  },
+  "proxy": {
+    "port": 44573,
+    "scope": "dev-sched-final-proxy.scope (8G/10G/control-group, stopped)",
+    "fault_switch": "/tmp/.../schedules-browser-final/policy-fault-switch.json",
+    "interceptions": "Intentional getPolicy 500s only; recovered browser fault text is in owner-browser-verification.json. Original raw proxy log was not retained.",
+    "origin_handling": "RPC Origin rewritten to runtime URL; static navigations strip automation Origin"
+  },
+  "renderer": {
+    "root": "/tmp/.../schedules-browser-final/rendererRoot",
+    "build": "vite build --outDir <scratch>/rendererRoot (frozen source, no public dist write)"
+  },
+  "synthetic_boundary": {
+    "external_model_cli": "/tmp/.../schedules-browser-final/bin/codex (node, codex-exec JSON: success/missing-terminal/long; marker+cwd probe)",
+    "scenarios_used": {
+      "success": "items 2,3",
+      "long": "item 6 cancel",
+      "missing-terminal": "item 6 fail"
+    },
+    "ownerHost": "fake receipt fixture-*/fixture-workspace/fixture-pane (proves root/tasks.start path; never a model)",
+    "policy": "private seeded weaver.db only (rev1 seed, rev2 sched_worker removed for echo demo, rev3 restored)",
+    "no_mock_service_db_command_scope": true,
+    "no_real_model_tasks_or_prod_data": true
+  },
+  "model_role_mapping": {
+    "worker_runs": {
+      "engine": "codex",
+      "model": "fixture-model",
+      "effort": "high",
+      "role": "worker",
+      "profiles": [
+        "same",
+        "sched_worker"
+      ]
+    },
+    "owner_run": {
+      "engineKind": "codex",
+      "profile": "owner/codex_owner",
+      "path": "legacy-root createTask+tasks.start+ownerHost receipt"
+    }
+  },
+  "run_scopes": {
+    "long_run_unit": "weaver-cli-codex-cdee79fc.scope (8G/10G/control-group, active during run; LoadState=not-found after web cancel)",
+    "cancel_pids_dead": [
+      742805,
+      742819
+    ],
+    "marker_replay_lines": 1
+  },
+  "browser": {
+    "session": "schedules-final-9db6a6d2",
+    "profile": "task-mode isolated <scratch>/final (created, closed, removed)",
+    "chrome": "Google Chrome via agent-browser global executablePath (no --executable-path, no CDP 9222, no shared/Convorel profile)",
+    "console_messages": 0,
+    "network_4xx_5xx": "none except intentional proxy 500s on getPolicy (logged)"
+  },
+  "counts": {
+    "tasks_before": 0,
+    "tasks_after_worker_runs": 0,
+    "tasks_after_owner_run": 1,
+    "tasks_final": 1,
+    "schedules_final": [
+      "quota.refresh(builtin,disabled)",
+      "final-owner-codex",
+      "final-worker-fault"
+    ]
+  },
+  "cleanup_verified": {
+    "browser_closed": true,
+    "profile_removed": true,
+    "scopes_stopped": [
+      "dev-sched-final-svc.scope",
+      "dev-sched-final-proxy.scope"
+    ],
+    "run_scope_gone": "weaver-cli-codex-cdee79fc.scope LoadState=not-found",
+    "pids_dead": [
+      438821,
+      457500
+    ],
+    "ports_free": [
+      38267,
+      44573
+    ],
+    "shared_4737_4738": "never touched",
+    "private_roots_deleted": [
+      "/tmp/sf9db6a6",
+      "<scratch>/dataDir",
+      "<scratch>/rendererRoot",
+      "<scratch>/demo/*",
+      "<scratch>/ctl/{marker,child}",
+      "<scratch>/*.log",
+      "<scratch>/*-ready.json"
+    ]
+  },
+  "artifact_errors": [],
+  "owner_review_metadata_corrections": [
+    "Corrected one extra character in the report task UUID using the actual Weaver task receipt.",
+    "Replaced references to unretained raw logs with precisely recovered task-scoped receipt and browser snapshot evidence.",
+    "Deleted-record observations remain explicitly labelled transcribed rather than raw retained API logs."
+  ]
+}

@@ -10,8 +10,8 @@ import { WorkspacePicker } from '../tasks/WorkspacePicker';
 import { schedulesStyles } from './schedules-style';
 import { styles } from '../../ui/styles';
 import {
-  BUILTIN_HINT, BUILTIN_INTERVAL_DESC, CRON_DESC, INTERVAL_DESC, TIMEOUT_DESC, WORKSPACE_DESC,
-  builtinPatch, draftChanged, draftErrors, draftFromDefinition, emptyDraft, isRunning, scheduleInput, timingOf,
+  BUILTIN_HINT, BUILTIN_INTERVAL_DESC, CRON_DESC, EXECUTOR_DESC, EXECUTOR_ROLE_LABELS, GOAL_DESC, INTERVAL_DESC, TIMEOUT_DESC, WORKSPACE_DESC,
+  buildExecutorOptions, builtinPatch, decodeExecutorValue, draftChanged, draftErrors, draftFromDefinition, emptyDraft, encodeExecutorValue, isExecutorAvailable, isRunning, scheduleInput, timingOf,
   type ScheduleDraft,
 } from './schedules-view';
 
@@ -45,13 +45,13 @@ const TIMING_OPTIONS = [
 
 const KIND_DESCRIPTIONS: Record<ScheduleDraft['kind'], string> = {
   script: '在本机系统 shell 中执行显式命令，适合备份、清理、巡检等固定动作。命令由 Weaver 服务账号运行，可以像普通程序一样调用 weaver CLI 等本机可执行文件。',
-  agent: '创建独立的根任务并走父 Agent 链路，由它拆解派发，适合需要判断的工作。',
+  agent: '创建独立任务并由所选执行 Agent 直接处理。父 Agent 可统筹复杂任务，子 Agent 直接执行简单任务。',
 };
 
 /**
  * One modal for creating and editing. The draft is component state, so a failed submit keeps
  * everything as typed; closing with unsaved changes asks before discarding. Builtin schedules
- * own only their timing and enabled switch; user schedules always need an existing workspace.
+ * own only their timing and enabled switch; user schedules may leave the workspace blank.
  */
 export function ScheduleFormModal({ open, definition, active, busy, pendingNotice, close, onClosed, submit }: {
   open: boolean;
@@ -72,6 +72,9 @@ export function ScheduleFormModal({ open, definition, active, busy, pendingNotic
   const [submitting, setSubmitting] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [policy, setPolicy] = useState<PolicySnapshot>();
+  const [policyLoading, setPolicyLoading] = useState(false);
+  const [policyError, setPolicyError] = useState('');
+  const policyTicket = useRef(0);
   const mounted=useRef(false);
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const fieldId = useId();
@@ -81,10 +84,23 @@ export function ScheduleFormModal({ open, definition, active, busy, pendingNotic
     setDraft(definition ? draftFromDefinition(definition) : emptyDraft());
     setInitial(definition ? draftFromDefinition(definition) : emptyDraft());
     setConfirmDiscard(false);
+    // Drop the previous snapshot so a stale policy can never offer options for the record now open.
+    setPolicy(undefined);
+    setPolicyError('');
+    setPolicyLoading(true);
+    const ticket = ++policyTicket.current;
     let current = true;
-    if (!window.weaver) return () => { current = false; };
-    void window.weaver.getPolicy().then(snapshot => { if (current) setPolicy(snapshot); })
-      .catch(cause => { if (current) notifyError(cause, '父 Agent 配置读取失败'); });
+    if (!window.weaver) { setPolicyLoading(false); setPolicyError('执行 Agent 配置读取失败：当前环境不可用。'); return () => { current = false; }; }
+    void window.weaver.getPolicy().then(snapshot => {
+      if (!mounted.current || !current || ticket !== policyTicket.current) return;
+      setPolicy(snapshot); setPolicyError(''); setPolicyLoading(false);
+    })
+      .catch(cause => {
+        if (!mounted.current || !current || ticket !== policyTicket.current) return;
+        setPolicyLoading(false);
+        setPolicyError(cause instanceof Error ? cause.message : String(cause ?? '执行 Agent 配置读取失败'));
+        notifyError(cause, '执行 Agent 配置读取失败');
+      });
     return () => { current = false; };
     // The record id, not the object identity: a background refresh creates a new definition
     // object and must never wipe the draft being edited.
@@ -101,14 +117,68 @@ export function ScheduleFormModal({ open, definition, active, busy, pendingNotic
     if (builtin) return draft.enabled !== definition?.enabled || JSON.stringify(timingOf(draft)) !== JSON.stringify(definition?.timing);
     return draftChanged(draft, initial);
   })();
-  const valid = Object.keys(errors).length === 0 && changed;
-  const profileOptions = policy
-    ? Object.keys(policy.config.owners).map(id => ({
-        value: id,
-        label: `${id}${!['claude','codex'].includes(policy.config.engines[policy.config.owners[id].engine]?.kind) ? ' · 不支持定时 Agent' : policy.owners[id]?.status === 'available' ? '' : ' · 不可用'}`,
-        disabled: policy.owners[id]?.status !== 'available' || !['claude','codex'].includes(policy.config.engines[policy.config.owners[id].engine]?.kind),
-      }))
-    : [];
+  const valid = Object.keys(errors).length === 0 && changed
+    && (builtin || runningOnly || draft.kind !== 'agent' || isExecutorAvailable(policy, draft.executorRole, draft.executorProfile));
+  const executorValue = draft.executorProfile ? encodeExecutorValue(draft.executorRole, draft.executorProfile) : undefined;
+  const baseExecutorOptions = useMemo(() => buildExecutorOptions(policy), [policy]);
+  const executorInBase = !!executorValue && baseExecutorOptions.some(option => option.value === executorValue);
+  const executorAvailable = isExecutorAvailable(policy, draft.executorRole, draft.executorProfile);
+  const executorOptions = useMemo(() => {
+    // Only echo a saved-but-gone value after a successful read; while loading or failed
+    // the select keeps its loading/empty placeholder instead of a misleading deleted row.
+    if (policy && draft.executorProfile && executorValue && !executorInBase) {
+      return [...baseExecutorOptions, {
+        value: executorValue,
+        label: `${draft.executorProfile} · ${EXECUTOR_ROLE_LABELS[draft.executorRole]} · 已删除或不可用`,
+        disabled: true,
+      }];
+    }
+    return baseExecutorOptions;
+  }, [policy, baseExecutorOptions, draft.executorProfile, draft.executorRole, executorValue, executorInBase]);
+  const reloadPolicy = () => {
+    if (!open || policyLoading) return;
+    const ticket = ++policyTicket.current;
+    setPolicyLoading(true);
+    setPolicyError('');
+    if (!window.weaver) {
+      setPolicyLoading(false);
+      setPolicyError('执行 Agent 配置读取失败：当前环境不可用。');
+      return;
+    }
+    void window.weaver.getPolicy().then(snapshot => {
+      if (!mounted.current || ticket !== policyTicket.current) return;
+      setPolicy(snapshot); setPolicyError(''); setPolicyLoading(false);
+    }).catch(cause => {
+      if (!mounted.current || ticket !== policyTicket.current) return;
+      setPolicyLoading(false);
+      setPolicyError(cause instanceof Error ? cause.message : String(cause ?? '执行 Agent 配置读取失败'));
+      notifyError(cause, '执行 Agent 配置读取失败');
+    });
+  };
+  const executorPlaceholder = policyLoading || (!policy && !policyError)
+    ? '正在读取…'
+    : policyError ? '读取失败，重试后选择' : (baseExecutorOptions.length ? '选择执行 Agent' : '没有可用的执行 Agent 配置');
+  const fieldError = (key: keyof ReturnType<typeof draftErrors>) => errors[key]
+    ? <p role="alert" className={styles.error}>{errors[key]}</p> : undefined;
+  const executorInline = (() => {
+    if (builtin || runningOnly || draft.kind !== 'agent') return undefined;
+    if (policyLoading || (!policy && !policyError)) return { tone: 'status' as const, text: '正在读取执行 Agent 配置，已选内容和草稿会保留。' };
+    if (policyError) return { tone: 'error' as const, text: `执行 Agent 配置读取失败：${policyError}` };
+    if (policy && baseExecutorOptions.length === 0) return { tone: 'status' as const, text: '还没有可用的执行 Agent 配置，先去设置里启用后再重试读取。' };
+    if (!draft.executorProfile) return undefined;
+    if (!executorInBase) return { tone: 'error' as const, text: '已保存的执行配置已被删除，换成可用配置后才能提交执行内容。' };
+    if (!executorAvailable) return { tone: 'error' as const, text: '所选执行配置当前不可用，换成可用配置后才能提交执行内容。' };
+    return undefined;
+  })();
+  const executorExtra = (<>
+    {fieldError('executor')}
+    {executorInline && (executorInline.tone === 'error'
+      ? <p role="alert" className={styles.error}>{executorInline.text}</p>
+      : <p role="status" className={styles.meta}>{executorInline.text}</p>)}
+    {(policyError || (policy && baseExecutorOptions.length === 0 && !builtin && !runningOnly && draft.kind === 'agent')) && (
+      <div><Button size="small" disabled={policyLoading} loading={policyLoading} onClick={reloadPolicy}>重试读取</Button></div>
+    )}
+  </>);
   const update = (patch: Partial<ScheduleDraft>) => setDraft(current => ({ ...current, ...patch }));
   const request = (): ScheduleSubmitRequest => {
     if (!definition) return { input: scheduleInput(draft) };
@@ -133,8 +203,6 @@ export function ScheduleFormModal({ open, definition, active, busy, pendingNotic
     if (draftChanged(draft, initial) && !submitting) { setConfirmDiscard(true); return; }
     if (!submitting) close();
   };
-  const fieldError = (key: keyof ReturnType<typeof draftErrors>) => errors[key]
-    ? <p role="alert" className={styles.error}>{errors[key]}</p> : undefined;
   const minutesOf = (): number | undefined => draft.intervalSeconds === undefined ? undefined : draft.intervalSeconds / 60;
   return <>
     <Modal open={open} title={definition ? (builtin ? '编辑内置定时任务' : '编辑定时任务') : '新建定时任务'} width={640} destroyOnHidden={false} maskClosable={!blocked} keyboard={!blocked} afterClose={onClosed} onCancel={requestClose} footer={null}>
@@ -179,8 +247,8 @@ export function ScheduleFormModal({ open, definition, active, busy, pendingNotic
                   <NamedSelect id={`${fieldId}-timezone`} aria-label="时区" showSearch disabled={lockedField('timezone') || blocked} value={draft.timezone || undefined} placeholder="选择时区" options={zones.map(zone => ({ value: zone, label: zone }))} onChange={value => { if (typeof value === 'string') update({ timezone: value }); }} />
                 </Form.Field>
               </div>}
-          {!builtin && <Form.Field label="工作目录" required desc={WORKSPACE_DESC} extra={fieldError('workspace')}>
-            <WorkspacePicker value={draft.workspace} disabled={lockedField('workspace') || blocked} onChange={workspace => update({ workspace })} />
+          {!builtin && <Form.Field label="工作目录" desc={WORKSPACE_DESC} extra={fieldError('workspace')}>
+            <WorkspacePicker value={draft.workspace} disabled={lockedField('workspace') || blocked} allowClear onChange={workspace => update({ workspace })} />
           </Form.Field>}
           {draft.kind === 'script' && !builtin && <>
             <Form.Field label="执行脚本" required desc={KIND_DESCRIPTIONS.script} extra={fieldError('command')}>
@@ -191,17 +259,15 @@ export function ScheduleFormModal({ open, definition, active, busy, pendingNotic
             </Form.Field>
           </>}
           {draft.kind === 'agent' && !builtin && <>
-            <Form.Field label="目标" required extra={fieldError('goal')}>
-              <TextArea id={`${fieldId}-goal`} aria-label="目标" disabled={lockedField('goal') || blocked} rows={3} maxLength={16000} value={draft.goal} placeholder="例如：核对文档与代码的差异并输出报告" onChange={event => update({ goal: event.target.value })} />
+            <Form.Field label="任务目标" required desc={GOAL_DESC} extra={fieldError('goal')}>
+              <TextArea id={`${fieldId}-goal`} aria-label="任务目标" disabled={lockedField('goal') || blocked} rows={3} maxLength={16000} value={draft.goal} placeholder="例如：核对 docs/ 与代码的差异并输出报告，项目在 /srv/site，允许只读检查" onChange={event => update({ goal: event.target.value })} />
             </Form.Field>
-            <Form.Field label="父 Agent 配置" required desc="使用已保存的策略配置；不可用的配置不能选择。" extra={fieldError('profile')}>
-              <NamedSelect id={`${fieldId}-profile`} aria-label="父 Agent 配置" disabled={lockedField('profile') || blocked} value={draft.profile || undefined} placeholder={policy ? '选择父 Agent 配置' : '正在读取…'} options={profileOptions} onChange={value => { if (typeof value === 'string') update({ profile: value }); }} />
-            </Form.Field>
-            <Form.Field label="验收标准" desc="可留空：父 Agent 会根据目标生成。每行一条，最多 30 条。" extra={fieldError('criteria')}>
-              <TextArea id={`${fieldId}-criteria`} aria-label="验收标准" disabled={lockedField('criteria') || blocked} rows={3} maxLength={30000} value={draft.criteria} placeholder="例如：报告包含新增与删除两类条目&#10;不修改任何文件" onChange={event => update({ criteria: event.target.value })} />
-            </Form.Field>
-            <Form.Field label="约束" desc="每行一条，最多 30 条，用于限制 Agent 的操作范围。" extra={fieldError('constraints')}>
-              <TextArea id={`${fieldId}-constraints`} aria-label="约束" disabled={lockedField('constraints') || blocked} rows={2} maxLength={30000} value={draft.constraints} placeholder="例如：只在 docs/ 目录内操作" onChange={event => update({ constraints: event.target.value })} />
+            <Form.Field label="执行 Agent" required desc={EXECUTOR_DESC} extra={executorExtra}>
+              <NamedSelect id={`${fieldId}-executor`} aria-label="执行 Agent" showSearch disabled={lockedField('executorRole') || lockedField('executorProfile') || blocked} value={executorValue} placeholder={executorPlaceholder} options={executorOptions} onChange={value => {
+                if (typeof value !== 'string') return;
+                const decoded = decodeExecutorValue(value);
+                if (decoded) update({ executorRole: decoded.role, executorProfile: decoded.profileId });
+              }} />
             </Form.Field>
           </>}
           <Form.Field label="启用" desc={builtin

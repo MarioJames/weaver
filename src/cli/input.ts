@@ -88,14 +88,23 @@ export function makeRequest(options: CLIOptions, input: unknown = {}, ownerAuth?
   applyOwnerAuth(envelope, ownerAuth);
   return envelope;
 }
-/** Fill tasks/schedules create workspace from the CLI caller cwd before the request is submitted. */
+/** Caller cwd convenience: tasks.create roots default to it (children inherit); schedules.create stays optional. */
 export function applyCallerWorkspace(request: Record<string, unknown>, cwd: string): void {
-  if (request.command !== 'tasks.create' && request.command !== 'schedules.create') return;
   const args = request.args;
   if (!args || typeof args !== 'object' || Array.isArray(args)) return;
   const record = args as Record<string, unknown>;
+  if (request.command === 'schedules.create') {
+    // An omitted schedule workspace stays omitted so creation is not bound to the caller repo;
+    // an explicit blank string passes through for the server to normalize to unspecified.
+    // Only a non-blank relative path uses the CLI convenience resolution; absolute paths,
+    // null and non-string values pass through untouched so the server reports the real error.
+    const workspace = record.workspace;
+    if (typeof workspace === 'string' && workspace.trim() !== '' && !isAbsolute(workspace)) record.workspace = resolve(cwd, workspace);
+    return;
+  }
+  if (request.command !== 'tasks.create') return;
   const workspace = record.workspace;
-  if (workspace === undefined) { if (request.command === 'schedules.create' || record.parentTaskId === undefined) record.workspace = cwd; }
+  if (workspace === undefined) { if (record.parentTaskId === undefined) record.workspace = cwd; }
   else if (typeof workspace !== 'string' || workspace.trim() === '') throw new LocalIPCError('INVALID_ARGUMENT', 'Explicit workspace must be a nonempty path string');
   else if (!isAbsolute(workspace)) record.workspace = resolve(cwd, workspace);
 }

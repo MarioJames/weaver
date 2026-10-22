@@ -4,6 +4,7 @@ import { mkdtempSync,rmSync,existsSync,readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join,resolve } from 'node:path';
 import { spawn,execFile } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import type { ChildProcess } from 'node:child_process';
 import { TaskStore } from '../../src/main/store';
 import { PolicyStore } from '../../src/main/policy/store';
@@ -156,5 +157,80 @@ test('recovery verifies the scope InvocationID before stopping and still cleans 
   const state=service?.storage.read();
   for(const def of state?.definitions??[])for(const r of state!.runs[def.id]??[])if(r.process)try{await recoverOwnedScope(r.process.unit,r.process.invocation);}catch{/* keep the workspace clean even if the run never settled */}
   await service?.stop();store?.close();rmSync(dir,{recursive:true,force:true});
+ }
+});
+
+
+const cliUnit=()=>`weaver-cli-codex-${randomBytes(4).toString('hex')}`;
+// Single-quote helper for shell fixtures: user-controlled paths are only ever path literals.
+const shQuote=(value:string)=>`'${value.replaceAll("'","'\\''")}'`;
+const activeState=async(unit:string)=>execShowProperty(unit,'ActiveState');
+const invocationOf=async(unit:string)=>{
+ for(let i=0;i<200;i++){await pause();try{const value=await execShowProperty(unit,'InvocationID');if(value&&value!=='n/a')return value;}catch{/* scope briefly missing between registration frames */}}
+ throw new Error('no InvocationID observed');
+};
+const waitGone=async(unit:string)=>{for(let i=0;i<200;i++){await pause();const load=await execShowProperty(unit,'LoadState');const active=await activeState(unit);if(load==='not-found'||!active||active==='inactive'||active==='failed')return;}throw new Error(`scope still active: ${unit}`);};
+const exactScopeCleanup=async(unit:string)=>{
+ await new Promise<void>(resolve=>{execFile('systemctl',['--user','stop',`${unit}.scope`],()=>resolve());});
+};
+
+test('only exact real CLI unit names are accepted for recovery',async()=>{
+ for(const unit of ['weaver-cli-unknown-abcdef12','weaver-cli-codex-ABCDEF12','weaver-cli-codex-abcdef1','weaver-cli-codex-abcdef123','weaver-cli-codex-e7d6975g']){
+  await assert.rejects(()=>recoverOwnedScope(unit),/Cannot verify persisted schedule process identity/);
+ }
+});
+
+test('collected CLI scope is already clean, but a live replacement needs its exact invocation',async()=>{
+ const dir=mkdtempSync(join(ROOT,'wv-cli-scope-')),pidFile=join(dir,'pid');
+ const unit=cliUnit();let launcher:ChildProcess|undefined;
+ try{
+  launcher=spawn('systemd-run',['--user','--scope','--collect','--quiet',`--unit=${unit}`,'--working-directory='+dir,'-p','MemoryHigh=8G','-p','MemoryMax=10G','-p','KillMode=control-group','--','/bin/sh','-c',`printf $$ > '${pidFile}'; sleep 30`],{cwd:dir,env:process.env,stdio:['ignore','ignore','ignore'],detached:true});
+  await waitFor(()=>existsSync(pidFile));
+  const pid=Number(readFileSync(pidFile,'utf8')), invocation=await invocationOf(unit);
+  // No persisted invocation and a wrong one are both unverifiable: refuse and leave the process alive.
+  await assert.rejects(()=>recoverOwnedScope(unit),/identity is missing/);
+  process.kill(pid,0);
+  await assert.rejects(()=>recoverOwnedScope(unit,'00000000000000000000000000000000'),/identity changed/);
+  process.kill(pid,0);
+  await recoverOwnedScope(unit,invocation);
+  await waitFor(()=>{try{process.kill(pid,0);return false;}catch{return true;}});
+  await waitGone(unit);
+  // A collected unit under a fresh name is already clean and must return success.
+  const collectedUnit=cliUnit();
+  await new Promise<void>((resolve,reject)=>{
+   const child=spawn('systemd-run',['--user','--scope','--collect','--quiet',`--unit=${collectedUnit}`,'--working-directory='+dir,'--','/bin/true'],{cwd:dir,env:process.env,stdio:['ignore','ignore','ignore'],detached:true});
+   child.once('error',reject);child.once('exit',()=>resolve());
+  });
+  await waitGone(collectedUnit);
+  await recoverOwnedScope(collectedUnit,invocation);
+  await recoverOwnedScope(collectedUnit);
+ }finally{
+  launcher?.kill('SIGKILL');
+  await exactScopeCleanup(unit);
+  rmSync(dir,{recursive:true,force:true});
+ }
+});
+
+test('recovery kills only an exact late systemd-run launcher, never a similar unit',async()=>{
+ const dir=mkdtempSync(join(ROOT,'wv-late-')),marker=join(dir,'launched'),decoyMarker=join(dir,'decoy-launched');
+ const unit=cliUnit(), other=cliUnit();
+ const script=(name:string,mark:string)=>`sleep 1; touch ${shQuote(mark)}; exec /usr/bin/systemd-run --user --scope --quiet --collect --unit='${name}' -- /bin/sleep 30`;
+ const late=spawn('/bin/bash',['-c',`exec -a systemd-run /bin/sh -c ${shQuote(script(unit,marker))} --unit='${unit}'`],{env:process.env,stdio:['ignore','ignore','ignore'],detached:true});
+ const decoy=spawn('/bin/bash',['-c',`exec -a systemd-run /bin/sh -c ${shQuote(script(other,decoyMarker))} --unit='${other}'`],{env:process.env,stdio:['ignore','ignore','ignore'],detached:true});
+ try{
+  await waitFor(()=>!!late.pid&&!!decoy.pid);
+  await recoverOwnedScope(unit);
+  await waitFor(()=>{try{process.kill(late.pid!,0);return false;}catch{return true;}});
+  // The decoy launcher is a different exact unit and must survive.
+  process.kill(decoy.pid!,0);
+  await new Promise(r=>setTimeout(r,1500));
+  assert.equal(existsSync(marker),false,'the killed launcher must not start any real scope');
+  assert.equal(existsSync(decoyMarker),true,'the different unit launcher was not killed');
+  process.kill(decoy.pid!,0);
+  assert.ok(!['active','activating','deactivating'].includes(await activeState(unit)));
+ }finally{
+  late.kill('SIGKILL');decoy.kill('SIGKILL');
+  await exactScopeCleanup(unit);await exactScopeCleanup(other);
+  rmSync(dir,{recursive:true,force:true});
  }
 });

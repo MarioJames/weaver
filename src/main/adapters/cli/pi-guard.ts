@@ -6,7 +6,7 @@ import type { CliAgentInput } from './types';
 import type { ManagedProcess } from '../worker';
 
 /** Events a launched agent emits that the task manager listens to; they are passed through unchanged. */
-const FORWARDED = ['first-output', 'stderr-tail', 'vendor-error', 'engine-model', 'error'] as const;
+const FORWARDED = ['first-output', 'stderr-tail', 'vendor-error', 'engine-model', 'identity', 'error'] as const;
 const DRAIN_MS = 2_000;
 
 const ended = (stream: Readable): Promise<void> => new Promise(resolve => {

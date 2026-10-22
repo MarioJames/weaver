@@ -1,8 +1,9 @@
-import type { ScheduleDefinition, ScheduleInput, ScheduleRun, ScheduleTiming } from '../../../shared/contracts/schedules';
+import type { ScheduleDefinition, ScheduleExecutor, ScheduleInput, ScheduleRun, ScheduleTiming } from '../../../shared/contracts/schedules';
+import type { PolicySnapshot } from '../../../shared/contracts/policy';
 import { QUOTA_INTERVAL_RANGE } from '../../../shared/policy/settings';
 import { isValidTimeZone, projectTimeZone } from '../../format/timezone';
 import type { StatusTone } from '../../format/status-colors';
-import { criteriaLines, workspacePathError } from '../tasks/TaskComposer';
+import { workspacePathError } from '../tasks/TaskComposer';
 
 /** The one place a schedule fact becomes UI text: kinds, triggers, run states and timing rules. */
 export const KIND_LABELS: Record<ScheduleDefinition['kind'], string> = { script: '脚本', agent: 'Agent' };
@@ -48,9 +49,11 @@ export const BUILTIN_INTERVAL_MIN_SECONDS = QUOTA_INTERVAL_RANGE.min * 60;
 export const BUILTIN_INTERVAL_MAX_SECONDS = QUOTA_INTERVAL_RANGE.max * 60;
 export const INTERVAL_DESC = `两次触发之间间隔的秒数，${INTERVAL_MIN}–${INTERVAL_MAX} 之间的整数。`;
 export const TIMEOUT_DESC = `单次执行的最长秒数，${TIMEOUT_MIN}–${TIMEOUT_MAX} 之间的整数；超时后本次运行的进程会被终止。`;
-export const WORKSPACE_DESC = '执行时所在的项目目录。请选择 Weaver 所在机器上已存在的绝对路径目录。';
+export const WORKSPACE_DESC = '可留空；填写时必须是 Weaver 所在机器上已存在的绝对路径目录。项目位置也可以直接写进任务目标。';
 export const BUILTIN_INTERVAL_DESC = `两次刷新之间的分钟数，也是「设置」页「额度」的间隔：${QUOTA_INTERVAL_RANGE.min}–${QUOTA_INTERVAL_RANGE.max} 分钟的整数（${BUILTIN_INTERVAL_MIN_SECONDS}–${BUILTIN_INTERVAL_MAX_SECONDS} 秒，整分钟）。内置任务不接受 cron 表达式。`;
 export const CRON_DESC = '5 或 6 个用空格分隔的字段（分 时 日 月 周，可加秒）。支持 L、W、# 等日期规则，保存时会验证表达式。';
+export const GOAL_DESC = '任务目标与其他要求都写在这里，包括项目位置与操作步骤。';
+export const EXECUTOR_DESC = '父 Agent 可统筹复杂任务，子 Agent 直接执行简单任务。全部配置都会列出，不可用的置灰不能提交；已删除的保存值会保留显示，换成可用配置后才能提交。';
 
 /** Client-side cron sanity only: the scheduler stays authoritative. 5/6 fields; the character set is up to the server parser. */
 export function cronExpressionError(expression: string): string {
@@ -58,6 +61,75 @@ export function cronExpressionError(expression: string): string {
   if (!fields.length) return '填写 cron 表达式。';
   if (fields.length !== 5 && fields.length !== 6) return '需要 5 或 6 个用空格分隔的字段，例如 */15 * * * *。';
   return '';
+}
+
+/** Which side of the policy executes an agent schedule: a parent owner or a worker child. */
+export type ScheduleExecutorRole = ScheduleExecutor['role'];
+
+export const EXECUTOR_ROLE_LABELS: Record<ScheduleExecutorRole, string> = { owner: '父 Agent', worker: '子 Agent' };
+
+/** Select value encoding that survives same-name owner/worker profiles: the role prefix disambiguates, the rest is the full id. */
+export function encodeExecutorValue(role: ScheduleExecutorRole, profileId: string): string {
+  return `${role}:${profileId}`;
+}
+
+export function decodeExecutorValue(value: string): ScheduleExecutor | undefined {
+  if (value.startsWith('owner:')) return { role: 'owner', profileId: value.slice('owner:'.length) };
+  if (value.startsWith('worker:')) return { role: 'worker', profileId: value.slice('worker:'.length) };
+  return undefined;
+}
+
+export interface ExecutorOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+}
+
+function engineModelText(engine?: string, model?: string): string {
+  if (engine && model) return `${engine}/${model}`;
+  return engine ?? model ?? '';
+}
+
+/** Every configured parent and child profile becomes one searchable option; availability comes from the live policy snapshot. */
+export function buildExecutorOptions(policy?: PolicySnapshot): ExecutorOption[] {
+  if (!policy) return [];
+  const options: ExecutorOption[] = [];
+  for (const id of Object.keys(policy.config.owners)) {
+    const available = policy.owners[id]?.status === 'available';
+    const detail = engineModelText(policy.config.owners[id]?.engine, policy.config.owners[id]?.model);
+    options.push({
+      value: encodeExecutorValue('owner', id),
+      label: `${id} · 父 Agent${detail ? ` · ${detail}` : ''}${available ? '' : ' · 不可用'}`,
+      disabled: !available,
+    });
+  }
+  for (const id of Object.keys(policy.config.workers)) {
+    const available = policy.workers[id]?.status === 'available';
+    const detail = engineModelText(policy.config.workers[id]?.engine, policy.config.workers[id]?.model);
+    options.push({
+      value: encodeExecutorValue('worker', id),
+      label: `${id} · 子 Agent${detail ? ` · ${detail}` : ''}${available ? '' : ' · 不可用'}`,
+      disabled: !available,
+    });
+  }
+  return options;
+}
+
+/** The executor is backend-validated; the frontend only reads the typed shape. */
+export function executorOfDefinition(definition: ScheduleDefinition): ScheduleExecutor | undefined {
+  return definition.agent?.executor;
+}
+
+export function executorText(executor?: ScheduleExecutor): string {
+  if (!executor) return '';
+  return `${EXECUTOR_ROLE_LABELS[executor.role]} · ${executor.profileId}`;
+}
+
+/** Submit gate reads the live snapshot: only an `available` entry may execute. */
+export function isExecutorAvailable(policy: PolicySnapshot | undefined, role: ScheduleExecutorRole, profileId: string): boolean {
+  if (!policy || !profileId) return false;
+  const availability = role === 'owner' ? policy.owners[profileId] : policy.workers[profileId];
+  return availability?.status === 'available';
 }
 
 /** What the form edits. Interval and timeout start with editable defaults and example placeholders. */
@@ -73,21 +145,21 @@ export interface ScheduleDraft {
   command: string;
   timeoutSeconds?: number;
   goal: string;
-  profile: string;
-  criteria: string;
-  constraints: string;
+  executorRole: ScheduleExecutorRole;
+  executorProfile: string;
 }
 
 export function emptyDraft(): ScheduleDraft {
   return {
     name: '', kind: 'script', enabled: true, timingMode: 'interval', intervalSeconds: 900,
     cron: '', timezone: projectTimeZone(), workspace: '', command: '', timeoutSeconds: 3600,
-    goal: '', profile: '', criteria: '', constraints: '',
+    goal: '', executorRole: 'owner', executorProfile: '',
   };
 }
 
 export function draftFromDefinition(definition: ScheduleDefinition): ScheduleDraft {
   const timing = definition.timing;
+  const executor = executorOfDefinition(definition);
   return {
     name: definition.name,
     kind: definition.kind,
@@ -100,9 +172,8 @@ export function draftFromDefinition(definition: ScheduleDefinition): ScheduleDra
     command: definition.script?.command ?? '',
     timeoutSeconds: definition.script?.timeoutSeconds,
     goal: definition.agent?.goal ?? '',
-    profile: definition.agent?.ownerProfileId ?? '',
-    criteria: (definition.agent?.acceptanceCriteria ?? []).join('\n'),
-    constraints: (definition.agent?.constraints ?? []).join('\n'),
+    executorRole: executor?.role ?? 'owner',
+    executorProfile: executor?.profileId ?? '',
   };
 }
 
@@ -117,12 +188,8 @@ export function timingOf(draft: ScheduleDraft): ScheduleTiming {
     : { mode: 'cron', expression: draft.cron.trim(), timezone: draft.timezone };
 }
 
-const optionalLines = (text: string): string[] | undefined => {
-  const values = criteriaLines(text);
-  return values.length ? values : undefined;
-};
-
-/** The create payload, and the update patch when editing: enabled rides in the same payload so one request applies it. */
+/** The create payload, and the update patch when editing: enabled rides in the same payload so one request applies it.
+ *  Workspace always travels as an explicit string: blank means cleared, so an edit that empties it really unsets the directory. */
 export function scheduleInput(draft: ScheduleDraft): ScheduleInput {
   return {
     name: draft.name.trim(),
@@ -135,9 +202,7 @@ export function scheduleInput(draft: ScheduleDraft): ScheduleInput {
       : {
           agent: {
             goal: draft.goal.trim(),
-            ownerProfileId: draft.profile,
-            ...{ ...(optionalLines(draft.criteria) ? { acceptanceCriteria: optionalLines(draft.criteria) } : {}) },
-            ...{ ...(optionalLines(draft.constraints) ? { constraints: optionalLines(draft.constraints) } : {}) },
+            executor: { role: draft.executorRole, profileId: draft.executorProfile },
           },
         }),
   };
@@ -150,20 +215,13 @@ export function builtinPatch(draft: ScheduleDraft, definition: ScheduleDefinitio
   return patch;
 }
 
-export type ScheduleDraftErrors = Partial<Record<'name' | 'interval' | 'cron' | 'timezone' | 'workspace' | 'command' | 'timeout' | 'goal' | 'profile' | 'criteria' | 'constraints', string>>;
+export type ScheduleDraftErrors = Partial<Record<'name' | 'interval' | 'cron' | 'timezone' | 'workspace' | 'command' | 'timeout' | 'goal' | 'executor', string>>;
 
 const NAME_MAX = 160;
-
-/** The shared contract keeps both lists at most 30 lines with up to 1000 characters each. */
-export function scheduleLinesError(text: string, field: '验收标准' | '约束'): string {
-  const lines = criteriaLines(text);
-  if (lines.length > 30) return `${field}最多 30 条，每行一条。`;
-  if (lines.some(line => line.length > 1000)) return `每条${field}不超过 1000 个字符。`;
-  return '';
-}
+const GOAL_MAX = 16000;
 
 /** Field errors shown inline; the save button stays disabled while any of them is set.
- * Builtin records own only their timing/enabled, so every other field check is skipped for them. */
+ *  Builtin records own only their timing/enabled, so every other field check is skipped for them. */
 export function draftErrors(draft: ScheduleDraft, builtin = false): ScheduleDraftErrors {
   const errors: ScheduleDraftErrors = {};
   if (!draft.name.trim()) errors.name = '填写任务名称。';
@@ -184,18 +242,15 @@ export function draftErrors(draft: ScheduleDraft, builtin = false): ScheduleDraf
     if (!isValidTimeZone(draft.timezone)) errors.timezone = '选择有效的 IANA 时区。';
   }
   if (!builtin) {
-    const workspaceProblem = workspacePathError(draft.workspace, true);
+    const workspaceProblem = workspacePathError(draft.workspace, false);
     if (workspaceProblem) errors.workspace = workspaceProblem;
     if (draft.kind === 'script') {
       if (!draft.command.trim()) errors.command = '填写要执行的命令。';
       if (draft.timeoutSeconds === undefined || !Number.isInteger(draft.timeoutSeconds) || draft.timeoutSeconds < TIMEOUT_MIN || draft.timeoutSeconds > TIMEOUT_MAX) errors.timeout = TIMEOUT_DESC;
     } else {
-      if (!draft.goal.trim()) errors.goal = '填写 Agent 的目标。';
-      if (!draft.profile) errors.profile = '选择父 Agent 配置。';
-      const criteriaProblem = scheduleLinesError(draft.criteria, '验收标准');
-      if (criteriaProblem) errors.criteria = criteriaProblem;
-      const constraintsProblem = scheduleLinesError(draft.constraints, '约束');
-      if (constraintsProblem) errors.constraints = constraintsProblem;
+      if (!draft.goal.trim()) errors.goal = '填写任务目标。';
+      else if (draft.goal.trim().length > GOAL_MAX) errors.goal = `任务目标最多 ${GOAL_MAX} 个字符。`;
+      if (!draft.executorProfile) errors.executor = '选择执行 Agent。';
     }
   }
   return errors;

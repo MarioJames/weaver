@@ -5,6 +5,7 @@ import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import type { Readable, Writable } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
+import { isRealEngineKind } from '../../workspace';
 
 const VERIFY_MS = 5000;
 const TERM_GRACE_MS = 1500;
@@ -72,35 +73,53 @@ function owns(unit: string, info: ScopeInfo | undefined, invocation: string | un
   return true;
 }
 
-/** Recover a persisted, UUID-named run scope. Failure to verify ownership fails closed.
- * Verify any existing invocation, then stop matching launchers before the final inspection. */
+/** Recover a persisted schedule or CLI run scope. Failure to verify ownership fails closed.
+ * Verify any existing invocation, then stop matching launchers before the final inspection.
+ * A collected/inactive scope is already clean; active CLI scopes need their exact invocation. */
 export async function recoverOwnedScope(unit: string, invocation?: string): Promise<void> {
-  if (process.platform !== 'linux' || !/^weaver-schedule-[0-9a-f-]{36}$/.test(unit)) throw new Error('Cannot verify persisted schedule process identity');
+  if (process.platform !== 'linux') throw new Error('Cannot verify persisted schedule process identity');
+  const cli = /^weaver-cli-([a-z0-9]+)-[0-9a-f]{8}$/.exec(unit);
+  const schedule = /^weaver-schedule-[0-9a-f-]{36}$/.test(unit);
+  if (!schedule && !(cli && isRealEngineKind(cli[1]!))) throw new Error('Cannot verify persisted schedule process identity');
   const inspect = async (): Promise<ScopeInfo | undefined> => {
     const result = await systemctl(['show', `${unit}.scope`, '-p', 'Id', '-p', 'LoadState', '-p', 'ActiveState', '-p', 'InvocationID', '--no-pager']);
     if (/^LoadState=not-found$/m.test(result.stdout)) return undefined;
     if (result.code !== 0 || !result.stdout.trim()) throw new Error(`Cannot inspect schedule scope ${unit}; restore the systemd user session and retry recovery`);
     const info = parseShow(result.stdout);
     if (!info.active) throw new Error(`Cannot inspect schedule scope ${unit}; ActiveState is missing`);
-    if (info.id !== `${unit}.scope` || invocation && info.invocation !== invocation) throw new Error(`Schedule scope ${unit} identity changed; manual ownership inspection required`);
+    if (info.id !== `${unit}.scope`) throw new Error(`Schedule scope ${unit} identity changed; manual ownership inspection required`);
     return info;
   };
-  // Reject a replaced scope before touching its launcher or descendants.
-  await inspect();
+  const verify = (info: ScopeInfo | undefined): boolean => {
+    if (!info || ['inactive','failed'].includes(info.active ?? '')) return false;
+    if (invocation && info.invocation !== invocation) throw new Error(`Schedule scope ${unit} identity changed; manual ownership inspection required`);
+    // A replacement can reuse the visible unit name. Without the persisted invocation
+    // there is no proof this active scope belongs to the schedule run, so never kill it.
+    if (cli && (!invocation || !info.invocation)) throw new Error(`CLI schedule scope ${unit} identity is missing; manual ownership inspection required`);
+    return true;
+  };
+  // Reject a replaced active scope before touching its launcher or descendants.
+  verify(await inspect());
   for (const entry of readdirSync('/proc')) {
     if (!/^\d+$/.test(entry)) continue;
     try {
       const argv = readFileSync(`/proc/${entry}/cmdline`, 'utf8').split('\0');
+      // Only the exact unit can be ours; a similar prefix never grants ownership.
       if (argv[0]?.split('/').at(-1) === 'systemd-run' && argv.includes(`--unit=${unit}`)) process.kill(Number(entry), 'SIGKILL');
     } catch { /* Process may have exited while enumerating. */ }
   }
   const info = await inspect();
-  if (!info || ['inactive','failed'].includes(info.active ?? '')) return;
+  if (!verify(info)) return;
   const killed = await systemctl(['kill', '-s', 'SIGKILL', '--kill-whom=all', `${unit}.scope`]);
-  if (killed.code !== 0) throw new Error(`Could not terminate schedule scope ${unit}`);
+  if (killed.code !== 0) {
+    // The scope can collect between the ownership check and kill. A missing or
+    // inactive scope is already clean; anything still active remains unverified.
+    if (!verify(await inspect())) return;
+    throw new Error(`Could not terminate schedule scope ${unit}`);
+  }
   await systemctl(['stop', `${unit}.scope`]);
   const after = await inspect();
-  if (after && !['inactive','failed'].includes(after.active ?? '')) throw new Error(`Schedule scope ${unit} remains active`);
+  if (verify(after)) throw new Error(`Schedule scope ${unit} remains active`);
 }
 
 /** One systemd user scope around a fixed argv. Descendants stay in the cgroup and die with it. */
@@ -151,16 +170,22 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
     if (verifyTimer) clearInterval(verifyTimer);
     if (verifyDeadline) clearTimeout(verifyDeadline);
   };
-  verifyTimer = setInterval(() => {
+  const verify = () => {
     if (verifyStopped || verifyInFlight) return;
     verifyInFlight = true;
     void showScope(unit).then(info => {
       if (verifyStopped) return;
       if (info?.invocation) { invocation ??= info.invocation; handle.emit('identity', invocation); }
       if (info?.mainPid) handle.pid = info.mainPid;
-      if (owns(unit, info, invocation, child.pid)) stopVerify();
+      // Keep observing until the manager has published InvocationID: an early
+      // activation frame can already match the unit name without an identity.
+      if (owns(unit, info, invocation, child.pid) && info?.invocation) stopVerify();
     }).catch(() => { /* show failures stay inside this turn */ }).finally(() => { verifyInFlight = false; });
-  }, 50);
+  };
+  verifyTimer = setInterval(verify, 50);
+  // Let every constructor listener attach before the first asynchronous observation;
+  // a systemd scope can otherwise start and finish inside one fast turn.
+  setImmediate(verify);
   const live = (info: ScopeInfo | undefined): boolean => info?.active === 'active' || info?.active === 'activating' || info?.active === 'deactivating';
   const finish = () => {
     if (closed) return;
@@ -173,7 +198,7 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
       handle.emit('error', new Error(`Refusing to stop scope ${unit}: ownership did not match`));
       throw new Error(`CLI scope ${unit} still active`);
     }
-    if (info?.invocation) invocation ??= info.invocation;
+    if (info?.invocation) { invocation ??= info.invocation; handle.emit('identity', info.invocation); }
   };
   const stop = (signal: NodeJS.Signals): Promise<void> => {
     if (signal === 'SIGKILL') { forceKill = true; escalate?.(); }

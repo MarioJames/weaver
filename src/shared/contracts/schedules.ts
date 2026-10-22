@@ -13,8 +13,13 @@ export type ScheduleTiming =
  * with the service account's permissions; it cannot invoke arbitrary builtin RPCs. */
 export interface ScheduleScript { command: string; timeoutSeconds: number }
 
-/** Agent schedules spawn an independent root that goes through tasks.start on the owner chain. */
-export interface ScheduleAgent { goal: string; ownerProfileId: string; acceptanceCriteria?: string[]; constraints?: string[] }
+/** Which configured profile executes an Agent schedule. The role disambiguates profiles that share an id. */
+export interface ScheduleExecutor { role: 'owner' | 'worker'; profileId: string }
+
+/** Agent schedules run owner-coordinated or worker-direct depending on role: an owner profile coordinates
+ * (and may dispatch workers), a worker profile executes directly.
+ * The role selects the matching policy section; model and effort always come from that profile. */
+export interface ScheduleAgent { goal: string; executor: ScheduleExecutor }
 
 /** Payload for schedules.create; `builtin` is service-generated only and cannot be forged by callers. */
 export interface ScheduleInput {

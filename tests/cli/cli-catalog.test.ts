@@ -57,6 +57,44 @@ test('tasks create stamps the caller cwd and keeps an explicit absolute path', (
   assert.equal('workspace' in (other.args as object), false);
 });
 
+test('schedules create keeps workspace optional in canonical and envelope forms; tasks roots and children unchanged', () => {
+  for (const request of [
+    { apiVersion: 'weaver.v1', command: 'schedules.create', args: { kind: 'script' } },
+    { apiVersion: 'weaver.v1', command: 'schedules.create', args: { kind: 'agent' } },
+  ]) {
+    applyCallerWorkspace(request, '/tmp/caller');
+    assert.equal('workspace' in (request.args as object), false);
+  }
+  const canonical = makeRequest(parseCLI(['schedules', 'create']), { name: 'n', kind: 'script', timing: { mode: 'interval', seconds: 60 }, script: { command: 'true', timeoutSeconds: 10 } });
+  applyCallerWorkspace(canonical, '/tmp/caller');
+  assert.equal('workspace' in (canonical.args as object), false);
+  const envelope = makeRequest(parseCLI(['schedules', 'create']), { apiVersion: 'weaver.v1', command: 'schedules.create', args: { name: 'n' } });
+  applyCallerWorkspace(envelope, '/tmp/caller');
+  assert.equal('workspace' in (envelope.args as object), false);
+  for (const workspace of ['', '   ']) {
+    const request: Record<string, unknown> = { command: 'schedules.create', args: { workspace } };
+    applyCallerWorkspace(request, '/tmp/caller');
+    assert.equal((request.args as Record<string, unknown>).workspace, workspace);
+  }
+  const relative: Record<string, unknown> = { command: 'schedules.create', args: { workspace: 'project' } };
+  applyCallerWorkspace(relative, '/tmp/caller');
+  assert.equal((relative.args as Record<string, unknown>).workspace, '/tmp/caller/project');
+  const absolute: Record<string, unknown> = { command: 'schedules.create', args: { workspace: '/srv/project' } };
+  applyCallerWorkspace(absolute, '/tmp/caller');
+  assert.equal((absolute.args as Record<string, unknown>).workspace, '/srv/project');
+  for (const workspace of [null, 12, false, {}]) {
+    const request: Record<string, unknown> = { command: 'schedules.create', args: { workspace } };
+    applyCallerWorkspace(request, '/tmp/caller');
+    assert.deepEqual((request.args as Record<string, unknown>).workspace, workspace);
+  }
+  const child: Record<string, unknown> = { command: 'tasks.create', args: { parentTaskId: 'p-1' } };
+  applyCallerWorkspace(child, '/tmp/caller');
+  assert.deepEqual(child.args, { parentTaskId: 'p-1' });
+  const patch: Record<string, unknown> = { command: 'schedules.update', args: { scheduleId: 's', patch: { workspace: '' } } };
+  applyCallerWorkspace(patch, '/tmp/caller');
+  assert.deepEqual(patch.args, { scheduleId: 's', patch: { workspace: '' } });
+});
+
 test('text and jsonl errors stay in the requested format', () => {
   const text = renderEnvelope('text', { ok: false, error: { code: 'APP_NOT_RUNNING', message: 'start weaver web --no-open' } });
   assert.equal(text, 'APP_NOT_RUNNING: start weaver web --no-open');

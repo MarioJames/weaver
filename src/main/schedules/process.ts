@@ -28,14 +28,14 @@ function maskCapturedSecrets(raw:Buffer,secrets:string[],hardCut:boolean):string
  return decoded+(hardCut?'':decoder.end());
 }
 /** Uses the existing systemd ownership/descendant cleanup launcher. No naked PID survives a restart. */
-export function executeScript(def:ScheduleDefinition,unit:string,identity:(invocation:string)=>void):ScriptExecution {
+export function executeScript(def: ScheduleDefinition,unit:string,identity:(invocation:string)=>void,effectiveWorkspace?:string):ScriptExecution {
  const secrets=Object.entries(process.env).filter(([k,v])=>v&&/secret|token|password|credential|api.?key|private.?key/i.test(k)).map(([,v])=>v!).sort((a,b)=>b.length-a.length);
  const redact=(s:string)=>redactContext(secrets.reduce((v,secret)=>v.split(secret).join(REDACTED),s),OUTPUT_BYTES+65536);
  let bytes=0,overflow=false,error:string|undefined,reason:'cancelled'|'interrupted'|undefined,timedOut=false;
  const chunks:Buffer[]=[];
  // Keep enough tail for redacting a secret that straddles the output boundary.
  const captureLimit=OUTPUT_BYTES+Math.max(0,...secrets.map(s=>Buffer.byteLength(s)));
- const child=startOwnedScope({command:['/bin/sh','-c',def.script!.command],cwd:def.workspace!,env:process.env,stdin:null,unit,detached:true});
+  const child=startOwnedScope({command:['/bin/sh','-c',def.script!.command],cwd:effectiveWorkspace ?? def.workspace!,env:process.env,stdin:null,unit,detached:true});
  child.on('identity',identity);
  const capture=(chunk:Buffer)=>{const buffer=Buffer.from(chunk);if(bytes+buffer.length>OUTPUT_BYTES)overflow=true;const remaining=captureLimit-bytes;if(remaining>0)chunks.push(buffer.subarray(0,remaining));bytes+=buffer.length;};
  child.stdout.on('data',capture);child.stderr.on('data',capture);

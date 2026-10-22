@@ -99,7 +99,7 @@ test('tick merges missed triggers, skips busy intervals and does not serialize i
 
 test('agent root is atomically associated, launched through tasks.start and settles from task terminal state',async()=>{
  const f=setup();try{
-  const d=f.create({kind:'agent',script:undefined,agent:{goal:'fixture',ownerProfileId:'codex_owner',acceptanceCriteria:['fixture']}}),run=f.call<ScheduleRun>('schedules.run',{scheduleId:d.id});
+  const d=f.create({kind:'agent',script:undefined,agent:{goal:'fixture',executor:{role:'owner',profileId:'codex_owner'}}}),run=f.call<ScheduleRun>('schedules.run',{scheduleId:d.id});
   assert.ok(run.taskId);assert.equal(f.store.get(run.taskId!).status,'queued');assert.equal(f.store.list().length,1);
   await new Promise(r=>setTimeout(r,20));assert.equal(f.launches.length,1);assert.equal(f.store.get(run.taskId!).status,'running');
   f.handler.schedules.tick();assert.equal(f.call('schedules.runs',{scheduleId:d.id,runId:run.id}).runs[0].status,'running');
@@ -110,7 +110,7 @@ test('agent root is atomically associated, launched through tasks.start and sett
 
 test('agent claim rolls back creation on failure and queued durable start intent is never replayed',async()=>{
  const f=setup();let service:ScheduleService|undefined;try{
-  const d=f.create({kind:'agent',script:undefined,agent:{goal:'fixture',ownerProfileId:'codex_owner'}});
+  const d=f.create({kind:'agent',script:undefined,agent:{goal:'fixture',executor:{role:'owner',profileId:'codex_owner'}}});
   const serviceOptions={store:f.store,policy:f.policy,notify:()=>{},command:()=>({apiVersion:'weaver.v1' as const,ok:true}),now:()=>AT};
   const bad=new ScheduleService({...serviceOptions,createTask:()=>{f.manager.create({title:'rollback',instruction:'x',owner:{name:'fixture',transport:'herdr-visible',session:'x',pane:'x'}});throw new Error('injected');}});
   assert.throws(()=>bad.run({scheduleId:d.id}));assert.equal(f.store.list().length,0);assert.equal(f.call('schedules.runs',{scheduleId:d.id}).total,0);
@@ -213,7 +213,7 @@ test('quota.refresh without a refresh service still fails with its real cause',a
 
 test('Agent recovery starts a bound queued root once and retains a live root across scheduler restart',async()=>{
  const f=setup();let recovered:ScheduleService|undefined;try{
-  const d=f.create({kind:'agent',script:undefined,agent:{goal:'fixture',ownerProfileId:'codex_owner'}});
+  const d=f.create({kind:'agent',script:undefined,agent:{goal:'fixture',executor:{role:'owner',profileId:'codex_owner'}}});
   // Persist claim and task binding without dispatching the post-commit callback (crash boundary).
   const run=(f.handler.schedules as any).claim(d.id,'manual') as ScheduleRun;
   assert.equal(f.store.get(run.taskId!).status,'queued');
@@ -341,7 +341,7 @@ test('a finished script claim is released only after the owned scope cleanup is 
 
 test('an indeterminate agent start never replays the intent; only a verifiably terminal task releases the claim',async()=>{
  const f=setup();let service:ScheduleService|undefined;try{
-  const d=f.create({kind:'agent',script:undefined,agent:{goal:'fixture',ownerProfileId:'codex_owner'}});
+  const d=f.create({kind:'agent',script:undefined,agent:{goal:'fixture',executor:{role:'owner',profileId:'codex_owner'}}});
   const run=(f.handler.schedules as any).claim(d.id,'manual') as ScheduleRun;
   assert.equal(f.store.get(run.taskId!).status,'queued');
   const calls:string[]=[];
@@ -373,7 +373,7 @@ test('an indeterminate agent start never replays the intent; only a verifiably t
 
 test('an incomplete queued start and abort receipt keep the claim until the Task actually becomes terminal',async()=>{
  const f=setup();let service:ScheduleService|undefined;try{
-  const d=f.create({kind:'agent',script:undefined,agent:{goal:'fixture',ownerProfileId:'codex_owner'}});
+  const d=f.create({kind:'agent',script:undefined,agent:{goal:'fixture',executor:{role:'owner',profileId:'codex_owner'}}});
   const run=(f.handler.schedules as any).claim(d.id,'manual') as ScheduleRun;
   f.store.putReceipt(`local-demo:schedule-start-${run.id}`,{hash:'fixture'});
   const { digest }=await import('../../src/main/application/tasks/records');
@@ -472,7 +472,7 @@ test('an unavailable associated Task identity keeps the schedule claim until ter
  const f=setup();let service:ScheduleService|undefined;
  const originalGet=f.store.get.bind(f.store);
  try{
-  const d=f.create({kind:'agent',script:undefined,agent:{goal:'fixture',ownerProfileId:'codex_owner'}});
+  const d=f.create({kind:'agent',script:undefined,agent:{goal:'fixture',executor:{role:'owner',profileId:'codex_owner'}}});
   const run=(f.handler.schedules as any).claim(d.id,'manual') as ScheduleRun;
   f.store.get=id=>{if(id===run.taskId)throw new Error('Task identity unavailable');return originalGet(id);};
   service=new ScheduleService({store:f.store,policy:f.policy,notify:()=>{},createTask:()=>{throw new Error('duplicate');},command:()=>{throw new Error('must not start or cancel an unknown identity');}});

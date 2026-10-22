@@ -166,6 +166,7 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
     const env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
     this.scope = startOwnedScope({ command: prepared.argv, cwd: prepared.workspace, env, stdin: prepared.stdin, ...(prepared.stdin!==null?{stdinPath:prepared.promptPath}:{}), unit: prepared.unit });
+    this.scope.on('identity', (invocation: string) => this.emit('identity', invocation));
     this.pid = this.scope.pid;
     this.emitRecords([
       { type: 'log', message: `Launching ${prepared.engine} with requested model ${prepared.model}` },
@@ -265,8 +266,11 @@ function redactRecord(record: WorkerRecord): WorkerRecord {
   return { type: 'result', summary: clip(redactSecrets(record.summary), 8000) };
 }
 
-/** Start one real CLI in its own systemd user scope. Rejects invalid input before launch. */
-export function startCliAgent(input: CliAgentInput): ManagedAgentProcess {
+/** Start one real CLI in its own systemd user scope. Rejects invalid input before launch.
+ * The optional hook persists the prepared unit/prompt identity in the caller's transaction
+ * before any external effect; when it throws nothing is started. */
+export function startCliAgent(input: CliAgentInput, beforeSpawn?: (prepared: PreparedCliAgent) => void): ManagedAgentProcess {
   const prepared = prepareCliAgentInput(input);
+  if (beforeSpawn) beforeSpawn(prepared);
   return new CliAgent(prepared);
 }

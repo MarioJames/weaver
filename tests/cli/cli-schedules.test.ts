@@ -103,18 +103,20 @@ test('only schedule creation gets caller workspace defaults; task inheritance re
   for (const kind of ['script', 'agent']) {
     const request = { command: 'schedules.create', args: { kind } };
     applyCallerWorkspace(request, '/tmp/caller');
-    assert.equal((request.args as Record<string, unknown>).workspace, '/tmp/caller');
+    assert.equal((request.args as Record<string, unknown>).workspace, undefined);
   }
   const relative = { command: 'schedules.create', args: { workspace: 'project' } };
   applyCallerWorkspace(relative, '/tmp/caller');
   assert.equal(relative.args.workspace, '/tmp/caller/project');
+  const blank = { command: 'schedules.create', args: { workspace: '' } };
+  applyCallerWorkspace(blank, '/tmp/caller');
+  assert.equal(blank.args.workspace, '');
   const builtin = { command: 'schedules.update', args: { scheduleId: id, patch: { enabled: false } } };
   applyCallerWorkspace(builtin, '/tmp/caller');
   assert.deepEqual(builtin.args, { scheduleId: id, patch: { enabled: false } });
   const inherited = { command: 'tasks.create', args: { parentTaskId: other } };
   applyCallerWorkspace(inherited, '/tmp/caller');
   assert.deepEqual(inherited.args, { parentTaskId: other });
-  assert.throws(() => applyCallerWorkspace({ command: 'schedules.create', args: { workspace: '' } }, '/tmp/caller'), /Explicit workspace/);
 });
 
 
@@ -126,7 +128,7 @@ test('a full schedule envelope preserves the caller command ID and resolves call
     return { apiVersion: 'weaver.v1', commandId: 'create-envelope-1', ok: true, data: { id, revision: 1 } };
   });
   assert.equal(result.code, 0, result.stdout);
-  assert.deepEqual(sent, { ...envelope, args: { ...envelope.args, workspace: process.cwd() } });
+  assert.deepEqual(sent, { ...envelope });
   assert.equal(JSON.parse(result.stdout).commandId, 'create-envelope-1');
   const conflict = await invoke(['schedules.create', '--command-id', 'other-command', '--input', JSON.stringify(envelope)], async () => { assert.fail('conflicting IDs must not reach transport'); });
   assert.equal(conflict.code, 1);

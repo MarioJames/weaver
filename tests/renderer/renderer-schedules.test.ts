@@ -3,11 +3,12 @@ import test from 'node:test';
 import { command } from '../../src/renderer/api/commands';
 import { readMutationReceipt, ScheduleMutationGate, type ScheduleMutation, type UnconfirmedIntent } from '../../src/renderer/features/schedules/schedule-mutations';
 import {
-  BUILTIN_INTERVAL_MAX_SECONDS, BUILTIN_INTERVAL_MIN_SECONDS, builtinPatch, cronExpressionError,
-  draftErrors, emptyDraft, scheduleInput,
+  BUILTIN_INTERVAL_MAX_SECONDS, BUILTIN_INTERVAL_MIN_SECONDS, buildExecutorOptions, builtinPatch, cronExpressionError,
+  decodeExecutorValue, draftErrors, draftFromDefinition, emptyDraft, encodeExecutorValue, executorOfDefinition, isExecutorAvailable, scheduleInput,
 } from '../../src/renderer/features/schedules/schedules-view';
 import type { CommandRequest, CommandResponse } from '../../src/shared/contracts/commands';
 import type { ScheduleDefinition } from '../../src/shared/contracts/schedules';
+import type { PolicySnapshot } from '../../src/shared/contracts/policy';
 import type { WeaverAPI } from '../../src/shared/contracts/api';
 
 const ULT = (code: string, message: string): Error => Object.assign(new Error(message), { code });
@@ -25,21 +26,87 @@ test('cron 判断只看字段个数，Croner 的 L、W、# 全部交给服务端
   assert.match(cronExpressionError('*/15 * * * * * 30'), /5 或 6/);
 });
 
-test('用户任务必须填已有绝对路径的 workspace，内置任务跳过执行类检查', () => {
-  const userDraft = { ...emptyDraft(), name: '清缓存', kind: 'script' as const, intervalSeconds: 900, command: 'echo ok', timeoutSeconds: 60 };
-  assert.match(draftErrors(userDraft, false).workspace ?? '', /选择目标项目目录/);
-  assert.equal(draftErrors(userDraft, false).command, undefined);
+test('工作目录对两类任务都可选：留空通过，填写时仍要求绝对路径，内置任务跳过检查', () => {
+  const scriptDraft = { ...emptyDraft(), name: '清缓存', kind: 'script' as const, intervalSeconds: 900, workspace: '', command: 'echo ok', timeoutSeconds: 60 };
+  assert.equal(draftErrors(scriptDraft, false).workspace, undefined);
+  const agentDraft = { ...emptyDraft(), name: '巡检', kind: 'agent' as const, intervalSeconds: 900, workspace: '', goal: 'g', executorRole: 'owner' as const, executorProfile: 'p' };
+  assert.equal(draftErrors(agentDraft, false).workspace, undefined);
+  const relative = { ...scriptDraft, workspace: 'docs' };
+  assert.match(draftErrors(relative, false).workspace ?? '', /绝对路径/);
+  const absolute = { ...scriptDraft, workspace: '/srv/project' };
+  assert.equal(draftErrors(absolute, false).workspace, undefined);
+  assert.equal(draftErrors(absolute, false).command, undefined);
   const builtinDraft = { ...emptyDraft(), name: '额度刷新', intervalSeconds: BUILTIN_INTERVAL_MIN_SECONDS };
   assert.equal(draftErrors(builtinDraft, true).workspace, undefined);
   assert.equal(draftErrors(builtinDraft, true).timeout, undefined);
 });
 
-test('名称长于 160 字、验收标准/约束按共享契约的 30 行×1000 字收紧', () => {
+test('名称与任务目标按边界收紧，执行 Agent 必选', () => {
   assert.match(draftErrors({ ...emptyDraft(), name: 'n'.repeat(170) }, false).name ?? '', /160/);
-  const long = 'c'.repeat(1001);
-  assert.match(draftErrors({ ...emptyDraft(), name: 'ok', kind: 'agent' as const, goal: 'g', profile: 'p', criteria: long }, false).criteria ?? '', /1000/);
-  const many = Array.from({ length: 31 }, (_, i) => `c${i}`).join('\n');
-  assert.match(draftErrors({ ...emptyDraft(), name: 'ok', kind: 'agent' as const, goal: 'g', profile: 'p', constraints: many }, false).constraints ?? '', /30/);
+  const agentBase = { ...emptyDraft(), name: 'ok', kind: 'agent' as const, intervalSeconds: 60, workspace: '', executorRole: 'owner' as const, executorProfile: 'p' };
+  assert.match(draftErrors({ ...agentBase, goal: '' }, false).goal ?? '', /任务目标/);
+  assert.match(draftErrors({ ...agentBase, goal: 'g'.repeat(16001) }, false).goal ?? '', /16000/);
+  assert.match(draftErrors({ ...agentBase, executorProfile: '' }, false).executor ?? '', /执行 Agent/);
+  assert.equal(draftErrors({ ...agentBase, goal: 'g' }, false).goal, undefined);
+  assert.equal(draftErrors({ ...agentBase, goal: 'g' }, false).executor, undefined);
+});
+
+test('执行者编码保留完整 id，同名父/子配置互不碰撞', () => {
+  assert.equal(encodeExecutorValue('owner', 'same'), 'owner:same');
+  assert.equal(encodeExecutorValue('worker', 'same'), 'worker:same');
+  assert.notEqual(encodeExecutorValue('owner', 'same'), encodeExecutorValue('worker', 'same'));
+  assert.deepEqual(decodeExecutorValue('owner:same'), { role: 'owner', profileId: 'same' });
+  assert.deepEqual(decodeExecutorValue('worker:same'), { role: 'worker', profileId: 'same' });
+  assert.deepEqual(decodeExecutorValue('worker:a:b'), { role: 'worker', profileId: 'a:b' });
+  assert.equal(decodeExecutorValue('other:x'), undefined);
+});
+
+test('执行者直接读共享类型：goal 与 executor 透传，提交门以快照 available 为准', () => {
+  const definition: ScheduleDefinition = { id: 's', name: '巡检', kind: 'agent', enabled: true, timing: { mode: 'interval', seconds: 60 }, revision: 1, createdAt: '', updatedAt: '', nextRunAt: null, lastRunAt: null, agent: { goal: '核对差异', executor: { role: 'worker', profileId: 'w1' } } };
+  assert.deepEqual(executorOfDefinition(definition), { role: 'worker', profileId: 'w1' });
+  const shaped = draftFromDefinition(definition);
+  assert.equal(shaped.goal, '核对差异');
+  assert.equal(shaped.executorRole, 'worker');
+  assert.equal(shaped.executorProfile, 'w1');
+  const policy: PolicySnapshot = {
+    revision: 1, blocks: [], activeBlocks: [], execution: 'disabled',
+    config: {
+      version: 1, herdr: { max_wait_minutes: 1 },
+      engines: { e1: { enabled: true, kind: 'custom' } },
+      owners: { o1: { enabled: true, engine: 'e1', model: 'm1', effort: 'low', workers: [], max_parallel: 1 } },
+      workers: { w1: { enabled: true, engine: 'e1', model: 'm1', effort: 'low' } },
+    },
+    owners: { o1: { status: 'available' } },
+    workers: { w1: { status: 'disabled' } },
+  };
+  assert.equal(isExecutorAvailable(policy, 'owner', 'o1'), true);
+  assert.equal(isExecutorAvailable(policy, 'worker', 'w1'), false);
+  assert.equal(isExecutorAvailable(policy, 'worker', 'missing'), false);
+  assert.equal(isExecutorAvailable(undefined, 'owner', 'o1'), false);
+});
+
+test('执行者选项覆盖全部父/子配置：同名独立、不可用禁用、不按引擎过滤', () => {
+  const policy: PolicySnapshot = {
+    revision: 1, blocks: [], activeBlocks: [], execution: 'disabled',
+    config: {
+      version: 1, herdr: { max_wait_minutes: 1 },
+      engines: { e1: { enabled: true, kind: 'custom' } },
+      owners: { same: { enabled: true, engine: 'e1', model: 'm1', effort: 'low', workers: [], max_parallel: 1 } },
+      workers: { same: { enabled: true, engine: 'e1', model: 'm2', effort: 'low' } },
+    },
+    owners: { same: { status: 'available' } },
+    workers: { same: { status: 'disabled' } },
+  };
+  const options = buildExecutorOptions(policy);
+  assert.equal(options.length, 2);
+  const ownerOption = options.find(option => option.value === 'owner:same')!;
+  const workerOption = options.find(option => option.value === 'worker:same')!;
+  assert.equal(ownerOption.disabled, false, '可用父配置不因引擎种类被屏蔽');
+  assert.match(ownerOption.label, /父 Agent/);
+  assert.match(ownerOption.label, /m1/);
+  assert.equal(workerOption.disabled, true);
+  assert.match(workerOption.label, /子 Agent/);
+  assert.equal(buildExecutorOptions(undefined).length, 0);
 });
 
 test('内置额度间隔只在 300–86400 秒且整分钟内有效，编辑输出一个原子 patch', () => {
@@ -60,12 +127,16 @@ assert.ok(draftErrors(builtin(BUILTIN_INTERVAL_MAX_SECONDS + 60), true).interval
   assert.deepEqual(Object.keys(patch), ['timing', 'enabled']);
 });
 
-test('scheduleInput 一次性带上 workspace 与 enabled，单请求完成切换', () => {
+test('scheduleInput 一次性带上 workspace 与 enabled，单请求完成切换；清空目录显式传空串', () => {
   const input = scheduleInput({ ...emptyDraft(), name: '巡检', kind: 'script', enabled: false, intervalSeconds: 60, workspace: '/srv/project', command: 'echo hi', timeoutSeconds: 30 });
   assert.deepEqual(input, {
     name: '巡检', kind: 'script', enabled: false, timing: { mode: 'interval', seconds: 60 },
     workspace: '/srv/project', script: { command: 'echo hi', timeoutSeconds: 30 },
   });
+  const cleared = scheduleInput({ ...emptyDraft(), name: '巡检', kind: 'script', intervalSeconds: 60, workspace: '   ', command: 'echo hi', timeoutSeconds: 30 });
+  assert.equal(cleared.workspace, '');
+  const agent = scheduleInput({ ...emptyDraft(), name: '巡检', kind: 'agent', intervalSeconds: 60, workspace: '', goal: '核对差异', executorRole: 'worker', executorProfile: 'w1' });
+  assert.deepEqual(agent.agent, { goal: '核对差异', executor: { role: 'worker', profileId: 'w1' } });
 });
 
 /**

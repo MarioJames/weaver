@@ -108,14 +108,23 @@ RPC 动词（method-wrapped，目录条目带 `rpc:{method,arity}`）：`policy 
 | `schedules.list` | `{kind?:'script'\|'agent',enabled?:boolean}` → `{schedules}` |
 | `schedules.get` | `{scheduleId}` → definition（id、revision、timing、nextRunAt、activeRunId、lastRun 等） |
 | `schedules.create` | `{name,kind,timing,enabled?,workspace?,script?,agent?}` → definition；script/agent 按 kind 必填，builtin 禁止伪造 |
-| `schedules.update` | `{scheduleId,expectedRevision,patch}` → definition；kind 不可改，运行中只改 enabled，内置只改 enabled/timing |
+| `schedules.update` | `{scheduleId,expectedRevision,patch}` → definition；kind 不可改，运行中只改 enabled，内置只改 enabled/timing；patch 省略 workspace 保留原值，显式空串清空为未指定 |
 | `schedules.enable` / `schedules.disable` | `{scheduleId,expectedRevision}` → definition；停用不取消当前运行 |
 | `schedules.delete` | `{scheduleId,expectedRevision}` → `{deleted:true,scheduleId}`；活跃或内置记录禁止删除 |
-| `schedules.run` | `{scheduleId,expectedRevision?}` → running 的 run；停用时也可手动运行，活跃时拒绝重叠 |
-| `schedules.cancel` | `{scheduleId,runId}` → run；只取消匹配的活跃运行，script 终止进程组，Agent 走 tasks.cancel |
+| `schedules.run` | `{scheduleId,expectedRevision?}` → running 的 run；停用时也可手动运行，活跃时拒绝重叠；认领与启动前按同一 role 重新核对 profile 可用性与 model/effort |
+| `schedules.cancel` | `{scheduleId,runId}` → run；只取消匹配的活跃运行，script 终止进程组，legacy-root Agent 走 tasks.cancel，直接 CLI/原生 Agent 终止对应执行并等待作用域回收确认 |
 | `schedules.runs` | `{scheduleId,offset?,limit?,runId?}` → `{runs,total}`；普通分页返回新到旧摘要，带 runId 返回 `{runs:[完整run],total:1}` |
 
-可复制脚本例子（省略 workspace 时使用调用方 cwd；相对路径也从调用方解析，更新记录不会补入 cwd）：
+Agent 输入只有目标与执行者（契约见 `src/shared/contracts/schedules.ts`，校验见 `src/main/schedules/input.ts`）：
+
+```json
+{"agent":{"goal":"…（1–16000 字符）","executor":{"role":"owner|worker","profileId":"同 role 下的可用 profile id"}}}
+```
+
+- `agent` 只接受 `goal` 与 `executor` 两个字段；旧 `ownerProfileId`、`acceptanceCriteria`、`constraints`、model/effort 覆盖一律 `INVALID_REQUEST` 拒绝。`role` 选择策略的对应分区（`owners.*` 或 `workers.*`），同名 id 分属两边时不混用：owner role 只读 owner 分区，worker role 只读 worker 分区。创建、执行字段更新与每次认领/启动前都按同一 role 重新核对该 profile 的可用性（缺失、停用或被阻断即 `POLICY_DENIED`，不新建、不启动）；model/effort 永远取该 profile 当前值，不接受覆盖。仅改 `enabled` 的更新不重新校验 profile，也不改变冻结运行；活跃运行也只允许改 `enabled`。
+- `workspace` 可选：create 省略或空串统一记为未指定（`undefined`），CLI 不再替补调用方 cwd；显式非空相对路径仍由 CLI 按调用方 cwd 解析成绝对路径后提交，服务端只接受已存在的绝对目录（相对路径与不存在目录直接拒绝，不回退服务端自己的目录）。update 省略保留原值，显式空串（`workspace:''`，网页端即清空输入框）清空为未指定。`name`/`timing`/`enabled` 与 `script{command,timeoutSeconds}` 语义保留。
+
+可复制脚本例子（workspace 省略即不绑定调用方目录，执行时落到该实例的中性目录；显式非空相对路径仍从调用方解析）：
 
 ```sh
 weaver schedules create --command-id script-schedule-create --input - <<'JSON'
@@ -124,11 +133,11 @@ JSON
 weaver schedules list --input '{"kind":"script","enabled":true}' --output json
 ```
 
-Agent 例子：先通过 `weaver policy get` 选有效父 Agent profile，替换 `your-owner-profile` 后执行。每次执行创建独立 root，并用 tasks.start 启动父 Agent 链路。
+Agent 例子：先通过 `weaver policy get` 选同 role 可用的 profile，把 `your-profile` 换成该 role 下的真实 id 后执行。`executor` 决定谁执行：owner profile 负责协调，worker profile 直接执行。
 
 ```sh
 weaver schedules create --command-id agent-schedule-create --input - <<'JSON'
-{"name":"工作日检查","kind":"agent","enabled":true,"timing":{"mode":"cron","expression":"0 9 * * 1-5","timezone":"Asia/Shanghai"},"agent":{"goal":"检查工作区并给出有证据的状态汇报，不推送代码","ownerProfileId":"your-owner-profile","acceptanceCriteria":["记录检查结果和实际验证"],"constraints":["保留已有修改"]}}
+{"name":"工作日检查","kind":"agent","enabled":true,"timing":{"mode":"cron","expression":"0 9 * * 1-5","timezone":"Asia/Shanghai"},"agent":{"goal":"检查工作区并给出有证据的状态汇报，不推送代码","executor":{"role":"worker","profileId":"your-profile"}}}
 JSON
 ```
 
@@ -156,7 +165,13 @@ weaver schedules delete --schedule-id <UUID> --expected-revision <revision> --co
 {"apiVersion":"weaver.v1","commandId":"schedule-update-1","command":"schedules.update","args":{"scheduleId":"00000000-0000-4000-8000-000000000001","expectedRevision":1,"patch":{"enabled":false}}}
 ```
 
-时间规则：interval 为 1–31536000 秒；cron 是 5/6 段表达式，必须带有效 IANA timezone，不接受 Date 字符串。到期先持久化 claim 再执行；仅在服务运行时执行，同一记录不重叠。重启时，没有活跃运行的已启用记录将错过的触发最多合并执行一次，不逐次补跑。旧活跃脚本先按持久化身份核实所属进程已结束或回收进程，再记为 interrupted 并释放 claim；其忙期间（含停机）错过的触发跳过。无法核实身份时保持活跃并显示恢复错误，不能绕过该保护启动重叠运行。run 的 `running` 只是已接受，不是执行成功；历史状态包括 running/succeeded/failed/interrupted/skipped/cancelled。Agent run 的 taskId 可用 `tasks get --task-id` 跟踪，必须等 root 终态才判定成功/失败。内置 quota.refresh 复用已有额度刷新，policy quota 设置是唯一配置来源，quota get 的 schedule 来自同一调度记录。
+时间规则：interval 为 1–31536000 秒；cron 是 5/6 段表达式，必须带有效 IANA timezone，不接受 Date 字符串。到期先持久化 claim 再执行；仅在服务运行时执行，同一记录不重叠。重启时，没有活跃运行的已启用记录将错过的触发最多合并执行一次，不逐次补跑。旧活跃执行先按持久化身份（unit 名与 invocation）核实所属进程已结束或回收进程，再记为 interrupted 并释放 claim；其忙期间（含停机）错过的触发跳过。无法核实身份时保持活跃并显示恢复错误（fail-closed，不重放、不换新误杀），不能绕过该保护启动重叠运行。run 的 `running` 只是已接受，不是执行成功：启动 ACK 与 exit 0 都不等于任务成功，自然完成才解除 active，零退出无成功结果判失败；历史状态包括 running/succeeded/failed/interrupted/skipped/cancelled。legacy-root Agent run 的 taskId 可用 `tasks get --task-id` 跟踪，必须等 root 终态才判定成功/失败。内置 quota.refresh 复用已有额度刷新，policy quota 设置是唯一配置来源，quota get 的 schedule 来自同一调度记录。
+
+执行映射（实现见 `src/main/schedules/agent.ts`、`src/main/schedules/service.ts`）：owner role 且引擎为 claude/codex 走既有 owner root（createTask 建独立任务再 tasks.start 启动、取消走 tasks.cancel 并保留历史链，owner 仍可按技能分发 worker）；其他有真实 CLI 适配的引擎无论 role 一律 direct CLI；worker role 且引擎为 claude 复用原生 parent 会话（单次发送冻结目标后关闭）。没有适配的引擎组合直接失败，没有 mock 回退。每次执行（claim 与 launch）都重新按同一 role 核对 profile 可用性与 model/effort，同名 id 不混。
+
+启动目录：定义省略或留空时不用调用方也不用服务端 cwd，而是当前实例 `dataDir/schedule-workspaces/<scheduleId>` 下的固定中性目录（0700 私有，解析后拒绝凭据/配置根），脚本与 Agent 共用同一规则；业务输出保留在该目录，删除任务不等删除文件。内部 per-run 状态（prompt/overlay State）放在 `schedule-agent-state/<runId>`，与业务目录分离，仅在自有作用域被精确确认回收后删除。没有目录的 goal 必须自带足够上下文定位项目，不假装自动知道项目。
+
+直接 prompt 只包装契约：标明 role/profile、启动目录含义（显式或中性）与当前实例 `--data-dir` CLI 前缀，目标原文逐字放入 `<goal>`，不拼接 shell、不臆造验收标准；含包装超 16000 字符直接报错、不启动任何模型。历史 run 的 definition 冻结不改写；旧定义（含 ownerProfileId/AC/constraints）在读取侧一次性迁移并入 goal 原文，大旧 prompt 完整保留，不静默截断。
 
 脚本 `{command,timeoutSeconds}` 的 timeoutSeconds 为 1–86400，按服务 OS shell、服务账户权限运行显式命令，没有任意内置 RPC 选择器。自定义脚本执行和安全恢复当前要求 Linux 与可用的 systemd 用户会话，其他平台会明确失败。停用只停止未来触发，需要终止当前运行时显式 cancel；取消结果以查询状态为准。
 

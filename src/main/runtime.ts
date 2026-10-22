@@ -4,6 +4,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_VERSION } from '../shared/contracts/commands';
 import { startCliAgent } from './adapters/cli/index';
+import { createParentAgent } from './im/parent-agent';
 import { HelloJobs, sayHi } from './engines/hello';
 import { EngineModelLister } from './engines/models';
 import { createPiModelCheck } from './engines/pi-model-check';
@@ -23,7 +24,7 @@ import { TaskManager } from './manager';
 import { PolicyBlockService } from './policy/blocks';
 import { PolicyStore } from './policy/store';
 import { applyQuotaSnapshot, QuotaPolicyConflict } from './policy/quota';
-import type { QuotaRefreshInput } from '../shared/contracts/quota';
+import type { QuotaEngine, QuotaRefreshInput } from '../shared/contracts/quota';
 import { QuotaProber } from './quota';
 import { StallMonitor } from './stall';
 import { RpcError, parseRpcBody } from './rpc';
@@ -246,7 +247,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       unblock: engine => unblockEngine({ blocks: unblockBlocks, stall: stall!, freeProbe: freeProbe! }, engine),
       unblockWorker: worker => unblockWorker({ blocks: unblockBlocks, stall: stall!, freeProbe: freeProbe! }, worker),
     };
-    commands = new CommandHandler(manager, policy, undefined, undefined, diagnostics, options.ownerHost, {refreshQuota:engine=>refreshQuota({engine})});
+    commands = new CommandHandler(manager, policy, undefined, undefined, diagnostics, options.ownerHost, {refreshQuota:(engine:QuotaEngine)=>refreshQuota({engine}),dataDir,startCli:startCliAgent,parentFactory:createParentAgent,checkPiModel});
     commands.transportStatus = 'ready';
     ready = true;
     await commands.schedules.start();
