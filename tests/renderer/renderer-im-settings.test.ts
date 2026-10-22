@@ -14,8 +14,9 @@ import {
 import { EFFORTS } from '../../src/shared/policy/settings';
 import { ModelListSession } from '../../src/renderer/features/engines/engine-models';
 import type { EngineModelList, EngineModelListInput } from '../../src/shared/engines';
-import { AgentStatus } from '../../src/renderer/features/bots/ImSettings';
+import { AgentStatus, ImSettingsView, type ImSettingsViewProps } from '../../src/renderer/features/bots/ImSettings';
 import { BotsPage } from '../../src/renderer/features/bots/BotsPage';
+import { botStyles } from '../../src/renderer/features/bots/bot-style';
 
 /** The real configured baseline the fixtures branch from, e.g. read at revision 5. */
 const APP_ID = 'cli_a1b2c3d4e5f6a7b8';
@@ -516,4 +517,135 @@ test('standby needs no phone session and a safe agent failure is visible without
   const html = markup(React.createElement(AgentStatus, { status: failed, controlId: 'retry' }));
   assert.match(html, /IM 操作失败，请检查配置或重新连接。/);
   assert.equal(failed.connection, 'connected');
+});
+
+function viewOf(over: Partial<ImSettingsViewProps> = {}): ImSettingsViewProps {
+  const base = configOf();
+  const defaults: ImSettingsViewProps = {
+    id: 'bot',
+    loading: false,
+    loadError: '',
+    saved: snapshotOf(base, 5),
+    values: draftOf(base),
+    edit: undefined,
+    conflict: false,
+    fieldErrors: {},
+    saveError: '',
+    saving: false,
+    savedTick: false,
+    refreshing: false,
+    reconnecting: false,
+    forceReading: false,
+    dirty: false,
+    engineOptions: [{ value: 'claude', label: 'claude', disabled: false }],
+    engineUsable: true,
+    discoveryEngine: 'claude',
+    efforts: ['low', 'medium', 'high'],
+    openCodeVariant: false,
+    effortOptions: ['low', 'medium', 'high'].map(value => ({ value, label: value, disabled: false })),
+    onRetryLoad: () => {},
+    onReloadLatest: () => {},
+    onRefreshStatus: () => {},
+    onReconnect: () => {},
+    onUpdate: () => {},
+    onEngineChange: () => {},
+    onRemoveWorkspace: () => {},
+    onAddWorkspace: () => {},
+    onDiscard: () => {},
+    onSave: () => {},
+    onTimeoutError: () => {},
+  };
+  return { ...defaults, ...over } as ImSettingsViewProps;
+}
+
+test('the Bot page offers the real IM channels through one tablist and renders only the selected channel panel', () => {
+  keepImDraft(undefined);
+  const html = markup(React.createElement(BotsPage, { policy: {} as PolicyDraft }));
+  assert.match(html, /role="tablist"/);
+  assert.equal((html.match(/role="tab"/g) ?? []).length, 1, 'the only real channel is Feishu IM, no invented channels');
+  assert.match(html, /<button[^>]*role="tab"[^>]*aria-selected="true"[^>]*>飞书 IM<\/button>/);
+  const panelStart = html.indexOf('role="tabpanel"');
+  assert.ok(panelStart > 0, 'the selected channel has a tab panel');
+  const panel = html.slice(panelStart);
+  assert.match(panel, /data-bot-channel="feishu"/);
+  assert.match(panel, /独立选择已启用的引擎/);
+  assert.match(panel, /正在读取飞书 IM 设置/);
+  const section = panel.slice(panel.indexOf('data-bot-channel="feishu"'));
+  const headerEnd = section.indexOf('</header>');
+  assert.ok(headerEnd > 0, 'the channel explanation is a header at the top of the panel');
+  assert.ok(section.indexOf('独立选择已启用的引擎') < headerEnd, 'the old left group column explanation moved into the panel header');
+  assert.ok(section.indexOf('正在读取飞书 IM 设置') > headerEnd, 'the rows follow the channel header instead of a left group column');
+});
+
+test('each Feishu setting is one two-column row: name label plus description on the left, control and its error on the right', () => {
+  const html = markup(React.createElement(ImSettingsView, viewOf({ fieldErrors: { appId: 'App ID 需要 cli_ 开头' } })));
+  const section = html.slice(html.indexOf('data-bot-channel="feishu"'));
+  assert.ok(section.length > 0);
+  const rows = section.split('<div data-bot-row="').slice(1);
+  assert.ok(rows.length >= 12, 'every existing setting row is still rendered');
+  for (const row of rows) {
+    const marker = row.match(/^([^"]+)"/)?.[1] ?? '';
+    const field = row.indexOf('data-bot-field=""');
+    const control = row.indexOf('data-bot-control=""');
+    assert.ok(field >= 0 && control > field, `${marker} keeps the name/description and control in separate columns`);
+    const htmlFor = row.match(/<label for="([^"]+)">/)?.[1];
+    assert.ok(htmlFor, `${marker} has a label linked to its control`);
+    assert.ok(row.slice(control).includes(`id="${htmlFor}"`), `${marker} label for="${htmlFor}" points into its own control column`);
+  }
+  const appId = rows.find(row => row.startsWith('bot-appid"'));
+  assert.ok(appId, 'the App ID row exists');
+  assert.match(appId, /App ID 需要 cli_ 开头/);
+  assert.ok(appId.indexOf('App ID 需要 cli_ 开头') > appId.indexOf('data-bot-control'), 'the field error sits under the control');
+  const controlClasses = [...section.matchAll(/<div data-bot-control="" class="([^"]+)">/g)].map(match => match[1]);
+  assert.equal(new Set(controlClasses).size, 1, 'all control columns share the same width track');
+  assert.equal(controlClasses[0], botStyles.controlCell);
+  const rowClasses = [...section.matchAll(/<div data-bot-row="[^"]*" class="([^"]+)">/g)].map(match => match[1]);
+  assert.equal(new Set(rowClasses).size, 1, 'all rows share the same two-column grid');
+  assert.equal(rowClasses[0], botStyles.row);
+});
+
+test('the new channel layout keeps the conflict, workspace empty/limit, save feedback and loading/error states', () => {
+  const conflict = markup(React.createElement(ImSettingsView, viewOf({
+    edit: activeEdit(), conflict: true, dirty: true, savedTick: true,
+    values: { ...draftOf(configOf()), workspaces: [], idleTimeoutMinutes: null },
+  })));
+  assert.match(conflict, /配置在别处被修改/);
+  assert.match(conflict, /放弃修改并载入最新/);
+  assert.match(conflict, /尚未添加工作空间/);
+  assert.match(conflict, /已保存/);
+  const full = markup(React.createElement(ImSettingsView, viewOf({
+    values: { ...draftOf(configOf()), workspaces: Array.from({ length: 32 }, (_, index) => `/projects/${index}`) },
+  })));
+  assert.match(full, /已达 32 个上限/);
+  const loading = markup(React.createElement(ImSettingsView, viewOf({ saved: undefined, values: undefined, loading: true })));
+  assert.match(loading, /data-bot-channel="feishu"/);
+  assert.match(loading, /正在读取飞书 IM 设置/);
+  const failed = markup(React.createElement(ImSettingsView, viewOf({ saved: undefined, values: undefined, loading: false, loadError: '读取失败，请重试' })));
+  assert.match(failed, /读取失败，请重试/);
+  assert.match(failed, />重试<\/button>/);
+});
+
+test('the effort description follows the engine kind: OpenCode variant versus no usable engine', () => {
+  const opencode = markup(React.createElement(ImSettingsView, viewOf({ efforts: undefined, openCodeVariant: true, engineUsable: false })));
+  assert.match(opencode, /OpenCode 的 variant 由模型定义/);
+  assert.doesNotMatch(opencode, /先选择一个支持飞书对话的引擎/);
+  const none = markup(React.createElement(ImSettingsView, viewOf({ efforts: undefined, openCodeVariant: false, engineUsable: false })));
+  assert.match(none, /先选择一个支持飞书对话的引擎/);
+  assert.doesNotMatch(none, /OpenCode 的 variant 由模型定义/);
+});
+
+test('the channel header shows only the description: no repeated channel title under the selected tab', () => {
+  const html = markup(React.createElement(ImSettingsView, viewOf()));
+  const sectionStart = html.indexOf('data-bot-channel="feishu"');
+  assert.ok(sectionStart > 0, 'the feishu channel section exists');
+  const sectionOpen = html.lastIndexOf('<section', sectionStart);
+  assert.ok(sectionOpen >= 0);
+  assert.match(html.slice(sectionOpen, sectionStart), /aria-label="飞书 IM"/, 'the section keeps aria-label for accessibility');
+  const headerStart = html.indexOf('<header', sectionStart);
+  assert.ok(headerStart > sectionStart, 'the channel has a header');
+  const headerEnd = html.indexOf('</header>', headerStart);
+  assert.ok(headerEnd > headerStart);
+  const header = html.slice(headerStart, headerEnd);
+  assert.doesNotMatch(header, /飞书 IM/, 'the selected tab already names the channel; the header must not repeat it');
+  assert.match(header, /独立选择已启用的引擎/, 'the channel description stays in the header');
 });

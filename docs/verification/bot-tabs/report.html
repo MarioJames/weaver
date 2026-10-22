@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bot 页（飞书 IM Tabs）浏览器验收报告</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.6; color: #1f1f1f; max-width: 960px; margin: 0 auto; padding: 24px 16px; background: #fff; }
+  h1 { font-size: 22px; } h2 { font-size: 18px; margin-top: 32px; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; } th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; font-size: 14px; vertical-align: top; }
+  th { background: #f5f5f5; } .pass { color: #0a7d2c; font-weight: bold; } .fail { color: #c00; font-weight: bold; } .na { color: #8a6d00; font-weight: bold; }
+  img { max-width: 100%; border: 1px solid #ddd; margin: 8px 0; } details { margin: 8px 0; } summary { cursor: pointer; font-weight: bold; }
+  code { background: #f5f5f5; padding: 1px 5px; border-radius: 3px; font-size: 13px; } .meta { color: #555; font-size: 14px; }
+  @media print { body { max-width: none; } details { display: block; } }
+</style>
+</head>
+<body>
+<h1>Bot 页（飞书 IM Tabs）浏览器验收报告</h1>
+<p class="meta">被测版本：工作区 <code>/home/mocha/opensource/weaver</code> 未提交工作树（含 Bot 页改造；验收只读源码，未改动）。服务：<code>npm run dev</code> 端口 4738，数据目录仓库内 <code>.weaver-dev</code>。日期：2026-10-22。主题：亮色。结论：<strong>全部可验收项通过，2 项未覆盖（加载态/空状态），发现 0 个源码缺陷</strong>。</p>
+
+<h2>1. 总览结论</h2>
+<table>
+<tr><th>编号</th><th>验收项</th><th>状态</th><th>依据</th></tr>
+<tr><td>V1</td><td>桌面宽（1440×900）视觉：Tabs 选中态、渠道说明、两栏布局、右栏控件左缘对齐、行间分隔、长文本换行、无溢出、无重叠</td><td class="pass">通过</td><td>截图 desktop-1440-*；12 行右栏左缘 spread=0px；scrollWidth(1440)&lt;=clientWidth(1440)；行间无交叠</td></tr>
+<tr><td>V2</td><td>中等宽（1024×800，内容宽 706px ≤860px）堆叠为单栏、无横向溢出、无重叠</td><td class="pass">通过</td><td>截图 medium-1024-*；12/12 行堆叠；scrollWidth(1024)&lt;=clientWidth(1024)</td></tr>
+<tr><td>V3</td><td>手机宽（390×844）堆叠单栏、无横向溢出、无重叠</td><td class="pass">通过</td><td>截图 mobile-390-*；12/12 行堆叠；scrollWidth(390)&lt;=clientWidth(390)</td></tr>
+<tr><td>T1</td><td>点击「飞书 IM」Tab：aria-selected=true，面板只显示飞书 IM 配置</td><td class="pass">通过</td><td>tabCount=1，aria-selected="true"，panelCount=1 且仅含飞书 IM、无其他渠道关键字</td></tr>
+<tr><td>S1</td><td>修改空闲超时 30→35 并保存：出现「已保存」；刷新后保持 35</td><td class="pass">通过</td><td>截图 save-idle35-before/after.png；reload 后 input 值为 35</td></tr>
+<tr><td>S2</td><td>改回原值 30 并保存；刷新后保持 30（开发数据恢复原状）</td><td class="pass">通过</td><td>保存出现「已保存」；reload 后值为 30；最终复核开关关/AppID 空/Secret 空/白名单空/无未保存修改</td></tr>
+<tr><td>E1</td><td>非法值（0）保存：字段下方错误提示截图；「放弃修改」恢复已保存值</td><td class="pass">通过</td><td>截图 invalid-idle-error.png，错误「空闲超时是 1 到 1440 之间的整数分钟。」；放弃后值回 30、错误消失、保存按钮禁用</td></tr>
+<tr><td>L1</td><td>加载态/骨架屏截图</td><td class="na">未覆盖</td><td>本地 dev 加载过快，未能稳定观察到加载态；未伪造</td></tr>
+<tr><td>L2</td><td>空状态（无渠道/无工作空间等）</td><td class="na">未覆盖</td><td>当前页面恒含 1 个渠道 Tab；工作空间为空提示属正常文案行，非独立空状态页，未单列</td></tr>
+<tr><td>C1</td><td>浏览器 console 错误与失败请求</td><td class="pass">通过</td><td>console 仅 vite 热更新握手 + React DevTools 提示，0 error/warn；XHR/fetch 137 个，0 个失败/4xx/5xx</td></tr>
+<tr><td>P1</td><td>证据无凭据泄露</td><td class="pass">通过</td><td>App Secret 输入框全程为空占位符；evidence 与截图不含 Secret/token</td></tr>
+</table>
+
+<h2>2. 视觉审查明细</h2>
+<ul>
+<li><strong>Tabs 选中态</strong>：通过。「飞书 IM」Tab 蓝色文字 + 下边线，当前唯一 Tab。</li>
+<li><strong>渠道说明</strong>：通过。面板顶部说明行完整展示并自动换行，无截断。</li>
+<li><strong>两栏 / 堆叠</strong>：通过。桌面宽 12 行全部左右两栏（右栏宽 400px）；内容宽 706px（1024 视口）与手机宽 12 行全部堆叠单栏。</li>
+<li><strong>右栏控件左缘对齐</strong>：通过。桌面宽 12 行控件区左缘 x=996，spread=0px。</li>
+<li><strong>行间分隔与间距</strong>：通过。行间 1px 分隔线（双栏时右栏另有 1px 纵向分隔，堆叠时转为横向分隔）；行高 69–103px 随内容自适应，无挤压。</li>
+<li><strong>长文本/路径换行</strong>：通过。说明文案 <code>overflow-wrap:anywhere</code>，截图中无截断、无横向溢出。</li>
+<li><strong>重叠</strong>：通过。三组视口行 bounding box 两两无交叠。</li>
+</ul>
+<p>注：文档根不滚动（scrollHeight=clientHeight），滚动容器为 <code>main</code>；<code>--full</code> 截图在此壳下仅产出视口尺寸，故每宽度以顶部/底部两张视口截图覆盖全部 12 行。</p>
+
+<h2>3. 交互证据</h2>
+<details open><summary>桌面宽截图（顶部 / 底部）</summary>
+<img src="desktop-1440-top.png" alt="桌面顶部"><img src="desktop-1440-bottom.png" alt="桌面底部"></details>
+<details><summary>中等宽截图（顶部 / 底部）</summary>
+<img src="medium-1024-top.png" alt="中等宽顶部"><img src="medium-1024-bottom.png" alt="中等宽底部"></details>
+<details><summary>手机宽截图（顶部 / 底部）</summary>
+<img src="mobile-390-top.png" alt="手机顶部"><img src="mobile-390-bottom.png" alt="手机底部"></details>
+<details><summary>保存流程：改前 35 / 已保存 / 非法值错误</summary>
+<img src="save-idle35-before.png" alt="保存前"><img src="save-idle35-after.png" alt="已保存"><img src="invalid-idle-error.png" alt="非法值错误"></details>
+<p>机器证据见 <a href="evidence.json">evidence.json</a>（视口检测数值、保存前后数值、console/网络统计）。</p>
+
+<h2>4. 过程备注</h2>
+<ul>
+<li>dev 服务启动初期，<code>tsx watch</code> 因工作区其他未提交改动（<code>src/main/**</code>，其他 worker 并发编辑中）曾报 <code>STARTUP_FAILED</code>（缺失 <code>chainEngines</code> / <code>EXCLUDED_WORKER_REASON</code> 导出）；等待文件收敛后服务稳定，curl 连续 6 次 200，后续验收未再中断。验收未修改任何源码。</li>
+<li>验收期间未触碰 4737 共享服务与 <code>~/.local/share/weaver</code> 数据；未切换启用开关、未改 App ID/Secret/引擎/工作空间，避免真实外部连接。</li>
+</ul>
+
+<h2>5. 资源释放</h2>
+<ul>
+<li>浏览器会话 <code>bot-tabs-b</code> 已 <code>close</code>；任务 profile <code>/tmp/weaver-bot-tabs/worker-b/browser-profile</code> 已删除（<code>bh task-profile remove</code>）。</li>
+<li><code>systemctl --user stop dev-weaver-bot-tabs.scope</code> 已执行，unit 不再存在，4738 端口已释放；4737 共享服务仍在监听，未受影响。</li>
+<li><code>.weaver-dev</code> 未删除/重置；Bot 配置经 UI 确认恢复验收前值（空闲超时 30、白名单空、开关关、AppID/Secret 空、无未保存修改）。临时文件已清理（仅保留本报告目录）。</li>
+</ul>
+<h2>6. 打磨复验：渠道标题去重（2026-10-22）</h2>
+<p>变更：<code>BotChannel</code> header 删除重复的粗体渠道标题，只保留渠道说明文字；<code>section</code> 继续保留 <code>aria-label="飞书 IM"</code>；header 的背景、内边距、下边框不变，仅去掉单子元素后不再需要的 <code>gap</code>。亮色主题、只观察未改任何 Bot 配置。</p>
+<table>
+<tr><th>视口</th><th>结论</th><th>依据</th></tr>
+<tr><td>桌面 1440×900</td><td class="pass">通过</td><td>Tab 下方 header 仅为渠道说明（不含「飞书 IM」），section aria-label 仍为「飞书 IM」；document 1440&lt;=1440、main 1172&lt;=1172，无横向溢出</td></tr>
+<tr><td>手机 390×844</td><td class="pass">通过</td><td>Tab 下方 header 仅为渠道说明（不含「飞书 IM」），section aria-label 仍为「飞书 IM」；document 390&lt;=390、main 380&lt;=380，无横向溢出，单栏堆叠</td></tr>
+</table>
+<details open><summary>打磨复验截图（顶部）</summary>
+<img src="polish-desktop-1440-top.png" alt="打磨后桌面顶部"><img src="polish-mobile-390-top.png" alt="打磨后手机顶部"></details>
+<p>单元测试：新增 header 去重渲染测试，先失败后通过；<code>tests/renderer/renderer-im-settings.test.ts</code> 38 项全过；<code>npm run typecheck</code> exit=0。机器证据见 <a href="evidence.json">evidence.json</a> 顶层 <code>polish</code> 字段。</p>
+</body>
+</html>
