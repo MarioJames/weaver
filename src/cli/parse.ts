@@ -4,6 +4,7 @@ import { LocalIPCError } from '../main/local-ipc';
 import { CLI_CATALOG, catalogCommand } from './catalog';
 import type { OutputFormat } from './output';
 import { isReconnectCommand } from './reconnect';
+import { parseTaskStatusList } from './task-status';
 
 export const DEFAULT_WEB_PORT = 4737;
 export function defaultDataDir(): string {
@@ -22,6 +23,9 @@ export interface CLIOptions {
   reconnectMaxIntervalSeconds?: number;
   engine?: string;
   worker?: string;
+  view?: 'full' | 'brief';
+  fields?: string[];
+  status?: string[];
   cancel?: boolean;
   refresh?: boolean;
   dryRun?: boolean;
@@ -42,7 +46,7 @@ export function positionals(argv: string[]): string[] {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg.startsWith('--')) { words.push(arg); continue; }
-    if (['--input', '--command-id', '--data-dir', '--task-id', '--schedule-id', '--port', '--output', '--for', '--reconnect-grace', '--reconnect-max-interval-s', '--agent', '--dir', '--timeout', '--engine', '--worker', '--field', '--expected-revision', '--manifest-digest', '--decision', '--comment', '--comment-file', '--owner-file'].includes(arg)) i++;
+    if (['--input', '--command-id', '--data-dir', '--task-id', '--schedule-id', '--port', '--output', '--for', '--reconnect-grace', '--reconnect-max-interval-s', '--agent', '--dir', '--timeout', '--engine', '--worker', '--view', '--fields', '--status', '--field', '--expected-revision', '--manifest-digest', '--decision', '--comment', '--comment-file', '--owner-file'].includes(arg)) i++;
   }
   return words;
 }
@@ -91,6 +95,27 @@ export function parseCLI(argv: string[]): CLIOptions {
       options.reconnectMaxIntervalSeconds = Number(value);
       continue;
     }
+    if (arg === '--view') {
+      const value = argv[++i];
+      if (!value || value.startsWith('--')) throw new LocalIPCError('INVALID_ARGUMENT', 'Missing value for --view');
+      if (value !== 'full' && value !== 'brief') throw new LocalIPCError('INVALID_ARGUMENT', '--view must be full or brief');
+      options.view = value;
+      continue;
+    }
+    if (arg === '--fields') {
+      const value = argv[++i];
+      if (!value || value.startsWith('--')) throw new LocalIPCError('INVALID_ARGUMENT', 'Missing value for --fields');
+      const fields = value.split(',').map(field => field.trim()).filter(Boolean);
+      if (!fields.length) throw new LocalIPCError('INVALID_ARGUMENT', '--fields must list at least one top-level field name');
+      options.fields = fields;
+      continue;
+    }
+    if (arg === '--status') {
+      const value = argv[++i];
+      if (value === undefined || value.startsWith('--')) throw new LocalIPCError('INVALID_ARGUMENT', 'Missing value for --status');
+      options.status = parseTaskStatusList(value);
+      continue;
+    }
     if (arg === '--expected-revision') {
       const value = argv[++i];
       if (!value || !/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) throw new LocalIPCError('INVALID_ARGUMENT', '--expected-revision must be a nonnegative safe integer');
@@ -121,6 +146,8 @@ export function parseCLI(argv: string[]): CLIOptions {
   }
   if (options.engine !== undefined && !ENGINE_FLAG_COMMANDS.includes(options.command ?? '')) throw new LocalIPCError('INVALID_ARGUMENT', '--engine is only valid for engines penalty, engines unblock and engines models');
   if (options.worker !== undefined && !WORKER_FLAG_COMMANDS.includes(options.command ?? '')) throw new LocalIPCError('INVALID_ARGUMENT', '--worker is only valid for workers probe and workers unblock');
+  if ((options.view !== undefined || options.fields !== undefined) && !['tasks.get', 'tasks.list'].includes(options.command ?? '')) throw new LocalIPCError('INVALID_ARGUMENT', '--view and --fields are only valid for tasks get and tasks list');
+  if (options.status !== undefined && options.command !== 'tasks.list') throw new LocalIPCError('INVALID_ARGUMENT', '--status is only valid for tasks list');
   if (options.cancel && options.command !== 'tasks.retry') throw new LocalIPCError('INVALID_ARGUMENT', '--cancel is only valid for tasks retry');
  if (options.refresh && options.command !== 'engines.models') throw new LocalIPCError('INVALID_ARGUMENT', '--refresh is only valid for engines models');
   if (options.dryRun && options.command !== 'janitor.sweep') throw new LocalIPCError('INVALID_ARGUMENT', '--dry-run is only valid for janitor sweep');
@@ -132,6 +159,7 @@ export function parseCLI(argv: string[]): CLIOptions {
   if (options.decision !== undefined && !['accepted', 'rejected'].includes(options.decision)) throw new LocalIPCError('INVALID_ARGUMENT', '--decision must be accepted or rejected');
   if (options.comment !== undefined && options.commentFile !== undefined) throw new LocalIPCError('INVALID_ARGUMENT', '--comment and --comment-file cannot be combined');
   if (options.field !== undefined) {
+    if (options.fields !== undefined) throw new LocalIPCError('INVALID_ARGUMENT', '--field cannot be combined with --fields');
     if (!item || item.mutation || item.local) throw new LocalIPCError('INVALID_ARGUMENT', '--field is only valid for non-streaming read commands');
     if (!/^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/.test(options.field)) throw new LocalIPCError('INVALID_ARGUMENT', '--field must be a dot-separated response path, e.g. data.revision');
     if (output || jsonAlias) throw new LocalIPCError('INVALID_ARGUMENT', '--field cannot be combined with --output or --json');

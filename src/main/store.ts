@@ -5,7 +5,7 @@ import { ownerSession } from '../shared/policy/owner-instance';
 import { type LogicalOwner } from '../shared/contracts/owners';
 import { type WorkPackage } from '../shared/contracts/tasks';
 import { type CommandReceipt } from '../shared/contracts/commands';
-import type { Task, TaskSummary } from '../shared/contracts/tasks';
+import type { Task, TaskStatus, TaskSummary } from '../shared/contracts/tasks';
 import { migrate } from './migrate';
 import { transact } from './storage/transaction';
 import { dbVendorLadder, type VendorLimit } from './storage/vendor-limits';
@@ -105,8 +105,12 @@ export class TaskStore {
   if(pending){const {events,artifacts,...body}=pending;return structuredClone({...body,events:events.slice(-3),eventCount:events.length,artifacts:artifacts.map(({content,...meta})=>meta)});}
   return this.summarizeCommitted(head);
  });}
- /** Durable summaries only: no pending merge, so this is what external readers may see. */
- listSummariesCommitted():TaskSummary[]{return this.listHeadsCommitted().map(head=>this.summarizeCommitted(head));}
+ /** Durable summaries only: no pending merge, so this is what external readers may see.
+  * Optional statuses filter the heads before event/artifact SQL, so a narrowed list never pays for excluded tasks. */
+ listSummariesCommitted(statuses?:readonly TaskStatus[]):TaskSummary[]{
+  const heads=this.listHeadsCommitted();
+  return (statuses?heads.filter(head=>statuses.includes(head.status)):heads).map(head=>this.summarizeCommitted(head));
+ }
  private summarizeCommitted(head:Task):TaskSummary{
   const events=this.db.prepare('SELECT body FROM task_events WHERE task_id=? ORDER BY position DESC LIMIT 3').all(head.id).reverse().map(row=>JSON.parse(String(row.body)));
   const count=Number(this.db.prepare('SELECT count(*) AS n FROM task_events WHERE task_id=?').get(head.id)!.n);

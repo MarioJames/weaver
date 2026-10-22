@@ -58,12 +58,22 @@ export async function readCommentFile(path: string): Promise<string> {
     return comment;
   } finally { await file.close(); }
 }
+/** Arrays (fields) compare by content so an identical --input value is not a false conflict. */
+function sameArg(left: unknown, right: unknown): boolean {
+  if (Array.isArray(left) && Array.isArray(right)) return left.length === right.length && left.every((item, index) => item === right[index]);
+  return left === right;
+}
+/** A single status string and its one-element array form are the same filter. */
+function sameStatusArg(left: unknown, right: unknown): boolean {
+  const list = (value: unknown) => typeof value === 'string' ? [value] : value;
+  return sameArg(list(left), list(right));
+}
 /** Put one convenience flag into request args, refusing to overwrite a different --input value. */
-export function mergeArg(envelope: Record<string, unknown>, key: string, value: unknown, label: string): void {
+export function mergeArg(envelope: Record<string, unknown>, key: string, value: unknown, label: string, same: (left: unknown, right: unknown) => boolean = sameArg): void {
   const args = envelope.args ?? {};
   if (!args || typeof args !== 'object' || Array.isArray(args)) throw new LocalIPCError('INVALID_ARGUMENT', 'Request args must be an object');
   const record = args as Record<string, unknown>;
-  if (key in record && record[key] !== value) throw new LocalIPCError('INVALID_ARGUMENT', `Input ${label} does not match CLI ${label}`);
+  if (key in record && !same(record[key], value)) throw new LocalIPCError('INVALID_ARGUMENT', `Input ${label} does not match CLI ${label}`);
   envelope.args = { ...record, [key]: value };
 }
 export function makeRequest(options: CLIOptions, input: unknown = {}, ownerAuth?: OwnerAuth): Record<string, unknown> {
@@ -78,6 +88,9 @@ export function makeRequest(options: CLIOptions, input: unknown = {}, ownerAuth?
   envelope.commandId = options.commandId || envelope.commandId || randomUUID();
   if (options.scheduleId !== undefined) mergeArg(envelope, 'scheduleId', options.scheduleId, 'schedule ID');
   if (options.taskId) mergeArg(envelope, 'taskId', options.taskId, 'task ID');
+  if (options.view !== undefined) mergeArg(envelope, 'view', options.view, 'view');
+  if (options.fields !== undefined) mergeArg(envelope, 'fields', options.fields, 'fields');
+  if (options.status !== undefined) mergeArg(envelope, 'status', options.status, 'status', sameStatusArg);
   if (options.engine !== undefined) mergeArg(envelope, 'engine', options.engine, 'engine');
   if (options.worker !== undefined) mergeArg(envelope, 'worker', options.worker, 'worker');
   if (options.cancel) mergeArg(envelope, 'cancel', true, 'cancel');

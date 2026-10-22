@@ -14,6 +14,7 @@ import {
   ParentAgentError,
   ConfirmedParentCancellation,
   type ParentAgentSession,
+  type ParentAgentSendOptions,
   type PreparedParentAgent,
   type ParentProcess,
   type ParentProcessLauncher,
@@ -938,7 +939,7 @@ export class OpenCodeParentSession implements ParentAgentSession {
     if (!this.closed) void this.close().catch(() => { /* close failures surface through unavailable */ });
   }
 
-  async send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void, options?: { finalAssistantOnly?: boolean }): Promise<string> {
+  async send(text: string, signal?: AbortSignal, onDelta?: (chunk: string) => void, options?: ParentAgentSendOptions): Promise<string> {
     if (typeof text !== 'string' || !text.trim() || text.length > PARENT_TEXT_MAX) throw parentError('invalid_input', `send text must be 1–${PARENT_TEXT_MAX} characters`);
     if (signal?.aborted) throw abortReason(signal);
     if (this.closed) throw parentError('closed', 'opencode parent session is closed');

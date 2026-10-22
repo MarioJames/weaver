@@ -15,6 +15,8 @@ import { createImChannel, type ImChannelFactory, type ImChannel, type Delivery }
 import { ImBootstrapBudgetError, imInstructions } from './bootstrap';
 import { extractInboundText } from './inbound';
 import { PublicDeltaFilter, parseReply, replyCard, REPLY_BYTES, actionIdentity } from './cards';
+import { formatParentProgress, PROGRESS_MAX_BYTES, PROGRESS_MAX_LINES } from './progress';
+import type { ParentProgressEvent } from './parent-agent';
 
 const SAFE = 'IM 操作失败，请检查配置或重新连接。';
 const TURN_FAIL_NOTICE = '本轮回复失败，未自动重新执行。请发送新消息重试。';
@@ -597,6 +599,28 @@ export class ImService {
     const turn: NonNullable<Session['turn']> = { id, abort, delivery, parentOutcome: 'not-started' };
     session.turn = turn;
     const filter = new PublicDeltaFilter(); let pending = ''; let total = 0; let wake: (() => void) | undefined; let done = false; let failure: unknown; let final = ''; let messageId = '';
+    // Progress lines carry an independent budget (count + byte caps) and never count
+    // toward the answer REPLY_BYTES (`total` only accumulates body text).
+    // Progress lines are transient streaming hints; the final `setContent(parseReply(final))`
+    // closes with the answer text only. The separator break below counts toward the
+    // progress byte budget, never toward `total`.
+    let progressCount = 0; let progressBytes = 0;
+    // Last queued-or-streamed character (body text, progress lines, separator breaks).
+    // Tracked across flushes so a progress line always starts on its own line even when
+    // body text does not end with a newline. When the body filter holds back an unflushed
+    // suffix, `delta` still carries the true tail, so fall back to it.
+    let lastChar = '';
+    const onProgress = (event: ParentProgressEvent): void => {
+      if (done || !delivery.valid()) return;
+      const line = formatParentProgress(event);
+      if (!line) return;
+      if (progressCount >= PROGRESS_MAX_LINES) return;
+      const separator = lastChar !== '' && lastChar !== '\n' ? '\n' : '';
+      const size = Buffer.byteLength(`${separator}${line}\n`);
+      if (progressBytes + size > PROGRESS_MAX_BYTES) return;
+      progressCount++; progressBytes += size;
+      pending += `${separator}${line}\n`; lastChar = '\n'; wake?.();
+    };
     delivery.abort.signal.addEventListener('abort', () => { abort.abort(); wake?.(); }, { once: true });
     const result = await channel.stream(session.chat, async controller => {
       messageId = controller.messageId;
@@ -608,7 +632,9 @@ export class ImService {
         const visible = filter.push(delta); total += Buffer.byteLength(visible);
         if (total > REPLY_BYTES) { failure = new ImServiceError('IM_REPLY_LIMIT'); abort.abort(); wake?.(); return; }
         pending += visible; wake?.();
-      }).then(value => { final = value; turn.parentOutcome = 'completed'; }, error => { failure = error; turn.parentOutcome = error instanceof ParentTurnNotSubmitted ? 'not-submitted' : error instanceof ConfirmedParentCancellation ? 'confirmed-cancellation' : 'failed'; }).finally(() => { done = true; wake?.(); });
+        if (visible) lastChar = visible.at(-1) ?? lastChar;
+        else if (delta) lastChar = delta.at(-1) ?? lastChar;
+      }, { onProgress }).then(value => { final = value; turn.parentOutcome = 'completed'; }, error => { failure = error; turn.parentOutcome = error instanceof ParentTurnNotSubmitted ? 'not-submitted' : error instanceof ConfirmedParentCancellation ? 'confirmed-cancellation' : 'failed'; }).finally(() => { done = true; wake?.(); });
       while (!done || pending) {
         if (!delivery.valid() || failure) { abort.abort(); break; }
         if (pending) { const chunk = pending; pending = ''; await controller.append(chunk); }

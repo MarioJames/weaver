@@ -14,7 +14,9 @@ import { REAL_ENGINE_KINDS, listWorkspaceDirectories } from '../../workspace';
 import { fail } from '../commands/errors';
 import type { CommandArgs } from '../commands/types';
 import type { WorkerUnblockResult } from '../workers/unblock';
+import { TASK_GET_FIELDS, TASK_LIST_FIELDS, briefTaskFields, projectTaskView, taskProjection } from './projection';
 import { publicTask, type TaskRecords } from './records';
+import { taskStatusFilter } from './status';
 
 /** Scale hint, not an admission rule: admission is per owner instance, so this sum over enabled profiles caps nothing by itself. */
 export function configuredParallel(policy: PolicyStore): number {
@@ -39,15 +41,19 @@ export class Queries {
  capabilities(a:CommandArgs):unknown{return {apiVersion:API_VERSION,cliTransport:this.environment.transportStatus(),authentication:'ephemeral-local-trusted-user-demo',ownerScopedAuthorization:false,ownerSpawn:this.environment.herdrPresent()?'herdr':'logical-registration',manualAttach:'metadata-only',ownerModelSpawned:false,attachmentVerified:false,authenticated:false,modelUsable:false,workerProviders:this.manager.canLaunchReal?['mock-jsonl',...REAL_ENGINE_KINDS]:['mock-jsonl'],realExecution:this.manager.canLaunchReal,mcp:false,maxParallel:configuredParallel(this.policy),capacity:{unit:'owner-instance',aggregate:'sum of enabled owner profile max_parallel',admission:'Each attached owner instance holds its own profile max_parallel slots, so maxParallel is a scale hint, not a profile-wide or global cap.'},policyAdmission:true,quota:QUOTA_CAPABILITIES,commands:[...READ_COMMANDS,...WRITE_COMMANDS],limits:{eventsPerPage:100},durability:'durable intent before effect; interrupted commands require reconciliation, not automatic replay'};}
  workspaces(a:CommandArgs):unknown{return listWorkspaceDirectories(a.path);}
   taskGet(a:CommandArgs):unknown{
+     const projection=taskProjection(a,'tasks.get',TASK_GET_FIELDS);
      const task=this.records.committedTask(a);
     // A running native task is the owner's own subagent, so its instruction is recoverable here even if the spawn response was lost.
     const next=task.status==='running'&&task.dispatch?.execution==='native'?this.nextFor(task):undefined;
-    return {...publicTask(task),...(next?{next}:{})};
+    const full={...publicTask(task),...(next?{next}:{})} as Record<string,unknown>;
+    return projectTaskView(full,briefTaskFields(task),projection);
    }
  taskList(a:CommandArgs):unknown{
     const offset=a.offset??0;const limit=a.limit??25;if(!Number.isSafeInteger(offset)||Number(offset)<0||!Number.isSafeInteger(limit)||Number(limit)<1||Number(limit)>100)fail('INVALID_REQUEST','Invalid pagination');
     if(a.parentTaskId!==undefined)parseId(a.parentTaskId,'parent task ID');
-     const all=this.manager.store.listSummariesCommitted().filter(t=>(a.ownerId===undefined||t.ownerId===a.ownerId)&&(a.parentTaskId===undefined||t.parentTaskId===a.parentTaskId));const tasks=all.slice(Number(offset),Number(offset)+Number(limit)).map(t=>{const {events,artifacts,...summary}=publicTask(t);return {...summary,artifactCount:artifacts.length};});return {tasks,nextOffset:Number(offset)+tasks.length<all.length?Number(offset)+tasks.length:null};
+    const projection=taskProjection(a,'tasks.list',TASK_LIST_FIELDS);
+    const statuses=taskStatusFilter(a);
+     const all=this.manager.store.listSummariesCommitted(statuses).filter(t=>(a.ownerId===undefined||t.ownerId===a.ownerId)&&(a.parentTaskId===undefined||t.parentTaskId===a.parentTaskId));const tasks=all.slice(Number(offset),Number(offset)+Number(limit)).map(t=>{const {events,artifacts,...summary}=publicTask(t);return projectTaskView({...summary,artifactCount:artifacts.length} as Record<string,unknown>,briefTaskFields(t),projection);});return {tasks,nextOffset:Number(offset)+tasks.length<all.length?Number(offset)+tasks.length:null};
    }
  packageGet(a:CommandArgs):unknown{const pkg=this.manager.store.getPackage(parseId(a.packageId,'package ID'));if(!pkg)fail('NOT_FOUND','Package not found');return pkg;}
   taskEvents(a:CommandArgs):unknown{

@@ -17,6 +17,7 @@ import {
   type ParentAgentSendOptions,
   type ParentProcess,
   type ParentProcessLauncher,
+  type ParentProgressEvent,
   type PreparedParentAgent,
   type TimerHandle,
 } from './parent-agent';
@@ -31,9 +32,13 @@ import { PublicTextBoundary } from './public-text';
  * and adopted with `--session-id` on the next child. This adapter never claims that the native
  * dsh process is reused across turns.
  *
- * Only `text` events and the terminal `final` event are public. `thinking`, `tool_call`,
- * `tool_result`, `status`, stderr diagnostics and protocol errors stay inside this module. The
- * stream is the native projection: committed text arrives when a step commits, not per token.
+ * Only `text` events and the terminal `final` event are public text. `thinking`,
+ * `tool_result`, `status` details, stderr diagnostics and protocol errors stay inside
+ * this module. The stream is the native projection: committed text arrives when a step
+ * commits, not per token. When the caller passes `ParentAgentSendOptions.onProgress`,
+ * `tool_call` tool names and `status` phase names are additionally reported as short
+ * sanitized progress labels (never arguments, commands, thinking text or paths);
+ * without `onProgress` the behavior is exactly the previous text-only one.
  *
  * Model, effort and the unattended permission posture ride the same private `--patch` overlay as
  * the existing worker launcher: `deepseek-official`, `workspace-write`, `ask`, and the local
@@ -62,6 +67,7 @@ interface ActiveTurn {
   failure?: ParentAgentError;
   timer: TimerHandle;
   onDelta?: (chunk: string) => void;
+  onProgress?: (event: ParentProgressEvent) => void;
   boundary: PublicTextBoundary;
   process?: ParentProcess;
   pid?: number;
@@ -164,6 +170,20 @@ export class DshParentSession implements ParentAgentSession {
     return this.lastStderr.trim() ? 'dsh CLI exited after reporting diagnostics' : 'dsh CLI exited';
   }
 
+  /**
+   * Best-effort progress channel: only short tool/stage labels leave this module.
+   * `thinking` bodies, `tool_call.input` (tool arguments/full commands), `tool_result`
+   * and stderr never enter onProgress; callback errors are swallowed and never affect
+   * the text turn.
+   */
+  private emitProgress(active: ActiveTurn, event: ParentProgressEvent): void {
+    if (active.settled || active.cancelError || active.failure) return;
+    const callback = active.onProgress;
+    if (!callback) return;
+    try { callback(event); }
+    catch { /* progress is best effort; the text turn owns failure reporting */ }
+  }
+
   private handleLine(active: ActiveTurn, line: string): void {
     if (active.settled) return;
     let frame: Record<string, unknown>;
@@ -192,6 +212,15 @@ export class DshParentSession implements ParentAgentSession {
       case 'status': {
         const phase = typeof frame.phase === 'string' ? frame.phase : '';
         if (phase === 'step_start') active.boundary.noteBoundary();
+        // Stage progress: only the stage name (turn start / step number), never body text or args.
+        if (phase === 'turn_start') this.emitProgress(active, { kind: 'stage', name: '开始' });
+        else if (phase === 'step_start') {
+          const step = frame.step;
+          this.emitProgress(active, {
+            kind: 'stage',
+            name: typeof step === 'number' && Number.isFinite(step) ? `步骤${step}` : '执行',
+          });
+        }
         if (phase === 'turn_end') {
           const reason = frame.reason;
           if (reason && typeof reason === 'object' && !Array.isArray(reason)) {
@@ -231,9 +260,17 @@ export class DshParentSession implements ParentAgentSession {
         return;
       }
       case 'thinking':
-      case 'tool_call':
       case 'tool_result':
         return;
+      case 'tool_call': {
+        // Tool progress: only the short tool-name label; `input` (args/full commands) and results never forward.
+        if (active.cancelError || active.failure) return;
+        const tool = frame.tool;
+        if (typeof tool === 'string' && tool.trim()) {
+          this.emitProgress(active, { kind: 'tool', name: tool });
+        }
+        return;
+      }
       default:
         return;
     }
@@ -271,6 +308,7 @@ export class DshParentSession implements ParentAgentSession {
 
   private stop(active: ActiveTurn): void {
     active.onDelta = undefined;
+    active.onProgress = undefined;
     active.timer.cancel();
     if (!active.process) {
       // No native child exists, so there is nothing to terminate.
@@ -451,6 +489,7 @@ export class DshParentSession implements ParentAgentSession {
     active.settled = true;
     active.timer.cancel();
     active.onDelta = undefined;
+    active.onProgress = undefined;
     active.detachAbort?.();
     if (typeof outcome === 'string') active.resolve?.(outcome);
     else active.reject?.(outcome);
@@ -482,6 +521,7 @@ export class DshParentSession implements ParentAgentSession {
 
     const prompt = this.instructionsSent ? text : `${this.prepared.instructions}\n\n${text}`;
     const finalOnly = options?.finalAssistantOnly === true;
+    const onProgress = options?.onProgress;
     let resolve!: (value: string) => void;
     let reject!: (error: Error) => void;
     let resolveClose!: () => void;
@@ -501,6 +541,7 @@ export class DshParentSession implements ParentAgentSession {
       nativeAborted: false,
       stderrTail: [],
       ...(!finalOnly && onDelta ? { onDelta } : {}),
+      ...(onProgress ? { onProgress } : {}),
     };
     const promise = new Promise<string>((res, rej) => { resolve = res; reject = rej; });
     active.resolve = resolve;

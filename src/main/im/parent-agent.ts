@@ -17,6 +17,12 @@ import { startQoderParentSession } from './parent-qoder';
 import { startDshParentSession } from './parent-dsh';
 import { imEngineEffortAllowed, isImEngineKind, type ImEngineKind } from '../../shared/im-engines';
 
+/** Short progress labels (tool/stage names only, never content) a session may emit during a turn. */
+export interface ParentProgressEvent {
+  kind: 'tool' | 'stage';
+  name: string;
+}
+
 /** Input for one long-lived IM parent agent session. Engine/model/effort come from the owner profile. */
 export interface ParentAgentInput {
   engineKind: ImEngineKind;
@@ -35,6 +41,13 @@ export interface ParentAgentSendOptions {
    * adapters without a native per-message final keep their existing behavior.
    */
   finalAssistantOnly?: boolean;
+  /**
+   * Optional progress channel. Adapters that can attribute native tool/stage events may
+   * call it with short labels; adapters that cannot simply ignore it and keep the
+   * pre-existing text-only behavior. Never carries thinking text, tool arguments,
+   * commands, credentials or paths — see progress.ts for the rendering/sanitizing side.
+   */
+  onProgress?: (event: ParentProgressEvent) => void;
 }
 
 export interface ParentAgentSession {
