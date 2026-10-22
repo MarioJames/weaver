@@ -11,6 +11,7 @@ import { createHerdrParentAgent } from './parent-herdr';
 import { ConfirmedParentCancellation, ParentTurnNotSubmitted, ParentAgentError, type ParentAgentFactory, type ParentAgentSession, type ParentAgentFailureReason, type ParentAgentInput } from './parent-agent';
 import { createImChannel, type ImChannelFactory, type ImChannel, type Delivery } from './channel';
 import { ImBootstrapBudgetError, imInstructions } from './bootstrap';
+import { extractInboundText } from './inbound';
 import { PublicDeltaFilter, parseReply, replyCard, REPLY_BYTES, actionIdentity } from './cards';
 
 const SAFE = 'IM 操作失败，请检查配置或重新连接。';
@@ -358,11 +359,18 @@ export class ImService {
   private message(message: NormalizedMessage, gen: number): void {
     if (!this.admissible(message.senderId, gen)) return;
     const raw = message.raw as { sender?: {sender_type?:string;sender_id?:{open_id?:string}}; message?: {content?:string;message_id?:string;chat_id?:string;create_time?:string;message_type?:string;chat_type?:string} } | undefined;
-    if (message.senderType !== 'user' || message.chatType !== 'p2p' || message.rawContentType !== 'text' || !/^om_[A-Za-z0-9_-]+$/.test(message.messageId) || !/^oc_[A-Za-z0-9_-]+$/.test(message.chatId) || !this.fresh(message.createTime)) return;
-    if (raw?.sender?.sender_type !== 'user' || raw.sender.sender_id?.open_id !== message.senderId || raw.message?.message_id !== message.messageId || raw.message.chat_id !== message.chatId || raw.message.message_type !== 'text' || raw.message.chat_type !== 'p2p' || !this.fresh(raw.message.create_time) || Number(raw.message.create_time) !== message.createTime) return;
-    let text: unknown;
-    try { text = JSON.parse(raw?.message?.content ?? '').text; } catch { return; }
-    if (typeof text !== 'string' || !text.trim() || Buffer.byteLength(text) > 16_000) { this.notice(message.chatId, '仅支持非空且不超过 16KB 的文本消息。', gen); return; }
+    if (message.senderType !== 'user' || message.chatType !== 'p2p' || (message.rawContentType !== 'text' && message.rawContentType !== 'post') || !/^om_[A-Za-z0-9_-]+$/.test(message.messageId) || !/^oc_[A-Za-z0-9_-]+$/.test(message.chatId) || !this.fresh(message.createTime)) return;
+    if (raw?.sender?.sender_type !== 'user' || raw.sender.sender_id?.open_id !== message.senderId || raw.message?.message_id !== message.messageId || raw.message.chat_id !== message.chatId || (raw.message.message_type !== 'text' && raw.message.message_type !== 'post') || raw.message.message_type !== message.rawContentType || raw.message.chat_type !== 'p2p' || typeof raw.message.content !== 'string' || !this.fresh(raw.message.create_time) || Number(raw.message.create_time) !== message.createTime) return;
+    const inbound = extractInboundText(message);
+    if (inbound.kind === 'silent') return;
+    if (inbound.kind === 'feedback') {
+      const feedbackClaim = this.claim(`message:${message.messageId}`);
+      if (feedbackClaim === 'persistence') { this.notice(message.chatId, PERSIST_NOTICE, gen); return; }
+      if (feedbackClaim !== 'claimed') return;
+      this.notice(message.chatId, inbound.notice, gen);
+      return;
+    }
+    const text = inbound.text;
     if (this.standby?.parent && this.standby.deadline <= this.now()) this.retireIdle(this.standby);
     const key = `${message.chatId}:${message.senderId}`; let session = this.sessions.get(key);
     if (session?.parent && !session.busy && !session.queue.length && session.deadline <= this.now()) { this.retireIdle(session); session = undefined; }

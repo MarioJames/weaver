@@ -589,3 +589,63 @@ test('控制unavailable先到时同代分类失败仍覆盖通用engine且旧代
   assert.ok(!JSON.stringify(snapshot).includes(canary) && !JSON.stringify(snapshot).includes('/tmp/secret'));
   assert.ok(f.notices.some(text => text.includes('本轮回复失败')) && !f.notices.join().includes(canary));
 });
+
+test('真实SDK post与text共享同会话FIFO与持久去重', async t => {
+  const { normalize } = await import('@larksuite/channel');
+  const texts: string[] = []; let launches = 0;
+  const { f } = await setup(t, async () => { launches++; return { send: async text => { texts.push(text); return `答:${text}`; }, close: async () => {} }; });
+  const now = Date.now();
+  const postContent = JSON.stringify({ title: '优化标题', content: [[{ tag: 'text', text: '在 weaver 做几个优化：', style: [] }], [{ tag: 'text', text: '1. bot 样式优化' }]] });
+  const post = await normalize({ sender: { sender_id: { open_id: 'ou_a' }, sender_type: 'user' }, message: { message_id: 'om_postshare', chat_id: 'oc_a', chat_type: 'p2p', message_type: 'post', create_time: String(now), content: postContent } }, { botIdentity: { openId: "ou_bot", name: "t" }, includeRaw: true });
+  f.handlers.message(message('t1', 'ou_a', 'oc_a', '前置文本', now));
+  f.handlers.message(post); await tick();
+  assert.equal(launches, 1);
+  assert.equal(texts.length, 2);
+  assert.match(texts[1]!, /优化标题/);
+  assert.match(texts[1]!, /bot 样式优化/);
+  assert.ok(!texts[1]!.includes('[rich text message]'));
+  f.handlers.message(post); await tick();
+  assert.equal(texts.length, 2, '同一post重放不重复执行');
+  assert.equal(f.cards.length, 2);
+});
+
+test('空白/超长/仅附件post安全反馈不触发任务且重复不重复通知', async t => {
+  const { normalize } = await import('@larksuite/channel');
+  let sends = 0;
+  const { f } = await setup(t, async () => ({ send: async () => { sends++; return 'ok'; }, close: async () => {} }));
+  const now = Date.now();
+  const blank = await normalize({ sender: { sender_id: { open_id: 'ou_a' }, sender_type: 'user' }, message: { message_id: 'om_postblank', chat_id: 'oc_a', chat_type: 'p2p', message_type: 'post', create_time: String(now), content: JSON.stringify({ title: '', content: [[{ tag: 'text', text: '   ' }]] }) } }, { botIdentity: { openId: "ou_bot", name: "t" }, includeRaw: true });
+  f.handlers.message(blank); await tick();
+  assert.equal(sends, 0);
+  assert.ok(f.notices.some(s => s.includes('仅支持')));
+  assert.ok(!f.notices.join().includes('[rich text message]'));
+  const before = f.notices.length;
+  f.handlers.message(blank); await tick();
+  assert.equal(f.notices.length, before, '重复unsupported不重复通知');
+  assert.equal(sends, 0);
+  const big = await normalize({ sender: { sender_id: { open_id: 'ou_a' }, sender_type: 'user' }, message: { message_id: 'om_postbig', chat_id: 'oc_a', chat_type: 'p2p', message_type: 'post', create_time: String(now), content: JSON.stringify({ title: '', content: [[{ tag: 'text', text: 'y'.repeat(16_001) }]] }) } }, { botIdentity: { openId: "ou_bot", name: "t" }, includeRaw: true });
+  f.handlers.message(big); await tick();
+  assert.equal(sends, 0);
+  assert.ok(f.notices.some(s => s.includes('仅支持')));
+  const attach = await normalize({ sender: { sender_id: { open_id: 'ou_a' }, sender_type: 'user' }, message: { message_id: 'om_postatt', chat_id: 'oc_a', chat_type: 'p2p', message_type: 'post', create_time: String(now), content: JSON.stringify({ title: '', content: [[{ tag: 'text', text: '' }]], files: [{ file_key: 'k_secret', file_name: 'a.txt' }] }) } }, { botIdentity: { openId: "ou_bot", name: "t" }, includeRaw: true });
+  f.handlers.message(attach); await tick();
+  assert.equal(sends, 0);
+  assert.ok(!f.notices.join().includes('k_secret'));
+});
+
+test('post类型伪造/未授权/群聊不进入Agent且无反馈', async t => {
+  const { normalize } = await import('@larksuite/channel');
+  let sends = 0;
+  const { f } = await setup(t, async () => ({ send: async () => { sends++; return 'ok'; }, close: async () => {} }));
+  const now = Date.now();
+  const real = await normalize({ sender: { sender_id: { open_id: 'ou_a' }, sender_type: 'user' }, message: { message_id: 'om_forge1', chat_id: 'oc_a', chat_type: 'p2p', message_type: 'post', create_time: String(now), content: JSON.stringify({ title: '', content: [[{ tag: 'text', text: 'hi' }]] }) } }, { botIdentity: { openId: "ou_bot", name: "t" }, includeRaw: true });
+  const forged = { ...real, rawContentType: 'text' };
+  f.handlers.message(forged as typeof real); await tick();
+  const unauth = await normalize({ sender: { sender_id: { open_id: 'ou_unknown' }, sender_type: 'user' }, message: { message_id: 'om_unauth_post', chat_id: 'oc_a', chat_type: 'p2p', message_type: 'post', create_time: String(now), content: JSON.stringify({ title: '', content: [[{ tag: 'text', text: 'hi' }]] }) } }, { botIdentity: { openId: "ou_bot", name: "t" }, includeRaw: true });
+  f.handlers.message(unauth); await tick();
+  const group = await normalize({ sender: { sender_id: { open_id: 'ou_a' }, sender_type: 'user' }, message: { message_id: 'om_group_post', chat_id: 'oc_a', chat_type: 'group', message_type: 'post', create_time: String(now), content: JSON.stringify({ title: '', content: [[{ tag: 'text', text: 'hi' }]] }) } }, { botIdentity: { openId: "ou_bot", name: "t" }, includeRaw: true });
+  f.handlers.message({ ...group, chatType: 'group' }); await tick();
+  assert.equal(sends, 0);
+  assert.equal(f.notices.length, 0);
+  assert.equal(f.cards.length, 0);
+});

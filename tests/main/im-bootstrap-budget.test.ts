@@ -75,6 +75,16 @@ test('root launch instructions distinguish the immediate request receipt from ob
   assert.match(text, /启动失败/);
 });
 
+test('同批同项目单root/复用已有任务/实时分页状态为产品政策', () => {
+  const text = imInstructions('/fixture', 'codex', epoch, ['/projects/fake']);
+  assert.match(text, /同一批.*同一项目.*一个root|只建一个root/);
+  assert.match(text, /拆child|child/);
+  assert.match(text, /复用|关联已有任务/);
+  assert.match(text, /tasks list|分页/);
+  assert.match(text, /root.*child|child.*root/);
+  assert.match(text, /running.*queued|queued.*running|review/);
+});
+
 
 test('save-time budget reserves the full UUID epoch and the longer supported engine kind', () => {
   const paths = ['/projects/fake'];
