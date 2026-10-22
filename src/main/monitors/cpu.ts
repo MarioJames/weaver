@@ -1,8 +1,18 @@
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { RunningCommand } from '../../shared/contracts/monitoring';
 
-export interface CpuSample { at: number; cpu: number | null }
+export interface CpuSample {
+  at: number;
+  cpu: number | null;
+  /** Cumulative CPU of the worker root's process tree, including descendants moved to another cgroup. */
+  treeCpu?: number | null;
+  /** The oldest live command under the vendor CLI at this sample; null means none was found. */
+  command?: RunningCommand | null;
+  /** True when that command has outlived herdr.max_command_minutes. */
+  commandTimedOut?: boolean;
+}
 /** Cumulative CPU of one worker scope in nanoseconds, or null when it cannot be read. */
 export type CpuReader = (scopeUnit: string) => Promise<number | null>;
 

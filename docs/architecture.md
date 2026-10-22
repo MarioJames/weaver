@@ -125,6 +125,7 @@ src/
 - 准入与派发同一 resolve 函数：`policy preview` 只读（`dispatch:"preview"`、`execution:"disabled"`）不执行；`workers.spawn` 实际校验 workspace/provider/容量后按结果 start 或入队。页面走的 `previewRoute` 由服务端当场补上同一份全局负载，所以预览显示的选择就是此刻派发会走的选择。
 - 并发按 **owner 实例**的 `profile.max_parallel`：槽位分组是 `instance:<ownerId>`，任务绑定 `ownerId` 时竞争的就是那个确切实例自己的额度；没有 `ownerId` 的遗留任务单独共用 `profile:<profileId>` 组。同一 profile 的多个实例各占各的额度，A 会话排满不影响 B 会话开工。容量在 `workers.spawn`、pump 复核和 `manager.start()` 启动前三处都查，超限一律入队而不是抢占。
 - `capabilities.maxParallel` 是 enabled profile 的 `max_parallel` 之和，配合 `capacity:{unit:'owner-instance', admission:…}` 只作规模提示——既不是 profile 级也不是全局的准入帽；系统没有全局并发上限。被限制的是**每个实例**的并发，跨实例的 子 Agent 负载均衡仍是全局的（见第一条）。
+- `herdr.max_command_minutes`（1–1440，默认 30）是单条命令处于 `running_command` 的最长时长；超过后 health 转 `stalled`（`reason:'command_timeout'`，附命令摘要），`tasks wait` 提前返回，由 owner 决定取消或重试，Weaver 不自动杀进程。旧策略缺少该键按 30 处理，不需要迁移。
 - `herdr.max_wait_minutes`（1–1440）是 父 Agent 对同一 子 Agent 两次检查之间的最长间隔：等待只用 `weaver tasks wait --task-id`，不带 `--for` 时等待 `max_wait_minutes × 60 秒`（策略读不到时退到 30 秒），显式 `--for` 允许 1–86400 秒，任务一结束就返回。期间 父 Agent 查看进展并决定继续等待、取消或收回，Weaver 不会据此停止 子 Agent。
 
 队列与冻结：
@@ -148,7 +149,7 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 - 请求的真实引擎/model/effort、adapter、workspace、scopeUnit 和 observed evidence 都记录在 `run` 与 observability 里；mock 显式记录 `execution:'mock'`。没有静默回退：CC 报 `CAPABILITY_UNAVAILABLE`（deferred），unknown kind 同拒，launcher 未加载同拒。
 - 生命周期收尾只清理本 launch 拥有的进程；Linux/systemd host 上每个真实 launch 使用唯一命名 user scope，取消/超时/完成前先关闭自身 scope。没有共享 leader/daemon。
 
-真实执行首个有效输出后与 native 执行都不设总执行时限；`herdr.max_wait_minutes` 只是 父 Agent 两次检查之间的最长间隔（`weaver tasks wait`/`tasks watch` 不带 `--for` 即等待 `max_wait_minutes × 60 秒`，策略读不到时为 30 秒；显式 `--for` 为 1–86400 秒，任务结束即返回，`wait` 还会在 health 为 `stalled` 时提前返回并带 `reason:'stalled'` 与重试/取消提示），Weaver 不据此停止 子 Agent，直接单测的 mock adapter 才允许一个更短的测试等待。
+真实执行首个有效输出后与 native 执行都不设总执行时限；`herdr.max_wait_minutes` 只是 父 Agent 两次检查之间的最长间隔（`weaver tasks wait`/`tasks watch` 不带 `--for` 即等待 `max_wait_minutes × 60 秒`，策略读不到时为 30 秒；显式 `--for` 为 1–86400 秒，任务结束即返回，`wait` 还会在 health 为 `stalled` 时提前返回并带 `reason:'stalled'` 与重试/取消提示），Weaver 不据此停止 子 Agent。单条命令的 `herdr.max_command_minutes` 只改变 health 判定与 wait 的提前返回，不触发自动停止；直接单测的 mock adapter 才允许一个更短的测试等待。
 
 ## 6. 卡住检测与引擎惩罚（src/main/stall.ts）
 
@@ -164,7 +165,7 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 - 子 Agent 解除（`workers unblock --worker <id>`，由用户决定）同为应用层操作（`src/main/application/workers/unblock.ts`）：先校验子 Agent 存在（未知为 `NOT_FOUND`，不写任何东西），再经 PolicyBlockService（`clearWorker`）删除所有 `block.worker` 等于它的 block（任意来源与 model）；引擎级「全部子 Agent 均被限流」供应商 block 只在去掉该子 Agent 的 block 后引擎已不再整体被封时才一并删除，手动或其他来源的引擎级 block、其他子 Agent 的 block 与供应商限流阶梯都保留。随后让免费渠道探测复位该子 Agent 的未决问题；stall 阶梯按引擎保存，只在该引擎已无 stall block 时复位；最后通知排队任务重新路由，步骤失败时已删除的 block 不回滚。
 - 惩罚只暂停引擎的派发资格：从不取消任务、从不杀进程；running 的任务继续跑完并照常回报。
 
-监控器每 60 秒 tick 一次，并发 tick 合并成在途那一次；只在 ready 窗口内写状态，await 采样与 await 探测之后都重新确认窗口仍然开着。期限、连击与记录落 `weaver.db` 的 `stall_*` 表（见 §3），重启后继续；`stop()` 中止在途探测并等当前 tick 收束，独立于服务 ready 回调也会阻止晚到的采样/探测写入，只有再次 `start()` 才恢复 tick；免费渠道探测与额度调度器同样：停止之后手动 tick、晚到的探测回答、手动探测都不再写库或策略，也不再启动新的探测或刷新（ready 回调为 true 或未提供都一样）。`taskHealth` 与引擎页/CLI 用的是**同一套**样本与分类器，不存在第二个判定者：`ended`（已完成/失败/取消，带最终 `taskStatus`）、`owner_starting`/`owner_running`（owner 根任务专属：`executionRole:'owner'` 的任务从不判 stalled，尚无 ownerHost 为 `owner_starting`、已有 ownerHost 为 `owner_running`）、`starting`（running real 尚无首个有效输出）、`stalled`（两条都满足）、`waiting_model`（静默 ≥5 分钟且 CPU 没有证明在忙，包含读不到的情况）、`working`（其余），非 running real 任务的 `silenceMs`/`cpuActive`/`cpuIdleMs` 保留为 `null` 而不是猜。`tasks.health`、`engines.health`、`engines.penalty`、`engines.unblock` 已接入同一 `CommandHandler`：health 返回不含 history 的摘要，penalty 返回单引擎完整保留记录，unblock 返回清理结果；缺监控器时返回 `CAPABILITY_UNAVAILABLE`。逐项命令语义见 [agent-interface](agent-interface.md#33-卡住健康与引擎惩罚命令)。
+监控器每 60 秒 tick 一次，并发 tick 合并成在途那一次；只在 ready 窗口内写状态，await 采样与 await 探测之后都重新确认窗口仍然开着。期限、连击与记录落 `weaver.db` 的 `stall_*` 表（见 §3），重启后继续；`stop()` 中止在途探测并等当前 tick 收束，独立于服务 ready 回调也会阻止晚到的采样/探测写入，只有再次 `start()` 才恢复 tick；免费渠道探测与额度调度器同样：停止之后手动 tick、晚到的探测回答、手动探测都不再写库或策略，也不再启动新的探测或刷新（ready 回调为 true 或未提供都一样）。`taskHealth` 与引擎页/CLI 用的是**同一套**样本与分类器，不存在第二个判定者：CPU 同时采 worker scope 和 CLI 根 PID 的进程树（含被 `systemd-run --scope` 移出的子孙），任一在忙即算忙；`ended`（已完成/失败/取消，带最终 `taskStatus`）、`owner_starting`/`owner_running`（owner 根任务专属：`executionRole:'owner'` 的任务从不判 stalled，尚无 ownerHost 为 `owner_starting`、已有 ownerHost 为 `owner_running`）、`starting`（running real 尚无首个有效输出）、`running_command`（vendor CLI 之外的存活命令，附脱敏摘要与时长；MCP/LSP/语言服务子树不算）、`stalled`（无存活命令且两条都满足，或命令超过 `herdr.max_command_minutes` 的 `command_timeout`）、`waiting_model`（静默 ≥5 分钟且 CPU 没有证明在忙，包含读不到的情况）、`working`（其余），非 running real 任务的 `silenceMs`/`cpuActive`/`cpuIdleMs` 保留为 `null` 而不是猜。`tasks.health`、`engines.health`、`engines.penalty`、`engines.unblock` 已接入同一 `CommandHandler`：health 返回不含 history 的摘要，penalty 返回单引擎完整保留记录，unblock 返回清理结果；缺监控器时返回 `CAPABILITY_UNAVAILABLE`。逐项命令语义见 [agent-interface](agent-interface.md#33-卡住健康与引擎惩罚命令)。
 
 ## 7. Owner 手动上下文与结果（ContinuationService）
 

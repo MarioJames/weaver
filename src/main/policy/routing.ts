@@ -3,7 +3,7 @@
 import type { Availability, Block, Config, Dispatch, Issue, Owner, RouteOptions } from '../../shared/contracts/policy';
 import { availabilityOf, coveringBlock, isBlockActive } from '../../shared/policy/availability';
 import { VENDOR_BLOCK_BY, isEngineBlock } from '../../shared/policy/blocks';
-import { EFFORTS, FREE_CHANNEL_INTERVAL_RANGE, JANITOR_INTERVAL_RANGE, JANITOR_TTL_RANGE, QUOTA_INTERVAL_RANGE, hasQuotaProbe, isValidTimezone } from '../../shared/policy/settings';
+import { EFFORTS, FREE_CHANNEL_INTERVAL_RANGE, JANITOR_INTERVAL_RANGE, JANITOR_TTL_RANGE, MAX_COMMAND_MINUTES_RANGE, QUOTA_INTERVAL_RANGE, hasQuotaProbe, isValidTimezone } from '../../shared/policy/settings';
 import { WEIGHT_MAX, effectiveWeight } from '../../shared/policy/weights';
 import { type Schema, lintSchema, validate } from "./json-schema";
 import CONFIG_SCHEMA from "./config.schema.json";
@@ -52,6 +52,7 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
     if (engine.quota_refresh === true && !hasQuotaProbe(engine.kind)) bad(`$.engines.${id}.quota_refresh`, `kind ${engine.kind} has no quota probe`);
   }
   if (c.quota && (c.quota.interval_minutes < QUOTA_INTERVAL_RANGE.min || c.quota.interval_minutes > QUOTA_INTERVAL_RANGE.max)) bad("$.quota.interval_minutes", `interval must be ${QUOTA_INTERVAL_RANGE.min}-${QUOTA_INTERVAL_RANGE.max} minutes`);
+  if (c.herdr.max_command_minutes !== undefined && (c.herdr.max_command_minutes < MAX_COMMAND_MINUTES_RANGE.min || c.herdr.max_command_minutes > MAX_COMMAND_MINUTES_RANGE.max)) bad("$.herdr.max_command_minutes", `max_command_minutes must be ${MAX_COMMAND_MINUTES_RANGE.min}-${MAX_COMMAND_MINUTES_RANGE.max} minutes`);
   if (c.display?.timezone) {
     if (!isValidTimezone(c.display.timezone)) bad("$.display.timezone", `timezone ${c.display.timezone} is not an IANA timezone name Intl supports`);
   }

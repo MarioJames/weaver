@@ -335,3 +335,15 @@ test('the new commands reach the socket as logical envelopes, not method wrapper
   assert.equal(JSON.parse(output).error.code,'INVALID_ARGUMENT');
  }finally{process.stdout.write=original;await app.close();await rm(directory,{recursive:true,force:true});}
 });
+
+test('text health names a running command and its age, and a command timeout says so',()=>{
+ const running={taskId:'t-3',state:'running_command',engine:'codex',silenceMs:900000,cpuActive:true,cpuIdleMs:0,runningCommand:{pid:42,summary:'pnpm test',startedAt:new Date(0).toISOString(),elapsedMs:125000}};
+ const text=renderEnvelope('text',{apiVersion:'weaver.v1',ok:true,data:running});
+ assert.match(text,/t-3 running_command/);
+ assert.match(text,/command: pnpm test \(pid 42, 125s\)/);
+ assert.match(text,/cpuActive=true/);
+ const timed={...running,state:'stalled',reason:'command_timeout'};
+ const stalled=renderEnvelope('text',{apiVersion:'weaver.v1',ok:true,data:{id:'t-3',status:'running',reason:'stalled',health:timed,hint:'cancel'}});
+ assert.match(stalled,/reason=command_timeout/);
+ assert.match(stalled,/command: pnpm test/);
+});

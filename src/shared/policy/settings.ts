@@ -21,6 +21,16 @@ export function quotaSettings(config: { quota?: QuotaSettings }): QuotaSettings 
   return config.quota ?? { auto_refresh: true, interval_minutes: 15 };
 }
 export const FREE_CHANNEL_INTERVAL_RANGE = { min: 5, max: 1440 } as const;
+/** A single command may run this long before health calls it suspect; Weaver never stops it on this setting. */
+export const MAX_COMMAND_MINUTES_DEFAULT = 30;
+export const MAX_COMMAND_MINUTES_RANGE = { min: 1, max: 1440 } as const;
+/** The effective bound: a missing key (older policy) means the default, never a migration. */
+export function maxCommandMinutes(config: { herdr?: { max_command_minutes?: unknown } }): number {
+  const value = config.herdr?.max_command_minutes;
+  return typeof value === 'number' && Number.isInteger(value) && value >= MAX_COMMAND_MINUTES_RANGE.min && value <= MAX_COMMAND_MINUTES_RANGE.max
+    ? value
+    : MAX_COMMAND_MINUTES_DEFAULT;
+}
 export const JANITOR_DEFAULTS: JanitorSettings = { enabled: true, ttl_hours: 24, interval_hours: 6 };
 export const JANITOR_TTL_RANGE = { min: 1, max: 8760 } as const;
 export const JANITOR_INTERVAL_RANGE = { min: 1, max: 168 } as const;

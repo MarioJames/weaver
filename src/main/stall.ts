@@ -1,15 +1,20 @@
 import type { Config, Block } from '../shared/contracts/policy';
-import type { ProbeOutcome, StallStatus } from '../shared/contracts/monitoring';
+import type { ProbeOutcome, RunningCommand, StallStatus, TaskHealth } from '../shared/contracts/monitoring';
 import type { Task } from '../shared/contracts/tasks';
 import { activeBlocks } from '../shared/policy/availability';
 import { STALL_BLOCK_BY, isEngineBlock, isStallEngineBlock } from '../shared/policy/blocks';
 import { LADDER_RESET_MS, PROBE_MS, PROBE_SUCCESSES, STALL_LADDER } from './domain/penalties';
 import { systemdCpuUsage, type CpuReader, type CpuSample } from './monitors/cpu';
+import { bootTimeMs, clockTicks, observeProcessTree, pidInScope, readProcessSnapshots, type ProcessSnapshot, type TreeObservation } from './monitors/process-tree';
+import { maxCommandMinutes } from '../shared/policy/settings';
 import { armStall, ladderQuiet } from './monitors/ladder';
 import { MonitorLifecycle } from './monitors/lifecycle';
 import { PolicyBlockService, type BlockPolicy } from './policy/blocks';
 import { boundedProbeError } from './redact-context';
 import { HISTORY_LIMIT, RECORD_TASKS_MAX, type EnginePenalty, type StallRecord, type StallState, type StallStateStore } from './storage/stall-state';
+
+/** Kept as a re-export: callers that imported health from the monitor keep working after the shared type move. */
+export type { TaskHealth } from '../shared/contracts/monitoring';
 
 /** Silence plus an idle scope for this long is a stall. */
 export const STALL_MS = 5 * 60_000;
@@ -32,21 +37,6 @@ export type CpuSamples = Record<string, CpuSample[]>;
 export interface ProbeRoute { engine: string; kind: string; worker: string; model: string; effort: string }
 export type RecoveryProbe = (route: ProbeRoute, signal: AbortSignal) => Promise<ProbeOutcome>;
 
-/** What a running worker looks like from the outside: the monitor's own samples, no second classifier. */
-export interface TaskHealth {
-  taskId: string;
-  state: 'ended' | 'starting' | 'working' | 'waiting_model' | 'stalled' | 'owner_starting' | 'owner_running';
-  taskStatus: Task['status'];
-  engine: string | null;
-  lastEventAt: string | null;
-  silenceMs: number | null;
-  cpuActive: boolean | null;
-  cpuIdleMs: number | null;
-  scopeUnit: string | null;
-  /** Owner roots only: how their sub-agents stand. */
-  children?: { total: number; running: number; completed: number };
-}
-
 /** The main-process policy writer, narrowed to what a penalty needs. */
 export type StallPolicy = BlockPolicy;
 
@@ -68,6 +58,22 @@ export function silenceMs(task: Task, now: number): number | null {
   return now - Date.parse(at);
 }
 
+/** One observed interval: true busy, false idle, null unreadable. Scope and tree evidence are ORed. */
+function intervalBusy(earlier: CpuSample, later: CpuSample, elapsed: number): boolean | null {
+  const scope = later.cpu === null || earlier.cpu === null || later.cpu < earlier.cpu
+    ? null
+    : later.cpu - earlier.cpu >= CPU_IDLE_SHARE * elapsed * NS_PER_MS;
+  const hasTree = earlier.treeCpu !== undefined || later.treeCpu !== undefined;
+  const tree = !hasTree ? null : later.treeCpu === null || later.treeCpu === undefined || earlier.treeCpu === null || earlier.treeCpu === undefined || later.treeCpu < earlier.treeCpu
+    ? null
+    : later.treeCpu - earlier.treeCpu >= CPU_IDLE_SHARE * elapsed * NS_PER_MS;
+  // The process tree covers descendants that left this cgroup; either reader proving work means busy.
+  if (scope === true || tree === true) return true;
+  // Unreadable evidence, on either reader, never proves an idle interval.
+  if (scope === null || (hasTree && tree === null)) return null;
+  return false;
+}
+
 /** Start of the newest consecutive idle run inside the samples; null when there is nothing to compare. */
 export function idleSince(samples: CpuSample[] | undefined): number | null {
   if (!samples || samples.length < 2) return null;
@@ -77,19 +83,24 @@ export function idleSince(samples: CpuSample[] | undefined): number | null {
     const later = samples[index]!, earlier = samples[index - 1]!;
     const elapsed = later.at - earlier.at;
     // A busy interval ends the idle run, and so does any sample that cannot prove otherwise.
-    if (later.cpu === null || earlier.cpu === null || later.cpu < earlier.cpu || elapsed <= 0) return from;
-    if (later.cpu - earlier.cpu >= CPU_IDLE_SHARE * elapsed * NS_PER_MS) return from;
+    if (elapsed <= 0 || intervalBusy(earlier, later, elapsed) !== false) return from;
     from = earlier.at;
   }
   return from;
 }
 
-/** A real run is stalled only when it has been silent and CPU-idle for STALL_MS of observed intervals. */
+/**
+ * A real run is stalled when it has been silent and CPU-idle for STALL_MS of observed intervals.
+ * A live command suppresses the stall; a command past its configured timeout is itself the verdict.
+ */
 export function isStalled(task: Task, now: number, samples: CpuSamples): boolean {
   if (!task.run?.scopeUnit) return false;
+  const list = samples[task.id];
+  const latest = list?.at(-1);
+  if (latest?.commandTimedOut === true) return true;
+  if (latest?.command) return false;
   const silence = silenceMs(task, now);
   if (silence === null || silence < STALL_MS) return false;
-  const list = samples[task.id];
   const idle = idleSince(list);
   if (idle === null) return false;
   return list![list!.length - 1]!.at - idle >= STALL_MS;
@@ -131,13 +142,13 @@ function probeRoute(config: Config, engine: string): ProbeRoute | null {
   return { engine, kind: target.kind, worker: worker[0], model: worker[1].model, effort: worker[1].effort };
 }
 
-/** Is the scope burning CPU in its newest observed interval? Null when nothing was observed to compare. */
+/** Is the worker burning CPU in its newest observed interval? Null when nothing was observed to compare. */
 function cpuActive(samples: CpuSample[] | undefined): boolean | null {
   if (!samples || samples.length < 2) return null;
   const later = samples[samples.length - 1]!, earlier = samples[samples.length - 2]!;
   const elapsed = later.at - earlier.at;
-  if (later.cpu === null || earlier.cpu === null || later.cpu < earlier.cpu || elapsed <= 0) return null;
-  return later.cpu - earlier.cpu >= CPU_IDLE_SHARE * elapsed * NS_PER_MS;
+  if (elapsed <= 0) return null;
+  return intervalBusy(earlier, later, elapsed);
 }
 
 /** Length of the newest idle run in observed intervals; null while nothing proves an interval was idle. */
@@ -156,6 +167,8 @@ export interface StallMonitorOptions {
   /** weaver.db-backed state, so restarts keep the ladder and history. */
   stateStore: StallStateStore;
   cpu?: CpuReader;
+  /** Test seam: a fixed /proc snapshot replaces a live scan, and its pids are trusted as stated. */
+  processes?: () => readonly ProcessSnapshot[];
   /** The engine's own light greeting. Without it nothing is probed and only the user can lift a penalty. */
   probe?: RecoveryProbe;
   now?: () => number;
@@ -219,6 +232,30 @@ export class StallMonitor {
     };
   }
 
+  /** Live /proc evidence: the default scans the kernel, tests may inject a table. */
+  private processTable(): readonly ProcessSnapshot[] {
+    return this.options.processes ? this.options.processes() : readProcessSnapshots();
+  }
+
+  /** The root pid participates only while its own cgroup still names this worker scope; never a reused pid. */
+  private treeOf(task: Task, now: number): TreeObservation | null {
+    const pid = task.run?.pid;
+    const unit = task.run?.scopeUnit;
+    if (!pid || !unit) return null;
+    if (!this.options.processes && !pidInScope(pid, unit)) return null;
+    return observeProcessTree(pid, this.processTable(), now, clockTicks(), bootTimeMs());
+  }
+
+  /** The newest sample with live command evidence folded in, so health never reports a command that has exited. */
+  private healthSamples(task: Task, command: RunningCommand | null, timedOut: boolean): CpuSample[] | undefined {
+    const base = this.samples.get(task.id);
+    if (!base?.length) return base;
+    const merged = base.slice();
+    const latest = merged[merged.length - 1]!;
+    merged[merged.length - 1] = { ...latest, command, commandTimedOut: timedOut };
+    return merged;
+  }
+
   /** The engines page and the CLI read the same silence and idle samples the monitor judged the penalty with. */
   taskHealth(task: Task): TaskHealth {
     // An owner root has no worker process of its own and never counts as stalled: the owner host is its answer.
@@ -245,13 +282,16 @@ export class StallMonitor {
       };
     }
     const now = this.clock();
-    const samples = this.samples.get(task.id);
+    const command = task.status === 'running' ? this.treeOf(task, now)?.command ?? null : null;
+    const maxMs = maxCommandMinutes(this.options.policy().snapshot().config) * 60_000;
+    const timedOut = command !== null && command.elapsedMs >= maxMs;
+    const samples = this.healthSamples(task, command, timedOut);
     const active = cpuActive(samples);
     const silence = silenceMs(task, now);
-    const stalled = isStalled(task, now, Object.fromEntries(this.samples));
+    const stalled = timedOut || isStalled(task, now, { [task.id]: samples ?? [] });
     return {
       taskId: task.id,
-      state: ['completed','failed','cancelled'].includes(task.status) ? 'ended' : task.status==='running'&&task.dispatch?.execution==='real'&&!task.run?.firstOutputAt ? 'starting' : stalled ? 'stalled' : silence !== null && silence >= STALL_MS && active !== true ? 'waiting_model' : 'working',
+      state: ['completed','failed','cancelled'].includes(task.status) ? 'ended' : timedOut ? 'stalled' : task.status==='running'&&task.dispatch?.execution==='real'&&!task.run?.firstOutputAt ? 'starting' : stalled ? 'stalled' : command ? 'running_command' : silence !== null && silence >= STALL_MS && active !== true ? 'waiting_model' : 'working',
       taskStatus: task.status,
       engine: task.dispatch?.engine ?? null,
       lastEventAt: task.events.at(-1)?.at ?? task.run?.startedAt ?? null,
@@ -259,6 +299,8 @@ export class StallMonitor {
       cpuActive: active,
       cpuIdleMs: idleRunMs(samples),
       scopeUnit: task.run?.scopeUnit ?? null,
+      ...(command ? { runningCommand: command } : {}),
+      ...(timedOut ? { reason: 'command_timeout' as const } : {}),
     };
   }
 
@@ -323,15 +365,27 @@ export class StallMonitor {
     const live = new Set(candidates.map(task => task.id));
     for (const id of this.samples.keys()) if (!live.has(id)) this.samples.delete(id);
     const at = this.clock();
+    const policy = this.options.policy();
+    const maxCommandMs = maxCommandMinutes(policy.snapshot().config) * 60_000;
+    // One /proc scan per tick serves every worker; individual systemd reads still run concurrently.
+    const processes = this.processTable();
+    const trusted = !this.options.processes;
     await Promise.all(candidates.map(async task => {
       let cpu: number | null = null;
       try { cpu = await this.readCpu(task.run!.scopeUnit!); } catch { cpu = null; }
+      let tree: TreeObservation | null = null;
+      const pid = task.run?.pid;
+      if (pid && task.run?.scopeUnit && (!trusted || pidInScope(pid, task.run.scopeUnit))) tree = observeProcessTree(pid, processes, at);
+      const command = tree?.command ?? null;
       const history = this.samples.get(task.id) ?? [];
-      history.push({ at, cpu });
+      history.push({
+        at, cpu,
+        ...(pid ? { treeCpu: tree?.cpuNs ?? null } : {}),
+        ...(pid ? { command, commandTimedOut: command !== null && command.elapsedMs >= maxCommandMs } : {}),
+      });
       this.samples.set(task.id, history.slice(-SAMPLE_LIMIT));
     }));
 
-    const policy = this.options.policy();
     // Sampling awaited on systemd, so the write gate is re-checked before anything is written.
     if (!this.lifecycle.writable(fence)) return;
     const held = this.held;

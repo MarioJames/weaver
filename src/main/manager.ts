@@ -80,6 +80,12 @@ export class TaskManager {
       child.on('stderr-tail',(tail:string)=>{run.adapterTail=true;run.stderrTail=tail;});
       child.on('vendor-error',(message:string,failure?:TaskFailure)=>{run.vendorError=redactSecrets(message).slice(-2048);if(failure)this.failAttempt(id,{...failure,vendorError:run.vendorError});});
       child.on('engine-model',(report:{actual:string;expected:string;match:boolean;responseModel?:string})=>this.recordEngineModel(id,run,report));
+      child.on('cleanup',(cleaned:{units?:unknown;pids?:unknown})=>{
+        const units=Array.isArray(cleaned.units)?cleaned.units.filter((unit):unit is string=>typeof unit==='string').slice(0,20):[];
+        const pids=Array.isArray(cleaned.pids)?cleaned.pids.filter((pid):pid is number=>Number.isSafeInteger(pid)).slice(0,50):[];
+        if(!units.length&&!pids.length)return;
+        try{const current=this.store.get(id);event(current,'lifecycle',`Cleaned escaped worker processes: ${units.length?`units ${units.join(', ')}`:''}${units.length&&pids.length?'; ':''}${pids.length?`pids ${pids.join(', ')}`:''}`.slice(0,2000));this.persist(current,'stream');}catch(error){this.fatal(error);}
+      });
     }
 
     const parser = new JsonlParser(record => this.record(id, record));

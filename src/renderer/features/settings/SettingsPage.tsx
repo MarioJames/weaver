@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from 'react';
 import { PageHeader } from '@lobehub/ui/dashboard';
 import { Skeleton } from '@lobehub/ui/base-ui';
 import type { QuotaSchedule } from '../../../shared/contracts/quota';
-import { FREE_CHANNEL_INTERVAL_RANGE, QUOTA_INTERVAL_RANGE, chatgptReviewEnabled, freeChannelProbeSettings, quotaSettings } from '../../../shared/policy/settings';
+import { FREE_CHANNEL_INTERVAL_RANGE, MAX_COMMAND_MINUTES_RANGE, QUOTA_INTERVAL_RANGE, chatgptReviewEnabled, freeChannelProbeSettings, maxCommandMinutes, quotaSettings } from '../../../shared/policy/settings';
 import { useFreeProbe } from '../probes/useFreeProbe';
 import { probeScheduleText } from '../probes/probe-view';
 import { NamedSwitch } from '../../ui/NamedControls';
@@ -75,7 +75,10 @@ export function SettingsPage({ policy }: { policy: PolicyDraft }) {
       </Group>
       <Group title="父 Agent" desc="父 Agent 观测和等待子 Agent 的方式。">
         <Setting label="查看间隔上限（分钟）" htmlFor={`${id}-wait`} desc="父 Agent 两次查看子 Agent 状态之间的最长间隔，也是 tasks wait 不带 --for 时的等待时长；子 Agent 完成后父 Agent 能及时发现。不会停止子 Agent。" state={saver.states.wait} error={inputErrors.wait}>
-          <MinutesInput id={`${id}-wait`} label="查看间隔上限（分钟）" value={saved.herdr.max_wait_minutes} min={1} max={1440} step={5} onError={inputError('wait')} onCommit={value => void saver.save('wait', () => ({ herdr: { max_wait_minutes: value } }))} />
+          <MinutesInput id={`${id}-wait`} label="查看间隔上限（分钟）" value={saved.herdr.max_wait_minutes} min={1} max={1440} step={5} onError={inputError('wait')} onCommit={value => void saver.save('wait', () => ({ herdr: { ...saved.herdr, max_wait_minutes: value } }))} />
+        </Setting>
+        <Setting label="单条命令最长运行时间（分钟）" htmlFor={`${id}-command`} desc="单条命令持续运行超过这个时长后，任务健康会提示父 Agent 疑似挂死，tasks wait 也会提前返回；不会自动停止命令。范围 1 到 1440 分钟。" state={saver.states.command} error={inputErrors.command}>
+          <MinutesInput id={`${id}-command`} label="单条命令最长运行时间（分钟）" value={maxCommandMinutes(saved)} min={MAX_COMMAND_MINUTES_RANGE.min} max={MAX_COMMAND_MINUTES_RANGE.max} step={5} onError={inputError('command')} onCommit={value => void saver.save('command', () => ({ herdr: { ...saved.herdr, max_command_minutes: value } }))} />
         </Setting>
       </Group>
     </div>

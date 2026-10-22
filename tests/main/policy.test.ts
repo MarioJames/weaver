@@ -301,3 +301,15 @@ test('policy save rejects weights above 10',()=>fixture((store)=>{
  assert.throws(()=>store.save({revision:s.revision,config:s.config,blocks:[]}),/0 to 10/);
 }));
 
+
+test('max_command_minutes: default 30, optional for older policies, and bounded 1–1440',()=>fixture((store)=>{
+ assert.equal(defaultConfig().herdr.max_command_minutes,30);
+ const config=defaultConfig();
+ assert.deepEqual(validateConfig(config),[]);
+ delete (config.herdr as {max_command_minutes?:number}).max_command_minutes;
+ assert.deepEqual(validateConfig(config),[],'older policy without the key stays valid');
+ const saved=store.save({revision:0,config,blocks:[]});
+ assert.equal(saved.config.herdr.max_command_minutes,30,'the snapshot reports the effective default');
+ for(const value of [1,1440]){const c=defaultConfig();c.herdr.max_command_minutes=value;assert.deepEqual(validateConfig(c),[],String(value));}
+ for(const value of [0,1441,1.5]){const c=defaultConfig();c.herdr.max_command_minutes=value;assert.ok(validateConfig(c).some(issue=>issue.path==='$.herdr.max_command_minutes'),String(value));}
+}));

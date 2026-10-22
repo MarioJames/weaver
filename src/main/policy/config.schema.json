@@ -140,6 +140,12 @@
           "description": "Retained upstream wait preference, unused by current Weaver runtime.",
           "type": "integer",
           "minimum": 1
+        },
+        "max_command_minutes": {
+          "description": "Longest a single command under a worker may stay in running_command before health reports stalled with reason command_timeout. Weaver never stops the command on this setting.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1440
         }
       }
     }

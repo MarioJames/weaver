@@ -85,6 +85,24 @@ for (const transport of ['injected', 'unix'] as const) {
       }
     });
 
+    test('running_command never returns early, while a command timeout is a stalled answer', async () => {
+      let checks = 0;
+      const running = await poll(request => {
+        if (request.command !== 'tasks.health') return ok(task);
+        checks += 1;
+        return ok({ ...stalled, state: 'running_command', reason: undefined, runningCommand: { pid: 42, summary: 'pnpm build', startedAt: new Date(0).toISOString(), elapsedMs: 90_000 } });
+      }, ['wait', '--for', '2']);
+      assert.equal(running.code, 1);
+      assert.equal(JSON.parse(running.output).data.reason, 'timeout');
+      assert.ok(checks >= 2, 'the command did not cut the wait short');
+      const timedOut = await poll(request => request.command === 'tasks.health'
+        ? ok({ ...stalled, reason: 'command_timeout', runningCommand: { pid: 42, summary: 'docker build .', startedAt: new Date(0).toISOString(), elapsedMs: 31 * 60_000 } })
+        : ok(task), ['wait', '--for', '2', '--output', 'text']);
+      assert.equal(timedOut.code, 0);
+      assert.match(timedOut.output, /reason=command_timeout/);
+      assert.match(timedOut.output, /command: docker build \. \(pid 42, 1860s\)/);
+    });
+
     test('wait checks health again before a short timeout, allowing a late stall to win', async () => {
       let checks = 0;
       const result = await poll(request => request.command === 'tasks.health'

@@ -49,5 +49,5 @@
     "pi_worker": { "enabled": false, "engine": "pi", "model": "glm-5.3-flash", "effort": "high", "description": "Disabled Pi template (glm-5.3-flash). Enable the engine and this worker before dispatch." },
     "dsh_worker": { "enabled": false, "engine": "dsh", "model": "deepseek-flash", "effort": "high", "description": "DeepSeek Harness worker (deepseek-flash via dsh headless). Uses the DeepSeek API key saved in dsh settings or DEEPSEEK_API_KEY." }
   },
-  "herdr": { "max_wait_minutes": 15 }
+  "herdr": { "max_wait_minutes": 15, "max_command_minutes": 30 }
 }

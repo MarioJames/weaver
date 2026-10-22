@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import type { Readable, Writable } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
 import { isRealEngineKind } from '../../workspace';
+import { cgroupPath, processTree, readProcessSnapshots, unitOfCgroup } from '../../monitors/process-tree';
 
 const VERIFY_MS = 5000;
 const TERM_GRACE_MS = 1500;
@@ -122,6 +123,77 @@ export async function recoverOwnedScope(unit: string, invocation?: string): Prom
   if (verify(after)) throw new Error(`Schedule scope ${unit} remains active`);
 }
 
+
+export interface EscapedCleanup {
+  /** Exact foreign scope units stopped because every process in them belonged to this worker. */
+  units: string[];
+  /** Descendants stopped individually because their scope could not be proven to be wholly theirs. */
+  pids: number[];
+}
+
+function userScope(path: string): boolean {
+  const uid = process.getuid?.();
+  if (uid === undefined) return false;
+  return path.startsWith('/user.slice/') && (path.includes(`/user@${uid}.service/`) || path.includes(`/user-${uid}.slice/`));
+}
+
+/**
+ * Find descendants that left the worker's cgroup through another systemd scope. A scope is stopped only when
+ * every process in it is one of those descendants; otherwise only the exact descendant pids are signalled,
+ * never an unrelated process that happens to share the scope.
+ */
+export async function cleanupEscapedDescendants(rootPid: number | undefined, ownUnit: string, remembered: ReadonlyMap<number, string> = new Map()): Promise<EscapedCleanup> {
+  if (!rootPid || process.platform !== 'linux') return { units: [], pids: [] };
+  const table = readProcessSnapshots();
+  const own = ownUnit.replace(/\.scope$/, '');
+  const tree = processTree(rootPid, table).filter(process => process.pid !== rootPid);
+  const paths = new Map(table.map(process => [process.pid, cgroupPath(process.pid)]));
+  const units = new Map<string, number[]>();
+  const loose = new Set<number>();
+  const seen = new Set<number>();
+  const remember = (pid: number, unit: string | null, path: string | null): void => {
+    if (seen.has(pid) || !unit || unit === own) return;
+    seen.add(pid);
+    if (!path || !userScope(path)) { loose.add(pid); return; }
+    const list = units.get(unit);
+    if (list) list.push(pid);
+    else units.set(unit, [pid]);
+  };
+  for (const process of tree) remember(process.pid, unitOfCgroup(paths.get(process.pid) ?? null), paths.get(process.pid) ?? null);
+  // A command can outlive the worker root; a sweep recorded it while the tree was still reachable.
+  for (const [pid, unit] of remembered) {
+    const path = paths.get(pid);
+    if (path !== undefined && unitOfCgroup(path) === unit) remember(pid, unit, path);
+  }
+  if (!tree.length && !seen.size) return { units: [], pids: [] };
+  const desc = new Set([...tree.map(process => process.pid), ...seen]);
+  const cleaned: EscapedCleanup = { units: [], pids: [] };
+  for (const [unit, members] of units) {
+    const all = table.filter(process => unitOfCgroup(paths.get(process.pid) ?? null) === unit).map(process => process.pid);
+    if (all.length && all.every(pid => desc.has(pid))) {
+      // A command that ignores SIGTERM must not hold task cancellation for systemd's stop timeout.
+      const killed = await systemctl(['kill', '-s', 'SIGKILL', '--kill-whom=all', `${unit}.scope`]);
+      const stopped = await systemctl(['stop', `${unit}.scope`]);
+      // --collect can make the stop report "not loaded" after the kill already emptied the scope.
+      if (killed.code === 0 || stopped.code === 0) {
+        cleaned.units.push(`${unit}.scope`);
+        cleaned.pids.push(...members);
+        continue;
+      }
+    }
+    for (const pid of members) loose.add(pid);
+  }
+  for (const pid of loose) {
+    try { process.kill(pid, 'SIGTERM'); cleaned.pids.push(pid); } catch { /* already gone */ }
+  }
+  if (loose.size) {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    for (const pid of loose) { try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ } }
+  }
+  cleaned.pids = [...new Set(cleaned.pids)];
+  return cleaned;
+}
+
 /** One systemd user scope around a fixed argv. Descendants stay in the cgroup and die with it. */
 export function startOwnedScope(options: { command: readonly string[]; cwd: string; env: NodeJS.ProcessEnv; stdin: string | null; stdinPath?: string; unit: string; keepStdinOpen?: boolean; detached?: boolean }): OwnedScope {
   if (options.keepStdinOpen && (options.stdin !== null || options.stdinPath !== undefined)) throw new Error('keepStdinOpen requires stdin: null and no stdinPath');
@@ -151,6 +223,22 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
   handle.pid = child.pid;
   handle.stdout = child.stdout;
   handle.stderr = child.stderr;
+  // Remember foreign scopes while the process tree is still reachable: a command can outlive its vendor CLI.
+  const rememberedEscapes = new Map<number, string>();
+  const rememberEscapes = () => {
+    if (process.platform !== 'linux' || !child.pid) return;
+    try {
+      const table = readProcessSnapshots();
+      for (const process of processTree(child.pid, table)) {
+        if (process.pid === child.pid) continue;
+        const path = cgroupPath(process.pid);
+        const foreign = unitOfCgroup(path ?? null);
+        if (foreign && foreign !== unit.replace(/\.scope$/, '') && path && userScope(path)) rememberedEscapes.set(process.pid, foreign);
+      }
+    } catch { /* the next sweep or the live tree at stop covers it */ }
+  };
+  const escapedTimer = setInterval(rememberEscapes, 3000);
+  escapedTimer.unref?.();
   if (promptFd !== undefined) { /* inherited read-only prompt file */ }
   else if (options.keepStdinOpen) {
     handle.stdin = child.stdin;
@@ -190,6 +278,7 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
   const finish = () => {
     if (closed) return;
     closed = true;
+    clearInterval(escapedTimer);
     stopVerify();
     handle.emit('close', exitCode, exitSignal);
   };
@@ -204,6 +293,18 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
     if (signal === 'SIGKILL') { forceKill = true; escalate?.(); }
     if (stopPromise) return stopPromise;
     stopPromise = (async () => {
+      clearInterval(escapedTimer);
+      let reportedCleanup = false;
+      const cleanEscaped = async () => {
+        if (reportedCleanup) return;
+        const cleaned = await cleanupEscapedDescendants(child.pid, unit, rememberedEscapes);
+        if (cleaned.units.length || cleaned.pids.length) {
+          reportedCleanup = true;
+          handle.emit('cleanup', cleaned);
+        }
+      };
+      // Before the worker scope is torn down, capture descendants that moved themselves elsewhere.
+      await cleanEscaped();
       let info = await showScope(unit);
       let killedLauncher = false;
       // A missing scope is not terminal while systemd-run can still register it.
@@ -219,6 +320,8 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
       }
       if (!live(info)) return;
       requireOwned(info);
+      // The command may have taken a new cgroup while the scope was starting; re-check once it is live.
+      await cleanEscaped();
       if (forceKill) await systemctl(['kill', '-s', 'SIGKILL', '--kill-whom=all', `${unit}.scope`]);
       else {
         await systemctl(['kill', '-s', 'SIGTERM', '--kill-whom=all', `${unit}.scope`]);

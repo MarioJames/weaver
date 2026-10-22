@@ -98,7 +98,7 @@ RPC 动词（method-wrapped，目录条目带 `rpc:{method,arity}`）：`policy 
 
 网页任务列表 RPC `listTasks` 只返回摘要（最近 3 条事件及产物元数据，不含产物正文），详情通过 `getTask(id)` 按需读取完整任务。网页另有两个不进 CLI 目录的 RPC 用于 子 Agent 可用性探测：`sayHi`（`{engine, model, effort}`，engine 为已保存配置里的引擎 id）立即返回 `{id, status:'running', startedAt}`，`sayHiResult(id)` 轮询到 `status:'done'` 后带 `result {ok, reply?, model?, error?, durationMs, checkedAt}`。探测在 `agent-state/` 下的空临时目录里用各 CLI 最轻的一次性调用发一句 hi：不带工具、MCP、插件/hooks 与用户 settings（CLI 支持时），不保存会话，不经过 子 Agent 执行适配，因此 Claude Code 也能探测。claude 不用 `--bare`，因为它不读 OAuth。120 秒超时即停止进程，同时最多 3 个，结果保留 10 分钟，结束后删除临时目录。这是一次真实推理，会消耗少量额度；成功只说明此刻可用。
 
-本地 wait/watch：`tasks wait --task-id` 与 `tasks watch --task-id` 的 `--for` 都是 1–86400 **秒**（即配置上限 1440 分钟），省略时两条命令共用同一个缺省 `herdr.max_wait_minutes × 60 秒`（每次从策略现读，不再压固定上限），读不到策略时退回 30 秒；缺省 `max_wait_minutes` 为 15，于是缺省等待 900 秒。显式 `--for` 不读策略。两者轮询 `tasks get`，任务一进入终态就写出那份快照并以 0 退出；`tasks wait` 遇到 health 为 `stalled` 时也以 0 提前返回，带 `reason:'stalled'`、health 和重试/取消提示，`watch` 仅在 text/jsonl 提示卡住转变并继续观察；`watch` 另外增量拉 `tasks events`，事件只在 `--output jsonl|text` 下逐行输出。它们只是轮询，不是第二调度器；超时按 `TIMEOUT` 失败退出，退出不取消任务。`herdr.max_wait_minutes` 是「父 Agent 查看间隔上限」这一个设置，Weaver 从不把它当 子 Agent 的执行 kill 时限——真实执行不会因为到这个分钟数就被停止（见 [architecture](architecture.md)）。
+本地 wait/watch：`tasks wait --task-id` 与 `tasks watch --task-id` 的 `--for` 都是 1–86400 **秒**（即配置上限 1440 分钟），省略时两条命令共用同一个缺省 `herdr.max_wait_minutes × 60 秒`（每次从策略现读，不再压固定上限），读不到策略时退回 30 秒；缺省 `max_wait_minutes` 为 15，于是缺省等待 900 秒。显式 `--for` 不读策略。两者轮询 `tasks get`，任务一进入终态就写出那份快照并以 0 退出；`tasks wait` 遇到 health 为 `stalled` 时也以 0 提前返回，带 `reason:'stalled'`、health 和重试/取消提示，`watch` 仅在 text/jsonl 提示卡住转变并继续观察；`watch` 另外增量拉 `tasks events`，事件只在 `--output jsonl|text` 下逐行输出。它们只是轮询，不是第二调度器；超时按 `TIMEOUT` 失败退出，退出不取消任务。`herdr.max_wait_minutes` 是「父 Agent 查看间隔上限」这一个设置，Weaver 从不把它当 子 Agent 的执行 kill 时限——真实执行不会因为到这个分钟数就被停止。单条命令另有 `herdr.max_command_minutes`（默认 30 分钟）：超过只会让 health 报 `stalled` 并注明 `command_timeout`，让 wait 返回给 owner 决定，Weaver 不自动杀命令（见 [architecture](architecture.md)）。
 
 ### 定时任务命令
 
@@ -230,15 +230,16 @@ weaver quota refresh --help --output json
 
 `tasks health`、`engines health`、`engines penalty`、`engines unblock` 已在 `CLI_CATALOG` 与 `CommandHandler` 接通，经同一 HTTP/Unix 逻辑命令通道调用监控器；网页 `getStall` 仍是单独的 method-wrapped RPC。`--engine` 只属于 penalty/unblock；unblock 是需 commandId 的写命令。没有监控器的进程以 `CAPABILITY_UNAVAILABLE` 明确拒绝诊断或解除，不伪造健康读数。
 
-**判定（`tasks health`，逻辑输入 `{taskId}`）**：只有 running 且 `dispatch.execution === 'real'` 的任务有健康读数，其余任务的 `silenceMs`/`cpuActive`/`cpuIdleMs` 保留 `null` 而不是猜。静默从最后一个事件的时间起算，没有事件时退回 `run.startedAt`。CPU 只测该任务自己 worker scope 的累计 CPU（systemd `CPUUsageNSec`，取不到时读 cgroup `cpu.stat`），比较相邻两个 60 秒样本的增量占比，低于单核 5% 算这一个区间空闲。以下状态共用同一个分类器：
+**判定（`tasks health`，逻辑输入 `{taskId}`）**：只有 running 且 `dispatch.execution === 'real'` 的任务有健康读数，其余任务的 `silenceMs`/`cpuActive`/`cpuIdleMs` 保留 `null` 而不是猜。静默从最后一个事件的时间起算，没有事件时退回 `run.startedAt`。CPU 同时测该任务 worker scope 的累计 CPU（systemd `CPUUsageNSec`，取不到时读 cgroup `cpu.stat`）和 worker CLI 根 PID 的整个进程树（遍历 `/proc` 的 ppid 关系累加 utime+stime，包含被 `systemd-run --scope` 移到其他 cgroup 的子孙）；两者任一判定在忙即算忙，读不到任一读数的区间不能证明空闲。以下状态共用同一个分类器：
 
 - `ended`：已完成、失败或取消，`taskStatus` 保留最终状态。
 - `starting`：running 的真实 子 Agent 尚无首个有效供应商输出。
-- `stalled`：静默 ≥5 分钟**且**连续观测到空闲 ≥5 分钟，两条同时成立。
+- `running_command`：worker 进程树里存在 vendor CLI 之外的存活命令进程（shell 启动或已知命令启动器；MCP/LSP/语言服务及其子树视为 vendor 常驻进程而忽略），附脱敏的 argv 摘要、PID 与已运行时长；有存活命令时不判 stalled。
+- `stalled`：无存活命令，且静默 ≥5 分钟**且**连续观测到空闲 ≥5 分钟；或者单条命令超过 `herdr.max_command_minutes`（默认 30，`reason:'command_timeout'`，同样附命令摘要），后者只报告、不杀进程。
 - `waiting_model`：静默 ≥5 分钟，且 CPU 没有证明在忙（包含完全读不到的情况）。
 - `working`：其余。
 
-读不到 CPU 永远判不出卡住，只会落进 `waiting_model`——这是有意的：没有第二条路径能把「我无法观测」说成「它停了」。读数形状是 `StallMonitor.taskHealth()` 的返回：`{taskId, state, taskStatus, engine|null, lastEventAt, silenceMs, cpuActive, cpuIdleMs, scopeUnit}`，接线只负责把它放进信封 `data`。
+读不到 CPU 永远判不出卡住，只会落进 `waiting_model`——这是有意的：没有第二条路径能把「我无法观测」说成「它停了」。读数形状是 `StallMonitor.taskHealth()` 的返回：`{taskId, state, taskStatus, engine|null, lastEventAt, silenceMs, cpuActive, cpuIdleMs, scopeUnit, runningCommand?, reason?}`，接线只负责把它放进信封 `data`。
 
 **读惩罚（`engines health` 无参 `{}`；`engines penalty` 单引擎 `{engine}`）**：`engines.health` 返回 `{engines,config}`；`config` 为 `{stallMinutes:5, quorum:2, ladder:[5,10,null], resetHours:2}`。每个引擎只含 `level`（0–3）、`lastTriggerAt`、`needsAttention`、`blocked`、`blockedUntil`、`nextProbeAt`、`probeSuccesses`，**不含 history**。`blocked` 只表示策略里是否存在该引擎自己的 `by:"weaver-stall"` 阻断，不代表人工/额度阻断或整体路由可用性；期限是名义探测时点，不是 `release_at`。策略中每个引擎都有摘要，另含留有监控器状态但已从策略移除的引擎。
 

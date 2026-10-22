@@ -104,7 +104,8 @@ export class PolicyStore {
   built.version=1;
   if(settings.chatgpt_review!==undefined)built.chatgpt_review=settings.chatgpt_review;
   built.engines=engines;built.owners=owners;built.workers=workers;
-  built.herdr=settings.herdr!==undefined?settings.herdr:defaultConfig().herdr;
+  // Older policies carry no max_command_minutes; the snapshot exposes the effective default without rewriting the row.
+  built.herdr={...defaultConfig().herdr,...(settings.herdr!==null&&typeof settings.herdr==='object'&&!Array.isArray(settings.herdr)?settings.herdr:{})};
   for(const key of ['quota','free_channel_probe','janitor','display'])if(settings[key]!==undefined)built[key]=settings[key];
   const config=built as unknown as Config;
   const blocks=(this.db.prepare('SELECT * FROM policy_blocks ORDER BY position').all() as Record<string,unknown>[]).map(row=>{
@@ -163,7 +164,10 @@ export class PolicyStore {
  private parse(config: unknown, blocks: unknown): {config:Config;blocks:Block[]} {
   bounded({config,blocks}); const issues=validateConfig(config);
   if(issues.length) throw new Error(issues.map(i=>`${i.path}: ${i.message}`).join('\n'));
-  return {config:structuredClone(config as Config),blocks:blocksOf(blocks,config as Config)};
+  const saved=config as Config;
+  // Truthful reads: an older policy without max_command_minutes reports the default its runtime uses.
+  const normalized:Config={...saved,herdr:{...defaultConfig().herdr,...saved.herdr}};
+  return {config:structuredClone(normalized),blocks:blocksOf(blocks,normalized)};
  }
  snapshot(): PolicySnapshot {
   const blocks=activeBlocks({version:1,blocks:this.blocks},this.now());

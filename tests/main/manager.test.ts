@@ -72,3 +72,26 @@ test('truncated JSON and oversized stderr fail safely',async () => {
 test('repeated artifact records are bounded',async () => {
  await harness(fixture("for(let i=0;i<21;i++)console.log(JSON.stringify({type:'artifact',name:'x.txt',mediaType:'text/plain',content:'x'}))"),async(manager,store)=>{const task=manager.create(input);manager.start(task.id);const done=await terminal(store,task.id);assert.equal(done.status,'failed');assert.equal(done.artifacts.length,20);});
 });
+
+test('escaped-scope cleanup is recorded on the task timeline',async()=>{
+ const adapter:WorkerAdapter={id:'real-fixture',start:()=>{
+  const child=spawn(process.execPath,['-e',"process.stdout.write(JSON.stringify({type:'result',summary:'ready'})+'\\n');setInterval(()=>{},1000)"],{stdio:['pipe','pipe','pipe'],shell:false});
+  child.stdin.end();
+  setTimeout(()=>child.emit('cleanup',{units:['escape-1234.scope'],pids:[4321,4322]}),25);
+  return child;
+ }};
+ await harness(adapter,async(manager,store)=>{
+  const task=manager.create(input);
+  task.dispatch={owner:'owner',worker:'worker',engine:'codex',model:'m',effort:'high',execution:'real',maxParallel:1};
+  manager.update(task);
+  manager.start(task.id);
+  const deadline=Date.now()+5000;
+  while(Date.now()<deadline&&!store.get(task.id).events.some(item=>/Cleaned escaped worker processes/.test(item.message)))await new Promise(resolve=>setTimeout(resolve,10));
+  const record=store.get(task.id).events.find(item=>/Cleaned escaped worker processes/.test(item.message));
+  assert.ok(record,JSON.stringify(store.get(task.id).events));
+  assert.match(record!.message,/escape-1234\.scope/);
+  assert.match(record!.message,/4321, 4322/);
+  manager.cancel(task.id);
+  assert.equal((await terminal(store,task.id)).status,'cancelled');
+ },3000);
+});

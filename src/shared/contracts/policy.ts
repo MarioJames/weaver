@@ -8,7 +8,7 @@ export interface FreeChannelProbeSettings { enabled: boolean; interval_minutes: 
 export interface JanitorSettings { enabled: boolean; ttl_hours: number; interval_hours: number }
 export interface Owner { enabled: boolean; engine: string; model: string; effort: string; workers: string[]; max_parallel: number; worker_weights?: Record<string, number> }
 export interface Worker { free_channel?: boolean; enabled: boolean; engine: string; model: string; effort: string; description?: string; /** Cap on tasks this worker runs at once across every owner; missing means no cap. */ max_parallel?: number }
-export interface Herdr { max_wait_minutes: number }
+export interface Herdr { max_wait_minutes: number; /** Missing on older policies: treated as 30 (MAX_COMMAND_MINUTES_DEFAULT). */ max_command_minutes?: number }
 /** Rendering preferences; missing means follow the browser. */
 export interface Display { timezone?: string }
 export interface Config { version: 1; chatgpt_review?: boolean; quota?: QuotaSettings; free_channel_probe?: FreeChannelProbeSettings; display?: Display; janitor?: JanitorSettings; engines: Record<string, Engine>; owners: Record<string, Owner>; workers: Record<string, Worker>; herdr: Herdr }

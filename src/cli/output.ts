@@ -25,9 +25,17 @@ function renderData(data: unknown): string {
   }
   if (record.reason === 'stalled' && record.health && typeof record.health === 'object') {
     const health = record.health as Record<string, unknown>;
+    const command = health.runningCommand && typeof health.runningCommand === 'object' ? health.runningCommand as Record<string, unknown> : undefined;
     return [`${record.id ?? ''} stalled (task status: ${record.status ?? 'unknown'})`,
-      `health: silenceMs=${health.silenceMs ?? 'unknown'} cpuIdleMs=${health.cpuIdleMs ?? 'unknown'} cpuActive=${health.cpuActive ?? 'unknown'} engine=${health.engine ?? 'unknown'}`,
+      `health: silenceMs=${health.silenceMs ?? 'unknown'} cpuIdleMs=${health.cpuIdleMs ?? 'unknown'} cpuActive=${health.cpuActive ?? 'unknown'} engine=${health.engine ?? 'unknown'}${health.reason ? ` reason=${String(health.reason)}` : ''}`,
+      ...(command ? [`command: ${String(command.summary ?? '')} (pid ${String(command.pid ?? 'unknown')}, ${Math.floor(Number(command.elapsedMs ?? 0) / 1000)}s)`] : []),
       `hint: ${record.hint ?? ''}`].join('\n');
+  }
+  if (typeof record.state === 'string' && typeof record.taskId === 'string' && record.runningCommand && typeof record.runningCommand === 'object') {
+    const command = record.runningCommand as Record<string, unknown>;
+    return [`${record.taskId} ${record.state}${record.reason ? ` (${String(record.reason)})` : ''}`,
+      `command: ${String(command.summary ?? '')} (pid ${String(command.pid ?? 'unknown')}, ${Math.floor(Number(command.elapsedMs ?? 0) / 1000)}s)`,
+      `health: silenceMs=${record.silenceMs ?? 'unknown'} cpuIdleMs=${record.cpuIdleMs ?? 'unknown'} cpuActive=${record.cpuActive ?? 'unknown'} engine=${record.engine ?? 'unknown'}`].join('\n');
   }
   if (typeof record.status === 'string' && typeof record.title === 'string') {
     const lines = [`${record.id ?? ''} ${record.status} ${record.title}`.trim()];

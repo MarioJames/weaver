@@ -16,6 +16,7 @@ import { EventsPanel } from './EventsPanel';
 import { OwnerInspector } from '../roles/OwnerInspector';
 import { ReviewPanel } from './ReviewPanel';
 import { TaskTextBlock } from './TaskTextBlock';
+import { TaskHealthBadge } from './TaskHealthBadge';
 import { styles as detailStyles } from './task-detail-style';
 
 const queueLabels = { waiting_for_capacity: '等待执行槽位', policy_blocked: '当前策略阻止派发', frozen_route_changed: '已冻结路由发生变化', workspace_changed: '工作目录发生变化', launch_blocked: '执行启动受阻' };
@@ -62,6 +63,7 @@ export function TaskDetail({ task, busy, onStart, onEdit, onCancel, action, onRe
         <Text className={styles.wrap} style={{ fontSize: 18, fontWeight: 600 }}>{taskTitle(task)}</Text>
         <div className={styles.row}>
           <Tag className={detailStyles.statusTag} variant="solid" color={statusTagColor(DISPLAY_TONES[status])} icon={timelineActive(task.status) ? <Icon icon={Loader2} spin size="small" /> : undefined}>{DISPLAY_LABELS[status]}</Tag>
+          <TaskHealthBadge taskId={task.id} active={task.status === 'running'} />
         </div>
         {needsWorkspace && <Text type="secondary">先编辑补充目标项目目录，才能开始执行。</Text>}
       </div>

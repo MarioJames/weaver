@@ -1,5 +1,36 @@
 import type { TaskFailure } from './tasks';
 
+
+/** One live command process under a worker's CLI, as health reports it. argv-derived and redacted. */
+export interface RunningCommand {
+  pid: number;
+  /** argv0 plus bounded arguments; credentials are redacted and environment is never read. */
+  summary: string;
+  startedAt: string;
+  elapsedMs: number;
+}
+
+export type TaskHealthState = 'ended' | 'starting' | 'working' | 'waiting_model' | 'running_command' | 'stalled' | 'owner_starting' | 'owner_running';
+
+/** The monitor's own reading of one running task: silence, CPU and any command it can prove is alive. */
+export interface TaskHealth {
+  taskId: string;
+  state: TaskHealthState;
+  taskStatus: 'queued' | 'running' | 'cancelling' | 'completed' | 'failed' | 'cancelled';
+  engine: string | null;
+  lastEventAt: string | null;
+  silenceMs: number | null;
+  cpuActive: boolean | null;
+  cpuIdleMs: number | null;
+  scopeUnit: string | null;
+  /** Present while a live command process exists under the worker CLI. */
+  runningCommand?: RunningCommand;
+  /** command_timeout: a command has outlived herdr.max_command_minutes; Weaver only reports, it never kills it. */
+  reason?: 'command_timeout';
+  /** Owner roots only: how their sub-agents stand. */
+  children?: { total: number; running: number; completed: number };
+}
+
 /** The answer of one light probe call. */
 export interface ProbeOutcome { ok: boolean; ms: number; error?: string }
 
