@@ -30,7 +30,7 @@ export class Mutations {
     if(a.ownerId!==undefined||owner){owner??=this.records.owner(a.ownerId);input=parseTaskInput({...a,title:a.title,instruction:a.instruction??a.goal,owner:{name:owner.name,transport:'herdr-visible',session:'unverified',pane:'unverified'}});}else input=parseTaskInput(a);
     const task=this.manager.create(input);if(parent)task.parentTaskId=parent.id;if(owner){task.ownerId=owner.id;task.ownerEpoch=0;task.ownerLastActivityAt=new Date().toISOString();task.continuationPolicy={idleRotationMinutes:60};this.records.put(task);}return publicTask(task);
    });}
- complete(a:CommandArgs):unknown{const task=this.records.task(a);this.records.revise(task,a);if(task.executionRole!=='owner')fail('INVALID_STATE','Only an owner root accepts tasks complete');if(a.outcome==='completed'){if(task.title===PENDING_TASK_TITLE||!task.acceptanceCriteria?.length)fail('INVALID_STATE','Describe root title and acceptance criteria before completion');const children=this.manager.store.listHeads().filter(t=>t.parentTaskId===task.id);if(children.length===0)fail('INVALID_STATE','The parent Agent must not implement itself: dispatch at least one subtask before completing the root');const leaves=children.filter(t=>!children.some(retry=>retry.retryOf===t.id));if(leaves.length===0)fail('INVALID_STATE','At least one final subtask is required; retried tasks stay history, completion reads the final leaf');if(leaves.some(t=>t.status!=='completed'||t.reviewState!=='accepted'))fail('INVALID_STATE','Every final child task must complete and pass owner review');}return this.completeReport(task,a);}
+  complete(a:CommandArgs):unknown{const task=this.records.task(a);this.records.revise(task,a);if(task.executionRole!=='owner')fail('INVALID_STATE','Only an owner root accepts tasks complete');if(a.outcome==='completed'){if(task.title===PENDING_TASK_TITLE||!task.acceptanceCriteria?.length)fail('INVALID_STATE','Describe root title and acceptance criteria before completion');const children=this.manager.store.listHeads().filter(t=>t.parentTaskId===task.id);if(children.length===0)fail('INVALID_STATE','The parent Agent must not implement itself: dispatch at least one subtask before completing the root');const leaves=children.filter(t=>!children.some(retry=>retry.retryOf===t.id));if(leaves.length===0)fail('INVALID_STATE','At least one final subtask is required; retried tasks stay history, completion reads the final leaf');const superseded=(leaf:Task)=>leaf.status==='cancelled'&&typeof leaf.supersededBy==='string'&&children.some(sibling=>sibling.id===leaf.supersededBy);const remaining=leaves.filter(leaf=>!superseded(leaf));if(remaining.length===0)fail('INVALID_STATE',`All ${leaves.length} final subtask(s) were superseded by a design change (${leaves.map(t=>t.id.slice(0,8)).join(', ')}); at least one non-superseded final subtask is required`);const blockers=remaining.filter(t=>t.status!=='completed'||t.reviewState!=='accepted');if(blockers.length>0){const describe=(t:Task)=>t.status==='cancelled'?'cancelled without a recorded supersede target':t.status!=='completed'?`not completed (status ${t.status})`:`not accepted (review ${t.reviewState??'pending'})`;fail('INVALID_STATE',`Blocked final subtasks: ${blockers.map(t=>`${t.id.slice(0,8)}: ${describe(t)}`).join('; ')}`);}}return this.completeReport(task,a);}
  describe(a:CommandArgs):unknown{
     const task=this.records.task(a);
     if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');
@@ -68,5 +68,23 @@ export class Mutations {
     this.manager.store.transaction(()=>{this.manager.store.putPackage(pkg);task.packageId=pkg.id;event(task,'lifecycle','Frozen work package created');this.records.put(task);});return pkg;
    }
  workersComplete(a:CommandArgs):unknown{const task=this.records.task(a);this.records.revise(task,a);if(task.executionRole==='owner')fail('INVALID_STATE','Report owner roots with tasks complete');return this.completeReport(task,a);}
- cancel(a:CommandArgs):unknown{const task=this.records.task(a);this.records.revise(task,a);if(terminal(task))return {task:publicTask(task),alreadyTerminal:true};if(task.executionRole==='owner')for(const child of this.manager.store.listHeads().filter(t=>t.parentTaskId===task.id&&!terminal(t)))this.manager.cancel(child.id);const cancelled=this.manager.cancel(task.id);if(task.executionRole==='owner'&&cancelled.ownerHost)this.closeCancelledRoot(cancelled);return publicTask(cancelled);}
+  cancel(a:CommandArgs):unknown{
+   const task=this.records.task(a);this.records.revise(task,a);
+   if(a.supersededBy===undefined){if(terminal(task))return {task:publicTask(task),alreadyTerminal:true};if(task.executionRole==='owner')for(const child of this.manager.store.listHeads().filter(t=>t.parentTaskId===task.id&&!terminal(t)))this.manager.cancel(child.id);const cancelled=this.manager.cancel(task.id);if(task.executionRole==='owner'&&cancelled.ownerHost)this.closeCancelledRoot(cancelled);return publicTask(cancelled);}
+   // Design-change replacement: every refusal happens before any state changes.
+   if(a.reason===undefined)fail('INVALID_REQUEST','reason (1–500 characters) is required when supersededBy is provided');
+   const reason=text(a.reason,'reason',500);
+   const targetId=parseId(a.supersededBy,'supersededBy task ID');
+   let target:Task;
+   try{target=this.manager.store.get(targetId);}catch{return fail('INVALID_REQUEST','Superseded task not found');}
+   if(task.status==='completed'||task.status==='failed')fail('INVALID_STATE','Completed or failed tasks cannot record supersededBy; only in-flight or already-cancelled tasks accept a replacement');
+   if(!task.parentTaskId)fail('INVALID_STATE','Only a child task of a running owner root can record supersededBy');
+   if(target.id===task.id)fail('INVALID_REQUEST','A task cannot be superseded by itself');
+   if(target.parentTaskId!==task.parentTaskId)fail('INVALID_REQUEST','The superseding task must be another child of the same parent');
+   let cursor:Task|undefined=target;const seen=new Set<string>();
+   while(cursor?.retryOf&&!seen.has(cursor.id)){seen.add(cursor.id);if(cursor.retryOf===task.id)fail('INVALID_STATE','A task cannot be superseded by its own retry descendant');try{cursor=this.manager.store.get(cursor.retryOf);}catch{break;}}
+   const mark=(current:Task)=>{current.supersededBy=target.id;current.supersededReason=reason;event(current,'lifecycle',`Superseded by ${target.id.slice(0,8)}: ${reason}`);this.records.put(current);return publicTask(current);};
+   if(terminal(task))return mark(task);
+   return mark(this.manager.cancel(task.id));
+  }
 }

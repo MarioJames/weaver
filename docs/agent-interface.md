@@ -63,7 +63,8 @@ CLI 直接用 `--input <file|->` 传 JSON（args 对象或完整信封均可；�
 | `tasks.create` | `{title, instruction或goal, ownerProfileId或ownerId(+ownerName/ownerProvider), workspace?, acceptanceCriteria?, constraints?}`；≤30 条明细；省略 workspace 时 CLI 用调用方 cwd 补，显式相对路径相对调用方解析；服务端不用自己的 repo 填空 |
 | `tasks.get` / `tasks.list` / `tasks.events` | get `{taskId}`，对**运行中的 native 任务**另附 `next`（spawn 回复丢了也从这里取回同一条子代理说明与收尾命令）；list `{offset,limit?,ownerId?}`（≤100/页）；events `{limit?1-100, after?}`，游标过期 `CURSOR_EXPIRED` |
 | `tasks.retry` | `{taskId, cancel?, expectedRevision?}`：接续重跑并自动派发的一步式命令，见下方「接续重跑」 |
-| `tasks.cancel` | `{taskId, expectedRevision?}`；终态返回 `alreadyTerminal:true` |
+| `tasks.cancel` | `{taskId, expectedRevision?, supersededBy?, reason?}`；终态返回 `alreadyTerminal:true`。设计变更作废子任务时带 `supersededBy`（同一父任务下另一个已存在子任务的 UUID）与 `reason`（1–500 字符）：在途任务照常取消并记录取代信息，已是 `cancelled` 的任务允许只补记取代信息（状态不变、revision 递增、写一条事件），`completed`/`failed` 带 `supersededBy` 一律拒绝 |
+| `tasks.complete` | 根任务 `{taskId, outcome:'completed'/'failed', summary≤8000, expectedRevision?, artifacts?}`；`completed` 要求根标题与验收标准已回填、至少一个子任务、全部最终叶子 `completed` 且 `reviews.submit` 为 `accepted`。`cancelled` 且 `supersededBy` 指向同一根任务下另一已存在子任务的最终叶子不计入（视为设计变更作废），其余叶子至少一个且阻塞项在错误信息里按 id 前 8 位列出原因 |
 | `tasks.health` | `{taskId}`；首个输出前为 `starting`，已结束任务为 `state:'ended'` 并带最终 `taskStatus`；只读该任务在监控器样本下的判定，见 [3.3 卡住健康与引擎惩罚命令](#33-卡住健康与引擎惩罚命令) |
 | `tasks.results` | `{taskId}`；非终态 `RESULT_NOT_READY`；manifest 含 artifact sha256 与 `manifestDigest` |
 | `artifacts.read` | `{taskId, artifactId}`；内容 ≤32,000 字符 |
