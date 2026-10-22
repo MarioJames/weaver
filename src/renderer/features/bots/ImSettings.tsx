@@ -18,6 +18,7 @@ import {
   adoptServer, conflictNote, createRequestGate, draftOf, IDLE_RANGE, IM_ENGINE_KINDS, imModelDiscoveryEngine, keepImDraft, modifiedEdit,
   peekImDraft, savePlan, switchDraftEngine, workspaceListError, IM_WORKSPACE_LIMIT, type ImDraft, type ImEdit,
 } from './im-state';
+import { IM_STABLE_POLL_MS, IM_TRANSITION_POLL_MS, nextImPollDelay } from './im-polling';
 
 const CONNECTION: Record<ImStatus['connection'], { label: string; color?: string }> = {
   disabled: { label: '未启用', color: tagColor('neutral') },
@@ -44,8 +45,9 @@ export function AgentStatus({ status, controlId, action }: { status: ImStatus; c
   </BotSetting>;
 }
 
-/** 后台轮询只吸收真实状态与修订，配置写入一律走显式保存。 */
-const POLL_MS = 30_000;
+/** 后台轮询只吸收真实状态与修订，配置写入一律走显式保存。稳定态低频，过渡态短周期见 im-polling。 */
+const POLL_MS = IM_STABLE_POLL_MS;
+const TRANSITION_POLL_MS = IM_TRANSITION_POLL_MS;
 
 const CHANNEL_DESC = '独立选择已启用的引擎、模型和思考力度，与 Bot 单聊无需配置父 Agent。引擎、模型、力度或工作空间变化会重建连接并结束旧上下文。对话不生成任务卡片，实际工作仍按 Weaver 现有调度执行。';
 
@@ -214,6 +216,8 @@ export function ImSettings({ policy }: { policy: PolicyDraft }) {
   const savedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const savingRef = useRef(false);
   const forceReadingRef = useRef(false);
+  /** 轮询在飞标记：poll 不计入互斥 busy，这里单独防止慢响应重叠。 */
+  const pollInFlightRef = useRef(false);
 
   useEffect(() => {
     mounted.current = true;
@@ -259,14 +263,17 @@ export function ImSettings({ policy }: { policy: PolicyDraft }) {
     }
   }, [applySnapshot, gate]);
 
-  /** 静默重读：后台轮询与保存失败后的核对；失败不打断输入，保持已知状态。 */
+  /** 静默重读：后台轮询与保存失败后的核对；失败不打断输入，保持已知状态。同一时刻只允许一个轮询在飞。 */
   const silentRead = useCallback(async () => {
+    if (pollInFlightRef.current) return;
+    pollInFlightRef.current = true;
     const flight = gate.begin('poll');
     try {
       const next = await window.weaver.getImSettings();
       if (!mounted.current || !flight.lands()) return;
       applySnapshot(next, false);
     } catch { /* 下一次轮询再试。 */ } finally {
+      pollInFlightRef.current = false;
       flight.end();
     }
   }, [applySnapshot, gate]);
@@ -336,14 +343,45 @@ export function ImSettings({ policy }: { policy: PolicyDraft }) {
     }
   }, [policy.snapshot, setEdit, silentRead, gate]);
 
-  // 有互斥请求（读取/载入最新/刷新/重连/保存）在飞时暂停轮询，空闲才轮；晚到的轮询响应走同一条落地线。
+  // 自适应轮询：过渡态（connecting / starting / closing）短周期跟进保存与重建后的状态机，
+  // 稳定态恢复低频；互斥请求在飞或已有轮询在飞时不重叠，只推迟下一次；失败由 silentRead 吞错后按计划继续。
+  // 状态翻转（保存/重建落地新状态）会重启本 effect，把已排队的长周期换成短周期；卸载清理 timer，不写已卸载状态。
+  const pollStatusKey = saved?.status ? `${saved.status.connection}/${saved.status.agentState}` : 'none';
   useEffect(() => {
-    const timer = setInterval(() => {
-      if (gate.busy()) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    async function tick(): Promise<void> {
+      if (cancelled || !mounted.current) return;
+      if (typeof document !== 'undefined' && document.hidden) {
+        schedule(POLL_MS);
+        return;
+      }
+      if (gate.busy() || pollInFlightRef.current) {
+        schedule(TRANSITION_POLL_MS);
+        return;
+      }
+      await silentRead();
+      if (cancelled || !mounted.current) return;
+      schedule(nextImPollDelay(savedRef.current?.status, POLL_MS, TRANSITION_POLL_MS));
+    }
+    function schedule(delay: number): void {
+      if (cancelled) return;
+      timer = setTimeout(() => { void tick(); }, delay);
+    }
+    schedule(nextImPollDelay(savedRef.current?.status, POLL_MS, TRANSITION_POLL_MS));
+    const onVisible = () => {
+      if (typeof document === 'undefined' || document.hidden || !mounted.current) return;
+      if (gate.busy() || pollInFlightRef.current) return;
+      // 切回可见时尽快跟进一次，复用同一条落地线与草稿接合，不另起请求体系。
       void silentRead();
-    }, POLL_MS);
-    return () => clearInterval(timer);
-  }, [silentRead, gate]);
+    };
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [silentRead, gate, pollStatusKey]);
 
   useEffect(() => { void read(false); }, [read]);
 

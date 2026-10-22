@@ -1,0 +1,7 @@
+00:36:47.894 reconnectIm 200
+00:36:48.996 getImSettings 200
+00:36:49.996 getImSettings None
+00:36:50.995 getImSettings None
+00:36:52.995 getImSettings None
+00:36:56.994 getImSettings None
+00:37:04.994 getImSettings 200
