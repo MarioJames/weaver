@@ -114,18 +114,19 @@ export async function buildRequest(options: CLIOptions, item: CatalogCommand | u
   const rpc = item?.rpc;
   let request: Record<string, unknown>;
   if (rpc) {
-    if (options.commandId || options.taskId) throw new LocalIPCError('INVALID_ARGUMENT', 'Policy, engine, quota, and probe commands do not take command or task IDs');
+    if (options.commandId || options.taskId) throw new LocalIPCError('INVALID_ARGUMENT', 'Policy, engine, quota, probe, and janitor commands do not take command or task IDs');
     if (rpc.arity === 1) {
-      if (!options.input && item!.command !== 'quota.refresh' && item!.command !== 'workers.probe' && !(item!.command === 'engines.models' && options.engine !== undefined)) throw new LocalIPCError('INVALID_ARGUMENT', 'This command requires --input');
+      if (!options.input && item!.command !== 'quota.refresh' && item!.command !== 'workers.probe' && item!.command !== 'janitor.sweep' && !(item!.command === 'engines.models' && options.engine !== undefined)) throw new LocalIPCError('INVALID_ARGUMENT', 'This command requires --input');
       const body = options.input ? await readInput(options.input) : {};
       if (body && typeof body === 'object' && !Array.isArray(body)) rejectOwnerAuthArg(body as Record<string, unknown>);
-      if (options.worker !== undefined || options.engine !== undefined || options.refresh) {
+      if (options.worker !== undefined || options.engine !== undefined || options.refresh || options.dryRun) {
         if (!body || typeof body !== 'object' || Array.isArray(body)) throw new LocalIPCError('INVALID_ARGUMENT', 'Input must be a JSON object');
         // Same merge and conflict rule as makeRequest: a flag never overwrites a different --input value.
         const holder: Record<string, unknown> = { args: body };
         if (options.worker !== undefined) mergeArg(holder, 'worker', options.worker, 'worker');
         if (options.engine !== undefined) mergeArg(holder, 'engine', options.engine, 'engine');
         if (options.refresh) mergeArg(holder, 'refresh', true, 'refresh');
+        if (options.dryRun) mergeArg(holder, 'dryRun', true, 'dry run');
         request = { method: rpc.method, args: [holder.args] };
       } else request = { method: rpc.method, args: [body] };
     } else if (options.input) throw new LocalIPCError('INVALID_ARGUMENT', 'This command does not take --input');

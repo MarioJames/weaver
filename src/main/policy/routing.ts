@@ -3,7 +3,7 @@
 import type { Availability, Block, Config, Dispatch, Issue, Owner, RouteOptions } from '../../shared/contracts/policy';
 import { availabilityOf, coveringBlock, isBlockActive } from '../../shared/policy/availability';
 import { VENDOR_BLOCK_BY, isEngineBlock } from '../../shared/policy/blocks';
-import { EFFORTS, FREE_CHANNEL_INTERVAL_RANGE, QUOTA_INTERVAL_RANGE, hasQuotaProbe, isValidTimezone } from '../../shared/policy/settings';
+import { EFFORTS, FREE_CHANNEL_INTERVAL_RANGE, JANITOR_INTERVAL_RANGE, JANITOR_TTL_RANGE, QUOTA_INTERVAL_RANGE, hasQuotaProbe, isValidTimezone } from '../../shared/policy/settings';
 import { WEIGHT_MAX, effectiveWeight } from '../../shared/policy/weights';
 import { type Schema, lintSchema, validate } from "./json-schema";
 import CONFIG_SCHEMA from "./config.schema.json";
@@ -56,6 +56,10 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
     if (!isValidTimezone(c.display.timezone)) bad("$.display.timezone", `timezone ${c.display.timezone} is not an IANA timezone name Intl supports`);
   }
   if (c.free_channel_probe && (c.free_channel_probe.interval_minutes < FREE_CHANNEL_INTERVAL_RANGE.min || c.free_channel_probe.interval_minutes > FREE_CHANNEL_INTERVAL_RANGE.max)) bad("$.free_channel_probe.interval_minutes", `interval must be ${FREE_CHANNEL_INTERVAL_RANGE.min}-${FREE_CHANNEL_INTERVAL_RANGE.max} minutes`);
+  if (c.janitor) {
+    if (c.janitor.ttl_hours < JANITOR_TTL_RANGE.min || c.janitor.ttl_hours > JANITOR_TTL_RANGE.max) bad("$.janitor.ttl_hours", `ttl must be ${JANITOR_TTL_RANGE.min}-${JANITOR_TTL_RANGE.max} hours`);
+    if (c.janitor.interval_hours < JANITOR_INTERVAL_RANGE.min || c.janitor.interval_hours > JANITOR_INTERVAL_RANGE.max) bad("$.janitor.interval_hours", `interval must be ${JANITOR_INTERVAL_RANGE.min}-${JANITOR_INTERVAL_RANGE.max} hours`);
+  }
   for (const [id, worker] of Object.entries(c.workers)) {
     const at = `$.workers.${id}`;
     const kind = Object.hasOwn(c.engines, worker.engine) ? c.engines[worker.engine]?.kind : undefined;

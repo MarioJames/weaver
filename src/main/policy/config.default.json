@@ -4,6 +4,7 @@
   "chatgpt_review": true,
   "quota": { "auto_refresh": true, "interval_minutes": 15 },
   "free_channel_probe": { "enabled": true, "interval_minutes": 10 },
+  "janitor": { "enabled": true, "ttl_hours": 24, "interval_hours": 6 },
   "engines": {
     "claude": { "enabled": true, "kind": "claude", "quota_refresh": true },
     "codex": { "enabled": true, "kind": "codex", "quota_refresh": true },

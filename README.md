@@ -90,6 +90,25 @@ weaver web              # same service, in this terminal; --no-open skips the br
 
 It is the same single writer and supervisor: it binds `127.0.0.1` only (default port 4737; `--port` selects another, `0` picks a free port), prints the URL after the stores and endpoints are ready, and keeps running after the browser closes. When a Weaver service is already running, `weaver web` returns that service's address instead of failing. `--dev` serves the UI with Vite on the same loopback origin. `--data-dir` overrides the state directory, which is also the discoverable endpoint root (`control.v1.json`). A busy port reports `EADDRINUSE` and names `--port`. Stop it with Ctrl+C or SIGTERM: the process drains, stops the workers it started, and exits. Task and policy data in `weaver.db` is kept, closing the browser tab does not stop tasks, and there is no second daemon behind any of this. Weaver does not read, migrate, or delete `~/.config/weaver-desktop`.
 
+## Temporary directory cleanup
+
+Weaver and its tests create short-lived directories under the OS temp root (`wv-*`, plus reserved `weaver-cli-*`, `weaver-policy-*` and `weaver-owner-*` scratch). The running service sweeps them at startup and then every 6 hours by default. A directory is removed only when all of these hold:
+
+- its name starts with an allow-listed Weaver prefix (plain `weaver-` task scratch is never touched);
+- it is a real directory owned by the service uid;
+- its newest recursive mtime is at least 24 hours old (bounded traversal, symlinks are never followed);
+- it is not a Weaver data directory and no live process has it as its cwd or an open file (checked through `/proc` on Linux; other platforms skip the process check but still require the TTL).
+
+The defaults live in the policy as `"janitor": {"enabled": true, "ttl_hours": 24, "interval_hours": 6}`. Save a different section with `weaver policy save`, or set `"enabled": false` to turn scheduled cleanup off. Every sweep records each removed or skipped candidate and why in `weaver.db` (newest 50 sweeps); the same summary is written to `server.log`. Run a sweep immediately, or preview it without deleting anything:
+
+```sh
+weaver janitor sweep --dry-run
+weaver janitor sweep
+weaver janitor status
+```
+
+`janitor` commands talk to the running service, so the same live-process and active-data-directory checks apply.
+
 ## 定时任务
 
 `schedules.*` 与网页共用 `weaver.v1` 命令和回执；多词与点号形式等价，支持 `--output json|jsonl|text`。写命令传稳定的 `--command-id`，重试同一次操作时复用它。下面创建每小时运行一次的脚本（省略 workspace 使用 CLI 调用方目录，也可显式指定）：

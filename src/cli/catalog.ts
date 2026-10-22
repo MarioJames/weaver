@@ -90,6 +90,8 @@ export const CLI_CATALOG: CatalogCommand[] = [
   cmd('engines.penalty', { inputFields: {"required": {"engine": "engine ID (set by --engine)"}, "optional": {}, "notes": "Stall ladder state and retained history from weaver.db, plus vendorLimit ({level,lastTriggerAt} of the vendor rate-limit ladder, null when none)."}, usage: 'engines penalty --engine <id>' }),
   cmd('engines.unblock', { inputFields: {"required": {"engine": "engine ID (set by --engine)"}, "optional": {}}, usage: 'engines unblock --engine <id> --command-id <id>' }),
   cmd('workers.unblock', { inputFields: {"required": {"worker": "worker ID (set by --worker)"}, "optional": {}, "notes": "The user's 「恢复派发」 for one worker. Only when the user decides; never call it on your own. Removes every block that names the worker (any source, any model) and the whole-engine 'all workers limited' vendor block that no longer holds; other workers' blocks and manual or foreign engine-level blocks stay. Resets the worker's stall and free-channel probe state, keeps the vendor rate-limit ladder, then re-routes queued tasks. Returns {worker, engine, removed, wasBlocked}."}, usage: 'workers unblock --worker <id> --command-id <id>' }),
+  cmd('janitor.sweep', { inputFields: { required: {}, optional: { dryRun: 'boolean; set by --dry-run' }, notes: 'Runs the temp-directory sweep now. Only allow-listed Weaver prefixes, directories owned by the service uid, unused by a live process, and older than the TTL are removed; symlinks are never followed.' }, usage: 'janitor sweep [--dry-run]' }),
+  cmd('janitor.status', { usage: 'janitor status    Janitor settings, next run and the retained sweep history, newest first.' }),
   cmd('quota.get', { usage: 'quota get' }),
   cmd('quota.refresh', { inputFields: { required: {}, optional: { engine: 'codex | claude | grok | opencode (omitted refreshes all four; OpenCode Go windows are display-only)' }, notes: 'Refreshes native account quota without inference and synchronizes Weaver-owned policy blocks. Manual blocks are retained. Does not accept commandId, taskId, --command-id, or --task-id.' }, usage: 'quota refresh [--input <refresh.json>]' }),
   cmd('engines.set-enabled', { inputFields: {"required": {"id": "engine ID", "enabled": "boolean", "revision": "current policy revision integer"}, "optional": {}}, usage: 'engines set-enabled --input <toggle.json>' }),
@@ -112,6 +114,7 @@ export const CLI_VALUE_OPTIONS = {
   '--decision': 'accepted | rejected; reviews submit',
   '--comment': 'Literal text; reviews submit',
   '--comment-file': 'UTF-8 text file, up to 4000 characters; reviews submit; exclusive with --comment',
+  '--dry-run': 'janitor sweep only; report what would be removed without deleting anything',
 };
 
 const catalogHelp = CLI_CATALOG.map(item => `  ${item.usage}`).join('\n');

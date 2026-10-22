@@ -60,6 +60,33 @@
         }
       }
     },
+    "janitor": {
+      "description": "Periodic cleanup of stale Weaver-owned directories under the OS temp root at startup and on an interval. Only allow-listed Weaver prefixes, directories owned by the service uid, unused by any live process, and older than the TTL are removed; symlinks are never followed. The CLI can run the same sweep on demand with `weaver janitor sweep [--dry-run]`.",
+      "type": "object",
+      "required": [
+        "enabled",
+        "ttl_hours",
+        "interval_hours"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "ttl_hours": {
+          "description": "A candidate is stale only when its newest recursive mtime is at least this many hours old.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8760
+        },
+        "interval_hours": {
+          "description": "Hours between scheduled sweeps while the runtime is running.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 168
+        }
+      }
+    },
     "display": {
       "description": "Rendering preferences. Missing or empty fields follow the browser.",
       "type": "object",

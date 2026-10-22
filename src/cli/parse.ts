@@ -21,6 +21,7 @@ export interface CLIOptions {
   worker?: string;
   cancel?: boolean;
   refresh?: boolean;
+  dryRun?: boolean;
   field?: string;
   expectedRevision?: number;
   manifestDigest?: string;
@@ -66,6 +67,7 @@ export function parseCLI(argv: string[]): CLIOptions {
     seen.add(arg);
     if (arg === '--json') { jsonAlias = true; continue; }
     if (arg === '--cancel') { options.cancel = true; continue; }
+    if (arg === '--dry-run') { options.dryRun = true; continue; }
  if (arg === '--refresh') { options.refresh = true; continue; }
     if (arg === '--output') { output = takeOutput(argv, ++i).format; continue; }
     if (arg === '--for') {
@@ -104,6 +106,7 @@ export function parseCLI(argv: string[]): CLIOptions {
   if (options.worker !== undefined && !WORKER_FLAG_COMMANDS.includes(options.command ?? '')) throw new LocalIPCError('INVALID_ARGUMENT', '--worker is only valid for workers probe and workers unblock');
   if (options.cancel && options.command !== 'tasks.retry') throw new LocalIPCError('INVALID_ARGUMENT', '--cancel is only valid for tasks retry');
  if (options.refresh && options.command !== 'engines.models') throw new LocalIPCError('INVALID_ARGUMENT', '--refresh is only valid for engines models');
+  if (options.dryRun && options.command !== 'janitor.sweep') throw new LocalIPCError('INVALID_ARGUMENT', '--dry-run is only valid for janitor sweep');
   const item = CLI_CATALOG.find(entry => entry.command === options.command);
   for (const [key, flag] of [['expectedRevision', '--expected-revision'], ['manifestDigest', '--manifest-digest'], ['decision', '--decision'], ['comment', '--comment'], ['commentFile', '--comment-file']] as const) {
     const field = key === 'commentFile' ? 'comment' : key;

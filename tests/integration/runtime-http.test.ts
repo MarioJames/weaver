@@ -5,7 +5,7 @@ import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { promisify } from 'node:util';
 import { connect, createServer } from 'node:net';
 import { request } from 'node:http';
-import { chmod, mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -541,6 +541,67 @@ test('dev mode serves the renderer on the owned origin', { timeout: 60_000 }, as
     assert.notEqual(rejected.status, 101);
     assert.equal(rejected.closed, true);
   } finally { await runtime?.close(); await rm(dataDir, { recursive: true, force: true }); }
+  // Vite's optimizer can outlive its own close; the runtime must wait for that write before close resolves.
+  await new Promise(resolve => setTimeout(resolve, 1_200));
+  assert.equal(existsSync(dataDir), false, 'no late Vite dependency-cache write may recreate the data dir');
+});
+
+test('runtime janitor sweeps an injected temp root at startup and on demand', { timeout: 30_000 }, async t => {
+  const root = await mkdtemp(join(tmpdir(), 'wv-janitor-runtime-root-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 'wv-janitor-runtime-data-'));
+  const old = new Date(Date.now() - 25 * 60 * 60_000);
+  const stale = join(root, 'wv-janitor-stale');
+  const fresh = join(root, 'wv-janitor-fresh');
+  await mkdir(stale); await writeFile(join(stale, 'cache.txt'), 'x'.repeat(64));
+  await mkdir(fresh); await writeFile(join(fresh, 'cache.txt'), 'fresh');
+  await utimes(join(stale, 'cache.txt'), old, old); await utimes(stale, old, old);
+  let runtime: WeaverRuntime | undefined;
+  try {
+    try { runtime = await startRuntime({ dataDir, port: 0, open: false, janitor: { tmpRoot: root } }); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EPERM') { t.skip('Sandbox denies Unix socket listen (EPERM); no bypass attempted'); return; }
+      throw error;
+    }
+    const call = (method: string, args: unknown[]) => httpCall(runtime!.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime!.port), body: JSON.stringify({ method, args }) });
+    let status = await call('janitorStatus', []);
+    for (let i = 0; i < 100; i++) {
+      if (!existsSync(stale) && status.json?.result?.history?.length >= 1) break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+      status = await call('janitorStatus', []);
+    }
+    assert.equal(existsSync(stale), false, 'the startup sweep removes a stale allow-listed directory');
+    assert.equal(existsSync(fresh), true, 'a fresh directory is kept');
+    assert.equal(status.status, 200, status.text);
+    assert.equal(status.json.result.settings.ttl_hours, 24);
+    assert.equal(status.json.result.history[0].tmpRoot, root);
+    assert.ok(status.json.result.history[0].scanned >= 2);
+    const late = join(root, 'wv-janitor-late');
+    await mkdir(late); await writeFile(join(late, 'cache.txt'), 'x');
+    await utimes(join(late, 'cache.txt'), old, old); await utimes(late, old, old);
+    const dry = await call('janitorSweep', [{ dryRun: true }]);
+    assert.equal(dry.status, 200, dry.text);
+    assert.equal(dry.json.result.dryRun, true);
+    assert.equal(dry.json.result.removed, 1);
+    assert.equal(existsSync(late), true, 'dry run deletes nothing');
+    const real = await call('janitorSweep', [{ dryRun: false }]);
+    assert.equal(real.status, 200, real.text);
+    assert.equal(real.json.result.removed, 1);
+    assert.equal(existsSync(late), false);
+    const after = await call('janitorStatus', []);
+    assert.equal(after.json.result.history.length >= 3, true, 'startup and both on-demand sweeps are recorded');
+    const cliStatus = await cli(dataDir, ['janitor', 'status']);
+    assert.equal(cliStatus.status, 0, cliStatus.stderr);
+    assert.equal(cliStatus.json.apiVersion, 'weaver.v1');
+    assert.equal(cliStatus.json.data.settings.ttl_hours, 24);
+    const cliDry = await cli(dataDir, ['janitor', 'sweep', '--dry-run']);
+    assert.equal(cliDry.status, 0, cliDry.stderr);
+    assert.equal(cliDry.json.data.dryRun, true);
+    assert.equal(cliDry.json.data.removed, 0, 'only the kept fresh directory remains');
+  } finally {
+    await runtime?.close();
+    await rm(root, { recursive: true, force: true });
+    await rm(dataDir, { recursive: true, force: true });
+  }
 });
 
 test('HTTP startup timeout begins after origin and complete RPC validation and restores on response',async t=>{
@@ -581,7 +642,7 @@ test('listEngineModels is a one-argument read RPC: valid input lists, malformed 
   assert.equal(RPC_METHODS.listEngineModels.timeoutMs, 40_000, 'the renderer waits up to 40 seconds for a model list');
   assert.equal(RPC_METHODS.workerProbe.timeoutMs, 130_000);
   assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'timeoutMs' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['listEngineModels', 'workerProbe']);
-  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'retryable' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['capabilities', 'getImSettings', 'getPolicy', 'getQuota', 'getStall', 'getTask', 'listEngineModels', 'listTasks', 'previewRoute', 'sayHiResult', 'validatePolicy', 'workerProbeStatus']);
+  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'retryable' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['capabilities', 'getImSettings', 'getPolicy', 'getQuota', 'getStall', 'getTask', 'janitorStatus', 'listEngineModels', 'listTasks', 'previewRoute', 'sayHiResult', 'validatePolicy', 'workerProbeStatus']);
   assert.match(client, /from '\.\.\/\.\.\/shared\/contracts\/rpc'/, 'the renderer client derives its method table, deadlines and retryable reads from the shared RPC contract');
   assert.doesNotMatch(client, /call\('listEngineModels'|\w+: \d+_000/, 'the renderer client does not hand-write method wrappers or deadlines');
 });

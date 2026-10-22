@@ -19,6 +19,7 @@ const exec = promisify(execFile);
 
 const entry = resolve('src/cli/main.ts');
 const scratch = mkdtempSync(join(tmpdir(), 'wv-server-'));
+test.after(() => rmSync(scratch, { recursive: true, force: true }));
 const okData = (data: unknown): Envelope => ({ apiVersion: 'weaver.v1', commandId: null, ok: true, data });
 /** How a pre-serverInfo weaver answers: a running server that cannot describe itself. */
 const legacyEnvelope: Envelope = { apiVersion: 'weaver.v1', commandId: null, ok: false, error: { code: 'INVALID_REQUEST', message: 'Unknown method' } };

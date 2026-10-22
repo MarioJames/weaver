@@ -1,4 +1,4 @@
-import type { Engine, FreeChannelProbeSettings, QuotaSettings } from '../contracts/policy';
+import type { Engine, FreeChannelProbeSettings, JanitorSettings, QuotaSettings } from '../contracts/policy';
 
 /** The single kind -> legal effort table; kinds not listed accept any non-empty string. */
 export const EFFORTS: Record<string, string[]> = {
@@ -21,6 +21,13 @@ export function quotaSettings(config: { quota?: QuotaSettings }): QuotaSettings 
   return config.quota ?? { auto_refresh: true, interval_minutes: 15 };
 }
 export const FREE_CHANNEL_INTERVAL_RANGE = { min: 5, max: 1440 } as const;
+export const JANITOR_DEFAULTS: JanitorSettings = { enabled: true, ttl_hours: 24, interval_hours: 6 };
+export const JANITOR_TTL_RANGE = { min: 1, max: 8760 } as const;
+export const JANITOR_INTERVAL_RANGE = { min: 1, max: 168 } as const;
+/** Stored janitor settings; a missing section means the documented defaults. */
+export function janitorSettings(config: { janitor?: JanitorSettings }): JanitorSettings {
+  return config.janitor ?? { ...JANITOR_DEFAULTS };
+}
 export function freeChannelProbeSettings(config: { free_channel_probe?: FreeChannelProbeSettings }): FreeChannelProbeSettings {
   return config.free_channel_probe ?? { enabled: true, interval_minutes: 10 };
 }

@@ -36,6 +36,9 @@ import { dbQuotaStore } from './storage/quota-snapshot';
 import { dbStallStore } from './storage/stall-state';
 import { dbVendorLadder } from './storage/vendor-limits';
 import { recoverInterruptedTasks } from './application/tasks/recovery';
+import { createViteOptimizerTracker, settleViteCache, TempJanitor } from './janitor';
+import { dbJanitorStore } from './storage/janitor-runs';
+import { janitorSettings } from '../shared/policy/settings';
 
 export interface RuntimeOptions {
   dataDir: string;
@@ -49,6 +52,16 @@ export interface RuntimeOptions {
   quotaProber?: QuotaProber;
   ownerHost?: AsyncOwnerHost;
   im?: Pick<ImServiceOptions, 'parentFactory' | 'channelFactory' | 'now'>;
+  /** Internal dependency injection for isolated janitor tests; never supplied over RPC. */
+  janitor?: {
+    tmpRoot?: string;
+    uid?: number | null;
+    platform?: NodeJS.Platform;
+    now?: () => number;
+    ttlMs?: number;
+    intervalMs?: number;
+    watchIntervalMs?: number;
+  };
 }
 
 export interface WeaverRuntime {
@@ -110,6 +123,10 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   let freeProbe: FreeChannelProbeMonitor | undefined;
   let http: HttpRuntime | undefined;
   let vite: { middlewares: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, next: (error?: unknown) => void) => void; close(): Promise<void> } | undefined;
+  const optimizerTracker = createViteOptimizerTracker();
+  let janitor: TempJanitor | undefined;
+  /** Tests started by node --test must opt in with an isolated root; an unguarded sweep could delete the real /tmp. */
+  const testContext = Boolean(process.env.NODE_TEST_CONTEXT);
   const inflight = new Set<Promise<unknown>>();
   const greetings = new AbortController();
   // One `pi --list-models` cache for the models page, the pre-launch check of tasks, hello and free-channel probes.
@@ -155,6 +172,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     modelLister,
     im: () => im!,
     server: () => ({ url: runtime.url, port: runtime.port, dataDir, startedAt, managedBy: managedBy() }),
+    janitor: () => janitor!,
   });
   async function dispatch(method: string, args: unknown[]): Promise<unknown> {
     const active = requireReady();
@@ -200,6 +218,8 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
           appType: 'spa',
           // Per data dir, so a test or another instance cannot rebuild the dependency cache under a running dev server.
           cacheDir: join(dataDir, 'vite'),
+          // The tracker makes close wait for an optimizer write that Vite's own close does not await.
+          optimizeDeps: { rolldownOptions: { plugins: [optimizerTracker.plugin] } },
           server: { middlewareMode: true, cors: false, port, headers: SECURITY_HEADERS, ws: { server } },
         });
       } : undefined,
@@ -209,6 +229,19 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     store = new TaskStore(join(dataDir, 'weaver.db'));
     recoverInterruptedTasks(store);
     policy = new PolicyStore(store.db);
+    janitor = new TempJanitor({
+      tmpRoot: options.janitor?.tmpRoot,
+      uid: options.janitor?.uid,
+      platform: options.janitor?.platform,
+      now: options.janitor?.now,
+      ttlMs: options.janitor?.ttlMs,
+      intervalMs: options.janitor?.intervalMs,
+      watchIntervalMs: options.janitor?.watchIntervalMs,
+      activeDataDirs: () => [dataDir],
+      settings: () => janitorSettings(policy!.snapshot().config),
+      store: dbJanitorStore(store!.db),
+      log: message => console.error(`Temp janitor: ${message}`),
+    });
     im = new ImService({ dataDir, policy: () => policy!.snapshot(), ...options.im, taskStatus: () => `Weaver 任务共 ${store!.listSummaries().length} 项。` });
     quotaProber = options.quotaProber ?? new QuotaProber({ snapshotStore: dbQuotaStore(store.db) });
     // Ladders and probe answers live in the same weaver.db, so a restart keeps its penalties and history.
@@ -256,6 +289,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     runtime.port = http.port;
     runtime.url = `http://127.0.0.1:${http.port}`;
     im.start();
+    if (!testContext || options.janitor?.tmpRoot !== undefined) janitor.start();
     if (options.open) openBrowser(runtime.url);
     return runtime;
   } catch (error) {
@@ -263,7 +297,9 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     await commands?.drain().catch(() => {});
     await im?.close().catch(() => {});
     await quotaProber?.close().catch(() => {});
+    janitor?.stop();
     await vite?.close().catch(() => {});
+    await settleViteCache(options.dev ? join(dataDir, 'vite') : undefined, { tracker: optimizerTracker, log: message => console.error(`Dev cache: ${message}`) }).catch(error => console.error(`Dev cache: ${error instanceof Error ? error.message : String(error)}`));
     await http?.close().catch(() => {});
     await ipc.close().catch(() => {});
     try { store?.close(); } catch { /* Preserve the initialization error. */ }
@@ -276,6 +312,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     closed = true;
     draining = true;
     ready = false;
+    janitor?.stop();
     let imCloseFailure: unknown;
     try { await im?.close(); } catch (error) { imCloseFailure = error; }
     const ownerDrain = commands?.drain();
@@ -289,6 +326,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     try { await manager?.shutdown(); } catch (error) { console.error(error instanceof Error ? error.message : 'shutdown failed'); }
     try { store?.close(); } catch (error) { console.error(error instanceof Error ? error.message : 'Task history could not be flushed'); }
     await vite?.close().catch(() => {});
+    await settleViteCache(options.dev ? join(dataDir, 'vite') : undefined, { tracker: optimizerTracker, log: message => console.error(`Dev cache: ${message}`) }).catch(error => console.error(`Dev cache: ${error instanceof Error ? error.message : String(error)}`));
     await http?.close().catch(() => {});
     await ipc.close().catch(() => {});
     resolveDone();

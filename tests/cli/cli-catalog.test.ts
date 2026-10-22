@@ -13,7 +13,7 @@ import { runCLI } from '../../src/cli/run';
 import { READ_COMMANDS, WRITE_COMMANDS } from '../../src/shared/contracts/commands';
 
 const serverCommands = [...READ_COMMANDS, ...WRITE_COMMANDS];
-const rpcCommands = ['policy.get', 'policy.validate', 'policy.save', 'policy.preview', 'engines.scan', 'engines.set-enabled', 'quota.get', 'quota.refresh'];
+const rpcCommands = ['policy.get', 'policy.validate', 'policy.save', 'policy.preview', 'engines.scan', 'engines.set-enabled', 'quota.get', 'quota.refresh', 'janitor.sweep', 'janitor.status'];
 
 test('catalog covers every handler command, nested continuation, and output flags', () => {
   for (const name of [...serverCommands, ...rpcCommands, 'tasks.wait', 'tasks.watch']) {
@@ -270,6 +270,38 @@ test('help parses the new flags and reports an invalid pairing in the requested 
  const bad=run(['tasks','get','--cancel','--help','--output','text']);
  assert.equal(bad.status,1);assert.match(bad.stdout,/^INVALID_ARGUMENT: --cancel is only valid/);
  assert.equal(bad.stdout.trim().split('\n').length,1);
+});
+
+test('janitor sweep is a direct RPC call and --dry-run becomes a boolean argument', async () => {
+  assert.equal(parseCLI(['janitor', 'sweep']).dryRun, undefined);
+  assert.equal(parseCLI(['janitor', 'sweep', '--dry-run']).dryRun, true);
+  assert.throws(() => parseCLI(['tasks', 'get', '--dry-run']), /--dry-run is only valid for janitor sweep/);
+  assert.throws(() => parseCLI(['janitor', 'sweep', '--dry-run', '--dry-run']), /Duplicate option --dry-run/);
+  const directory = await mkdtemp(join(tmpdir(), 'wv-janitor-cli-'));
+  const app = await startLocalIPC(directory, request => ({ apiVersion: 'weaver.v1', ok: true, data: request }));
+  const original = process.stdout.write;
+  let output = '';
+  try {
+    process.stdout.write = ((chunk: unknown) => { output += String(chunk); return true; }) as typeof process.stdout.write;
+    assert.equal(await runCLI(['janitor', 'sweep', '--dry-run', '--data-dir', directory]), 0);
+    const sent = JSON.parse(output).data as { method: string; args: unknown[]; commandId?: unknown };
+    assert.equal(sent.method, 'janitorSweep');
+    assert.deepEqual(sent.args, [{ dryRun: true }]);
+    assert.equal(sent.commandId, undefined, 'direct RPC commands do not carry a command ID');
+    output = '';
+    assert.equal(await runCLI(['janitor', 'sweep', '--data-dir', directory]), 0);
+    assert.deepEqual((JSON.parse(output).data as { args: unknown[] }).args, [{}]);
+    output = '';
+    assert.equal(await runCLI(['janitor', 'sweep', '--dry-run', '--input', '{"dryRun":false}', '--data-dir', directory]), 1);
+    assert.match(JSON.parse(output).error.message, /Input dry run does not match CLI dry run/);
+    output = '';
+    assert.equal(await runCLI(['janitor', 'status', '--data-dir', directory]), 0);
+    assert.equal((JSON.parse(output).data as { method: string }).method, 'janitorStatus');
+  } finally {
+    process.stdout.write = original;
+    await app.close();
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test('the new commands reach the socket as logical envelopes, not method wrappers',async()=>{

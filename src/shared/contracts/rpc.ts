@@ -46,6 +46,8 @@ export const RPC_METHODS = {
   cancelTask: { arity: 1 },
   capabilities: { arity: 0, retryable: true },
   serverInfo: { arity: 0 },
+  janitorSweep: { arity: 1, cli: 'janitor.sweep', mutation: true },
+  janitorStatus: { arity: 0, retryable: true, cli: 'janitor.status', mutation: false },
 } as const satisfies Record<string, RpcMethodSpec>;
 
 export type RpcMethod = keyof typeof RPC_METHODS;

@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 /** Every schema change lands here as one ordered step; PRAGMA user_version tracks what ran. */
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 /** A step is plain SQL, or a function for data work SQL alone cannot express (here: rewriting JSON snapshots). */
 type Step = (string | ((db: DatabaseSync) => void))[];
@@ -116,6 +116,10 @@ const STEPS: Step[] = [
     `DELETE FROM policy_workers WHERE engine IN (SELECT id FROM policy_engines WHERE kind = 'zcode')`,
     `DELETE FROM policy_engines WHERE kind = 'zcode'`,
     dropZcodeFromSnapshots,
+  ],
+  // 12: the temp-directory janitor keeps one bounded history row per sweep, so every removal or skip is queryable.
+  [
+    `CREATE TABLE IF NOT EXISTS janitor_sweeps(id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, body TEXT NOT NULL)`,
   ],
 ];
 

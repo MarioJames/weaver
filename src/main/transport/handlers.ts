@@ -24,6 +24,8 @@ import type { QuotaProber } from '../quota';
 import { RpcError } from '../rpc';
 import type { StallMonitor } from '../stall';
 import type { TaskStore } from '../store';
+import type { TempJanitor } from '../janitor';
+import { object } from '../../shared/validation';
 
 /** The started services every RPC method works against. */
 export interface ActiveServices {
@@ -47,6 +49,7 @@ export interface RpcHost {
   /** The runtime's model-list cache, shared with the pi pre-launch check; a host without one gets its own. */
   modelLister?: EngineModelLister;
   server(): { url: string; port: number; dataDir: string; startedAt: string; managedBy: 'systemd' | 'launchd' | null };
+  janitor(): TempJanitor;
 }
 
 export type RpcHandler = (active: ActiveServices, args: unknown[]) => unknown;
@@ -201,6 +204,18 @@ function serverHandlers(host: RpcHost): Handlers<'capabilities' | 'serverInfo'> 
   };
 }
 
+function janitorHandlers(host: RpcHost): Handlers<'janitorSweep' | 'janitorStatus'> {
+  return {
+    janitorSweep: (_active, args) => {
+      const input = object(args[0]);
+      if (Object.keys(input).some(key => key !== 'dryRun')) throw new RpcError('INVALID_REQUEST', 'Janitor sweep input only accepts dryRun');
+      if (input.dryRun !== undefined && typeof input.dryRun !== 'boolean') throw new RpcError('INVALID_REQUEST', 'dryRun must be a boolean');
+      return host.track(host.janitor().sweep({ dryRun: input.dryRun === true }));
+    },
+    janitorStatus: () => host.janitor().status(),
+  };
+}
+
 /** The business implementation behind every RPC method; HTTP /api/rpc and the Unix socket both reach it through the runtime. */
 export function createRpcHandlers(host: RpcHost): RpcHandlers {
   return {
@@ -213,5 +228,6 @@ export function createRpcHandlers(host: RpcHost): RpcHandlers {
     ...probeHandlers(host),
     ...taskHandlers(),
     ...serverHandlers(host),
+    ...janitorHandlers(host),
   };
 }

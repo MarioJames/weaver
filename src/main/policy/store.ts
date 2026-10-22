@@ -43,7 +43,7 @@ function dropRetiredFields(value: unknown): unknown {
  return config;
 }
 /** Top-level config sections kept as one settings row each (engines, owners and workers have their own tables). */
-const SETTING_KEYS=['$schema','chatgpt_review','quota','free_channel_probe','display'];
+const SETTING_KEYS=['$schema','chatgpt_review','quota','free_channel_probe','janitor','display'];
 const bit=(value:boolean)=>value?1:0;
 const optionalText=(value:string|undefined)=>value===undefined?null:value;
 /** App-owned single-writer settings in the same weaver.db as the task store. Never touches upstream config or a host home. */
@@ -105,7 +105,7 @@ export class PolicyStore {
   if(settings.chatgpt_review!==undefined)built.chatgpt_review=settings.chatgpt_review;
   built.engines=engines;built.owners=owners;built.workers=workers;
   built.herdr=settings.herdr!==undefined?settings.herdr:defaultConfig().herdr;
-  for(const key of ['quota','free_channel_probe','display'])if(settings[key]!==undefined)built[key]=settings[key];
+  for(const key of ['quota','free_channel_probe','janitor','display'])if(settings[key]!==undefined)built[key]=settings[key];
   const config=built as unknown as Config;
   const blocks=(this.db.prepare('SELECT * FROM policy_blocks ORDER BY position').all() as Record<string,unknown>[]).map(row=>{
    const block:Block={engine:String(row.engine),reason:String(row.reason),since:String(row.since)};

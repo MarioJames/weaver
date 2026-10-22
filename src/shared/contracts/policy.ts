@@ -4,12 +4,14 @@ export interface Engine { enabled: boolean; kind: string; quota_refresh?: boolea
 export interface QuotaSettings { auto_refresh: boolean; interval_minutes: number }
 /** Scheduled live probes of free_channel workers; missing means enabled every 10 minutes. */
 export interface FreeChannelProbeSettings { enabled: boolean; interval_minutes: number }
+/** Periodic cleanup of stale Weaver-owned temp directories. Missing means enabled with a 24 hour TTL every 6 hours. */
+export interface JanitorSettings { enabled: boolean; ttl_hours: number; interval_hours: number }
 export interface Owner { enabled: boolean; engine: string; model: string; effort: string; workers: string[]; max_parallel: number; worker_weights?: Record<string, number> }
 export interface Worker { free_channel?: boolean; enabled: boolean; engine: string; model: string; effort: string; description?: string; /** Cap on tasks this worker runs at once across every owner; missing means no cap. */ max_parallel?: number }
 export interface Herdr { max_wait_minutes: number }
 /** Rendering preferences; missing means follow the browser. */
 export interface Display { timezone?: string }
-export interface Config { version: 1; chatgpt_review?: boolean; quota?: QuotaSettings; free_channel_probe?: FreeChannelProbeSettings; display?: Display; engines: Record<string, Engine>; owners: Record<string, Owner>; workers: Record<string, Worker>; herdr: Herdr }
+export interface Config { version: 1; chatgpt_review?: boolean; quota?: QuotaSettings; free_channel_probe?: FreeChannelProbeSettings; display?: Display; janitor?: JanitorSettings; engines: Record<string, Engine>; owners: Record<string, Owner>; workers: Record<string, Worker>; herdr: Herdr }
 /** A block with `worker` keeps only that worker out; without it the block covers the whole engine (or one model of it). */
 export interface Block { engine: string; model?: string; worker?: string; reason: string; since: string; release_at?: string; by?: string }
 export interface State { version: 1; blocks: Block[] }

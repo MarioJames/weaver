@@ -12,6 +12,17 @@ function renderNext(next: Record<string, unknown>): string[] {
 function renderData(data: unknown): string {
   if (!data || typeof data !== 'object') return data === undefined ? '' : String(data);
   const record = data as Record<string, unknown>;
+  if (typeof record.dryRun === 'boolean' && typeof record.removed === 'number' && Array.isArray(record.entries)) {
+    const lines = [`${record.dryRun ? 'would remove' : 'removed'} ${record.removed} of ${record.scanned} candidate(s) under ${record.tmpRoot ?? ''}`.trim()];
+    for (const item of record.entries as Record<string, unknown>[]) if (item.action === 'removed' || item.action === 'would-remove') lines.push(`${item.action}: ${item.path}`);
+    return lines.join('\n');
+  }
+  if (record.settings && Array.isArray(record.history)) {
+    const settings = record.settings as Record<string, unknown>;
+    const lines = [`janitor ${settings.enabled ? 'enabled' : 'disabled'}: ttl ${settings.ttl_hours}h, interval ${settings.interval_hours}h, next ${record.nextSweepAt ?? 'not scheduled'}`];
+    for (const item of (record.history as Record<string, unknown>[]).slice(0, 10)) lines.push(`${item.finishedAt ?? ''} ${item.dryRun ? 'dry run' : 'sweep'}: removed ${item.removed ?? 0}, skipped ${item.skipped ?? 0}, failed ${item.failed ?? 0}`);
+    return lines.join('\n');
+  }
   if (record.reason === 'stalled' && record.health && typeof record.health === 'object') {
     const health = record.health as Record<string, unknown>;
     return [`${record.id ?? ''} stalled (task status: ${record.status ?? 'unknown'})`,

@@ -24,7 +24,7 @@ const POLL_GAP_MS = 1000;
 export const RPC_DEADLINE_MS = 15_000;
 
 /** Methods the shared RPC table serves that the browser never calls (CLI and diagnostics only). */
-const NOT_BROWSER_METHODS = ['policyHistory', 'policyRollback', 'serverInfo'] as const satisfies readonly RpcMethod[];
+const NOT_BROWSER_METHODS = ['policyHistory', 'policyRollback', 'serverInfo', 'janitorSweep', 'janitorStatus'] as const satisfies readonly RpcMethod[];
 type BrowserMethod = Exclude<RpcMethod, (typeof NOT_BROWSER_METHODS)[number]>;
 /** Every method `window.weaver` forwards over RPC; the table and RendererAPI must agree. */
 type RemoteMethods = Exclude<keyof RendererAPI, 'onTasksChanged'>;

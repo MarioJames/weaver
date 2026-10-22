@@ -39,8 +39,8 @@ function seedPolicy(db: DatabaseSync, config: Config, blocks: Block[] = [], revi
     o.workers.forEach((worker, position) => db.prepare('INSERT INTO policy_owner_workers(owner_id,worker_id,position,weight) VALUES (?,?,?,?)').run(id, worker, position, o.worker_weights?.[worker] ?? null));
   });
   blocks.forEach((b, index) => db.prepare('INSERT INTO policy_blocks(position,engine,model,worker,reason,since,release_at,by) VALUES (?,?,?,?,?,?,?,?)').run(index, b.engine, b.model ?? null, b.worker ?? null, b.reason, b.since, b.release_at ?? null, b.by ?? null));
-  const { herdr, $schema, chatgpt_review, quota, free_channel_probe } = config as unknown as Record<string, unknown>;
-  for (const [key, value] of Object.entries({ herdr, $schema, chatgpt_review, quota, free_channel_probe })) if (value !== undefined) db.prepare('INSERT INTO policy_settings(key,body) VALUES (?,?)').run(key, JSON.stringify(value));
+  const { herdr, $schema, chatgpt_review, quota, free_channel_probe, janitor } = config as unknown as Record<string, unknown>;
+  for (const [key, value] of Object.entries({ herdr, $schema, chatgpt_review, quota, free_channel_probe, janitor })) if (value !== undefined) db.prepare('INSERT INTO policy_settings(key,body) VALUES (?,?)').run(key, JSON.stringify(value));
   for (let revision = 1; revision <= revisions; revision++) db.prepare('INSERT INTO policy_revisions(revision,saved_at,source,body) VALUES (?,?,?,?)').run(revision, '2030-01-01T00:00:00.000Z', 'save', JSON.stringify({ version: 1, revision, config, blocks }));
 }
 
