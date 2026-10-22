@@ -217,14 +217,16 @@ weaver quota refresh --help --output json
 
 ### 3.2 服务命令组 `weaver server`
 
-一台机器上的所有 agent 会话共享同一个 Weaver 服务进程（唯一写者与 worker 监督者）。`weaver server` 管理它的生命周期；参数与返回字段以 `weaver server --help` 与 `weaver --help --output json` 为准。
+同一 data dir 上的所有 agent 会话共享同一个 Weaver 服务进程（唯一写者与 worker 监督者）。`weaver server` 管理它的生命周期；参数与返回字段以 `weaver server --help` 与 `weaver --help --output json` 为准。
 
 - `weaver server start [--port 4737] [--data-dir D]`：以后台分离进程启动服务，日志写在 `<data-dir>/server.log`，等到服务能应答才返回。已有运行中的服务时不再起第二个，直接返回那个服务的信息；同一 port + data dir 装了登录自启服务时，由它来启动。客户端报 `APP_NOT_RUNNING` 就执行这条。
 - `weaver server status`：运行时给出 pid、url、port、data dir、版本、running workers 与 `managedBy`；未运行时明确报停止状态。两种情况都附带「是否已安装登录自启服务」。
-- `weaver server stop [--force]`：发 SIGTERM 并等待退出。有 worker 在跑时默认拒绝并返回 `SERVER_BUSY`——停止会取消在途工作——`--force` 才强制。停止由用户发起：owner agent 不把停服务当作任务收尾，也不杀它的进程或 systemd scope。
+- `weaver server stop [--cancel-workers] [--timeout <seconds>]`：发 SIGTERM 并等待退出（默认 60 秒，可设 1–600 秒），有运行中 worker 也不拒绝。默认不取消本版创建的真实 CLI worker；`--cancel-workers` 才先取消 running/cancelling 的非 native worker 并等到这些 worker 没有剩余，超时返回 `SERVER_CANCEL_TIMEOUT` 且不发 SIGTERM。`--force` 在 stop 上没有强制语义；需要取消 worker 时用 `--cancel-workers`。停止由用户发起：owner agent 不把停服务当作任务收尾，也不杀它的进程或 systemd scope。
 - `weaver server install [--port] [--data-dir] [--force]` / `weaver server uninstall`：安装或移除登录自启，Linux 写 systemd user unit `weaver.service`，macOS 写 launchd agent `dev.weaver.server`；只在安装后的独立可执行文件下可用。install 捕获调用时的 `PATH`，让 worker 仍找得到各引擎 CLI；对没有被该服务管理的运行实例只给提示，不动它。
 
-前台模式 `weaver web` 保留给开发与调试（打开浏览器），它与后台服务是同一进程实现的两种运行方式。崩溃服务遗留的 stale endpoint（discovery 文件还在、socket 已不应答）在服务启动时自动清除，所以 `weaver server start` 能自行恢复。
+默认停止不取消本版创建的真实 CLI worker：它们用独立日志文件继续运行，新服务启动时按持久启动记录核实并接回；有运行中 worker 时结果里带计数。自动接回仅覆盖本版创建且带持久启动记录的真实 CLI 运行；从旧版首次升级必须先等真实 worker 全部结束再停服替换，飞书进行中的对话/回合和定时任务运行不保证跨重启继续。native 任务和已有 ownerHost 的 owner 宿主保持现有状态，不由 worker 接回路径恢复。
+
+前台模式 `weaver web` 保留给开发与调试（打开浏览器），它与后台服务是同一进程实现的两种运行方式；同一 data dir 已有实例时返回该实例地址而不另起。崩溃服务遗留的 stale endpoint（discovery 文件还在、socket 已不应答）在服务启动时自动清除，所以 `weaver server start` 能自行恢复。
 
 ### 3.3 卡住健康与引擎惩罚命令
 

@@ -33,7 +33,7 @@ Weaver 是本地任务控制面，交付三件套：
           │    ├─ MockWorkerAdapter（显式 mock-jsonl，bundled scripts/mock-worker.mjs）
           │    └─ RoutingWorkerAdapter → startCliAgent（src/main/adapters/cli）真实引擎（含 qodercli）
           ├─ PolicyStore（weaver.db 的 policy_* 表）+ 纯路由 policy/routing.ts、路由预览 policy/preview.ts
-          ├─ TaskStore（weaver.db，SQLite 事务）；槽位/事件规则 domain/tasks.ts，启动恢复 application/tasks/recovery.ts
+          ├─ TaskStore（weaver.db，SQLite 事务）；槽位/事件规则 domain/tasks.ts，启动恢复 application/tasks/{reattach,recovery}.ts
           ├─ StallMonitor（src/main/stall.ts，60 秒一次采样/惩罚/恢复探测；CPU 读取 monitors/cpu.ts；状态经 storage/stall-state.ts 落 weaver.db 的 stall_* 表，free-channel 与额度观测的 SQLite 适配同在 src/main/storage/；监视器共用的小机制是 monitors/ladder.ts（阶梯起算、级别、重置窗口、供应商限流步进）与 monitors/lifecycle.ts（tick 合并、定时器、可中止探测、stop 围栏），不是监视器基类）
           ├─ PolicyBlockService（src/main/policy/blocks.ts）：stall、免费渠道探测、供应商限流与额度四个来源，以及用户的引擎与子 Agent 手动解除，对 policy blocks 的读—改—存（revision 冲突后重读重试）都经它。自动来源可经 `atomic()` 把 block 保存与配套监视器状态（阶梯、监视器行）在同一 SQLite 连接上的单个事务里提交，两者要么都落盘要么都不落盘（生产装配满足同连接；测试替身或异连接时退化为各自保存）；人工解除（`engines unblock`）是多步骤：先提交清块保存，随后复位 StallMonitor 阶梯与免费渠道未决问题——清块提交后即使 stall/free probe 复位失败也会通知调度恢复路由，stall 状态保存失败则留 dirty 由下次 tick 收敛；来源标记与归属/作用域谓词只定义在 src/shared/policy/blocks.ts
           ├─ engines/{probe,control}.ts（PATH+--version 只读探测）
@@ -56,7 +56,7 @@ src/
     runtime.ts            装配、全局 ready/draining、启动与关闭顺序
     migrate.ts            有序 SQLite 迁移（SCHEMA_VERSION=11，追加式）
     commands.ts           CommandHandler 门面：只装配应用层单元
-    application/          用例层：commands/{gateway,registry,errors}、tasks/{queries,mutations,records,results,recovery}、
+    application/          用例层：commands/{gateway,registry,errors}、tasks/{queries,mutations,records,results,recovery,reattach}、
                           scheduling/{coordinator,dispatch,retry,vendor-limits}、owners/lifecycle、engines/unblock、workers/unblock
     transport/handlers.ts 每个 RPC 方法一个 handler 的分派层
     rpc.ts                RPC 请求解析与 HTTP 状态码映射
@@ -93,7 +93,7 @@ src/
 - RPC 方法表只有一份：`src/shared/contracts/rpc.ts`（方法、arity、retryable、`cli` 直连映射、`timeoutMs`）。`main/rpc.ts` 的 allowlist/arity 校验、`transport/handlers.ts` 的 handler 覆盖、CLI catalog 的直连 RPC 映射与 renderer client 的重试/超时都从它读取，没有第二份 allowlist。
 - 处理链：`CommandGateway` 校验 `weaver.v1` 信封、维护 durable intent/receipt（`COMMAND_INDETERMINATE`/`IDEMPOTENCY_CONFLICT` 语义）与统一错误出口；`createRegistry` 把每个命令路由到 tasks/scheduling/owners 单元；`Coordinator` 负责 pump、准入与冻结路由复核，`Dispatcher`/`Retries` 派发与重试，`VendorLimits` 写供应商限流阶梯与对应 block。
 
-进程语义：服务单实例。前台 `weaver web` 跑在当前终端；后台 `weaver server start` 以分离进程启动并等到能应答才返回，已有运行实例时不再起第二个、直接返回它的信息，同一 port + data dir 装了登录自启服务时由该服务启动。端口被占返回 `EADDRINUSE`；`--data-dir` 决定默认 endpoint/state 目录。崩溃服务遗留的 stale endpoint（discovery 文件还在、socket 已不应答）在启动时自动清除。停止两种模式走同一条关停路径——`weaver web` 用 Ctrl+C，后台用 `weaver server stop`（有 running worker 时默认拒绝 `SERVER_BUSY`，因为停止会取消它们，`--force` 才强制）——随后 draining（`ready=false`，命令面报 `APP_DRAINING`，同时开始 `commands.drain()` 中止在途 owner launch）→ 停额度定时器 → 停 StallMonitor（中止在途恢复探测，并等当前那次 tick 收束）→ 停免费渠道探测（`freeProbe.stop()`，同样中止在途探测并等当前 tick 收束，见 src/main/runtime.ts）→ 中止在途额度探测与引擎 hello → 等待 owner launch/精确清理与其余未响应请求完成 → `manager.shutdown()` 逐个取消本进程拥有的 running 任务并等待子进程退出 → 关闭 HTTP/socket → 退出。draining 后完成的额度请求不再保存策略；采样与探测都是 await 过的，回到写状态前会再确认一次仍在 ready 窗口内，所以关停之后不会补写 block 或惩罚状态。任务、策略与惩罚文件保留。关闭浏览器页不停任务。客户端断开不取消已提交的工作。服务是整机共享的：owner agent 不把停服务当作任务收尾，也不杀它的进程或 systemd scope，只有用户停。登录自启由 `weaver server install` / `uninstall` 管理：Linux 写 systemd user unit `weaver.service`，macOS 写 launchd agent `dev.weaver.server`，只从安装后的独立可执行文件可用，install 捕获当前 `PATH` 让 worker 仍找得到引擎 CLI，对未被该服务管理的运行实例只给提示不动它。
+进程语义：同一 data dir 单实例（进程级实例锁）。前台 `weaver web` 跑在当前终端，发现同一 data dir 已有实例时返回它的地址而不另起；后台 `weaver server start` 以分离进程启动并等到能应答才返回，已有运行实例时不再起第二个、直接返回它的信息，同一 port + data dir 装了登录自启服务时由该服务启动。端口被占返回 `EADDRINUSE`；`--data-dir` 决定默认 endpoint/state 目录。崩溃服务遗留的 stale endpoint（discovery 文件还在、socket 已不应答）在启动时自动清除。停止两种模式走同一条关停路径——`weaver web` 用 Ctrl+C/SIGTERM，后台用 `weaver server stop`（不再因运行中 worker 拒绝；默认不取消本版创建的真实 CLI worker；它们以文件模式继续运行，新服务启动时凭持久启动记录接回。需要一并取消时用 `--cancel-workers`，先取消 running/cancelling 的非 native worker，超时返回 `SERVER_CANCEL_TIMEOUT` 且不发 SIGTERM；`--force` 在 stop 上没有强制语义）——随后 draining（`ready=false`，命令面报 `APP_DRAINING`，同时开始 `commands.drain()` 中止在途 owner launch）→ 停额度定时器 → 停 StallMonitor（中止在途恢复探测，并等当前那次 tick 收束）→ 停免费渠道探测（`freeProbe.stop()`，同样中止在途探测并等当前 tick 收束，见 src/main/runtime.ts）→ 中止在途额度探测与引擎 hello → 等待 owner launch/精确清理与其余未响应请求完成 → `manager.shutdown()`：可接回的文件模式真实运行 detach 而不发信号，mock 运行取消并等待退出，旧版非文件模式的真实运行不杀也不取消但停止接收晚到写入；native 任务和已有 ownerHost 的 owner 任务保持原状，不由 worker 接回路径恢复 → 关闭 HTTP/socket → 退出。接回只覆盖本版创建且带持久启动记录的真实 CLI 运行，无法核实作用域身份时保持待恢复而不误杀；从旧版首次升级必须先等真实 worker 全部结束再停服替换，飞书进行中的对话/回合和定时任务运行不在此接回保证内。draining 后完成的额度请求不再保存策略；采样与探测都是 await 过的，回到写状态前会再确认一次仍在 ready 窗口内，所以关停之后不会补写 block 或惩罚状态。任务、策略与惩罚文件保留。关闭浏览器页不停任务。客户端断开不取消已提交的工作。服务是该 data dir 上的会话共享的：owner agent 不把停服务当作任务收尾，也不杀它的进程或 systemd scope，只有用户停。登录自启由 `weaver server install` / `uninstall` 管理：Linux 写 systemd user unit `weaver.service`，macOS 写 launchd agent `dev.weaver.server`，只从安装后的独立可执行文件可用，install 捕获当前 `PATH` 让 worker 仍找得到引擎 CLI，对未被该服务管理的运行实例只给提示不动它。
 
 ## 3. 单写权威与存储
 
