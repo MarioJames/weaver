@@ -12,8 +12,9 @@ export const botStyles = createStaticStyles(({ css, cssVar }) => ({
     background: ${cssVar.colorBgContainer};
   `,
   tabList: css`
-    /* 渠道导航已在卡片之外：左右与卡片内容对齐，下方留出与卡片的间距。 */
-    padding: 10px 20px 12px;
+    /* 渠道导航已在卡片之外：底线之外留出真正的空白，避免卡片贴着导航底线。 */
+    margin-block-end: ${cssVar.marginSM};
+    padding: 10px 20px 0;
 
     button { font-family: inherit; }
   `,
