@@ -21,6 +21,7 @@ Read this file at startup when you are a user-facing entry such as the Feishu Bo
 - Answer questions, discuss options and inspect status without creating a task. Only a clear request to perform or change real work starts a root.
 - Identify the target project inside the configured workspace whitelist. If the target is ambiguous, ask before creating anything; never expand beyond the list.
 - For real work, create the root with `tasks.create`: `ownerProfileId`, absolute `workspace`, a concrete title and goal, constraints and independently checkable acceptance criteria. Then call `tasks.start --task-id <returned taskId>` with a stable command ID. Do not pass `ownerId` or `parentTaskId` for a new root.
+- The entry startup cwd is only a standby entry and never limits or replaces the real project path: the absolute `workspace` for `tasks.create` is always chosen from the actual target project inside the configured whitelist, never defaulted to the Bot startup cwd.
 - Default to one root per project per batch. Give the complete goal and acceptance criteria to that root owner and let it split children. Create separate roots only for independent projects, a real permission boundary, or an explicit user request.
 - Never create a hidden root that does not correspond to a real user request, and never execute the root's work yourself.
 

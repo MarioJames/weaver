@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { connect } from 'node:net';
 import { lstatSync } from 'node:fs';
 import path from 'node:path';
-import { ConfirmedParentCancellation, ParentAgentError, createParentAgent, type ParentAgentFailureReason, type ParentAgentInput, type ParentAgentSession } from './parent-agent';
+import { ConfirmedParentCancellation, ParentAgentError, createParentAgent, spawnOwnedParentProcess, type ParentAgentFailureReason, type ParentAgentInput, type ParentAgentSession } from './parent-agent';
 import { hostWire } from './parent-host-wire';
 import { imMasterIdentityPrompt } from './bootstrap';
 import { HOST_STARTUP_MS, identityTimeoutMs, isMasterReadyText } from './parent-identity';
@@ -87,7 +87,12 @@ export async function runParentHost(args: readonly string[]): Promise<number> {
         // Executable discovery uses this process' PATH; authentication stays only in child env.
         if (typeof env.PATH === 'string') process.env.PATH = env.PATH;
         initPromise = createParentAgent(frame.input as ParentAgentInput, {
-          launch: (command, cwd, extra) => spawn(command[0], command.slice(1), { cwd, env: { ...env, ...extra }, stdio: ['pipe', 'pipe', 'pipe'] }),
+          // dsh runs one native child per turn and may start tool descendants. Give that child a
+          // private process group so cancellation reclaims its whole tree without signalling the
+          // host's group or another session. Other engines keep their existing direct child.
+          launch: (command, cwd, extra) => (frame.input as ParentAgentInput).engineKind === 'dsh'
+            ? spawnOwnedParentProcess(command, cwd, { ...env, ...extra })
+            : spawn(command[0], command.slice(1), { cwd, env: { ...env, ...extra }, stdio: ['pipe', 'pipe', 'pipe'] }),
         });
         void initPromise.then(value => {
           if (stopping) return;

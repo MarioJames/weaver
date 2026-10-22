@@ -5,7 +5,7 @@ import { EFFORTS } from './policy/settings';
  * for a Feishu IM conversation. This is deliberately narrower than the policy schema vocabulary:
  * the other schema kinds have no installed probe and no parent protocol, so the UI must not offer them.
  */
-export const IM_ENGINE_KINDS = ['claude', 'codex', 'opencode', 'pi', 'grok', 'qodercli'] as const;
+export const IM_ENGINE_KINDS = ['claude', 'codex', 'opencode', 'pi', 'grok', 'qodercli', 'dsh'] as const;
 export type ImEngineKind = (typeof IM_ENGINE_KINDS)[number];
 
 const IM_ENGINE_SET: ReadonlySet<string> = new Set(IM_ENGINE_KINDS);
@@ -41,6 +41,7 @@ const IM_ENGINE_LABELS: Record<ImEngineKind, string> = {
   pi: 'Pi',
   grok: 'Grok',
   qodercli: 'Qoder',
+  dsh: 'DSH',
 };
 
 export function imEngineLabel(kind: ImEngineKind): string {

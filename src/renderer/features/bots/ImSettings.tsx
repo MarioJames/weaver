@@ -132,7 +132,7 @@ export function ImSettingsView({
           <BotSetting label="open_id 白名单" htmlFor={`${id}-openids`} desc="只接受这些飞书用户发来的单聊文本消息，每行一个。open_id 的获取方式见接入文档，不做自动绑定。" error={fieldErrors.openIds}>
             <TextArea id={`${id}-openids`} aria-label="open_id 白名单，每行一个" value={values.openIdsText} placeholder={'ou_xxxxxxxxxxxxxxxx\n（每行一个）'} autoSize={{ minRows: 2, maxRows: 6 }} disabled={lockFields} style={{ inlineSize: '100%', maxInlineSize: 360 }} onChange={event => onUpdate({ openIdsText: event.target.value })} />
           </BotSetting>
-          <BotSetting label="引擎" htmlFor={`${id}-engine`} desc="支持已启用的 Claude、Codex、OpenCode、Pi、Grok、Qoder；这里只控制 Bot 聊天，不依赖父 Agent 配置。" error={fieldErrors.engine || (values.engine && !engineUsable ? '已保存的引擎已失效、未启用或暂不支持，请重新选择。' : '')}>
+          <BotSetting label="引擎" htmlFor={`${id}-engine`} desc="选用已安装且已启用的引擎；这里只控制 Bot 聊天，不依赖父 Agent 或 worker 配置。" error={fieldErrors.engine || (values.engine && !engineUsable ? '已保存的引擎已失效、未启用或暂不支持，请重新选择。' : '')}>
             <NamedSelect id={`${id}-engine`} aria-label="引擎" value={values.engine || undefined} options={engineOptions} style={{ inlineSize: '100%', maxInlineSize: 320 }} popupMatchSelectWidth={false} disabled={lockFields} placeholder="选择已启用的引擎" onChange={engine => { if (typeof engine === 'string') onEngineChange(engine); }} />
           </BotSetting>
           <BotSetting label="模型" htmlFor={`${id}-model`} desc="从引擎提供的模型中选择，也可手动填写；切换引擎后需重新明确模型。" error={fieldErrors.model}>
@@ -140,7 +140,7 @@ export function ImSettingsView({
               <ModelPicker id={`${id}-model`} label="模型" engine={engineUsable ? discoveryEngine : ''} value={values.model} placeholder="例如：gpt-6.1-sol 或 claude-opus-5-5" onChange={model => { if (!lockFields) onUpdate({ model }); }} />
             </fieldset>
           </BotSetting>
-          <BotSetting label="思考力度" htmlFor={`${id}-effort`} desc={efforts ? 'Bot 独立使用的思考力度，默认 medium；保存后随模型一起生效。' : openCodeVariant ? 'OpenCode 的 variant 由模型定义，可直接填写；保存后随模型一起生效。' : '先选择一个支持飞书对话的引擎。'} error={fieldErrors.effort}>
+          <BotSetting label="思考力度" htmlFor={`${id}-effort`} desc={efforts ? 'Bot 独立使用的思考力度；保存后随模型一起生效。' : openCodeVariant ? 'OpenCode 的 variant 由模型定义，可直接填写；保存后随模型一起生效。' : '先选择一个支持飞书对话的引擎。'} error={fieldErrors.effort}>
             {efforts
               ? <NamedSelect id={`${id}-effort`} aria-label="思考力度" value={values.effort || undefined} options={effortOptions} style={{ inlineSize: '100%', maxInlineSize: 320 }} disabled={lockFields || !engineUsable} placeholder="先选择引擎" onChange={effort => { if (typeof effort === 'string') onUpdate({ effort }); }} />
               : <div className={botStyles.controlStack}>

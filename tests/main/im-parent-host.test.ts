@@ -22,8 +22,8 @@ function fixturePids(marker: string): number[] {
   for (const line of text.trim().split('\n')) {
     if (!line.trim()) continue;
     try {
-      const entry = JSON.parse(line) as { spawnPid?: unknown; pid?: unknown };
-      for (const value of [entry.spawnPid, entry.pid]) if (typeof value === 'number' && value > 0) pids.add(value);
+      const entry = JSON.parse(line) as { spawnPid?: unknown; pid?: unknown; toolPid?: unknown };
+      for (const value of [entry.spawnPid, entry.toolPid, entry.pid]) if (typeof value === 'number' && value > 0) pids.add(value);
     } catch { /* ignore partially written marker lines */ }
   }
   return [...pids];
@@ -607,6 +607,77 @@ test('opencode split progress plus terminal marker still reaches ready through f
     await until(() => frames.some(frame => frame.type === 'prepared' && frame.id === 1));
     wire.send({ type: 'submit', id: 1 });
     await until(() => frames.some(frame => frame.type === 'result' && frame.id === 1));
+    wire.send({ type: 'close', id: 0 });
+    await exit;
+    assert.equal(child.exitCode, 0);
+    await assertFixtureReaped(marker, true);
+  } finally {
+    child.stdin.end(); child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('dsh internal host hides identity, resumes one persisted session across per-turn children, and confirms cancellation', { timeout: 20000 }, async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-dsh-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  const extra = join(dir, 'extra'); mkdirSync(extra);
+  copyFileSync(new URL('../fixtures/parent/dsh-fixture.mjs', import.meta.url), join(dir, 'dsh')); chmodSync(join(dir, 'dsh'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID(), marker = join(dir, 'marker');
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  const events = (): Array<Record<string, any>> => {
+    try { return readFileSync(marker, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line) as Record<string, any>); }
+    catch { return []; }
+  };
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'dsh', model: 'deepseek-flash', effort: 'high', workspace, additionalWorkspaces: [extra], instructions: 'Fixture only. No model.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, DSH_FIXTURE_SCENARIO: 'abort-tree', DSH_FIXTURE_MARKER: marker } });
+    await until(() => frames.some(frame => frame.type === 'ready'));
+    assert.equal(frames.some(frame => frame.type === 'delta'), false, 'the hidden identity turn never streams public text');
+    const identity = events().filter(entry => entry.event === 'spawn');
+    assert.equal(identity.length, 1);
+    assert.equal(identity[0]!.adopted, undefined);
+    const identityTask = events().find(entry => entry.event === 'task');
+    assert.equal(identityTask!.hidden, true);
+    assert.ok(String(identityTask!.task).includes('WEAVER_MASTER_READY'));
+
+    wire.send({ type: 'prepare', id: 1, text: '第一轮' });
+    await until(() => frames.some(frame => frame.type === 'prepared' && frame.id === 1));
+    wire.send({ type: 'submit', id: 1 });
+    await until(() => frames.some(frame => frame.type === 'result' && frame.id === 1));
+    const firstUser = events().filter(entry => entry.event === 'spawn')[1]!;
+    assert.equal(firstUser.adopted, identity[0]!.sessionId);
+    const userTasks = events().filter(entry => entry.event === 'task' && entry.hidden === false);
+    assert.equal(userTasks[0]!.task, '第一轮');
+
+    wire.send({ type: 'prepare', id: 2, text: '取消' });
+    await until(() => frames.some(frame => frame.type === 'prepared' && frame.id === 2));
+    wire.send({ type: 'submit', id: 2 });
+    await until(() => frames.some(frame => frame.type === 'delta' && frame.id === 2));
+    wire.send({ type: 'abort', id: 2 });
+    await until(() => frames.some(frame => frame.type === 'cancelled' && frame.id === 2));
+    const aborted = events().filter(entry => entry.event === 'spawn')[2]!;
+    assert.equal(aborted.adopted, identity[0]!.sessionId);
+    const tool = events().find(entry => entry.event === 'tool')!;
+    assert.ok(typeof tool.toolPid === 'number', 'the cancelled turn started a tool descendant');
+    assert.equal((() => { try { process.kill(tool.toolPid, 0); return true; } catch { return false; } })(), false,
+      'cancellation is confirmed only after the tool descendant stopped');
+    await until(() => events().some(entry => entry.event === 'signal' && entry.pid === aborted.pid && entry.signal === 'SIGTERM'));
+
+    wire.send({ type: 'prepare', id: 3, text: '第二轮' });
+    await until(() => frames.some(frame => frame.type === 'prepared' && frame.id === 3));
+    wire.send({ type: 'submit', id: 3 });
+    await until(() => frames.some(frame => frame.type === 'result' && frame.id === 3));
+    const resumed = events().filter(entry => entry.event === 'spawn')[3]!;
+    assert.equal(resumed.adopted, identity[0]!.sessionId);
+    assert.equal(frames.find(frame => frame.type === 'result' && frame.id === 3)!.text, '你好，世界');
+
     wire.send({ type: 'close', id: 0 });
     await exit;
     assert.equal(child.exitCode, 0);

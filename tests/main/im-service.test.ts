@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile, writeFile, mkdir, copyFile, chmod } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { realpath } from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { IM_ENGINE_KINDS } from '../../src/shared/im-engines';
 import { ImService } from '../../src/main/im/service';
@@ -428,10 +429,11 @@ for(const startup of ['start-rejected','late-success','real-failure'] as const){
   });
 }
 
-const EFFORT_FOR: Record<string, string> = { claude: 'medium', codex: 'medium', opencode: 'my-variant.1', pi: 'minimal', grok: 'none', qodercli: 'auto' };
+const EFFORT_FOR: Record<string, string> = { claude: 'medium', codex: 'medium', opencode: 'my-variant.1', pi: 'minimal', grok: 'none', qodercli: 'auto', dsh: 'high' };
 
-test('6成熟引擎经别名engine id分别save/准入：factory收到对应kind/effort/全部roots，同会话复用', async t => {
-  assert.deepEqual([...IM_ENGINE_KINDS].sort(), ['claude', 'codex', 'grok', 'opencode', 'pi', 'qodercli']);
+test('7个成熟引擎经别名engine id分别save/准入：factory启动cwd为home不随首项目变化，项目白名单完整在引导数据', async t => {
+  assert.deepEqual([...IM_ENGINE_KINDS].sort(), ['claude', 'codex', 'dsh', 'grok', 'opencode', 'pi', 'qodercli']);
+  const expectedHome = realpathSync(homedir());
   for (const kind of IM_ENGINE_KINDS) {
     const dir = await mkdtemp(join(ROOT, `six-${kind}-`));
     const extra = await mkdtemp(join(ROOT, `six-${kind}-extra-`));
@@ -449,13 +451,45 @@ test('6成熟引擎经别名engine id分别save/准入：factory收到对应kind
       assert.equal(inputs[0]!.engineKind, kind);
       assert.equal(inputs[0]!.model, 'test-model');
       assert.equal(inputs[0]!.effort, EFFORT_FOR[kind]);
-      assert.deepEqual([inputs[0]!.workspace, ...(inputs[0]!.additionalWorkspaces ?? [])].sort(), [await realpath(dir), await realpath(extra)].sort(), `${kind} 全部roots送达factory`);
+      // Bot启动cwd为home，不随第一项目变化；不把项目作为可写附加根。
+      assert.equal(inputs[0]!.workspace, expectedHome, `${kind} 启动cwd为home`);
+      assert.deepEqual(inputs[0]!.additionalWorkspaces ?? [], [], `${kind} 不透传项目可写根`);
+      const canonical = [await realpath(dir), await realpath(extra)];
+      assert.notEqual(inputs[0]!.workspace, canonical[0]);
+      assert.notEqual(inputs[0]!.workspace, canonical[1]);
+      // 项目A/B完整在引导数据；引导明确真实任务workspace从实际目标选择。
+      assert.ok(inputs[0]!.instructions.includes(JSON.stringify(canonical)), `${kind} 引导保留完整项目列表`);
+      assert.match(inputs[0]!.instructions, /tasks\.create.*workspace/);
+      assert.match(inputs[0]!.instructions, /Bot启动cwd为home/);
+      assert.match(inputs[0]!.instructions, /不限制\/代替实际项目路径/);
       assert.equal(f.cards.length, 2);
     } finally {
       await service.close().catch(() => {});
       await rm(dir, { recursive: true, force: true });
       await rm(extra, { recursive: true, force: true });
     }
+  }
+  // 首项目顺序交换仍是同一home：另起一例证明启动cwd不随第一项目变化。
+  {
+    const dirA = await mkdtemp(join(ROOT, 'order-a-'));
+    const dirB = await mkdtemp(join(ROOT, 'order-b-'));
+    const live = policy();
+    const seen: string[] = [];
+    for (const order of [[dirA, dirB], [dirB, dirA]] as const) {
+      const dataDir = await mkdtemp(join(ROOT, 'order-data-'));
+      const f = fixture();
+      const service = new ImService({ dataDir, policy: () => live, parentFactory: async input => { seen.push(input.workspace); return { send: async () => 'ok', close: async () => {} }; }, channelFactory: f.factory });
+      try {
+        await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [...order], idleTimeoutMinutes: 30 } });
+        await tick();
+      } finally {
+        await service.close().catch(() => {});
+        await rm(dataDir, { recursive: true, force: true });
+      }
+    }
+    assert.deepEqual(seen, [expectedHome, expectedHome]);
+    await rm(dirA, { recursive: true, force: true });
+    await rm(dirB, { recursive: true, force: true });
   }
 });
 

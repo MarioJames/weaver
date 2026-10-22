@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseImWorkspaces, resolveImWorkspaces } from '../../src/main/im/workspaces';
 import { ImSettingsStore } from '../../src/main/im/settings';
@@ -50,6 +50,26 @@ test('credential homes and their descendants/symlink aliases are refused, withou
   } finally { if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR; else process.env.CLAUDE_CONFIG_DIR = previous; }
 });
 
+test('dsh credential home, descendants and aliases are refused while home itself stays allowed', () => {
+  // Read-only metadata only: never read credential files or directory contents.
+  const home = homedir();
+  const dsh = join(home, '.dsh');
+  const dshChild = join(dsh, 'profiles');
+  // Lexical roots stay refused even when absent: no existence check precedes the rejection.
+  for (const path of [dsh, dshChild]) assert.throws(() => resolveImWorkspaces([path]), { code: 'IM_WORKSPACES_INVALID' });
+  // home itself is the explicit Bot startup cwd and remains an allowed spelling.
+  assert.deepEqual(resolveImWorkspaces([home]), [home]);
+  // Symlink-alias shielding is proven by the generic credential-root alias fixtures
+  // (CLAUDE_CONFIG_DIR and protected-root cases); the real .dsh spelling cannot be
+  // isolated from home, so the live-alias check only runs when the metadata target
+  // exists. A dangling alias cannot resolve and stays unavailable by design.
+  const alias = join(root, 'dsh-alias');
+  const targetExists = statSync(dshChild, { throwIfNoEntry: false })?.isDirectory() ?? false;
+  symlinkSync(dshChild, alias);
+  if (targetExists) assert.throws(() => resolveImWorkspaces([alias]), { code: 'IM_WORKSPACES_INVALID' });
+  else assert.throws(() => resolveImWorkspaces([alias]), { code: 'IM_WORKSPACES_UNAVAILABLE' });
+});
+
 test('bootstrap gives all paths as JSON data and explicit project-root workflow with stable operation ids', () => {
   const dirs = [join(root,"a 'quoted' $(not-a-command)"), join(root,'项目二')];
   const instructions = imInstructions("/isolated/data 'quoted'", 'codex', 'fixture-epoch', dirs);
@@ -58,6 +78,8 @@ test('bootstrap gives all paths as JSON data and explicit project-root workflow 
   assert.match(instructions, /tasks\.create.*ownerProfileId.*workspace/);
   assert.match(instructions, /tasks\.start --task-id/);
   assert.match(instructions, /command-id/);
+  assert.match(instructions, /Bot启动cwd为home/);
+  assert.match(instructions, /不限制\/代替实际项目路径/);
 });
 
 test('protected root symlink also shields canonical root, descendants and other aliases', async t => {

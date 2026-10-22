@@ -11,18 +11,19 @@ import { IM_ENGINE_KINDS, imEngineEffortAllowed, imEngineEfforts, isImEngineKind
 const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'im-engines-'));
 test.after(() => rmSync(dir, { recursive: true, force: true }));
 
-test('the shared IM engine list is exactly the six installed catalog kinds, never mock-jsonl', () => {
-  assert.deepEqual([...IM_ENGINE_KINDS].sort(), ['claude', 'codex', 'grok', 'opencode', 'pi', 'qodercli']);
+test('the shared IM engine list is exactly the seven installed catalog kinds, never mock-jsonl', () => {
+  assert.deepEqual([...IM_ENGINE_KINDS].sort(), ['claude', 'codex', 'dsh', 'grok', 'opencode', 'pi', 'qodercli']);
   for (const kind of IM_ENGINE_KINDS) assert.equal(isImEngineKind(kind), true);
   assert.equal(isImEngineKind('mock-jsonl'), false);
   assert.equal(isImEngineKind('zed'), false);
   assert.equal(imEngineEfforts('opencode'), undefined);
   assert.equal(imEngineEfforts('claude')?.includes('xhigh'), true);
+  assert.deepEqual(imEngineEfforts('dsh'), ['off', 'low', 'high', 'max']);
 });
 
 test('parent preparation accepts every enabled engine effort and keeps OpenCode variant free-form', () => {
   const workspace = join(dir, 'ws'); mkdirSync(workspace);
-  const efforts: Record<string, string> = { claude: 'xhigh', codex: 'xhigh', opencode: 'provider-variant', pi: 'max', grok: 'xhigh', qodercli: 'ultracode' };
+  const efforts: Record<string, string> = { claude: 'xhigh', codex: 'xhigh', opencode: 'provider-variant', pi: 'max', grok: 'xhigh', qodercli: 'ultracode', dsh: 'high' };
   for (const kind of IM_ENGINE_KINDS) {
     const prepared = prepareParentAgentInput({ engineKind: kind, model: kind === 'opencode' ? 'provider/model' : 'fixture-model', effort: efforts[kind]!, workspace, instructions: 'fixture' });
     assert.equal(prepared.engineKind, kind);

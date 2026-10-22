@@ -24,7 +24,7 @@ function hostCommand(): readonly string[] {
   if (!entry || !isAbsolute(entry) || !entry.endsWith('.mjs')) throw parentError('engine', 'Bot host requires the current bundled Weaver executable');
   return [process.execPath, realpathSync(entry)];
 }
-const ENGINE_TITLES: Record<string, string> = { claude: 'Claude', codex: 'Codex', opencode: 'OpenCode', pi: 'Pi', grok: 'Grok', qodercli: 'Qoder' };
+const ENGINE_TITLES: Record<string, string> = { claude: 'Claude', codex: 'Codex', opencode: 'OpenCode', pi: 'Pi', grok: 'Grok', qodercli: 'Qoder', dsh: 'DSH' };
 function botTitle(at: string, engine: string): string {
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit' }).formatToParts(new Date(at));
   return `${parts.find(p => p.type === 'month')!.value}${parts.find(p => p.type === 'day')!.value}｜FEA｜飞书 Bot·${ENGINE_TITLES[engine] ?? engine}`;

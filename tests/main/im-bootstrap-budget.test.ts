@@ -80,6 +80,8 @@ test('system rules route entry Master to the single reference and keep the insta
   assert.match(text, /tasks\.create.*ownerProfileId.*workspace/);
   assert.match(text, /tasks\.start/);
   assert.match(text, /owners\.attach/);
+  assert.match(text, /Bot启动cwd为home/);
+  assert.match(text, /不限制\/代替实际项目路径/);
   assert.match(text, /跨\s*engine/);
   assert.match(text, /白名单不是无限授权/);
   assert.match(text, /项目读写与实际工作限定/);
@@ -120,6 +122,7 @@ test('the entry skill links the Master reference and the reference exists in the
   assert.match(repositoryReference, /owners\.attach/);
   assert.match(repositoryReference, /ownerProfileId/);
   assert.match(repositoryReference, /ownerHost/);
+  assert.match(repositoryReference, /never limits or replaces the real project path/);
   assert.match(repositoryReference, /## Public output/);
   assert.match(repositoryReference, /blank line between paragraphs/);
   assert.match(repositoryReference, /never a bare URL/);

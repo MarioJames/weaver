@@ -6,7 +6,7 @@
 import type { ImConfig, ImSettingsSnapshot, SaveImSettingsInput } from '../../../shared/contracts/im';
 import type { Config } from '../../../shared/contracts/policy';
 import { ENGINE_CATALOG } from '../../../shared/engines';
-import { IM_EFFORT_PATTERN, IM_ENGINE_KINDS as IM_ENGINE_LIST, imEngineEffortAllowed, isImEngineKind } from '../../../shared/im-engines';
+import { IM_EFFORT_PATTERN, IM_ENGINE_KINDS as IM_ENGINE_LIST, imEngineEffortAllowed, imEngineEfforts, isImEngineKind } from '../../../shared/im-engines';
 
 /** 页面上可编辑的表单值。Secret 只留在内存草稿里，从不写 localStorage 或磁盘。 */
 export interface ImDraft {
@@ -35,16 +35,31 @@ export interface ImEdit {
 
 export const IDLE_RANGE = { min: 1, max: 1440 } as const;
 
+export const IM_ENGINE_KINDS: ReadonlySet<string> = new Set(IM_ENGINE_LIST);
+
+/**
+ * 换引擎后旧力度非法时的回退：仍被新引擎支持的用户值由调用方保留，
+ * 这里只在必须换底时按该引擎原生力度表选一个合法值（优先 medium，其次 low，最后取原生首项）。
+ * opencode 自由 variant 与未知 kind 沿用 medium 占位（其为合法 variant 字符串）。
+ */
+function fallbackEffort(kind: string): string {
+  if (!isImEngineKind(kind)) return 'medium';
+  const values = imEngineEfforts(kind);
+  if (!values) return 'medium';
+  if (values.includes('medium')) return 'medium';
+  if (values.includes('low')) return 'low';
+  return values[0] ?? 'medium';
+}
+
 /** 客户端先把明显走不通的输入挡回原处；控制面失败时仍会原样报错。 */
 const APP_ID_RE = /^cli_[0-9a-f]{16}$/;
 const OPEN_ID_PREFIX = 'ou_';
-export const IM_ENGINE_KINDS: ReadonlySet<string> = new Set(IM_ENGINE_LIST);
 
-/** 换引擎后必须重新明确模型；力度只有仍被新引擎支持时才保留。 */
+/** 换引擎后必须重新明确模型；力度只有仍被新引擎支持时才保留，否则按新引擎原生表回退。 */
 export function switchDraftEngine(draft: ImDraft, engine: string, config: Config | undefined): Pick<ImDraft, 'engine' | 'model' | 'effort'> {
   if (engine === draft.engine) return { engine, model: draft.model, effort: draft.effort };
   const kind = config?.engines[engine]?.kind;
-  return { engine, model: '', effort: isImEngineKind(kind) && imEngineEffortAllowed(kind, draft.effort) ? draft.effort : 'medium' };
+  return { engine, model: '', effort: isImEngineKind(kind) && imEngineEffortAllowed(kind, draft.effort) ? draft.effort : fallbackEffort(typeof kind === 'string' ? kind : '') };
 }
 
 /**

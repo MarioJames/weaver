@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { realpathSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { resolveImWorkspaces } from './workspaces';
 import type { PolicySnapshot } from '../../shared/contracts/policy';
 import type { ImSettingsSnapshot, ImStatus, SaveImSettingsInput } from '../../shared/contracts/im';
@@ -201,6 +203,15 @@ export class ImService {
   private static channelHashOf(config: StoredImConfig): string {
     return createHash('sha256').update(config.appId).update('\0').update(config.appSecret).digest('hex');
   }
+  /**
+   * Bot entry-Master startup cwd: the safe existing home canonical path, identical for all
+   * seven engines. Project roots are never used as the startup cwd; they only travel in the
+   * bootstrap context/whitelist and the fingerprint. Real task roots still come from the actual
+   * target project, never from this startup cwd.
+   */
+  private static botHomeWorkspace(): string {
+    try { return realpathSync(homedir()); } catch { throw new ImServiceError('IM_CONFIG_UNAVAILABLE'); }
+  }
   /** No-op saves are only safe on a healthy live generation; faults must still rebuild explicitly. */
   private needsRecovery(): boolean {
     if (this.agentError) return true;
@@ -248,9 +259,11 @@ export class ImService {
       // never reach this owner-less entity. The kind allowlist is the single shared module.
       if (!engine || !isImEngineKind(engine.kind) || availabilityOf(policy.config, activeBlocks({ version: 1, blocks: policy.blocks }, this.now()), entity).status !== 'available') throw 0;
       if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(config.model) || !imEngineEffortAllowed(engine.kind, config.effort)) throw 0;
-      const roots = resolveImWorkspaces(config.workspaces); const workspace = roots[0]!;
-      const input = { engineKind: engine.kind as ImEngineKind, model: config.model, effort: config.effort, workspace, additionalWorkspaces: roots.slice(1) };
-      return { input, roots, fingerprint: JSON.stringify([config.engine, input, config.allowedOpenIds]) };
+      const roots = resolveImWorkspaces(config.workspaces);
+      const workspace = ImService.botHomeWorkspace();
+      // Master does no real project work: no project root is passed as a writable engine root.
+      const input = { engineKind: engine.kind as ImEngineKind, model: config.model, effort: config.effort, workspace, additionalWorkspaces: [] as string[] };
+      return { input, roots, fingerprint: JSON.stringify([config.engine, input, roots, config.allowedOpenIds]) };
     } catch { throw new ImServiceError('IM_CONFIG_UNAVAILABLE'); }
   }
   private async restartAgents(retryClose = false): Promise<void> {

@@ -82,6 +82,67 @@ for (const engine of ['codex', 'claude'] as const) {
   });
 }
 
+test('real background dsh host keeps per-turn children in the unit, confirms cancel, continues and reclaims', { skip: !enabled, timeout: 60000 }, async () => {
+  const dir = mkdtempSync(join(root!, 'h-'));
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  const extra = join(dir, 'extra'); mkdirSync(extra);
+  const bin = join(dir, 'bin'); mkdirSync(bin);
+  copyFileSync(new URL('../fixtures/parent/dsh-fixture.mjs', import.meta.url), join(bin, 'dsh')); chmodSync(join(bin, 'dsh'), 0o700);
+  const oldPath = process.env.PATH;
+  const marker = join(dir, 'marker');
+  process.env.PATH = `${bin}:${oldPath}`;
+  process.env.DSH_FIXTURE_SCENARIO = 'abort-tree'; process.env.DSH_FIXTURE_MARKER = marker;
+  const { defaultAsyncRunner } = await import('../../src/main/owner-host');
+  const herdrCalls: string[] = [];
+  const runner: typeof defaultAsyncRunner = request => {
+    if (request.file === 'herdr' || request.file.endsWith('/herdr')) herdrCalls.push(request.args.join(' '));
+    return defaultAsyncRunner(request);
+  };
+  let session: ParentAgentSession | undefined;
+  try {
+    session = await createBackgroundParentAgent({ engineKind: 'dsh', model: 'deepseek-flash', effort: 'high', workspace, additionalWorkspaces: [extra], instructions: 'Fixture only. No model.' }, { dataDir: dir }, { hostCommand: releaseHostCommand(), startupMs: 15000, runner });
+    const registry = join(dir, 'im-host');
+    const epoch = readdirSync(registry)[0]; const record = JSON.parse(readFileSync(join(registry, epoch, 'record.json'), 'utf8'));
+    proof({ case: 'dsh', stage: 'ready', record });
+    assert.equal(record.launchMode, 'background');
+    const events = (): Array<Record<string, any>> => readFileSync(marker, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line) as Record<string, any>);
+    assert.equal(events().filter(entry => entry.event === 'spawn').length, 1, 'only the hidden identity turn has run before the first user send');
+    const abort = new AbortController();
+    let delta!: () => void; const gotDelta = new Promise<void>(resolve => { delta = resolve; });
+    const sending = session.send('first', abort.signal, () => delta());
+    await gotDelta;
+    const first = events().filter(entry => entry.event === 'spawn')[1]!;
+    assert.equal(readFileSync(`/proc/${first.pid}/cgroup`, 'utf8').trim(), `0::${record.cgroup}`, 'the per-turn dsh child stays inside the host unit cgroup');
+    const tool = events().find(entry => entry.event === 'tool')!;
+    assert.ok(typeof tool.toolPid === 'number', 'the cancelled turn owns a real tool grandchild');
+    assert.equal(readFileSync(`/proc/${tool.toolPid}/cgroup`, 'utf8').trim(), `0::${record.cgroup}`, 'the tool grandchild stays inside the same host unit, not a shared foreign scope');
+    abort.abort();
+    await assert.rejects(sending, ConfirmedParentCancellation);
+    assert.equal(existsSync(`/proc/${tool.toolPid}`), false, 'cancel is confirmed only after the tool grandchild stopped');
+    const chunks: string[] = [];
+    assert.ok(await session.send('second', undefined, value => chunks.push(value)));
+    assert.ok(chunks.length);
+    assert.ok(await session.send('third'));
+    await session.close();
+    for (const entry of events()) {
+      if (typeof entry.pid === 'number') assert.equal(existsSync(`/proc/${entry.pid}`), false, `dsh child ${entry.pid} must be reaped`);
+      if (typeof entry.toolPid === 'number') assert.equal(existsSync(`/proc/${entry.toolPid}`), false, `dsh tool grandchild ${entry.toolPid} must be reaped`);
+    }
+    assert.equal(existsSync(`/proc/${record.mainPid}`), false);
+    assert.equal(existsSync(join('/sys/fs/cgroup', record.cgroup)), false);
+    assert.deepEqual(readdirSync(registry), []);
+    assert.ok(!existsSync(String(first.overlayPath)), 'the host close removes the private dsh overlay');
+    assert.deepEqual(herdrCalls, []);
+  } finally {
+    try { await session?.close(); }
+    finally {
+      process.env.PATH = oldPath;
+      delete process.env.DSH_FIXTURE_SCENARIO; delete process.env.DSH_FIXTURE_MARKER;
+      if (!existsSync(join(dir, 'im-host')) || readdirSync(join(dir, 'im-host')).length === 0) rmSync(dir, { recursive: true });
+    }
+  }
+});
+
 for (const failure of ['kill-host', 'engine-exit', 'bad-callback', 'close-failure', 'startup-failure', 'recovery'] as const) test(`real background host ${failure}: fence, exact cleanup and recovery`, { skip: !enabled, timeout: 60000 }, async () => {
   const { spawn } = await import('node:child_process');
   const { once } = await import('node:events');

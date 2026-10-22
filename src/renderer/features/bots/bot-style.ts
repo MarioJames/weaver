@@ -12,7 +12,8 @@ export const botStyles = createStaticStyles(({ css, cssVar }) => ({
     background: ${cssVar.colorBgContainer};
   `,
   tabList: css`
-    padding: 10px 20px 0;
+    /* 渠道导航已在卡片之外：左右与卡片内容对齐，下方留出与卡片的间距。 */
+    padding: 10px 20px 12px;
 
     button { font-family: inherit; }
   `,

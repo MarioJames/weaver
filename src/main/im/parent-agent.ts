@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { redactSecrets } from '../../shared/redact';
 import { findExecutableSync } from '../system/executables';
 import { startOwnedScope, type OwnedScope } from '../adapters/cli/scope';
@@ -13,6 +14,7 @@ import { startOpenCodeParentSession } from './parent-opencode';
 import { startPiParentSession } from './parent-pi';
 import { startGrokParentSession } from './parent-grok';
 import { startQoderParentSession } from './parent-qoder';
+import { startDshParentSession } from './parent-dsh';
 import { imEngineEffortAllowed, isImEngineKind, type ImEngineKind } from '../../shared/im-engines';
 
 /** Input for one long-lived IM parent agent session. Engine/model/effort come from the owner profile. */
@@ -153,14 +155,46 @@ export function startParentScope(command: readonly string[], workspace: string, 
   return startOwnedScope({ command, cwd: workspace, env: { ...parentEnv(), ...extraEnv }, stdin: null, keepStdinOpen: true, unit });
 }
 
-/** Engine stdio transport only. It does not assert ownership or closure of any enclosing unit. */
+/**
+ * Engine stdio transport. A plain launcher owns only the direct child. A launcher that can
+ * authoritatively stop the whole tree it created also exposes killTree/treeAlive; those are the
+ * only acceptable proof that descendants are gone. Close/error events and settled promises are
+ * never tree-death proof by themselves.
+ */
 export interface ParentProcess extends EventEmitter {
+  readonly pid?: number;
   stdout: Readable;
   stderr: Readable;
   stdin?: Writable;
   kill(signal?: NodeJS.Signals): boolean;
+  /** Signal every process this launch owns (scope/cgroup or private process group). */
+  killTree?(signal?: NodeJS.Signals): boolean;
+  /** Positive liveness check for the owned tree; false only when no member remains. */
+  treeAlive?(): boolean;
 }
 export type ParentProcessLauncher = (command: readonly string[], workspace: string, env?: Readonly<Record<string, string>>) => ParentProcess;
+
+/**
+ * Launch one engine child as the leader of a private process group. Tool descendants inherit the
+ * group, so the IM host can reclaim exactly this conversation without touching its own group or
+ * another session. The host's systemd cgroup remains the outer boundary.
+ */
+export function spawnOwnedParentProcess(command: readonly string[], workspace: string, env: NodeJS.ProcessEnv): ParentProcess {
+  const child = spawn(command[0], command.slice(1), { cwd: workspace, env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
+  const pgid = child.pid;
+  const groupAlive = (): boolean => {
+    if (pgid === undefined) return false;
+    try { process.kill(-pgid, 0); return true; }
+    catch (error) { return (error as NodeJS.ErrnoException).code === 'EPERM'; }
+  };
+  return Object.assign(child, {
+    killTree: (signal: NodeJS.Signals = 'SIGTERM'): boolean => {
+      if (pgid === undefined) return false;
+      try { process.kill(-pgid, signal); return true; } catch { return false; }
+    },
+    treeAlive: groupAlive,
+  });
+}
 
 export interface TimerHandle {
   cancel(): void;
@@ -197,5 +231,6 @@ export const createParentAgent = async (input: ParentAgentInput, internals?: Par
   if (prepared.engineKind === 'pi') return startPiParentSession(prepared, waits);
   if (prepared.engineKind === 'grok') return startGrokParentSession(prepared, waits);
   if (prepared.engineKind === 'qodercli') return startQoderParentSession(prepared, waits);
+  if (prepared.engineKind === 'dsh') return startDshParentSession(prepared, waits);
   return startClaudeParentSession(prepared, waits);
 };

@@ -28,7 +28,7 @@ function inside(child: string, parent: string): boolean {
 function credentialRoots(): string[] {
   const home = homedir();
   // Same shield as parent/CLI launchers; custom native config homes are protected too. No contents read.
-  const lexical = ['.codex', '.claude', '.grok', '.pi', '.opencode', '.qoder', '.qoder-cli', '.zcode', '.ssh'].map(name => join(home, name)).concat([
+  const lexical = ['.codex', '.claude', '.grok', '.pi', '.opencode', '.qoder', '.qoder-cli', '.zcode', '.dsh', '.ssh'].map(name => join(home, name)).concat([
     join(home, '.config', 'opencode'), join(home, '.config', 'agents-cooperation'),
     ...[process.env.CODEX_HOME, process.env.CLAUDE_CONFIG_DIR].filter((p): p is string => !!p).map(p => resolve(p)),
   ]);

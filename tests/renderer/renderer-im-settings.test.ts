@@ -366,33 +366,43 @@ test('changing engines clears the model, preserves only a legal effort and never
   assert.equal(next.secret, 'pending-secret');
   assert.match(validateDraft(next, configOf(), policy).model, /模型/);
   assert.equal(switchDraftEngine({ ...draft, effort: 'ultracode' }, 'codex', policy).effort, 'medium');
-  for (const kind of ['codex', 'claude']) {
+  assert.equal(switchDraftEngine({ ...draft, effort: 'medium' }, 'dsh', policy).effort, 'low', 'medium is illegal for dsh and falls back to low');
+  assert.equal(switchDraftEngine({ ...draft, effort: 'high' }, 'dsh', policy).effort, 'high', 'a legal dsh effort is preserved');
+  for (const kind of ['codex', 'claude', 'dsh']) {
     for (const effort of EFFORTS[kind]) assert.equal(validateDraft(textOf(configOf(), { engine: kind, effort }), configOf(), policy).effort, undefined);
   }
 });
 
-test('all six catalog engines are offered, validated per kind, and OpenCode keeps a free-form bounded variant', () => {
+test('all seven catalog engines are offered, validated per kind, and OpenCode keeps a free-form bounded variant', () => {
   const policy = defaultConfig();
   for (const engine of Object.values(policy.engines)) engine.enabled = true;
   const cases = [
     ['claude', 'claude'], ['codex', 'codex'], ['grok', 'grok'],
-    ['opencode', 'opencode'], ['pi', 'pi'], ['qoder', 'qodercli'],
+    ['opencode', 'opencode'], ['pi', 'pi'], ['qoder', 'qodercli'], ['dsh', 'dsh'],
   ] as const;
   assert.deepEqual([...IM_ENGINE_KINDS].sort(), cases.map(([, kind]) => kind).sort());
   for (const [engine, kind] of cases) {
     const efforts = kind === 'opencode' ? ['provider-default', 'high'] : EFFORTS[kind];
+    assert.ok(efforts?.length, `${kind} has a fixed effort table (opencode uses free-form variants)`);
     for (const effort of efforts) {
       const errors = validateDraft(textOf(configOf(), { engine, effort }), configOf(), policy);
       assert.equal(errors.engine, undefined, `${kind} engine was rejected`);
       assert.equal(errors.effort, undefined, `${kind} effort ${effort} was rejected`);
     }
   }
+  // dsh 原生力度只有 off/low/high/max：medium 非法，切换到 dsh 时回退 low。
+  assert.deepEqual(EFFORTS.dsh, ['off', 'low', 'high', 'max']);
+  assert.match(validateDraft(textOf(configOf(), { engine: 'dsh', effort: 'medium' }), configOf(), policy).effort ?? '', /思考力度/);
+  assert.equal(switchDraftEngine({ ...textOf(configOf()), effort: 'medium' }, 'dsh', policy).effort, 'low');
+  assert.equal(switchDraftEngine({ ...textOf(configOf()), effort: 'high' }, 'dsh', policy).effort, 'high');
   assert.match(validateDraft(textOf(configOf(), { engine: 'opencode', effort: 'has space' }), configOf(), policy).effort ?? '', /variant/);
   assert.equal(validateDraft(textOf(configOf(), { engine: 'opencode', effort: 'x'.repeat(32) }), configOf(), policy).effort, undefined);
   assert.match(validateDraft(textOf(configOf(), { engine: 'opencode', effort: 'x'.repeat(33) }), configOf(), policy).effort ?? '', /variant/);
   const disabled = defaultConfig();
   const errors = validateDraft(textOf(configOf(), { engine: 'pi', effort: 'high' }), configOf(), disabled);
   assert.match(errors.engine ?? '', /尚未启用/);
+  const dshDisabled = validateDraft(textOf(configOf(), { engine: 'dsh', effort: 'high' }), configOf(), disabled);
+  assert.match(dshDisabled.engine ?? '', /尚未启用/, 'a disabled dsh engine is not selectable either');
   assert.equal(switchDraftEngine({ ...textOf(configOf()), effort: 'provider-x' }, 'opencode', policy).effort, 'provider-x');
   assert.equal(switchDraftEngine({ ...textOf(configOf()), effort: 'not a variant' }, 'opencode', policy).effort, 'medium');
 });
@@ -402,12 +412,15 @@ test('policy alias engines resolve to the catalog id for model discovery while s
   policy.engines.ocode = { enabled: true, kind: 'opencode', quota_refresh: false };
   policy.engines.pi_alt = { enabled: true, kind: 'pi', quota_refresh: false };
   policy.engines.qoder_alias = { enabled: true, kind: 'qodercli', quota_refresh: false };
+  policy.engines.dsh_alias = { enabled: true, kind: 'dsh', quota_refresh: false };
   assert.equal(imModelDiscoveryEngine('ocode', policy), 'opencode');
   assert.equal(imModelDiscoveryEngine('pi_alt', policy), 'pi');
   assert.equal(imModelDiscoveryEngine('qoder_alias', policy), 'qoder');
   assert.equal(imModelDiscoveryEngine('qoder', policy), 'qoder', 'qoder kind qodercli maps to catalog qoder');
   assert.equal(imModelDiscoveryEngine('claude', policy), 'claude');
   assert.equal(imModelDiscoveryEngine('pi', policy), 'pi');
+  assert.equal(imModelDiscoveryEngine('dsh', policy), 'dsh');
+  assert.equal(imModelDiscoveryEngine('dsh_alias', policy), 'dsh', 'dsh alias kind maps to catalog dsh');
 });
 
 test('the reused model-list consumer uses public API only after engine selection and keeps manual model saves on failure', async () => {
