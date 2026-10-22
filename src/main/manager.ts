@@ -9,7 +9,7 @@ import { classifyVendorError } from './adapters/cli/vendor-errors';
 import { redactSecrets } from '../shared/redact';
 import { redactContext } from './redact-context';
 
-interface Running { child: ManagedProcess; timeout?: NodeJS.Timeout; killTimer?: NodeJS.Timeout; error?: string; result?: string; cancelled: boolean; stderrBytes: number; stderrTail: string; adapterTail?: boolean; vendorError?: string; firstTimer?: NodeJS.Timeout }
+interface Running { child: ManagedProcess; timeout?: NodeJS.Timeout; killTimer?: NodeJS.Timeout; error?: string; result?: string; cancelled: boolean; stderrTail: string; adapterTail?: boolean; vendorError?: string; firstTimer?: NodeJS.Timeout; artifactOverflowNoted?: boolean }
 
 /** `herdr.max_wait_minutes` is the owner's polling bound, never an execution deadline: only a direct mock test may pass the short hook. */
 export function executionTimeoutMs(task: Pick<Task, 'dispatch'>, fallback?: number): number | undefined {
@@ -72,7 +72,7 @@ export class TaskManager {
     try { child = this.adapter.start(task); } catch (error) {
       task.failure={kind:'early_exit',message:redactSecrets(error instanceof Error?error.message:String(error)).slice(-4000)}; task.status = 'failed'; task.run.status = 'stopped'; task.run.endedAt = new Date().toISOString(); event(task, 'error', task.failure.message); this.persist(task); return task;
     }
-    const run: Running = { child, cancelled: false, stderrBytes: 0, stderrTail: '', ...(timeoutMs === undefined ? {} : { timeout: setTimeout(() => this.stop(id, 'Mock worker exceeded its test timeout'), timeoutMs) }) };
+    const run: Running = { child, cancelled: false, stderrTail: '', ...(timeoutMs === undefined ? {} : { timeout: setTimeout(() => this.stop(id, 'Mock worker exceeded its test timeout'), timeoutMs) }) };
     this.running.set(id, run);
     if(execution==='real'){
       run.firstTimer=setTimeout(()=>this.failAttempt(id,{kind:'no_output',message:'Worker produced no valid vendor output within 120 seconds'}),120000);
@@ -101,9 +101,9 @@ export class TaskManager {
         const failure=classifyVendorError(task.dispatch?.engineKind??task.run?.adapter??'',run.stderrTail);
         if(failure){this.failAttempt(id,{...failure,stderrTail:run.stderrTail});return;}
       }
-      run.stderrBytes += chunk.length;
-      if (execution!=='real' && run.stderrBytes > 32768) { this.stop(id, 'Worker stderr exceeds 32 KiB limit'); return; }
-      try { const current = this.store.get(id); event(current, 'log', `stderr: ${safe}`); this.persist(current, 'stream'); } catch (error) { this.stop(id, 'Unable to persist stderr'); this.fatal(error); }
+      // Mock stderr has no volume cap: chunks become bounded timeline records below, so a chatty worker can no longer fail its own run.
+      const clipped=safe.length>8000?`${safe.slice(0,8000)}…（单条 stderr 已截断）`:safe;
+      try { const current = this.store.get(id); event(current, 'log', `stderr: ${clipped}`); this.persist(current, 'stream'); } catch (error) { this.stop(id, 'Unable to persist stderr'); this.fatal(error); }
     });
     child.on('error', (error: Error) => { this.failAttempt(id,{kind:task.run?.firstOutputAt?'other':'early_exit',message:redactSecrets(error.message).slice(-4000)}); });
     child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
@@ -203,7 +203,12 @@ export class TaskManager {
       case 'log': event(task, 'log', record.message); break;
       case 'progress': task.progress = Math.max(task.progress, record.percent); event(task, 'progress', record.message); break;
       case 'artifact':
-        if (task.artifacts.length >= 20) throw new Error('Worker exceeds 20 artifact limit');
+        // Artifact storage stays bounded (parity with the tasks.create API limit), but overflow no longer fails the run:
+        // the first 20 artifacts and the final result are always kept, extras are dropped with a single timeline note.
+        if (task.artifacts.length >= 20) {
+          if (!run.artifactOverflowNoted) { run.artifactOverflowNoted = true; event(task, 'log', `Artifact limit reached (20); further worker artifacts are not stored, results are unaffected`); }
+          break;
+        }
         task.artifacts.push({ id: randomUUID(), name: record.name, mediaType: record.mediaType, content: record.content, createdAt: new Date().toISOString() });
         event(task, 'artifact', `Received ${record.name}`); break;
       case 'result': run.result = record.summary; event(task, 'result', record.summary); break;

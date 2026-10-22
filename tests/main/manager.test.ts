@@ -64,13 +64,17 @@ test('result without exit is still running, then timeout fails it',async () => {
   const done=await terminal(store,task.id); assert.equal(done.status,'failed');assert.match(done.events.at(-1)!.message,/timeout/);
  },2000);
 });
-test('truncated JSON and oversized stderr fail safely',async () => {
- for(const code of ["process.stdout.write('{\\\"type\\\":')","process.stderr.write('x'.repeat(40000));setInterval(()=>{},1000)"]) {
-  await harness(fixture(code),async(manager,store)=>{const task=manager.create(input);manager.start(task.id);assert.equal((await terminal(store,task.id)).status,'failed');});
- }
+test('truncated JSON fails, but oversized stderr is clipped into bounded records instead of failing',async () => {
+  await harness(fixture("process.stdout.write('{\\\"type\\\":')"),async(manager,store)=>{const task=manager.create(input);manager.start(task.id);assert.equal((await terminal(store,task.id)).status,'failed');});
+  await harness(fixture("process.stderr.write('x'.repeat(40000));console.log(JSON.stringify({type:'result',summary:'stderr ok'}))"),async(manager,store)=>{
+   const task=manager.create(input);manager.start(task.id);const done=await terminal(store,task.id);
+   assert.equal(done.status,'completed');assert.equal(done.summary,'stderr ok');
+   const logged=done.events.find(e=>e.kind==='log'&&e.message.startsWith('stderr: '));
+   assert.ok(logged,'stderr is kept as a timeline record');assert.ok(logged!.message.length<=8100,'stderr record is clipped');
+  });
 });
-test('repeated artifact records are bounded',async () => {
- await harness(fixture("for(let i=0;i<21;i++)console.log(JSON.stringify({type:'artifact',name:'x.txt',mediaType:'text/plain',content:'x'}))"),async(manager,store)=>{const task=manager.create(input);manager.start(task.id);const done=await terminal(store,task.id);assert.equal(done.status,'failed');assert.equal(done.artifacts.length,20);});
+test('artifact overflow keeps the first 20 and the result instead of failing the run',async () => {
+  await harness(fixture("for(let i=0;i<21;i++)console.log(JSON.stringify({type:'artifact',name:'x.txt',mediaType:'text/plain',content:'x'}));console.log(JSON.stringify({type:'result',summary:'artifacts ok'}))"),async(manager,store)=>{const task=manager.create(input);manager.start(task.id);const done=await terminal(store,task.id);assert.equal(done.status,'completed');assert.equal(done.artifacts.length,20);assert.equal(done.summary,'artifacts ok');assert.ok(done.events.some(e=>e.kind==='log'&&/Artifact limit reached/.test(e.message)));});
 });
 
 test('escaped-scope cleanup is recorded on the task timeline',async()=>{

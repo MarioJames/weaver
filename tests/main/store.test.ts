@@ -28,7 +28,7 @@ test('a database from a newer schema is refused',() => {
   assert.throws(() => new TaskStore(db),/newer than this build supports/);
  } finally {rmSync(dir,{recursive:true,force:true});}
 });
-test('bounds event retention to 500',() => {const task=fixture();for(let i=0;i<510;i++)event(task,'log',String(i));assert.equal(task.events.length,500);assert.equal(task.events[0].message,'10');});
+test('process records keep head and tail with one omission marker under the 500 bound',() => {const task=fixture();for(let i=0;i<510;i++)event(task,'log',String(i));assert.equal(task.events.length,451);assert.deepEqual(task.events.slice(0,50).map(e=>e.message),Array.from({length:50},(_,i)=>String(i)));assert.match(task.events[50].message,/^已省略 60 条过程记录（/);assert.deepEqual(task.events.slice(51).map(e=>e.message),Array.from({length:400},(_,i)=>String(i+110)));});
 test('every real engine kind round-trips through a persisted run',() => {
  const dir=mkdtempSync(join(tmpdir(),'weaver-store-'));try {
   const path=join(dir,'weaver.db');

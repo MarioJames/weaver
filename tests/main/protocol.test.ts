@@ -9,11 +9,18 @@ test('JSONL survives fragmented UTF-8, CRLF, blank lines, and final unterminated
  for (const byte of buffer) parser.push(Buffer.from([byte])); parser.finish();
  assert.deepEqual(records,[{type:'log',message:'你好 👋'},{type:'result',summary:'done'}]);
 });
-test('rejects malformed, unknown, invalid, and oversized records',() => {
- for (const line of ['{broken}',JSON.stringify({type:'unknown'}),JSON.stringify({type:'progress',percent:101,message:'x'})]) assert.throws(() => new JsonlParser(() => {}).push(Buffer.from(line+'\n')));
- assert.throws(() => new JsonlParser(() => {}).push(Buffer.alloc(129*1024,65)),/128 KiB/);
- assert.throws(() => new JsonlParser(() => {}).push(Buffer.alloc(3*1024*1024)),/2 MiB/);
- assert.throws(() => {const p=new JsonlParser(() => {}); p.push(Buffer.from((JSON.stringify({type:'log',message:''})+'\n').repeat(1001)));},/1000/);
+test('rejects malformed, unknown, invalid, and oversized lines',() => {
+  for (const line of ['{broken}',JSON.stringify({type:'unknown'}),JSON.stringify({type:'progress',percent:101,message:'x'})]) assert.throws(() => new JsonlParser(() => {}).push(Buffer.from(line+'\n')));
+  assert.throws(() => new JsonlParser(() => {}).push(Buffer.alloc(129*1024,65)),/128 KiB/);
+});
+test('volume is unbounded at the parser: 5000 records and multi-MiB output are accepted',() => {
+  const records: WorkerRecord[]=[]; const parser=new JsonlParser(record => records.push(record));
+  const line=JSON.stringify({type:'log',message:'x'.repeat(500)})+'\n';
+  let bytes=0;
+  for(let i=0;i<5000;i++){const chunk=Buffer.from(line);bytes+=chunk.length;parser.push(chunk);}
+  assert.ok(bytes>2*1024*1024,`cumulative ${bytes} bytes must exceed the old 2 MiB cap`);
+  parser.push(Buffer.from(JSON.stringify({type:'result',summary:'done'})+'\n')); parser.finish();
+  assert.equal(records.length,5001); assert.deepEqual(records.at(-1),{type:'result',summary:'done'});
 });
 test('rejects traversal and unsupported artifact types; preserves text as text',() => {
  for (const name of ['../secret','a/b','a\\b','..','\u0000']) assert.throws(() => parseWorkerRecord({type:'artifact',name,mediaType:'text/plain',content:''}));
