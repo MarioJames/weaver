@@ -55,7 +55,7 @@ CLI 直接用 `--input <file|->` 传 JSON（args 对象或完整信封均可；�
 | `owners.get` | `{ownerId}`；同一条实例记录加 `runningTaskCount` |
 | `owners.continuation.get` | `{taskId}`（或 `--task-id`） |
 | `owners.continuation.configure` | `{expectedRevision, idleRotationMinutes}`：整数，或 `null`（关闭），1–10080 分钟 |
-| `owners.attach` | `{name, profileId, session?, pane?, title?}`；纯元数据登记，`verified:false`，不联系宿主也不起进程。`profileId`+`name`+`session` 三元组就是实例身份：同键同参重发（换一个 commandId 也一样）返回那同一个已登记实例而不再建一行；`pane` 只留档、不参与身份。缺省 `session` 补 `'external-cli'`、缺省 `pane` 补 `'unverified'`，补全后的值才参与判断，所以两次都省略 session 仍是同一实例。会话标签持久保存在 `session` 字段，早于该字段的旧记录仍从 `host.session` 取到（见下方两层身份）。可选 `title`（1–120 字符）是该实例当前主任务的看板标题：重复 attach 带 `title` 则更新、省略则保留原值 |
+| `owners.attach` | `{name, profileId, session?, pane?, title?, ownerId?}`；纯元数据登记，`verified:false`，不联系宿主也不起进程。不带 `ownerId` 时，`profileId`+`name`+`session` 三元组就是实例身份：同键同参重发（换一个 commandId 也一样）返回那同一个已登记实例而不再建一行。带 `ownerId` 时认领该既有行（profile 必须一致，只允许 manual 实例），name/session/pane 更新为本次调用者标签，不新建实例。两种 attach 都返回该 LogicalOwner 字段加 `credentialPath`；token 只在 `credentialPath` 指向的 0600 私有文件中，不在响应里。`pane` 只留档、不参与身份。缺省 `session` 补 `'external-cli'`、缺省 `pane` 补 `'unverified'`，补全后的值才参与判断，所以两次都省略 session 仍是同一实例。会话标签持久保存在 `session` 字段，早于该字段的旧记录仍从 `host.session` 取到（见下方两层身份）。可选 `title`（1–120 字符）是该实例当前主任务的看板标题：重复 attach 带 `title` 则更新、省略则保留原值 |
 | `owners.spawn` | `{name, profileId}`；缺省也是 manual 逻辑登记，不启动宿主；显式 `provider:"mock"` 保留进程内测试宿主 |
 | `owners.describe` | `{ownerId, title}`；只更新该实例的看板 `title`（1–120 字符，去首尾空白），返回更新后的实例（含 `runningTaskCount`）；host、session、state 不动。未知 `ownerId` 返回与 `owners.get` 相同的 `NOT_FOUND`；title 非法返回 `INVALID_REQUEST` 并指明 `title`；同 command-id 重放返回原回执 |
 | `owners.switch` | `{expectedRevision(必填), expectedEpoch?, reason? 'manual'/'idle', profileId?, launch?}`；轮换 父 Agent 并生成接续包，响应含 `contextPack` 与 `prompt`（脱敏、≤6000 字符的接手说明）。mock 宿主原子握手；manual 分支只生成接续包。`launch:true` 是显式追加的一步：轮换提交之后再去 Herdr 默认会话拉起新宿主，失败也只回 `launch:{ok:false,code,message}`，已生效的轮换不回滚 |
@@ -81,7 +81,9 @@ CLI 直接用 `--input <file|->` 传 JSON（args 对象或完整信封均可；�
 | `operations.get` | `{commandId}` |
 | `observability.get` / `observability.export` | `{taskId, kind?}`；export 返回 JSON 文本形式的完整 trace |
 
-**owner 的两层身份**：策略里的 `owners.<id>` 是 *profile*（每台宿主引擎至多启用一个）；真正派发前要先用 `owners attach` 把当前 agent 会话登记成一个 *owner 实例*，一次会话登记一次，返回的 `id` 全会话复用。输入约定：`name` 为 `<宿主> · <工作区目录名> · <HH:MM 会话开始>`（如 `Claude · weaver · 14:20`），`session` 取 `$CODEX_THREAD_ID`，否则 `$HERDR_PANE_ID`，否则工作区绝对路径；`--command-id` 在同一会话内保持稳定，回复丢失时同键同参取回原收据，仍不确定就 `weaver owners list` 按 name/session 找回那个实例。之后 `tasks create` 一律带 `ownerId`；带 `ownerProfileId` 走的是临时登记路径，服务端为该任务另建一个新的逻辑 owner（默认名 `Task owner`），任务因此散落到互不相干的 owner 行、不再共享同一会话的并发与上报。attach 始终是 `verified:false` 的元数据登记，服务端不联系宿主、不起进程、也不验证那个 session 标签是否真的对应一个活着的会话。
+**owner 的两层身份**：策略里的 `owners.<id>` 是 *profile*（每台宿主引擎至多启用一个）；真正派发前要先用 `owners attach` 把当前 agent 会话登记成一个 *owner 实例*，一次会话登记一次，返回的 `id` 全会话复用。输入约定：`name` 为 `<宿主> · <工作区目录名> · <HH:MM 会话开始>`（如 `Claude · weaver · 14:20`），`session` 取 `$CODEX_THREAD_ID`，否则 `$HERDR_PANE_ID`，否则工作区绝对路径；`--command-id` 在同一会话内保持稳定，回复丢失时同键同参取回原收据，仍不确定就 `weaver owners list` 按 name/session 找回那个实例。之后 `tasks create` 一律带 `ownerId`；带 `ownerProfileId` 走的是临时登记路径，服务端为该任务另建一个新的逻辑 owner（默认名 `Task owner`），任务因此散落到互不相干的 owner 行、不再共享同一会话的并发与上报。attach 始终是 `verified:false` 的元数据登记，服务端不联系宿主、不起进程、也不验证那个 session 标签是否真的对应一个活着的会话。Herdr 启动的根/接续宿主不新建 owner：先 `owners get` 或 `policy get` 读取 profileId，再带 `ownerId` 调 `owners attach` 认领当前行，name 用实际 Agent 名称、session 用当前宿主会话。
+
+**owner 凭证上下文与 CLI `--owner-file`**：第一次 `owners attach` 走既有的本机可信认证，不需要凭证文件；响应给出 `credentialPath`（`<data-dir>/owner-credentials/<ownerId>.json`），父 Agent 之后固定使用 `weaver --data-dir <实例> --owner-file <credentialPath>`。文件内容为 `{version:1,ownerId:<UUID>,token:<64位小写hex>}`，必须是当前用户所有、0600（不得有 group/other 位）、普通文件且非符号链接、≤1 MiB。CLI 读入后把 `ownerAuth:{ownerId,token}` 放在逻辑 `CommandRequest` 顶层，不放进 `args`；`tasks wait/watch` 内部的 `tasks get`、`tasks events`、`tasks health` 使用同一身份。显式文件缺失、格式/权限/符号链接/大小错误一律在任何请求发送前失败，不降级为无上下文；直接 RPC 命令（如 `policy get`）仍会先校验该文件，但不携带 `ownerAuth`。`--input` 信封里已带 `ownerAuth` 时必须与文件一致，否则显式拒绝；`ownerAuth` 出现在 args 中同样拒绝。CLI 不生成 token、不打印 token 或文件正文。这是**本机可信用户**身份边界，不是 tenant 或 per-owner 隔离；认领后的 owner 上下文与既有本机管理员控制面区分开，但不宣称多租户安全隔离。
 
 容量也是按**实例**算的：每个登记好的 owner 实例各自持有其 profile 的 `max_parallel` 个槽位，任务绑定 `ownerId` 后就一直用那个具体实例（`owners.list`/`owners.get` 的 `runningTaskCount` 就是它占用的槽位数）。没有 `ownerId` 的遗留任务退回按 profile 分组计数。`capabilities.maxParallel` 因此只是规模提示（各 profile 上限之和），不是全局并发上限；子 Agent 之间的负载均衡仍是全局的，不受 owner 实例边界影响。
 
@@ -252,9 +254,11 @@ weaver quota refresh --help --output json
 
 ```sh
 weaver owners attach --input owner.json --command-id owner-001
-# → data.{id, name, profileId, mode:'manual', state:'attached', host}（一次会话登记一次，同 profileId+name+session 重发返回同一个 id；`<ownerId>` = data.id）
+# → data.{id, name, profileId, mode:'manual', state:'attached', host, credentialPath}（一次会话登记一次，同 profileId+name+session 重发返回同一个 id；Herdr 根/接续带 ownerId 认领当前行；`<ownerId>` = data.id，`<credentialPath>` = data.credentialPath）
+# 此后每条命令固定加上同一实例与凭证：
+#   weaver --data-dir <instance> --owner-file <credentialPath> ...
 
-weaver tasks create --input task.json --command-id create-001
+weaver --data-dir <instance> --owner-file <credentialPath> tasks create --input task.json --command-id create-001
 # → data.{id, workspace, ownerId, continuationPolicy{idleRotationMinutes:60}}（ownerId 用 attach 返回的实例 id）
 
 weaver packages create --task-id <taskId> --input package.json --command-id package-001

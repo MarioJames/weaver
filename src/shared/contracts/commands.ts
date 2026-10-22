@@ -1,5 +1,7 @@
 export const API_VERSION = 'weaver.v1' as const;
-export interface CommandRequest { apiVersion: typeof API_VERSION; commandId?: string; command: string; args: Record<string, unknown> }
+/** The credential context a CLI sends after reading the private owner file; an authenticated request never falls back to the local administrator. */
+export interface OwnerAuth { ownerId:string; token:string }
+export interface CommandRequest { apiVersion: typeof API_VERSION; commandId?: string; command: string; args: Record<string, unknown>; ownerAuth?: OwnerAuth }
 export interface CommandResponse { apiVersion: typeof API_VERSION; commandId?: string; ok: boolean; data?: unknown; error?: {code:string;message:string;retryable:boolean} }
 export interface CommandReceipt {hash:string;response?:CommandResponse}
 /** The one step an owner takes after dispatch, so it never has to understand engines:

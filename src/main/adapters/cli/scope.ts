@@ -263,15 +263,20 @@ export function startOwnedScope(options: { command: readonly string[]; cwd: stri
     exitCode = exitCode ?? 1;
     afterStop('SIGKILL');
   });
-  // systemd-run can exit while a background descendant still holds its pipes. Start
-  // cgroup cleanup on exit; only publish close after the streams themselves close.
-  if (options.detached) child.on('exit', (code, signal) => {
+  // systemd-run can exit while a background descendant still holds its pipes.
+  // Start cgroup cleanup on exit for every scope: without this the non-detached
+  // success path waits for 'close', which never arrives while a descendant
+  // holds stdout/stderr, leaking the launcher and its descendants. 'close'
+  // still publishes the final event only after the streams drain and the scope
+  // is reclaimed; output is never destroyed to force an earlier close.
+  child.on('exit', (code, signal) => {
     childClosed = true;
     exitCode = code;
     if (!exitSignal && signal) exitSignal = signal;
     stopVerify();
     void stop(cancelRequested ? exitSignal ?? 'SIGTERM' : 'SIGTERM').catch(error => {
-      handle.emit('error', error instanceof Error ? error : new Error(String(error)));
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/still active/.test(message)) handle.emit('error', error instanceof Error ? error : new Error(message));
     });
   });
   child.on('close', (code, signal) => {

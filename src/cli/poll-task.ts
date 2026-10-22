@@ -2,6 +2,7 @@ import { failure, LocalIPCError } from '../main/local-ipc';
 import { sendRequest } from './client';
 import { makeRequest } from './input';
 import { writeEnvelope } from './output';
+import type { OwnerAuth } from './owner-identity';
 import type { CLIOptions } from './parse';
 
 /** The omitted --for deadline: min(600, herdr.max_wait_minutes×60) from the policy, or 30 when it cannot be read. */
@@ -19,12 +20,12 @@ export interface PollRuntime {
   request: typeof sendRequest;
 }
 
-export async function pollTask(options: CLIOptions, mode: 'wait' | 'watch', runtime: Partial<PollRuntime> = {}): Promise<number> {
+export async function pollTask(options: CLIOptions, mode: 'wait' | 'watch', runtime: Partial<PollRuntime> = {}, ownerAuth?: OwnerAuth): Promise<number> {
   const now = runtime.now ?? Date.now;
   const sleep = runtime.sleep ?? (milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)));
   const send = runtime.request ?? sendRequest;
   const deadline = now() + (options.forSeconds ?? await defaultForSeconds(options.dataDir)) * 1000;
-  const request = (command:string,args:Record<string,unknown>) => send(options.dataDir, makeRequest({...options,command},args), deadline-now());
+  const request = (command:string,args:Record<string,unknown>) => send(options.dataDir, makeRequest({...options,command},args,ownerAuth), deadline-now());
   let after: string | undefined;
   let snapshot: { ok: boolean; data?: { status?: string; [key: string]: unknown } } | undefined;
   let health: Record<string, unknown> | undefined;

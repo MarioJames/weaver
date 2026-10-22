@@ -2,12 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { API_VERSION, type CommandResponse } from '../../../shared/contracts/commands';
 import type { LogicalOwner, OwnerInstance } from '../../../shared/contracts/owners';
 import type { Task, TaskOwnerHost } from '../../../shared/contracts/tasks';
-import { sameOwnerInstance } from '../../../shared/policy/owner-instance';
+import { ownerSession, sameOwnerInstance } from '../../../shared/policy/owner-instance';
 import { parseId, text } from '../../../shared/validation';
 import type { MockOwnerHostAdapter } from '../../adapters/logical';
 import { ContinuationService } from '../../continuation';
 import type { TaskManager } from '../../manager';
 import { OwnerLaunchError, type OwnerLaunchResult } from '../../owner-host';
+import { OwnerIdentity } from '../../owners/identity';
 import { handoffPrompt, rootOwnerPrompt } from '../../owners/prompts';
 import type { PolicyStore } from '../../policy/store';
 import { redactContext } from '../../redact-context';
@@ -18,12 +19,22 @@ import type { CommandArgs, CommandFlow } from '../commands/types';
 import type { EffectRunner } from '../commands/gateway';
 import { canonical, publicTask, terminal, type TaskRecords } from '../tasks/records';
 
+const hostEvidence=(owner:LogicalOwner):Record<string,unknown>|undefined=>owner.host&&typeof owner.host==='object'&&!Array.isArray(owner.host)?owner.host as Record<string,unknown>:undefined;
+const claimedHostPane=(owner:LogicalOwner):string|undefined=>{const pane=hostEvidence(owner)?.pane;return typeof pane==='string'&&pane?pane:undefined;};
+/** The claimed row keeps its host evidence shape while name, profile and caller labels move to the claiming caller. */
+function claimedHost(owner:LogicalOwner,name:string,profileId:string,session:string,pane:string):unknown {
+ const current=hostEvidence(owner)??{};const {closedAt,...rest}=current;
+ return {...rest,ownerId:owner.id,name,profileId,adapter:typeof rest.adapter==='string'?rest.adapter:'mock-owner',mode:'manual',state:'attached',
+  visibility:'external-unverified',verified:false,ownsHost:false,session,pane,createdAt:typeof rest.createdAt==='string'?rest.createdAt:owner.createdAt};
+}
+
 /** Owner instances and the Herdr hosts behind them: registration, handoff launches, root owner start and exact cleanup. */
 export class OwnerLifecycle {
  private readonly launchingEpochs = new Set<string>();
+ private readonly identity:OwnerIdentity;
  constructor(private readonly manager:TaskManager,private readonly policy:PolicyStore,private readonly records:TaskRecords,
   private readonly continuation:ContinuationService,private readonly ownerHost:MockOwnerHostAdapter,
-  private readonly runner:Pick<EffectRunner,'runDeferred'>,private readonly isDraining:()=>boolean){}
+  private readonly runner:Pick<EffectRunner,'runDeferred'>,private readonly isDraining:()=>boolean){this.identity=new OwnerIdentity(manager.store);}
  /** Work holding this instance's own slots: running plus cancelling. Queued and terminal tasks hold none. */
  runningOn(owner:LogicalOwner):number {return slotGroupCount(this.manager.store.listHeads(),slotGroupFor(owner.id,owner.profileId));}
  /** Every registered instance, its profile, its caller session label and how much of it is busy. */
@@ -39,27 +50,46 @@ export class OwnerLifecycle {
   return {...owner,runningTaskCount:this.runningOn(owner)};
  }
  continuationConfigure(a:CommandArgs):unknown{if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');return this.continuation.configure(parseId(a.taskId,'task ID'),a.expectedRevision as number,a.idleRotationMinutes as number|null);}
- register(command:'owners.attach'|'owners.spawn',a:CommandArgs):LogicalOwner{
-    const mode=command==='owners.spawn'&&a.provider==='mock'?'mock':'manual';if(a.provider!==undefined&&a.provider!=='mock')fail('CAPABILITY_UNAVAILABLE','This process does not spawn an owner model');
-    // Inputs are validated before the registry is read, so a malformed request can never reach an existing instance.
-    const profileId=text(a.profileId,'profileId',120);const name=text(a.name,'name',120);
-    const title=a.title===undefined?undefined:text(a.title,'title',120).trim();
-    const session=a.session===undefined?'external-cli':text(a.session,'session',120);
-    const pane=a.pane===undefined?'unverified':text(a.pane,'pane',120);
-    const owners=this.manager.store.listOwners();
-    // The profile is the policy role; this caller's profile + name + session is one instance of it. A repeat attach is that same durable registration.
-    if(command==='owners.attach'&&mode==='manual'){
-     const attached=owners.find(owner=>sameOwnerInstance(owner,{profileId,name,session}));
-     if(attached){if(title!==undefined){attached.title=title;this.manager.store.putOwner(attached);}return attached;}
-    }
-    // Admission and limits decide whether a new instance may be created; a duplicate has nothing to admit.
-    if(this.policy.snapshot().owners[profileId]?.status!=='available')fail('POLICY_DENIED','Owner profile is unavailable');
-    const owner:LogicalOwner={id:randomUUID(),name,profileId,mode,state:mode==='mock'?'ready':'attached',createdAt:new Date().toISOString(),...(mode==='manual'?{session}:{})};
-    if(title!==undefined)owner.title=title;
-    if(mode==='mock'){if(a.session!==undefined||a.pane!==undefined)fail('INVALID_REQUEST','Logical registration has no session or pane');owner.host=this.ownerHost.spawn({ownerId:owner.id,name:owner.name,profileId});}
-    else owner.host=this.ownerHost.attach({ownerId:owner.id,name:owner.name,profileId,session,pane});
-    this.manager.store.putOwner(owner);return owner;
+  register(command:'owners.attach'|'owners.spawn',a:CommandArgs):LogicalOwner&{credentialPath?:string}{
+     const mode=command==='owners.spawn'&&a.provider==='mock'?'mock':'manual';if(a.provider!==undefined&&a.provider!=='mock')fail('CAPABILITY_UNAVAILABLE','This process does not spawn an owner model');
+     // Inputs are validated before the registry is read, so a malformed request can never reach an existing instance.
+     const profileId=text(a.profileId,'profileId',120);const name=text(a.name,'name',120);
+     const title=a.title===undefined?undefined:text(a.title,'title',120).trim();
+     const session=a.session===undefined?'external-cli':text(a.session,'session',120);
+     const pane=a.pane===undefined?'unverified':text(a.pane,'pane',120);
+     const owners=this.manager.store.listOwners();
+     // An explicit ownerId claims that durable row instead of creating another one; profile, host and task bindings stay with it.
+     if(command==='owners.attach'&&mode==='manual'&&a.ownerId!==undefined){
+      const ownerId=parseId(a.ownerId,'owner ID');const found=owners.find(owner=>owner.id===ownerId);
+      if(!found)fail('NOT_FOUND','Owner not found');
+      const claimed=found!;
+      if(claimed.profileId!==profileId)fail('INVALID_REQUEST','ownerId belongs to a different owner profile');
+      if(claimed.mode!=='manual')fail('INVALID_STATE','Only an attached owner can be claimed');
+      const nextSession=a.session===undefined?ownerSession(claimed)??'external-cli':session;
+      const nextPane=a.pane===undefined?claimedHostPane(claimed)??'unverified':pane;
+      const credentialPath=this.ensureCredential(claimed.id);
+      claimed.name=name;claimed.session=nextSession;if(title!==undefined)claimed.title=title;
+      claimed.host=claimedHost(claimed,name,profileId,nextSession,nextPane);
+      this.manager.store.putOwner(claimed);return {...claimed,credentialPath};
+     }
+     // The profile is the policy role; this caller's profile + name + session is one instance of it. A repeat attach is that same durable registration.
+     if(command==='owners.attach'&&mode==='manual'){
+      const attached=owners.find(owner=>sameOwnerInstance(owner,{profileId,name,session}));
+      if(attached){const credentialPath=this.ensureCredential(attached.id);if(title!==undefined){attached.title=title;this.manager.store.putOwner(attached);}return {...attached,credentialPath};}
+     }
+     // Admission and limits decide whether a new instance may be created; a duplicate has nothing to admit.
+     if(this.policy.snapshot().owners[profileId]?.status!=='available')fail('POLICY_DENIED','Owner profile is unavailable');
+     const owner:LogicalOwner={id:randomUUID(),name,profileId,mode,state:mode==='mock'?'ready':'attached',createdAt:new Date().toISOString(),...(mode==='manual'?{session}:{})};
+     if(title!==undefined)owner.title=title;
+     const credentialPath=command==='owners.attach'?this.ensureCredential(owner.id):undefined;
+     if(mode==='mock'){if(a.session!==undefined||a.pane!==undefined)fail('INVALID_REQUEST','Logical registration has no session or pane');owner.host=this.ownerHost.spawn({ownerId:owner.id,name:owner.name,profileId});}
+     else owner.host=this.ownerHost.attach({ownerId:owner.id,name:owner.name,profileId,session,pane});
+     this.manager.store.putOwner(owner);return credentialPath?{...owner,credentialPath}:owner;
    }
+  private ensureCredential(ownerId:string):string{
+   try{return this.identity.ensure(ownerId).credentialPath;}
+   catch(error){return fail('PERSISTENCE_ERROR',`Could not prepare the owner credential file: ${error instanceof Error?error.message:String(error)}`);}
+  }
  *switchOwner(a:CommandArgs):CommandFlow<unknown>{if(!Number.isSafeInteger(a.expectedRevision)||(a.expectedEpoch!==undefined&&!Number.isSafeInteger(a.expectedEpoch)))fail('INVALID_REQUEST','Revision and epoch must be integers');if(a.reason!==undefined&&a.reason!=='manual'&&a.reason!=='idle')fail('INVALID_REQUEST','Invalid switch reason');if(a.launch!==undefined&&typeof a.launch!=='boolean')fail('INVALID_REQUEST','launch must be a boolean');const task=this.records.task(a);const owner=this.records.owner(task.ownerId);const profile=text(a.profileId??owner.profileId,'profileId',120);if(this.policy.snapshot().owners[profile]?.status!=='available')fail('POLICY_DENIED','Target owner profile unavailable');const result=this.continuation.rotate(task.id,Number(a.expectedRevision),a.reason==='idle'?'idle':'manual',a.expectedEpoch===undefined?undefined:Number(a.expectedEpoch),profile);if(a.launch!==true)return result;const launched=yield* this.startOwnerHost(this.manager.store.get(task.id),profile,typeof result.prompt==='string'?result.prompt:'');(result as {launch?:unknown}).launch=launched.ownerHost?{ok:true,ownerHost:launched.ownerHost}:{ok:false,code:launched.failure!.code,message:launched.failure!.message};return result;}
  *launchOwner(a:CommandArgs):CommandFlow<unknown>{if(!Number.isSafeInteger(a.expectedRevision))fail('INVALID_REQUEST','expectedRevision must be an integer');const task=this.records.task(a);this.records.revise(task,a);if(!task.contextPack)return fail('INVALID_STATE','No context pack to launch the owner from');const owner=task.ownerId?this.records.owner(task.ownerId):undefined;if(!owner)return fail('INVALID_STATE','Task has no logical owner');const profile=owner.profileId;if(this.policy.snapshot().owners[profile]?.status!=='available')fail('POLICY_DENIED','Owner profile is unavailable');const prompt=handoffPrompt(task,task.contextPack,this.continuation.dataDir);const launched=yield* this.startOwnerHost(this.manager.store.get(task.id),profile,prompt);return {taskId:task.id,prompt,...launched.ownerHost?{launch:{ok:true,ownerHost:launched.ownerHost}}:{launch:{ok:false,code:launched.failure!.code,message:launched.failure!.message}},task:publicTask(this.manager.store.get(task.id))};}
   private *startOwnerHost(task:Task,profile:string,prompt:string):CommandFlow<{ownerHost?:TaskOwnerHost;failure?:{code:string;message:string}}> {

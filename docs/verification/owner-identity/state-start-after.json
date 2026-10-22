@@ -1,0 +1,36 @@
+{
+  "storage": "{\"status\":[],\"owner\":[\"6bdd6bab-63db-4de0-93b8-0cf8e299cd5d\"],\"worker\":[],\"workspace\":[],\"time\":\"today\"}",
+  "pressed": [
+    {
+      "pressed": "true",
+      "text": "今天\n3"
+    },
+    {
+      "pressed": "true",
+      "text": "全部\n3"
+    },
+    {
+      "pressed": "true",
+      "text": "人工筛选夹具\n3"
+    },
+    {
+      "pressed": "true",
+      "text": "全部\n3"
+    },
+    {
+      "pressed": "true",
+      "text": "全部\n3"
+    }
+  ],
+  "dialog": [
+    "任务详情",
+    "验收开始：保持父 Agent 筛选",
+    "执行中",
+    "取消任务",
+    "概览",
+    "Prompt",
+    "要求",
+    "时间线 3"
+  ],
+  "noMatch": false
+}

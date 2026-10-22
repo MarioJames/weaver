@@ -1,0 +1,33 @@
+{
+  "releasedAt": "2026-10-21T20:50:00-04:00",
+  "ownedResources": {
+    "serviceUnit": "dev-weaver-owner17-browser.scope",
+    "servicePid": 4173178,
+    "servicePort": 43997,
+    "browserSession": "weaver-owner17-browser",
+    "browserProfile": "/tmp/weaver-owner-17d9d3ce-mjive0wr/browser/browser-profile",
+    "tempRoot": "/tmp/weaver-owner-17d9d3ce-mjive0wr/browser"
+  },
+  "actions": [
+    "agent-browser close",
+    "bh task-profile remove /tmp/weaver-owner-17d9d3ce-mjive0wr/browser/browser-profile",
+    "systemctl --user stop dev-weaver-owner17-browser.scope",
+    "rm -rf /tmp/weaver-owner-17d9d3ce-mjive0wr/browser"
+  ],
+  "verification": {
+    "unitState": "inactive",
+    "servicePidPresent": false,
+    "port43997Listening": false,
+    "profileDirectoryExists": false,
+    "tempRootExists": false,
+    "profileChromeProcesses": 0
+  },
+  "notTouched": [
+    "shared Weaver service on /home/mocha/.local/share/weaver",
+    ".weaver-dev",
+    "Convorel Chrome / persistent 9222 browser",
+    "real Herdr sessions",
+    "project source and tests"
+  ],
+  "limitation": "Only final evidence was copied into docs/verification/owner-identity; the task scratch root outside browser/ belongs to the parent/other workers and was left untouched."
+}

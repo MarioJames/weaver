@@ -27,6 +27,7 @@ export interface CLIOptions {
   decision?: string;
   comment?: string;
   commentFile?: string;
+  ownerFile?: string;
 }
 /** The only commands --engine names; anything else is a wrong-command error. */
 const ENGINE_FLAG_COMMANDS = ['engines.penalty', 'engines.unblock', 'engines.models'];
@@ -37,7 +38,7 @@ export function positionals(argv: string[]): string[] {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg.startsWith('--')) { words.push(arg); continue; }
-    if (['--input', '--command-id', '--data-dir', '--task-id', '--schedule-id', '--port', '--output', '--for', '--agent', '--dir', '--timeout', '--engine', '--worker', '--field', '--expected-revision', '--manifest-digest', '--decision', '--comment', '--comment-file'].includes(arg)) i++;
+    if (['--input', '--command-id', '--data-dir', '--task-id', '--schedule-id', '--port', '--output', '--for', '--agent', '--dir', '--timeout', '--engine', '--worker', '--field', '--expected-revision', '--manifest-digest', '--decision', '--comment', '--comment-file', '--owner-file'].includes(arg)) i++;
   }
   return words;
 }
@@ -79,7 +80,7 @@ export function parseCLI(argv: string[]): CLIOptions {
       options.expectedRevision = Number(value);
       continue;
     }
-    const key = ({ '--field': 'field', '--manifest-digest': 'manifestDigest', '--decision': 'decision', '--comment': 'comment', '--comment-file': 'commentFile', '--input': 'input', '--command-id': 'commandId', '--data-dir': 'dataDir', '--task-id': 'taskId', '--schedule-id': 'scheduleId', '--engine': 'engine', '--worker': 'worker' } as const)[arg as '--input'];
+    const key = ({ '--field': 'field', '--manifest-digest': 'manifestDigest', '--decision': 'decision', '--comment': 'comment', '--comment-file': 'commentFile', '--input': 'input', '--command-id': 'commandId', '--data-dir': 'dataDir', '--task-id': 'taskId', '--schedule-id': 'scheduleId', '--engine': 'engine', '--worker': 'worker', '--owner-file': 'ownerFile' } as const)[arg as '--input'];
     if (!key) throw new LocalIPCError('INVALID_ARGUMENT', `Unknown option ${arg}`);
     const value = argv[++i];
     if (!value || value.startsWith('--')) throw new LocalIPCError('INVALID_ARGUMENT', `Missing value for ${arg}`);
@@ -116,5 +117,6 @@ export function parseCLI(argv: string[]): CLIOptions {
     if (output || jsonAlias) throw new LocalIPCError('INVALID_ARGUMENT', '--field cannot be combined with --output or --json');
   }
   options.dataDir = resolve(options.dataDir);
+  if (options.ownerFile !== undefined) options.ownerFile = resolve(options.ownerFile);
   return options;
 }

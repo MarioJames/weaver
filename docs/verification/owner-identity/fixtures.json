@@ -1,0 +1,29 @@
+{
+  "manualOwner": {
+    "id": "6bdd6bab-63db-4de0-93b8-0cf8e299cd5d",
+    "name": "人工筛选父 Agent",
+    "profileId": "codex_owner",
+    "title": "人工筛选夹具",
+    "session": "owner-identity-fixture"
+  },
+  "seededTasks": [
+    {
+      "id": "a44e0cd2-5ddc-4f09-830e-776c1d46d29f",
+      "title": "重试夹具任务",
+      "status": "queued",
+      "workspace": "/tmp/weaver-owner-17d9d3ce-mjive0wr/browser/projects/retry"
+    },
+    {
+      "id": "965a73da-d76e-4289-8d93-4d1c68965c56",
+      "title": "人工筛选任务 B",
+      "status": "queued",
+      "workspace": "/tmp/weaver-owner-17d9d3ce-mjive0wr/browser/projects/board"
+    },
+    {
+      "id": "9d9cdcfc-f7e9-4626-8429-b8b9b7635a49",
+      "title": "人工筛选任务 A",
+      "status": "queued",
+      "workspace": "/tmp/weaver-owner-17d9d3ce-mjive0wr/browser/projects/board"
+    }
+  ]
+}

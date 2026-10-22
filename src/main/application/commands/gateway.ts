@@ -1,9 +1,10 @@
 import { API_VERSION, isWriteCommand, type CommandResponse } from '../../../shared/contracts/commands';
 import type { Task } from '../../../shared/contracts/tasks';
-import { object, text } from '../../../shared/validation';
+import { object, parseId, text } from '../../../shared/validation';
 import { ContinuationError } from '../../continuation';
 import type { TaskManager } from '../../manager';
 import { closeOwnerHost, closeOwnerHostAsync, launchOwner, launchOwnerAsync, type OwnerLaunchResult } from '../../owner-host';
+import { OwnerIdentity, ownerReceiptKey, setOwnerScope } from '../../owners/identity';
 import { digest, publicTask } from '../tasks/records';
 import { CommandError, fail } from './errors';
 import type { CommandRegistry, FlowCommand, SyncCommand } from './registry';
@@ -65,12 +66,39 @@ export class EffectRunner {
 }
 /** The command envelope: validation, durable intent and receipt, routing to the registry, and one error exit for sync and async callers. */
 export class CommandGateway {
- constructor(private readonly manager:TaskManager,private readonly runner:EffectRunner,private readonly registry:CommandRegistry,private readonly isDraining:()=>boolean){}
+ constructor(private readonly manager:TaskManager,private readonly runner:EffectRunner,private readonly registry:CommandRegistry,private readonly isDraining:()=>boolean,
+  private readonly identity:OwnerIdentity=new OwnerIdentity(manager.store)){}
  handle(value:unknown):CommandResponse {return this.runner.run(this.handleFlow(value));}
  handleAsync(value:unknown):Promise<CommandResponse> {return this.runner.runAsync(this.handleFlow(value));}
  private run(command:string,args:Record<string,unknown>):unknown {
   if(!Object.hasOwn(this.registry.sync,command))return fail('COMMAND_UNKNOWN','Unknown logical command');
   return this.registry.sync[command as SyncCommand](args);
+ }
+ /** A present ownerAuth is always verified; only its absence selects the existing trusted-local administrator path. */
+ private ownerContext(value:unknown):string|undefined {
+  if(value===undefined)return undefined;
+  if(!value||typeof value!=='object'||Array.isArray(value))fail('UNAUTHORIZED','Owner credentials are invalid');
+  const ownerId=(value as Record<string,unknown>).ownerId;const token=(value as Record<string,unknown>).token;
+  if(typeof ownerId!=='string'||typeof token!=='string')fail('UNAUTHORIZED','Owner credentials are invalid');
+  try{return this.identity.verify(ownerId,token);}catch{return fail('UNAUTHORIZED','Owner credentials are invalid');}
+ }
+ private requireTaskOwner(taskId:string,ownerId:string,label:string):void {
+  let task:Task|undefined;
+  try{task=this.manager.store.get(taskId);}catch{fail('NOT_FOUND',`${label} not found`);}
+  if(task!.ownerId!==ownerId)fail('FORBIDDEN',`${label} does not belong to the authenticated owner`);
+ }
+ /** Scope the cloned args to the authenticated owner before any receipt is read or written. */
+ private scopeOwner(command:string,args:Record<string,unknown>,ownerId:string):void {
+  if(command==='tasks.create'){
+   if(args.ownerProfileId!==undefined)fail('FORBIDDEN','Owner credentials cannot create or select an owner profile');
+   if(args.ownerId!==undefined&&parseId(args.ownerId,'owner ID')!==ownerId)fail('FORBIDDEN','Task must belong to the authenticated owner');
+   args.ownerId=ownerId;
+  }
+  if(command==='tasks.list'&&args.ownerId===undefined)args.ownerId=ownerId;
+  if(args.ownerId!==undefined&&parseId(args.ownerId,'owner ID')!==ownerId)fail('FORBIDDEN','Request must belong to the authenticated owner');
+  if(args.parentTaskId!==undefined)this.requireTaskOwner(parseId(args.parentTaskId,'parent task ID'),ownerId,'Parent task');
+  if(args.taskId!==undefined)this.requireTaskOwner(parseId(args.taskId,'task ID'),ownerId,'Task');
+  if(args.packageId!==undefined){const pkg=this.manager.store.getPackage(parseId(args.packageId,'package ID'));if(pkg)this.requireTaskOwner(pkg.taskId,ownerId,'Package task');}
  }
  private *handleFlow(value:unknown):CommandFlow<CommandResponse> {
   let commandId:string|undefined; let receiptKey:string|undefined; let effected=false;
@@ -78,11 +106,13 @@ export class CommandGateway {
    if(Buffer.byteLength(JSON.stringify(value))>128*1024)fail('INVALID_REQUEST','Request exceeds 128 KiB');
    const r=object(value); if(r.apiVersion!==API_VERSION)fail('VERSION_UNSUPPORTED','Expected weaver.v1');
    const command=text(r.command,'command',80); const args=structuredClone(object(r.args??{}));
+   const authenticated=this.ownerContext(r.ownerAuth);
    if(r.commandId!==undefined)commandId=text(r.commandId,'commandId',120);
    if(this.isDraining())fail('APP_DRAINING','App is shutting down');
+   if(authenticated){this.scopeOwner(command,args,authenticated);setOwnerScope(args,authenticated);}
    if(isWriteCommand(command)) {
     if(!commandId)fail('INVALID_REQUEST','Mutation requires commandId');
-    receiptKey=`local-demo:${commandId}`;const hash=digest({command,args});const old=this.manager.store.getReceipt(receiptKey);
+    receiptKey=authenticated?ownerReceiptKey(authenticated,commandId!):`local-demo:${commandId}`;const hash=digest({command,args});const old=this.manager.store.getReceipt(receiptKey);
     if(old) {if(old.hash!==hash)fail('IDEMPOTENCY_CONFLICT','commandId already used for different arguments');if(old.response)return old.response;fail('COMMAND_INDETERMINATE','Previous command was interrupted. Inspect tasks/owners before issuing a new command; no automatic replay was performed.');}
     // Durable intent first: a crash can block a retry, but cannot silently repeat a spawn.
     this.manager.store.putReceipt(receiptKey,{hash});

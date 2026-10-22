@@ -1,0 +1,3 @@
+fa9277e2a5a65ae300b74c776ea1c1e9fb2378e64a564ff882750d1daa060687  src/renderer/features/tasks/TasksPage.tsx
+6a8b02176103fde1aad96dd33b7a63bd03c7b03b88339cbacb3fd753db025818  src/renderer/features/tasks/NewTaskDialog.tsx
+b7b7ef968043021dd115fcb6d9065e1e9c7c2dd15c46e8df57e5a47813c1d6a5  src/renderer/features/tasks/task-create.ts

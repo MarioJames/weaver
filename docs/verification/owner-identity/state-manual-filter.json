@@ -1,0 +1,17 @@
+{
+  "storage": "{\"status\":[],\"owner\":[\"6bdd6bab-63db-4de0-93b8-0cf8e299cd5d\"],\"worker\":[],\"workspace\":[],\"time\":\"today\"}",
+  "cards": [
+    "重试夹具任务\n草稿\n由 人工筛选夹具 于 20:35 创建",
+    "人工筛选任务 B\n草稿\n由 人工筛选夹具 于 20:35 创建",
+    "人工筛选任务 A\n草稿\n由 人工筛选夹具 于 20:35 创建"
+  ],
+  "pressed": [
+    "今天\n3",
+    "全部\n3",
+    "人工筛选夹具\n3",
+    "全部\n3",
+    "全部\n3"
+  ],
+  "noMatch": false,
+  "rootCard": false
+}

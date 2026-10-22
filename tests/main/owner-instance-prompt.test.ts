@@ -22,7 +22,7 @@ for(const long of [false,true])test(`root/handoff/switch/continuation bind the $
  try {
   const goal='完整原始目标'.repeat(1000);const task=await call('tasks.create',{ownerProfileId:'codex_owner',workspace:project,goal});await call('tasks.start',{taskId:task.id});await tick();assert.equal(captures.length,1);assert.equal(captures[0]!.workspace,project);assert.ok(captures[0]!.prompt.includes(goal));assert.ok(captures[0]!.prompt.includes(task.id));assert.ok(captures[0]!.prompt.includes(task.ownerId));
   assert.deepEqual(argv(command(captures[0]!.prompt),project),['--data-dir',dataDir,'--skill']);
-  assert.deepEqual(argv(command(captures[0]!.prompt,` tasks get --task-id ${task.id}`),project),['--data-dir',dataDir,'tasks','get','--task-id',task.id]);
+  assert.deepEqual(argv(command(captures[0]!.prompt,` tasks get --task-id ${task.id}`),project),['--data-dir',dataDir,'--owner-file','<credentialPath>','tasks','get','--task-id',task.id]);
   const queued=await call('tasks.create',{ownerProfileId:'codex_owner',workspace:project,goal:'Actual project handoff'});
   const rotation=await call('owners.switch',{taskId:queued.id,expectedRevision:queued.revision});
   const get=await call('owners.continuation.get',{taskId:queued.id});assert.equal(get.prompt,rotation.prompt);

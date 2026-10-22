@@ -156,6 +156,19 @@ test('rootOwnerPrompt leads with the host-instruction preamble on its first line
  assert.ok(!prompt.includes('herdr'));
  assert.ok(prompt.includes('每个子任务结果一回来，立即读取并按其工作包自己的验收标准独立核验文件和必要测试，同一轮内 results ack、reviews submit，不等其他子任务、根任务整体核验、浏览器验收或外部审查；跨子任务的集成问题另开修正子任务。'));
 });
+test('owner prompts claim the existing owner and reuse its credential path for later commands',()=>{
+ const task={id:TASK_ID,ownerId:'22222222-2222-4222-8222-222222222222',instruction:'Ship the thing',constraints:[],acceptanceCriteria:[]};
+ const root=rootOwnerPrompt(task as unknown as Parameters<typeof rootOwnerPrompt>[0],'/isolated/instance');
+ for(const pattern of [/owners attach/,/owners get/,/ownerId/,/credentialPath/,/--owner-file/,/不要另建第二个 owner/,/name 用本 Agent 的实际名称/,/session 用当前宿主会话/])assert.match(root,pattern,String(pattern));
+ assert.doesNotMatch(root,/不要 attach/);
+ const f=fixture();try {
+  const prompt=f.service.rotate(TASK_ID,0,'manual').prompt!;
+  const current=(f.store.get(TASK_ID) as ContinuationTask).ownerId;
+  assert.match(prompt,new RegExp(`ownerId 为 ${current}`));
+  for(const pattern of [/owners attach/,/owners get/,/credentialPath/,/--owner-file/,/不要新建第二个 owner/,/name 为本 Agent 的实际名称/,/session 为当前宿主会话/])assert.match(prompt,pattern,String(pattern));
+  assert.doesNotMatch(prompt,/不要 attach/);
+ }finally{f.close();}
+});
 test('handoffPrompt tells a root owner to review each child as soon as its result arrives',()=>{
  const f=fixture();try {
   const t=f.store.get(TASK_ID) as ContinuationTask;

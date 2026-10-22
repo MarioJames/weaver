@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "taskId": "f107cd7e-f1ab-4a1e-8a6b-0ac0d05c5d48",
+  "generatedAt": "2026-10-22T01:17:23.493Z",
+  "overall": true,
+  "fatal": null,
+  "checks": {
+    "passed": 160,
+    "failed": 0,
+    "total": 160
+  },
+  "build": {
+    "command": "npm run build",
+    "exitCode": 0,
+    "includesTypecheck": true,
+    "includesVite": true,
+    "includesBuildMain": true,
+    "viteCompleted": true,
+    "nodeVersion": "v24.21.0",
+    "npmVersion": "12.0.2",
+    "version": "0.6.1",
+    "source": {
+      "method": "rsync current working tree excluding node_modules/.git/dist/.weaver-dev/docs/verification; node_modules symlinked from original",
+      "gitHead": "5ae023f9a572e075a47eb46dfeba67ad413f124c",
+      "sourceTreeSha256": "7b545130dedc457c0351ea03030177364eb367b73397d7c3b5c686ffa34deca1",
+      "keyFiles": {
+        "src/cli/owner-identity.ts": "f4e9708ff240db75a3d88fbc3af2ebb67397781d3c03761226add01a9ca68cf0",
+        "src/main/owners/identity.ts": "21f76df0b1dd4cc611e3868dad61ce9d71b79cc073135a98ede9601a6254a579",
+        "src/main/application/commands/gateway.ts": "7a1a9db4c3725f367af0c108b27b9f1925f769f5a83c0cf575d5808bf898bc76",
+        "src/main/local-ipc.ts": "e6a64bb4d078cc8e5d5d5f277af254b360af5aeb8fb98d57eb0631b04efd1bc5",
+        "src/main/application/owners/lifecycle.ts": "2da2bb6e8f0aa03ef149e058d38dbaf06206dbc1d3162c0bd42d8cf6c2c8d835",
+        "src/cli/catalog.ts": "98aeb72bb765b7d9e8521013e684c5753b369f09e5c5848b3e1a9a0f30c92f2e"
+      }
+    },
+    "artifacts": {
+      "dist/cli/main.mjs": {
+        "sha256": "6ffb9be268f011e7b4875ca148d4087a08d72dfa94c1858abcbd6488f5ed9eb8",
+        "bytes": 7658984
+      },
+      "dist/renderer/index.html": {
+        "sha256": "86f91aed8ec66f388521c0e2c351c0d5ee57a2986e485e1fd750eb44baa48d73"
+      },
+      "dist/workers/mock-worker.mjs": {
+        "sha256": "849f305b7e2e84417d7d3c05a06e25951dbc90f0e30aa9d1756a01b003cc659d"
+      },
+      "cli-help.txt": {
+        "sha256": "8d4bd632a51595eb2adc8438b736acf87807e612cd41f1a41297d24e11983a19"
+      },
+      "cli-skill.md": {
+        "sha256": "d33208a61172a5452f3b46ad140caa869eecb10790ae66528ab62987eff0a408"
+      }
+    },
+    "originalDist": {
+      "before": "977bb3ac664bca61ee6c3b036186c5b1f54dfca7e688b80879f37835edfad07e",
+      "after": "977bb3ac664bca61ee6c3b036186c5b1f54dfca7e688b80879f37835edfad07e",
+      "unchanged": true
+    }
+  },
+  "contract": {
+    "helpOwnerFile": true,
+    "helpOwnerAuth": true,
+    "helpCredentialPath": true,
+    "helpLocalTrustBoundary": true,
+    "helpOptionalOwnerIdClaim": true,
+    "skillOwnerFile": true,
+    "skillOwnerIdClaim": true
+  },
+  "transport": {
+    "realUnixSocket": true,
+    "socketPathBytes": 89,
+    "socketPathLimit": 103,
+    "isolatedDataDir": true,
+    "sqlite": "isolated dataDir/weaver.db",
+    "counts": {
+      "tasks": 4,
+      "owners": 3,
+      "packages": 1
+    },
+    "chain": "built node CLI -> Unix socket -> isolated SQLite"
+  },
+  "workflow": {
+    "ownerIdA": "67775e4d-c551-4dcd-9ea0-1a39e4865e1a",
+    "ownerIdRoot": "b416e591-4bd6-4da8-bacb-549b4ddd9a51",
+    "ownerIdB": "d3711c72-f184-4508-949c-6b8f91032bdb",
+    "rootTaskId": "1a667ec2-9183-4d62-a7ac-11fe332c9c4e",
+    "childTaskId": "c7d554da-f65a-4a90-88ff-f3b2cc6d8254",
+    "packageId": "07aa3043-bc79-4f7b-a52d-7bde8834ccbe",
+    "standaloneTaskId": "2e618d83-1179-4f03-8a5a-054c31d462e1",
+    "adminNamespaceTaskId": "8e195fe1-1573-4c84-82a6-83bd042e69a8",
+    "registration": true,
+    "repeatAttachSameOwnerAndCredential": true,
+    "rootOwnerClaimedWithoutNewOwner": true,
+    "ownerCounts": {
+      "afterA": 1,
+      "afterRepeatA": 1,
+      "afterRoot": 2,
+      "afterClaim": 2,
+      "afterB": 3
+    },
+    "credentialCreatedTaskWithoutOwnerId": true,
+    "childBoundToRootAndOwner": true,
+    "packageFrozen": true,
+    "explicitMockJsonlDispatch": true,
+    "dispatchExecution": "mock",
+    "dispatchAdapter": "mock-jsonl",
+    "watchTerminal": true,
+    "waitTerminal": true,
+    "resultAcknowledged": true,
+    "reviewAccepted": true,
+    "operationsOwnerNamespace": true,
+    "operationsNamespacesIndependent": true,
+    "credentialRestartReuse": true,
+    "ownerRowsAcrossRestart": 3
+  },
+  "rejections": {
+    "foreignTaskGet": "FORBIDDEN",
+    "foreignParentCreate": "FORBIDDEN",
+    "foreignPackageGet": "FORBIDDEN",
+    "foreignReview": "FORBIDDEN",
+    "foreignWait": "FORBIDDEN",
+    "foreignReceiptReplay": "FORBIDDEN",
+    "foreignOperations": "NOT_FOUND",
+    "wrongToken": "UNAUTHORIZED",
+    "wrongTokenReceiptReplay": "UNAUTHORIZED",
+    "missingCredential": "INVALID_ARGUMENT",
+    "unsafeCredential": "UNSAFE_ENDPOINT",
+    "symlinkCredential": "UNSAFE_ENDPOINT",
+    "malformedCredential": "INVALID_ARGUMENT",
+    "claimWrongProfile": "INVALID_REQUEST",
+    "claimMissingOwner": "NOT_FOUND",
+    "stateUnchangedAcrossFailures": true
+  },
+  "secrets": {
+    "tokensAndDigestsAbsentFromCliOutputs": true,
+    "ownersListNoCredentialPath": true,
+    "snapshotNoCredentialPath": true,
+    "credentialFileMode": true,
+    "credentialDirectoryMode": true,
+    "databaseStoresDigestOnly": true
+  },
+  "restart": {
+    "serverStopped": true,
+    "discoveryRemoved": true,
+    "serverProcessGone": true,
+    "serverRestarted": true,
+    "ownerCountUnchanged": true,
+    "credentialPathStable": true,
+    "tokenReused": true,
+    "taskReadable": true,
+    "receiptReadable": true,
+    "claimNoNewOwner": true
+  },
+  "boundaries": {
+    "realModelInvoked": false,
+    "realHerdrInvoked": false,
+    "rootExecutionStateSeededDirectly": true,
+    "mockProvider": "mock-jsonl",
+    "browserAcceptance": false,
+    "fullTestSuite": false,
+    "externalChatGptReview": "not performed by this package; not claimed",
+    "note": "Root went through built-CLI tasks.create/tasks.describe, then its owner execution state was seeded directly in the isolated SQLite database because real Herdr/model launch is out of scope. All subsequent work used the built node CLI over the real Unix socket."
+  },
+  "artifacts": {
+    "evidence": "/home/mocha/opensource/weaver/docs/verification/owner-identity/identity-integration.json",
+    "buildLog": "temporary, removed with task root",
+    "sourceSnapshot": "temporary, removed with task root"
+  },
+  "cleanup": {
+    "unit": "dev-weaver-owner17-integration.scope",
+    "unitStopped": true,
+    "discoveryRemoved": true,
+    "serverProcessGone": true,
+    "tempRoot": "/tmp/weaver-owner-17d9d3ce-mjive0wr/i",
+    "tempRootRemoved": true,
+    "finalStopAfterEvidenceWrite": true,
+    "finalStopVerified": true,
+    "finalStateVerifiedAt": "2026-10-22T01:23:16.190469+00:00",
+    "finalActiveState": "inactive",
+    "finalLoadState": "not-found",
+    "finalSubState": "dead",
+    "finalMatchingNodeProcesses": 0,
+    "tempRootExists": false,
+    "harnessOpenPipeTimeout": true
+  }
+}

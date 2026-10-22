@@ -194,6 +194,103 @@ test('missing launcher executable reports an error and closes without waiting fo
 });
 
 
+test('launcher exit with a pipe-holding descendant still closes and kills owned descendants', { timeout: 25000 }, async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'wv-scope-pipe-'));
+  const pidfile = join(dir, 'grand.pid');
+  const unrelated = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { detached: true, stdio: 'ignore' });
+  unrelated.unref();
+  const unit = `weaver-cli-pipe-${randomBytes(6).toString('hex')}`;
+  const began = Date.now();
+  let closed = false;
+  let code: number | null | undefined;
+  let closes = 0;
+  const errors: string[] = [];
+  let stdout = '';
+  const scope = startOwnedScope({
+    command: [process.execPath, '-e', 'const {spawn}=require("node:child_process");const fs=require("node:fs");const grand=spawn(process.execPath,["-e","setInterval(()=>{},1000)"],{detached:true,stdio:["ignore","inherit","inherit"]});grand.unref();fs.writeFileSync(process.env.SCOPE_PIDFILE,String(grand.pid));process.stdout.write("parent-done\\n");setTimeout(()=>process.exit(0),100);'],
+    cwd: dir,
+    env: { ...process.env, SCOPE_PIDFILE: pidfile },
+    stdin: null,
+    unit,
+  });
+  scope.on('error', error => errors.push(String(error)));
+  scope.stdout.on('data', chunk => { stdout += chunk.toString('utf8'); });
+  scope.on('close', value => { closed = true; closes += 1; code = value; });
+  try {
+    // No manual kill: the launcher exits on its own while the grandchild holds
+    // the pipes. Close must still arrive bounded (old code waited forever).
+    const deadline = Date.now() + 15000;
+    while (!closed && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
+    const grandchild = Number(readFileSync(pidfile, 'utf8'));
+    const active = await inspectScope(unit);
+    t.diagnostic(JSON.stringify({ unit, launcherPid: scope.pid ?? null, elapsed: Date.now() - began, closed, closes, code, errors, stdout: stdout.trim(), grandchild, grandAlive: alive(grandchild), grandInScope: processInScope(grandchild, unit), unrelatedAlive: alive(unrelated.pid ?? 0), active }));
+    assert.equal(closed, true, 'scope must close even though a descendant held stdout/stderr');
+    assert.equal(closes, 1);
+    assert.equal(code, 0);
+    assert.match(stdout, /parent-done/);
+    await waitFor(() => !alive(grandchild));
+    assert.equal(alive(unrelated.pid ?? 0), true, 'unrelated processes must not be signalled');
+    assert.doesNotMatch(active, /ActiveState=(active|activating|deactivating)(?:\n|$)/);
+    assert.deepEqual(errors, []);
+  } finally {
+    if (unrelated.pid) try { process.kill(unrelated.pid, 'SIGKILL'); } catch { /* already gone */ }
+    try { scope.kill('SIGKILL'); } catch { /* scope already stopped */ }
+    try {
+      const grandchild = Number(readFileSync(pidfile, 'utf8'));
+      if (grandchild > 1 && alive(grandchild) && processInScope(grandchild, unit)) process.kill(grandchild, 'SIGKILL');
+    } catch { /* already gone or never started */ }
+    await cleanupScope(unit);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+
+test('normal success preserves stdout and stderr larger than the pipe buffer', { timeout: 20000 }, async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'wv-scope-bulk-'));
+  const unit = `weaver-cli-bulk-${randomBytes(6).toString('hex')}`;
+  const outBytes = 2 * 1024 * 1024;
+  const errBytes = 1024 * 1024;
+  const outTail = 'STDOUT_TAIL';
+  const errTail = 'STDERR_TAIL';
+  let closed = false;
+  let closes = 0;
+  let code: number | null | undefined;
+  const errors: string[] = [];
+  const stdout: Buffer[] = [];
+  const stderr: Buffer[] = [];
+  const scope = startOwnedScope({
+    command: [process.execPath, '-e', `process.stdout.write(Buffer.alloc(${outBytes},111));process.stderr.write(Buffer.alloc(${errBytes},101));process.stdout.write(${JSON.stringify(outTail)});process.stderr.write(${JSON.stringify(errTail)});`],
+    cwd: dir,
+    env: { ...process.env },
+    stdin: null,
+    unit,
+  });
+  scope.on('error', error => errors.push(String(error)));
+  scope.stdout.on('data', chunk => stdout.push(chunk));
+  scope.stderr.on('data', chunk => stderr.push(chunk));
+  scope.on('close', value => { closed = true; closes += 1; code = value; });
+  try {
+    const deadline = Date.now() + 15000;
+    while (!closed && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
+    const out = Buffer.concat(stdout);
+    const err = Buffer.concat(stderr);
+    t.diagnostic(JSON.stringify({ unit, closed, closes, code, errors, stdoutBytes: out.length, stderrBytes: err.length }));
+    assert.equal(closed, true);
+    assert.equal(closes, 1);
+    assert.equal(code, 0);
+    assert.equal(out.length, outBytes + outTail.length);
+    assert.equal(out.subarray(outBytes).toString(), outTail);
+    assert.equal(err.length, errBytes + errTail.length);
+    assert.equal(err.subarray(errBytes).toString(), errTail);
+    assert.deepEqual(errors, []);
+  } finally {
+    try { scope.kill('SIGKILL'); } catch { /* scope already stopped */ }
+    await cleanupScope(unit);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+
 const LINE_LIMIT = 8 * 1024 * 1024;
 
 test('oversized complete frames are skipped and decoding resumes in the same chunk', () => {

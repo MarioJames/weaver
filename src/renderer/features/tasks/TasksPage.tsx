@@ -88,11 +88,9 @@ export function TasksPage({ work, ownerKind, freeChannel, requestedTaskId, onReq
       create={(input, start) => work.action(() => createTask(input, start, {
         create: value => command<{ id: string }>('tasks.create', { ...value }, true),
         start: id => window.weaver.startTask(id),
-        // The new parent Agent is on the board at once: it is selected, its 父 Agent filter is set, and the splitting notice points at it.
-        select: id => {
-          setSelected(id);
-          setFilters(current => current.owner.includes(id) ? current : { ...current, owner: [...current.owner, id] });
-        },
+        // Opening the new task must not touch the board filters: a fresh parent Agent has no children yet,
+        // so narrowing 父 Agent to it would empty the board behind the detail drawer.
+        select: setSelected,
         startFailed: (id, error) => notifyError(error, '任务已创建，启动失败', { label: '重试启动', run: () => { void work.action(() => window.weaver.startTask(id)); } }),
       }))} />
   </>;

@@ -1,0 +1,10 @@
+{
+  "url": "http://127.0.0.1:43997/#/tasks",
+  "viewport": {
+    "h": 900,
+    "w": 1440
+  },
+  "storage": "{\"status\":[],\"owner\":[\"6bdd6bab-63db-4de0-93b8-0cf8e299cd5d\"],\"worker\":[],\"workspace\":[],\"time\":\"today\"}",
+  "toast": false,
+  "horizontalOverflow": false
+}

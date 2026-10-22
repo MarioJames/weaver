@@ -130,6 +130,39 @@ test('keepStdinOpen rejects contradictory stdin options and leaves defaults unto
   }
 });
 
+test('launcher exit and pipe close publish exactly one close with drained output', async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'weaver-im-scope-once-'));
+  const previousPath = process.env.PATH;
+  writeShims(dir);
+  process.env.PATH = `${dir}:${previousPath}`;
+  let resident: ReturnType<typeof observeScope> | undefined;
+  try {
+    let closes = 0;
+    let stdout = '';
+    resident = observeScope(startOwnedScope({
+      command: [process.execPath, '-e', `process.stdout.write('SCOPE_ONCE\\n');setTimeout(()=>process.exit(0),50);`],
+      cwd: dir,
+      env: { ...process.env },
+      stdin: null,
+      unit: 'dev-weaver-im-once',
+    }));
+    const { scope } = resident;
+    scope.on('close', () => { closes += 1; });
+    scope.stdout.setEncoding('utf8');
+    scope.stdout.on('data', chunk => { stdout += chunk; });
+    const code = await resident.wait();
+    assert.equal(code, 0);
+    assert.equal(closes, 1, 'exit-triggered cleanup must not double-publish close');
+    assert.match(stdout, /SCOPE_ONCE/);
+  } finally {
+    try { await resident?.dispose(); }
+    finally {
+      process.env.PATH = previousPath;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 function writeShims(dir: string): void {
   writeFileSync(join(dir, 'systemd-run'), '#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n', { mode: 0o700 });
   writeFileSync(join(dir, 'systemctl'), '#!/bin/sh\necho ActiveState=inactive\n', { mode: 0o700 });

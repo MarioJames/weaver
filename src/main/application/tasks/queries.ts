@@ -8,6 +8,7 @@ import { QUOTA_CAPABILITIES } from '../../policy/quota';
 import type { PolicyStore } from '../../policy/store';
 import { redactContext } from '../../redact-context';
 import { engineLadderKey } from '../../storage/vendor-limits';
+import { ownerReceiptKey, ownerScopeOf } from '../../owners/identity';
 import type { StallMonitor } from '../../stall';
 import { REAL_ENGINE_KINDS, listWorkspaceDirectories } from '../../workspace';
 import { fail } from '../commands/errors';
@@ -93,5 +94,5 @@ export class Queries {
     return this.monitor().unblockWorker(worker);
    }
  artifactRead(a:CommandArgs):unknown{const task=this.records.task(a);const artifactId=parseId(a.artifactId,'artifact ID');const artifact=task.artifacts.find(v=>v.id===artifactId);if(!artifact)fail('NOT_FOUND','Artifact not found');return artifact;}
- operationGet(a:CommandArgs):unknown{const id=text(a.commandId,'commandId',120);const receipt=this.manager.store.getReceipt(`local-demo:${id}`);if(!receipt)fail('NOT_FOUND','Command receipt not found');return {commandId:id,state:receipt!.response?'settled':'indeterminate',response:receipt!.response};}
+ operationGet(a:CommandArgs):unknown{const id=text(a.commandId,'commandId',120);const scope=ownerScopeOf(a);const receipt=this.manager.store.getReceipt(scope?ownerReceiptKey(scope,id):`local-demo:${id}`);if(!receipt)fail('NOT_FOUND','Command receipt not found');return {commandId:id,state:receipt!.response?'settled':'indeterminate',response:receipt!.response};}
 }

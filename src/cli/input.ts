@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
 import { LocalIPCError, MAX_FRAME_BYTES } from '../main/local-ipc';
 import type { CatalogCommand } from './catalog';
+import { applyOwnerAuth, rejectOwnerAuthArg, type OwnerAuth } from './owner-identity';
 import type { CLIOptions } from './parse';
 
 /** --input is a JSON file, "-" for stdin, or the JSON object itself when it starts with "{". */
@@ -65,12 +66,14 @@ export function mergeArg(envelope: Record<string, unknown>, key: string, value: 
   if (key in record && record[key] !== value) throw new LocalIPCError('INVALID_ARGUMENT', `Input ${label} does not match CLI ${label}`);
   envelope.args = { ...record, [key]: value };
 }
-export function makeRequest(options: CLIOptions, input: unknown = {}): Record<string, unknown> {
+export function makeRequest(options: CLIOptions, input: unknown = {}, ownerAuth?: OwnerAuth): Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new LocalIPCError('INVALID_ARGUMENT', 'Input must be a JSON object');
   const object = input as Record<string, unknown>;
   const isEnvelope = 'apiVersion' in object || 'command' in object;
   const envelope: Record<string, unknown> = isEnvelope ? { ...object } : { apiVersion: 'weaver.v1', command: options.command, args: object };
   if (options.command && isEnvelope && envelope.command !== options.command) throw new LocalIPCError('INVALID_ARGUMENT', 'Input command does not match CLI command');
+  const requestArgs = envelope.args;
+  if (requestArgs && typeof requestArgs === 'object' && !Array.isArray(requestArgs)) rejectOwnerAuthArg(requestArgs as Record<string, unknown>);
   if (options.commandId && envelope.commandId && envelope.commandId !== options.commandId) throw new LocalIPCError('INVALID_ARGUMENT', 'Input command ID does not match CLI command ID');
   envelope.commandId = options.commandId || envelope.commandId || randomUUID();
   if (options.scheduleId !== undefined) mergeArg(envelope, 'scheduleId', options.scheduleId, 'schedule ID');
@@ -82,6 +85,7 @@ export function makeRequest(options: CLIOptions, input: unknown = {}): Record<st
   for (const key of ['expectedRevision', 'manifestDigest', 'decision', 'comment'] as const) {
     if (options[key] !== undefined) mergeArg(envelope, key, options[key], key);
   }
+  applyOwnerAuth(envelope, ownerAuth);
   return envelope;
 }
 /** Fill tasks/schedules create workspace from the CLI caller cwd before the request is submitted. */
@@ -97,7 +101,7 @@ export function applyCallerWorkspace(request: Record<string, unknown>, cwd: stri
 }
 
 /** The request one CLI invocation sends: a direct RPC call for policy, engine, quota and probe commands, otherwise a weaver.v1 command envelope. */
-export async function buildRequest(options: CLIOptions, item: CatalogCommand | undefined): Promise<Record<string, unknown>> {
+export async function buildRequest(options: CLIOptions, item: CatalogCommand | undefined, ownerAuth?: OwnerAuth): Promise<Record<string, unknown>> {
   const rpc = item?.rpc;
   let request: Record<string, unknown>;
   if (rpc) {
@@ -105,6 +109,7 @@ export async function buildRequest(options: CLIOptions, item: CatalogCommand | u
     if (rpc.arity === 1) {
       if (!options.input && item!.command !== 'quota.refresh' && item!.command !== 'workers.probe' && !(item!.command === 'engines.models' && options.engine !== undefined)) throw new LocalIPCError('INVALID_ARGUMENT', 'This command requires --input');
       const body = options.input ? await readInput(options.input) : {};
+      if (body && typeof body === 'object' && !Array.isArray(body)) rejectOwnerAuthArg(body as Record<string, unknown>);
       if (options.worker !== undefined || options.engine !== undefined || options.refresh) {
         if (!body || typeof body !== 'object' || Array.isArray(body)) throw new LocalIPCError('INVALID_ARGUMENT', 'Input must be a JSON object');
         // Same merge and conflict rule as makeRequest: a flag never overwrites a different --input value.
@@ -117,7 +122,7 @@ export async function buildRequest(options: CLIOptions, item: CatalogCommand | u
     } else if (options.input) throw new LocalIPCError('INVALID_ARGUMENT', 'This command does not take --input');
     else request = { method: rpc.method, args: [] };
   } else {
-    request = makeRequest(options, options.input ? await readInput(options.input) : {});
+    request = makeRequest(options, options.input ? await readInput(options.input) : {}, ownerAuth);
     applyCallerWorkspace(request, process.cwd());
     if (request.command === 'operations.get' && options.commandId) {
       const args = request.args;

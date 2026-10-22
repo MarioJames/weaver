@@ -1,0 +1,12 @@
+{
+  "storage": "{\"status\":[],\"owner\":[\"6bdd6bab-63db-4de0-93b8-0cf8e299cd5d\"],\"worker\":[],\"workspace\":[],\"time\":\"today\"}",
+  "cards": [
+    "重试夹具任务\n草稿\n由 人工筛选夹具 于 20:35 创建",
+    "人工筛选任务 B\n草稿\n由 人工筛选夹具 于 20:35 创建",
+    "人工筛选任务 A\n草稿\n由 人工筛选夹具 于 20:35 创建"
+  ],
+  "dialogs": [
+    "任务详情\n验收失败重试：最终证据\n执行中\n取消任务\n概览\nPrompt\n要求\n时间线 3\n产物 0\n验收\n接续\n更新时间\n20:47\n父 Agent\nclaude_owner\n工作目录\n/tmp/weaver-owner-17d9d3ce-mjive0wr/browser/projects/retry\n父 Agent · 在 Herdr 中运行\nAgent\nowner-784f100f-0\nHerdr 会话\ndefault\n宿主工作区\nw-browser\n窗格\nw-browser:p1\n启动时间\n20:47\n子任务 · 0\n父 Agent 正在准备和拆分任务，子任务会自动显示在这里。"
+  ],
+  "toast": false
+}

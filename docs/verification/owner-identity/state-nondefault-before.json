@@ -1,0 +1,73 @@
+{
+  "storage": "{\"status\":[],\"owner\":[\"6bdd6bab-63db-4de0-93b8-0cf8e299cd5d\"],\"worker\":[],\"workspace\":[],\"time\":\"today\"}",
+  "filters": [
+    {
+      "pressed": "true",
+      "text": "今天\n3"
+    },
+    {
+      "pressed": "false",
+      "text": "近 1 小时\n3"
+    },
+    {
+      "pressed": "false",
+      "text": "近 24 小时\n3"
+    },
+    {
+      "pressed": "false",
+      "text": "近 7 天\n3"
+    },
+    {
+      "pressed": "false",
+      "text": "近 30 天\n3"
+    },
+    {
+      "pressed": "false",
+      "text": "全部\n3"
+    },
+    {
+      "pressed": "true",
+      "text": "全部\n3"
+    },
+    {
+      "pressed": "false",
+      "text": "草稿\n3"
+    },
+    {
+      "pressed": "false",
+      "text": "全部\n4"
+    },
+    {
+      "pressed": "true",
+      "text": "人工筛选夹具\n3"
+    },
+    {
+      "pressed": "false",
+      "text": "验收草稿：保持默认筛选\n1"
+    },
+    {
+      "pressed": "true",
+      "text": "全部\n3"
+    },
+    {
+      "pressed": "true",
+      "text": "全部\n3"
+    },
+    {
+      "pressed": "false",
+      "text": "board\n2"
+    },
+    {
+      "pressed": "false",
+      "text": "retry\n1"
+    },
+    {
+      "pressed": null,
+      "text": "人工筛选夹具"
+    },
+    {
+      "pressed": null,
+      "text": "清除全部"
+    }
+  ]
+}

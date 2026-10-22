@@ -13,6 +13,31 @@ async function until(predicate: () => boolean): Promise<void> {
   const end = Date.now() + 4000;
   while (!predicate()) { if (Date.now() > end) throw new Error('Host fixture timed out'); await new Promise(resolve => setTimeout(resolve, 5)); }
 }
+
+function fixturePids(marker: string): number[] {
+  let text = '';
+  try { text = readFileSync(marker, 'utf8'); } catch { return []; }
+  const pids = new Set<number>();
+  for (const line of text.trim().split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const entry = JSON.parse(line) as { spawnPid?: unknown; pid?: unknown };
+      for (const value of [entry.spawnPid, entry.pid]) if (typeof value === 'number' && value > 0) pids.add(value);
+    } catch { /* ignore partially written marker lines */ }
+  }
+  return [...pids];
+}
+
+async function assertFixtureReaped(marker: string, expectSpawned: boolean): Promise<void> {
+  if (expectSpawned) assert.ok(fixturePids(marker).length > 0, 'the fixture engine should have started');
+  const end = Date.now() + 3000;
+  for (;;) {
+    const alive = fixturePids(marker).filter(pid => { try { process.kill(pid, 0); return true; } catch { return false; } });
+    if (alive.length === 0) return;
+    if (Date.now() > end) assert.fail(`orphaned fixture engine still alive: ${alive.join(',')}`);
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+}
 for (const engine of ['codex', 'claude']) test(`${engine} internal host proves non-submission and retains context after confirmed abort`, { timeout: 15000 }, async () => {
   const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-'));
   chmodSync(dir, 0o700);
@@ -166,6 +191,97 @@ test('opencode mid-turn engine death still delivers the terminal error frame', {
     assert.equal(terminal.type, 'error');
     assert.equal(terminal.reason, 'engine');
     await exit;
+  } finally {
+    child.stdin.end(); child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test('opencode normal close reaps the fixture engine', { timeout: 15000 }, async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-clean-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  copyFileSync(new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url), join(dir, 'opencode')); chmodSync(join(dir, 'opencode'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID(), marker = join(dir, 'marker');
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'opencode', model: 'fixture-provider/fixture-model', effort: 'high', workspace, instructions: 'Fixture only.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, OPENCODE_FIXTURE_MARKER: marker } });
+    await until(() => frames.some(frame => frame.type === 'ready'));
+    wire.send({ type: 'prepare', id: 1, text: 'hello' });
+    await until(() => frames.some(frame => frame.type === 'prepared' && frame.id === 1));
+    wire.send({ type: 'submit', id: 1 });
+    await until(() => frames.some(frame => frame.type === 'result' && frame.id === 1));
+    wire.send({ type: 'close', id: 0 });
+    await exit;
+    assert.equal(child.exitCode, 0);
+    await assertFixtureReaped(marker, true);
+  } finally {
+    child.stdin.end(); child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('opencode auth failure close reaps the fixture engine', { timeout: 15000 }, async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-auth-clean-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  copyFileSync(new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url), join(dir, 'opencode')); chmodSync(join(dir, 'opencode'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID(), marker = join(dir, 'marker');
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'opencode', model: 'fixture-provider/fixture-model', effort: 'high', workspace, instructions: 'Fixture only.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, OPENCODE_FIXTURE_SCENARIO: 'auth', OPENCODE_FIXTURE_MARKER: marker } });
+    await until(() => frames.some(frame => frame.type === 'ready'));
+    wire.send({ type: 'prepare', id: 1, text: 'authenticate' });
+    await until(() => frames.some(frame => frame.type === 'prepared' && frame.id === 1));
+    wire.send({ type: 'submit', id: 1 });
+    await until(() => frames.some(frame => frame.type === 'error' && frame.id === 1));
+    const error = frames.find(frame => frame.type === 'error' && frame.id === 1)!;
+    assert.equal(error.reason, 'auth');
+    assert.ok(!JSON.stringify(error).includes('not authenticated'));
+    wire.send({ type: 'close', id: 0 });
+    await exit;
+    assert.equal(child.exitCode, 0);
+    await assertFixtureReaped(marker, true);
+  } finally {
+    child.stdin.end(); child.kill('SIGKILL'); await exit;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('opencode close during init still reaps the fixture engine', { timeout: 15000 }, async () => {
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-init-race-'));
+  chmodSync(dir, 0o700);
+  const workspace = join(dir, 'ws'); mkdirSync(workspace);
+  copyFileSync(new URL('../fixtures/parent/opencode-fixture.mjs', import.meta.url), join(dir, 'opencode')); chmodSync(join(dir, 'opencode'), 0o700);
+  const endpoint = join(dir, 's'), epoch = randomUUID(), marker = join(dir, 'marker');
+  const frames: HostFrame[] = [];
+  let wire!: ReturnType<typeof hostWire>;
+  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
+  const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['pipe', 'ignore', 'pipe'] });
+  const exit = once(child, 'close');
+  try {
+    await until(() => frames.some(frame => frame.type === 'hello'));
+    wire.send({ type: 'init', id: 0, input: { engineKind: 'opencode', model: 'fixture-provider/fixture-model', effort: 'high', workspace, instructions: 'Fixture only.' }, env: { PATH: `${dir}:${dirname(process.execPath)}`, OPENCODE_FIXTURE_MARKER: marker } });
+    wire.send({ type: 'close', id: 0 });
+    await exit;
+    assert.equal(child.exitCode, 0);
+    assert.ok(!frames.some(frame => frame.type === 'ready'), 'close must win while init is still in flight');
+    await assertFixtureReaped(marker, true);
   } finally {
     child.stdin.end(); child.kill('SIGKILL'); await exit;
     await new Promise<void>(resolve => server.close(() => resolve()));

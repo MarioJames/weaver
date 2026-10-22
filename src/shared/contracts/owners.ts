@@ -16,3 +16,5 @@ export interface LogicalOwner {id:string;name:string;profileId:string;/** Short 
 export interface OwnerInstanceKey {profileId:string;name:string;session:string}
 /** A registered instance as the control plane reports it: its identity and how much of it is already busy. */
 export interface OwnerInstance extends LogicalOwner {runningTaskCount:number}
+/** The attach receipt: owner metadata plus the private file path the CLI reads, never the token itself. */
+export interface OwnerRegistration extends LogicalOwner {credentialPath?:string}

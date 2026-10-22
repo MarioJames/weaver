@@ -1,0 +1,27 @@
+{
+  "captured": 323,
+  "byStatus": [
+    {
+      "status": 200,
+      "count": 321
+    },
+    {
+      "status": 400,
+      "count": 2
+    }
+  ],
+  "non2xx": [
+    {
+      "requestId": "19217.175",
+      "status": 400,
+      "postData": "{\"method\":\"startTask\",\"args\":[\"b71f9e41-70d9-4b8a-b985-426d224cd47e\"]}",
+      "responseBody": "{\"error\":{\"code\":\"INVALID_REQUEST\",\"message\":\"Workspace does not exist: /tmp/weaver-owner-17d9d3ce-mjive0wr/browser/projects/retry. Create the project directory and dispatch again. No model was launched.\"}}"
+    },
+    {
+      "requestId": "19217.430",
+      "status": 400,
+      "postData": "{\"method\":\"startTask\",\"args\":[\"784f100f-3735-4f2c-946d-8680ac8f308c\"]}",
+      "responseBody": "{\"error\":{\"code\":\"INVALID_REQUEST\",\"message\":\"Workspace does not exist: /tmp/weaver-owner-17d9d3ce-mjive0wr/browser/projects/retry. Create the project directory and dispatch again. No model was launched.\"}}"
+    }
+  ]
+}

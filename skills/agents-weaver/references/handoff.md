@@ -2,13 +2,15 @@
 
 Exact flags and limits come from `weaver <command> --help --output json`; policy fields live in [config](config.md). Below are only the request JSON shapes and rules the help does not spell out.
 
+After the first owner attach returns `credentialPath`, prefix every command in this reference with the same instance and credential: `weaver --data-dir <instance> --owner-file <credentialPath> ...`. The examples below omit that prefix for brevity. Do not print, copy or interpolate the token; the credential file is user-only (0600) and is local trusted-user identity, not tenant isolation.
+
 ## Task scratch root
 
 Use, in order: the task root the caller provided, else `ACCEPTANCE_TMPDIR`, else `TMPDIR`. Create one unique private subdirectory inside it (`mkdtemp`) and reuse it for CLI JSON requests, logs and all scratch — yours and your workers'; state the exact path in every package scope. Never override a provided root with your own `/tmp/...` path; if the parent is missing or invalid, report that instead of going elsewhere. Deliverables stay in the authorized workspace. Record each directory you create and its users; remove only your own task-owned directory after artifacts and evidence are safe. A failed task or a pending dependency keeps its directory with an owner, reason and observable release condition. Never delete the provided parent, directories you do not own, or anything that would repurpose this root as Weaver's `--data-dir` or socket path.
 
 ## Request JSON examples
 
-`weaver owners attach --input owner.json --command-id owner-20261019-4f2a1b` — once per agent session, before any task:
+`weaver owners attach --input owner.json --command-id owner-20261019-4f2a1b` — once per agent session, before any task. A Herdr-started root or continuation instead claims its existing row with `ownerId`; it must not create a second owner:
 
 ```json
 {
@@ -18,7 +20,7 @@ Use, in order: the task root the caller provided, else `ACCEPTANCE_TMPDIR`, else
 }
 ```
 
-`name` is `<Host> · <workspace dir name> · <HH:MM session start>`; `session` is `$CODEX_THREAD_ID`, else `$HERDR_PANE_ID`, else the absolute workspace path. The reply `data.id` is this session's owner id, and `data` also echoes `name`/`profileId`. Attach is metadata only (`verified: false`) — it never contacts your host. Re-issue with the same `--command-id` and identical input to get the original receipt back; if that comes back `COMMAND_INDETERMINATE`, read `weaver owners list` and take the entry with the same name/session instead of registering a second owner.
+For the claim, add `"ownerId": "<the task/root owner row>"`, keep `name` as the actual agent name and `session` as the current host session, and read `profileId` first with `weaver owners get --input owner-get.json` or `weaver policy get`. Do not guess the profile. `name` is `<Host> · <workspace dir name> · <HH:MM session start>`; `session` is `$CODEX_THREAD_ID`, else `$HERDR_PANE_ID`, else the absolute workspace path. The reply `data.id` is this session's owner id, `data.credentialPath` is the only credential location, and `data` also echoes `name`/`profileId`; it never contains the token. From the next command on use `weaver --data-dir <instance> --owner-file <credentialPath>`. Attach is metadata only (`verified: false`) — it never contacts your host. Re-issue with the same `--command-id` and identical input to get the original receipt back; if that comes back `COMMAND_INDETERMINATE`, read `weaver owners list` and take the entry with the same name/session (or claim the known `ownerId`) instead of registering a second owner.
 
 `weaver owners describe --input describe.json --command-id describe-001` — once the session's main task is clear, set its board title (and again whenever the main task changes):
 
@@ -134,4 +136,4 @@ Use stable IDs supplied by the owner. Preserve the digest of the result actually
 
 `weaver owners continuation get --task-id <id>` returns the manual context pack and handoff prompt (`acknowledgementId` is `null`, not a host confirmation). `weaver owners continuation configure --task-id <id> --input cfg.json` sets or clears idle rotation (`{"expectedRevision":2,"idleRotationMinutes":90}`, `null` disables, 1–10080); `weaver owners switch` hands ownership over. With `launch:true`, it also starts the new owner in Herdr and delivers the continuation prompt; `weaver owners launch` uses the existing context pack to retry that host launch without switching again. Both return the final launch result; a failed launch does not roll back the switch. See each command's help for current fields.
 
-No credential or executable argv belongs in any request. A host session reference belongs only in the owner attach registration above, where it is stored as an unverified label — never in task input, scope or artifacts. The task workspace is the authorized project, not Weaver's private state directory.
+No credential belongs in a request, prompt, scope, artifact or executable argv: the owner token stays in the private `--owner-file` file and only its path goes on the command line. A host session reference belongs only in the owner attach registration above, where it is stored as an unverified label — never in task input, scope or artifacts. The task workspace is the authorized project, not Weaver's private state directory. `--owner-file` is local trusted-user identity, not a tenant boundary; never pass it to an untrusted agent or a different instance.

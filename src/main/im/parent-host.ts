@@ -24,15 +24,24 @@ export async function runParentHost(args: readonly string[]): Promise<number> {
     let session: ParentAgentSession | undefined, initializing = false, stopping = false, lastId = 0;
     let active: { id: number; abort: AbortController; text: string; submitted: boolean } | undefined;
     let inFlight: Promise<string> | undefined;
+    let initPromise: Promise<ParentAgentSession> | undefined;
     const timer = setTimeout(() => shutdown(), 30_000);
     const shutdown = () => {
       if (stopping) return;
       stopping = true; clearTimeout(timer); active?.abort.abort();
       socket.destroy();
       process.stdin.off('end', shutdown); process.stdin.off('close', shutdown); process.stdin.off('error', shutdown); process.off('SIGHUP', shutdown);
-      // Exiting the main service process lets systemd reclaim every engine descendant.
-      void session?.close().catch(() => {});
-      resolve(0);
+      // Awaiting the engine teardown (and a racing init) before resolving keeps the
+      // process.exit in run.ts from truncating session.close() and orphaning the engine.
+      // close() itself is bounded, so this wait cannot hang the host.
+      void (async () => {
+        try {
+          if (initPromise) {
+            try { session ??= await initPromise; } catch { /* startup failure carries its own frame */ }
+          }
+          await session?.close().catch(() => {});
+        } finally { resolve(0); }
+      })();
     };
     // An engine failure surfaces as `unavailable` while its send rejection still carries the
     // classified reason. Tearing down the socket first would drop that error frame and leave
@@ -54,15 +63,18 @@ export async function runParentHost(args: readonly string[]): Promise<number> {
         const env = frame.env as NodeJS.ProcessEnv;
         // Executable discovery uses this process' PATH; authentication stays only in child env.
         if (typeof env.PATH === 'string') process.env.PATH = env.PATH;
-        void createParentAgent(frame.input as ParentAgentInput, {
+        initPromise = createParentAgent(frame.input as ParentAgentInput, {
           launch: (command, cwd, extra) => spawn(command[0], command.slice(1), { cwd, env: { ...env, ...extra }, stdio: ['pipe', 'pipe', 'pipe'] }),
-        }).then(value => {
+        });
+        void initPromise.then(value => {
           session = value;
-          if (stopping) { void value.close().catch(() => {}); return; }
+          // A racing shutdown awaits initPromise and owns the close; skip the extra close here.
+          if (stopping) return;
           clearTimeout(timer);
           void value.unavailable?.then(shutdownForUnavailable);
           wire.send({ id: 0, type: 'ready' });
         }, error => {
+          if (stopping) return;
           // Startup failures carry only the fixed reason; vendor text and paths stay in this process.
           try { wire.send({ id: 0, type: 'failed', reason: hostFailureReason(error) }); socket.end(); } catch { /* socket is already gone */ }
           setTimeout(shutdown, 250);

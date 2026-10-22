@@ -7,6 +7,7 @@ import { runSkills, SKILLS_HELP } from './commands/skills';
 import { runWeb, writeWebHelp } from './commands/web';
 import { buildRequest, readCommentFile } from './input';
 import { requestedOutput, responseField, writeEnvelope, type OutputFormat } from './output';
+import { readOwnerCredential } from './owner-identity';
 import { DEFAULT_WEB_PORT, defaultDataDir, parseCLI, positionals } from './parse';
 import { pollTask, type PollRuntime } from './poll-task';
 import { runServer, SERVER_HELP } from './server/commands';
@@ -61,13 +62,16 @@ export async function runCLI(argv: string[], pollRuntime: Partial<PollRuntime> =
     const options = parseCLI(argv);
     errorFormat = options.output;
     commandId = options.commandId;
+    // An explicit credential file is part of the request identity: bad, unsafe or missing files
+    // fail closed before any transport call, including direct RPC and local wait/watch polling.
+    const ownerAuth = options.ownerFile !== undefined ? await readOwnerCredential(options.ownerFile) : undefined;
     const item = CLI_CATALOG.find(entry => entry.command === options.command);
     if (options.commentFile !== undefined) options.comment = await readCommentFile(options.commentFile);
     if (item?.local) {
       if (!options.taskId) throw new LocalIPCError('INVALID_ARGUMENT', `${item.usage} requires --task-id`);
-      return await pollTask(options, item.local, pollRuntime);
+      return await pollTask(options, item.local, pollRuntime, ownerAuth);
     }
-    const request = await buildRequest(options, item);
+    const request = await buildRequest(options, item, ownerAuth);
     if (!item?.rpc) commandId = typeof request.commandId === 'string' ? request.commandId : undefined;
     const response = await (pollRuntime.request ?? sendRequest)(options.dataDir, request) as { ok: boolean };
     if (options.field && response.ok) process.stdout.write(responseField(response, options.field) + '\n');

@@ -1,0 +1,33 @@
+{
+  "appUrl": "http://127.0.0.1:43997",
+  "route": "/#/tasks",
+  "service": {
+    "kind": "isolated dev web runtime",
+    "command": "/home/mocha/.local/bin/node --import tsx src/cli/main.ts web --dev --no-open --port 0 --data-dir /tmp/weaver-owner-17d9d3ce-mjive0wr/browser/data",
+    "unit": "dev-weaver-owner17-browser.scope",
+    "pid": 4173178,
+    "dataDir": "/tmp/weaver-owner-17d9d3ce-mjive0wr/browser/data",
+    "dataDirMode": "0700",
+    "sourceRoot": "/home/mocha/opensource/weaver",
+    "vite": true
+  },
+  "browser": {
+    "engine": "Google Chrome 156.0.8078.47",
+    "tool": "agent-browser 0.34.0",
+    "mode": "task",
+    "headless": true,
+    "session": "weaver-owner17-browser",
+    "profile": "/tmp/weaver-owner-17d9d3ce-mjive0wr/browser/browser-profile",
+    "viewport": { "width": 1440, "height": 900 }
+  },
+  "fakeHost": {
+    "herdr": "/tmp/weaver-owner-17d9d3ce-mjive0wr/browser/bin/herdr",
+    "claude": "/tmp/weaver-owner-17d9d3ce-mjive0wr/browser/bin/claude",
+    "scope": "only the isolated test service PATH",
+    "behavior": "fake herdr answers workspace/tab/agent protocol commands; fake claude only answers --help; no model or real Herdr session is started"
+  },
+  "fixtures": "fixtures.json",
+  "finalState": "final-state.json",
+  "sourceHashes": "source-hashes.txt",
+  "note": "HEAD advanced due other workers while testing; the tested TasksPage/NewTaskDialog/task-create hashes stayed unchanged."
+}
