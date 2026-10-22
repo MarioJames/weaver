@@ -125,7 +125,7 @@ src/
 - 准入与派发同一 resolve 函数：`policy preview` 只读（`dispatch:"preview"`、`execution:"disabled"`）不执行；`workers.spawn` 实际校验 workspace/provider/容量后按结果 start 或入队。页面走的 `previewRoute` 由服务端当场补上同一份全局负载，所以预览显示的选择就是此刻派发会走的选择。
 - 并发按 **owner 实例**的 `profile.max_parallel`：槽位分组是 `instance:<ownerId>`，任务绑定 `ownerId` 时竞争的就是那个确切实例自己的额度；没有 `ownerId` 的遗留任务单独共用 `profile:<profileId>` 组。同一 profile 的多个实例各占各的额度，A 会话排满不影响 B 会话开工。容量在 `workers.spawn`、pump 复核和 `manager.start()` 启动前三处都查，超限一律入队而不是抢占。
 - `capabilities.maxParallel` 是 enabled profile 的 `max_parallel` 之和，配合 `capacity:{unit:'owner-instance', admission:…}` 只作规模提示——既不是 profile 级也不是全局的准入帽；系统没有全局并发上限。被限制的是**每个实例**的并发，跨实例的 子 Agent 负载均衡仍是全局的（见第一条）。
-- `herdr.max_wait_minutes`（1–1440）是 父 Agent 对同一 子 Agent 两次检查之间的最长间隔：等待只用 `weaver tasks wait --task-id`，不带 `--for` 时上限取 `min(600 秒, max_wait_minutes × 60 秒)`（策略读不到时退到 30 秒），任务一结束就返回。期间 父 Agent 查看进展并决定继续等待、取消或收回，Weaver 不会据此停止 子 Agent。
+- `herdr.max_wait_minutes`（1–1440）是 父 Agent 对同一 子 Agent 两次检查之间的最长间隔：等待只用 `weaver tasks wait --task-id`，不带 `--for` 时等待 `max_wait_minutes × 60 秒`（策略读不到时退到 30 秒），显式 `--for` 允许 1–86400 秒，任务一结束就返回。期间 父 Agent 查看进展并决定继续等待、取消或收回，Weaver 不会据此停止 子 Agent。
 
 队列与冻结：
 
@@ -148,7 +148,7 @@ launcher 组合（`startCliAgent`）：`RealEngineKind = 'opencode'|'pi'|'grok'|
 - 请求的真实引擎/model/effort、adapter、workspace、scopeUnit 和 observed evidence 都记录在 `run` 与 observability 里；mock 显式记录 `execution:'mock'`。没有静默回退：CC 报 `CAPABILITY_UNAVAILABLE`（deferred），unknown kind 同拒，launcher 未加载同拒。
 - 生命周期收尾只清理本 launch 拥有的进程；Linux/systemd host 上每个真实 launch 使用唯一命名 user scope，取消/超时/完成前先关闭自身 scope。没有共享 leader/daemon。
 
-真实执行首个有效输出后与 native 执行都不设总执行时限；`herdr.max_wait_minutes` 只是 父 Agent 两次检查之间的最长间隔（`weaver tasks wait`/`tasks watch` 不带 `--for` 即按 `min(600 秒, max_wait_minutes × 60 秒)` 取上限，策略读不到时为 30 秒，任务结束即返回，`wait` 还会在 health 为 `stalled` 时提前返回并带 `reason:'stalled'` 与重试/取消提示），Weaver 不据此停止 子 Agent，直接单测的 mock adapter 才允许一个更短的测试等待。
+真实执行首个有效输出后与 native 执行都不设总执行时限；`herdr.max_wait_minutes` 只是 父 Agent 两次检查之间的最长间隔（`weaver tasks wait`/`tasks watch` 不带 `--for` 即等待 `max_wait_minutes × 60 秒`，策略读不到时为 30 秒；显式 `--for` 为 1–86400 秒，任务结束即返回，`wait` 还会在 health 为 `stalled` 时提前返回并带 `reason:'stalled'` 与重试/取消提示），Weaver 不据此停止 子 Agent，直接单测的 mock adapter 才允许一个更短的测试等待。
 
 ## 6. 卡住检测与引擎惩罚（src/main/stall.ts）
 

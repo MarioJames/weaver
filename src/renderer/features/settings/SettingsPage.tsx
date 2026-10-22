@@ -74,7 +74,7 @@ export function SettingsPage({ policy }: { policy: PolicyDraft }) {
         </Setting>
       </Group>
       <Group title="父 Agent" desc="父 Agent 观测和等待子 Agent 的方式。">
-        <Setting label="查看间隔上限（分钟）" htmlFor={`${id}-wait`} desc="父 Agent 两次查看子 Agent 状态之间的最长间隔；子 Agent 完成后父 Agent 能及时发现。不会停止子 Agent。" state={saver.states.wait} error={inputErrors.wait}>
+        <Setting label="查看间隔上限（分钟）" htmlFor={`${id}-wait`} desc="父 Agent 两次查看子 Agent 状态之间的最长间隔，也是 tasks wait 不带 --for 时的等待时长；子 Agent 完成后父 Agent 能及时发现。不会停止子 Agent。" state={saver.states.wait} error={inputErrors.wait}>
           <MinutesInput id={`${id}-wait`} label="查看间隔上限（分钟）" value={saved.herdr.max_wait_minutes} min={1} max={1440} step={5} onError={inputError('wait')} onCommit={value => void saver.save('wait', () => ({ herdr: { max_wait_minutes: value } }))} />
         </Setting>
       </Group>

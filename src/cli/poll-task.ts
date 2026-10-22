@@ -5,12 +5,12 @@ import { writeEnvelope } from './output';
 import type { OwnerAuth } from './owner-identity';
 import type { CLIOptions } from './parse';
 
-/** The omitted --for deadline: min(600, herdr.max_wait_minutes×60) from the policy, or 30 when it cannot be read. */
+/** The omitted --for deadline: herdr.max_wait_minutes×60 from the policy, or 30 when it cannot be read. */
 export async function defaultForSeconds(dataDir: string): Promise<number> {
   try {
     const policy = await sendRequest(dataDir, { method: 'getPolicy', args: [] }, 2000) as { ok?: boolean; data?: { config?: { herdr?: { max_wait_minutes?: unknown } } } };
     const minutes = policy.data?.config?.herdr?.max_wait_minutes;
-    if (policy.ok === true && typeof minutes === 'number' && Number.isFinite(minutes) && minutes > 0) return Math.min(600, minutes * 60);
+    if (policy.ok === true && typeof minutes === 'number' && Number.isFinite(minutes) && minutes > 0) return minutes * 60;
   } catch { /* keep the fallback below */ }
   return 30;
 }

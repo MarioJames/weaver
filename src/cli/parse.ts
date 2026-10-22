@@ -72,7 +72,7 @@ export function parseCLI(argv: string[]): CLIOptions {
     if (arg === '--output') { output = takeOutput(argv, ++i).format; continue; }
     if (arg === '--for') {
       const value = argv[++i];
-      if (!value || !/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 600) throw new LocalIPCError('INVALID_ARGUMENT', '--for must be a whole number of seconds from 1 through 600');
+      if (!value || !/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 86400) throw new LocalIPCError('INVALID_ARGUMENT', '--for must be a whole number of seconds from 1 through 86400');
       options.forSeconds = Number(value);
       continue;
     }
