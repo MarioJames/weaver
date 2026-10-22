@@ -230,7 +230,12 @@ export class ScheduleService {
    }catch(error){failures++;output.push(`${engine}: ${error instanceof Error?error.message:String(error)}`);}
   }
   if(cancelled()){this.finish(run,'cancelled',{output:redactContext(output.join('\n'),65536)});return;}
-  this.finish(run,!targets.length?'skipped':failures?'failed':'succeeded',{output:redactContext(targets.length?output.join('\n'):'No enabled quota refresh targets',65536),error:failures?`${failures} targets did not produce a fresh quota observation; ${observations} succeeded`:undefined});
+  if(!targets.length){this.finish(run,'skipped',{output:redactContext('No enabled quota refresh targets',65536)});return;}
+  // Probe misses (stale/unknown/cooldown records or a throwing engine probe) stay observable
+  // in the per-engine output plus a summary line, but never fail the run itself. Only a real
+  // execution failure (missing refresh service, scheduler exception, cancel/interrupt) fails it.
+  if(failures)output.push(`${failures} 个目标未获得新鲜额度观测，${observations} 个成功`);
+  this.finish(run,'succeeded',{output:redactContext(output.join('\n'),65536)});
  }
  cancel(a:Record<string,unknown>):ScheduleRun {
   exact(a,['scheduleId','runId']);const state=this.storage.read(),d=definition(state,a.scheduleId),id=parseId(a.runId,'run ID'),run=state.runs[d.id]?.find(r=>r.id===id);

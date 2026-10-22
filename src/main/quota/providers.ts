@@ -205,6 +205,13 @@ function microCents(value: unknown): bigint | null {
  * subscriberUserId/paymentMethodId are never read. Missing or malformed windows fail
  * closed to unknown; limit 0 is unknown, never exhausted; used over limit caps at 100
  * and reports an exhausted plan window only.
+ *
+ * The official Console contract makes fiveHour.resetsAt optional (fiveHour.startsAt is
+ * optional too, but unread): the rolling five-hour window starts on first use, so
+ * between windows it has no reset yet (the Console UI renders "Starts on first use").
+ * That empty window is recorded as 0% used with no reset instead of discarding the valid
+ * week/month observation. Week and month resets stay required, and any timestamp that is
+ * present but unparseable is malformed.
  */
 export function normalizeConsoleStatus(payload: unknown): Measurement {
   const body = object(payload);
@@ -224,7 +231,15 @@ export function normalizeConsoleStatus(payload: unknown): Measurement {
     const limit = microCents(slot.limitMicroCents);
     if (used === null || limit === null || limit === 0n) return missing;
     const resetsAt = parseProviderTimestamp(slot.resetsAt);
-    if (resetsAt === null) return missing;
+    if (resetsAt === null) {
+      if (key !== 'fiveHour' || (slot.resetsAt !== null && slot.resetsAt !== undefined)) return missing;
+      windows.push({
+        id, label, scope: 'account', model: null,
+        usedPercent: 0, remainingPercent: 100, resetsAt: null, durationMinutes: duration,
+        used: null, total: null, remaining: null, unit: 'percent',
+      });
+      continue;
+    }
     const percent = used >= limit ? 100 : Number((used * 10000n) / limit) / 100;
     if (!Number.isFinite(percent) || percent < 0 || percent > 100) return missing;
     windows.push({

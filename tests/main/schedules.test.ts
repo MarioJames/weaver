@@ -133,7 +133,7 @@ test('builtin projects policy save/rollback, block changes preserve cadence, out
   snap=f.policy.snapshot();snap.config.quota={auto_refresh:false,interval_minutes:30};f.policy.save({revision:snap.revision,config:snap.config,blocks:[]});assert.equal(service.quotaStatus().nextRunAt,null);
   f.policy.rollback(original);assert.equal(service.quotaStatus().enabled,true);assert.equal(service.quotaStatus().intervalMinutes,15);
   const run=service.run({scheduleId:builtin.id});await new Promise(r=>setTimeout(r,20));assert.equal(service.runs({scheduleId:builtin.id,runId:run.id}).runs[0].status,'succeeded');assert.deepEqual(calls,['codex','claude']);
-  stale=true;const bad=service.run({scheduleId:builtin.id});await new Promise(r=>setTimeout(r,20));assert.equal(service.runs({scheduleId:builtin.id,runId:bad.id}).runs[0].status,'failed');
+  stale=true;const bad=service.run({scheduleId:builtin.id});await new Promise(r=>setTimeout(r,20));assert.equal(service.runs({scheduleId:builtin.id,runId:bad.id}).runs[0].status,'succeeded');
   snap=f.policy.snapshot();for(const e of Object.values(snap.config.engines))e.quota_refresh=false;f.policy.save({revision:snap.revision,config:snap.config,blocks:snap.blocks});
   const empty=service.run({scheduleId:builtin.id});await new Promise(r=>setTimeout(r,20));assert.equal(service.runs({scheduleId:builtin.id,runId:empty.id}).runs[0].status,'skipped');
  }finally{await service?.stop();await f.close();}
@@ -147,7 +147,67 @@ test('builtin quota run refreshes an explicitly enabled OpenCode target through 
   let snap=f.policy.snapshot();snap.config.engines.opencode.enabled=true;snap.config.engines.opencode.quota_refresh=true;f.policy.save({revision:snap.revision,config:snap.config,blocks:snap.blocks},{allowEngineEnable:true});
   const builtin=service.list({}).schedules.find(d=>d.builtin)!;const run=service.run({scheduleId:builtin.id});await new Promise(r=>setTimeout(r,20));
   assert.deepEqual(calls,['codex','claude','opencode']);
-  assert.equal(service.runs({scheduleId:builtin.id,runId:run.id}).runs[0].status,'failed','an unsupported Go observation keeps the existing fresh/failed outcome contract');
+  assert.equal(service.runs({scheduleId:builtin.id,runId:run.id}).runs[0].status,'succeeded','an unsupported Go observation stays observable in output without failing the run');
+  }finally{await service?.stop();await f.close();}
+});
+
+test('quota.refresh probe miss stays succeeded with per-engine output and a summary line (partial stale)',async()=>{
+ const f=setup();let service:ScheduleService|undefined;try{
+  const at=new Date(AT).toISOString();
+  const fresh=(engine:QuotaEngine):EngineQuotaRecord=>({engine,status:'available',source:'fixture',checkedAt:at,observedAt:at,stale:false,windows:[],detail:'fixture',retryAt:null});
+  const staleUnknown=(engine:QuotaEngine):EngineQuotaRecord=>({engine,status:'unknown',source:'fixture',checkedAt:at,observedAt:null,stale:true,windows:[],detail:'Go 套餐窗口缺失',retryAt:new Date(AT+60000).toISOString()});
+  service=new ScheduleService({store:f.store,policy:f.policy,now:()=>AT,notify:()=>{},createTask:()=>{},command:()=>({apiVersion:'weaver.v1',ok:true}),refreshQuota:async engine=>engine==='codex'?{records:[fresh(engine)],snapshot:f.policy.snapshot(),policyChanged:false}:{records:[staleUnknown(engine)],snapshot:f.policy.snapshot(),policyChanged:false}});
+  const builtin=service.list({}).schedules.find(d=>d.builtin)!,run=service.run({scheduleId:builtin.id});
+  for(let i=0;i<100&&service.runs({scheduleId:builtin.id,runId:run.id}).runs[0].status==='running';i++)await new Promise(r=>setTimeout(r,10));
+  const detail=service.runs({scheduleId:builtin.id,runId:run.id}).runs[0];
+  assert.equal(detail.status,'succeeded','a partially stale probe must not fail the quota.refresh run');
+  assert.ok(!detail.error,`expected empty error, got: ${detail.error}`);
+  assert.match(detail.output,/codex/);assert.match(detail.output,/claude/);
+  assert.match(detail.output,/Go 套餐窗口缺失/);assert.match(detail.output,/cooldown/);assert.match(detail.output,/stale/);
+  assert.match(detail.output,/未获得新鲜额度观测/);assert.match(detail.output,/1 个成功/);
+ }finally{await service?.stop();await f.close();}
+});
+
+test('quota.refresh probe miss stays succeeded with per-engine output and a summary line (all stale)',async()=>{
+ const f=setup();let service:ScheduleService|undefined;try{
+  const at=new Date(AT).toISOString();
+  const staleRecord=(engine:QuotaEngine):EngineQuotaRecord=>({engine,status:'unknown',source:'fixture',checkedAt:at,observedAt:null,stale:true,windows:[],detail:'no observation',retryAt:null});
+  service=new ScheduleService({store:f.store,policy:f.policy,now:()=>AT,notify:()=>{},createTask:()=>{},command:()=>({apiVersion:'weaver.v1',ok:true}),refreshQuota:async engine=>({records:[staleRecord(engine)],snapshot:f.policy.snapshot(),policyChanged:false})});
+  const builtin=service.list({}).schedules.find(d=>d.builtin)!,run=service.run({scheduleId:builtin.id});
+  for(let i=0;i<100&&service.runs({scheduleId:builtin.id,runId:run.id}).runs[0].status==='running';i++)await new Promise(r=>setTimeout(r,10));
+  const detail=service.runs({scheduleId:builtin.id,runId:run.id}).runs[0];
+  assert.equal(detail.status,'succeeded','an all-stale probe must not fail the quota.refresh run');
+  assert.ok(!detail.error,`expected empty error, got: ${detail.error}`);
+  assert.match(detail.output,/codex/);assert.match(detail.output,/claude/);
+  assert.match(detail.output,/未获得新鲜额度观测/);assert.match(detail.output,/0 个成功/);
+ }finally{await service?.stop();await f.close();}
+});
+
+test('quota.refresh probe miss stays succeeded with per-engine output and a summary line (single engine throws)',async()=>{
+ const f=setup();let service:ScheduleService|undefined;try{
+  const at=new Date(AT).toISOString();
+  service=new ScheduleService({store:f.store,policy:f.policy,now:()=>AT,notify:()=>{},createTask:()=>{},command:()=>({apiVersion:'weaver.v1',ok:true}),refreshQuota:async engine=>{
+   if(engine==='codex')throw new Error('probe boom');
+   return {records:[{engine,status:'available',source:'fixture',checkedAt:at,observedAt:at,stale:false,windows:[],detail:'fixture',retryAt:null}],snapshot:f.policy.snapshot(),policyChanged:false};
+  }});
+  const builtin=service.list({}).schedules.find(d=>d.builtin)!,run=service.run({scheduleId:builtin.id});
+  for(let i=0;i<100&&service.runs({scheduleId:builtin.id,runId:run.id}).runs[0].status==='running';i++)await new Promise(r=>setTimeout(r,10));
+  const detail=service.runs({scheduleId:builtin.id,runId:run.id}).runs[0];
+  assert.equal(detail.status,'succeeded','a throwing engine probe must not fail the quota.refresh run');
+  assert.ok(!detail.error,`expected empty error, got: ${detail.error}`);
+  assert.match(detail.output,/codex/);assert.match(detail.output,/probe boom/);assert.match(detail.output,/claude/);
+  assert.match(detail.output,/未获得新鲜额度观测/);assert.match(detail.output,/1 个成功/);
+ }finally{await service?.stop();await f.close();}
+});
+
+test('quota.refresh without a refresh service still fails with its real cause',async()=>{
+ const f=setup();let service:ScheduleService|undefined;try{
+  service=new ScheduleService({store:f.store,policy:f.policy,now:()=>AT,notify:()=>{},createTask:()=>{},command:()=>({apiVersion:'weaver.v1',ok:true})});
+  const builtin=service.list({}).schedules.find(d=>d.builtin)!,run=service.run({scheduleId:builtin.id});
+  for(let i=0;i<100&&service.runs({scheduleId:builtin.id,runId:run.id}).runs[0].status==='running';i++)await new Promise(r=>setTimeout(r,10));
+  const detail=service.runs({scheduleId:builtin.id,runId:run.id}).runs[0];
+  assert.equal(detail.status,'failed');
+  assert.equal(detail.error,'Quota refresh service unavailable');
  }finally{await service?.stop();await f.close();}
 });
 

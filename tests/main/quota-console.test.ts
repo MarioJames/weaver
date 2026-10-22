@@ -306,6 +306,64 @@ test('Console reading is read-only and honors seconds and millisecond expiries',
   await assert.rejects(() => readNativeCredential('opencode', f.env, start), /重新登录/);
 });
 
+test('an unstarted rolling meter keeps the other Console windows and reports an empty window', async t => {
+  const f = fixture(t);
+  f.nativeDb();
+  let now = start;
+  let body: unknown = {
+    subscriberUserId: 'sub-secret',
+    paymentMethodId: 'pm-secret',
+    useBalance: false,
+    access: {
+      meters: {
+        // The official Console client declares fiveHour.resetsAt optional and
+        // renders this as "Starts on first use"; used/limit stay required.
+        fiveHour: { usedMicroCents: '0', limitMicroCents: '1200' },
+        week: { startsAt: '2026-10-12T00:00:00.000Z', resetsAt: resetWeek, usedMicroCents: '360', limitMicroCents: '1200' },
+        month: { resetsAt: resetMonth, usedMicroCents: '600', limitMicroCents: '1200' },
+      },
+    },
+  };
+  const prober = new QuotaProber({ env: f.env, now: () => new Date(now), fetch: async () => json(body) });
+  t.after(() => prober.close());
+  let record = (await prober.refresh({ engine: 'opencode' })).records[3];
+  assert.equal(record.status, 'available');
+  assert.deepEqual(record.windows.map(w => [w.id, w.usedPercent, w.remainingPercent, w.resetsAt, w.durationMinutes]), [
+    ['opencode:rolling', 0, 100, null, 300],
+    ['opencode:weekly', 30, 70, resetWeek, 10080],
+    ['opencode:monthly', 50, 50, resetMonth, null],
+  ]);
+  assert.doesNotMatch(JSON.stringify(record), /sub-secret|pm-secret/);
+  now += 60001;
+  body = {
+    access: {
+      meters: {
+        fiveHour: { usedMicroCents: '0', limitMicroCents: '1200', startsAt: null, resetsAt: null },
+        week: { startsAt: '2026-10-12T00:00:00.000Z', resetsAt: resetWeek, usedMicroCents: '0', limitMicroCents: '1200' },
+        month: { resetsAt: resetMonth, usedMicroCents: '0', limitMicroCents: '1200' },
+      },
+    },
+  };
+  record = (await prober.refresh({ engine: 'opencode' })).records[3];
+  assert.equal(record.status, 'available');
+  assert.equal(record.windows[0].usedPercent, 0);
+  assert.equal(record.windows[0].resetsAt, null);
+  now += 60001;
+  body = {
+    access: {
+      meters: {
+        fiveHour: { usedMicroCents: '0', limitMicroCents: '1200' },
+        week: { startsAt: '2026-10-12T00:00:00.000Z', resetsAt: resetWeek, usedMicroCents: '1200', limitMicroCents: '1200' },
+        month: { resetsAt: resetMonth, usedMicroCents: '0', limitMicroCents: '1200' },
+      },
+    },
+  };
+  record = (await prober.refresh({ engine: 'opencode' })).records[3];
+  assert.equal(record.status, 'exhausted', 'an empty rolling window must not hide a real week exhaustion');
+  assert.equal(record.windows[0].usedPercent, 0);
+  assert.equal(record.windows[1].usedPercent, 100);
+});
+
 test('Console shape errors fail closed without dollars or identifiers', async t => {
   const f = fixture(t);
   f.nativeDb();
@@ -326,6 +384,9 @@ test('Console shape errors fail closed without dollars or identifiers', async t 
     consoleBody(['99999999999999999999999999', '1200000000', reset5h]),
     { access: { meters: { fiveHour: { usedMicroCents: '1', limitMicroCents: '2', resetsAt: 'not-a-date' }, week: { usedMicroCents: '1', limitMicroCents: '2', resetsAt: resetWeek }, month: { usedMicroCents: '1', limitMicroCents: '2', resetsAt: resetMonth } } } },
     { access: { meters: { week: { usedMicroCents: '1', limitMicroCents: '2', resetsAt: resetWeek }, month: { usedMicroCents: '1', limitMicroCents: '2', resetsAt: resetMonth } } } },
+    { access: { meters: { fiveHour: { usedMicroCents: '0', limitMicroCents: '1200' }, week: { usedMicroCents: '1', limitMicroCents: '1200' }, month: { usedMicroCents: '1', limitMicroCents: '1200', resetsAt: resetMonth } } } },
+    { access: { meters: { fiveHour: { usedMicroCents: '0', limitMicroCents: '1200' }, week: { usedMicroCents: '1', limitMicroCents: '1200', resetsAt: resetWeek }, month: { usedMicroCents: '1', limitMicroCents: '1200', resetsAt: null } } } },
+    { access: { meters: { fiveHour: { limitMicroCents: '1200' }, week: { usedMicroCents: '1', limitMicroCents: '1200', resetsAt: resetWeek }, month: { usedMicroCents: '1', limitMicroCents: '1200', resetsAt: resetMonth } } } },
     { usage: { rolling: { status: 'ok', percent: 1, resetsAt: reset5h }, weekly: { status: 'ok', percent: 1, resetsAt: resetWeek }, monthly: { status: 'ok', percent: 1, resetsAt: resetWeek } } },
     {},
   ]) {
