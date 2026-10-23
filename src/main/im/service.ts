@@ -17,6 +17,7 @@ import { ImBootstrapBudgetError, imInstructions } from './bootstrap';
 import { extractInboundText } from './inbound';
 import { PublicDeltaFilter, parseReply, replyCard, REPLY_BYTES, actionIdentity } from './cards';
 import { createProgressBatchState, reduceProgressBatch } from './progress';
+import { Keepalive, type KeepaliveTimers } from './keepalive';
 import type { ParentProgressEvent } from './parent-agent';
 
 const SAFE = 'IM 操作失败，请检查配置或重新连接。';
@@ -43,10 +44,10 @@ export class ImServiceError extends Error {
 interface Item { text: string }
 type ClaimResult = 'claimed' | 'duplicate' | 'persistence';
 type ParentOutcome = 'not-started' | 'not-submitted' | 'pending' | 'completed' | 'confirmed-cancellation' | 'failed';
-interface Session { closeRejected?: boolean; failed?: boolean; gen: number; used: boolean; rotation?: Promise<void>; key: string; chat: string; user: string; epoch: string; valid: boolean; queue: Item[]; busy: boolean; deadline: number; parent?: ParentAgentSession; launching?: Promise<ParentAgentSession>; launchAbort?: AbortController; turn?: { id: string; abort: AbortController; delivery: Delivery; cancelled?: boolean; parentOutcome: ParentOutcome }; timer?: ReturnType<typeof setTimeout>; job?: Promise<void>; closing?: Promise<void>; retire?: 'idle' | 'other' }
+interface Session { closeRejected?: boolean; failed?: boolean; gen: number; used: boolean; rotation?: Promise<void>; key: string; chat: string; user: string; epoch: string; valid: boolean; queue: Item[]; busy: boolean; deadline: number; parent?: ParentAgentSession; launching?: Promise<ParentAgentSession>; launchAbort?: AbortController; turn?: { id: string; abort: AbortController; delivery: Delivery; cancelled?: boolean; parentOutcome: ParentOutcome; keepalive?: Keepalive }; timer?: ReturnType<typeof setTimeout>; job?: Promise<void>; closing?: Promise<void>; retire?: 'idle' | 'other' }
 interface ActionBinding { session: Session; generation: number; messageId: string; actionId: string; message: string; expires: number; consumed: boolean }
 interface PendingWait { chat: string; user: string; gen: number; text: string; messageId: string; admittedAt: number; timer?: ReturnType<typeof setTimeout>; done: boolean }
-export interface ImServiceOptions { dataDir: string; policy(): PolicySnapshot; parentFactory?: ParentAgentFactory; channelFactory?: ImChannelFactory; now?: () => number; taskStatus?: () => string }
+export interface ImServiceOptions { dataDir: string; policy(): PolicySnapshot; parentFactory?: ParentAgentFactory; channelFactory?: ImChannelFactory; now?: () => number; taskStatus?: () => string; keepaliveTimers?: KeepaliveTimers }
 export class ImService {
   private readonly settings: ImSettingsStore;
   private readonly inbox: ImInbox;
@@ -197,7 +198,10 @@ export class ImService {
   private lock<T>(fn: () => Promise<T>): Promise<T> { const next = this.serial.then(fn, fn); this.serial = next.catch(() => {}); return next; }
   private safeCode(error: unknown): string { const code = (error as {code?:unknown})?.code; return typeof code === 'string' && /^IM_[A-Z_]+$/.test(code) ? code : 'IM_FAILED'; }
   /** Transport-only failure: WS/HTTP boundary. Agent-only failures never touch connection. */
-  private failTransport(): void { this.status.message = SAFE; this.status.connection = 'error'; }
+  private failTransport(): void {
+    this.status.message = SAFE; this.status.connection = 'error';
+    for (const session of this.slots()) session.turn?.keepalive?.cancel();
+  }
   /** Healthy transport keeps the same WS object usable for agent-only rebuilds. */
   private transportHealthy(): boolean { return !!this.channel && this.status.connection !== 'error'; }
   private isLiveChannel(channel: ImChannel, cGen: number): boolean {
@@ -385,7 +389,7 @@ export class ImService {
     try { session.launchAbort?.abort(); } catch { /* already aborted */ }
     if (this.standby === session) this.standby = undefined;
     this.retiring.add(session);
-    session.valid = false; session.queue = []; clearTimeout(session.timer); session.turn?.abort.abort(); session.turn?.delivery.abort.abort();
+    session.valid = false; session.queue = []; clearTimeout(session.timer); session.turn?.keepalive?.cancel(); session.turn?.abort.abort(); session.turn?.delivery.abort.abort();
     // Deliberate teardown (stop/new_session/release) marks the turn so drain treats the abort as expected.
     if (session.turn) session.turn.cancelled = true;
     if (this.sessions.get(session.key) === session) this.sessions.delete(session.key);
@@ -509,9 +513,11 @@ export class ImService {
   private claim(id: string): ClaimResult { try { return this.inbox.claim(id, this.now()) ? 'claimed' : 'duplicate'; } catch { return 'persistence'; } }
   private sessionCount(): number { return new Set([...this.sessions.keys(), ...[...this.retiring].map(s => s.key).filter(Boolean), ...this.pending.keys()]).size; }
   private capacity(session?: Session): boolean { return session ? session.valid && session.queue.length < 8 : !!this.standby || this.sessionCount() + this.slots().filter(s => !s.key).length < 16; }
-  private notice(chat: string, text: string, gen: number): void {
-    if (gen !== this.agentGen || this.closed || !this.channel || this.notices >= 16) return;
-    this.notices++; void this.channel.send(chat, text).catch(() => { if (gen === this.agentGen && !this.closed) this.failTransport(); }).finally(() => { this.notices--; });
+  private notice(chat: string, text: string, gen: number): Promise<boolean> | undefined {
+    if (gen !== this.agentGen || this.closed || !this.channel || this.notices >= 16) return undefined;
+    const channel = this.channel;
+    this.notices++;
+    return channel.send(chat, text).then(() => true, () => { if (gen === this.agentGen && !this.closed) this.failTransport(); return false; }).finally(() => { this.notices--; });
   }
   private message(message: NormalizedMessage, gen: number): void {
     if (!this.admissible(message.senderId, gen)) return;
@@ -581,6 +587,7 @@ export class ImService {
     session.deadline = admittedAt + this.settings.current().config.idleTimeoutMinutes * 60_000;
     this.recordMessageAt(admittedAt); clearTimeout(session.timer);
     session.queue.push({ text });
+    session.turn?.keepalive?.touch();
     if (!session.busy) { session.busy = true; session.job = this.drain(session, gen).catch(() => { this.markAgentFailure(gen, 'engine'); }); }
   }
   private valid(session: Session, gen: number): boolean { return session.valid && this.sessions.get(session.key) === session && this.admissible(session.user, gen); }
@@ -639,7 +646,7 @@ export class ImService {
     const delivery: Delivery = { valid: () => this.valid(session, gen) && session.turn?.id === id && !abort.signal.aborted, failed: false, abort: new AbortController() };
     const turn: NonNullable<Session['turn']> = { id, abort, delivery, parentOutcome: 'not-started' };
     session.turn = turn;
-    const filter = new PublicDeltaFilter(); let pending = ''; let total = 0; let wake: (() => void) | undefined; let done = false; let failure: unknown; let final = ''; let messageId = '';
+    const filter = new PublicDeltaFilter(); let pending = ''; let total = 0; let wake: (() => void) | undefined; let done = false; let failure: unknown; let final = ''; let messageId = ''; let keepalive: Keepalive | undefined;
     // Batched progress display is driven by the pure reducer in progress.ts: status
     // fragments and body/status separators carry their own independent budget there
     // and never count toward the answer REPLY_BYTES (`total` only accumulates the
@@ -650,7 +657,7 @@ export class ImService {
       if (done || !delivery.valid()) return;
       const out = reduceProgressBatch(batch, { type: 'progress', event });
       batch = out.state;
-      if (out.append) { pending += out.append; wake?.(); }
+      if (out.append) { pending += out.append; keepalive?.touch(); wake?.(); }
     };
     delivery.abort.signal.addEventListener('abort', () => { abort.abort(); wake?.(); }, { once: true });
     const result = await channel.stream(session.chat, async controller => {
@@ -658,7 +665,15 @@ export class ImService {
       // CardKit startup can finish after stop or a generation fence. No parent turn exists yet.
       if (session.turn !== turn || turn.cancelled || delivery.failed || !delivery.valid()) throw new ImServiceError('IM_TURN_NOT_STARTED');
       turn.parentOutcome = 'pending';
-      const work = session.parent!.send(text, abort.signal, delta => {
+      keepalive = new Keepalive({
+        timers: this.options.keepaliveTimers,
+        depth: () => session.queue.length,
+        valid: () => !done && turn.parentOutcome === 'pending' && session.turn === turn && !turn.cancelled && delivery.valid(),
+        send: notice => this.notice(session.chat, notice, gen) ?? false,
+      });
+      turn.keepalive = keepalive;
+      abort.signal.addEventListener('abort', () => keepalive?.cancel(), { once: true });
+      const started = session.parent!.send(text, abort.signal, delta => {
         if (done || !delivery.valid()) return;
         const visible = filter.push(delta); total += Buffer.byteLength(visible);
         if (total > REPLY_BYTES) { failure = new ImServiceError('IM_REPLY_LIMIT'); abort.abort(); wake?.(); return; }
@@ -667,8 +682,10 @@ export class ImService {
         if (!visible) return;
         const out = reduceProgressBatch(batch, { type: 'text', text: visible });
         batch = out.state;
-        if (out.append) { pending += out.append; wake?.(); }
-      }, { onProgress }).then(value => { final = value; turn.parentOutcome = 'completed'; }, error => { failure = error; turn.parentOutcome = error instanceof ParentTurnNotSubmitted ? 'not-submitted' : error instanceof ConfirmedParentCancellation ? 'confirmed-cancellation' : 'failed'; }).finally(() => {
+        if (out.append) { pending += out.append; keepalive?.touch(); wake?.(); }
+      }, { onProgress });
+      keepalive.start();
+      const work = started.then(value => { final = value; turn.parentOutcome = 'completed'; }, error => { failure = error; turn.parentOutcome = error instanceof ParentTurnNotSubmitted ? 'not-submitted' : error instanceof ConfirmedParentCancellation ? 'confirmed-cancellation' : 'failed'; }).finally(() => {
         // Turn-end closes an open tool batch on the success path only: when there
         // is no failure and the delivery is still valid, the end fragment joins
         // `pending` before `done` so the single append loop below streams it
@@ -679,10 +696,10 @@ export class ImService {
           batch = endOut.state;
           if (endOut.append) pending += endOut.append;
         }
-        done = true; wake?.();
+        done = true; keepalive?.cancel(); wake?.();
       });
       while (!done || pending) {
-        if (!delivery.valid() || failure) { abort.abort(); break; }
+        if (!delivery.valid() || failure) { keepalive?.cancel(); abort.abort(); break; }
         if (pending) { const chunk = pending; pending = ''; await controller.append(chunk); }
         else await new Promise<void>(resolve => {
           const ready = () => { abort.signal.removeEventListener('abort', ready); if (wake === ready) wake = undefined; resolve(); };
@@ -696,7 +713,7 @@ export class ImService {
       if (failure) throw failure;
       if (!delivery.valid()) throw new ImServiceError('IM_TURN_FAILED');
       const parsed = parseReply(final); await controller.setContent(parsed.text || '本轮没有可显示的回复。');
-    }, delivery).catch(error => { abort.abort(); throw error; });
+    }, delivery).catch(error => { keepalive?.cancel(); abort.abort(); throw error; });
     if (!delivery.valid() || delivery.failed || !result || result !== messageId) throw new ImServiceError('IM_DELIVERY_FAILED');
     const parsed = parseReply(final); const buttons: {label:string;nonce:string;actionId:string}[] = [];
     this.pruneActions();
