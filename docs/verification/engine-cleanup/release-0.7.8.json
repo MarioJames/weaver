@@ -1,0 +1,65 @@
+{
+  "version": "0.7.8",
+  "releaseCommit": "60b22bfab84bb63e0b3bf44f36fde0c6814d5d3f",
+  "tagVerified": true,
+  "releaseUrl": "https://github.com/MarioJames/weaver/releases/tag/v0.7.8",
+  "ciUrl": "https://github.com/MarioJames/weaver/actions/runs/39922959978",
+  "ci": {
+    "passed": 2059,
+    "skipped": 32,
+    "failed": 0,
+    "publishedPlatforms": [
+      "linux-x64",
+      "linux-arm64",
+      "darwin-arm64"
+    ]
+  },
+  "upgrade": {
+    "preservedTaskIds": 1035,
+    "taskBindingsUnchanged": true,
+    "privateConfigAndInboxHashesUnchanged": true,
+    "workersPreserved": 3,
+    "counts": {
+      "tasks": 1035,
+      "task_events": 99366,
+      "artifacts": 743,
+      "owners": 199,
+      "packages": 1012
+    },
+    "feishuStatus": {
+      "connection": "connected",
+      "agentState": "ready",
+      "activeSessions": 0,
+      "busySessions": 0
+    },
+    "configRevision": 12
+  },
+  "browser": {
+    "url": "http://127.0.0.1:4737/#/engines",
+    "ui": {
+      "card": "opencode",
+      "cleanupEntryVisible": true,
+      "modalTitle": "清理 OpenCode 数据库",
+      "defaults": {
+        "keepDays": "1",
+        "pruneEvents": false,
+        "vacuum": true,
+        "confirmDisabledUntilPreview": true
+      },
+      "previewInvoked": false,
+      "cleanupApplied": false,
+      "closeReopen": "ok"
+    },
+    "checks": {
+      "console_errors": 0,
+      "page_errors": 0,
+      "network_errors": 0,
+      "non_2xx_xhr": 0,
+      "cleanup_http_requests": 0
+    },
+    "screenshot": "release-0.7.8-cleanup.png",
+    "browserClosed": true,
+    "profileRemoved": true
+  },
+  "scope": "真实本机浏览器仅检查入口和弹窗；清理执行及失败路径使用隔离数据库验证。"
+}
