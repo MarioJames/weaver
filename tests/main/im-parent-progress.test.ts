@@ -242,6 +242,7 @@ async function setup(t: any, parent: ParentAgentFactory) {
   const config = {
     enabled: true, appId: 'cli_test', appSecret: 'CANARY_SECRET', allowedOpenIds: ['ou_a'],
     engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 1,
+    ownerProfileId: '',
   };
   await service.save({ expectedRevision: 0, config });
   await tick();

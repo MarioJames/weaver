@@ -28,7 +28,7 @@ test('真实runtime HTTP 默认禁用、secret保存保留清除/revision、同�
  t.after(async()=>{await runtime.close();await rm(dir,{recursive:true,force:true});});
  async function rpc(method:string,args:unknown[]=[],origin=runtime.url){const response=await fetch(`${runtime.url}/api/rpc`,{method:'POST',headers:{'Content-Type':'application/json',Origin:origin},body:JSON.stringify({method,args})});return {status:response.status,body:await response.json() as any};}
  const initial=await rpc('getImSettings');assert.equal(initial.body.result.config.enabled,false);assert.equal(initial.body.result.status.connection,'disabled');assert.equal(network,0);
- const config={enabled:false,appId:'cli_test',appSecret:'VERY_DISTINCT_IM_SECRET',allowedOpenIds:['ou_test'],engine:'',model:'',effort:'medium',workspaces:[],idleTimeoutMinutes:30};
+ const config={enabled:false,appId:'cli_test',appSecret:'VERY_DISTINCT_IM_SECRET',allowedOpenIds:['ou_test'],engine:'',model:'',effort:'medium',workspaces:[],idleTimeoutMinutes: 30, ownerProfileId: ''};
  const saved=await rpc('saveImSettings',[{expectedRevision:0,config}]);assert.equal(saved.body.result.revision,1);assert.equal(saved.body.result.config.appSecretConfigured,true);assert.ok(!JSON.stringify(saved).includes(config.appSecret));
  const mode=(await stat(`${dir}/im-settings.json`)).mode&0o777;assert.equal(mode,0o600);assert.match(await readFile(`${dir}/im-settings.json`,'utf8'),/VERY_DISTINCT_IM_SECRET/);
  const {appSecret,...keep}=config;void appSecret;
@@ -50,7 +50,7 @@ test('HTTP同配置保存不重建通道/父进程，凭据变化才重建', asy
     const response = await fetch(`${runtime.url}/api/rpc`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: runtime.url }, body: JSON.stringify({ method, args }) });
     return { status: response.status, body: await response.json() as any };
   };
-  const config = { enabled: true, appId: 'cli_test', appSecret: 'RUNTIME_SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  const config = { enabled: true, appId: 'cli_test', appSecret: 'RUNTIME_SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   const first = await rpc('saveImSettings', [{ expectedRevision: 0, config }]);
   assert.equal(first.status, 200); assert.equal(channels, 1); assert.equal(parents, 1);
   const { appSecret, ...keep } = config; void appSecret;
@@ -81,7 +81,7 @@ test('真实HTTP新engine save路径：pi/opencode可启用，同配置不重建
     const response = await fetch(`${runtime.url}/api/rpc`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: runtime.url }, body: JSON.stringify({ method, args }) });
     return { status: response.status, body: await response.json() as any };
   };
-  const config = { enabled: true, appId: 'cli_test', appSecret: 'RUNTIME_PI_SECRET', allowedOpenIds: ['ou_a'], engine: 'pi', model: 'm', effort: 'minimal', workspaces: [dir], idleTimeoutMinutes: 30 };
+  const config = { enabled: true, appId: 'cli_test', appSecret: 'RUNTIME_PI_SECRET', allowedOpenIds: ['ou_a'], engine: 'pi', model: 'm', effort: 'minimal', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   const first = await rpc('saveImSettings', [{ expectedRevision: 0, config }]);
   assert.equal(first.status, 200); assert.equal(first.body.result.revision, 1);
   assert.equal(first.body.result.config.engine, 'pi');
@@ -110,7 +110,7 @@ test('IM close 失败仍关闭 HTTP/IPC 并完成 done，不伪装关闭成功',
  t.after(async()=>{await rm(dir,{recursive:true,force:true});});
  // Enable only the isolated fake transport; no SDK or model connection.
  const {ImSettingsStore}=await import('../../src/main/im/settings'); isolatedPolicy(dir);
- new ImSettingsStore(dir).save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes:30}});
+ new ImSettingsStore(dir).save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes: 30, ownerProfileId: ''}});
  const runtime=await startRuntime({dataDir:dir,im:{parentFactory:async()=>({send:async()=>'',close:async()=>{}}),channelFactory:()=>({connect:async()=>{},close:async()=>{throw new Error('PRIVATE_VENDOR_ERROR');},send:async()=>{},stream:async()=>'',updateCard:async()=>{},retireCard:async()=>{},state:()=> 'connected'})}});
  await new Promise<void>(resolve=>setImmediate(resolve));
  await assert.rejects(runtime.close(),error=>error instanceof Error&&error.message.includes('IM 操作失败')&&!error.message.includes('PRIVATE_VENDOR_ERROR'));await runtime.done;
@@ -133,7 +133,7 @@ test('真实HTTP保存完整bootstrap超预算给固定可操作中文，原配�
   const response = await fetch(`${runtime.url}/api/rpc`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: runtime.url }, body: JSON.stringify({ method, args }) });
   return { status: response.status, body: await response.json() as any };
  };
- const config = { enabled: true, appId: 'cli_test', appSecret: 'DISTINCT_FAKE_BUDGET_SECRET', allowedOpenIds: ['ou_fake'], engine: 'codex', model: 'gpt-test', effort: 'low', workspaces: [dir], idleTimeoutMinutes: 30 };
+ const config = { enabled: true, appId: 'cli_test', appSecret: 'DISTINCT_FAKE_BUDGET_SECRET', allowedOpenIds: ['ou_fake'], engine: 'codex', model: 'gpt-test', effort: 'low', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
  const first = await rpc('saveImSettings', [{ expectedRevision: 0, config }]);
  assert.equal(first.status, 200); assert.equal(first.body.result.revision, 1);
  const before = await readFile(join(dir, 'im-settings.json'), 'utf8');

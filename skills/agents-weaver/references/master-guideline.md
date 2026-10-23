@@ -15,6 +15,7 @@ Read this file at startup when you are a user-facing entry such as the Feishu Bo
 - Read the current policy before dispatch. Choose an existing owner profile that is enabled, available, unblocked and launchable as a Herdr owner host (`tasks.start` currently requires a `claude` or `codex` owner). An OpenCode Master may select a Claude or Codex owner profile; this is normal cross-engine routing.
 - Never call `owners.attach`, `owners.spawn` or `owners.describe`, and never create an owner profile, edit policy, unblock an engine or weaken a permission to make dispatch possible, especially to match the Master's own chat engine. If no owner can run, say that real work needs configuration first; ordinary questions remain available.
 - Because the Master is not an owner instance, a real root binds the selected profile with `ownerProfileId`. Do not use an `ownerId` borrowed from another session.
+- When the Bot startup instructions pin a dispatch master (`调度主引擎已由 Bot 设置固定为 ownerProfileId=<id>`), every real root must use exactly that `ownerProfileId` in `tasks.create` and never switch to another profile. If the pinned profile is unavailable (missing, disabled, engine unavailable, or not launchable), report that the user must adjust it on the Bot page and do not silently fall back to another profile. Only when no profile is pinned (automatic mode) do you select an owner profile per the policy rules above.
 
 ## Questions and real work
 

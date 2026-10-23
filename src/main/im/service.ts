@@ -3,7 +3,8 @@ import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolveImWorkspaces } from './workspaces';
 import type { PolicySnapshot } from '../../shared/contracts/policy';
-import type { ImSettingsSnapshot, ImStatus, SaveImSettingsInput } from '../../shared/contracts/im';
+import type { ImOwnerProfileOption, ImSettingsSnapshot, ImStatus, SaveImSettingsInput } from '../../shared/contracts/im';
+import { OWNER_HOST_KINDS } from '../owner-host';
 import { isImEngineKind, imEngineEffortAllowed, type ImEngineKind } from '../../shared/im-engines';
 import { activeBlocks, availabilityOf } from '../../shared/policy/availability';
 import type { NormalizedMessage, CardActionEvent } from '@larksuite/channel';
@@ -33,7 +34,12 @@ const RESET_FAIL_NOTICE = '会话切换未完成，请检查 Agent 状态或稍�
 const MISSING_BINARY_MESSAGE = 'Bot 引擎缺失，请安装对应 CLI 后重新连接。';
 const AUTH_MESSAGE = 'Bot 引擎认证失败，请检查登录或密钥后重新连接。';
 const PROTOCOL_MESSAGE = 'Bot 与引擎协议不兼容，请升级引擎后重新连接。';
-export class ImServiceError extends Error { constructor(readonly code: string) { super(code === 'IM_BOOTSTRAP_TOO_LARGE' ? new ImBootstrapBudgetError().message : SAFE); } }
+const OWNER_PROFILE_MESSAGE = '所选调度主引擎不存在、已停用或无法作为父 Agent 启动，请改选或使用自动。';
+export class ImServiceError extends Error {
+  constructor(readonly code: string) {
+    super(code === 'IM_BOOTSTRAP_TOO_LARGE' ? new ImBootstrapBudgetError().message : code === 'IM_OWNER_PROFILE_UNAVAILABLE' ? OWNER_PROFILE_MESSAGE : SAFE);
+  }
+}
 interface Item { text: string }
 type ClaimResult = 'claimed' | 'duplicate' | 'persistence';
 type ParentOutcome = 'not-started' | 'not-submitted' | 'pending' | 'completed' | 'confirmed-cancellation' | 'failed';
@@ -73,7 +79,29 @@ export class ImService {
   snapshot(): ImSettingsSnapshot {
     let saved;
     try { saved = this.settings.current(); } catch (error) { throw new ImServiceError(this.safeCode(error)); }
-    return { revision: saved.revision, config: publicImConfig(saved.config), status: { ...this.status, agentState: this.agentState(), agentMessage: this.agentError ? ImService.agentMessageFor(this.agentReason) : undefined, activeSessions: this.sessionCount(), busySessions: [...this.sessions.values(), ...this.retiring].filter(s => s.busy).length } };
+    return { revision: saved.revision, config: publicImConfig(saved.config), status: { ...this.status, agentState: this.agentState(), agentMessage: this.agentError ? ImService.agentMessageFor(this.agentReason) : undefined, activeSessions: this.sessionCount(), busySessions: [...this.sessions.values(), ...this.retiring].filter(s => s.busy).length }, ownerProfiles: this.ownerProfiles(saved.config.ownerProfileId ?? '') };
+  }
+  /** Owner profiles for the Bot pin: sorted by id, with a `missing` entry when the saved pin vanished. */
+  private ownerProfiles(savedOwner: string): ImOwnerProfileOption[] {
+    const config = this.options.policy().config;
+    const owners = config.owners ?? {};
+    const engines = config.engines ?? {};
+    const list: ImOwnerProfileOption[] = Object.entries(owners).map(([id, owner]) => {
+      const engine = (engines as Record<string, { enabled: boolean; kind: string }>)[owner.engine];
+      let selectable = true;
+      let reason: ImOwnerProfileOption['reason'];
+      if (!owner.enabled) { selectable = false; reason = 'disabled'; }
+      else if (!engine || !engine.enabled) { selectable = false; reason = 'engine_disabled'; }
+      else if (!(OWNER_HOST_KINDS as readonly string[]).includes(engine.kind)) { selectable = false; reason = 'not_launchable'; }
+      return { id, engine: owner.engine, engineKind: engine?.kind ?? '', model: owner.model, effort: owner.effort, selectable, ...(selectable ? {} : { reason }) };
+    }).sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+    if (savedOwner !== '' && !Object.hasOwn(owners, savedOwner)) {
+      list.push({ id: savedOwner, engine: '', engineKind: '', model: '', effort: '', selectable: false, reason: 'missing' });
+    }
+    return list;
+  }
+  private ownerSelectable(id: string): boolean {
+    return this.ownerProfiles('').some(option => option.id === id && option.selectable);
   }
   start(): void { void this.reconnect().catch(() => this.failTransport()); }
   save(input: SaveImSettingsInput): Promise<ImSettingsSnapshot> {
@@ -81,6 +109,16 @@ export class ImService {
       if (this.closed) throw new ImServiceError('IM_CLOSED');
       const old = this.settings.current().config;
       const config = { ...input?.config, appSecret: input?.config?.appSecret ?? old.appSecret } as StoredImConfig;
+      const requestedOwner = typeof (input?.config as { ownerProfileId?: unknown })?.ownerProfileId === 'string'
+        ? (input.config as { ownerProfileId: string }).ownerProfileId
+        : undefined;
+      const storedOwner = old.ownerProfileId ?? '';
+      // A disabled save that keeps the stored pin must always stay possible (same rule as workspaces):
+      // it skips the live selectability check so the Bot can always be turned off.
+      const skipOwnerCheck = requestedOwner !== undefined && (input.config as { enabled?: unknown }).enabled === false && requestedOwner === storedOwner;
+      if (requestedOwner !== undefined && requestedOwner !== '' && !skipOwnerCheck && !this.ownerSelectable(requestedOwner)) {
+        throw new ImServiceError('IM_OWNER_PROFILE_UNAVAILABLE');
+      }
       if (config.enabled) this.route(config);
       try { this.settings.save(input); } catch (error) { throw new ImServiceError(this.safeCode(error)); }
       const next = this.settings.current().config;
@@ -117,7 +155,7 @@ export class ImService {
       // even if an old parent close later fails the old channel is still revoked.
       if (newHash !== this.channelHash) { await this.restartTransport(true); return this.snapshot(); }
       // Same transport credentials but agent runtime changed (engine/model/effort/
-      // workspaces/allowedOpenIds): reuse the healthy channel/WS, rebuild only agents.
+      // workspaces/allowedOpenIds/ownerProfileId): reuse the healthy channel/WS, rebuild only agents.
       if (!this.transportHealthy()) { await this.restartTransport(true); return this.snapshot(); }
       await this.restartAgents(true); return this.snapshot();
     });
@@ -265,7 +303,9 @@ export class ImService {
       const workspace = ImService.botHomeWorkspace();
       // Master does no real project work: no project root is passed as a writable engine root.
       const input = { engineKind: engine.kind as ImEngineKind, model: config.model, effort: config.effort, workspace, additionalWorkspaces: [] as string[] };
-      return { input, roots, fingerprint: JSON.stringify([config.engine, input, roots, config.allowedOpenIds]) };
+      // The pinned owner never gates admission: a later-invalid pin is reported via the
+      // snapshot and the running Master, but chat itself stays available.
+      return { input, roots, fingerprint: JSON.stringify([config.engine, input, roots, config.allowedOpenIds, config.ownerProfileId ?? '']) };
     } catch { throw new ImServiceError('IM_CONFIG_UNAVAILABLE'); }
   }
   private async restartAgents(retryClose = false): Promise<void> {
@@ -386,10 +426,11 @@ export class ImService {
     const launchAbort = new AbortController();
     session.launchAbort = launchAbort;
     session.launching = Promise.resolve().then(() => {
-      const route = this.route(this.settings.current().config);
+      const current = this.settings.current().config;
+      const route = this.route(current);
       // A queued start fenced before invoking the factory must not create a stale process.
       if (!this.currentSlot(session)) throw new ImServiceError('IM_STALE_START');
-      const input = { ...route.input, instructions: imInstructions(this.options.dataDir, route.input.engineKind, session.epoch, route.roots) };
+      const input = { ...route.input, instructions: imInstructions(this.options.dataDir, route.input.engineKind, session.epoch, route.roots, current.ownerProfileId ?? '') };
       // The default background factory and custom injected factories both receive the
       // private launch signal (options, never the serialized ParentAgentInput); custom
       // factories keep working with one arg and may ignore cancellation. The signal lets a rebuild/disable during the

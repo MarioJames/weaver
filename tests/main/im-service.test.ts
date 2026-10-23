@@ -28,7 +28,7 @@ function message(id:string,user='ou_a',chat='oc_a',text='你好',now=Date.now())
 async function setup(t:any,parent:ParentAgentFactory,options:{now?:()=>number;connect?:()=>Promise<void>}={}) {
  const dir=await mkdtemp(join(ROOT, 'service-'));const f=fixture(parent,options.connect); const live=policy(); const service=new ImService({dataDir:dir,policy:()=>live,parentFactory:parent,channelFactory:f.factory,now:options.now});
  t.after(async()=>{await service.close();await rm(dir,{recursive:true,force:true});});
- const config={enabled:true,appId:'cli_test',appSecret:'CANARY_SECRET',allowedOpenIds:['ou_a','ou_b'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes:1};
+ const config={enabled:true,appId:'cli_test',appSecret:'CANARY_SECRET',allowedOpenIds:['ou_a','ou_b'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes: 1, ownerProfileId: ''};
  await service.save({expectedRevision:0,config});await tick();return {dir,f,service,config,live};
 }
 test('授权、两条快速原始消息、串行复用、跨用户独立 epoch、持久去重',async t=>{
@@ -120,7 +120,7 @@ test('单卡任意选项只消费一次，idle到期旧卡不能复活父Agent�
 test('channel close失败重连不启动新代，失败引用保留供再次关闭',async t=>{
  let handlers!:ImChannelHandlers;let creations=0;let closes=0;let fail=true;
  const dir=await mkdtemp(`${ROOT}close-`);const service=new ImService({dataDir:dir,policy,parentFactory:async()=>({send:async()=>{throw new Error('unexpected model turn');},close:async()=>{}}),channelFactory:(_c,h)=>{handlers=h;creations++;return {connect:async()=>{},close:async()=>{closes++;if(fail)throw new Error('SECRET');},send:async()=>{},stream:async()=>'',updateCard:async()=>{},retireCard:async()=>{},state:()=> 'connected'};}});
- await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes:1}});await tick();
+ await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes: 1, ownerProfileId: ''}});await tick();
  await assert.rejects(service.reconnect(),/IM 操作失败/);assert.equal(creations,1);assert.equal(service.snapshot().status.connection,'error');handlers.message(message('fenced'));await tick();assert.equal(service.snapshot().status.activeSessions,0);
  fail=false;await service.reconnect();await tick();assert.equal(creations,2);assert.ok(closes>=2);await service.close();await rm(dir,{recursive:true,force:true});
 });
@@ -178,7 +178,7 @@ test('pending在撤权/关机后不会随late close启动；同ID等待重发保
 test('父close明确失败不启动下一代，持久等待消息收到失败回执且旧引用仍可见',async t=>{
  let now=Date.now();let launches=0;const dir=await mkdtemp(join(ROOT,'close-fail-'));const f=fixture();const service=new ImService({dataDir:dir,policy,now:()=>now,channelFactory:f.factory,parentFactory:async()=>{launches++;return {send:async()=> '完成',close:async()=>{throw new Error('PRIVATE_CLOSE_DETAIL');}};}});
  t.after(async()=>{await service.close().catch(()=>{});await rm(dir,{recursive:true,force:true});});
- await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes:1}});await tick();f.handlers.message(message('old_close','ou_a','oc_a','旧',now));await tick();now+=61_000;f.handlers.message(message('wait_close','ou_a','oc_a','新',now));await tick();assert.equal(launches,1);assert.ok(f.notices.some(s=>s.includes('关闭未完成')));assert.ok(!f.notices.join().includes('PRIVATE_CLOSE_DETAIL'));assert.equal(service.snapshot().status.activeSessions,1);
+ await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes: 1, ownerProfileId: ''}});await tick();f.handlers.message(message('old_close','ou_a','oc_a','旧',now));await tick();now+=61_000;f.handlers.message(message('wait_close','ou_a','oc_a','新',now));await tick();assert.equal(launches,1);assert.ok(f.notices.some(s=>s.includes('关闭未完成')));assert.ok(!f.notices.join().includes('PRIVATE_CLOSE_DETAIL'));assert.equal(service.snapshot().status.activeSessions,1);
 });
 
 async function waitFor(predicate:()=>boolean,label:string):Promise<void>{
@@ -195,7 +195,7 @@ for(const engine of ['claude','codex'] as const)for(const queued of [false,true,
    process.env[scenarioKey]=calls.length===0?(queued==='confirmed'?'abort':queued?'interrupt-failed':'missing-terminal'):'default';const record={input,texts:[] as string[]};calls.push(record);const parent=await createParentAgent(input,{startupMs:3_000,turnMs:3_000,closeMs:300});parents.push(parent);return {send:(text,signal,onDelta)=>{record.texts.push(text);return parent.send(text,signal,onDelta);},close:()=>parent.close()};
   }});
   try{
-   await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes:30}});await tick();
+   await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes: 30, ownerProfileId: ''}});await tick();
    f.handlers.message(message('fatal_A','ou_a','oc_a','A'));await waitFor(()=>f.chunks.length>0,'first delta');if(queued)f.handlers.message(message('fatal_B','ou_a','oc_a','B'));
    f.handlers.menu({app_id:'cli_test',event_id:'fatal_stop',event_key:'stop',create_time:String(Date.now()),operator:{operator_id:{open_id:'ou_a'}}});await waitFor(()=>service.snapshot().status.busySessions===0,'fatal A settled');await tick();
    if(queued==='confirmed'){
@@ -216,7 +216,7 @@ test('父正常完成后仅出站update期间stop，仍允许原父FIFO继续',a
  const updating=deferred<void>();const finishUpdate=deferred<void>();t.after(()=>finishUpdate.resolve());let calls=0;let launches=0;const dir=await mkdtemp(join(ROOT,'outbound-stop-'));const f=fixture();let handlers!:ImChannelHandlers;
  const factory:ImChannelFactory=(config,h)=>{handlers=h;const channel=f.factory(config,h);return {...channel,updateCard:async(id,card,delivery)=>{if(calls===1){updating.resolve();await finishUpdate.promise;}if(!delivery.valid())throw new Error('stopped outbound');await channel.updateCard(id,card,delivery);}};};
  const service=new ImService({dataDir:dir,policy,channelFactory:factory,parentFactory:async()=>{launches++;return {send:async()=>{calls++;return '完成';},close:async()=>{}};}});t.after(async()=>{await service.close();await rm(dir,{recursive:true,force:true});});
- await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes:30}});await tick();handlers.message(message('out_A'));await updating.promise;handlers.message(message('out_B'));handlers.menu({app_id:'cli_test',event_id:'out_stop',event_key:'stop',create_time:String(Date.now()),operator:{operator_id:{open_id:'ou_a'}}});finishUpdate.resolve();await tick();assert.equal(calls,2);assert.equal(launches,1);assert.equal(f.cards.length,1);
+ await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes: 30, ownerProfileId: ''}});await tick();handlers.message(message('out_A'));await updating.promise;handlers.message(message('out_B'));handlers.menu({app_id:'cli_test',event_id:'out_stop',event_key:'stop',create_time:String(Date.now()),operator:{operator_id:{open_id:'ou_a'}}});finishUpdate.resolve();await tick();assert.equal(calls,2);assert.equal(launches,1);assert.equal(f.cards.length,1);
 });
 
 test('同配置保存保留同parent/epoch/按钮/FIFO，secret省略同样不重建', async t => {
@@ -281,7 +281,7 @@ test('模型/effort/凭据/白名单/工作空间变化仍fence旧代且先关�
   const inputs: ParentAgentInput[] = []; const texts: string[] = []; let closes = 0; let creations = 0;
   const service = new ImService({ dataDir: dir, policy, parentFactory: async input => { inputs.push(input); creations++; return { send: async text => { texts.push(text); return 'ok'; }, close: async () => { closes++; } }; }, channelFactory: f.factory });
   t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
-  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET_ONE', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET_ONE', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config: base }); await tick();
   f.handlers.message(message('eff1')); await tick();
   assert.equal(creations, 1); assert.deepEqual(texts, ['你好']);
@@ -305,14 +305,14 @@ test('idle变更保留健康parent并按准入重算，不延长保活，忙时�
   // Blank standby survives an idle-only save (starting deadline 0 is not expired).
   assert.equal(launches, 1);
   const rev0 = service.snapshot().revision;
-  await service.save({ expectedRevision: rev0, config: { ...config, idleTimeoutMinutes: 30 } }); await tick();
+  await service.save({ expectedRevision: rev0, config: { ...config, idleTimeoutMinutes: 30} }); await tick();
   assert.equal(launches, 1); assert.equal(closes, 0);
   // Admit at T, save at T+50s with idle 2min: deadline must stay T+120s, not T+170s.
   f.handlers.message(message('idle_keep', 'ou_a', 'oc_a', '旧', now)); await tick();
   assert.equal(launches, 1);
   now += 50_000;
   const rev1 = service.snapshot().revision;
-  await service.save({ expectedRevision: rev1, config: { ...config, idleTimeoutMinutes: 2 } }); await tick();
+  await service.save({ expectedRevision: rev1, config: { ...config, idleTimeoutMinutes: 2} }); await tick();
   assert.equal(launches, 1); assert.equal(closes, 0);
   now += 80_000; // T+130s: past T+120s, so the idle session must have rotated.
   f.handlers.message(message('idle_expired', 'ou_a', 'oc_a', '新', now)); await tick();
@@ -322,11 +322,11 @@ test('idle变更保留健康parent并按准入重算，不延长保活，忙时�
   const dir2 = await mkdtemp(join(ROOT, 'idle-busy-')); const f2 = fixture();
   const svc2 = new ImService({ dataDir: dir2, policy, parentFactory: async () => ({ send: async () => busyGate, close: async () => {} }), channelFactory: f2.factory, now: () => now });
   t.after(async () => { resolveBusy('done'); await svc2.close().catch(() => {}); await rm(dir2, { recursive: true, force: true }); });
-  const cfg2 = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir2], idleTimeoutMinutes: 1 };
+  const cfg2 = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir2], idleTimeoutMinutes: 1, ownerProfileId: ''};
   await svc2.save({ expectedRevision: 0, config: cfg2 }); await tick();
   f2.handlers.message(message('b1', 'ou_a', 'oc_a', '忙', now)); await tick();
   now += 61_000;
-  await svc2.save({ expectedRevision: 1, config: { ...cfg2, idleTimeoutMinutes: 30 } }); await tick();
+  await svc2.save({ expectedRevision: 1, config: { ...cfg2, idleTimeoutMinutes: 30} }); await tick();
   assert.equal(svc2.snapshot().status.busySessions, 1);
   resolveBusy('完成'); await tick();
   assert.equal(svc2.snapshot().status.busySessions, 0);
@@ -359,7 +359,7 @@ test('16会话idle-only保存全部保留，空白standby不误杀', async t => 
   const rev = service.snapshot().revision;
   // setup idle=1, save idle=30: a real idle-only change; all 16 live sessions must survive it.
   assert.notEqual(config.idleTimeoutMinutes, 30);
-  await service.save({ expectedRevision: rev, config: { ...config, idleTimeoutMinutes: 30 } }); await tick();
+  await service.save({ expectedRevision: rev, config: { ...config, idleTimeoutMinutes: 30} }); await tick();
   assert.equal(launches, 16); assert.equal(closes, 0); assert.equal(service.snapshot().status.activeSessions, 16);
 });
 
@@ -390,7 +390,7 @@ test('disable关闭失败后同disabled保存重试清理，不吞失败', async
     parentFactory: async () => ({ send: async () => 'ok', close: async () => { closes++; if (fail) throw new Error('STUCK_CLOSE'); } }),
   });
   t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
-  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config: base }); await tick();
   await assert.rejects(service.save({ expectedRevision: 1, config: { ...base, enabled: false } }), /IM 操作失败/);
   assert.equal(closes, 1);
@@ -416,7 +416,7 @@ for(const startup of ['start-rejected','late-success','real-failure'] as const){
   }};};
   const service=new ImService({dataDir:dir,policy,channelFactory:factory,parentFactory:async input=>{launches++;inputs.push(input);return {send:async(text,signal)=>{sent.push(text);if(signal?.aborted)throw new Error('pre-aborted parent input');return `context:${sent.join('/')}`;},close:async()=>{closes++;}};}});
   t.after(async()=>{await service.close();await rm(dir,{recursive:true,force:true});});
-  await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes:30}});await tick();
+  await service.save({expectedRevision:0,config:{enabled:true,appId:'cli_test',appSecret:'SECRET',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:[dir],idleTimeoutMinutes: 30, ownerProfileId: ''}});await tick();
   handlers.message(message('healthy','ou_a','oc_a','健康上下文'));await tick();assert.deepEqual(sent,['健康上下文']);assert.equal(f.cards.length,1);
   handlers.message(message('not_started_A','ou_a','oc_a','A'));await started.promise;handlers.message(message('not_started_B','ou_a','oc_a','B'));assert.match(await readFile(join(dir,'im-inbox.json'),'utf8'),/message:om_not_started_B/);
   handlers.menu({app_id:'cli_test',event_id:'not_started_stop',event_key:'stop',create_time:String(Date.now()),operator:{operator_id:{open_id:'ou_a'}}});finishStart.resolve();await tick();
@@ -443,7 +443,7 @@ test('7个成熟引擎经别名engine id分别save/准入：factory启动cwd为h
     const f = fixture();
     const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: async input => { inputs.push(input); return { send: async text => `ok:${text}`, close: async () => {} }; }, channelFactory: f.factory });
     try {
-      await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'alias', model: 'test-model', effort: EFFORT_FOR[kind]!, workspaces: [dir, extra], idleTimeoutMinutes: 30 } });
+      await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'alias', model: 'test-model', effort: EFFORT_FOR[kind]!, workspaces: [dir, extra], idleTimeoutMinutes: 30, ownerProfileId: ''} });
       await tick();
       f.handlers.message(message(`m1-${kind}`)); await tick();
       f.handlers.message(message(`m2-${kind}`)); await tick();
@@ -480,7 +480,7 @@ test('7个成熟引擎经别名engine id分别save/准入：factory启动cwd为h
       const f = fixture();
       const service = new ImService({ dataDir, policy: () => live, parentFactory: async input => { seen.push(input.workspace); return { send: async () => 'ok', close: async () => {} }; }, channelFactory: f.factory });
       try {
-        await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [...order], idleTimeoutMinutes: 30 } });
+        await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [...order], idleTimeoutMinutes: 30, ownerProfileId: ''} });
         await tick();
       } finally {
         await service.close().catch(() => {});
@@ -500,7 +500,7 @@ test('未知未实现kind仍拒绝；OpenCode合法variant通过、非法effort�
   const f = fixture();
   const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: async () => ({ send: async () => 'ok', close: async () => {} }), channelFactory: f.factory });
   t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
-  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'alias', model: 'test-model', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'alias', model: 'test-model', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   await assert.rejects(service.save({ expectedRevision: 0, config: base }), { code: 'IM_CONFIG_UNAVAILABLE' });
   live.config.engines = { alias: { enabled: true, kind: 'opencode' } };
   await service.save({ expectedRevision: 0, config: { ...base, effort: 'valid-variant_2.0' } });
@@ -522,7 +522,7 @@ test('切engine旧代close完成后才新建，旧代fence不再执行', async t
   const counting: ImChannelFactory = (c, h) => { channels++; return f.factory(c, h); };
   const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: async input => { inputs.push(input); return { send: async text => { texts.push(text); return 'ok'; }, close: async () => { closes++; } }; }, channelFactory: counting });
   t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
-  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'aaa', model: 'm', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'aaa', model: 'm', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config: base }); await tick();
   f.handlers.message(message('before')); await tick();
   assert.equal(inputs.length, 1); assert.equal(inputs[0]!.engineKind, 'claude');
@@ -551,7 +551,7 @@ test('启动缺binary/auth/protocol/未知错误各固定安全agentMessage且�
     const f = fixture();
     const service = new ImService({ dataDir: dir, policy, parentFactory: async () => { throw parentError(reason, `${canary} at /tmp/private/${reason} vendor detail`); }, channelFactory: f.factory });
     try {
-      await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 } });
+      await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''} });
       await tick();
       const snapshot = service.snapshot();
       assert.equal(snapshot.status.agentState, 'error');
@@ -567,7 +567,7 @@ test('启动缺binary/auth/protocol/未知错误各固定安全agentMessage且�
   const unknownFixture = fixture();
   const unknownService = new ImService({ dataDir: unknownDir, policy, parentFactory: async () => { throw new Error(`${unknownCanary} /etc/shadow`); }, channelFactory: unknownFixture.factory });
   try {
-    await unknownService.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [unknownDir], idleTimeoutMinutes: 30 } });
+    await unknownService.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [unknownDir], idleTimeoutMinutes: 30, ownerProfileId: ''} });
     await tick();
     const snapshot = unknownService.snapshot();
     assert.equal(snapshot.status.agentState, 'error');
@@ -604,7 +604,7 @@ test('回合auth失败固定安全status且手机回执不回显；旧代late失
     parentFactory: () => { calls++; return calls === 1 ? firstLaunch : Promise.resolve({ send: async () => 'ok', close: async () => {} }); },
   });
   t.after(async () => { await late.close().catch(() => {}); await rm(lateDir, { recursive: true, force: true }); });
-  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [lateDir], idleTimeoutMinutes: 30 };
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [lateDir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   await late.save({ expectedRevision: 0, config: base }); await tick();
   const rebuilding = late.save({ expectedRevision: 1, config: { ...base, model: 'gpt-next' } });
   await tick();
@@ -709,7 +709,7 @@ test('transport复用红线：model变更保留同channel且换parent，新消�
   // Track handler identity: fixture exposes latest handlers via f.handlers getter.
   const service = new ImService({ dataDir: dir, policy, parentFactory: async () => { parents++; return { send: async text => { texts.push(text); return 'ok'; }, close: async () => { parentCloses++; } }; }, channelFactory: counting });
   t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
-  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config: base }); await tick();
   assert.equal(channels, 1); assert.equal(parents, 1);
   f.handlers.message(message('reuse1')); await tick();
@@ -732,7 +732,7 @@ test('transport语义：effort/白名单/工作空间变更复用channel，凭�
   const counting: ImChannelFactory = (c, h) => { channels++; const ch = f.factory(c, h); return { ...ch, close: async () => { channelCloses++; await ch.close(); } }; };
   const service = new ImService({ dataDir: dir, policy, parentFactory: async () => { parents++; return { send: async () => 'ok', close: async () => { parentCloses++; } }; }, channelFactory: counting });
   t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); await rm(extra, { recursive: true, force: true }); });
-  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config: base }); await tick();
   assert.equal(channels, 1); assert.equal(parents, 1);
   // effort-only change reuses the channel.
@@ -771,7 +771,7 @@ test('transport语义：Agent失败同配置save仅恢复Agent，connection保�
   const dir = await mkdtemp(join(ROOT, 'transport-agent-recovery-'));
   const service = new ImService({ dataDir: dir, policy, parentFactory: async () => { parents++; const gen = parents; return { send: async () => { if (gen === 1) throw new Error('MODEL_BOOM'); return 'recovered'; }, close: async () => { closes++; } }; }, channelFactory: counting });
   t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
-  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config: base }); await tick();
   f.handlers.message(message('fault1')); await tick();
   assert.equal(service.snapshot().status.agentState, 'error');
@@ -793,7 +793,7 @@ test('transport语义：旧parent关闭失败无新parent、WS健康、新准入
   const counting: ImChannelFactory = (c, h) => { channels++; return f.factory(c, h); };
   const service = new ImService({ dataDir: dir, policy, now: () => now, parentFactory: async () => { parents++; return { send: async () => 'ok', close: async () => { if (failClose) throw new Error('STUCK_CLOSE'); } }; }, channelFactory: counting });
   t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
-  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config: base }); await tick();
   assert.equal(channels, 1); assert.equal(parents, 1);
   f.handlers.message(message('old1')); await tick();
@@ -825,7 +825,7 @@ test('transport语义：撤白名单后即使close失败旧Agent也不能准入�
   };
   const service = new ImService({ dataDir: dir, policy, parentFactory: async () => { parents++; return { send: async text => { sent.push(`parent:${text}`); return 'ok'; }, close: async () => { if (failClose) throw new Error('STUCK'); } }; }, channelFactory: counting });
   t.after(async () => { failClose = false; await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
-  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a', 'ou_b'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a', 'ou_b'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config: base }); await tick();
   f.handlers.message(message('before_revoke', 'ou_b')); await tick();
   const parentsBeforeRevoke = parents;
@@ -852,7 +852,7 @@ test('reconcile中Agent关闭失败不关闭健康WS，无替代parent且重试�
   const live = policy();
   const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: async () => { parents++; return { send: async () => 'ok', close: async () => { if (failClose) throw new Error('STUCK_CLOSE'); } }; }, channelFactory: counting });
   t.after(async () => { failClose = false; await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
-  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config: base }); await tick();
   assert.equal(channels, 1); assert.equal(parents, 1);
   assert.equal(service.snapshot().status.connection, 'connected');
@@ -897,7 +897,7 @@ test('connecting中同凭据模型保存复用channel，晚connected仍生效且
   };
   const service = new ImService({ dataDir: dir, policy, parentFactory: async () => { parents++; return { send: async () => 'ok', close: async () => {} }; }, channelFactory: counting });
   t.after(async () => { resolveFirstConnect(); await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
-  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30 };
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config: base }); await tick();
   assert.equal(channels, 1); assert.equal(parents, 1);
   assert.equal(service.snapshot().status.connection, 'connecting');
@@ -920,4 +920,120 @@ test('connecting中同凭据模型保存复用channel，晚connected仍生效且
   assert.equal(parents, 3, '旧channel事件被fence');
   liveHandlers.error(); await tick();
   assert.equal(service.snapshot().status.connection, 'connected', '旧channel error不得污染新连接');
+});
+
+test('快照 ownerProfiles 按 id 排序、selectable 与 reason 正确、无 secret', async t => {
+  const dir = await mkdtemp(join(ROOT, 'owner-snap-'));
+  const live = policy();
+  live.config.engines = {
+    codex: { enabled: true, kind: 'codex' },
+    claude: { enabled: true, kind: 'claude' },
+    off: { enabled: false, kind: 'codex' },
+    pi: { enabled: true, kind: 'pi' },
+  };
+  live.config.owners = {
+    zeta: { enabled: true, engine: 'codex', model: 'm1', effort: 'medium', workers: [], max_parallel: 1 },
+    alpha: { enabled: false, engine: 'codex', model: 'm2', effort: 'medium', workers: [], max_parallel: 1 },
+    beta: { enabled: true, engine: 'missing', model: 'm3', effort: 'medium', workers: [], max_parallel: 1 },
+    gamma: { enabled: true, engine: 'off', model: 'm4', effort: 'medium', workers: [], max_parallel: 1 },
+    delta: { enabled: true, engine: 'pi', model: 'm5', effort: 'minimal', workers: [], max_parallel: 1 },
+  };
+  const f = fixture();
+  const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: async () => ({ send: async () => 'ok', close: async () => {} }), channelFactory: f.factory });
+  t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'CANARY_SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: '' };
+  await service.save({ expectedRevision: 0, config: base });
+  await tick();
+  const snap = service.snapshot();
+  assert.deepEqual(snap.ownerProfiles.map(o => o.id), ['alpha', 'beta', 'delta', 'gamma', 'zeta']);
+  const byId = Object.fromEntries(snap.ownerProfiles.map(o => [o.id, o]));
+  assert.equal(byId.zeta.selectable, true);
+  assert.equal(byId.zeta.reason, undefined);
+  assert.equal(byId.alpha.selectable, false); assert.equal(byId.alpha.reason, 'disabled');
+  assert.equal(byId.beta.selectable, false); assert.equal(byId.beta.reason, 'engine_disabled');
+  assert.equal(byId.gamma.selectable, false); assert.equal(byId.gamma.reason, 'engine_disabled');
+  assert.equal(byId.delta.selectable, false); assert.equal(byId.delta.reason, 'not_launchable');
+  assert.equal(byId.zeta.engine, 'codex'); assert.equal(byId.zeta.engineKind, 'codex');
+  assert.ok(!JSON.stringify(snap).includes('CANARY_SECRET'));
+});
+
+test('已存 owner 被删除时快照含 missing 项且聊天仍可用', async t => {
+  const dir = await mkdtemp(join(ROOT, 'owner-missing-'));
+  const live = policy();
+  const f = fixture();
+  let launches = 0;
+  const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: async () => { launches++; return { send: async () => 'ok', close: async () => {} }; }, channelFactory: f.factory });
+  t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: 'main' };
+  await service.save({ expectedRevision: 0, config: base });
+  await tick();
+  assert.equal(service.snapshot().ownerProfiles.find(o => o.id === 'main')?.selectable, true);
+  delete live.config.owners.main;
+  const snap = service.snapshot();
+  const missing = snap.ownerProfiles.find(o => o.id === 'main');
+  assert.ok(missing);
+  assert.equal(missing.selectable, false); assert.equal(missing.reason, 'missing');
+  assert.equal(missing.engine, ''); assert.equal(missing.engineKind, '');
+  f.handlers.message(message('still_chat')); await tick();
+  assert.equal(launches, 1);
+  assert.equal(f.cards.length, 1);
+});
+
+test('保存非法/停用/非 claude-codex 的非空 owner 被拒且不写盘', async t => {
+  const dir = await mkdtemp(join(ROOT, 'owner-reject-'));
+  const live = policy();
+  live.config.engines.pi = { enabled: true, kind: 'pi' };
+  live.config.owners = {
+    good: { enabled: true, engine: 'codex', model: 'm', effort: 'medium', workers: [], max_parallel: 1 },
+    off: { enabled: true, engine: 'codex', model: 'm', effort: 'medium', workers: [], max_parallel: 1 },
+    badkind: { enabled: true, engine: 'pi', model: 'm', effort: 'minimal', workers: [], max_parallel: 1 },
+  };
+  live.config.owners.off.enabled = false;
+  const f = fixture();
+  const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: async () => ({ send: async () => 'ok', close: async () => {} }), channelFactory: f.factory });
+  t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: '' };
+  await service.save({ expectedRevision: 0, config: base });
+  await tick();
+  const { readFile } = await import('node:fs/promises');
+  const bytes = await readFile(join(dir, 'im-settings.json'), 'utf8');
+  for (const pin of ['nope', 'off', 'badkind']) {
+    await assert.rejects(service.save({ expectedRevision: 1, config: { ...base, ownerProfileId: pin } }), { code: 'IM_OWNER_PROFILE_UNAVAILABLE' });
+    assert.equal(service.snapshot().revision, 1);
+    assert.equal(service.snapshot().config.ownerProfileId, '');
+    assert.equal(await readFile(join(dir, 'im-settings.json'), 'utf8'), bytes);
+  }
+  await assert.rejects(service.save({ expectedRevision: 1, config: { ...base, ownerProfileId: 'has space' } }), (e) => (e as { code?: string }).code === 'IM_SETTINGS_INVALID' || (e as { code?: string }).code === 'IM_OWNER_PROFILE_UNAVAILABLE');
+});
+
+test('关闭 Bot 且 pin 未变时可保存；修改 pin 触发 Master 重建但不重建 channel', async t => {
+  const dir = await mkdtemp(join(ROOT, 'owner-pin-'));
+  const live = policy();
+  live.config.owners.second = { enabled: true, engine: 'codex', model: 'm2', effort: 'medium', workers: [], max_parallel: 1 };
+  const inputs: ParentAgentInput[] = [];
+  let closes = 0; let channels = 0;
+  const f = fixture();
+  const counting: ImChannelFactory = (c, h) => { channels++; return f.factory(c, h); };
+  const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: async (input) => { inputs.push(input); return { send: async () => 'ok', close: async () => { closes++; } }; }, channelFactory: counting });
+  t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
+  const base = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: 'main' };
+  await service.save({ expectedRevision: 0, config: base });
+  await tick();
+  assert.equal(channels, 1);
+  const firstInstructions = inputs[0].instructions;
+  assert.match(firstInstructions, /ownerProfileId=main/);
+  const liveHandlers = f.handlers;
+  await service.save({ expectedRevision: 1, config: { ...base, ownerProfileId: 'second' } });
+  await tick();
+  assert.equal(closes, 1);
+  assert.equal(inputs.length, 2);
+  assert.match(inputs[1].instructions, /ownerProfileId=second/);
+  assert.notEqual(inputs[0].instructions, inputs[1].instructions);
+  assert.equal(channels, 1, 'pin 变化只重建 Master，不重建 channel');
+  assert.equal(f.handlers, liveHandlers);
+  // Disable with unchanged pin succeeds even after the profile vanished.
+  delete live.config.owners.second;
+  await service.save({ expectedRevision: 2, config: { ...base, ownerProfileId: 'second', enabled: false } });
+  await tick();
+  assert.equal(service.snapshot().status.connection, 'disabled');
 });

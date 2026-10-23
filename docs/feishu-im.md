@@ -48,6 +48,7 @@
 | 思考力度 | 按引擎支持范围选择，默认 medium；DSH 不支持 medium，切换时回退到原生 low。OpenCode 填该模型接受的 variant（最多 32 字符，字母数字开头）；DSH 固定为 off、low、high、max。换引擎时仍合法的力度保留，否则按新引擎的原生合法值回退。 |
 | 工作空间 | 浏览 Weaver 所在机器的目录并添加到列表，可逐项移除，最多 32 个。所有 Bot 主会话均在 home 启动，实际任务按目标项目目录执行，与项目列表顺序无关；项目列表是任务范围，不是每个会话只能选一个，也不把 home 自动加入白名单。 |
 | 空闲超时（分钟） | 单聊会话的空闲结束时间，1–1440 分钟，默认 30。 |
+| 调度主引擎 | Bot 派发实际任务时固定的父 Agent（owner）profile：下拉列出当前策略全部 owner profile（按 id 排序），仅已启用、引擎已启用且 kind 为 claude/codex 的可选；空值表示「自动（按策略）」。 |
 
 打开「启用飞书 IM」并保存后，Weaver 通过长连接接入飞书并启动 Agent。「连接状态」只表示飞书网络状态与会话数；独立「Agent 状态」显示未启动、启动中、待命、回复中、结束中或启动异常，网络「已连接」不等于 Agent 已就绪。尚无手机会话时也可待命（活跃会话数为 0）。「刷新状态」只读刷新；「重建连接与会话」在启用且已保存配置后用于显式完整重建，失败不自动重放已执行或结果不明的输入。引擎、模型、力度、工作空间或白名单变化只结束旧上下文并重建 Agent，健康且凭据相同的飞书连接保持；仅空闲时长变化且通道健康时只重算回收时间，不重建。关闭开关并保存会断开连接并回收手机对话 host；已派发的项目任务继续运行。
 
@@ -57,7 +58,9 @@
 
 多工作空间的引擎边界（以各引擎原生能力为准）：Bot 作为入口 Master 不实施真实项目工作，启动 cwd 为 home，不把项目列表作为引擎可写附加根传入；七引擎一致。项目目录只保留在完整引导列表中，按任务目标以绝对路径引用：Claude、Codex、Qoder 即使原生支持多 root，Bot 侧也不透传项目 writable roots；Grok、Pi 同样只在引导文本中按各自原生本地权限以绝对路径访问，不创建链接视图、不静默丢弃，不加 `--approve`，不禁用扩展；DSH 的 sandbox-policy 每个 Session 只有一个主 workspace root（Session cwd，即 home），没有多 root 参数，子进程 cwd 与 Session root 均为 home，其余项目目录保留在完整引导列表中并可按绝对路径读取，但 `workspace-write` 下主 root 外的写入会进入原生 `ask`，headless 没有审批应答者，因此 fail closed，不静默扩大权限。需要交互审批但手机端无批准控件时，对应工具请求会明确拒绝并在对话中说明，不默认批准，也不是所有工具一概禁用。
 
-保存过的目录后来移动或失效，仍可保留原有完整有序列表、仅关闭 Bot；改动列表或重新启用必须重新通过目录和预算检查。引擎、模型、力度或完整有序目录列表变化后，旧 host 回收完才重建；未经证明的清理失败会显示异常，不假装已待命。已有 Secret、模型和 low 等力度不会因迁移被重置。
+保存过的目录后来移动或失效，仍可保留原有完整有序列表、仅关闭 Bot；改动列表或重新启用必须重新通过目录和预算检查。引擎、模型、力度、完整有序目录列表或调度主引擎变化后，旧 host 回收完才重建（其中调度主引擎变化只重建 Master，不重建飞书通道）；未经证明的清理失败会显示异常，不假装已待命。已有 Secret、模型和 low 等力度不会因迁移被重置。
+
+调度主引擎（ownerProfileId）语义：为空表示「自动（按策略）」，入口 Master 按策略与 [master-guideline.md](../skills/agents-weaver/references/master-guideline.md) 选择可用 owner；非空表示固定该 profile，Master 的 `tasks.create` 必须使用它，不改选其他 profile，该 profile 不可用时告知用户去 Bot 页调整，不自动回退。快照中的 `ownerProfiles` 列出全部 profile 与可选性（`selectable`，附 `disabled` / `engine_disabled` / `not_launchable` / `missing` 原因），限流等瞬时不可用不影响可选性；已存值在策略中消失时以 `missing` 项提示。保存时非空值必须对应当前可选 profile，否则报 `IM_OWNER_PROFILE_UNAVAILABLE`（所选调度主引擎不存在、已停用或无法作为父 Agent 启动，请改选或使用自动）且不写盘；关闭 Bot（`enabled=false`）且该字段与已存值相同时跳过在线校验，保证总能关闭。存储为 v4（`im-settings.json`，`0600`）：v2/v3 文件读取时在内存迁移为 `ownerProfileId=''`（不改文件字节与修订），下次成功保存原子写 v4 且修订只 +1；v4 缺字段/未知字段/非法格式一律 `IM_SETTINGS_CORRUPT`，不回退默认值；`ownerProfileId` 为空或 `^[A-Za-z0-9_-]+$`（≤128，无首尾空白与控制字符），非法输入报 `IM_SETTINGS_INVALID`，预算超限（含 128 位最长 pin 预留）报 `IM_BOOTSTRAP_TOO_LARGE`，修订冲突报 `IM_SETTINGS_CONFLICT`。已选 profile 后来失效不拒绝聊天（聊天仍可用，失效由快照提示与 Master 运行时报告兜底）。
 
 「重建连接与会话」会结束当前上下文并按最新已保存配置完整重建（含通道）；引擎、模型、力度、工作空间或白名单变化只结束旧上下文并重建 Agent，健康且凭据相同的飞书连接保持；凭据、启停变化或网络故障时重建通道。健康保存（配置无实质变化）或仅调整空闲时长时不重建，只重算回收时间。空闲超时到期、配置实质改变、等待超时或显式重建才会结束旧上下文。空闲时已有已准入排队消息，等本轮与准入队列安全收束、确认关闭后再按新上下文继续。
 
@@ -91,7 +94,7 @@ open_id 是飞书用户在本应用内的标识，**Weaver 不做自动绑定**�
 
 ## 实际项目任务与消息持久性
 
-用户明确安排实际工作时，Bot 先识别配置工作空间列表中的目标项目；目标不清楚就先询问，不擅自扩大到列表外目录。Bot 作为入口 Master 先读 agents-weaver 技能入口，Master 行为以 [master-guideline.md](../skills/agents-weaver/references/master-guideline.md) 为单一来源，不复制全文，再读取现有策略，选择已启用、可用、未阻断且可启动为 owner host 的现有 owner profile（`tasks.start` 当前要求 claude 或 codex owner；Master 的对话引擎不限制执行 owner 的选择，可跨引擎，例如 OpenCode 对话可选已有可用的 `codex_owner`），通过 `tasks.create(ownerProfileId, workspace)` 创建真实 root（workspace 为列表中选定的绝对项目目录，不省略、不沿用 Bot 自身 cwd）。同一批同一项目的多个事项默认只建一个 root，由 owner 拆 child；独立项目、权限/审批边界不同或用户明确要求分开时才建多个 root；追问/纠正/继续先查现有任务并复用，不重复派发。再调用 `tasks.start`。启动 ACK 仅表示请求已受理；随后通过 `tasks.get` / `tasks.events` 观察真实 `ownerHost` 或启动失败，才报告主 Agent 已启动或失败。对应 Herdr 主 Agent 执行拆分、Weaver 派发和验收，真实 root/child 正常进入任务面板；Bot 不自身 `owners.attach`，也不为普通问答建隐藏任务。
+用户明确安排实际工作时，Bot 先识别配置工作空间列表中的目标项目；目标不清楚就先询问，不擅自扩大到列表外目录。Bot 作为入口 Master 先读 agents-weaver 技能入口，Master 行为以 [master-guideline.md](../skills/agents-weaver/references/master-guideline.md) 为单一来源，不复制全文；当 Bot 设置固定了调度主引擎时一律使用该 `ownerProfileId`（不可用时报告并指引去 Bot 页调整，不回退），未固定时再读取现有策略，选择已启用、可用、未阻断且可启动为 owner host 的现有 owner profile（`tasks.start` 当前要求 claude 或 codex owner；Master 的对话引擎不限制执行 owner 的选择，可跨引擎，例如 OpenCode 对话可选已有可用的 `codex_owner`），通过 `tasks.create(ownerProfileId, workspace)` 创建真实 root（workspace 为列表中选定的绝对项目目录，不省略、不沿用 Bot 自身 cwd）。同一批同一项目的多个事项默认只建一个 root，由 owner 拆 child；独立项目、权限/审批边界不同或用户明确要求分开时才建多个 root；追问/纠正/继续先查现有任务并复用，不重复派发。再调用 `tasks.start`。启动 ACK 仅表示请求已受理；随后通过 `tasks.get` / `tasks.events` 观察真实 `ownerHost` 或启动失败，才报告主 Agent 已启动或失败。对应 Herdr 主 Agent 执行拆分、Weaver 派发和验收，真实 root/child 正常进入任务面板；Bot 不自身 `owners.attach`，也不为普通问答建隐藏任务。
 
 持久化的 inbox claim 仅包含消息标识和时间，不保存排队正文；排队正文只在进程内存中。正常 idle 轮转期间已准入并等待关闭的消息可续到新上下文；服务重启不会恢复或重放这些正文。已派发项目 root 不属于 Bot host 的清理 journal，Bot 关闭、换配置或轮转不取消它们。
 
@@ -116,6 +119,8 @@ DSH 0.2.1-rc.2 已实测 `dsh --profile headless --help` 只提供 `--json` 与 
 已有 v1 私有设置由本次维护执行受保护的一次性转换；这不是日常用户操作流程，网页无需迁移按钮，也不要求用户编辑私有文件。
 
 已有 v2 私有文件在读取时将唯一 workspace 无损映射为 workspaces 数组，文件字节与修订不变；下一次成功 CAS 保存原子写成 v3 并递增修订。RPC 只使用 workspaces 数组，不保留旧 workspace 投影；私有 Secret、既有引擎/模型/力度完整保留，不要求用户手工编辑配置文件。
+
+已有 v2/v3 私有文件在读取时将调度主引擎在内存默认为自动（`ownerProfileId=''`），其余字段原样保留，文件字节与修订不变；下一次成功 CAS 保存原子写成 v4 并递增修订。v4 缺字段/未知字段/非法格式一律 fail closed，不回退默认值；`ownerProfileId` 非法（超长、非法字符、首尾空白或控制字符）报 `IM_SETTINGS_INVALID`，不可选 profile 报 `IM_OWNER_PROFILE_UNAVAILABLE`，预算超限报 `IM_BOOTSTRAP_TOO_LARGE`，修订冲突报 `IM_SETTINGS_CONFLICT`。
 
 ## 各引擎流式能力与统一进度状态
 

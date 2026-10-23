@@ -16,7 +16,7 @@ import { BotChannel, BotSetting } from './BotSettingRows';
 import type { PolicyDraft } from '../../policy/usePolicyDraft';
 import {
   adoptServer, conflictNote, createRequestGate, draftOf, IDLE_RANGE, IM_ENGINE_KINDS, imModelDiscoveryEngine, keepImDraft, modifiedEdit,
-  peekImDraft, savePlan, switchDraftEngine, workspaceListError, IM_WORKSPACE_LIMIT, type ImDraft, type ImEdit,
+  ownerProfileError, ownerProfileOptions, ownerSelectDisplay, ownerSelectValue, peekImDraft, savePlan, switchDraftEngine, workspaceListError, IM_WORKSPACE_LIMIT, type ImDraft, type ImEdit,
 } from './im-state';
 import { IM_STABLE_POLL_MS, IM_TRANSITION_POLL_MS, nextImPollDelay } from './im-polling';
 
@@ -95,6 +95,12 @@ export function ImSettingsView({
 }: ImSettingsViewProps) {
   const lockFields = saving || forceReading;
   const status = saved?.status;
+  const ownerOptions = ownerProfileOptions(saved?.ownerProfiles ?? []);
+  // 快照推进（轮询/刷新/策略变化）后，已固定的父 Agent 可能当场失效：这里按最新快照即时说明，
+  // 刻意不用关闭豁免（豁免只决定 validateDraft 是否拦下保存，见 im-state）：Bot 关闭时也要一眼看到固定值已失效。
+  const ownerLiveError = values && saved
+    ? ownerProfileError(values.ownerProfileId ?? '', saved.ownerProfiles, '', true)
+    : '';
   const connection = CONNECTION[status?.connection ?? 'disabled'];
   const configuredSecret = saved?.config.appSecretConfigured ?? false;
   const statusDesc = !status || status.connection === 'disabled'
@@ -147,6 +153,11 @@ export function ImSettingsView({
                   <Input id={`${id}-effort`} aria-label="思考力度" value={values.effort} placeholder={openCodeVariant ? '例如：high 或该模型接受的 variant' : '先选择引擎'} style={{ inlineSize: '100%', maxInlineSize: 320 }} disabled={lockFields || !engineUsable} onChange={event => onUpdate({ effort: event.target.value })} />
                   {openCodeVariant && engineUsable && <Text type="secondary" fontSize={12} className={botStyles.wrap}>填写该模型接受的 variant。</Text>}
                 </div>}
+          </BotSetting>
+          <BotSetting label="调度主引擎" htmlFor={`${id}-owner`} desc="Bot 派发实际任务时使用的父 Agent：「自动（按策略）」由 Master 按策略选择可用的父 Agent；固定后 Master 只用该父 Agent，不回退。只影响任务派发，不影响 Bot 聊天引擎。" error={fieldErrors.ownerProfileId || ownerLiveError}>
+            {/* 自动在草稿里是 ''，lobe Select 会把 '' 归一为空显示：这里经哨兵（见 ownerSelectDisplay）
+                让触发框直接显示「自动（按策略）」，回调里再映射回 ''（见 ownerSelectValue）。 */}
+            <NamedSelect id={`${id}-owner`} aria-label="调度主引擎" value={ownerSelectDisplay(values.ownerProfileId)} options={ownerOptions} style={{ inlineSize: '100%', maxInlineSize: 320 }} popupMatchSelectWidth={false} disabled={lockFields} onChange={owner => onUpdate({ ownerProfileId: ownerSelectValue(owner) })} />
           </BotSetting>
           <BotSetting label="工作空间" htmlFor={`${id}-workspaces`} desc={`Bot 可访问列表中的全部目录，并按任务目标在相应目录创建主 Agent 和任务。最多 ${IM_WORKSPACE_LIMIT} 个，选择 Weaver 所在机器上已存在的项目目录；保存后生效。`} error={fieldErrors.workspaces}>
             <div className={botStyles.workspaces}>
@@ -312,7 +323,7 @@ export function ImSettings({ policy }: { policy: PolicyDraft }) {
     const current = savedRef.current;
     const pending = editRef.current;
     if (!current || !pending || savingRef.current) return;
-    const plan = savePlan(pending, policy.snapshot?.config);
+    const plan = savePlan(pending, policy.snapshot?.config, current.ownerProfiles);
     setFieldErrors(plan.errors);
     setSaveError('');
     // 没有可提交的输入（分钟框此刻无数）就不发请求；校验错误由上面一步整体拦下并留在各字段。
@@ -401,6 +412,15 @@ export function ImSettings({ policy }: { policy: PolicyDraft }) {
       ? { ...current, values: { ...current.values, ...patch } }
       : { values: { ...draftOf(base.config), ...patch }, base: base.config, revision: base.revision };
     setEdit(next);
+    // 换了固定父 Agent 就按新值重判：清掉上次保存留下的过期字段错误，最新快照的即时说明接管展示。
+    if (Object.hasOwn(patch, 'ownerProfileId')) {
+      setFieldErrors(fieldErrors => {
+        if (!fieldErrors.ownerProfileId) return fieldErrors;
+        const rest = { ...fieldErrors };
+        delete rest.ownerProfileId;
+        return rest;
+      });
+    }
   }, [setEdit]);
 
   const discard = useCallback(() => {

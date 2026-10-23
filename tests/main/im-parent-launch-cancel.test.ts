@@ -43,7 +43,7 @@ test('rebuild during launch aborts the private startup signal and closes fast', 
   const live = policy();
   const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: parent, channelFactory: f.factory });
   t.after(async () => { await service.close(); });
-  const config = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 1 };
+  const config = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 1, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config });
   await tick();
   assert.equal(factoryCalls, 1);
@@ -70,7 +70,7 @@ test('late launch result after fence never creates a stale parent', { timeout: 1
   const live = policy();
   const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: parent, channelFactory: f.factory });
   t.after(async () => { await service.close(); });
-  const config = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 1 };
+  const config = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 1, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config });
   await tick();
   f.handlers.message(message('late'));

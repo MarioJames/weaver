@@ -3,7 +3,7 @@
  * 形状全部取自 `src/shared/contracts/im.ts`（后端独占），这里不做本地副本；
  * 本模块只存规则的纯函数，组件在 `ImSettings.tsx`。
  */
-import type { ImConfig, ImSettingsSnapshot, SaveImSettingsInput } from '../../../shared/contracts/im';
+import type { ImConfig, ImOwnerProfileOption, ImSettingsSnapshot, SaveImSettingsInput } from '../../../shared/contracts/im';
 import type { Config } from '../../../shared/contracts/policy';
 import { ENGINE_CATALOG } from '../../../shared/engines';
 import { IM_EFFORT_PATTERN, IM_ENGINE_KINDS as IM_ENGINE_LIST, imEngineEffortAllowed, imEngineEfforts, isImEngineKind } from '../../../shared/im-engines';
@@ -19,6 +19,8 @@ export interface ImDraft {
   model: string;
   effort: string;
   workspaces: string[];
+  /** 固定的父 Agent profile id；'' 表示「自动（按策略）」。下拉里用 OWNER_AUTO_VALUE 哨兵显示，草稿与契约里仍是 ''。 */
+  ownerProfileId: string;
   /**
    * 用户此刻在分钟数输入框里看到的数：敲好、敲错都如实进草稿，清空或打不出的字符为 null。
    * 非法可见值绝不换底成旧值，能否保存交给 validateDraft，让它以真实状态报错或被放弃/重载复位。
@@ -107,6 +109,7 @@ export function draftOf(config: ImConfig): ImDraft {
     effort: config.effort,
     workspaces: [...config.workspaces],
     idleTimeoutMinutes: config.idleTimeoutMinutes,
+    ownerProfileId: config.ownerProfileId ?? '',
   };
 }
 
@@ -119,6 +122,7 @@ export function valuesMatchConfig(values: ImDraft, config: ImConfig): boolean {
     && values.effort === config.effort
     && JSON.stringify(values.workspaces) === JSON.stringify(config.workspaces)
     && values.idleTimeoutMinutes === config.idleTimeoutMinutes
+    && values.ownerProfileId === (config.ownerProfileId ?? '')
     && JSON.stringify(parseOpenIds(values.openIdsText)) === JSON.stringify(config.allowedOpenIds);
 }
 
@@ -131,6 +135,7 @@ export function modifiedEdit(edit: ImEdit): boolean {
     || edit.values.engine !== edit.base.engine
     || edit.values.model !== edit.base.model
     || edit.values.effort !== edit.base.effort
+    || edit.values.ownerProfileId !== (edit.base.ownerProfileId ?? '')
     || JSON.stringify(edit.values.workspaces) !== JSON.stringify(edit.base.workspaces)
     || edit.values.idleTimeoutMinutes !== edit.base.idleTimeoutMinutes
     || JSON.stringify(parseOpenIds(edit.values.openIdsText)) !== JSON.stringify(edit.base.allowedOpenIds);
@@ -177,9 +182,11 @@ export interface ImSavePlan {
 /**
  * 保存计划：`expectedRevision` 取自草稿的基线修订，即这份草稿从哪个已保存版本分支出来，
  * 绝不用刷新读到的最新修订（保存冲突只能由后端裁决，也不在此无条件提升 revision 绕过它）。
+ * `ownerProfiles` 是最新快照里的父 Agent 列表：传了才做本地可选性预检（挡住已停用/已删除的固定值），
+ * 没传（例如旧快照不可用）则跳过该项、交由后端裁决；空 pin（自动）永远合法。
  */
-export function savePlan(edit: ImEdit, config: Config | undefined): ImSavePlan {
-  const errors = validateDraft(edit.values, edit.base, config);
+export function savePlan(edit: ImEdit, config: Config | undefined, ownerProfiles?: readonly ImOwnerProfileOption[]): ImSavePlan {
+  const errors = validateDraft(edit.values, edit.base, config, ownerProfiles);
   const idle = edit.values.idleTimeoutMinutes;
   // 框里没有数（null/打出的非法字符被控件收归 null）时按共享契约无从构造；
   // 一旦可构造，payload 携带的分钟数就是用户所见之数，非法数靠组件按 errors 拦下而非被换底。
@@ -196,6 +203,7 @@ export function savePlan(edit: ImEdit, config: Config | undefined): ImSavePlan {
       effort: values.effort,
       workspaces: [...values.workspaces],
       idleTimeoutMinutes: idle,
+      ownerProfileId: values.ownerProfileId,
     },
   };
   if (values.secret !== '') input.config.appSecret = values.secret;
@@ -206,8 +214,10 @@ export function savePlan(edit: ImEdit, config: Config | undefined): ImSavePlan {
 /**
  * 显式保存前的本地校验。关闭 IM 时允许保存未完整配置、只挡格式错误；
  * 开启时每项都在本地说清楚缺什么，错误文字回投给各自的字段。
+ * `ownerProfiles` 是最新快照里的父 Agent 列表：传了才校验固定值的可选性，
+ * 没传则跳过该项（交由后端裁决）；与已保存存储的规则一致，关闭 Bot 且 pin 未动时跳过该项检查，总能关闭。
  */
-export function validateDraft(draft: ImDraft, saved: ImConfig, config: Config | undefined): Record<string, string> {
+export function validateDraft(draft: ImDraft, saved: ImConfig, config: Config | undefined, ownerProfiles?: readonly ImOwnerProfileOption[]): Record<string, string> {
   const errors: Record<string, string> = {};
   const directoriesError = workspaceListError(draft.workspaces, draft.enabled);
   if (directoriesError) errors.workspaces = directoriesError;
@@ -243,7 +253,71 @@ export function validateDraft(draft: ImDraft, saved: ImConfig, config: Config | 
   if (draft.appId.trim() !== '' && draft.appId.trim() !== saved.appId.trim() && saved.appSecretConfigured && !draft.clearSecret && draft.secret.trim() === '') {
     errors.secret = 'App ID 变更后旧 Secret 不再适用：请粘贴新的应用 Secret，或点「清除已保存」。';
   }
+  if (ownerProfiles !== undefined) {
+    const ownerError = ownerProfileError(draft.ownerProfileId ?? '', ownerProfiles, saved.ownerProfileId ?? '', draft.enabled);
+    if (ownerError) errors.ownerProfileId = ownerError;
+  }
   return errors;
+}
+
+/** UI 层专用的「自动（按策略）」哨兵：lobe Select 把空选项值归一为 undefined 再回调，
+ * 直接用 '' 做选项 value 会导致选中自动时触发框显示为空（只有展开才看到勾选）。
+ * 哨兵含冒号，永远通不过后端的 `^[A-Za-z0-9_-]+$` 与策略 owner id 的 `^[a-z][a-z0-9_]{0,39}$`，
+ * 因此不可能与合法 profile id 冲突；它只存在于下拉的 value/回调之间，草稿与契约里仍是 ''。 */
+export const OWNER_AUTO_VALUE = ':auto:';
+
+/** 草稿 '' <-> 下拉哨兵：选中自动时框内显示「自动（按策略）」，草稿里仍是 ''。 */
+export function ownerSelectDisplay(ownerProfileId: string | undefined): string {
+  return ownerProfileId === '' || ownerProfileId === undefined ? OWNER_AUTO_VALUE : ownerProfileId;
+}
+
+/** 下拉回调 -> 草稿：哨兵回填为 ''；lobe 把无值回调为 undefined，这里同样回填 ''。 */
+export function ownerSelectValue(value: unknown): string {
+  if (value === OWNER_AUTO_VALUE) return '';
+  return typeof value === 'string' ? value : '';
+}
+
+/** 调度主引擎下拉的选项：首项固定为自动，其余保持快照顺序（后端已按 id 排序）；不可选项禁用并按原因加后缀。 */
+export function ownerProfileOptions(profiles: readonly ImOwnerProfileOption[]): { value: string; label: string; disabled: boolean }[] {
+  const suffix: Record<string, string> = {
+    disabled: '（已停用）',
+    engine_disabled: '（引擎未启用）',
+    not_launchable: '（不能作为父 Agent 启动）',
+    missing: '（已删除）',
+  };
+  return [
+    { value: OWNER_AUTO_VALUE, label: '自动（按策略）', disabled: false },
+    ...profiles.map(option => {
+      const detail = [option.engineKind, option.model].filter(part => part !== '').join(' · ');
+      const tail = option.selectable ? '' : (suffix[option.reason ?? ''] ?? '（不可用）');
+      return { value: option.id, label: detail === '' ? `${option.id}${tail}` : `${option.id} · ${detail}${tail}`, disabled: !option.selectable };
+    }),
+  ];
+}
+
+/**
+ * 固定父 Agent 值的即时说明：空 pin（自动）永远合法；关闭 Bot 且 pin 与已存值一致时跳过检查，总能关闭；
+ * 快照列表缺失（旧快照不可用）时无法判断，返回空、交由后端裁决。其余按原因给出具体字段错误。
+ */
+export function ownerProfileError(
+  ownerProfileId: string,
+  profiles: readonly ImOwnerProfileOption[] | undefined,
+  savedOwnerProfileId: string,
+  enabled: boolean,
+): string {
+  if (ownerProfileId === '') return '';
+  if (!enabled && ownerProfileId === savedOwnerProfileId) return '';
+  if (profiles === undefined) return '';
+  const found = profiles.find(option => option.id === ownerProfileId);
+  if (!found) return '当前选择的父 Agent 已删除，请改选或切换为自动。';
+  if (found.selectable) return '';
+  switch (found.reason) {
+    case 'disabled': return '当前选择的父 Agent 已停用，请改选或切换为自动。';
+    case 'engine_disabled': return '当前选择的父 Agent 所属引擎未启用，请改选或切换为自动。';
+    case 'not_launchable': return '当前选择的父 Agent 无法启动，请改选或切换为自动。';
+    case 'missing':
+    default: return '当前选择的父 Agent 已删除，请改选或切换为自动。';
+  }
 }
 
 /** 冲突说明：点明草稿依据的基线与控制面当前修订，给出恢复动作，不暗示自动修复。 */

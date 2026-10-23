@@ -24,7 +24,7 @@ const APP_ID = 'cli_a1b2c3d4e5f6a7b8';
 function configOf(over: Partial<ImConfig> = {}): ImConfig {
   return {
     enabled: true, appId: APP_ID, appSecretConfigured: true, allowedOpenIds: ['ou_1111111111111111'],
-    engine: 'claude', model: 'claude-opus-5-5', effort: 'medium', workspaces: ['/home/me/projects/weaver'], idleTimeoutMinutes: 30, ...over,
+    engine: 'claude', model: 'claude-opus-5-5', effort: 'medium', workspaces: ['/home/me/projects/weaver'], idleTimeoutMinutes: 30, ownerProfileId: '', ...over,
   };
 }
 
@@ -33,7 +33,7 @@ function statusOf(over: Partial<ImStatus> = {}): ImStatus {
 }
 
 function snapshotOf(config: ImConfig, revision: number, status: ImStatus = statusOf()): ImSettingsSnapshot {
-  return { revision, config, status };
+  return { revision, config, status, ownerProfiles: [] };
 }
 
 function textOf(base: ImConfig, over: Partial<ImDraft> = {}): ImDraft {
@@ -50,7 +50,7 @@ function markup(node: React.ReactNode) {
 }
 
 test('a page without an active draft adopts a later snapshot whole: revision, config and status move together', () => {
-  const next = snapshotOf(configOf({ idleTimeoutMinutes: 45 }), 7);
+  const next = snapshotOf(configOf({ idleTimeoutMinutes: 45, ownerProfileId: ''}), 7);
   const outcome = adoptServer(next, undefined);
   assert.deepEqual(outcome, { saved: next, edit: undefined, conflict: false });
 });
@@ -58,7 +58,7 @@ test('a page without an active draft adopts a later snapshot whole: revision, co
 test('an edit whose values sit back on its baseline is not a draft: the page keeps following the saved config', () => {
   const base = configOf();
   const edit: ImEdit = { values: textOf(base), base, revision: 5 };
-  const outcome = adoptServer(snapshotOf(configOf({ idleTimeoutMinutes: 45 }), 7), edit);
+  const outcome = adoptServer(snapshotOf(configOf({ idleTimeoutMinutes: 45, ownerProfileId: ''}), 7), edit);
   assert.equal(outcome.edit, undefined);
   assert.equal(outcome.conflict, false);
 });
@@ -66,7 +66,7 @@ test('an edit whose values sit back on its baseline is not a draft: the page kee
 test('a concurrent update never rewrites the draft baseline: the later save still carries the forked revision', () => {
   const base = configOf();
   const edit = activeEdit({}, base);
-  const next = snapshotOf(configOf({ allowedOpenIds: ['ou_3333333333333333'], idleTimeoutMinutes: 60 }), 9);
+  const next = snapshotOf(configOf({ allowedOpenIds: ['ou_3333333333333333'], idleTimeoutMinutes: 60, ownerProfileId: ''}), 9);
   const outcome = adoptServer(next, edit);
   assert.equal(outcome.saved, next, 'the live status and revision of the control plane are still reflected');
   assert.equal(outcome.conflict, true, 'the page says the config moved underneath the draft instead of mixing them');
@@ -193,18 +193,18 @@ test('an out-of-range or empty visible idle alone is a real unsaved change gated
 });
 
 test('re-reads keep a draft whose visible idle is invalid: no silent normalization, no swapped baseline, and a corrected number saves as seen', () => {
-  const base = configOf({ idleTimeoutMinutes: 40 });
+  const base = configOf({ idleTimeoutMinutes: 40, ownerProfileId: ''});
   for (const idle of [null, 0, 1441] as const) {
     const edit = activeEdit({ openIdsText: 'ou_1111111111111111', idleTimeoutMinutes: idle }, base);
     const same = adoptServer(snapshotOf(base, 5), edit);
     assert.equal(same.edit, edit, 'the invalid number the user sees is not dropped or replaced by the saved 40');
     assert.equal(same.conflict, false);
     assert.equal(same.saved.config.idleTimeoutMinutes, 40, 'the page still reports what the control plane holds');
-    const later = adoptServer(snapshotOf(configOf({ idleTimeoutMinutes: 45 }), 9), edit);
+    const later = adoptServer(snapshotOf(configOf({ idleTimeoutMinutes: 45, ownerProfileId: ''}), 9), edit);
     assert.ok(later.edit, 'the draft with its fixable field survives a newer revision');
     assert.equal(later.edit.revision, 5);
     assert.equal(later.conflict, true);
-    const fixed = savePlan({ ...edit, values: { ...edit.values, idleTimeoutMinutes: 90 } }, undefined);
+    const fixed = savePlan({ ...edit, values: { ...edit.values, idleTimeoutMinutes: 90, ownerProfileId: ''} }, undefined);
     assert.ok(fixed.input, 'correcting the visible number unblocks the same draft');
     assert.equal(fixed.input.config.idleTimeoutMinutes, 90);
   }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { EventDispatcher } from '@larksuiteoapi/node-sdk';
 import { createImChannelTransport, type Delivery } from '../../src/main/im/channel';
 import type { LarkChannel, LarkChannelOptions, MarkdownStreamProducer } from '@larksuite/channel';
-const config={enabled:true,appId:'cli_test',appSecret:'SECRET_CANARY',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:['/tmp'],idleTimeoutMinutes:30};
+const config={enabled:true,appId:'cli_test',appSecret:'SECRET_CANARY',allowedOpenIds:['ou_a'],engine:'codex',model:'gpt-test',effort:'medium',workspaces:['/tmp'],idleTimeoutMinutes: 30, ownerProfileId: ''};
 const noop=()=>{};
 const handlers={message:noop,card:()=>({}),menu:noop,error:noop,connecting:noop,connected:noop};
 test('发布版 EventDispatcher 展平 header 并保留真实 open_id/message/context，callback toast 返回给协议层',async()=>{

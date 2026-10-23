@@ -371,7 +371,7 @@ test('dsh 进度经后台宿主到达 ImService 卡片并收口只剩答案', { 
     createBackgroundParentAgent(input, { dataDir, signal: opts?.signal }, { hostCommand: [process.execPath, '--import', 'tsx', CLI_MAIN], startupMs: 20000, runner });
   const service = new ImService({ dataDir: serviceDir, policy, parentFactory: parentFactory as any, channelFactory: factory });
   try {
-    await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'CANARY_SECRET', allowedOpenIds: ['ou_a'], engine: 'dsh', model: 'deepseek-flash', effort: 'high', workspaces: [harness.workspace], idleTimeoutMinutes: 1 } as any });
+    await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'CANARY_SECRET', allowedOpenIds: ['ou_a'], engine: 'dsh', model: 'deepseek-flash', effort: 'high', workspaces: [harness.workspace], idleTimeoutMinutes: 1, ownerProfileId: '' } as any });
     for (let i = 0; i < 24; i++) await new Promise(resolve => setImmediate(resolve));
     const now = Date.now();
     handlers.message({
