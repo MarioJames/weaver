@@ -1,0 +1,105 @@
+{
+  "result": "passed",
+  "evidenceSources": [
+    "runner-final.log",
+    "regression-platform-final.log",
+    "shutdown-platform-final.log",
+    "typecheck-platform-final.log",
+    "regression-generation-guard.log",
+    "typecheck-generation-guard.log"
+  ],
+  "runnerModes": [
+    {
+      "mode": "source",
+      "preview": "preview",
+      "apply": "applied",
+      "vacuum": "completed",
+      "deleted": 1,
+      "retained": 1,
+      "drain": "completed",
+      "protected": "auth+retained-event+orphan-event"
+    },
+    {
+      "mode": "bundle",
+      "preview": "preview",
+      "apply": "applied",
+      "vacuum": "completed",
+      "deleted": 1,
+      "retained": 1,
+      "drain": "completed",
+      "protected": "auth+retained-event+orphan-event"
+    },
+    {
+      "mode": "standalone",
+      "preview": "preview",
+      "apply": "applied",
+      "vacuum": "completed",
+      "deleted": 1,
+      "retained": 1,
+      "drain": "completed",
+      "protected": "auth+retained-event+orphan-event"
+    }
+  ],
+  "regression": {
+    "tests": 38,
+    "passed": 38,
+    "failed": 0,
+    "includes": [
+      "真实HTTP异步preview/apply及失效preview拒绝",
+      "SQLite竞争写事务busy无写入",
+      "事件idle边界、projection/sequence/auth/orphan保护",
+      "非Linux运行入口在打开数据库前拒绝"
+    ]
+  },
+  "shutdown": {
+    "tests": 3,
+    "passed": 3,
+    "failed": 0,
+    "includes": [
+      "重复信号单次close并清理listener",
+      "close错误返回非零，无未处理拒绝",
+      "未请求close时信号状态保持"
+    ]
+  },
+  "typecheck": {
+    "command": "tsc --noEmit",
+    "passed": true
+  },
+  "totals": {
+    "tests": 41,
+    "passed": 41,
+    "failed": 0
+  },
+  "limits": [
+    "非Linux分支仅通过模拟process.platform验证，未在macOS/Windows真实宿主执行",
+    "browser短任务未捕获运行中后台进度和关闭重开恢复运行瞬态，未注入延时或mock伪造",
+    "最后的一行request generation guard通过源码逻辑审查及现有门禁，未在浏览器伪造乱序或声称竞态复现"
+  ],
+  "safety": "仅虚构隔离fixture；未使用生产OpenCode数据、模型凭据或外部模型额度",
+  "requestGenerationGuard": {
+    "change": "start()通过校验后、发送请求前递增draftVersion.current，旧recover响应因版本失效被忽略，catch的recover使用当前版本",
+    "sourceChecks": {
+      "guardAfterValidation": true,
+      "guardBeforeRequest": true,
+      "catchRecoverUsesCurrentVersion": true
+    },
+    "finalTargetedRegression": {
+      "files": [
+        "tests/main/cleanup-opencode.test.ts",
+        "tests/main/engine-cleanup-api.test.ts",
+        "tests/renderer/renderer-engines-polish.test.ts"
+      ],
+      "tests": 21,
+      "passed": 21,
+      "failed": 0,
+      "evidence": "regression-generation-guard.log"
+    },
+    "typecheck": {
+      "passed": true,
+      "evidence": "typecheck-generation-guard.log"
+    },
+    "normalBrowserPreviewPassed": true,
+    "raceReproducedInBrowser": false,
+    "networkReorderingMocked": false
+  }
+}

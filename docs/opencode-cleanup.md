@@ -35,3 +35,20 @@ node node_modules/typescript/bin/tsc --noEmit
 预览 JSON 的 eventPruning 显示候选会话和事件数、静默边界；统计不读取巨大的 event.data。执行时与过期删除共享事务和同一候选 ID 集合，逐一验证候选事件归零，核验保留 event_sequence 及现有 session/message/part/session_message/session_input/session_context_epoch/todo/session_share 投影内容摘要不变；account/account_state 与认证、项目、权限表也受摘要校验保护。保留会话的事件数按明确候选扣减，孤立事件数量不变。
 
 依据 [OpenCode v1.19.4 event 实现](https://github.com/anomalyco/opencode/blob/v1.19.4/packages/core/src/event.ts)：新事件使用保留 sequence 的 latest+1，旧 seq 回放会核验完整事件；durable 订阅和同步直接使用事件历史。会话读取与 LLM 历史走本地投影。删除历史不会禁用未来事件持久化，因此定时目标可持续清理静默会话的新增历史。运行前仍应停止 OpenCode，进程检查与写锁不能取代应用停用。
+
+
+## 引擎页手动清理
+
+引擎页仅 OpenCode 卡片提供「清理数据库」。默认保留北京时间今天，关闭保留会话事件裁剪，开启执行后的空间整理。先预览数据库与日志文件大小、待删除与保留数量，再确认不可撤销的删除范围。裁剪开关开启时额外展示同步、回放历史丢失提示；本地消息和工具结果保留。参数修改会使预览失效。
+
+控制面通过 `startEngineCleanup` 启动 preview/apply 后台任务，由 `getEngineCleanup` 读取任务与进度；关闭再打开弹窗仍可查看正在执行的任务。请求失败保留输入，可核对进度和重试。服务端一次只执行一个任务，apply 必须引用同参数、15 分钟内、未使用过的成功预览。执行事务内会再次核对预览选择和表计数；数据库变化时拒绝删除并要求重新预览。原脚本和控制面共用 `src/main/engines/opencode-cleanup-core.mjs`，不存在两份删除 SQL。
+
+目标路径仅由服务端环境决定：优先 `OPENCODE_DB`，其次 `$XDG_DATA_HOME/opencode/opencode.db`，最后 `$HOME/.local/share/opencode/opencode.db`。RPC 不接受客户端数据库路径。SQLite 维护在独立子进程运行，源代码 tsx、Node bundle 和 Bun standalone 都通过自身隐藏 CLI 入口启动；HTTP 服务不会被同步 SQLite 工作阻塞。服务正常关闭时先拒绝新请求，再等待维护子进程完成（包括压缩）后释放服务资源，不强制中断已提交后的空间整理。任务记录只保存在该服务进程内，重启后需重新预览。
+
+缺少数据库、目标库正在被 OpenCode 使用、数据库忙锁或不认识的结构都会返回真实原因，不会停止 OpenCode、创建缺失库或自动放宽结构检查。删除事务成功但空间整理失败时，结果仍说明数据已清理与空间整理的实际状态。
+
+接口集成与数据保护验证：
+
+```sh
+node --import tsx --test tests/main/cleanup-opencode.test.ts tests/main/engine-cleanup-api.test.ts
+```

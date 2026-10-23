@@ -1,0 +1,64 @@
+{
+  "result": "passed",
+  "source": "最终版本，start()加入request generation guard后Linux真实浏览器复验",
+  "url": "http://127.0.0.1:4789/#/engines",
+  "platform": "linux",
+  "mode": "browser-harness task",
+  "isolation": {
+    "fixture": true,
+    "HOME": true,
+    "XDG": true,
+    "OPENCODE_DB": true,
+    "dataDir": true,
+    "externalModelCalls": false,
+    "productionDataAccess": false,
+    "mockApi": false
+  },
+  "checks": {
+    "entry": "仅OpenCode清理按钮",
+    "modalDefaults": {
+      "keepDays": 1,
+      "pruneEvents": false,
+      "vacuum": true
+    },
+    "preview": {
+      "expiredSessions": 1,
+      "retainedSessions": 2,
+      "expiredEvents": 1,
+      "prunedRetainedEvents": 0,
+      "retainedEvents": 3
+    },
+    "database": {
+      "unchanged": true,
+      "beforeSha256": "a2ecc1fbad73b96973a33677e4af977cf772c7ea8ccbf3a4812d8260139efa2f",
+      "afterSha256": "a2ecc1fbad73b96973a33677e4af977cf772c7ea8ccbf3a4812d8260139efa2f"
+    },
+    "console": {
+      "warnings": 0,
+      "errors": 0
+    },
+    "network": {
+      "requests": 29,
+      "errors": 0
+    },
+    "artifactErrors": []
+  },
+  "limitations": [
+    "仅非写入preview烟测；完整删除/恢复验证见browser-report.json",
+    "短任务未捕获运行中关闭重开与进度瞬态，限制保留",
+    "request generation guard的乱序竞态未在浏览器复现，仅源码逻辑和现有门禁验证；browser只验证真实正常流程"
+  ],
+  "cleanup": {
+    "chrome": "closed",
+    "profile": "removed",
+    "scope": "dev-weaver-engine-cleanup.scope inactive",
+    "port4789": "released",
+    "fixtureAndIsolatedData": "removed"
+  },
+  "requestGenerationGuard": {
+    "change": "start()通过校验后、发送请求前递增draftVersion.current，旧recover响应因版本失效被忽略，catch的recover使用当前版本",
+    "validation": "源码逻辑审查+已有core/API/renderer21测试+typecheck+正常browser preview",
+    "raceReproducedInBrowser": false,
+    "networkReorderingMocked": false
+  }
+}

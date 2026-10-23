@@ -1,0 +1,18 @@
+- generic [ref=e1] clickable [onclick]
+  - generic
+    - generic
+      - region "Notifications" [ref=e2]
+      - region "Notifications" [ref=e3]
+      - region "Notifications" [ref=e4]
+      - region "Notifications" [ref=e5]
+      - region "Notifications" [ref=e6]
+      - region "Notifications" [ref=e7]
+      - dialog "确认整理数据库空间？"
+        - generic
+          - heading "确认整理数据库空间？" [level=2, ref=e8]
+          - button "Close" [ref=e9]
+          - generic
+            - StaticText "当前没有待删除的会话或事件，将保留 2 个会话。本次仅整理数据库空间。"
+          - StaticText "删除完成后会整理数据库空间，可能需要较长时间。"
+          - button "取消" [ref=e10]
+          - button "确认整理空间" [ref=e11]

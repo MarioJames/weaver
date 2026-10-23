@@ -1,0 +1,75 @@
+{
+  "result": {
+    "id": "de3cf60e748b3651",
+    "status": "done",
+    "startedAt": "2026-10-23T07:40:12.344Z",
+    "input": {
+      "engine": "opencode",
+      "mode": "apply",
+      "keepDays": 1,
+      "eventIdleMinutes": 60,
+      "pruneEvents": true,
+      "vacuum": true,
+      "previewId": "2fa03a3628b89a0e"
+    },
+    "progress": "任务已结束",
+    "result": {
+      "status": "applied",
+      "cutoff": "2026-10-22T16:00:00.000Z",
+      "keepDays": 1,
+      "selection": "aa810dc783f4cd43481148a4580f4de6bf077e579bd0bc017ffd0db0cf118bb6",
+      "eventPruning": {
+        "enabled": true,
+        "idleMinutes": 60,
+        "idleCutoff": "2026-10-23T06:39:58.209Z",
+        "candidateSessions": 1,
+        "candidateEvents": 1
+      },
+      "expiredIds": [
+        "old"
+      ],
+      "retainedCount": 2,
+      "before": {
+        "session": 3,
+        "message": 3,
+        "part": 3,
+        "event_sequence": 4,
+        "event": 4,
+        "auth": 1
+      },
+      "after": {
+        "session": 2,
+        "message": 2,
+        "part": 2,
+        "event_sequence": 3,
+        "event": 2,
+        "auth": 1
+      },
+      "deleted": {
+        "session": 1,
+        "message": 1,
+        "part": 1,
+        "event_sequence": 1,
+        "event": 2,
+        "auth": 0
+      },
+      "retained": {
+        "message": 2,
+        "part": 2,
+        "event": 1,
+        "orphanEvents": 1
+      },
+      "bytesBefore": {
+        "database": 249856,
+        "-wal": 0,
+        "-shm": 0
+      },
+      "bytesAfter": {
+        "database": 118784,
+        "-wal": 0,
+        "-shm": 0
+      },
+      "vacuum": "completed"
+    }
+  }
+}

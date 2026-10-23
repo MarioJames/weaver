@@ -1,0 +1,78 @@
+{
+  "bytes": 118784,
+  "sha256": "3914fb39e7cca4aaddef9694333458b1118eab21f5af4aacbcb1dc28c984c9f1",
+  "tables": {
+    "session": [
+      {
+        "id": "idle",
+        "time_updated": 1792733584642
+      },
+      {
+        "id": "recent",
+        "time_updated": 1792740484642
+      }
+    ],
+    "message": [
+      {
+        "id": "m-idle",
+        "session_id": "idle"
+      },
+      {
+        "id": "m-recent",
+        "session_id": "recent"
+      }
+    ],
+    "part": [
+      {
+        "id": "p-idle",
+        "message_id": "m-idle",
+        "session_id": "idle"
+      },
+      {
+        "id": "p-recent",
+        "message_id": "m-recent",
+        "session_id": "recent"
+      }
+    ],
+    "event_sequence": [
+      {
+        "aggregate_id": "idle",
+        "seq": 1,
+        "owner_id": "fixture"
+      },
+      {
+        "aggregate_id": "recent",
+        "seq": 1,
+        "owner_id": "fixture"
+      },
+      {
+        "aggregate_id": "orphan",
+        "seq": 1,
+        "owner_id": "fixture"
+      }
+    ],
+    "event": [
+      {
+        "id": "e-recent",
+        "aggregate_id": "recent",
+        "seq": 1,
+        "type": "test",
+        "data": 65536
+      },
+      {
+        "id": "e-orphan",
+        "aggregate_id": "orphan",
+        "seq": 1,
+        "type": "test",
+        "data": 2
+      }
+    ],
+    "auth": [
+      {
+        "id": "synthetic",
+        "data": "fictional-data"
+      }
+    ]
+  },
+  "fk": []
+}

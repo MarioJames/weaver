@@ -1,3 +1,4 @@
+import type { EngineCleanupInput, EngineCleanupJob } from './engine-cleanup';
 import type { ImSettingsSnapshot, SaveImSettingsInput } from './im';
 import type { PolicySnapshot, SavePolicyInput, PreviewInput, RoutePreview, Issue } from './policy';
 import type { EngineProbeRecord, EngineReadiness, ExecutionBoundary, HelloInput, HelloJob } from '../engines';
@@ -21,6 +22,8 @@ export interface WeaverAPI {
  getQuota(): Promise<QuotaSnapshot>;
  refreshQuota(input: QuotaRefreshInput): Promise<QuotaRefreshResult>;
  setEngineEnabled(input: EngineToggleInput): Promise<EngineToggleResult>;
+ startEngineCleanup(input: EngineCleanupInput): Promise<EngineCleanupJob>;
+ getEngineCleanup(id: string): Promise<EngineCleanupJob | null>;
  sayHi(input: HelloInput): Promise<HelloJob>;
  sayHiResult(id: string): Promise<HelloJob>;
  listTasks(): Promise<TaskSummary[]>;

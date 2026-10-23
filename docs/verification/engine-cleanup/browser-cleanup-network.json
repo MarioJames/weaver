@@ -1,0 +1,229 @@
+[
+  {
+    "requestId": "1190315.175",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "getEngineCleanup",
+      "args": [
+        "opencode"
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.198",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "startEngineCleanup",
+      "args": [
+        {
+          "engine": "opencode",
+          "mode": "preview",
+          "keepDays": 1,
+          "eventIdleMinutes": 60,
+          "pruneEvents": false,
+          "vacuum": true
+        }
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.200",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "getEngineCleanup",
+      "args": [
+        "134b84f566a4b65e"
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.236",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "startEngineCleanup",
+      "args": [
+        {
+          "engine": "opencode",
+          "mode": "preview",
+          "keepDays": 1,
+          "eventIdleMinutes": 60,
+          "pruneEvents": true,
+          "vacuum": true
+        }
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.238",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "getEngineCleanup",
+      "args": [
+        "2e0644d872e54122"
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.253",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "startEngineCleanup",
+      "args": [
+        {
+          "engine": "opencode",
+          "mode": "preview",
+          "keepDays": 1,
+          "eventIdleMinutes": 60,
+          "pruneEvents": true,
+          "vacuum": true
+        }
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.254",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "getEngineCleanup",
+      "args": [
+        "24a6bd563c9e1eb9"
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.265",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "startEngineCleanup",
+      "args": [
+        {
+          "engine": "opencode",
+          "mode": "preview",
+          "keepDays": 1,
+          "eventIdleMinutes": 60,
+          "pruneEvents": true,
+          "vacuum": true
+        }
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.267",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "getEngineCleanup",
+      "args": [
+        "2fa03a3628b89a0e"
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.285",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "startEngineCleanup",
+      "args": [
+        {
+          "engine": "opencode",
+          "mode": "apply",
+          "keepDays": 1,
+          "eventIdleMinutes": 60,
+          "pruneEvents": true,
+          "vacuum": true,
+          "previewId": "2fa03a3628b89a0e"
+        }
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.287",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "getEngineCleanup",
+      "args": [
+        "de3cf60e748b3651"
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.319",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "getEngineCleanup",
+      "args": [
+        "opencode"
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.347",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "startEngineCleanup",
+      "args": [
+        {
+          "engine": "opencode",
+          "mode": "preview",
+          "keepDays": 1,
+          "eventIdleMinutes": 60,
+          "pruneEvents": false,
+          "vacuum": true
+        }
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.349",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "getEngineCleanup",
+      "args": [
+        "d1cfdc83bd698318"
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.366",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "startEngineCleanup",
+      "args": [
+        {
+          "engine": "opencode",
+          "mode": "apply",
+          "keepDays": 1,
+          "eventIdleMinutes": 60,
+          "pruneEvents": false,
+          "vacuum": true,
+          "previewId": "d1cfdc83bd698318"
+        }
+      ]
+    }
+  },
+  {
+    "requestId": "1190315.368",
+    "status": 200,
+    "url": "http://127.0.0.1:4789/api/rpc",
+    "input": {
+      "method": "getEngineCleanup",
+      "args": [
+        "3b6328b8a59d000b"
+      ]
+    }
+  }
+]

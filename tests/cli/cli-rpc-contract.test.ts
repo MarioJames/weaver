@@ -7,16 +7,16 @@ import { RPC_METHODS } from '../../src/shared/contracts/rpc';
 import { RpcError, parseRpcBody } from '../../src/main/rpc';
 import { createRpcHandlers, type RpcHost } from '../../src/main/transport/handlers';
 
-/** The allowlist the browser and the CLI shared before the contract table existed; it must not drift. */
+/** Explicit public RPC methods and arity, including background OpenCode maintenance. */
 const FROZEN_ARITY: Record<string, number> = {
   getImSettings: 0, saveImSettings: 1, reconnectIm: 0,
   command: 1, getPolicy: 0, policyHistory: 0, policyRollback: 1, validatePolicy: 1, savePolicy: 1, previewRoute: 1, scanEngines: 0,
-  listEngineModels: 1, getQuota: 0, refreshQuota: 1, getStall: 0, workerProbe: 1, workerProbeStatus: 0, sayHi: 1, sayHiResult: 1,
+  listEngineModels: 1, getQuota: 0, refreshQuota: 1, getStall: 0, workerProbe: 1, workerProbeStatus: 0, sayHi: 1, sayHiResult: 1, startEngineCleanup: 1, getEngineCleanup: 1,
   setEngineEnabled: 1, listTasks: 0, getTask: 1, createTask: 1, startTask: 1, cancelTask: 1, capabilities: 0, serverInfo: 0,
   janitorSweep: 1, janitorStatus: 0,
 };
 
-test('the RPC contract keeps the original method allowlist and arity', () => {
+test('the RPC contract keeps the public method allowlist and arity', () => {
   assert.deepEqual(Object.fromEntries(Object.entries(RPC_METHODS).map(([method, spec]) => [method, spec.arity])), FROZEN_ARITY);
   for (const [method, arity] of Object.entries(FROZEN_ARITY)) {
     assert.deepEqual(parseRpcBody({ method, args: Array(arity).fill({}) }), { method, args: Array(arity).fill({}) });

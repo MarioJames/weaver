@@ -1,0 +1,40 @@
+- generic [ref=e1] clickable [onclick]
+  - generic
+    - generic
+      - region "Notifications" [ref=e2]
+      - region "Notifications" [ref=e3]
+      - region "Notifications" [ref=e4]
+      - region "Notifications" [ref=e5]
+      - region "Notifications" [ref=e6]
+      - region "Notifications" [ref=e7]
+      - dialog "清理 OpenCode 数据库"
+        - generic
+          - heading "清理 OpenCode 数据库" [level=2, ref=e8]
+          - button "Close" [ref=e9]
+          - StaticText "按北京时间的自然日保留最近会话，默认保留今天。预览不会删除数据；执行前请结束使用这个数据库的 OpenCode 进程。"
+          - form
+            - LabelText
+              - StaticText "保留天数"
+            - textbox "保留天数" [ref=e13]: 1
+              - StaticText "1"
+            - LabelText
+              - generic
+                - StaticText "裁剪保留会话的事件历史"
+                - StaticText "默认关闭。开启会损失所选会话的事件同步与回放历史，保留本地消息和工具结果。"
+            - switch "裁剪保留会话的事件历史 默认关闭。开启会损失所选会话的事件同步与回放历史，保留本地消息和工具结果。" [checked=true, ref=e14]
+            - LabelText
+              - generic
+                - StaticText "会话至少空闲多少分钟"
+                - StaticText "0 表示所有保留会话；依据会话最后更新时间筛选。"
+            - textbox "会话至少空闲多少分钟" [ref=e15]: 60
+              - StaticText "60"
+            - StaticText "执行后整理空间（压缩数据库）"
+            - LabelText
+              - StaticText "执行后整理空间"
+            - switch "执行后整理空间" [checked=true, ref=e16]
+          - alert
+            - StaticText "清理未完成"
+            - StaticText "OpenCode 数据库不存在，未创建新数据库。请确认服务端的数据库位置。"
+          - button "关闭" [ref=e10]
+          - button "预览清理范围" [ref=e11]
+          - button "确认整理空间…" [disabled, ref=e12]

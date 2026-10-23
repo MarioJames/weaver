@@ -1,3 +1,4 @@
+import { EngineCleanup } from './EngineCleanup';
 import { notifyError, useNotifyError } from '../../api/notify';
 import { NamedSwitch } from '../../ui/NamedControls';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -212,6 +213,7 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
             {isQuotaKind(kind) ? <QuotaSummary engine={kind} record={quota.records.find(item => item.engine === kind)} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === kind ? quota.feedback : undefined} onRefresh={() => void quota.refresh(kind)} />
               : <Text type="secondary" className={styles.meta}>未提供原生额度接口。</Text>}
             <BlockList blocks={engineBlocks} state={stall.snapshot?.engines[entry.id]} now={stall.now} disabled={busyId !== '' || !record} onRemove={block => void resume(entry.id, block)} />
+            {entry.id === 'opencode' && <EngineCleanup />}
             <div className={engineStyles.cardFoot}>
               <div className={styles.spread}>
                 <Text>主动刷新额度</Text>

@@ -1,3 +1,4 @@
+import { EngineCleanupJobs, parseEngineCleanup } from '../engines/cleanup';
 import type { ImService } from '../im/service';
 import type { SaveImSettingsInput } from '../../shared/contracts/im';
 import { randomUUID } from 'node:crypto';
@@ -46,6 +47,7 @@ export interface RpcHost {
   stall(): StallMonitor;
   freeProbe(): FreeChannelProbeMonitor;
   hellos: HelloJobs;
+  cleanups?: EngineCleanupJobs;
   /** The runtime's model-list cache, shared with the pi pre-launch check; a host without one gets its own. */
   modelLister?: EngineModelLister;
   server(): { url: string; port: number; dataDir: string; startedAt: string; managedBy: 'systemd' | 'launchd' | null };
@@ -131,11 +133,20 @@ function engineHandlers(host: RpcHost): Handlers<'scanEngines' | 'listEngineMode
   };
 }
 
-function probeHandlers(host: RpcHost): Handlers<'getStall' | 'workerProbe' | 'workerProbeStatus' | 'sayHi' | 'sayHiResult'> {
+function probeHandlers(host: RpcHost): Handlers<'getStall' | 'workerProbe' | 'workerProbeStatus' | 'sayHi' | 'sayHiResult' | 'startEngineCleanup' | 'getEngineCleanup'> {
   return {
     getStall: () => host.stall().status(),
     workerProbeStatus: () => host.freeProbe().status(),
     workerProbe: (_active, args) => host.freeProbe().probeNow(parseFreeProbeInput(args[0]).worker),
+    startEngineCleanup: (_active, args) => {
+      let input;
+      try { input = parseEngineCleanup(args[0]); } catch (error) { throw new RpcError('INVALID_REQUEST', String(error)); }
+      if (!host.cleanups) throw new RpcError('INVALID_REQUEST', '清理服务不可用');
+      try { return host.cleanups.start(input); } catch (error) { throw new RpcError('CONFLICT', String(error)); }
+    },
+    getEngineCleanup: (_active, args) => {
+      try { return host.cleanups?.get(args[0]) ?? null; } catch (error) { throw new RpcError('INVALID_REQUEST', String(error)); }
+    },
     sayHi: (active, args) => {
       const input = parseHelloInput(args[0]);
       if (!active.policy.snapshot().config.engines[input.engine]) throw new RpcError('INVALID_REQUEST', `Engine ${input.engine} is not configured`);

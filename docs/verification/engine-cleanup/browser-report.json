@@ -1,0 +1,43 @@
+{
+  "url": "http://127.0.0.1:4789/#/engines",
+  "mode": "browser-harness task",
+  "session": "engine-cleanup-10f4ae72",
+  "isolated": true,
+  "productionDataTouched": false,
+  "externalModelsCalled": false,
+  "mockApi": false,
+  "passed": [
+    "清理按钮仅OpenCode卡片",
+    "默认keepDays=1/prune关闭/压缩开启",
+    "0和小数输入保留原值、内联错误禁提交",
+    "prune默认idle60、idle0允许、prune关闭忽略隐藏非法idle",
+    "默认预览会话1/事件1，prune60预览会话1/事件2/候选事件1",
+    "预览及取消确认前后数据库SHA256与所有行完全相同",
+    "选项变更失效旧预览",
+    "missing-db真实失败保留输入，恢复文件后可预览重试",
+    "确认执行删除旧会话及其projection和event、仅裁剪idle event",
+    "保留idle/recent本地projection和sequence、recent event、orphan event/sequence、auth，foreign_key_check为空",
+    "UI显示删除1会话2事件，压缩249856→118784 bytes，释放0.13MiB",
+    "离开页面重入恢复已完成job与输入",
+    "关闭重开保留编辑草稿",
+    "无删除时压缩确认使用非危险标题和按钮",
+    "双击压缩确认只有1条apply RPC",
+    "light主题截图审查；console无warn/error，network无4xx/5xx"
+  ],
+  "limits": [
+    "fixture任务极短，未捕获运行中后台进度、关闭重开恢复运行中状态；未通过mock或人工延迟伪造",
+    "真实失败使用missing-db，未额外构造busy锁"
+  ],
+  "artifactErrors": [],
+  "networkErrors": 0,
+  "consoleWarnings": 0,
+  "consoleErrors": 0,
+  "resources": {
+    "chrome": "closed",
+    "profile": "removed",
+    "service": "dev-weaver-engine-cleanup.scope stopped",
+    "port": 4789,
+    "fixture": "removed",
+    "persistentData": "未读写生产OpenCode；仅删除本次虚构fixture及隔离Weaver数据"
+  }
+}

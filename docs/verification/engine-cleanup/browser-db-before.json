@@ -1,0 +1,110 @@
+{
+  "bytes": 249856,
+  "sha256": "c9cb39070bef9b5621344f6cb1c6e154d9bda92b7f60cab081c3c6379a7a8d84",
+  "tables": {
+    "session": [
+      {
+        "id": "old",
+        "time_updated": 1792684799000
+      },
+      {
+        "id": "idle",
+        "time_updated": 1792733584642
+      },
+      {
+        "id": "recent",
+        "time_updated": 1792740484642
+      }
+    ],
+    "message": [
+      {
+        "id": "m-old",
+        "session_id": "old"
+      },
+      {
+        "id": "m-idle",
+        "session_id": "idle"
+      },
+      {
+        "id": "m-recent",
+        "session_id": "recent"
+      }
+    ],
+    "part": [
+      {
+        "id": "p-old",
+        "message_id": "m-old",
+        "session_id": "old"
+      },
+      {
+        "id": "p-idle",
+        "message_id": "m-idle",
+        "session_id": "idle"
+      },
+      {
+        "id": "p-recent",
+        "message_id": "m-recent",
+        "session_id": "recent"
+      }
+    ],
+    "event_sequence": [
+      {
+        "aggregate_id": "old",
+        "seq": 1,
+        "owner_id": "fixture"
+      },
+      {
+        "aggregate_id": "idle",
+        "seq": 1,
+        "owner_id": "fixture"
+      },
+      {
+        "aggregate_id": "recent",
+        "seq": 1,
+        "owner_id": "fixture"
+      },
+      {
+        "aggregate_id": "orphan",
+        "seq": 1,
+        "owner_id": "fixture"
+      }
+    ],
+    "event": [
+      {
+        "id": "e-old",
+        "aggregate_id": "old",
+        "seq": 1,
+        "type": "test",
+        "data": 65536
+      },
+      {
+        "id": "e-idle",
+        "aggregate_id": "idle",
+        "seq": 1,
+        "type": "test",
+        "data": 65536
+      },
+      {
+        "id": "e-recent",
+        "aggregate_id": "recent",
+        "seq": 1,
+        "type": "test",
+        "data": 65536
+      },
+      {
+        "id": "e-orphan",
+        "aggregate_id": "orphan",
+        "seq": 1,
+        "type": "test",
+        "data": 2
+      }
+    ],
+    "auth": [
+      {
+        "id": "synthetic",
+        "data": "fictional-data"
+      }
+    ]
+  },
+  "fk": []
+}

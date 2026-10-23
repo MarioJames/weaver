@@ -36,6 +36,8 @@ export const RPC_METHODS = {
   getStall: { arity: 0, retryable: true },
   workerProbe: { arity: 1, cli: 'workers.probe', mutation: true, timeoutMs: 130_000 },
   workerProbeStatus: { arity: 0, retryable: true, cli: 'workers.probe-status', mutation: false },
+  startEngineCleanup: { arity: 1 },
+  getEngineCleanup: { arity: 1, retryable: true },
   sayHi: { arity: 1 },
   sayHiResult: { arity: 1, retryable: true },
   setEngineEnabled: { arity: 1, cli: 'engines.set-enabled', mutation: true },

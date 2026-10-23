@@ -1,3 +1,4 @@
+import { EngineCleanupJobs } from './engines/cleanup';
 import { ImService, ImServiceError, type ImServiceOptions } from './im/service';
 import { spawn } from 'node:child_process';
 import { dirname, join, resolve, sep } from 'node:path';
@@ -144,6 +145,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     job.then(() => { inflight.delete(job); }, () => { inflight.delete(job); });
     return job;
   };
+  const cleanups = new EngineCleanupJobs(track);
   const requireReady = () => {
     if (draining) throw new RpcError('APP_DRAINING', 'Weaver is shutting down');
     if (!ready || !commands || !manager || !store || !policy || !quotaProber) throw new RpcError('APP_STARTING', 'Weaver is still starting');
@@ -172,6 +174,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     stall: () => stall!,
     freeProbe: () => freeProbe!,
     hellos,
+    cleanups,
     modelLister,
     im: () => im!,
     server: () => ({ url: runtime.url, port: runtime.port, dataDir, startedAt, managedBy: managedBy() }),
