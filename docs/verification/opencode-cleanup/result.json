@@ -1,0 +1,66 @@
+{
+  "verifiedAt": "2026-10-23T07:23:43.388003+00:00",
+  "database": "/home/mocha/.local/share/opencode/opencode.db",
+  "originalBytes": 29725904896,
+  "beforeEventPruneBytes": 16554545152,
+  "finalBytes": 208252928,
+  "totalReclaimedBytes": 29517651968,
+  "eventPruneReclaimedBytes": 16346292224,
+  "deleted": {
+    "expiredSessions": 609,
+    "expiredSessionEvents": 364362,
+    "retainedSessionHistoryEvents": 164444
+  },
+  "finalCounts": {
+    "session": 168,
+    "message": 10526,
+    "part": 43903,
+    "event": 96,
+    "event_sequence": 172,
+    "project": 19,
+    "account": 1
+  },
+  "orphanEventsRetained": 96,
+  "validation": {
+    "scriptStatus": "applied",
+    "scriptProjectionAndProtectedDigestVerified": true,
+    "vacuum": "completed",
+    "quickCheck": "ok",
+    "foreignKeyViolations": 0,
+    "walBytes": 0,
+    "closedConnectionCompanionsPresent": {
+      "-wal": true,
+      "-shm": true
+    }
+  },
+  "nativeSmoke": {
+    "version": "1.19.4",
+    "list_identical": true,
+    "export_identical": true,
+    "export_sha256": "31c236e1ca1d4e9b381a8b22ae30b90b794e1c0e21df511ccca3e88dfd407e60",
+    "tool_parts": 34,
+    "tool_parts_sha256": "5cafaa2cdd43cbcc5ecc19fa3333340a354b05626412dee36d504979641d1730",
+    "projection_counts": {
+      "session": 1,
+      "message": 20,
+      "part": 91,
+      "session_message": 0,
+      "session_input": 0,
+      "session_context_epoch": 0,
+      "event_sequence": 1
+    },
+    "initial_seq": 329,
+    "before_prune_seq": 330,
+    "after_prune_new_seq": 331,
+    "integrity_check": "ok",
+    "foreign_key_violations": 0,
+    "external_model_requests": 0,
+    "coverage": "Real CLI list/export and real HTTP title mutation; no LLM reply tested",
+    "cleanup": {
+      "private_fixture_and_exports": "deleted",
+      "isolated_runtime_directories": "deleted",
+      "scope": "dev-opencode-native-smoke.scope stopped",
+      "port": 41879
+    }
+  }
+}
