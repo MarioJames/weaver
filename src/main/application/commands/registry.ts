@@ -34,6 +34,7 @@ export function createRegistry(u: CommandUnits): CommandRegistry {
    'owners.continuation.configure': a => u.owners.continuationConfigure(a),
    'tasks.create': a => u.mutations.create(a),
    'tasks.start': a => u.owners.startRoot(a),
+   'tasks.followup': a => u.owners.followup(a),
    'tasks.complete': a => u.mutations.complete(a),
    'tasks.describe': a => u.mutations.describe(a),
    'tasks.update': a => u.mutations.update(a),

@@ -12,20 +12,20 @@ const WS_LIST_OK=JSON.stringify({result:{type:'workspace_list',workspaces:[]}});
 const PANE_LIST_OK=JSON.stringify({result:{type:'pane_list',panes:[]}});
 const TAB_CLOSE_OK=JSON.stringify({result:{type:'ok'}});
 type Step={stdout?:string;stderr?:string;code?:number};
-type Script={workspaceList?:Step;paneList?:Step|((workspaceId:string)=>Step|undefined);create?:Step;claudeHelp?:string|null;start?:Step;prompt?:Step;rename?:Step;close?:Step;tabCreate?:Step;tabClose?:Step};
+type Script={workspaceList?:Step;paneList?:Step|((workspaceId:string)=>Step|undefined);create?:Step;claudeHelp?:string|null;start?:Step;get?:Step;prompt?:Step;rename?:Step;close?:Step;tabCreate?:Step;tabClose?:Step};
 function fakeRunner(script:Script={},calls:RunnerInput[]=[]):Runner{
  let unexpected=0;
  return input=>{
   calls.push(input);
   if(input.file===CLAUDE){const help=script.claudeHelp;if(help===undefined)return {code:1,stdout:'',stderr:'unexpected claude probe'};if(help===null)return {code:1,stdout:'',stderr:'claude --help exited non-zero'};return {code:0,stdout:help,stderr:''};}
   const group=input.args[2],action=input.args[3];
-  const known=(group==='workspace'&&['list','create','close'].includes(String(action)))||(group==='pane'&&action==='list')||(group==='tab'&&['create','close'].includes(String(action)))||(group==='agent'&&['start','prompt','rename'].includes(String(action)));
+  const known=(group==='workspace'&&['list','create','close'].includes(String(action)))||(group==='pane'&&action==='list')||(group==='tab'&&['create','close'].includes(String(action)))||(group==='agent'&&['start','get','prompt','rename'].includes(String(action)));
   // An unknown command group or action is a launcher bug, never a silent success.
   if(!known){unexpected++;return {code:1,stdout:'',stderr:`unexpected herdr call #${unexpected}`};}
   const step=group==='workspace'?(action==='list'?script.workspaceList:action==='create'?script.create:script.close)
     :group==='pane'?script.paneList
     :group==='tab'?(action==='create'?script.tabCreate:script.tabClose)
-    :(action==='start'?script.start:action==='rename'?script.rename:script.prompt);
+    :(action==='start'?script.start:action==='get'?script.get:action==='rename'?script.rename:script.prompt);
   if(group==='pane'){const resolved=typeof step==='function'?step(input.args[5]??''):step as Step|undefined;return {code:0,stdout:PANE_LIST_OK,stderr:'',...(resolved??{})};}
   if(group==='workspace'&&action==='list')return {code:0,stdout:WS_LIST_OK,stderr:'',...(step as Step|undefined)};
   if(group==='tab'&&action==='close')return {code:0,stdout:TAB_CLOSE_OK,stderr:'',...(step as Step|undefined)};
@@ -46,9 +46,10 @@ test('claude launch drives herdr through argv arrays, detects the effort flag an
  assert.deepEqual(calls[0],{file:HERDR,args:['--session','default','workspace','create','--cwd','/srv/proj','--label','proj','--no-focus'],timeout:30000});
  assert.deepEqual(calls[1],{file:CLAUDE,args:['--help'],timeout:15000});
  assert.deepEqual(calls[2],{file:HERDR,args:['--session','default','agent','start','owner-11111111-1','--kind','claude','--pane','w7:p1','--timeout',START_TIMEOUT,'--','--model','claude-opus-5-5','--effort','high'],timeout:70000});
- assert.deepEqual(calls[3],{file:HERDR,args:['--session','default','agent','prompt','w7:p1','continue the fixture work now'],timeout:60000});
- assert.deepEqual(calls[4],{file:HERDR,args:['--session','default','agent','rename','w7:p1','--clear'],timeout:15000});
- assert.equal(calls.length,5);
+ assert.deepEqual(calls[3],{file:HERDR,args:['--session','default','agent','get','w7:p1'],timeout:15000});
+ assert.deepEqual(calls[4],{file:HERDR,args:['--session','default','agent','prompt','w7:p1','continue the fixture work now'],timeout:60000});
+ assert.deepEqual(calls[5],{file:HERDR,args:['--session','default','agent','rename','w7:p1','--clear'],timeout:15000});
+ assert.equal(calls.length,6);
  assert.match(result.agentName,/^[a-z][a-z0-9_-]{0,31}$/);
 });
 test('codex launch skips the help probe and passes the effort config as one argv element',()=>{
@@ -56,14 +57,14 @@ test('codex launch skips the help probe and passes the effort config as one argv
  const runner=fakeRunner({create:{stdout:JSON.stringify({result:{workspace:{workspace_id:'w7'},root_pane:{pane_id:'w7:p2'}}})}},calls);
  const result=launch({engineKind:'codex',model:'gpt-6-astra',session:'work'},runner);
  assert.equal(result.session,'work');assert.equal(result.workspaceId,'w7');assert.equal(result.paneId,'w7:p2');assert.equal(result.createdWorkspace,true);
- assert.equal(calls.length,4);
+ assert.equal(calls.length,5);
  assert.deepEqual(calls[1].args,['--session','work','agent','start','owner-11111111-1','--kind','codex','--pane','w7:p2','--timeout',START_TIMEOUT,'--','-m','gpt-6-astra','-c','model_reasoning_effort="high"']);
  assert.ok(!calls.some(call=>call.file===CLAUDE));
- const promptCall=calls[2];
+ const promptCall=calls[3];
  assert.equal(promptCall.args[4],'w7:p2');
  assert.equal(promptCall.args[5],'continue the fixture work now');
  assert.equal(promptCall.args.length,6);
- assert.deepEqual(calls[3].args,['--session','work','agent','rename','w7:p2','--clear']);
+ assert.deepEqual(calls[4].args,['--session','work','agent','rename','w7:p2','--clear']);
 });
 test('the workspace label is the workspace directory name, with or without a trailing slash, never the task title',()=>{
  for(const workspace of ['/srv/proj','/srv/proj/','/srv/proj//']){
@@ -87,8 +88,8 @@ test('prompt addresses the pane id, then the agent name is cleared; the launch r
  const calls:RunnerInput[]=[];
  const result=launch({},fakeRunner({create:{stdout:createOk}},calls));
  assert.equal(result.agentName,'owner-11111111-1');
- assert.deepEqual(calls.map(call=>[call.args[2],call.args[3],call.args[4]]),[['workspace','create','--cwd'],['agent','start','owner-11111111-1'],['agent','prompt','w7:p1'],['agent','rename','w7:p1']]);
- assert.equal(calls[3]!.args[5],'--clear');
+ assert.deepEqual(calls.map(call=>[call.args[2],call.args[3],call.args[4]]),[['workspace','create','--cwd'],['agent','start','owner-11111111-1'],['agent','get','w7:p1'],['agent','prompt','w7:p1'],['agent','rename','w7:p1']]);
+ assert.equal(calls[4]!.args[5],'--clear');
 });
 test('a failing or throwing rename --clear is cosmetic: the launch succeeds and nothing is closed',()=>{
  for(const mode of ['exit','envelope','throw'] as const){
@@ -109,9 +110,9 @@ test('claude help without an effort flag, or failing, keeps only --model',()=>{
  for(const help of [null,'usage: claude [options]','--effort'.split('').reverse().join('')+' <level>'] as const){
   const calls:RunnerInput[]=[];
   const runner=fakeRunner({create:{stdout:createOk},claudeHelp:help as string|null},calls);
-  launch({claudePath:CLAUDE},runner);
-  assert.equal(calls.length,5);
-  assert.ok(!calls[2]!.args.includes('--effort'));
+   launch({claudePath:CLAUDE},runner);
+   assert.equal(calls.length,6);
+   assert.ok(!calls[2]!.args.includes('--effort'));
   assert.deepEqual(calls[2]!.args.slice(-2),['--model','claude-opus-5-5']);
  }
 });
@@ -119,7 +120,7 @@ test('no claude on PATH means no probe at all',()=>{
  const calls:RunnerInput[]=[];
  const runner=fakeRunner({create:{stdout:createOk}},calls);
  launch({},runner);
- assert.equal(calls.length,4);
+ assert.equal(calls.length,5);
  assert.ok(!calls[1]!.args.includes('--effort'));
 });
 test('unsupported engine kinds fail before any herdr call',()=>{
@@ -217,8 +218,8 @@ test('a failing prompt submission also cleans up the created tab',()=>{
  const calls:RunnerInput[]=[];
  const runner=fakeRunner({create:{stdout:createOk},prompt:{code:1,stderr:'agent_blocked'}},calls);
  assert.throws(()=>launch({},runner),error=>{assert.match((error as Error).message,/agent prompt failed \(exit 1\)/);return true;});
- assert.deepEqual(calls[3]!.args,['--session','default','tab','close','w7:t1']);
- assert.equal(calls.length,4);
+ assert.deepEqual(calls[4]!.args,['--session','default','tab','close','w7:t1']);
+ assert.equal(calls.length,5);
 });
 test('a runner that throws on workspace create reports the step and closes nothing',()=>{
  const calls:RunnerInput[]=[];
@@ -267,8 +268,8 @@ test('a blocked agent prompt envelope with exit code 0 fails the launch and clos
   assert.ok(error instanceof Error);
   assert.match(error.message,/agent prompt failed \(exit 0\): agent_blocked: agent is blocked/);
   return true;});
- assert.deepEqual(calls[3]!.args,['--session','default','tab','close','w7:t1']);
- assert.equal(calls.length,4);
+ assert.deepEqual(calls[4]!.args,['--session','default','tab','close','w7:t1']);
+ assert.equal(calls.length,5);
 });
 test('documented success envelopes are not mistaken for failures',()=>{
  const started=JSON.stringify({id:'cli:agent:start',result:{type:'agent_started',agent:{pane_id:'w7:p1',name:'owner-11111111-1',agent_status:'idle'},argv:['claude','--model','claude-opus-5-5']}});
@@ -276,7 +277,20 @@ test('documented success envelopes are not mistaken for failures',()=>{
   const calls:RunnerInput[]=[];
   const runner=fakeRunner({create:{stdout:createOk},start:{stdout:started},prompt:{stdout:prompt}},calls);
   assert.deepEqual(launch({},runner),createResult);
-  assert.equal(calls.length,4);
+  assert.equal(calls.length,5);
+ }
+});
+test('agent start records the pane terminal id, and a failed identity read never fails the launch',()=>{
+ const calls:RunnerInput[]=[];
+ const withTerminal=fakeRunner({create:{stdout:createOk},get:{stdout:JSON.stringify({result:{agent:{pane_id:'w7:p1',terminal_id:'term-42'}}})}},calls);
+ assert.deepEqual(launch({},withTerminal),{...createResult,terminalId:'term-42'});
+ assert.deepEqual(calls[2].args,['--session','default','agent','get','w7:p1']);
+ for(const get of [{code:1,stderr:'pane metadata unavailable'},{stdout:'{"error":{"code":"gone","message":"agent exited"}}'},{stdout:'not json'}] as const){
+  const failedCalls:RunnerInput[]=[];
+  const result=launch({},fakeRunner({create:{stdout:createOk},get},failedCalls));
+  assert.equal(result.terminalId,undefined);
+  assert.deepEqual(result,createResult);
+  assert.equal(failedCalls.length,5);
  }
 });
 test('a cleanup that throws is appended to the launch failure it recovers from',()=>{
@@ -361,7 +375,7 @@ test('workspaces without a matching directory fall through to the existing works
   const runner=fakeRunner({workspaceList,paneList,create:{stdout:createOk}},calls);
   const result=launch({workspace:dir},runner);
   assert.deepEqual(result,createResult);
-  assert.deepEqual(calls.map(call=>[call.args[2],call.args[3]]),[['workspace','list'],['pane','list'],['workspace','create'],['agent','start'],['agent','prompt'],['agent','rename']]);
+  assert.deepEqual(calls.map(call=>[call.args[2],call.args[3]]),[['workspace','list'],['pane','list'],['workspace','create'],['agent','start'],['agent','get'],['agent','prompt'],['agent','rename']]);
   assert.deepEqual(calls[2]!.args,['--session','default','workspace','create','--cwd',dir,'--label',realpathSync(dir).split('/').at(-1),'--no-focus']);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });

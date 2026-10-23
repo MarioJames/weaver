@@ -23,12 +23,13 @@ test('async codex launch preserves exact IDs, explicit argv, unicode labels and 
   const calls: RunnerInput[] = [];
   const host = await launchOwnerAsync({ ...input, asyncRunner: fixture({}, calls) });
   assert.deepEqual(host, { session: 'default', workspaceId: 'exact-workspace', paneId: 'different:pane', createdWorkspace: true, agentName: 'owner-1234abcd-2' });
-  assert.deepEqual(calls.map(call => call.timeout), [30000, 70000, 60000, 15000]);
+  assert.deepEqual(calls.map(call => call.timeout), [30000, 70000, 15000, 60000, 15000]);
   assert.deepEqual(calls[0].args.slice(4, 8), ['--cwd', '/fake/project/', '--label', 'project']);
   assert.deepEqual(calls[1].args, ['--session', 'default', 'agent', 'start', host.agentName, '--kind', 'codex', '--pane', 'different:pane', '--timeout', '60000', '--', '-m', 'explicit-model', '-c', 'model_reasoning_effort="high"']);
-  assert.deepEqual(calls[2].args, ['--session', 'default', 'agent', 'prompt', 'different:pane', input.prompt]);
-  assert.deepEqual(calls[3].args, ['--session', 'default', 'agent', 'rename', 'different:pane', '--clear']);
-  assert.equal(calls.length, 4);
+  assert.deepEqual(calls[2].args, ['--session', 'default', 'agent', 'get', 'different:pane']);
+  assert.deepEqual(calls[3].args, ['--session', 'default', 'agent', 'prompt', 'different:pane', input.prompt]);
+  assert.deepEqual(calls[4].args, ['--session', 'default', 'agent', 'rename', 'different:pane', '--clear']);
+  assert.equal(calls.length, 5);
 });
 
 test('async rename --clear failure is cosmetic and never closes the workspace', async () => {

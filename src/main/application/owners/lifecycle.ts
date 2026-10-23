@@ -7,7 +7,7 @@ import { parseId, text } from '../../../shared/validation';
 import type { MockOwnerHostAdapter } from '../../adapters/logical';
 import { ContinuationService } from '../../continuation';
 import type { TaskManager } from '../../manager';
-import { OwnerLaunchError, type OwnerLaunchResult } from '../../owner-host';
+import { deliverOwnerFollowup, OwnerFollowupError, OwnerLaunchError, type OwnerFollowupOptions, type OwnerLaunchResult } from '../../owner-host';
 import { OwnerIdentity } from '../../owners/identity';
 import { handoffPrompt, rootOwnerPrompt } from '../../owners/prompts';
 import type { PolicyStore } from '../../policy/store';
@@ -34,7 +34,8 @@ export class OwnerLifecycle {
  private readonly identity:OwnerIdentity;
  constructor(private readonly manager:TaskManager,private readonly policy:PolicyStore,private readonly records:TaskRecords,
   private readonly continuation:ContinuationService,private readonly ownerHost:MockOwnerHostAdapter,
-  private readonly runner:Pick<EffectRunner,'runDeferred'>,private readonly isDraining:()=>boolean){this.identity=new OwnerIdentity(manager.store);}
+  private readonly runner:Pick<EffectRunner,'runDeferred'>,private readonly isDraining:()=>boolean,
+  private readonly followupOptions:OwnerFollowupOptions={}){this.identity=new OwnerIdentity(manager.store);}
  /** Work holding this instance's own slots: running plus cancelling. Queued and terminal tasks hold none. */
  runningOn(owner:LogicalOwner):number {return slotGroupCount(this.manager.store.listHeads(),slotGroupFor(owner.id,owner.profileId));}
  /** Every registered instance, its profile, its caller session label and how much of it is busy. */
@@ -110,14 +111,14 @@ export class OwnerLifecycle {
      cleanupAttempted=true;try{yield {kind:'close',host:launched};}catch(error){throw new OwnerLaunchError('OWNER_LAUNCH_FAILED',`Owner launch superseded; host cleanup failed: ${error instanceof Error?error.message:String(error)}`);}
      throw new OwnerLaunchError('OWNER_LAUNCH_FAILED','Owner launch superseded by a newer binding or app shutdown');
     }
-    ownerHost={kind:'herdr',session:launched.session,workspaceId:launched.workspaceId,paneId:launched.paneId,...(launched.tabId?{tabId:launched.tabId}:{}),...(launched.createdWorkspace===undefined?{}:{createdWorkspace:launched.createdWorkspace}),agentName:launched.agentName,launchedAt:new Date().toISOString()};
+    ownerHost={kind:'herdr',session:launched.session,workspaceId:launched.workspaceId,paneId:launched.paneId,...(launched.tabId?{tabId:launched.tabId}:{}),...(launched.terminalId?{terminalId:launched.terminalId}:{}),...(launched.createdWorkspace===undefined?{}:{createdWorkspace:launched.createdWorkspace}),agentName:launched.agentName,launchedAt:new Date().toISOString()};
     fresh.ownerHost=ownerHost;event(fresh,'lifecycle',`Started ${profile} in Herdr (${ownerHost.agentName})`);this.records.put(fresh);
     return {ownerHost};
    }catch(error){
     // update() also notifies listeners after its atomic store write. A listener failure must not dispose a durably visible host.
     const saved=this.manager.store.get(task.id);
     if(ownerHost&&saved.ownerId===ownerId&&(saved.ownerEpoch??0)===epoch&&saved.ownerHost&&
-      saved.ownerHost.session===ownerHost.session&&saved.ownerHost.workspaceId===ownerHost.workspaceId&&saved.ownerHost.paneId===ownerHost.paneId&&saved.ownerHost.tabId===ownerHost.tabId&&saved.ownerHost.createdWorkspace===ownerHost.createdWorkspace&&saved.ownerHost.agentName===ownerHost.agentName&&saved.ownerHost.launchedAt===ownerHost.launchedAt)return {ownerHost:saved.ownerHost};
+      saved.ownerHost.session===ownerHost.session&&saved.ownerHost.workspaceId===ownerHost.workspaceId&&saved.ownerHost.paneId===ownerHost.paneId&&saved.ownerHost.tabId===ownerHost.tabId&&saved.ownerHost.terminalId===ownerHost.terminalId&&saved.ownerHost.createdWorkspace===ownerHost.createdWorkspace&&saved.ownerHost.agentName===ownerHost.agentName&&saved.ownerHost.launchedAt===ownerHost.launchedAt)return {ownerHost:saved.ownerHost};
     const code=error instanceof OwnerLaunchError?error.code:'OWNER_LAUNCH_FAILED';let message=error instanceof Error?error.message:String(error);
     if(launched&&!cleanupAttempted){
      cleanupAttempted=true;
@@ -148,6 +149,42 @@ export class OwnerLifecycle {
    const fresh=this.manager.store.get(taskId);
    event(fresh,'error',`Cancelled parent Agent host cleanup failed: ${redactContext(error instanceof Error?error.message:String(error),8000)}`);this.records.put(fresh);
    return {apiVersion:API_VERSION,ok:false};
+  }
+ }
+ /** Delivers one user follow-up synchronously to the running root owner host and leaves an event trail. */
+ followup(a:Record<string,unknown>):unknown {
+  const task=this.records.task(a);
+  const message=typeof a.message==='string'?a.message.trim():'';
+  if(!message||Array.from(message).length>8000)fail('INVALID_REQUEST','message must be 1–8000 characters after trimming');
+  let source='cli';
+  if(a.source!==undefined){
+   const rawSource=a.source;
+   if(typeof rawSource!=='string')fail('INVALID_REQUEST','source must be a string');
+   const trimmed=(rawSource as string).trim();
+   if(!trimmed||Array.from(trimmed).length>40)fail('INVALID_REQUEST','source must be 1–40 characters after trimming');
+   source=trimmed;
+  }
+  if(task.parentTaskId)fail('INVALID_STATE','Only a root owner task can receive a follow-up instruction');
+  if(task.status!=='running')fail('INVALID_STATE',task.status==='queued'?'Root task has not started; run tasks start first':`Root task is not running (${task.status})`);
+  if(task.executionRole!=='owner')fail('INVALID_STATE','Only a root owner task can receive a follow-up instruction');
+  if(!task.ownerHost)fail('INVALID_STATE','Root task has no Herdr owner host; start the owner first');
+  const host=task.ownerHost!;
+  if(host.kind!=='herdr')fail('INVALID_STATE','Root task owner host is not a Herdr host');
+  const snapshot=this.policy.snapshot();
+  const owner=task.ownerId?this.manager.store.getOwner(task.ownerId):undefined;
+  const profile=owner?snapshot.config.owners[owner.profileId]:undefined;
+  const engineKind=profile?snapshot.config.engines[profile.engine]?.kind:undefined;
+  try{
+   const delivered=deliverOwnerFollowup({host,taskId:task.id,message,source,engineKind:String(engineKind??'')},this.followupOptions);
+   const fresh=this.manager.store.get(task.id);
+   event(fresh,'log',`追加目标（来源：${source}）：\n${redactContext(message,8000)}`);this.records.put(fresh);
+   return {taskId:task.id,delivered:true,deliveredAt:delivered.deliveredAt,ownerHost:{session:host.session,paneId:host.paneId}};
+  }catch(error){
+   if(!(error instanceof OwnerFollowupError))throw error;
+   const fresh=this.manager.store.get(task.id);
+   // The failure trail names the source and code only; the user's original text is never recorded here.
+   event(fresh,'error',`追加目标投递失败（来源：${source}，${error.code}）：未投递用户原文；失败详情见本次命令响应。`);this.records.put(fresh);
+   fail(error.code,error.message);
   }
  }
  /** A root is supervised by its visible owner, with no worker process and no worker admission slot. */

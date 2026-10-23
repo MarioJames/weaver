@@ -16,7 +16,7 @@ import { TaskRecords } from './application/tasks/records';
 import { Results } from './application/tasks/results';
 import { ContinuationService } from './continuation';
 import { TaskManager } from './manager';
-import { launchOwner, herdrOnPath } from './owner-host';
+import { launchOwner, herdrOnPath, type OwnerFollowupOptions } from './owner-host';
 import { PolicyStore } from './policy/store';
 
 /** The one app-owned command handler shared by the loopback UI and CLI. It only wires the application units together:
@@ -32,7 +32,8 @@ export class CommandHandler {
  private readonly continuation:ContinuationService;
   constructor(readonly manager:TaskManager,readonly policy:PolicyStore,
    hostLauncher: typeof launchOwner = launchOwner, herdrPresent: () => boolean = () => herdrOnPath(),
-   diagnostics?: TaskDiagnostics, asyncHost:AsyncOwnerHost = {}, scheduleOptions:Pick<ScheduleOptions,'refreshQuota'|'now'|'dataDir'|'startCli'|'parentFactory'|'checkPiModel'> = {}){
+   diagnostics?: TaskDiagnostics, asyncHost:AsyncOwnerHost = {}, scheduleOptions:Pick<ScheduleOptions,'refreshQuota'|'now'|'dataDir'|'startCli'|'parentFactory'|'checkPiModel'> = {},
+   ownerFollowup:OwnerFollowupOptions = {}){
    const ownerHost=new MockOwnerHostAdapter();
    const isDraining=()=>this.draining;
    this.continuation=new ContinuationService(manager.store,ownerHost);
@@ -44,7 +45,7 @@ export class CommandHandler {
    const dispatch=new Dispatcher(manager,policy,records,this.continuation);
    const retries=new Retries(manager,policy,records,dispatch,applyVendorBlocks);
    const results=new Results(manager,records,ownerHost);
-   const owners=new OwnerLifecycle(manager,policy,records,this.continuation,ownerHost,this.runner,isDraining);
+   const owners=new OwnerLifecycle(manager,policy,records,this.continuation,ownerHost,this.runner,isDraining,ownerFollowup);
    const queries=new Queries(manager,policy,records,diagnostics,{transportStatus:()=>this.transportStatus,herdrPresent},task=>dispatch.nextFor(task));
    const mutations=new Mutations(manager,records,policy,a=>owners.register('owners.spawn',a),task=>owners.closeCancelledRoot(task));
    this.coordinator=new Coordinator(manager,policy,records,dispatch,applyVendorBlocks,taskId=>{results.deliver({taskId});},isDraining);
