@@ -41,7 +41,7 @@ node node_modules/typescript/bin/tsc --noEmit
 
 引擎页仅 OpenCode 卡片提供「清理数据库」。默认保留北京时间今天，关闭保留会话事件裁剪，开启执行后的空间整理。先预览数据库与日志文件大小、待删除与保留数量，再确认不可撤销的删除范围。裁剪开关开启时额外展示同步、回放历史丢失提示；本地消息和工具结果保留。参数修改会使预览失效。
 
-控制面通过 `startEngineCleanup` 启动 preview/apply 后台任务，由 `getEngineCleanup` 读取任务与进度；关闭再打开弹窗仍可查看正在执行的任务。请求失败保留输入，可核对进度和重试。服务端一次只执行一个任务，apply 必须引用同参数、15 分钟内、未使用过的成功预览。执行事务内会再次核对预览选择和表计数；数据库变化时拒绝删除并要求重新预览。原脚本和控制面共用 `src/main/engines/opencode-cleanup-core.mjs`，不存在两份删除 SQL。
+控制面通过 `startEngineCleanup` 启动 preview/apply 后台任务，由 `getEngineCleanup` 读取任务与进度；关闭再打开弹窗仍可查看正在执行的任务。请求失败保留输入，可核对进度和重试。服务端一次只执行一个任务，apply 必须引用同参数、15 分钟内、未使用过的成功预览。执行事务内会再次核对预览选择和表计数；数据库变化时拒绝删除并要求重新预览。原脚本和控制面共用 `src/shared/opencode-cleanup-core.mjs`，不存在两份删除 SQL。
 
 目标路径仅由服务端环境决定：优先 `OPENCODE_DB`，其次 `$XDG_DATA_HOME/opencode/opencode.db`，最后 `$HOME/.local/share/opencode/opencode.db`。RPC 不接受客户端数据库路径。SQLite 维护在独立子进程运行，源代码 tsx、Node bundle 和 Bun standalone 都通过自身隐藏 CLI 入口启动；HTTP 服务不会被同步 SQLite 工作阻塞。服务正常关闭时先拒绝新请求，再等待维护子进程完成（包括压缩）后释放服务资源，不强制中断已提交后的空间整理。任务记录只保存在该服务进程内，重启后需重新预览。
 

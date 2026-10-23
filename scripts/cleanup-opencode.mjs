@@ -3,8 +3,8 @@ import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 
-export { cleanup, cutoffTime } from '../src/main/engines/opencode-cleanup-core.mjs';
-import { cleanup } from '../src/main/engines/opencode-cleanup-core.mjs';
+export { cleanup, cutoffTime } from '../src/shared/opencode-cleanup-core.mjs';
+import { cleanup } from '../src/shared/opencode-cleanup-core.mjs';
 function main() {
   const options = { db: join(process.env.XDG_DATA_HOME || join(homedir(), '.local/share'), 'opencode/opencode.db') };
   const args = process.argv.slice(2);

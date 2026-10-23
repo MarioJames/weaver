@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Descriptions, Input, Modal, Text } from '@lobehub/ui/base-ui';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
 import { createStaticStyles } from 'antd-style';
+import { fullTime } from '../../format/timezone';
 import { NamedSwitch } from '../../ui/NamedControls';
 import type { CleanupReport, EngineCleanupInput, EngineCleanupJob } from '../../../shared/contracts/engine-cleanup';
 
@@ -11,7 +12,8 @@ const css = createStaticStyles(({ css, cssVar }) => ({
 
  actions: css`display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;`,
 }));
-const bytes = (n: number) => `${(n / 1024 / 1024).toLocaleString('zh-CN', { maximumFractionDigits: 2 })} MiB`;
+const megabytes = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
+const bytes = (n: number) => `${megabytes.format(n / 1024 / 1024)} MiB`;
 const total = (values: Record<string, number>) => Object.values(values).reduce((sum, n) => sum + n, 0);
 const vacuumText = (status: string) => ({ completed: '已完成', 'not-requested': '未请求', 'skipped-active-opencode': '数据已清理；OpenCode 正在使用数据库，空间整理已跳过', 'skipped-busy': '数据已清理；数据库正忙，空间整理已跳过', 'vacuum-completed-checkpoint-busy': '压缩已完成；日志文件正忙，暂未收缩' }[status] || '数据已清理，空间整理失败，可稍后重试');
 const reasons: Record<string, string> = { 'active-opencode': 'OpenCode 正在使用这个数据库，请结束相关会话后重试。', 'cleanup-running': '已有清理任务占用数据库，请稍后重试。', 'database-busy': '数据库正忙，本次没有删除数据，请稍后重试。' };
@@ -98,7 +100,7 @@ export function EngineCleanup() {
     </Form>
     {running && <Alert type="info" title="任务在后台运行，关闭窗口后仍会继续" description={job?.progress || '正在启动清理进程…'} />}
     {pollFailed && <Alert type="warning" title="暂时无法读取进度" action={<Button size="small" onClick={() => setPollFailed(false)}>重新读取进度</Button>} />}
-    {report && <><Text>{report.status === 'preview' ? '预览范围' : '清理已完成'}：删除北京时间 {new Date(report.cutoff).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })} 之前更新的会话。</Text><Facts report={report} /></>}
+    {report && <><Text>{report.status === 'preview' ? '预览范围' : '清理已完成'}：删除北京时间 {fullTime(report.cutoff, 'Asia/Shanghai')} 之前更新的会话。</Text><Facts report={report} /></>}
     {job?.result?.status === 'error' && <Alert type="error" title="清理未完成" description={job.result.error} />}
     {job?.result?.status === 'skipped' && <Alert type="warning" title="本次未执行清理" description={reasons[job.result.reason] || job.result.reason} />}
     <div className={css.actions}><Button onClick={() => setOpen(false)}>关闭</Button><Button loading={sending && !confirm} disabled={running || !!daysError || !!idleError} onClick={() => void start('preview')}>预览清理范围</Button><Button type="primary" danger={hasDeletions} disabled={running || !preview || !!daysError || !!idleError} onClick={() => setConfirm(true)}>{hasDeletions ? '确认清理…' : vacuum ? '确认整理空间…' : '确认执行…'}</Button></div>

@@ -32,7 +32,7 @@ function writeHelp(argv: string[], errorFormat: OutputFormat): void {
 
 export async function runCLI(argv: string[], pollRuntime: Partial<PollRuntime> = {}): Promise<number> {
   if (argv[0] === '__weaver-opencode-cleanup') {
-    const { runCleanupChild } = await import('../main/engines/cleanup');
+    const { runCleanupChild } = await import('../shared/engine-cleanup');
     return runCleanupChild(argv.slice(1));
   }
   if (argv[0] === '__weaver-im-parent-host') {
