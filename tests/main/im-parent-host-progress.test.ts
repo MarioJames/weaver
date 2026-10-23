@@ -385,8 +385,10 @@ test('dsh 进度经后台宿主到达 ImService 卡片并收口只剩答案', { 
     } as any);
     for (let i = 0; i < 400; i++) await new Promise(resolve => setImmediate(resolve));
     await new Promise(resolve => setTimeout(resolve, 1500));
-    assert.ok(chunks.some(c => c.includes('⏺ 阶段：开始')), JSON.stringify(chunks));
-    assert.ok(chunks.some(c => c.includes('⏺ 调用工具：bash')), JSON.stringify(chunks));
+    const streamed = chunks.filter(c => !c.startsWith('[setContent]')).join('');
+    assert.equal(streamed, '*深度思考中……*\n*工具调用中……*\n*调用结束*\n\n你好，世界', JSON.stringify(chunks));
+    assert.ok(!streamed.includes('bash'), JSON.stringify(chunks));
+    assert.ok(!streamed.includes('⏺'), JSON.stringify(chunks));
     assert.ok(!chunks.join('').includes('步骤'), JSON.stringify(chunks));
     assert.equal(chunks.at(-1), '[setContent]你好，世界');
     assert.equal((cards as unknown[]).length, 1);

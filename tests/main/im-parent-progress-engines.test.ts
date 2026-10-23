@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { appendFileSync, chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -14,13 +14,15 @@ import type { ImEngineKind } from '../../src/shared/im-engines';
 // card on the production path for every IM engine:
 // ImService -> createBackgroundParentAgent -> __weaver-im-parent-host ->
 // engine adapter, with progress frames carried back over the host wire and
-// rendered as exclusive progress lines in the streaming card.
+// rendered as fixed batched status lines in the streaming card.
 //
 // Per engine the test asserts: the card stream contains exactly one
-// "⏺ 阶段：开始" plus at least the expected "⏺ 调用工具：<label>" lines, every
-// progress line owns its line, the closing setContent carries only the answer,
-// and no fixture-buried secret (SECRET_* / commands / absolute paths) leaks
-// into the card stream.
+// "*深度思考中……*" plus exactly one "*工具调用中……*" batch start with its
+// matching "*调用结束*" close (codex additionally shows one "*继续努力中……*"
+// for its 3rd consecutive tool), every status line owns its line, the closing
+// setContent carries only the answer, and no fixture-buried secret (SECRET_* /
+// commands / absolute paths) leaks into the card stream. Tool/stage names never
+// appear in the stream: only the fixed copy above.
 
 function fakeRunnerFactory() {
   let child: ChildProcess | undefined;
@@ -58,7 +60,12 @@ function fakeRunnerFactory() {
 }
 
 const CLI_MAIN = new URL('../../src/cli/main.ts', import.meta.url).pathname;
-const TRANSCRIPT = '/tmp/weaver-stream-unify-1022/P5/engines-transcript.log';
+// Engine card transcript lives in a test-owned temp directory only: it is created
+// under WEAVER_PARENT_TEST_TMPDIR (or TMPDIR) and recycled by test.after. It never
+// touches any pre-existing external evidence path.
+const TRANSCRIPT_ROOT = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-engines-transcript-'));
+test.after(() => { rmSync(TRANSCRIPT_ROOT, { recursive: true, force: true }); });
+const TRANSCRIPT = join(TRANSCRIPT_ROOT, 'engines-transcript.log');
 const transcriptSections: string[] = [];
 
 interface EngineCase {
@@ -268,17 +275,29 @@ for (const c of ENGINES) {
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       const streamText = chunks.filter(entry => !entry.startsWith('[setContent]')).join('');
-      assert.ok(chunks.some(entry => entry.includes('⏺ 阶段：开始')), `${c.key} card never showed the start stage: ${JSON.stringify(chunks)}`);
+      const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;
+      assert.equal(count(streamText, '*深度思考中……*'), 1, `${c.key} thinking line: ${JSON.stringify(chunks)}`);
+      assert.equal(count(streamText, '*工具调用中……*'), 1, `${c.key} tool batch start: ${JSON.stringify(chunks)}`);
+      assert.equal(count(streamText, '*调用结束*'), 1, `${c.key} batch close: ${JSON.stringify(chunks)}`);
+      assert.equal(
+        count(streamText, '*继续努力中……*'),
+        c.key === 'codex' ? 1 : 0,
+        `${c.key} encourage line: ${JSON.stringify(chunks)}`,
+      );
+      assert.ok(!streamText.includes('⏺'), `${c.key} leaked old per-tool rendering: ${JSON.stringify(chunks)}`);
       for (const tool of c.tools) {
-        assert.ok(chunks.some(entry => entry.includes(`⏺ 调用工具：${tool}`)), `${c.key} card never showed tool ${tool}: ${JSON.stringify(chunks)}`);
+        assert.ok(!streamText.includes(tool), `${c.key} card leaked tool name ${tool}: ${JSON.stringify(chunks)}`);
       }
-      // Every progress line owns its line: no body text may share it.
+      // Every status line owns its line: only the fixed copy may appear.
+      const FIXED = ['*深度思考中……*', '*工具调用中……*', '*继续努力中……*', '*调用结束*'];
       for (const line of streamText.split('\n')) {
-        if (line.includes('⏺')) assert.match(line.trim(), /^⏺ (阶段|调用工具)：.+$/, `${c.key} progress line shares its line: ${JSON.stringify(line)}`);
+        if (line.includes('*')) assert.ok(FIXED.includes(line.trim()), `${c.key} status line shares its line: ${JSON.stringify(line)}`);
       }
-      // The closing setContent carries only the answer; progress is transient.
+      // The closing setContent carries only the answer; status is transient.
       assert.equal(chunks.at(-1), `[setContent]${c.answer}`, `${c.key} closing content: ${JSON.stringify(chunks)}`);
       assert.equal(cards.length, 1);
+      const closingCard = (cards[0] as { card: { body: { elements: { content?: string }[] } } }).card;
+      assert.equal(closingCard.body.elements[0]?.content, c.answer, `${c.key} updateCard leaked status`);
       // Fixture-buried secrets (args, commands, paths) must not reach the card.
       const serialized = chunks.join('');
       for (const secret of c.secrets) {
@@ -303,10 +322,8 @@ for (const c of ENGINES) {
 }
 
 test('落盘七引擎卡片序列证据', { timeout: 15000 }, async () => {
-  mkdirSync('/tmp/weaver-stream-unify-1022/P5', { recursive: true });
   assert.equal(transcriptSections.length, ENGINES.length, `missing engine sections: ${transcriptSections.length}/${ENGINES.length}`);
   const body = `${transcriptSections.join('\n')}\n`;
   for (const key of ENGINES.map(e => e.key)) assert.ok(body.includes(`=== ${key} `), `transcript missing ${key}`);
   writeFileSync(TRANSCRIPT, body, { mode: 0o600 });
-  appendFileSync(TRANSCRIPT, '');
 });
