@@ -39,6 +39,7 @@ import { dbVendorLadder } from './storage/vendor-limits';
 import { reattach } from './application/tasks/reattach';
 import { acquireInstanceLock, type InstanceLock } from './instance-lock';
 import { createViteOptimizerTracker, settleViteCache, TempJanitor } from './janitor';
+import { formatStoreStatus } from './im/task-status';
 import { dbJanitorStore } from './storage/janitor-runs';
 import { janitorSettings } from '../shared/policy/settings';
 
@@ -247,7 +248,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       store: dbJanitorStore(store!.db),
       log: message => console.error(`Temp janitor: ${message}`),
     });
-    im = new ImService({ dataDir, policy: () => policy!.snapshot(), ...options.im, taskStatus: () => `Weaver 任务共 ${store!.listSummaries().length} 项。` });
+    im = new ImService({ dataDir, policy: () => policy!.snapshot(), ...options.im, taskStatus: () => formatStoreStatus(store!) });
     quotaProber = options.quotaProber ?? new QuotaProber({ snapshotStore: dbQuotaStore(store.db) });
     // Ladders and probe answers live in the same weaver.db, so a restart keeps its penalties and history.
     stall = new StallMonitor({

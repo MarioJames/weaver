@@ -12,7 +12,7 @@ export interface TaskProjection {
 const TASK_FIELDS = [
   'id', 'title', 'instruction', 'workspace', 'acceptanceCriteria', 'constraints', 'executionRole',
   'parentTaskId', 'failure', 'ownerEpoch', 'ownerLastActivityAt', 'continuationPolicy',
-  'continuationHistory', 'contextPack', 'ownerHost', 'revision', 'scheduled', 'queueReason',
+  'continuationHistory', 'contextPack', 'ownerHost', 'ownerReport', 'revision', 'scheduled', 'queueReason',
   'retryOf', 'ownerId', 'packageId', 'acknowledged', 'reviewState', 'reviewComment', 'supersededBy',
   'supersededReason', 'dispatch', 'createdAt', 'updatedAt', 'status', 'progress', 'summary', 'run',
 ] as const;

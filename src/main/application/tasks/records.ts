@@ -9,7 +9,7 @@ export const digest=(value:unknown)=>createHash('sha256').update(canonical(value
 export const terminal=(t:Task)=>['completed','failed','cancelled'].includes(t.status);
 /** The attempt ended on a vendor rate limit or exhausted quota. */
 export const vendorLimited=(t:Task)=>t.status==='failed'&&(t.failure?.kind==='rate_limit'||t.failure?.kind==='quota');
-export function publicTask<T extends Pick<Task,'owner'|'run'>>(task:T){const {owner,run,...rest}=task;if(!run)return rest;const visible={...run};delete visible.pid;delete visible.stateDir;delete visible.logs;delete visible.nonce;delete visible.logIdentity;return {...rest,run:visible};}
+export function publicTask<T extends Pick<Task,'owner'|'run'>>(task:T){const {owner,run,...rest}=task;const withReport={...rest,ownerReport:(rest as Record<string,unknown>).ownerReport ?? null};if(!run)return withReport;const visible={...run};delete visible.pid;delete visible.stateDir;delete visible.logs;delete visible.nonce;delete visible.logIdentity;return {...withReport,run:visible};}
 /** Looks tasks and owners up for the command units that share one manager; every miss is the same NOT_FOUND answer. */
 export class TaskRecords {
  constructor(readonly manager:TaskManager){}

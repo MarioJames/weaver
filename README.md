@@ -299,6 +299,29 @@ review: { "expectedRevision": <read the current revision again after ack; ack it
 
 A revision copied from the pre-ack step is already stale for the review and returns `REVISION_CONFLICT`; read it fresh before each submission.
 
+## Root progress: owner push, overview pull
+
+运行中的 owner root（`executionRole:'owner'` 且无 parent）由 root owner 主动推送进度；Master、Bot 状态菜单与用户读同一份全局概览。进度写入通道是 `tasks report`，聚合读取是 `tasks overview`；向运行中 owner 追加目标走正式 `tasks followup`（见 Skill 与 Master guideline），不要复用 `tasks describe`（只回填标题/验收标准，首个子任务后即锁定）冒充送达。版本能力先按实际 CLI 能力检测：旧 `0.7.4` 基线既无 `followup` 也无 `report`/`overview`；正式 `0.7.6` 与 `0.7.5` 提供正式 `followup`（`taskId` + `message` 1–8000 + 可选 `source` ≤40），`report`/`overview` 从正式 `0.7.6` 提供。`delivered:true` 只表示 Herdr 接受了追加消息，不表示 owner 已处理、不表示新报告已生成，绝不把 `delivered` 当新报告读。
+
+```sh
+weaver --data-dir <instance> --owner-file <credentialPath> tasks report --task-id <root> --input - --command-id report-0731-01 <<'JSON'
+{"summary":"已复现并定位到竞态，补丁验证中","percent":42,"phase":"验证","blockers":["等待 code review"],"nextSteps":["合入补丁"]}
+JSON
+weaver --data-dir <instance> tasks overview --output json
+weaver --data-dir <instance> tasks get --task-id <root> --view full --output json
+weaver --data-dir <instance> tasks followup --help --output json
+```
+
+字段以同一实例的 `weaver --data-dir <instance> tasks report --help --output json`、`tasks overview --help --output json`、`tasks followup --help --output json` 与 `tasks get --help --output json` 为准：`summary` 必填 1–2000；`percent` 可选（有限数 0–100，省略则保留 root 进度，不从子任务推算）；`phase` 可选 1–120；`blockers`/`nextSteps` 可选数组，各 ≤10 项、每项 ≤500；`expectedRevision` 可选。每次成功上报更新最新报告与 revision 并追加一条 progress 事件；同一 `--command-id` 幂等（先查 `weaver operations get --command-id <id>`）。只有该任务的 owner 凭证能上报运行中的 owner root（`report` 额外带 `--owner-file`，`overview`/`get`/`followup help` 绑定同一 `--data-dir` 即可）；上报时机为 describe/split 之后、每次 dispatch/review 轮次、阻塞或失败时立即、complete 之前，内容简洁、可核查、不含凭据。`tasks overview` 返回全部运行中 owner root 的 `ownerReport`（`summary`/`percent|null`/`phase|null`/`blockers`/`nextSteps`/`reportedAt`）、`reportAgeSeconds|null`、`reportStale`、直接子任务状态计数与 `lastError`，不含子任务详情；`tasks get --view full` 返回同一个 `ownerReport`，未上报的旧任务为 `ownerReport:null`，`--view brief` 的键集合保持不变。
+
+Staleness 只描述报告的新鲜度：`reportStale` 为真（`floor(上报年龄秒数) >= staleAfterSeconds`，默认 900 秒；未上报的 root 恒为 `reportAgeSeconds:null`、`reportStale:false`）表示该上报已过期、需要 owner 重新上报，不表示任务失败。stale 的正确反应是等 owner 的下一轮 `tasks report`，不是重试/取消/宣布失败；但用户明确追加目标走正式 `followup` 即时送达，不要说成“只能等下一轮上报”。Master 回答进度时先读同一实例的 `tasks overview`、先讲阻塞与新鲜度，只在用户明确追问某个任务时才查它的子任务。
+
+Master 与 Bot 默认从 `tasks overview` 读运行中的 root 清单和进度：`tasks list` 还会返回 children，不能拿它当默认根任务库存，也不能把子任务拼成 root 进展。只有用户明确追问某个 root 的子任务、历史或排队情况时，才按既有 `--status`/`--view`/`--fields`/分页读 `tasks list`。旧 CLI 没有 `tasks overview` 时，明确说明该版本没有整体 root 报告；可以读单个 `tasks get`，但不要用 children 冒充根进展。Bot 状态文本逐 root 显示标题、上报进度/阶段（有才显示）、摘要、阻塞、新鲜度和直接子任务计数；未上报显示 root 进度与最近错误；没有运行中的根任务时只用一句中文说明没有运行中的根任务，不展示实现命令。文本只做逐字段截断，不做整体截断，正常的 12/20 个 root 必须全部出现。
+
+Phase1 保持 push 优先：owner 在自己的执行上下文里决定上报什么、什么时候上报；任何拉取式追问（定时 ping 运行中的 owner、向忙终端注入消息）都会打断执行、跨越 Herdr 会话边界。进度上报通道之外没有轮询式进度拉取；已实现的正式送达是 `tasks followup`（服务只读核验运行中根任务的 Herdr 宿主 pane/workspace/tab/terminal/engine 后同步投递，`delivered:true` 仅表示 Herdr 已接受追加消息），绝不等同于直接 Herdr 注入，Agent 不得直接 Herdr 注入/终端写入。尚未实现的是带关联 ID、超时与回应状态的结构化 pull 进度请求，仍只是设计（DESIGN ONLY，未实现、不做原型、不添加 pull 产品）。用户明确追加目标按实际 CLI 能力检测走正式 `followup`；完整版本区分、送达语义与追加目标处理规范见 [root 进度文档](docs/root-task-progress.md)。
+
+部署唯一完整流程见 [root 进度文档](docs/root-task-progress.md)（构建/备份/停服/安装/技能/验读/回滚顺序，同一实例绑定、fail-closed 备份恢复、worker 默认不取消、回滚不动数据库）。本任务以 `npm run build` 语义作为开发验收引用；**未生成或安装 standalone 发布产物、未部署、未停服/重启共享服务、未覆盖已安装的二进制或技能、未修改生产数据库**。备份路径不是凭据；文档与示例不出现任何 secret。
+
 ## Health and continuation retries
 
 `weaver tasks health --task-id <id>` reports `starting` before a real worker’s first output, then `working`, `waiting_model`, `running_command` or `stalled` with silence time and CPU activity. CPU is the union of the worker scope and the worker CLI's whole process tree, so a command moved to another cgroup by `systemd-run --scope` still counts. A live command suppresses a stall; `stalled` requires no live command, silence and continuous CPU-idle for 5 minutes, or a command past `herdr.max_command_minutes` (`reason:'command_timeout'`). Missing CPU evidence never proves a stall. Finished tasks return `ended` with their final `taskStatus`. Check health before declaring a worker stuck. `tasks wait` returns early with reason `stalled`, health and a retry/cancel hint; `tasks watch` reports the transition and keeps watching.

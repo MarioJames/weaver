@@ -16,6 +16,7 @@ import type { CommandArgs } from '../commands/types';
 import type { WorkerUnblockResult } from '../workers/unblock';
 import { TASK_GET_FIELDS, TASK_LIST_FIELDS, briefTaskFields, projectTaskView, taskProjection } from './projection';
 import { publicTask, type TaskRecords } from './records';
+import { buildTaskOverview } from './owner-report';
 import { taskStatusFilter } from './status';
 
 /** Scale hint, not an admission rule: admission is per owner instance, so this sum over enabled profiles caps nothing by itself. */
@@ -100,5 +101,16 @@ export class Queries {
     return this.monitor().unblockWorker(worker);
    }
  artifactRead(a:CommandArgs):unknown{const task=this.records.task(a);const artifactId=parseId(a.artifactId,'artifact ID');const artifact=task.artifacts.find(v=>v.id===artifactId);if(!artifact)fail('NOT_FOUND','Artifact not found');return artifact;}
- operationGet(a:CommandArgs):unknown{const id=text(a.commandId,'commandId',120);const scope=ownerScopeOf(a);const receipt=this.manager.store.getReceipt(scope?ownerReceiptKey(scope,id):`local-demo:${id}`);if(!receipt)fail('NOT_FOUND','Command receipt not found');return {commandId:id,state:receipt!.response?'settled':'indeterminate',response:receipt!.response};}
+  operationGet(a:CommandArgs):unknown{const id=text(a.commandId,'commandId',120);const scope=ownerScopeOf(a);const receipt=this.manager.store.getReceipt(scope?ownerReceiptKey(scope,id):`local-demo:${id}`);if(!receipt)fail('NOT_FOUND','Command receipt not found');return {commandId:id,state:receipt!.response?'settled':'indeterminate',response:receipt!.response};}
+  overview(a:CommandArgs):unknown{
+    if (Object.keys(a).some(key => !['ownerId', 'staleAfterSeconds'].includes(key))) fail('INVALID_REQUEST', 'Unexpected overview field');
+    let ownerId: string | undefined;
+    if (a.ownerId !== undefined) ownerId = parseId(a.ownerId, 'owner ID');
+    let staleAfterSeconds: number | undefined;
+    if (a.staleAfterSeconds !== undefined) {
+      if (!Number.isInteger(a.staleAfterSeconds) || Number(a.staleAfterSeconds) < 0 || Number(a.staleAfterSeconds) > 86400) fail('INVALID_REQUEST', 'staleAfterSeconds must be an integer between 0 and 86400');
+      staleAfterSeconds = Number(a.staleAfterSeconds);
+    }
+    return buildTaskOverview(this.manager.store, { ...(ownerId !== undefined ? { ownerId } : {}), ...(staleAfterSeconds !== undefined ? { staleAfterSeconds } : {}) });
+  }
 }

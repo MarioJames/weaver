@@ -1,13 +1,39 @@
 import { randomUUID } from 'node:crypto';
 import type { LogicalOwner } from '../../../shared/contracts/owners';
-import type { Task, WorkPackage } from '../../../shared/contracts/tasks';
+import type { OwnerReport, Task, WorkPackage } from '../../../shared/contracts/tasks';
 import { PENDING_TASK_TITLE, object, parseId, parseTaskInput, parseWorkerRecord, text } from '../../../shared/validation';
+import { redactReportSecrets, stripReportControls } from './owner-report';
 import { event } from '../../domain/tasks';
 import type { TaskManager } from '../../manager';
 import type { PolicyStore } from '../../policy/store';
+import { ownerScopeOf } from '../../owners/identity';
 import { CommandError, fail } from '../commands/errors';
 import type { CommandArgs } from '../commands/types';
 import { publicTask, terminal, type TaskRecords } from './records';
+
+const REPORT_KEYS = ['taskId', 'summary', 'percent', 'phase', 'blockers', 'nextSteps', 'expectedRevision'] as const;
+
+/**
+ * Strip C0 controls (keeping tab/LF/CR), DEL and C1 first — before redaction, so a control
+ * character cannot split a sensitive key/flag to evade masking — then mask credential-shaped
+ * text (key=value/Bearer/URL/token plus CLI `--flag value` forms incl. quoted and newline
+ * splits), trim and bound. Errors never echo the input.
+ */
+function cleanReportText(raw: string, max: number): string {
+  const cleaned = redactReportSecrets(stripReportControls(raw)).trim();
+  if (!cleaned) fail('INVALID_REQUEST', 'Report text must not be empty');
+  return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
+}
+
+function reportStringList(value: unknown, field: 'blockers' | 'nextSteps'): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 10) fail('INVALID_REQUEST', `${field} must be an array of at most 10 items`);
+  return (value as unknown[]).map(raw => {
+    if (typeof raw !== 'string' || !raw.trim() || raw.length > 500) fail('INVALID_REQUEST', `Invalid ${field} entry`);
+    const item: string = raw as string;
+    return cleanReportText(item, 500);
+  });
+}
 
 /** Task state changes an owner or worker asks for: create, describe, freeze a package, report, complete and cancel. */
 export class Mutations {
@@ -68,7 +94,45 @@ export class Mutations {
     this.manager.store.transaction(()=>{this.manager.store.putPackage(pkg);task.packageId=pkg.id;event(task,'lifecycle','Frozen work package created');this.records.put(task);});return pkg;
    }
  workersComplete(a:CommandArgs):unknown{const task=this.records.task(a);this.records.revise(task,a);if(task.executionRole==='owner')fail('INVALID_STATE','Report owner roots with tasks complete');return this.completeReport(task,a);}
-  cancel(a:CommandArgs):unknown{
+  report(a:CommandArgs):unknown{
+    if (Object.keys(a).some(key => !(REPORT_KEYS as readonly string[]).includes(key))) fail('INVALID_REQUEST', 'Unexpected report field');
+    const scope = ownerScopeOf(a);
+    if (typeof scope !== 'string' || !scope) fail('UNAUTHORIZED', 'Owner credentials are required');
+    if (a.expectedRevision !== undefined && (!Number.isSafeInteger(a.expectedRevision) || Number(a.expectedRevision) < 0)) fail('INVALID_REQUEST', 'expectedRevision must be a nonnegative safe integer');
+    if (typeof a.summary !== 'string' || !a.summary.trim() || a.summary.length > 2000) fail('INVALID_REQUEST', 'Invalid summary (maximum 2000 characters)');
+    let percent: number | null = null;
+    if (a.percent !== undefined) {
+      // Explicit null is rejected: the contract allows omitting percent (read back as null)
+      // or a finite 0–100 number, but null is not a valid input value.
+      if (a.percent === null || typeof a.percent !== 'number' || !Number.isFinite(a.percent) || a.percent < 0 || a.percent > 100) fail('INVALID_REQUEST', 'Invalid percent (must be a finite number 0–100)');
+      percent = a.percent as number;
+    }
+    let phase: string | null = null;
+    if (a.phase !== undefined) {
+      // Same as percent: omitted reads back as null, but explicit null is rejected.
+      const rawPhase: unknown = a.phase;
+      if (rawPhase === null || typeof rawPhase !== 'string' || !rawPhase.trim() || rawPhase.length > 120) fail('INVALID_REQUEST', 'Invalid phase (maximum 120 characters)');
+      phase = cleanReportText(rawPhase as string, 120);
+    }
+    const blockers = reportStringList(a.blockers, 'blockers');
+    const nextSteps = reportStringList(a.nextSteps, 'nextSteps');
+    const rawSummary: unknown = a.summary;
+    const summary = cleanReportText(rawSummary as string, 2000);
+    const task = this.records.task(a);
+    this.records.revise(task, a);
+    if (task.ownerId !== scope) fail('FORBIDDEN', 'Task does not belong to the authenticated owner');
+    if (task.parentTaskId !== undefined) fail('INVALID_STATE', 'Only a root task accepts owner progress reports');
+    if (task.executionRole !== 'owner') fail('INVALID_STATE', 'Only an owner root accepts progress reports');
+    if (task.status !== 'running') fail('INVALID_STATE', 'Only a running owner root accepts progress reports');
+    const report: OwnerReport = { summary, percent, phase, blockers, nextSteps, reportedAt: new Date().toISOString() };
+    task.ownerReport = report;
+    if (percent !== null) task.progress = percent;
+    const detail = [`Owner progress report`, phase ? `[${phase}]` : null, percent !== null ? `${percent}%` : null].filter(Boolean).join(' ');
+    event(task, 'progress', `${detail}: ${summary}`.slice(0, 2000));
+    this.records.put(task);
+    return publicTask(task);
+  }
+   cancel(a:CommandArgs):unknown{
    const task=this.records.task(a);this.records.revise(task,a);
    if(a.supersededBy===undefined){if(terminal(task))return {task:publicTask(task),alreadyTerminal:true};if(task.executionRole==='owner')for(const child of this.manager.store.listHeads().filter(t=>t.parentTaskId===task.id&&!terminal(t)))this.manager.cancel(child.id);const cancelled=this.manager.cancel(task.id);if(task.executionRole==='owner'&&cancelled.ownerHost)this.closeCancelledRoot(cancelled);return publicTask(cancelled);}
    // Design-change replacement: every refusal happens before any state changes.

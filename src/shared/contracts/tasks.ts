@@ -69,7 +69,18 @@ export interface AgentRun {
   recovery?: { state: 'pending'; reason: string; since: string };
 }
 export interface TaskFailure { kind: 'early_exit'|'no_output'|'rate_limit'|'quota'|'auth'|'vendor'|'cancelled'|'other'|'unknown_outcome'; message: string; exitCode?: number; stderrTail?: string; vendorError?: string; retryAt?: string }
-export interface Task extends TaskInput { executionRole?: 'owner'; parentTaskId?: string; title: string; failure?: TaskFailure; ownerEpoch?: number; ownerLastActivityAt?: string; continuationPolicy?: ContinuationPolicy; continuationHistory?: HandoffRecord[]; contextPack?: ContextPack; ownerHost?: TaskOwnerHost; revision?: number; scheduled?: boolean; queueReason?: { code: 'waiting_for_capacity' | 'policy_blocked' | 'frozen_route_changed' | 'workspace_changed' | 'launch_blocked'; message: string }; retryOf?: string; ownerId?: string; packageId?: string; acknowledged?: boolean; reviewState?: 'pending' | 'accepted' | 'rejected'; reviewComment?: string; /** Design-change replacement: the sibling child (same parentTaskId) that takes over this cancelled task. */ supersededBy?: string; /** Why the superseding sibling takes over (1–500 chars). */ supersededReason?: string; dispatch?: TaskDispatch; id: string; createdAt: string; updatedAt: string; status: TaskStatus; progress: number; events: TaskEvent[]; artifacts: Artifact[]; run?: AgentRun; summary?: string }
+/** The latest owner progress report on a running owner root. Percent/phase are null when omitted. */
+export interface OwnerReport { summary: string; percent: number | null; phase: string | null; blockers: string[]; nextSteps: string[]; reportedAt: string }
+/** One running owner root in the global overview. Child counts are literal direct-child status counts (retries included). */
+export interface RootTaskOverview {
+  id: string; title: string; ownerId: string | null; status: TaskStatus; progress: number;
+  ownerReport: OwnerReport | null; reportAgeSeconds: number | null; reportStale: boolean;
+  childCounts: { total: number; queued: number; running: number; cancelling: number; completed: number; failed: number; cancelled: number };
+  lastError: string | null;
+}
+/** Global running-root overview shared by tasks.overview and Bot. */
+export interface TaskOverview { generatedAt: string; staleAfterSeconds: number; roots: RootTaskOverview[] }
+export interface Task extends TaskInput { executionRole?: 'owner'; parentTaskId?: string; title: string; failure?: TaskFailure; ownerEpoch?: number; ownerLastActivityAt?: string; continuationPolicy?: ContinuationPolicy; continuationHistory?: HandoffRecord[]; contextPack?: ContextPack; ownerHost?: TaskOwnerHost; revision?: number; scheduled?: boolean; queueReason?: { code: 'waiting_for_capacity' | 'policy_blocked' | 'frozen_route_changed' | 'workspace_changed' | 'launch_blocked'; message: string }; retryOf?: string; ownerId?: string; packageId?: string; acknowledged?: boolean; reviewState?: 'pending' | 'accepted' | 'rejected'; reviewComment?: string; /** Design-change replacement: the sibling child (same parentTaskId) that takes over this cancelled task. */ supersededBy?: string; /** Why the superseding sibling takes over (1–500 chars). */ supersededReason?: string; dispatch?: TaskDispatch; id: string; createdAt: string; updatedAt: string; status: TaskStatus; progress: number; events: TaskEvent[]; artifacts: Artifact[]; run?: AgentRun; summary?: string; /** Latest owner progress report; absent on tasks persisted before the report channel. */ ownerReport?: OwnerReport | null }
 export type WorkerRecord =
  | { type: 'log'; message: string }
  | { type: 'progress'; percent: number; message: string }
