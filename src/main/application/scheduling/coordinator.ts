@@ -1,3 +1,4 @@
+import type { OpenCodeAccountAdmission } from './opencode-accounts';
 import type { Task } from '../../../shared/contracts/tasks';
 import { event, slotGroupCount, slotGroupFor } from '../../domain/tasks';
 import type { TaskManager } from '../../manager';
@@ -19,7 +20,7 @@ export class Coordinator {
  private delivered=new Map<string,string>();
  constructor(private readonly manager:TaskManager,private readonly policy:PolicyStore,private readonly records:TaskRecords,
   private readonly dispatch:Pick<Dispatcher,'routeOf'|'decideExecution'|'capacityWait'|'queueWaitText'>,private readonly applyVendorBlocks:()=>void,
-  private readonly deliver:(taskId:string)=>void,private readonly isDraining:()=>boolean){}
+  private readonly deliver:(taskId:string)=>void,private readonly isDraining:()=>boolean,private readonly accounts?:OpenCodeAccountAdmission){}
  private queueBlocked(task:Task, code:NonNullable<Task['queueReason']>['code'], message:string):void {
   const bounded=redactContext(message,700);
   if(task.queueReason?.code===code&&task.queueReason.message===bounded)return;
@@ -44,6 +45,7 @@ export class Coordinator {
    let phase:NonNullable<Task['queueReason']>['code']='policy_blocked';
    try{
     const frozen=task.dispatch;
+    const accountWait=this.accounts?.admit(task);if(accountWait){this.queueBlocked(task,'launch_blocked',accountWait);continue;}
     // A whole-engine vendor block sends the task to another engine; a worker-level one only takes that worker out.
     const vendorBlocks=this.policy.snapshot().blocks.filter(block=>block.engine===frozen.engine&&block.by===VENDOR_BLOCK_BY&&(!block.release_at||Date.parse(block.release_at)>Date.now()));
     const engineBlocked=vendorBlocks.some(block=>block.worker===undefined);

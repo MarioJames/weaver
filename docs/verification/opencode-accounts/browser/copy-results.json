@@ -1,0 +1,42 @@
+{
+  "status": "passed",
+  "app_url": "http://127.0.0.1:44227/",
+  "checks": {
+    "unauthenticated_reconnect_instruction_visible": true,
+    "unsupported_free_and_balance_limit_visible": true,
+    "read_operation_does_not_switch_boundary_visible": true,
+    "no_obsolete_weaver_cannot_login_or_switch_claim": true,
+    "other_engine_recovery_tests_unchanged": true
+  },
+  "typecheck": "passed",
+  "renderer_tests": {
+    "passed": 12,
+    "failed": 0
+  },
+  "artifact_errors": [],
+  "console": {
+    "warnings": 0,
+    "errors": 0
+  },
+  "network": {
+    "unexpected_failures": 0,
+    "errors": 0
+  },
+  "evidence": [
+    "copy-unauthenticated",
+    "copy-unsupported",
+    "copy-unauthenticated.json",
+    "copy-unsupported.json"
+  ],
+  "boundary": "Real source UI/Chrome; empty Console pool and API Key unauthenticated/unsupported statuses supplied by in-memory fixtures. No real account, credentials, subscription, login or switch accessed.",
+  "quota_view_sha256": "3508aa0b11d404f43797c3e5fa92c7741cc41c65acc7df789ff6e86042a35fa1",
+  "cleanup": {
+    "scope": "dev-weaver-opencode-copy-01a16bd0.scope",
+    "scope_stopped": true,
+    "chrome_closed": true,
+    "profile_removed": true,
+    "isolated_data_home_xdg_db_and_scripts_removed": true,
+    "two_original_bh_captures_removed_after_archive": true,
+    "parent_scratch_and_prior_final_evidence_preserved": true
+  }
+}

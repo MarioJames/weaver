@@ -79,8 +79,8 @@ export function quotaRecoveryText(record: EngineQuotaRecord): string {
   // OpenCode Go windows share the opencode kind with free and third-party routes: a 100% Go
   // plan window never pauses the engine, and limits keep arriving through model feedback.
   if (record.engine === 'opencode' && record.status === 'exhausted') return 'Go 套餐窗口已耗尽；这不代表余额、免费模型或其他路线不可用。实际限额按对应模型反馈处理。';
-  if (record.engine === 'opencode' && record.status === 'unauthenticated') return '请在 OpenCode 中重新连接 OpenCode Go 后手动刷新。Weaver 不会登录、刷新凭据或切换账户。';
-  if (record.engine === 'opencode' && record.status === 'unsupported') return '免费模型与按量余额没有官方只读额度接口；连接 OpenCode Go 后可查看套餐窗口。Weaver 不会改动认证。';
+  if (record.engine === 'opencode' && record.status === 'unauthenticated') return '额度读取本身不切换账号。请在「账号登录与切换」或 OpenCode 中重新连接 OpenCode Go 后手动刷新。';
+  if (record.engine === 'opencode' && record.status === 'unsupported') return '免费模型与按量余额没有官方只读额度接口；连接 OpenCode Go 后可查看套餐窗口。额度读取本身不切换账号。';
   if (record.status === 'unauthenticated') return '请在原生 CLI 中确认登录后手动刷新。Weaver 不会登录、刷新凭据或切换账户。';
   if (quotaThirdParty(record)) return '用量由供应商统计。切回官方订阅后可再次刷新；Weaver 不会改动 cc-switch 或 CLI 配置。';
   if (record.status === 'unsupported') return '当前已有认证无法用于此额度读取。请核对原生 CLI 的订阅登录方式；Weaver 不会改动认证。';

@@ -1,0 +1,17 @@
+{
+  "pool": [
+    {
+      "stale": true,
+      "status": "exhausted"
+    },
+    {
+      "stale": true,
+      "status": "exhausted"
+    },
+    {
+      "stale": true,
+      "status": "exhausted"
+    }
+  ],
+  "text": "当前用于调度：beta.long.account.for.narrow.screen@example.test · 同名组织与用于窄屏测试的较长团队名称\n正在自动切换调度账号，请稍候。\n所有已登录账号额度均已耗尽，等待恢复后再调度。\nalpha@example.test · 团队 Alpha\nbeta.long.account.for.narrow.screen@example.test · 同名组织与用于窄屏测试的较长团队名称\nbeta.long.account.for.narrow.screen@example.test · 同名组织 / 第二个工作空间\n当前用于调度\n正在查看：beta.long.account.for.narrow.screen@example.test · 同名组织与用于窄屏测试的较长团队名称\n尚未确认此账号的 Go 凭证会随 Console 登录切换。\n上次观测：账户额度耗尽\nGo 每周窗口\n已用 100%\n10-24 23:19 重置\nGo 套餐窗口已耗尽；这不代表余额、免费模型或其他路线不可用。实际限额按对应模型反馈处理。\n已过期 · 23:19 观测\n当前账号耗尽时，调度会在确认其他账号仍有额度后自动切换；运行中任务结束后切换，不重跑已失败任务。"
+}

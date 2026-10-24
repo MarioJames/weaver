@@ -15,6 +15,7 @@ export interface OpenCodeConsoleIdentity {
   account: string;
   fingerprint: string;
   renewable: boolean;
+  expiresAt: number | null;
 }
 
 const nonemptyToken = (value: unknown): string | undefined =>
@@ -29,7 +30,9 @@ export function openCodeDataDir(env: NodeJS.ProcessEnv): string {
 }
 
 export function openCodeConsoleDbPath(env: NodeJS.ProcessEnv): string {
-  return path.join(openCodeDataDir(env), 'opencode', 'opencode.db');
+  const override = env.OPENCODE_DB;
+  if (override === ':memory:' || (override && path.isAbsolute(override))) return override;
+  return path.join(openCodeDataDir(env), 'opencode', override || 'opencode.db');
 }
 
 function normalizeOrigin(url: unknown): string | null {
@@ -65,6 +68,18 @@ function expiryMs(value: unknown): number | null {
  * Never reads email or refresh-token values; renewal need is a boolean CASE only.
  */
 export function readOpenCodeConsole(env: NodeJS.ProcessEnv, now: number): OpenCodeConsoleIdentity | null {
+  return readConsole(env, now);
+}
+
+/** Internal only: callers must first verify this account/org pair against native listOrgs. Never changes the active cursor. */
+export function readOpenCodeConsoleAccount(env: NodeJS.ProcessEnv, now: number, accountID: string, orgID: string): OpenCodeConsoleIdentity {
+  if (!nonemptyId(accountID) || !nonemptyId(orgID)) throw new QuotaFailure('unsupported', '原生 Console 账号参数无效');
+  const result = readConsole(env, now, { accountID, orgID });
+  if (!result) throw new QuotaFailure('unauthenticated', '未找到原生 Console 登录');
+  return result;
+}
+
+function readConsole(env: NodeJS.ProcessEnv, now: number, selected?: { accountID: string; orgID: string }): OpenCodeConsoleIdentity | null {
   const file = openCodeConsoleDbPath(env);
   let db: DatabaseSync | null = null;
   try {
@@ -87,24 +102,29 @@ export function readOpenCodeConsole(env: NodeJS.ProcessEnv, now: number): OpenCo
     } catch {
       // readOnly already prevents writes; query_only is a best-effort guard.
     }
-    let stateRows: Array<{ active_account_id: unknown; active_org_id: unknown }>;
-    try {
-      stateRows = db.prepare('SELECT active_account_id, active_org_id FROM account_state LIMIT 2').all() as Array<{ active_account_id: unknown; active_org_id: unknown }>;
-    } catch {
-      throw new QuotaFailure('unsupported', '无法安全读取原生 Console 登录');
+    let activeAccountId = selected?.accountID;
+    let activeOrgId = selected?.orgID;
+    if (!selected) {
+      let stateRows: Array<{ active_account_id: unknown; active_org_id: unknown }>;
+      try {
+        stateRows = db.prepare('SELECT active_account_id, active_org_id FROM account_state LIMIT 2').all() as Array<{ active_account_id: unknown; active_org_id: unknown }>;
+      } catch {
+        throw new QuotaFailure('unsupported', '无法安全读取原生 Console 登录');
+      }
+      if (stateRows.length === 0) return null;
+      if (stateRows.length !== 1) throw new QuotaFailure('unsupported', '原生 Console 登录账户不明确，不会使用其他账号凭据');
+      const rawAccountId: unknown = stateRows[0].active_account_id;
+      // Only a genuinely absent cursor (NULL or blank) means "no active login" and
+      // keeps the verified API-key path. A present-but-invalid cursor is unusable
+      // Console state and must fail closed, never falling back to another key.
+      if (rawAccountId === null || rawAccountId === undefined) return null;
+      if (typeof rawAccountId === 'string' && rawAccountId.trim() === '') return null;
+      activeAccountId = nonemptyId(rawAccountId);
+      if (!activeAccountId) throw new QuotaFailure('unsupported', '原生 Console 登录账户不明确，不会使用其他账号凭据');
+      activeOrgId = nonemptyId(stateRows[0].active_org_id);
+      if (!activeOrgId) throw new QuotaFailure('unsupported', '原生 Console 登录组织缺失，不会使用其他账号凭据');
     }
-    if (stateRows.length === 0) return null;
-    if (stateRows.length !== 1) throw new QuotaFailure('unsupported', '原生 Console 登录账户不明确，不会使用其他账号凭据');
-    const rawAccountId: unknown = stateRows[0].active_account_id;
-    // Only a genuinely absent cursor (NULL or blank) means "no active login" and
-    // keeps the verified API-key path. A present-but-invalid cursor is unusable
-    // Console state and must fail closed, never falling back to another key.
-    if (rawAccountId === null || rawAccountId === undefined) return null;
-    if (typeof rawAccountId === 'string' && rawAccountId.trim() === '') return null;
-    const activeAccountId = nonemptyId(rawAccountId);
-    if (!activeAccountId) throw new QuotaFailure('unsupported', '原生 Console 登录账户不明确，不会使用其他账号凭据');
-    const activeOrgId = nonemptyId(stateRows[0].active_org_id);
-    if (!activeOrgId) throw new QuotaFailure('unsupported', '原生 Console 登录组织缺失，不会使用其他账号凭据');
+    if (!activeAccountId || !activeOrgId) throw new QuotaFailure('unsupported', '原生 Console 账号组织无效');
     let rows: Array<{ url: unknown; access_token: unknown; token_expiry: unknown; has_refresh: unknown }>;
     try {
       rows = db.prepare(
@@ -139,7 +159,7 @@ export function readOpenCodeConsole(env: NodeJS.ProcessEnv, now: number): OpenCo
       throw new QuotaFailure('unauthenticated', '原生 Console 登录已过期，请在 OpenCode 中重新登录后手动刷新');
     }
     const fingerprint = createHash('sha256').update(account).update('\0').update(token).digest('hex');
-    return { token, orgId: activeOrgId, origin, account, fingerprint, renewable: row.has_refresh === 1 };
+    return { token, orgId: activeOrgId, origin, account, fingerprint, renewable: row.has_refresh === 1, expiresAt: expires };
   } finally {
     try {
       db.close();

@@ -1,0 +1,21 @@
+{
+  "scope": "dev-weaver-opencode-browser-01a16bd0.scope",
+  "scope_active": false,
+  "chrome_closed": true,
+  "profile_removed": true,
+  "runtime_home_xdg_data_db_removed": true,
+  "scratch_fixture_and_scripts_removed": true,
+  "original_capture_ids_removed": [
+    "20261023T231234",
+    "20261023T231321",
+    "20261023T231342",
+    "20261023T231352",
+    "20261023T231837",
+    "20261023T231932",
+    "20261023T232003",
+    "20261023T232042",
+    "20261023T232111"
+  ],
+  "shared_services_and_parent_scratch_preserved": true,
+  "reason": "All final evidence archived; no remaining dependency on verification runtime."
+}

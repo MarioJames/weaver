@@ -1,0 +1,10 @@
+{
+  "job": {
+    "id": "fixture-job-15",
+    "status": "authorizing",
+    "userCode": "ABCD-EFGH",
+    "verificationUrl": "https://opencode.ai/device?fixture=1"
+  },
+  "restores": 2,
+  "startCalls": 1
+}

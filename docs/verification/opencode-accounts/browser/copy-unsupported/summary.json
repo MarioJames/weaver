@@ -1,0 +1,22 @@
+{
+  "target": "http://127.0.0.1:44227/",
+  "mode": "task",
+  "session": "weaver-opencode-copy-01a16bd0",
+  "reuse_page": true,
+  "profile_dir": "/tmp/weaver-opencode-accounts.nYEX6C/copy-profile",
+  "timestamp": "20261023T233051",
+  "evidence_dir": "/home/mocha/opensource/weaver/docs/verification/opencode-accounts/browser/copy-unsupported",
+  "artifacts": {
+    "screenshot": "screenshot.png",
+    "dom": "dom.json",
+    "console": "console.json",
+    "network_xhr": "network-xhr.json",
+    "network_errors": "network-errors.json"
+  },
+  "counts": {
+    "network_xhr": 33,
+    "network_errors": 0
+  },
+  "artifact_errors": [],
+  "profile_removed_after_capture": true
+}

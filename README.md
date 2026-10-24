@@ -152,7 +152,7 @@ weaver engines scan           # PATH + --version probe of the fixed engine catal
 weaver policy get             # saved owners, workers, weights, blocks, revision
 weaver policy history         # every saved policy revision (number, time, source)
 weaver workers probe-status   # free-channel probe schedule, ladder state and history
-weaver quota get              # 只读 weaver.db 中最近一次 Codex / Claude Code / Grok / OpenCode Go 额度（OpenCode 仅展示，不自动阻断），不联网
+weaver quota get              # 只读 weaver.db 中最近一次 Codex / Claude Code / Grok / OpenCode Go 额度（OpenCode 不增删整引擎阻断），不联网
 weaver engines health         # stall penalty summaries; no history
 weaver engines penalty --engine <id>  # retained history for one engine
 ```
@@ -274,7 +274,9 @@ weaver quota refresh --help --output json
 
 成功观测保鲜 5 分钟后标记陈旧，每次观测写入 `weaver.db` 的 `quota_records`，进程重启后 `quota get` 仍可读；每家网络请求至少间隔 60 秒，并遵守接口的 `Retry-After`。除内置 `quota.refresh` 定时任务按 `quota.interval_minutes` 触发外，没有后台轮询或强制绕过。只有新鲜、明确的账户耗尽会增加自有阻断，只有新鲜 `available` 会解除自有阻断；未知、失败或过期观测保留旧阻断。OpenCode 记录仅展示、不自动增删自有阻断。人工和其他来源的阻断保持原样；已过期的人工引擎阻断妨碍自动阻断时，刷新返回 `QUOTA_POLICY_CONFLICT`（HTTP 409），整次策略合并不落盘。
 
-探测只读取已有原生登录凭据，通过固定 HTTPS GET 调用四种额度的非公开/未文档化额度接口（OpenCode 有两种原生登录来源，各走各自固定 GET，不承诺为公开稳定 API）；不刷新或改写登录、不启动推理。OpenCode 当前登录优先走只读 `opencode.db` 的当前 Console 账号/org（`GET https://opencode.ai/console/api/go/status`，`Bearer` 原生 access + `x-org-id`，仅向该官方同源发送）。只有原生库确实没有 active account（库缺失、state 表为空、无 active account 游标）时，才用 `auth.json` 的 Go API key（`GET https://opencode.ai/zen/go/v1/usage`）；Console 库存在但 active 账号过期、缺 org、state 歧义或多行、来源非官方同源、token 无效或读取失败时，一律按安全状态失败，不回退到另一个凭据，也不在账号间挑选。两者只展示三窗口百分比（美元/used/total/remaining 保持 `null`，reset 用服务端时间），不读 cookie、不刷新 token、不改原生库、不切换账号。接口来源、原生凭据路径、状态解释及完整输出示例见 [额度 CLI 契约](docs/agent-interface.md#31-原生账户额度)。Grok CLI 订阅额度与 xAI API 钱包、RPM/TPM 或 token 费用不同；OpenCode Go 仪表是套餐计量百分比，不是实际美元消费。
+当前引擎探针 `QuotaProber` 只读取已有原生登录凭据，通过固定 HTTPS GET 调用四种额度的非公开/未文档化额度接口（OpenCode 有两种原生登录来源，各走各自固定 GET，不承诺为公开稳定 API）；不刷新或改写登录、不启动推理。OpenCode 当前登录优先走只读 `opencode.db` 的当前 Console 账号/org（`GET https://opencode.ai/console/api/go/status`，`Bearer` 原生 access + `x-org-id`，仅向该官方同源发送）。只有原生库确实没有 active account（库缺失、state 表为空、无 active account 游标）时，才用 `auth.json` 的 Go API key（`GET https://opencode.ai/zen/go/v1/usage`）；Console 库存在但 active 账号过期、缺 org、state 歧义或多行、来源非官方同源、token 无效或读取失败时，一律按安全状态失败，不回退到另一个凭据，也不在账号间挑选。这两条只读探针只展示三窗口百分比（美元/used/total/remaining 保持 `null`，reset 用服务端时间），不读 cookie、不刷新 token、不改原生库、不切换账号。接口来源、原生凭据路径、状态解释及完整输出示例见 [额度 CLI 契约](docs/agent-interface.md#31-原生账户额度)。Grok CLI 订阅额度与 xAI API 钱包、RPM/TPM 或 token 费用不同；OpenCode Go 仪表是套餐计量百分比，不是实际美元消费。
+
+OpenCode 多账号额度池是独立于上述只读探针的运行路径：账号发现和显式额度刷新通过原生 CLI/API 查询组织，可能由 OpenCode 自身续期 token；显式切换和调度 admission 可改变原生 active 账号/组织。引擎页按账号和组织查看额度，查看操作不切换账号；没有 Console 账号时保留当前 API Key 的额度。切换仅影响之后新启动的进程，不重放失败任务。接口、空闲保护与 Go 凭证限制见 [OpenCode 账号与额度](docs/opencode-accounts.md)。
 
 ## Result acceptance
 

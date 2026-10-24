@@ -44,6 +44,10 @@ Weaver 是本地任务控制面，交付三件套：
           └─ ContinuationService（src/main/continuation.ts，owner 手动上下文；接手/根任务提示词在 src/main/owners/prompts.ts，脱敏规则在 src/shared/redact.ts，上下文截断封装在 src/main/redact-context.ts）
 ```
 
+OpenCode Console 账号由 `engines/opencode-accounts.ts` 复用原生 CLI 与短时 Basic loopback API 管理；不换 HOME/XDG/DB、不直接写原生账号库。`quota/opencode-pool.ts` 按账号与组织独立观测，`storage/opencode-account-pool.ts` 用独立 TaskStore KV 保存安全缓存与冷却，原 `QuotaProber` 继续只投影当前引擎额度。Segmented 只选择查看对象，不切账号。
+
+`scheduling/opencode-accounts.ts` 是唯一账号 admission gate：首个 Go 任务按需发现账号；确认当前耗尽/失败后才在全局 OpenCode 空闲时原生切到近期确认有额度的 Go 账号。Coordinator 的 queued admission、TaskManager 所有 start/beforeSpawn、人工账号变更与受控探测共用它。TaskManager 定义通用 launch guard port，应用服务注入实现；run 持久记录安全账号身份，vendor failure 按捕获身份写入 pool，保留其他来源与旧无归因 block，失败任务不自动重放。启用中的 OpenCode IM 与同用户外部进程阻止切换，既有会话不被重启或删除。关闭 runtime 先关闭 admission、取消/等待 pool 与 helper，再关闭 store；详见 [账号与额度](opencode-accounts.md)。
+
 ### 2.1 源码目录、依赖方向与命令/RPC 契约
 
 ```text
@@ -57,7 +61,7 @@ src/
     migrate.ts            有序 SQLite 迁移（SCHEMA_VERSION=11，追加式）
     commands.ts           CommandHandler 门面：只装配应用层单元
     application/          用例层：commands/{gateway,registry,errors}、tasks/{queries,mutations,records,results,recovery,reattach}、
-                          scheduling/{coordinator,dispatch,retry,vendor-limits}、owners/lifecycle、engines/unblock、workers/unblock
+                          scheduling/{coordinator,dispatch,retry,vendor-limits,opencode-accounts}、owners/lifecycle、engines/unblock、workers/unblock
     transport/handlers.ts 每个 RPC 方法一个 handler 的分派层
     rpc.ts                RPC 请求解析与 HTTP 状态码映射
     http.ts local-ipc.ts  两个传输适配器：loopback HTTP 与已认证 Unix socket 帧
@@ -69,9 +73,9 @@ src/
     stall.ts free-channel.ts quota/   三个监视/观测模块，判定归各自模块
     policy/               routing.ts（路由与配置校验）、preview.ts、blocks.ts（PolicyBlockService）、quota.ts、json-schema.ts + config.schema.json + config.default.json
     adapters/             worker JSONL 适配与真实引擎 launcher（adapters/cli/{argv,launch,normalize,redact,scope,vendor-errors}）
-    engines/              probe/control/hello/models
+    engines/              probe/control/hello/models/opencode-accounts
     owner-host.ts owners/prompts.ts continuation.ts
-    quota/                credentials/index/providers/opencode-console/third-party/timestamps
+    quota/                credentials/index/providers/opencode-console/opencode-pool/third-party/timestamps
     system/executables.ts 可执行文件查找（PATH 扫描、X_OK、realpath）
     manager.ts protocol.ts workspace.ts embedded.ts redact-context.ts
   cli/                    main.ts run.ts catalog.ts parse.ts input.ts output.ts client.ts poll-task.ts、
@@ -101,14 +105,14 @@ src/
 
 - `weaver.db`：内置 `node:sqlite` DatabaseSync，WAL + synchronous=FULL，所有写者共用同一个连接与事务。结构由有序迁移步骤建立，`PRAGMA user_version` 记录已执行到哪一步（当前 11；第 11 步移除已下线的 zcode 引擎：删除 kind 为 zcode 的引擎行及其子 Agent、父 Agent、引用、封禁与运行状态，历史任务原样保留）：空库从 0 逐步升到最新，已是最新时为空操作，版本比本构建新则拒绝启动；后续结构变更只追加新步骤。
   - 任务面（步骤 1、6）：`tasks` 保存主字段及不含 events/artifacts 的 JSON；`task_events`、`artifacts`（content 独立列）、`owners`、`packages`、`receipts`、`kv`（sequence）按访问模式分表；`vendor_worker_limits`（worker，无法确定 worker 时是 `@engine:<id>`；level、last_trigger_at）是**唯一**的供应商限流阶梯（步骤 6 起为按引擎的 `vendor_limits`，步骤 7 改为按 worker）：派发失败路径与免费渠道探测路径都读写它，窗口同为 2 小时、级数同为 10 → 30 → 60 分钟，两条路径互相可见。命令 intent、spawn 前状态都先同步提交再产生进程效果。保留每任务 500 events、20 artifacts（内容 ≤32,000 字符）。流式输出只缓冲被改动任务，500ms 合并检查点；同步命令同时提交待落盘流式记录，失败回滚数据库及内存 sequence/缓冲。子 Agent 运行记录（task 的 `run.evidence`）登记 `promptPath`、仅 pi 引擎才有的 `sessionDir` 与从事件流解析出的厂商会话 ID（`vendorSessionId`，如 codex thread id、claude session id），`tasks get` 原样返回。
-  - 策略（步骤 2）：`policy_engines`、`policy_owners`、`policy_owner_workers`（owner 的子 Agent 顺序与权重）、`policy_workers`、`policy_settings`（`herdr`、`chatgpt_review`、`quota`、`free_channel_probe`、`display` 等按键一行）、`policy_blocks`，整体上限 256 KiB、500 blocks；`revision` 乐观锁，保存在单个事务里整体替换各表并追加一行 `policy_revisions`（修订号、时间、来源 `save`/`rollback:N`/`import`、完整快照），取代原来的 `.bak`/`pre-*` 备份文件；回滚把某修订的快照作为新修订写入，从不原地改写历史。`blocks` 是唯一的持久阻断来源，额度自动阻断（`by:"weaver-quota:<kind>"`）与卡住惩罚（`by:"weaver-stall"`）都写在这里，人工条目按来源保留。`display.timezone` 是可选 IANA 时区名，保存时按 Intl 校验。owners 与 workers 不再有 proxy 字段——迁移步骤 8 把它从表和历史快照里删除，agent 进程一律沿用服务进程自身环境，没有按角色的代理设置。
+  - 策略（步骤 2）：`policy_engines`、`policy_owners`、`policy_owner_workers`（owner 的子 Agent 顺序与权重）、`policy_workers`、`policy_settings`（`herdr`、`chatgpt_review`、`quota`、`free_channel_probe`、`display` 等按键一行）、`policy_blocks`，整体上限 256 KiB、500 blocks；`revision` 乐观锁，保存在单个事务里整体替换各表并追加一行 `policy_revisions`（修订号、时间、来源 `save`/`rollback:N`/`import`、完整快照），取代原来的 `.bak`/`pre-*` 备份文件；回滚把某修订的快照作为新修订写入，从不原地改写历史。`blocks` 是通用路由阻断的持久来源；OpenCode 多账号的额度冷却另存专用 KV，仅由 Go admission 使用。额度自动阻断（`by:"weaver-quota:<kind>"`）与卡住惩罚（`by:"weaver-stall"`）都写在这里，人工条目按来源保留。`display.timezone` 是可选 IANA 时区名，保存时按 Intl 校验。owners 与 workers 不再有 proxy 字段——迁移步骤 8 把它从表和历史快照里删除，agent 进程一律沿用服务进程自身环境，没有按角色的代理设置。
   - 惩罚（步骤 3）：`stall_penalties`（每引擎一行：level、lastTriggerAt、needsAttention、blockedUntil、nextProbeAt、probeSuccesses、head）与 `stall_history`（全局最近 50 条，每条 `engine`、`level`、`at` 与 JSON 明细：`tasks` 至多 50 个完整任务 ID 并以 `taskCount` 保留总数、触发时的 `stalledMinutes`，或探测结果 `probe:{ok, ms, error?}` 加 `model`/`effort`，或恢复 `message`；探测错误经脱敏并截到 200 字符）。`blockedUntil`/`nextProbeAt` 是名义期限与下次探测时刻（epoch ms，不是策略 `release_at`），`probeSuccesses` 是 level 3 的连续成功数。重启后期限、连击与记录接着用；某次读取的语义校验失败（level/连击超出整数范围、时间戳无效等）则整份忽略、记一行日志，阶梯从 0 重新开始——但策略里那条 stall block 还在，下一 tick 会按它把级别补到至少 1 并重新武装探测，不会静默放行。只有监控器与手动解除会改这些表。
   - 免费渠道探测（步骤 4）：`free_probe_workers`（每个 free_channel 子 Agent 一行的未决问题与探测排程；`mode='rate_limit'` 的行不再自存级数——步骤 9 把这些行的 level/last_trigger_at 并入 `vendor_worker_limits`：同 worker 两边都有时 last_trigger_at 取较新者，两次触发相差不足 2 小时取较高 level、否则取较新一方的 level，随后这些行的 level 清零、last_trigger_at 置空；stall 与 quota 模式的阶梯仍在本表）与 `free_probe_history`（最近 50 条探测记录）。
   - 额度（步骤 5）：`quota_records`（每引擎最近一次观测）与 `quota_state`（凭据指纹、上次账号、下次请求时刻）。
   - 读取入口都是 CLI：`tasks get/list`、`policy get`、`policy history`、`engines health/penalty`、`workers probe-status`、`quota get`。
   - 旧 JSON 数据的一次性迁入不在产品内：产品里没有任何 JSON 自动导入；迁移由仓库外的单文件脚本在部署时手动对真实数据执行（目标库有数据即拒绝；在临时库构建并校验后原子替换；不改不删源 JSON）。回滚方式是停服务后移走 `weaver.db`，原 JSON 未被改动（需旧版本二进制读取）。
 
-额度观测：`QuotaProber` 只读原生认证并通过固定非公开/未文档化 HTTPS GET 获取四种额度数据（Codex、Claude Code、Grok 各一个，OpenCode 按当前 Console 账号/org 与 Go API key 各走一个，不承诺为公开稳定 API），观测保鲜 5 分钟（之后显示陈旧）、每 provider 请求间隔至少 60 秒，每次观测写入 `quota_records`，重启后可读；`quota get` 无网络，`quota refresh` 显式触发探测与自有 blocks 合并。内置 `quota.refresh` 定时任务（`builtinSchedule`，`src/main/schedules/service.ts` 的 `builtin:'quota.refresh'`）按已保存的 `quota.auto_refresh` / `quota.interval_minutes`（缺省开启、15 分钟，5–1440）触发，到期后对已启用且 `quota_refresh` 生效的引擎所属 kind 走同一探测与合并路径；进程启动后首轮至少等一个检查周期。Codex/Claude Code/Grok 的新鲜耗尽观测可增删自有阻断，OpenCode Go 套餐窗口仅展示三窗口百分比（金额为 `null`，reset 用服务端时间）、永不自动增删阻断。`policy.blocks` 仍是唯一持久阻断来源；人工来源不被自动覆盖，遇到妨碍施加自动阻断的过期 foreign 唯一 key 返回原子冲突。请求/认证边界及错误语义见 [额度接口](agent-interface.md#31-原生账户额度)。
+额度观测：`QuotaProber` 只读原生认证并通过固定非公开/未文档化 HTTPS GET 获取四种额度数据（Codex、Claude Code、Grok 各一个，OpenCode 按当前 Console 账号/org 与 Go API key 各走一个，不承诺为公开稳定 API），观测保鲜 5 分钟（之后显示陈旧）、每 provider 请求间隔至少 60 秒，每次观测写入 `quota_records`，重启后可读；`quota get` 无网络，`quota refresh` 显式触发探测与自有 blocks 合并；其中 OpenCode 的 runtime 路径还更新账号额度池，原生列表查询可能触发 OpenCode 自身的 token 续期，额度池查询本身不切换账号。内置 `quota.refresh` 定时任务（`builtinSchedule`，`src/main/schedules/service.ts` 的 `builtin:'quota.refresh'`）按已保存的 `quota.auto_refresh` / `quota.interval_minutes`（缺省开启、15 分钟，5–1440）触发，到期后对已启用且 `quota_refresh` 生效的引擎所属 kind 走同一探测与合并路径；进程启动后首轮至少等一个检查周期。Codex/Claude Code/Grok 的新鲜耗尽观测可增删自有阻断，OpenCode Go 套餐窗口展示三窗口百分比（金额为 `null`，reset 用服务端时间），不自动增删整 OpenCode 引擎阻断；已确认账号耗尽与 run 失败可交给账号 admission 等待或切到其他近期确认可用账号。`policy.blocks` 保持通用路由阻断的权威；OpenCode 多账号的账号冷却不写整引擎阻断，单独保存在专用 KV。人工来源不被自动覆盖，遇到妨碍施加自动阻断的过期 foreign 唯一 key 返回原子冲突。请求/认证边界及错误语义见 [额度接口](agent-interface.md#31-原生账户额度)。
 
 写入模型均在 SQLite 事务内完成（`src/main/store.ts`）；中断的写命令先以 durable intent（receipt 写入）暴露为 `COMMAND_INDETERMINATE`，要求用 `operations.get` 查收据并核对现状，不做自动重放。命令收据键为 `local-demo:<commandId>`，同键同参返回原响应、同键不同参拒绝 `IDEMPOTENCY_CONFLICT`。这不是 exactly-once 外部执行保证，也没有事务 outbox。
 

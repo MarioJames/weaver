@@ -1,0 +1,45 @@
+{
+  "globalQuota": {
+    "records": [
+      {
+        "checkedAt": "2026-10-24T03:13:52.230Z",
+        "detail": "内存 fixture 额度，无真实订阅请求",
+        "engine": "opencode",
+        "observedAt": "2026-10-24T03:13:52.230Z",
+        "retryAt": null,
+        "source": "fixture",
+        "stale": false,
+        "status": "available",
+        "windows": [
+          {
+            "durationMinutes": 10080,
+            "id": "fixture-week",
+            "label": "API-key 独立 Go 窗口",
+            "model": null,
+            "remaining": null,
+            "remainingPercent": 58,
+            "resetsAt": "2026-10-25T03:13:52.230Z",
+            "scope": "account",
+            "total": null,
+            "unit": "percent",
+            "used": null,
+            "usedPercent": 42
+          }
+        ]
+      }
+    ]
+  },
+  "legacyPercentVisible": false,
+  "legacyWindowVisible": false,
+  "pool": {
+    "accounts": [],
+    "active": {
+      "accountID": "fixture-b",
+      "orgID": "org-b"
+    },
+    "switching": false
+  },
+  "scroll": 390,
+  "visibleText": "当前用于调度：尚未确认\n尚无账号额度记录。点击「读取全部账号额度」，或在「账号登录与切换」中登录账号。\n读取缓存\n读取全部账号额度\n当前账号耗尽时，调度会在确认其他账号仍有额度后自动切换；运行中任务结束后切换，不重跑已失败任务。",
+  "width": 390
+}

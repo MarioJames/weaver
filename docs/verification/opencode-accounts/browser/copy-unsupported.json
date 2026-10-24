@@ -1,0 +1,8 @@
+{
+  "calls": [
+    "getPool",
+    "getPool"
+  ],
+  "state": "unsupported",
+  "text": "当前凭证额度（含 API Key）单独显示；登录 Console 后可按账号和组织查看额度。\n当前认证方式不支持\n隔离 fixture：当前凭证不可用于额度读取\n免费模型与按量余额没有官方只读额度接口；连接 OpenCode Go 后可查看套餐窗口。额度读取本身不切换账号。\n23:30 检查"
+}

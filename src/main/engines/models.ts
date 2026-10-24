@@ -151,6 +151,11 @@ export class EngineModelLister {
   private readonly inflight = new Map<string, Promise<EngineModelList>>();
   constructor(private readonly options: ModelListerOptions = {}) {}
 
+  invalidate(engine: string): void {
+    this.cache.delete(engine);
+    this.inflight.delete(engine);
+  }
+
   list(input: EngineModelListInput): Promise<EngineModelList> {
     const key = input.engine;
     const clock = (this.options.now ?? (() => new Date()))().getTime();
@@ -159,7 +164,7 @@ export class EngineModelLister {
     const active = this.inflight.get(key);
     if (active) return active;
     const job = this.execute(input).then(list => {
-      if (list.status === 'ok' || list.status === 'unsupported') this.cache.set(key, { at: clock, list });
+      if (this.inflight.get(key) === job && (list.status === 'ok' || list.status === 'unsupported')) this.cache.set(key, { at: clock, list });
       return list;
     }).finally(() => { if (this.inflight.get(key) === job) this.inflight.delete(key); });
     this.inflight.set(key, job);

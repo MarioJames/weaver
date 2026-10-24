@@ -33,6 +33,8 @@ export interface TaskDispatch {
   adapter?: string; workspace?: string; engineKind?: string; workspaceIdentity?: string;
 }
 export interface AgentRun {
+  /** Safe native Console identity captured before launch; never a token. */
+  consoleAccount?: { accountID: string; orgID: string; generation: number };
   id: string; adapter: string; execution?: 'real' | 'mock' | 'native'; status: AgentStatus;
   engine?: string; model?: string; effort?: string; workspace?: string;
   scopeUnit?: string; evidence?: CliAgentEvidence;

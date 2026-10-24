@@ -1,3 +1,9 @@
+import { createBackgroundParentAgent } from './im/parent-background';
+import { OpenCodeAccountAdmission, externalOpenCodeBusy } from './application/scheduling/opencode-accounts';
+import { OpenCodeQuotaPool, type OpenCodeQuotaPoolOptions } from './quota/opencode-pool';
+import { dbOpenCodePoolStore } from './storage/opencode-account-pool';
+import type { OpenCodeConsoleAccounts } from '../shared/contracts/opencode-accounts';
+import { OpenCodeAccounts, readOpenCodeActiveRef, type OpenCodeAccountsOptions } from './engines/opencode-accounts';
 import { EngineCleanupJobs } from './engines/cleanup';
 import { ImService, ImServiceError, type ImServiceOptions } from './im/service';
 import { spawn } from 'node:child_process';
@@ -54,6 +60,14 @@ export interface RuntimeOptions {
   workerScript?: string;
   /** Internal dependency injection for isolated runtime tests; never supplied over RPC. */
   quotaProber?: QuotaProber;
+  /** Main-process-only dependency injection; never accepted from RPC. */
+  openCode?: {
+    env?: NodeJS.ProcessEnv;
+    accountsFactory?: (options: OpenCodeAccountsOptions) => OpenCodeAccounts;
+    poolFactory?: (options: OpenCodeQuotaPoolOptions) => OpenCodeQuotaPool;
+    readActive?: typeof readOpenCodeActiveRef;
+    externalBusy?: () => string | undefined;
+  };
   ownerHost?: AsyncOwnerHost;
   im?: Pick<ImServiceOptions, 'parentFactory' | 'channelFactory' | 'now'>;
   /** Internal dependency injection for isolated janitor tests; never supplied over RPC. */
@@ -123,6 +137,9 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   let store: TaskStore | undefined;
   let policy: PolicyStore | undefined;
   let quotaProber: QuotaProber | undefined;
+  let openCodeQuotaPool: OpenCodeQuotaPool | undefined;
+  let accountAdmission: OpenCodeAccountAdmission | undefined;
+  let mutationSnapshot: OpenCodeConsoleAccounts | undefined;
   let stall: StallMonitor | undefined;
   let freeProbe: FreeChannelProbeMonitor | undefined;
   let http: HttpRuntime | undefined;
@@ -131,21 +148,45 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   let janitor: TempJanitor | undefined;
   /** Tests started by node --test must opt in with an isolated root; an unguarded sweep could delete the real /tmp. */
   const testContext = Boolean(process.env.NODE_TEST_CONTEXT);
+  const assertOpenCodeAccess = () => {
+    if (testContext && !options.openCode?.env && !options.openCode?.accountsFactory) throw new RpcError('OPENCODE_TEST_ISOLATION', '测试必须显式提供隔离的 OpenCode 环境或原生服务替身。');
+  };
+  const assertOpenCodePoolAccess = () => {
+    if (testContext && !options.openCode?.env && !options.openCode?.poolFactory) throw new RpcError('OPENCODE_TEST_ISOLATION', '测试必须显式提供隔离的 OpenCode 凭据环境或账号额度服务替身。');
+  };
+  const readOpenCodeCursor = () => {
+    if (testContext && !options.openCode?.env && !options.openCode?.readActive) throw new RpcError('OPENCODE_TEST_ISOLATION', '测试必须提供隔离的 OpenCode 游标读取。');
+    return (options.openCode?.readActive ?? readOpenCodeActiveRef)(options.openCode?.env);
+  };
   const inflight = new Set<Promise<unknown>>();
   const greetings = new AbortController();
   // One `pi --list-models` cache for the models page, the pre-launch check of tasks, hello and free-channel probes.
   const modelLister = new EngineModelLister();
   const checkPiModel = createPiModelCheck(modelLister);
+  const withOpenCodeLease = <T>(kind: string, job: () => Promise<T>): Promise<T> => {
+    const release = kind === 'opencode' ? accountAdmission?.lease() : undefined;
+    try { return job().finally(() => release?.()); } catch (error) { release?.(); throw error; }
+  };
   const hellos = new HelloJobs(route => {
     const engine = policy?.snapshot().config.engines[route.engine];
-    return track(sayHi({ ...route, kind: engine?.kind ?? route.engine }, { root: join(dataDir, 'agent-state'), signal: greetings.signal, checkPiModel }));
+    return track(withOpenCodeLease(engine?.kind ?? route.engine, () => sayHi({ ...route, kind: engine?.kind ?? route.engine }, { root: join(dataDir, 'agent-state'), signal: greetings.signal, checkPiModel })));
   });
   const track = <T>(job: Promise<T>): Promise<T> => {
     inflight.add(job);
     job.then(() => { inflight.delete(job); }, () => { inflight.delete(job); });
     return job;
   };
-  const cleanups = new EngineCleanupJobs(track);
+  const startScheduledCli: typeof startCliAgent = (input, beforeSpawn) => {
+    const release = input.engine === 'opencode' ? accountAdmission?.lease() : undefined;
+    try { const proc = startCliAgent(input, beforeSpawn); proc.once('close', () => release?.()); return proc; }
+    catch (error) { release?.(); throw error; }
+  };
+  const scheduledParent: typeof createParentAgent = async (input, internals) => {
+    const release = input.engineKind === 'opencode' ? accountAdmission?.lease() : undefined;
+    try { const session = await createParentAgent(input, internals); return { ...session, send: session.send.bind(session), close: async () => { await session.close(); release?.(); } }; }
+    catch (error) { release?.(); throw error; }
+  };
+  const cleanups = new EngineCleanupJobs(track, () => accountAdmission?.lease() ?? (() => {}));
   const requireReady = () => {
     if (draining) throw new RpcError('APP_DRAINING', 'Weaver is shutting down');
     if (!ready || !commands || !manager || !store || !policy || !quotaProber) throw new RpcError('APP_STARTING', 'Weaver is still starting');
@@ -155,7 +196,9 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   function refreshQuota(input: QuotaRefreshInput) {
     const active = requireReady();
     return track((async () => {
+      if (testContext && !options.quotaProber && !options.openCode?.env && (input.engine === 'opencode' || input.engine === undefined)) throw new RpcError('OPENCODE_TEST_ISOLATION', '测试必须提供隔离的额度环境或引擎额度替身。');
       const quota = await active.prober.refresh(input);
+      if ((input.engine === 'opencode' || input.engine === undefined) && (!testContext || options.openCode?.env || options.openCode?.poolFactory)) { await openCodeQuotaPool?.refresh(); accountAdmission?.refreshed(); }
       if (draining) throw new RpcError('APP_DRAINING', 'Weaver is shutting down');
       let result;
       try { result = applyQuotaSnapshot(active.policy, quota, input); }
@@ -167,7 +210,24 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       return result;
     })());
   }
+  const openCodeAccounts = (options.openCode?.accountsFactory ?? (config => new OpenCodeAccounts(config)))({
+    env: options.openCode?.env,
+    accessGuard: assertOpenCodeAccess,
+    mutationGuard: () => accountAdmission?.beginMutation() ?? (() => {}),
+    observed: snapshot => accountAdmission?.observe(snapshot),
+    changed: async snapshot => {
+      modelLister.invalidate('opencode');
+      accountAdmission?.observe(snapshot);
+      mutationSnapshot = snapshot;
+      try { await refreshQuota({ engine: 'opencode' }); }
+      finally { mutationSnapshot = undefined; }
+    },
+  });
   const handlers = createRpcHandlers({
+    openCodeAccounts,
+    get openCodeQuotaPool() { return openCodeQuotaPool; },
+    assertOpenCodeAccess: assertOpenCodePoolAccess,
+    onOpenCodeQuotaChanged: () => accountAdmission?.refreshed(),
     track,
     refreshQuota,
     quotaSchedule: () => commands!.schedules.quotaStatus(),
@@ -238,6 +298,26 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     });
     store = new TaskStore(join(dataDir, 'weaver.db'));
     policy = new PolicyStore(store.db);
+    openCodeQuotaPool = (options.openCode?.poolFactory ?? (config => new OpenCodeQuotaPool(config)))({
+      env: options.openCode?.env,
+      accounts: { list: () => { assertOpenCodePoolAccess(); return mutationSnapshot ? Promise.resolve(mutationSnapshot) : openCodeAccounts.list(); } },
+      persistence: dbOpenCodePoolStore(store),
+    });
+    accountAdmission = new OpenCodeAccountAdmission({
+      pool: openCodeQuotaPool, native: openCodeAccounts, tasks: () => store!.listHeads(),
+      readActive: readOpenCodeCursor,
+      externalBusy: options.openCode?.externalBusy ?? (() => externalOpenCodeBusy(openCodeAccounts.ownedPids)),
+      busyReason: () => {
+        if (!im) return;
+        const snapshot = im.snapshot();
+        if (snapshot.config.enabled && policy!.snapshot().config.engines[snapshot.config.engine]?.kind === 'opencode') return 'IM OpenCode 会话或备用服务仍被保留，自动切换等待其释放；不会中断会话。';
+      },
+      wake: () => commands?.pump(),
+    });
+    if (openCodeQuotaPool.get().accounts.length && (!testContext || options.openCode?.env || options.openCode?.accountsFactory)) {
+      try { openCodeQuotaPool.setActive(readOpenCodeCursor()); }
+      catch { accountAdmission.cursorUnavailable(); }
+    }
     janitor = new TempJanitor({
       tmpRoot: options.janitor?.tmpRoot,
       uid: options.janitor?.uid,
@@ -251,8 +331,18 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       store: dbJanitorStore(store!.db),
       log: message => console.error(`Temp janitor: ${message}`),
     });
-    im = new ImService({ dataDir, policy: () => policy!.snapshot(), ...options.im, taskStatus: () => formatStoreStatus(store!) });
-    quotaProber = options.quotaProber ?? new QuotaProber({ snapshotStore: dbQuotaStore(store.db) });
+    im = new ImService({ dataDir, policy: () => policy!.snapshot(), ...options.im,
+      parentFactory: async (input, lifecycle?: { signal?: AbortSignal }) => {
+        const release = input.engineKind === 'opencode' ? accountAdmission?.lease() : undefined;
+        try {
+          const factory = options.im?.parentFactory as (import('./im/parent-agent').ParentAgentFactory & ((input: import('./im/parent-agent').ParentAgentInput, lifecycle?: { signal?: AbortSignal }) => Promise<import('./im/parent-agent').ParentAgentSession>)) | undefined;
+          const session = factory ? await factory(input, lifecycle) : await createBackgroundParentAgent(input, { dataDir, signal: lifecycle?.signal });
+          return { ...session, send: session.send.bind(session), close: async () => { await session.close(); release?.(); } };
+        } catch (error) { release?.(); throw error; }
+      },
+      taskStatus: () => formatStoreStatus(store!),
+    });
+    quotaProber = options.quotaProber ?? new QuotaProber({ env: options.openCode?.env, snapshotStore: dbQuotaStore(store.db) });
     // Ladders and probe answers live in the same weaver.db, so a restart keeps its penalties and history.
     stall = new StallMonitor({
       tasks: () => store!.list(),
@@ -260,8 +350,8 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       stateStore: dbStallStore(store.db),
       ready: () => ready && !draining,
       // Recovery is verified with the same light greeting the engines page runs, in this data dir's own scratch.
-      probe: (route, signal) => track(sayHi({ engine: route.engine, model: route.model, effort: route.effort, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal, checkPiModel })
-        .then(result => ({ ok: result.ok, ms: result.durationMs, error: result.error }))),
+      probe: (route, signal) => track(withOpenCodeLease(route.kind, () => sayHi({ engine: route.engine, model: route.model, effort: route.effort, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal, checkPiModel })
+        .then(result => ({ ok: result.ok, ms: result.durationMs, error: result.error })))),
       onBlocksChanged: () => commands?.pump(),
       log: message => console.error(`Stall monitor: ${message}`),
     });
@@ -271,8 +361,8 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       vendorLadder: dbVendorLadder(store.db),
       ready: () => ready && !draining,
       // The same light greeting the penalty recovery uses.
-      probe: (route, signal) => track(sayHi({ ...route, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal, checkPiModel })
-        .then(result => ({ ok: result.ok, ms: result.durationMs, error: result.error }))),
+      probe: (route, signal) => track(withOpenCodeLease(route.kind, () => sayHi({ ...route, kind: route.kind }, { root: join(dataDir, 'agent-state'), signal, checkPiModel })
+        .then(result => ({ ok: result.ok, ms: result.durationMs, error: result.error })))),
       onBlocksChanged: () => commands?.pump(),
       log: message => console.error(`Free channel probe: ${message}`),
     });
@@ -291,6 +381,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     });
     // Reattach runs before the command pump or schedules exist, so no new attempt can overlap a recovered run.
     await reattach(manager);
+    manager.launchGuard = accountAdmission;
     // Health and penalties are this monitor's own answers, so the command face reads them from it rather than inventing them.
     // The user's engine or worker unblock clears the blocks through the policy service and then resets both monitors' state.
     const unblockBlocks = new PolicyBlockService(() => policy!, { log: message => console.error(`Stall monitor: ${message}`), onChanged: () => commands?.pump() });
@@ -300,7 +391,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       unblock: engine => unblockEngine({ blocks: unblockBlocks, stall: stall!, freeProbe: freeProbe! }, engine),
       unblockWorker: worker => unblockWorker({ blocks: unblockBlocks, stall: stall!, freeProbe: freeProbe! }, worker),
     };
-    commands = new CommandHandler(manager, policy, undefined, undefined, diagnostics, options.ownerHost, {refreshQuota:(engine:QuotaEngine)=>refreshQuota({engine}),dataDir,startCli:startCliAgent,parentFactory:createParentAgent,checkPiModel});
+    commands = new CommandHandler(manager, policy, undefined, undefined, diagnostics, options.ownerHost, {refreshQuota:(engine:QuotaEngine)=>refreshQuota({engine}),dataDir,startCli:startScheduledCli,parentFactory:scheduledParent,checkPiModel}, {}, accountAdmission);
     commands.transportStatus = 'ready';
     await commands.schedules.start();
     ready = true;
@@ -320,6 +411,8 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     await commands?.drain().catch(() => {});
     await stall?.stop().catch(() => {});
     await freeProbe?.stop().catch(() => {});
+    await Promise.allSettled([openCodeQuotaPool?.close(), openCodeAccounts.close()]);
+    await accountAdmission?.close().catch(() => {});
     await quotaProber?.close().catch(() => {});
     greetings.abort();
     await Promise.allSettled([...inflight]);
@@ -339,6 +432,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     closed = true;
     draining = true;
     ready = false;
+    accountAdmission?.stop();
     janitor?.stop();
     let imCloseFailure: unknown;
     try { await im?.close(); } catch (error) { imCloseFailure = error; }
@@ -346,6 +440,10 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     await commands?.schedules.stop().catch(() => {});
     await stall?.stop().catch(() => {});
     await freeProbe?.stop().catch(() => {});
+    let accountCloseFailure: unknown;
+    const accountStops = await Promise.allSettled([openCodeQuotaPool?.close(), openCodeAccounts.close()]);
+    try { await accountAdmission?.close(); } catch (error) { accountCloseFailure = error; }
+    for (const result of accountStops) if (result.status === 'rejected') accountCloseFailure ??= result.reason;
     await quotaProber?.close().catch(() => {});
     greetings.abort();
     await ownerDrain;
@@ -360,5 +458,6 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     await lock?.release().catch(error => console.error(error instanceof Error ? error.message : 'instance lock release failed'));
     resolveDone();
     if (imCloseFailure) throw imCloseFailure;
+    if (accountCloseFailure) throw accountCloseFailure;
   }
 }

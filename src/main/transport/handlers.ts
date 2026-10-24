@@ -1,3 +1,5 @@
+import type { OpenCodeQuotaPool } from '../quota/opencode-pool';
+import type { OpenCodeAccounts } from '../engines/opencode-accounts';
 import { EngineCleanupJobs, parseEngineCleanup } from '../engines/cleanup';
 import type { ImService } from '../im/service';
 import type { SaveImSettingsInput } from '../../shared/contracts/im';
@@ -39,6 +41,10 @@ export interface ActiveServices {
 
 /** What the runtime lends to the handlers: its in-flight tracking, shared quota refresh, monitors and identity. */
 export interface RpcHost {
+  openCodeAccounts?: OpenCodeAccounts;
+  openCodeQuotaPool?: OpenCodeQuotaPool;
+  assertOpenCodeAccess?: () => void;
+  onOpenCodeQuotaChanged?: () => void;
   im(): ImService;
   track<T>(job: Promise<T>): Promise<T>;
   /** Manual and scheduled refresh share one probe-then-merge path. */
@@ -236,6 +242,19 @@ export function createRpcHandlers(host: RpcHost): RpcHandlers {
     ...policyHandlers(),
     ...quotaHandlers(host),
     ...engineHandlers(host),
+    getOpenCodeAccountQuotas: () => host.openCodeQuotaPool?.get() ?? { accounts: [], active: null, switching: false },
+    refreshOpenCodeAccountQuotas: (_active, args) => {
+      const input = object(args[0]);
+      if (Object.keys(input).some(k => !['accountID', 'orgID'].includes(k)) || (input.accountID === undefined) !== (input.orgID === undefined) || (input.accountID !== undefined && (typeof input.accountID !== 'string' || !/^[^\s\x00-\x1f\x7f]{1,256}$/.test(input.accountID) || typeof input.orgID !== 'string' || !/^[^\s\x00-\x1f\x7f]{1,256}$/.test(input.orgID)))) throw new RpcError('INVALID_REQUEST', '账号额度参数无效');
+      host.assertOpenCodeAccess?.();
+      if (!host.openCodeQuotaPool) throw new RpcError('OPENCODE_UNAVAILABLE', '账号额度服务尚未就绪');
+      return host.track(host.openCodeQuotaPool.refresh(input as { accountID?: string; orgID?: string }).then(snapshot => { host.onOpenCodeQuotaChanged?.(); return snapshot; }));
+    },
+    listOpenCodeAccounts: () => { if (!host.openCodeAccounts) throw new RpcError('OPENCODE_UNAVAILABLE', '账号服务不可用'); return host.track(host.openCodeAccounts.list()); },
+    startOpenCodeLogin: () => { if (!host.openCodeAccounts) throw new RpcError('OPENCODE_UNAVAILABLE', '账号服务不可用'); return host.openCodeAccounts.startLogin(); },
+    getOpenCodeLogin: (_active, args) => { if (!host.openCodeAccounts) throw new RpcError('OPENCODE_UNAVAILABLE', '账号服务不可用'); return host.openCodeAccounts.getLogin(args[0]); },
+    cancelOpenCodeLogin: (_active, args) => { if (!host.openCodeAccounts) throw new RpcError('OPENCODE_UNAVAILABLE', '账号服务不可用'); return host.track(host.openCodeAccounts.cancelLogin(args[0])); },
+    switchOpenCodeAccount: (_active, args) => { if (!host.openCodeAccounts) throw new RpcError('OPENCODE_UNAVAILABLE', '账号服务不可用'); return host.track(host.openCodeAccounts.switchAccount(args[0])); },
     ...probeHandlers(host),
     ...taskHandlers(),
     ...serverHandlers(host),

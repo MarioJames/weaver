@@ -1,0 +1,17 @@
+Final npm run check: exit 0
+Command: ACCEPTANCE_TMPDIR=<task scratch> WEAVER_OPENCODE_NATIVE_TEST_ROOT=<task scratch> npm run check
+TypeScript: passed (typecheck and build)
+
+✔ native isolated account listing preserves conversation and other provider authentication (5702.317886ms)
+✔ native switch writes only its cursor while isolated conversation and other provider auth stay intact (5014.148461ms)
+ℹ tests 2133
+ℹ suites 2
+ℹ pass 2103
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 30
+ℹ todo 0
+ℹ duration_ms 41285.640984
+✓ built in 1.46s
+
+Build warnings: dependency MODULE_LEVEL_DIRECTIVE (use client directives in bundled third-party modules). Build completed successfully.

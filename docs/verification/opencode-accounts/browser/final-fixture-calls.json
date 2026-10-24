@@ -1,0 +1,222 @@
+{
+  "active": {
+    "accountID": "fixture-a",
+    "orgID": "org-a"
+  },
+  "calls": [
+    {
+      "at": "2026-10-24T03:18:20.679Z",
+      "input": null,
+      "method": "getPool"
+    },
+    {
+      "input": {
+        "engine": "opencode"
+      },
+      "method": "refreshQuota"
+    },
+    {
+      "at": "2026-10-24T03:18:37.506Z",
+      "input": null,
+      "method": "getPool"
+    },
+    {
+      "at": "2026-10-24T03:19:07.506Z",
+      "input": null,
+      "method": "getPool"
+    },
+    {
+      "at": "2026-10-24T03:19:31.628Z",
+      "input": {
+        "accountEmail": "beta.long.account.for.narrow.screen@example.test",
+        "accountID": "fixture-b",
+        "accountUrl": "https://opencode.ai",
+        "active": false,
+        "orgID": "org-b",
+        "orgName": "同名组织与用于窄屏测试的较长团队名称"
+      },
+      "method": "refreshPool"
+    },
+    {
+      "at": "2026-10-24T03:19:31.678Z",
+      "input": {
+        "accountEmail": "beta.long.account.for.narrow.screen@example.test",
+        "accountID": "fixture-b",
+        "accountUrl": "https://opencode.ai",
+        "active": false,
+        "orgID": "org-b",
+        "orgName": "同名组织与用于窄屏测试的较长团队名称"
+      },
+      "method": "refreshPool"
+    },
+    {
+      "at": "2026-10-24T03:19:31.710Z",
+      "input": {
+        "accountEmail": "beta.long.account.for.narrow.screen@example.test",
+        "accountID": "fixture-b",
+        "accountUrl": "https://opencode.ai",
+        "active": false,
+        "orgID": "org-b",
+        "orgName": "同名组织与用于窄屏测试的较长团队名称"
+      },
+      "method": "refreshPool"
+    },
+    {
+      "at": "2026-10-24T03:19:37.506Z",
+      "input": null,
+      "method": "getPool"
+    },
+    {
+      "at": "2026-10-24T03:19:38.828Z",
+      "input": null,
+      "method": "listAccounts"
+    },
+    {
+      "at": "2026-10-24T03:19:38.828Z",
+      "input": {
+        "id": "current"
+      },
+      "method": "getLogin"
+    },
+    {
+      "at": "2026-10-24T03:19:51.396Z",
+      "input": {
+        "accountID": "fixture-b",
+        "expectedActive": {
+          "accountID": "fixture-a",
+          "orgID": "org-a"
+        },
+        "orgID": "org-b"
+      },
+      "method": "switchAccount"
+    },
+    {
+      "at": "2026-10-24T03:19:51.427Z",
+      "input": null,
+      "method": "getPool"
+    },
+    {
+      "at": "2026-10-24T03:19:51.532Z",
+      "input": null,
+      "method": "listAccounts"
+    },
+    {
+      "at": "2026-10-24T03:19:51.577Z",
+      "input": null,
+      "method": "listAccounts"
+    },
+    {
+      "at": "2026-10-24T03:19:51.611Z",
+      "input": null,
+      "method": "startLogin"
+    },
+    {
+      "at": "2026-10-24T03:20:03.160Z",
+      "input": null,
+      "method": "listAccounts"
+    },
+    {
+      "at": "2026-10-24T03:20:03.160Z",
+      "input": {
+        "id": "current"
+      },
+      "method": "getLogin"
+    },
+    {
+      "at": "2026-10-24T03:20:03.710Z",
+      "input": {
+        "id": "fixture-job-15"
+      },
+      "method": "cancelLogin"
+    },
+    {
+      "at": "2026-10-24T03:20:03.745Z",
+      "input": null,
+      "method": "startLogin"
+    },
+    {
+      "at": "2026-10-24T03:20:04.754Z",
+      "input": {
+        "id": "fixture-job-19"
+      },
+      "method": "getLogin"
+    },
+    {
+      "at": "2026-10-24T03:20:04.827Z",
+      "input": null,
+      "method": "startLogin"
+    },
+    {
+      "at": "2026-10-24T03:20:05.839Z",
+      "input": {
+        "id": "fixture-job-21"
+      },
+      "method": "getLogin"
+    },
+    {
+      "at": "2026-10-24T03:20:05.839Z",
+      "input": null,
+      "method": "listAccounts"
+    },
+    {
+      "at": "2026-10-24T03:20:05.857Z",
+      "input": null,
+      "method": "getPool"
+    },
+    {
+      "at": "2026-10-24T03:20:28.980Z",
+      "input": null,
+      "method": "getPool"
+    },
+    {
+      "at": "2026-10-24T03:20:42.463Z",
+      "input": null,
+      "method": "getPool"
+    },
+    {
+      "at": "2026-10-24T03:20:51.776Z",
+      "input": null,
+      "method": "listAccounts"
+    },
+    {
+      "at": "2026-10-24T03:20:51.776Z",
+      "input": {
+        "id": "current"
+      },
+      "method": "getLogin"
+    },
+    {
+      "at": "2026-10-24T03:20:51.776Z",
+      "input": null,
+      "method": "listAccounts"
+    },
+    {
+      "at": "2026-10-24T03:20:51.790Z",
+      "input": null,
+      "method": "getPool"
+    },
+    {
+      "at": "2026-10-24T03:20:52.309Z",
+      "input": {
+        "accountID": "fixture-a",
+        "expectedActive": {
+          "accountID": "fixture-b",
+          "orgID": "org-b"
+        },
+        "orgID": "org-a"
+      },
+      "method": "switchAccount"
+    },
+    {
+      "at": "2026-10-24T03:20:52.337Z",
+      "input": null,
+      "method": "getPool"
+    },
+    {
+      "at": "2026-10-24T03:21:01.507Z",
+      "input": null,
+      "method": "getPool"
+    }
+  ],
+  "domSecretMarkers": []
+}

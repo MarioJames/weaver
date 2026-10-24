@@ -7,7 +7,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { startRuntime } from '../../src/main/runtime';
 import { QuotaProber } from '../../src/main/quota';
-import { parseEngineCleanup } from '../../src/main/engines/cleanup';
+import { EngineCleanupJobs, parseEngineCleanup } from '../../src/main/engines/cleanup';
 import type { EngineCleanupJob } from '../../src/shared/contracts/engine-cleanup';
 
 const options = { engine: 'opencode', mode: 'preview', keepDays: 1, pruneEvents: false, eventIdleMinutes: 60, vacuum: true } as const;
@@ -36,7 +36,7 @@ test('real HTTP asynchronous cleanup is preview-gated, protects retained history
  const dir = mkdtempSync(join(tmpdir(), 'wv-c-')); const path = join(dir, 'opencode.db'); const db = database(path);
  const original = { env: process.env.OPENCODE_DB, argv: process.argv[1] };
  process.env.OPENCODE_DB = path; process.argv[1] = resolve('src/cli/main.ts');
- const runtime = await startRuntime({ dataDir: join(dir, 'service'), port: 0, open: false, quotaProber: new QuotaProber({ env: { HOME: dir } }) });
+ const runtime = await startRuntime({ dataDir: join(dir, 's'), port: 0, open: false, quotaProber: new QuotaProber({ env: { HOME: dir } }) });
  const rpc = async (method: string, args: unknown[]) => {
   const response = await fetch(`${runtime.url}/api/rpc`, { method: 'POST', headers: { origin: runtime.url, 'content-type': 'application/json' }, body: JSON.stringify({ method, args }) });
   return await response.json() as { result?: EngineCleanupJob; error?: { code: string; message: string } };
@@ -92,3 +92,53 @@ test('unsupported platform rejects maintenance before opening any database', () 
   assert.equal(existsSync(path), false);
  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+async function leaseFixture(run: (path: string, db: DatabaseSync) => Promise<void>) {
+ const dir = mkdtempSync(join(process.env.ACCEPTANCE_TMPDIR || tmpdir(), 'wv-cleanup-lease-'));
+ const path = join(dir, 'opencode.db'); const db = database(path);
+ const original = { env: process.env.OPENCODE_DB, argv: process.argv[1] };
+ process.env.OPENCODE_DB = path; process.argv[1] = resolve('src/cli/main.ts');
+ try { await run(path, db); }
+ finally { db.close(); if (original.env === undefined) delete process.env.OPENCODE_DB; else process.env.OPENCODE_DB = original.env; process.argv[1] = original.argv; rmSync(dir, { recursive: true, force: true }); }
+}
+
+test('maintenance lease refusal creates no job and does not touch the database', async () => leaseFixture(async (_path, db) => {
+ let tracked = 0; let acquired = 0;
+ const jobs = new EngineCleanupJobs(promise => { tracked++; return promise; }, () => { acquired++; throw new Error('fixture admission denied'); });
+ assert.throws(() => jobs.start(options), /fixture admission denied/);
+ assert.equal(acquired, 1); assert.equal(tracked, 0); assert.equal(jobs.get('opencode'), undefined);
+ assert.equal(db.prepare('SELECT count(*) n FROM session').get()!.n, 2);
+}));
+
+test('maintenance lease spans preview and apply, rejects concurrency before acquiring, and preserves a denied preview', async () => leaseFixture(async (_path, db) => {
+ let held = false; let acquired = 0; let released = 0; let deny = false; let completion: Promise<unknown> = Promise.resolve();
+ const jobs = new EngineCleanupJobs(promise => { completion = promise; return promise; }, () => {
+  acquired++; if (deny) throw new Error('fixture admission denied');
+  assert.equal(held, false); held = true;
+  return () => { assert.equal(held, true); held = false; released++; };
+ });
+ const preview = jobs.start(options);
+ assert.equal(held, true); assert.equal(released, 0);
+ assert.throws(() => jobs.start(options), /已有数据库清理任务/); assert.equal(acquired, 1);
+ await completion;
+ assert.equal(jobs.get(preview.id)?.result?.status, 'preview'); assert.equal(held, false); assert.equal(released, 1);
+ assert.throws(() => jobs.start({ ...options, mode: 'apply', keepDays: 2, previewId: preview.id }), /选项已变更/); assert.equal(acquired, 1);
+ deny = true;
+ assert.throws(() => jobs.start({ ...options, mode: 'apply', previewId: preview.id }), /fixture admission denied/);
+ assert.equal(released, 1); assert.equal(db.prepare('SELECT count(*) n FROM session').get()!.n, 2);
+ deny = false;
+ const apply = jobs.start({ ...options, mode: 'apply', previewId: preview.id });
+ assert.equal(held, true); await completion;
+ assert.equal(jobs.get(apply.id)?.result?.status, 'applied'); assert.equal(held, false); assert.equal(released, 2);
+ assert.deepEqual(db.prepare('SELECT id FROM session').all().map(row => row.id), ['retained']);
+}));
+
+test('maintenance lease releases once when the cleanup child reports an error', async () => leaseFixture(async (path) => {
+ process.env.OPENCODE_DB = path + '.missing';
+ let held = false; let released = 0; let completion: Promise<unknown> = Promise.resolve();
+ const jobs = new EngineCleanupJobs(promise => { completion = promise; return promise; }, () => { held = true; return () => { held = false; released++; }; });
+ const job = jobs.start(options); assert.equal(held, true);
+ await completion;
+ assert.equal(jobs.get(job.id)?.result?.status, 'error'); assert.equal(held, false); assert.equal(released, 1);
+ assert.equal(existsSync(process.env.OPENCODE_DB!), false);
+}));

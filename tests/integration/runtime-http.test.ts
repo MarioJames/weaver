@@ -668,8 +668,8 @@ test('listEngineModels is a one-argument read RPC: valid input lists, malformed 
   const client = await readFile(new URL('../../src/renderer/api/client.ts', import.meta.url), 'utf8');
   assert.equal(RPC_METHODS.listEngineModels.timeoutMs, 40_000, 'the renderer waits up to 40 seconds for a model list');
   assert.equal(RPC_METHODS.workerProbe.timeoutMs, 130_000);
-  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'timeoutMs' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['listEngineModels', 'workerProbe']);
-  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'retryable' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['capabilities', 'getEngineCleanup', 'getImSettings', 'getPolicy', 'getQuota', 'getStall', 'getTask', 'janitorStatus', 'listEngineModels', 'listTasks', 'previewRoute', 'sayHiResult', 'validatePolicy', 'workerProbeStatus']);
+  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'timeoutMs' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['cancelOpenCodeLogin', 'listEngineModels', 'listOpenCodeAccounts', 'refreshOpenCodeAccountQuotas', 'switchOpenCodeAccount', 'workerProbe']);
+  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'retryable' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['capabilities', 'getEngineCleanup', 'getImSettings', 'getOpenCodeAccountQuotas', 'getOpenCodeLogin', 'getPolicy', 'getQuota', 'getStall', 'getTask', 'janitorStatus', 'listEngineModels', 'listTasks', 'previewRoute', 'sayHiResult', 'validatePolicy', 'workerProbeStatus']);
   assert.match(client, /from '\.\.\/\.\.\/shared\/contracts\/rpc'/, 'the renderer client derives its method table, deadlines and retryable reads from the shared RPC contract');
   assert.doesNotMatch(client, /call\('listEngineModels'|\w+: \d+_000/, 'the renderer client does not hand-write method wrappers or deadlines');
 });

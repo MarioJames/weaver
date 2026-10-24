@@ -1,23 +1,25 @@
 import { EngineCleanup } from './EngineCleanup';
+import { OpenCodeAccounts } from './OpenCodeAccounts';
+import { OpenCodeAccountQuota } from './OpenCodeAccountQuota';
+import { QuotaSummary } from './QuotaSummary';
 import { notifyError, useNotifyError } from '../../api/notify';
 import { NamedSwitch } from '../../ui/NamedControls';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, RefreshCw, ScanSearch } from 'lucide-react';
+import { Play, ScanSearch } from 'lucide-react';
 import { PageHeader, Surface } from '@lobehub/ui/dashboard';
-import { ActionIcon, Button, Progress, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
+import { Button, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
 import { ENGINE_CATALOG, catalogEntry, type EngineProbeRecord } from '../../../shared/engines';
-import type { EngineQuotaRecord, QuotaEngine, QuotaWindow } from '../../../shared/contracts/quota';
+import type { EngineQuotaRecord, QuotaEngine } from '../../../shared/contracts/quota';
 import { QUOTA_KINDS, quotaRefreshEnabled } from '../../../shared/policy/settings';
 import { STALL_BLOCK_BY, VENDOR_BLOCK_BY, isQuotaBlock } from '../../../shared/policy/blocks';
 import { type Block, type Engine } from '../../../shared/contracts/policy';
-import { acceptQuotaPolicy, dateText, quotaPercentText, quotaProgressPercent, quotaRecordStale, quotaRecoveryText, quotaRetryMs, quotaStatusText, quotaNextUpdateMs, quotaCountText, quotaVisibleWindows, quotaThirdParty } from '../quota/quota-view';
+import { acceptQuotaPolicy, dateText, quotaNextUpdateMs } from '../quota/quota-view';
 import type { PolicyDraft, PolicyUpdate } from '../../policy/usePolicyDraft';
 import { resumeWorker } from '../../policy/worker-resume';
 import type { StallEngineState, StallHistoryEntry, StallSnapshot } from '../../api/client';
 import type { EngineStallStatus } from '../../../shared/contracts/monitoring';
 import { styles } from '../../ui/styles';
 import { engineStyles } from './engines-style';
-import { TimeText } from '../../ui/TimeText';
 import { compactTime } from '../../format/timezone';
 import { createStaticStyles } from 'antd-style';
 import type { StatusTone } from '../../format/status-colors';
@@ -153,6 +155,7 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
   const [scanning, setScanning] = useState(false);
   useNotifyError(policy.loadError, '配置读取失败');
   const [busyId, setBusyId] = useState('');
+  const [accountVersion, setAccountVersion] = useState(0);
   const stall = useStall();
   const quota = useQuota(policy, stall.load);
   const scan = useCallback(async () => {
@@ -210,10 +213,10 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
           extra={<div className={engineStyles.enable}>{blocked && reason && <Tooltip title={reason}><Text type="secondary" data-switch-reason={entry.id} className={engineStyles.switchReason}>{reason}</Text></Tooltip>}<NamedSwitch aria-label={`启用 ${entry.id}`} size="small" checked={enabled} loading={busyId === entry.id} disabled={blocked} onChange={checked => void toggle(entry.id, checked)} /></div>}>
           <div className={engineStyles.cardBody}>
             <StallNotice state={stall.snapshot?.engines[entry.id]} now={stall.now} />
-            {isQuotaKind(kind) ? <QuotaSummary engine={kind} record={quota.records.find(item => item.engine === kind)} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === kind ? quota.feedback : undefined} onRefresh={() => void quota.refresh(kind)} />
+            {entry.id === 'opencode' ? <OpenCodeAccountQuota autoRefresh={record ? quotaRefreshEnabled(record) : false} version={accountVersion} policyBusy={policy.busy} currentCredentialQuota={<QuotaSummary engine="opencode" record={quota.records.find(item => item.engine === 'opencode')} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === 'opencode' ? quota.feedback : undefined} onRefresh={() => void quota.refresh('opencode')} />} /> : isQuotaKind(kind) ? <QuotaSummary engine={kind} record={quota.records.find(item => item.engine === kind)} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === kind ? quota.feedback : undefined} onRefresh={() => void quota.refresh(kind)} />
               : <Text type="secondary" className={styles.meta}>未提供原生额度接口。</Text>}
             <BlockList blocks={engineBlocks} state={stall.snapshot?.engines[entry.id]} now={stall.now} disabled={busyId !== '' || !record} onRemove={block => void resume(entry.id, block)} />
-            {entry.id === 'opencode' && <EngineCleanup />}
+            {entry.id === 'opencode' && <><OpenCodeAccounts onChanged={async () => { setAccountVersion(current => current + 1); await quota.load(); await policy.load(); }} /><EngineCleanup /></>}
             <div className={engineStyles.cardFoot}>
               <div className={styles.spread}>
                 <Text>主动刷新额度</Text>
@@ -272,38 +275,4 @@ export function BlockList({ blocks, disabled, onRemove, now = Date.now(), state 
       </div>;
     })}
   </section>;
-}
-
-function QuotaSummary({ engine, record, now, busy, policyBusy, feedback, onRefresh }: { engine: QuotaEngine; record?: EngineQuotaRecord; now: number; busy: QuotaEngine | null; policyBusy: boolean; feedback?: { text: string; error: boolean }; onRefresh: () => void }) {
-  const retry = quotaRetryMs(record, now);
-  const stale = record ? quotaRecordStale(record, now) : true;
-  const tone = record?.status === 'exhausted' || record?.status === 'error' ? 'warning' : 'secondary';
-  return <section aria-label={`${engine} 额度`} className={styles.tight}>
-    <div className={styles.spread}>
-      <Text type={tone}>{record ? quotaStatusText(record, stale) : '读取中'}</Text>
-      <Tooltip title={retry > 0 ? `冷却中，${Math.ceil(retry / 1000)} 秒后可刷新` : '刷新额度'}>
-        <ActionIcon size="small" icon={RefreshCw} aria-label={`刷新 ${engine} 额度`} loading={busy === engine} disabled={busy !== null || policyBusy || retry > 0} onClick={onRefresh} />
-      </Tooltip>
-    </div>
-    {!record ? <Skeleton.Text rows={1} /> : <>
-      {quotaVisibleWindows(record).map(window => <QuotaWindowRow key={window.id} window={window} />)}
-      {!record.windows.length && record.status !== 'unknown' && <Text type="secondary" className={styles.meta}>{record.detail}</Text>}
-      {quotaRecoveryText(record) && record.status !== 'unknown' && <Text type="secondary" className={styles.meta}>{quotaRecoveryText(record)}</Text>}
-      <Text type="secondary" className={styles.meta}>{record.observedAt ? <>{stale ? '已过期 · ' : ''}<TimeText value={record.observedAt} now={now} /> 观测</> : record.checkedAt ? <><TimeText value={record.checkedAt} now={now} /> 检查</> : '尚未刷新'}</Text>
-    </>}
-    {feedback && !feedback.error && !(record && quotaThirdParty(record)) && <Text role="status" type={feedback.error ? 'danger' : 'secondary'} className={styles.meta}>{feedback.text}</Text>}
-  </section>;
-}
-
-function QuotaWindowRow({ window }: { window: QuotaWindow }) {
-  const percent = quotaProgressPercent(window);
-  const amount = window.unit === 'percent' ? `已用 ${quotaPercentText(window.usedPercent)}` : `剩余 ${quotaCountText(window.remaining, window.unit)} / ${quotaCountText(window.total, window.unit)}`;
-  return <div className={engineStyles.quotaWindow}>
-    <div className={styles.spread}>
-      <Text className={styles.meta}>{window.label}{window.scope === 'model' && window.model ? ` · ${window.model}` : ''}</Text>
-      <Text className={`${styles.meta} ${styles.numbers}`}>{amount}</Text>
-    </div>
-    {percent !== null && <Progress size="small" percent={percent} showInfo={false} status={percent >= 100 ? 'exception' : undefined} aria-label={`${window.label} 已用比例`} />}
-    {window.resetsAt && <Text type="secondary" className={styles.meta}><TimeText value={window.resetsAt} /> 重置</Text>}
-  </div>;
 }

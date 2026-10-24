@@ -1,0 +1,15 @@
+{
+  "active": {
+    "accountID": "fixture-a",
+    "orgID": "org-a"
+  },
+  "focus": "beta.long.account.for.narrow.screen@example.test · 同名组织 / 第二个工作空间",
+  "pageScroll": 390,
+  "pageWidth": 390,
+  "segmentScroll": 694,
+  "segmentWidth": 314,
+  "selected": [
+    "beta.long.account.for.narrow.screen@example.test · 同名组织 / 第二个工作空间"
+  ],
+  "text": "当前用于调度：alpha@example.test · 团队 Alpha\n全部账号额度未知，等待人工确认。\nalpha@example.test · 团队 Alpha\nbeta.long.account.for.narrow.screen@example.test · 同名组织与用于窄屏测试的较长团队名称\nbeta.long.account.for.narrow.screen@example.test · 同名组织 / 第二个工作空间\n仅查看额度\n正在查看：beta.long.account.for.narrow.screen@example.test · 同名组织 / 第二个工作空间。仅查看，不影响正在调度的账号。\n额度未知\n23:18 检查\n当前账号耗尽时，调度会在确认其他账号仍有额度后自动切换；运行中任务结束后切换，不重跑已失败任务。"
+}

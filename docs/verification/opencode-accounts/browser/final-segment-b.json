@@ -1,0 +1,9 @@
+{
+  "active": {
+    "accountID": "fixture-a",
+    "orgID": "org-a"
+  },
+  "legacyVisible": false,
+  "switches": [],
+  "text": "当前用于调度：alpha@example.test · 团队 Alpha\nalpha@example.test · 团队 Alpha\nbeta.long.account.for.narrow.screen@example.test · 同名组织与用于窄屏测试的较长团队名称\nbeta.long.account.for.narrow.screen@example.test · 同名组织 / 第二个工作空间\n仅查看额度\n正在查看：beta.long.account.for.narrow.screen@example.test · 同名组织与用于窄屏测试的较长团队名称。仅查看，不影响正在调度的账号。\n尚未确认此账号的 Go 凭证会随 Console 登录切换。\n观测到可用额度\nGo 每周窗口\n已用 20%\n10-24 23:18 重置\n23:18 观测\n当前账号耗尽时，调度会在确认其他账号仍有额度后自动切换；运行中任务结束后切换，不重跑已失败任务。"
+}

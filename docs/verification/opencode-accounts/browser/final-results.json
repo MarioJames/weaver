@@ -1,0 +1,75 @@
+{
+  "status": "passed",
+  "app_url": "http://127.0.0.1:37929/",
+  "checks": {
+    "api_key_fallback_and_original_refresh": true,
+    "view_b_preserves_active_a_and_hides_global": true,
+    "manual_switch_expected_active": true,
+    "closed_login_stops_reads": true,
+    "login_restores_without_duplicate_start": true,
+    "pair_refresh_and_failure_preserve_observation": true,
+    "cache_failure_preserves_pair_and_hides_global": true,
+    "cache_retry_recovers": true,
+    "unknown_does_not_show_zero": true,
+    "exhausted_and_stale_are_explicit": true,
+    "keyboard_can_select_same_email_second_org": true,
+    "narrow_page_does_not_overflow_and_segments_scroll": true,
+    "list_failure_and_login_terminal_states": true
+  },
+  "artifact_errors": [],
+  "evidence": [
+    "final-apikey",
+    "final-desktop",
+    "final-authorization",
+    "final-switching",
+    "final-narrow"
+  ],
+  "renderer_sha256": {
+    "EnginesPage.tsx": "09a75c0914a3ced25589d6d4698793f4f78c3361a9c67bcdf9a05575645cc77f",
+    "OpenCodeAccounts.tsx": "daddb92b2d10484eb004c3e269557582572b705eaf9219ac44692779793f2344",
+    "OpenCodeAccountQuota.tsx": "4ea274c69c4a827d8e4c30f6088e44b0c774a028d1cdfc7aa7d3f49952f5bc25",
+    "QuotaSummary.tsx": "91318b38a97beae13025c92d523380bd48bf5ed5ec01d8bd76daa00df4823a21"
+  },
+  "runtime_scope": "Original isolated source dev runtime started before final backend scheduler wiring; only renderer behavior is covered.",
+  "boundary": "Real Chrome/UI/source rendering; new account/login/quota APIs replaced by in-memory fixture using example.test emails and fake device code. No real Console login, switch, subscription, token or provider quota verified. Other policy/scan APIs use isolated HOME/XDG/OPENCODE_DB/data-dir runtime.",
+  "console": {
+    "warnings": 0,
+    "errors": 0
+  },
+  "network": {
+    "unexpected_runtime_failures": 0,
+    "known_setup_failures": [
+      "Two 403 responses from first prepare using localhost:34435 (INVALID_HOST); fixed by preparing with BH_APP_HOST=127.0.0.1, preserved raw evidence."
+    ],
+    "external_console_requests": 0
+  },
+  "theme": "Existing main.tsx fixes ThemeProvider to light; dark theme unsupported and not claimed verified.",
+  "cleanup": {
+    "scope": "dev-weaver-opencode-browser-01a16bd0.scope",
+    "scope_active": false,
+    "chrome_closed": true,
+    "profile_removed": true,
+    "runtime_home_xdg_data_db_removed": true,
+    "scratch_fixture_and_scripts_removed": true,
+    "original_capture_ids_removed": [
+      "20261023T231234",
+      "20261023T231321",
+      "20261023T231342",
+      "20261023T231352",
+      "20261023T231837",
+      "20261023T231932",
+      "20261023T232003",
+      "20261023T232042",
+      "20261023T232111"
+    ],
+    "shared_services_and_parent_scratch_preserved": true,
+    "reason": "All final evidence archived; no remaining dependency on verification runtime."
+  },
+  "prior_regression": {
+    "status": "fixed_and_retested",
+    "evidence": [
+      "api-key-no-console-regression.json",
+      "api-key-no-console-regression.png"
+    ]
+  }
+}

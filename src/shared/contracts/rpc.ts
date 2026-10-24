@@ -19,6 +19,13 @@ export interface RpcMethodSpec {
 }
 
 export const RPC_METHODS = {
+  getOpenCodeAccountQuotas: { arity: 0, retryable: true },
+  refreshOpenCodeAccountQuotas: { arity: 1, mutation: true, timeoutMs: 180_000 },
+  listOpenCodeAccounts: { arity: 0, timeoutMs: 90_000 },
+  startOpenCodeLogin: { arity: 0, mutation: true },
+  getOpenCodeLogin: { arity: 1, retryable: true },
+  cancelOpenCodeLogin: { arity: 1, mutation: true, timeoutMs: 30_000 },
+  switchOpenCodeAccount: { arity: 1, mutation: true, timeoutMs: 180_000 },
   getImSettings: { arity: 0, retryable: true },
   saveImSettings: { arity: 1, mutation: true },
   reconnectIm: { arity: 0, mutation: true },

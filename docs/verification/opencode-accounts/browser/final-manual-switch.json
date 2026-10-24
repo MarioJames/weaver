@@ -1,0 +1,21 @@
+{
+  "active": {
+    "accountID": "fixture-b",
+    "orgID": "org-b"
+  },
+  "calls": [
+    {
+      "at": "2026-10-24T03:19:51.396Z",
+      "input": {
+        "accountID": "fixture-b",
+        "expectedActive": {
+          "accountID": "fixture-a",
+          "orgID": "org-a"
+        },
+        "orgID": "org-b"
+      },
+      "method": "switchAccount"
+    }
+  ],
+  "modal": "OpenCode 账号登录与切换\n账号共用原有对话与配置，只切换登录。仅之后新启动的进程生效；运行中任务继续使用原账号，长驻服务需重新启动。\n当前账号\nbeta.long.account.for.narrow.screen@example.test\n当前组织\n同名组织与用于窄屏测试的较长团队名称\nConsole 登录可切换；尚未确认所有账号的 Go 凭证跟随情况。\n刷新账号列表\n切换到已登录账号 / 组织\nbeta.long.account.for.narrow.screen@example.test · 同名组织与用于窄屏测试的较长团队名称（当前）\n已选择：beta.long.account.for.narrow.screen@example.test · 同名组织与用于窄屏测试的较长团队名称\n切换账号 / 组织\n登录新账号\n当前 Console 账号/组织已切换。\n关闭"
+}

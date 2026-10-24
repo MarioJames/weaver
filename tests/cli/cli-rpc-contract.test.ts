@@ -9,6 +9,8 @@ import { createRpcHandlers, type RpcHost } from '../../src/main/transport/handle
 
 /** Explicit public RPC methods and arity, including background OpenCode maintenance. */
 const FROZEN_ARITY: Record<string, number> = {
+  getOpenCodeAccountQuotas: 0, refreshOpenCodeAccountQuotas: 1,
+  listOpenCodeAccounts: 0, startOpenCodeLogin: 0, getOpenCodeLogin: 1, cancelOpenCodeLogin: 1, switchOpenCodeAccount: 1,
   getImSettings: 0, saveImSettings: 1, reconnectIm: 0,
   command: 1, getPolicy: 0, policyHistory: 0, policyRollback: 1, validatePolicy: 1, savePolicy: 1, previewRoute: 1, scanEngines: 0,
   listEngineModels: 1, getQuota: 0, refreshQuota: 1, getStall: 0, workerProbe: 1, workerProbeStatus: 0, sayHi: 1, sayHiResult: 1, startEngineCleanup: 1, getEngineCleanup: 1,

@@ -1,3 +1,4 @@
+import type { OpenCodeAccountAdmission } from './opencode-accounts';
 import type { Block } from '../../../shared/contracts/policy';
 import { VENDOR_BLOCK_BY, isEngineBlock, isScopeBlock } from '../../../shared/policy/blocks';
 import { vendorBlockReason } from '../../adapters/cli/vendor-errors';
@@ -14,11 +15,11 @@ export class VendorLimits {
   private readonly blocks: PolicyBlockService;
   private readonly ladder: VendorLadderStore;
 
-  constructor(private readonly manager: TaskManager, policy: PolicyStore) {
+  constructor(private readonly manager: TaskManager, policy: PolicyStore, private readonly accounts?: OpenCodeAccountAdmission) {
     this.blocks = new PolicyBlockService(() => policy);
     this.ladder = dbVendorLadder(manager.store.db);
     // Historical failures must not recreate a block after an explicit unblock or restart.
-    for (const task of manager.store.listHeads()) if (task.failure) this.vendorBlockedAttempts.add(task.run?.id ?? task.id);
+    for (const task of manager.store.listHeads()) if (task.failure) { this.accounts?.recordFailure(task); this.vendorBlockedAttempts.add(task.run?.id ?? task.id); }
   }
 
   /**
@@ -30,7 +31,9 @@ export class VendorLimits {
       const failure = task.failure;
       const engine = task.dispatch?.engine;
       const key = task.run?.id ?? task.id;
-      if (!engine || !failure || !['rate_limit', 'quota'].includes(failure.kind) || this.vendorBlockedAttempts.has(key)) continue;
+      if (!engine || !failure || !['rate_limit', 'quota', 'auth'].includes(failure.kind) || this.vendorBlockedAttempts.has(key)) continue;
+      if (this.accounts?.recordFailure(task)) { this.vendorBlockedAttempts.add(key); continue; }
+      if (failure.kind === 'auth') continue;
       // The ladder step and the block it earns are one commit: a save that fails leaves the ladder where it was, so the retry steps it once.
       this.blocks.atomic(() => this.blocks.update(snapshot => {
         const now = Date.now();

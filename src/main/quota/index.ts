@@ -21,6 +21,8 @@ export interface QuotaProberOptions {
   timeoutMs?: number;
   /** Restart-durable observations; product passes the weaver.db adapter. */
   snapshotStore?: QuotaSnapshotStore;
+  /** Trusted main-process selection only; never exposed over RPC. */
+  credentialResolver?: (engine: QuotaEngine, env: NodeJS.ProcessEnv, now: number) => Promise<NativeCredential>;
 }
 
 function initial(engine: QuotaEngine): EngineQuotaRecord {
@@ -51,7 +53,7 @@ export class QuotaProber {
   private readonly snapshotStore?: QuotaSnapshotStore;
   private closed = false;
 
-  constructor(options: QuotaProberOptions = {}) {
+  constructor(private readonly options: QuotaProberOptions = {}) {
     this.env = options.env ?? process.env;
     this.clock = options.now ?? (() => new Date());
     this.fetcher = options.fetch ?? globalThis.fetch;
@@ -171,7 +173,7 @@ export class QuotaProber {
     const now = this.clock().getTime();
     // The native endpoint reports the subscription, not the provider the CLI is actually switched to; do not read or show it.
     if (await usesThirdPartyProvider(engine, this.env)) throw new QuotaFailure('unsupported', THIRD_PARTY_DETAIL);
-    const credential = await readNativeCredential(engine, this.env, now);
+    const credential = await (this.options.credentialResolver ?? readNativeCredential)(engine, this.env, now);
     identify(credential.fingerprint, credential.opencodeKind);
     if (signal.aborted || this.closed) throw new QuotaFailure('error', '额度探测已取消');
     this.lastAccounts.set(engine, credential.account);
@@ -200,6 +202,45 @@ export class QuotaProber {
       : row);
     const source = isConsole ? PROVIDERS.opencodeConsole.source : PROVIDERS[engine].source;
     return { engine, source, ...measurement, checkedAt, observedAt: checkedAt, stale: false, retryAt: new Date(this.nextRequests.get(engine)!).toISOString() };
+  }
+
+  /** Uses the same bounded trusted HTTP boundary as quota; only a boolean leaves this method. */
+  async consoleGoReady(): Promise<boolean> {
+    if (this.closed) return false;
+    const controller = new AbortController();
+    this.controllers.add(controller);
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    let onAbort!: () => void;
+    const interrupted = new Promise<never>((_, reject) => {
+      onAbort = () => reject(new QuotaFailure('error', 'Console 配置读取已取消'));
+      controller.signal.addEventListener('abort', onAbort, { once: true });
+    });
+    try {
+      const work = async () => {
+        const credential = await (this.options.credentialResolver ?? readNativeCredential)('opencode', this.env, this.clock().getTime());
+        if (controller.signal.aborted || this.closed || credential.opencodeKind !== 'console' || credential.origin !== OPENCODE_CONSOLE_ORIGIN || !credential.orgId) return false;
+        const response = await this.fetchResponse(`${OPENCODE_CONSOLE_ORIGIN}/api/config`, {
+          Authorization: `Bearer ${credential.token}`, 'x-org-id': credential.orgId, Accept: 'application/json', 'User-Agent': `Weaver/${VERSION}`,
+        }, controller.signal);
+        if (!response.ok) throw this.statusFailure(response, '原生 Console 配置无法读取', true);
+        const payload = object(await this.readJson(response, controller.signal));
+        const config = object(payload?.config);
+        const provider = object(object(config?.provider)?.['opencode-go']);
+        const key = object(provider?.options)?.apiKey;
+        // Native SDK uses options.apiKey before auth.json. Other shapes are unverified.
+        return typeof key === 'string' && key.length > 0 && key.length <= 16384 && !['public', 'opencode-oauth-dummy-key'].includes(key) && !/[\s\x00-\x1f\x7f]/.test(key) && !key.includes('{env:');
+      };
+      return await Promise.race([work(), interrupted]);
+    } catch (error) {
+      if (error instanceof QuotaFailure && error.retryAt !== null) {
+        this.nextRequests.set('opencode', Math.max(this.nextRequests.get('opencode') ?? 0, error.retryAt));
+        const record = this.records.get('opencode')!;
+        record.retryAt = new Date(this.nextRequests.get('opencode')!).toISOString();
+        this.persist();
+      }
+      return false;
+    }
+    finally { clearTimeout(timer); controller.signal.removeEventListener('abort', onAbort); this.controllers.delete(controller); }
   }
 
   /**

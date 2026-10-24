@@ -1,0 +1,8 @@
+{
+  "active": {
+    "accountID": "fixture-a",
+    "orgID": "org-a"
+  },
+  "legacyMixed": false,
+  "text": "当前用于调度：beta.long.account.for.narrow.screen@example.test · 同名组织与用于窄屏测试的较长团队名称\n全部账号额度未知，等待人工确认。\n账号额度读取失败，已保留上次内容，请重试读取。\nalpha@example.test · 团队 Alpha\nbeta.long.account.for.narrow.screen@example.test · 同名组织与用于窄屏测试的较长团队名称\nbeta.long.account.for.narrow.screen@example.test · 同名组织 / 第二个工作空间\n当前用于调度\n正在查看：beta.long.account.for.narrow.screen@example.test · 同名组织与用于窄屏测试的较长团队名称\n尚未确认此账号的 Go 凭证会随 Console 登录切换。\n额度未知\n23:19 检查\n重试读取\n读取全部账号额度\n当前账号耗尽时，调度会在确认其他账号仍有额度后自动切换；运行中任务结束后切换，不重跑已失败任务。"
+}

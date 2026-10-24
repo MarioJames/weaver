@@ -243,3 +243,16 @@ test('the model list request goes straight to the control plane client', async (
     assert.deepEqual(seen, [{ engine: 'pi' }]);
   } finally { globals.window = saved; }
 });
+
+test('account cache invalidation prevents an old inflight model result from repopulating the new account cache', async () => {
+  let complete: ((result: CaptureResult) => void) | undefined;
+  let runs = 0;
+  const lister = new EngineModelLister({ find: async () => '/fixture/opencode', run: async () => { runs++; if (runs === 1) return await new Promise<CaptureResult>(resolve => { complete = resolve; }); return ok('opencode/new-account-model\n'); } });
+  const old = lister.list({ engine: 'opencode' });
+  await new Promise(resolve => setImmediate(resolve));
+  lister.invalidate('opencode');
+  const fresh = await lister.list({ engine: 'opencode' });
+  complete!(ok('opencode/old-account-model\n')); await old;
+  assert.equal((await lister.list({ engine: 'opencode' })).models[0]?.id, fresh.models[0]?.id);
+  assert.equal(runs, 2);
+});

@@ -1,0 +1,80 @@
+{
+  "status": "passed",
+  "date": "2026-10-24",
+  "scope": "OpenCode Console账号/组织登录与切换、分账号额度、Go排队任务自动换号",
+  "check": {
+    "command": "npm run check",
+    "exit_code": 0,
+    "typecheck": "passed",
+    "tests": 2133,
+    "passed": 2103,
+    "failed": 0,
+    "skipped": 30,
+    "build": "passed",
+    "warnings": [
+      "Third-party MODULE_LEVEL_DIRECTIVE / use client bundling warnings"
+    ]
+  },
+  "native_integration": {
+    "version": "OpenCode 1.19.4",
+    "tests": 2,
+    "result": "passed",
+    "isolation": "Disposable HOME/XDG/OPENCODE_DB, fixture accounts and tokens, no real subscription calls",
+    "preserved": [
+      "session rows",
+      "message rows",
+      "other provider auth.json bytes"
+    ],
+    "mutation": "native switch cursor only"
+  },
+  "browser": {
+    "result": "passed",
+    "evidence": [
+      "browser/final-results.json",
+      "browser/copy-results.json"
+    ],
+    "boundary": "Real source UI and Chrome; account/login/quota responses use isolated in-memory fixtures. Real authorization and provider inference not exercised."
+  },
+  "independent_review": "account-review.md: 63 related tests, typecheck and boundary review passed",
+  "feature_scan": {
+    "status": "incomplete",
+    "reason": "Existing unrelated untracked .worktrees entries are not regular files; no hard-rule violations reported. Existing architecture-boundary tests passed."
+  },
+  "cleanup": {
+    "scopes_inactive": [
+      "dev-weaver-opencode-check-01a16bd0.scope",
+      "dev-weaver-opencode-check2-01a16bd0.scope",
+      "dev-weaver-opencode-browser-01a16bd0.scope",
+      "dev-weaver-opencode-copy-01a16bd0.scope"
+    ],
+    "browser_profiles_and_isolated_fixture_databases": "removed",
+    "task_scratch": "removed after evidence archive and worker receipt completion",
+    "persistent_user_data": "preserved",
+    "shared_weaver_service": "preserved"
+  },
+  "limitations": [
+    "Native experimental Console API may change with OpenCode versions",
+    "Real multiple subscription login, online Go quota/config and inference were not exercised",
+    "Existing processes keep cached credentials; switching waits for OpenCode to become idle",
+    "Existing OpenCode IM configuration or unverifiable external process activity prevents switching"
+  ],
+  "source_sha256": {
+    "src/main/engines/opencode-accounts.ts": "f2cecfa0087cf6d86ab419546153922bc4d7893547740163c6c4c6904aed866f",
+    "src/main/application/scheduling/opencode-accounts.ts": "e8778dd3144e6c19c8b137d74bc01c3279082aa0a308593dabdfbe48b8725457",
+    "src/main/quota/opencode-pool.ts": "54b608897cc968e0649925ad7a08f9d5169b3bc89fd9f6e931b75495dd4f3f3c",
+    "src/main/storage/opencode-account-pool.ts": "6ff6696cf0ab0e4286303675890dd46f9146a763167e6cbe92a541d64b3f5f89",
+    "src/renderer/features/engines/OpenCodeAccountQuota.tsx": "4ea274c69c4a827d8e4c30f6088e44b0c774a028d1cdfc7aa7d3f49952f5bc25",
+    "src/renderer/features/engines/OpenCodeAccounts.tsx": "daddb92b2d10484eb004c3e269557582572b705eaf9219ac44692779793f2344",
+    "src/main/runtime.ts": "c166efbf7cb7619b56090118a8b498f6f6b4553ef7aee78b4839f9318773eb79",
+    "src/main/manager.ts": "a194c7c7ccc32fafca42b4617439bd4bd534ce272aa3dba2963de330dc766814"
+  },
+  "delegation": {
+    "owner_instance": "fa9d8930-e663-41ec-a8f3-4ada249f50b0",
+    "worker": "codex_sol_med",
+    "engine": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "medium",
+    "status": "Final research, backend, scheduler, quota, UI, browser and corrective packages completed and accepted",
+    "earlier_findings": "Initial API Key fallback browser failure and storage dependency rejection corrected and independently revalidated in final packages"
+  }
+}
