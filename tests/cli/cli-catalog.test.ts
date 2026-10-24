@@ -277,7 +277,7 @@ test('janitor sweep is a direct RPC call and --dry-run becomes a boolean argumen
   assert.equal(parseCLI(['janitor', 'sweep', '--dry-run']).dryRun, true);
   assert.throws(() => parseCLI(['tasks', 'get', '--dry-run']), /--dry-run is only valid for janitor sweep/);
   assert.throws(() => parseCLI(['janitor', 'sweep', '--dry-run', '--dry-run']), /Duplicate option --dry-run/);
-  const directory = await mkdtemp(join(tmpdir(), 'wv-janitor-cli-'));
+  const directory = await mkdtemp(join(tmpdir(), 'wj-'));
   const app = await startLocalIPC(directory, request => ({ apiVersion: 'weaver.v1', ok: true, data: request }));
   const original = process.stdout.write;
   let output = '';
@@ -305,7 +305,7 @@ test('janitor sweep is a direct RPC call and --dry-run becomes a boolean argumen
 });
 
 test('the new commands reach the socket as logical envelopes, not method wrappers',async()=>{
- const directory=await mkdtemp(join(tmpdir(),'wv-catalog-'));
+ const directory=await mkdtemp(join(tmpdir(),'wc-'));
  const app=await startLocalIPC(directory,request=>({apiVersion:'weaver.v1',ok:true,data:request}));
  const original=process.stdout.write;
  let output='';

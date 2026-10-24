@@ -31,13 +31,13 @@ export class ImSettingsError extends Error {
 
 // The revision starts at 0: the first successful save passes expectedRevision 0 and produces revision 1.
 const INITIAL_REVISION = 0;
-const VERSION = 4;
+const VERSION = 5;
 const DEFAULT_IDLE_MINUTES = 30;
 const APP_ID_MAX = 128;
 const SECRET_MAX = 512;
 const OPEN_ID_MAX = 128;
 const OPEN_IDS_MAX = 1000;
-const ENGINE_MAX = 128;
+const CHANNEL_MAX = 128;
 const MODEL_MAX = 200;
 const EFFORT_MAX = 32;
 const IDLE_MINUTES_MIN = 1;
@@ -53,13 +53,13 @@ const EFFORT_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
 
-const CONFIG_KEYS = ['enabled', 'appId', 'allowedOpenIds', 'engine', 'model', 'effort', 'workspaces', 'idleTimeoutMinutes', 'ownerProfileId'] as const;
+const CONFIG_KEYS = ['enabled', 'appId', 'allowedOpenIds', 'channel', 'model', 'effort', 'workspaces', 'idleTimeoutMinutes', 'ownerProfileId'] as const;
 const STORED_CONFIG_KEYS = [...CONFIG_KEYS, 'appSecret'] as const;
 const FILE_KEYS = ['version', 'revision', 'config'] as const;
 const INPUT_KEYS = ['expectedRevision', 'config'] as const;
 
 const defaultConfig = (): StoredImConfig => ({
-  enabled: false, appId: '', appSecret: '', allowedOpenIds: [], engine: '', model: '', effort: 'medium', workspaces: [], idleTimeoutMinutes: DEFAULT_IDLE_MINUTES, ownerProfileId: '',
+  enabled: false, appId: '', appSecret: '', allowedOpenIds: [], channel: '', model: '', effort: 'medium', workspaces: [], idleTimeoutMinutes: DEFAULT_IDLE_MINUTES, ownerProfileId: '',
 });
 
 const emptySettings = (): StoredImSettings => ({ revision: INITIAL_REVISION, config: defaultConfig() });
@@ -114,7 +114,7 @@ function parseStoredConfig(value: unknown, code: ImSettingsErrorCode): StoredImC
     appId: boundedPattern(item.appId, 'IM settings appId', APP_ID_MAX, APP_ID_RE, code),
     appSecret: boundedText(item.appSecret, 'IM settings appSecret', SECRET_MAX, code),
     allowedOpenIds: openIds,
-    engine: boundedPattern(item.engine, 'IM settings engine', ENGINE_MAX, ID_RE, code),
+    channel: boundedPattern(item.channel, 'IM settings channel', CHANNEL_MAX, ID_RE, code),
     model: boundedPattern(item.model, 'IM settings model', MODEL_MAX, MODEL_RE, code),
     effort: boundedPattern(item.effort, 'IM settings effort', EFFORT_MAX, EFFORT_RE, code),
     workspaces: storedWorkspaces(item.workspaces, code),
@@ -130,7 +130,7 @@ export function publicImConfig(config: StoredImConfig): ImConfig {
     appId: config.appId,
     appSecretConfigured: config.appSecret !== '',
     allowedOpenIds: [...config.allowedOpenIds],
-    engine: config.engine,
+    channel: config.channel,
     model: config.model,
     effort: config.effort,
     workspaces: [...config.workspaces],
@@ -180,7 +180,7 @@ export class ImSettingsStore {
     if (new Set(openIds).size !== openIds.length) throw new ImSettingsError('IM_SETTINGS_INVALID', 'IM settings allowedOpenIds is malformed');
 
     const appId = boundedPattern(raw.appId, 'IM settings appId', APP_ID_MAX, APP_ID_RE, 'IM_SETTINGS_INVALID');
-    const engine = boundedPattern(raw.engine, 'IM settings engine', ENGINE_MAX, ID_RE, 'IM_SETTINGS_INVALID');
+    const channel = boundedPattern(raw.channel, 'IM settings channel', CHANNEL_MAX, ID_RE, 'IM_SETTINGS_INVALID');
     const model = boundedPattern(raw.model, 'IM settings model', MODEL_MAX, MODEL_RE, 'IM_SETTINGS_INVALID');
     const effort = boundedPattern(raw.effort, 'IM settings effort', EFFORT_MAX, EFFORT_RE, 'IM_SETTINGS_INVALID');
     const ownerProfileId = storedOwnerProfileId(raw.ownerProfileId, 'IM_SETTINGS_INVALID');
@@ -205,15 +205,15 @@ export class ImSettingsStore {
       appSecret = boundedText(raw.appSecret, 'IM settings appSecret', SECRET_MAX, 'IM_SETTINGS_INVALID');
     }
 
-    if (enabled && (appId === '' || appSecret === '' || engine === '' || model === '' || effort === '' || openIds.length === 0 || workspaces.length === 0))
-      throw new ImSettingsError('IM_SETTINGS_INVALID', 'IM settings require appId, appSecret, engine, model, effort, allowlist and workspaces to enable');
+    if (enabled && (appId === '' || appSecret === '' || channel === '' || model === '' || effort === '' || openIds.length === 0 || workspaces.length === 0))
+      throw new ImSettingsError('IM_SETTINGS_INVALID', 'IM settings require appId, appSecret, channel, model, effort, allowlist and workspaces to enable');
 
     if (enabled || !unchangedWorkspaces) {
       try { validateImInstructionBudget(this.dataDir, workspaces, ownerProfileId); }
       catch { throw new ImSettingsError('IM_BOOTSTRAP_TOO_LARGE', new ImBootstrapBudgetError().message); }
     }
 
-    const next: StoredImSettings = { revision: existing.revision + 1, config: { enabled, appId, appSecret, allowedOpenIds: openIds, engine, model, effort, workspaces, idleTimeoutMinutes: raw.idleTimeoutMinutes as number, ownerProfileId } };
+    const next: StoredImSettings = { revision: existing.revision + 1, config: { enabled, appId, appSecret, allowedOpenIds: openIds, channel, model, effort, workspaces, idleTimeoutMinutes: raw.idleTimeoutMinutes as number, ownerProfileId } };
     this.write(next);
     this.cached = next;
     return copy(next);
@@ -233,7 +233,7 @@ export class ImSettingsStore {
     try { parsed = JSON.parse(raw); }
     catch { throw new ImSettingsError('IM_SETTINGS_CORRUPT', 'IM settings storage is corrupt'); }
     const file = exactObject(parsed, FILE_KEYS, 'IM settings file', 'IM_SETTINGS_CORRUPT');
-    if (file.version !== VERSION && file.version !== 2 && file.version !== 3) throw new ImSettingsError('IM_SETTINGS_CORRUPT', 'IM settings storage is corrupt');
+    if (file.version !== VERSION && file.version !== 2 && file.version !== 3 && file.version !== 4) throw new ImSettingsError('IM_SETTINGS_CORRUPT', 'IM settings storage is corrupt');
     if (typeof file.revision !== 'number' || !Number.isInteger(file.revision) || file.revision < 0) throw new ImSettingsError('IM_SETTINGS_CORRUPT', 'IM settings storage is corrupt');
     // v2/v3 are normalized in memory only: reading never changes bytes or revision. The next successful
     // CAS save atomically writes v4 and increments once, preserving all private config fields.
@@ -242,15 +242,21 @@ export class ImSettingsStore {
     // where it did not exist is IM_SETTINGS_CORRUPT, never a tolerant default.
     let config = file.config;
     if (file.version === 2) {
-      const legacyKeys: string[] = [...STORED_CONFIG_KEYS.filter(key => key !== 'workspaces' && key !== 'ownerProfileId'), 'workspace'];
+      const legacyKeys: string[] = [...STORED_CONFIG_KEYS.filter(key => key !== 'workspaces' && key !== 'ownerProfileId').map(key => key === 'channel' ? 'engine' : key), 'workspace'];
       const legacy = exactObject(config, legacyKeys, 'IM settings config', 'IM_SETTINGS_CORRUPT');
       const { workspace, ...rest } = legacy;
       if (typeof workspace !== 'string') throw new ImSettingsError('IM_SETTINGS_CORRUPT', 'IM settings workspace is malformed');
       config = { ...rest, workspaces: workspace === '' ? [] : [workspace], ownerProfileId: '' };
     } else if (file.version === 3) {
-      const v3Keys: string[] = STORED_CONFIG_KEYS.filter(key => key !== 'ownerProfileId');
+      const v3Keys: string[] = STORED_CONFIG_KEYS.filter(key => key !== 'ownerProfileId').map(key => key === 'channel' ? 'engine' : key);
       const current = exactObject(config, v3Keys, 'IM settings config', 'IM_SETTINGS_CORRUPT');
       config = { ...current, ownerProfileId: '' };
+    }
+    if(file.version !== VERSION) {
+      const old=exactObject(config,STORED_CONFIG_KEYS.map(key=>key==='channel'?'engine':key),'IM settings config','IM_SETTINGS_CORRUPT');
+      const {engine,...rest}=old;
+      if(typeof engine!=='string')throw new ImSettingsError('IM_SETTINGS_CORRUPT','IM settings engine is malformed');
+      config={...rest,channel:engine ? `default_${engine}` : ''};
     }
     this.cached = { revision: file.revision, config: parseStoredConfig(config, 'IM_SETTINGS_CORRUPT') };
     return this.cached;

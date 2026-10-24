@@ -21,8 +21,8 @@ function policy(): PolicySnapshot {
     revision: 0,
     config: {
       version: 1,
-      engines: { codex: { enabled: true, kind: 'codex' } },
-      owners: { main: { enabled: true, engine: 'codex', model: 'gpt-test', effort: 'medium', workers: [], max_parallel: 1 } },
+      engines: { codex: { enabled: true, kind: 'codex' } },channels:{"default_codex":{engine:"codex",label:"codex",kind:"subscription",enabled:true}},
+      owners: { main: { enabled: true, channel: "default_codex", model: 'gpt-test', effort: 'medium', workers: [], max_parallel: 1 } },
       workers: {}, herdr: { max_wait_minutes: 30 },
     },
     blocks: [], activeBlocks: [], owners: {}, workers: {}, execution: 'disabled',
@@ -143,7 +143,7 @@ async function setup(t: any, parent: ParentAgentFactory, timers = manualTimers()
   t.after(async () => { await service.close().catch(() => {}); await rm(dir, { recursive: true, force: true }); });
   const config = {
     enabled: true, appId: 'cli_test', appSecret: 'CANARY_SECRET', allowedOpenIds: ['ou_a'],
-    engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30,
+    channel: "default_codex", model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 30,
     ownerProfileId: '',
   };
   await service.save({ expectedRevision: 0, config });

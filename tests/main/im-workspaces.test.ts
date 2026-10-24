@@ -10,7 +10,7 @@ import { imInstructions } from '../../src/main/im/bootstrap';
 const root = mkdtempSync(join(tmpdir(), 'im-workspaces-'));
 test.after(() => rmSync(root, { recursive: true, force: true }));
 const project = (name: string) => { const path = join(root, name); mkdirSync(path); return path; };
-const config = (workspaces: string[]) => ({ enabled: false, appId: '', appSecret: '', allowedOpenIds: [], engine: '', model: '', effort: 'medium', workspaces, idleTimeoutMinutes: 30, ownerProfileId: ''});
+const config = (workspaces: string[]) => ({ enabled: false, appId: '', appSecret: '', allowedOpenIds: [], channel: '', model: '', effort: 'medium', workspaces, idleTimeoutMinutes: 30, ownerProfileId: ''});
 
 test('directory list validates boundaries without creating paths or reading their contents', () => {
   const a = project('one'); const b = project('two'); const missing = join(root, 'not-created');

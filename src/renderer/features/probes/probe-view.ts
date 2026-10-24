@@ -1,7 +1,7 @@
 import type { FreeChannelStatus, FreeWorkerStatus } from '../../../shared/contracts/monitoring';
 import { activeBlocks, coveringBlock } from '../../../shared/policy/availability';
 import { FREE_PROBE_BLOCK_BY, STALL_BLOCK_BY, VENDOR_BLOCK_BY } from '../../../shared/policy/blocks';
-import { type Block, type Owner, type Worker } from '../../../shared/contracts/policy';
+import { type Block, type Config, type Owner, type Worker } from '../../../shared/contracts/policy';
 import { dateText } from '../quota/quota-view';
 import type { StatusTone } from '../../format/status-colors';
 
@@ -20,8 +20,8 @@ export function pauseOfBlock(block: Pick<Block, 'by'> | undefined): { label: str
 }
 
 /** The active block that keeps one worker or owner out, found the way the router finds it. Pass the worker's policy key for a worker: a worker-scoped block reaches only the worker it names, never an owner or a sibling. */
-export function blockOf(blocks: Block[], entity: Owner | Worker, now: number = Date.now(), workerId?: string): Block | undefined {
-  return coveringBlock(activeBlocks({ version: 1, blocks }, now), entity, workerId);
+export function blockOf(blocks: Block[], entity: Owner | Worker, now: number, workerId: string | undefined, config: Config): Block | undefined {
+  return coveringBlock(activeBlocks({ version: 1, blocks }, now), entity, workerId, config);
 }
 
 /** Reason plus the recovery time when the block names one: the same line in tag hints and list notes. */
@@ -34,8 +34,8 @@ export interface ProbeStateView { key: ProbeStateKey; label: string; tone: Statu
 
 /** One worker's state as a person reads it: a tag and one explanatory line. Order matters: the open question outranks everything else. */
 export function probeStateView(status: FreeWorkerStatus | undefined): ProbeStateView {
-  if (!status) return { key: 'idle', label: '未参与探测', tone: 'default', detail: '启用该子 Agent 及其引擎并保存后，才会定时探测。' };
-  if (!status.probed) return { key: 'idle', label: '未参与探测', tone: 'default', detail: '该子 Agent 或其引擎已停用，不会探测。' };
+  if (!status) return { key: 'idle', label: '未参与探测', tone: 'default', detail: '启用该子 Agent、渠道及其引擎并保存后，才会定时探测。' };
+  if (!status.probed) return { key: 'idle', label: '未参与探测', tone: 'default', detail: '该子 Agent、渠道或其引擎已停用，不会探测。' };
   if (status.mode === 'quota') {
     const release = status.availability.release_at ?? status.blockedUntil;
     return { key: 'quota', label: '免费额度用完', tone: 'orange', detail: release ? `预计 ${dateText(release)} 恢复` : '等待探测成功后恢复' };

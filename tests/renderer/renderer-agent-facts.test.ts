@@ -24,8 +24,9 @@ const claude: Task = { ...bare, id: 't2', title: '接入新引擎', status: 'run
 const policyConfig = {
   version: 1,
   engines: { claude: { enabled: true, kind: 'claude', quota_refresh: true }, qoder: { enabled: false, kind: 'qodercli', quota_refresh: false } },
-  owners: { claude_owner: { enabled: true, engine: 'claude', model: 'claude-opus-5-5', effort: 'high', workers: ['claude_worker'], max_parallel: 4 } },
-  workers: { claude_worker: { enabled: true, engine: 'claude', model: 'sonnet', effort: 'high' } },
+  channels: { default_claude: { engine: 'claude', label: 'Claude 工作账号', kind: 'subscription', enabled: true } },
+  owners: { claude_owner: { enabled: true, channel: 'default_claude', model: 'claude-opus-5-5', effort: 'high', workers: ['claude_worker'], max_parallel: 4 } },
+  workers: { claude_worker: { enabled: true, channel: 'default_claude', model: 'sonnet', effort: 'high' } },
   herdr: { max_wait_minutes: 15 },
 } as unknown as Config;
 const ownerKind = ownerKindLookup(policyConfig);

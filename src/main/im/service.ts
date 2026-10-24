@@ -1,3 +1,6 @@
+import { join } from 'node:path';
+import { roleEngine } from '../../shared/policy/channels';
+import type { ChannelBinding } from '../channels/runtime';
 import { createHash, randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -47,7 +50,7 @@ type ParentOutcome = 'not-started' | 'not-submitted' | 'pending' | 'completed' |
 interface Session { closeRejected?: boolean; failed?: boolean; gen: number; used: boolean; rotation?: Promise<void>; key: string; chat: string; user: string; epoch: string; valid: boolean; queue: Item[]; busy: boolean; deadline: number; parent?: ParentAgentSession; launching?: Promise<ParentAgentSession>; launchAbort?: AbortController; turn?: { id: string; abort: AbortController; delivery: Delivery; cancelled?: boolean; parentOutcome: ParentOutcome; keepalive?: Keepalive }; timer?: ReturnType<typeof setTimeout>; job?: Promise<void>; closing?: Promise<void>; retire?: 'idle' | 'other' }
 interface ActionBinding { session: Session; generation: number; messageId: string; actionId: string; message: string; expires: number; consumed: boolean }
 interface PendingWait { chat: string; user: string; gen: number; text: string; messageId: string; admittedAt: number; timer?: ReturnType<typeof setTimeout>; done: boolean }
-export interface ImServiceOptions { dataDir: string; policy(): PolicySnapshot; parentFactory?: ParentAgentFactory; channelFactory?: ImChannelFactory; now?: () => number; taskStatus?: () => string; keepaliveTimers?: KeepaliveTimers }
+export interface ImServiceOptions { dataDir: string; policy(): PolicySnapshot; channelConfig?: (id:string)=>ChannelBinding; parentFactory?: ParentAgentFactory; channelFactory?: ImChannelFactory; now?: () => number; taskStatus?: () => string; keepaliveTimers?: KeepaliveTimers }
 export class ImService {
   private readonly settings: ImSettingsStore;
   private readonly inbox: ImInbox;
@@ -88,16 +91,18 @@ export class ImService {
     const owners = config.owners ?? {};
     const engines = config.engines ?? {};
     const list: ImOwnerProfileOption[] = Object.entries(owners).map(([id, owner]) => {
-      const engine = (engines as Record<string, { enabled: boolean; kind: string }>)[owner.engine];
+      const engineId=config.channels[owner.channel]?.engine ?? '';
+      const engine = (engines as Record<string, { enabled: boolean; kind: string }>)[engineId];
       let selectable = true;
       let reason: ImOwnerProfileOption['reason'];
       if (!owner.enabled) { selectable = false; reason = 'disabled'; }
+      else if (!config.channels[owner.channel]?.enabled) { selectable=false; reason='channel_disabled'; }
       else if (!engine || !engine.enabled) { selectable = false; reason = 'engine_disabled'; }
       else if (!(OWNER_HOST_KINDS as readonly string[]).includes(engine.kind)) { selectable = false; reason = 'not_launchable'; }
-      return { id, engine: owner.engine, engineKind: engine?.kind ?? '', model: owner.model, effort: owner.effort, selectable, ...(selectable ? {} : { reason }) };
+      return { id, channel:owner.channel, engine: engineId, engineKind: engine?.kind ?? '', model: owner.model, effort: owner.effort, selectable, ...(selectable ? {} : { reason }) };
     }).sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
     if (savedOwner !== '' && !Object.hasOwn(owners, savedOwner)) {
-      list.push({ id: savedOwner, engine: '', engineKind: '', model: '', effort: '', selectable: false, reason: 'missing' });
+      list.push({ id: savedOwner, channel:'', engine: '', engineKind: '', model: '', effort: '', selectable: false, reason: 'missing' });
     }
     return list;
   }
@@ -296,8 +301,8 @@ export class ImService {
   private route(config: StoredImConfig): { input: Omit<ParentAgentInput, 'instructions'>; roots: string[]; fingerprint: string } {
     try {
       if (!/^cli_[a-zA-Z0-9]+$/.test(config.appId) || !config.appSecret || !config.allowedOpenIds.length || config.allowedOpenIds.some(id => !/^ou_[A-Za-z0-9_-]+$/.test(id))) throw 0;
-      const policy = this.options.policy(); const engine = policy.config.engines[config.engine];
-      const entity = { enabled: true, engine: config.engine, model: config.model, effort: config.effort, workers: [], max_parallel: 1 };
+      const policy = this.options.policy(); const engine = policy.config.engines[policy.config.channels[config.channel]?.engine ?? ''];
+      const entity = { enabled: true, channel: config.channel, model: config.model, effort: config.effort, workers: [], max_parallel: 1 };
       // Independent chat: only the real engine availability (enabled + active engine/model
       // blocks) gates admission. Owner/worker presence never matters; worker-scoped blocks
       // never reach this owner-less entity. The kind allowlist is the single shared module.
@@ -306,10 +311,10 @@ export class ImService {
       const roots = resolveImWorkspaces(config.workspaces);
       const workspace = ImService.botHomeWorkspace();
       // Master does no real project work: no project root is passed as a writable engine root.
-      const input = { engineKind: engine.kind as ImEngineKind, model: config.model, effort: config.effort, workspace, additionalWorkspaces: [] as string[] };
+      const input = { channel: config.channel, ...(this.options.channelConfig?{channelConfig:this.options.channelConfig(config.channel),channelStateDir:join(this.options.dataDir,'agent-state','im')}:{}), engineKind: engine.kind as ImEngineKind, model: config.model, effort: config.effort, workspace, additionalWorkspaces: [] as string[] };
       // The pinned owner never gates admission: a later-invalid pin is reported via the
       // snapshot and the running Master, but chat itself stays available.
-      return { input, roots, fingerprint: JSON.stringify([config.engine, input, roots, config.allowedOpenIds, config.ownerProfileId ?? '']) };
+      return { input, roots, fingerprint: JSON.stringify([config.channel, input, roots, config.allowedOpenIds, config.ownerProfileId ?? '']) };
     } catch { throw new ImServiceError('IM_CONFIG_UNAVAILABLE'); }
   }
   private async restartAgents(retryClose = false): Promise<void> {

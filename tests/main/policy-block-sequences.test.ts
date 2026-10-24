@@ -112,7 +112,7 @@ async function freeSequence(scripts: Record<string, string[]>, ticks: number, ed
   config.engines.opencode.enabled = true;
   config.workers.qoder_worker.enabled = true;
   config.workers.opencode_worker.enabled = true;
-  config.workers.qoder_paid_worker = { engine: 'qoder', model: 'paid-model', effort: 'auto', enabled: true };
+  config.workers.qoder_paid_worker = { channel: "default_qoder", model: 'paid-model', effort: 'auto', enabled: true };
   const policy = new PolicyStore(join(dir, 'weaver.db'), () => now);
   const base = policy.snapshot();
   policy.save({ revision: base.revision, config, blocks: base.blocks }, { allowEngineEnable: true });
@@ -199,11 +199,11 @@ function quotaSequence(): Row[] {
   const policy = new PolicyStore(join(dir, 'weaver.db'), () => START);
   const base = policy.snapshot();
   base.config.engines.codex!.enabled = true;
-  base.config.engines.codex!.quota_refresh = true;
+  base.config.channels.default_codex.quota_refresh = true;
   policy.save({ revision: base.revision, config: base.config, blocks: [{ engine: 'claude', reason: 'manual', since: new Date(START).toISOString(), by: 'user' }] }, { allowEngineEnable: true });
   const record = recorder(policy, () => null);
   const observation = (status: string, resetsAt: string | null) => ({
-    engine: 'codex', status, stale: false, checkedAt: new Date(START).toISOString(), observedAt: new Date(START).toISOString(), statusBasis: 'windows',
+    channel:'default_codex', engine: 'codex', status, stale: false, checkedAt: new Date(START).toISOString(), observedAt: new Date(START).toISOString(), statusBasis: 'windows',
     windows: [{ scope: 'account', usedPercent: status === 'exhausted' ? 100 : 10, resetsAt, remaining: null, total: null, used: null }],
   });
   const apply = (label: string, status: string, resetsAt: string | null = null) => {

@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { SCHEMA_VERSION, migrate } from '../../src/main/migrate';
 import { PolicyStore } from '../../src/main/policy/store';
-import { defaultConfig, validateConfig } from '../../src/main/policy/routing';
+import { defaultConfig as currentConfig, validateConfig } from '../../src/main/policy/routing';
 import { TaskStore } from '../../src/main/store';
 import { TaskManager } from '../../src/main/manager';
 import { MockWorkerAdapter } from '../../src/main/adapters/worker';
@@ -20,23 +20,26 @@ import type { Task } from '../../src/shared/contracts/tasks';
 // Step 11 only deletes rows (no table changes), so a fully migrated database whose user_version is put back to 10 and
 // which is then filled with the shapes an older build wrote is exactly the historical database the step upgrades.
 
+function defaultConfig(): any { const c: any=currentConfig(); for(const channel of Object.values(c.channels) as any[]) if(channel.quota_refresh!==undefined)c.engines[channel.engine].quota_refresh=channel.quota_refresh; for(const r of [...Object.values(c.owners),...Object.values(c.workers)] as any[]) {r.engine=c.channels[r.channel].engine;delete r.channel;} delete c.channels;return c; }
+
 const version = (db: DatabaseSync) => Number((db.prepare('PRAGMA user_version').get() as { user_version: number | string }).user_version);
 const rows = (db: DatabaseSync, sql: string) => (db.prepare(sql).all() as Record<string, unknown>[]).map(row => ({ ...row }));
 
 function legacyDatabase(): DatabaseSync {
   const db = new DatabaseSync(':memory:');
   migrate(db);
+  db.exec(`UPDATE policy_owners SET channel=(SELECT json_extract(body, '$.engine') FROM policy_channels WHERE id=channel) WHERE channel IN (SELECT id FROM policy_channels); UPDATE policy_workers SET channel=(SELECT json_extract(body, '$.engine') FROM policy_channels WHERE id=channel) WHERE channel IN (SELECT id FROM policy_channels); DROP TABLE policy_channels; DROP TABLE channel_secrets; ALTER TABLE policy_owners RENAME COLUMN channel TO engine; ALTER TABLE policy_workers RENAME COLUMN channel TO engine; ALTER TABLE policy_blocks DROP COLUMN channel`);
   db.exec('PRAGMA user_version=10');
   return db;
 }
 
 /** Rows exactly as PolicyStore.writeAll lays a config out, bypassing validation so retired kinds can be stored. */
-function seedPolicy(db: DatabaseSync, config: Config, blocks: Block[] = [], revisions = 1): void {
-  Object.entries(config.engines).forEach(([id, engine], index) => db.prepare('INSERT INTO policy_engines(id,position,enabled,kind,quota_refresh) VALUES (?,?,?,?,?)').run(id, index, engine.enabled ? 1 : 0, engine.kind, engine.quota_refresh === undefined ? null : engine.quota_refresh ? 1 : 0));
-  Object.entries(config.workers).forEach(([id, w], index) => db.prepare('INSERT INTO policy_workers(id,position,enabled,engine,model,effort,description,free_channel,max_parallel) VALUES (?,?,?,?,?,?,?,?,?)').run(id, index, w.enabled ? 1 : 0, w.engine, w.model, w.effort, w.description ?? null, w.free_channel === undefined ? null : w.free_channel ? 1 : 0, w.max_parallel ?? null));
-  Object.entries(config.owners).forEach(([id, o], index) => {
+function seedPolicy(db: DatabaseSync, config: any, blocks: Block[] = [], revisions = 1): void {
+  (Object.entries(config.engines) as [string,any][]).forEach(([id, engine], index) => db.prepare('INSERT INTO policy_engines(id,position,enabled,kind,quota_refresh) VALUES (?,?,?,?,?)').run(id, index, engine.enabled ? 1 : 0, engine.kind, engine.quota_refresh === undefined ? null : engine.quota_refresh ? 1 : 0));
+  (Object.entries(config.workers) as [string,any][]).forEach(([id, w], index) => db.prepare('INSERT INTO policy_workers(id,position,enabled,engine,model,effort,description,free_channel,max_parallel) VALUES (?,?,?,?,?,?,?,?,?)').run(id, index, w.enabled ? 1 : 0, w.engine, w.model, w.effort, w.description ?? null, w.free_channel === undefined ? null : w.free_channel ? 1 : 0, w.max_parallel ?? null));
+  (Object.entries(config.owners) as [string,any][]).forEach(([id, o], index) => {
     db.prepare('INSERT INTO policy_owners(id,position,enabled,engine,model,effort,max_parallel) VALUES (?,?,?,?,?,?,?)').run(id, index, o.enabled ? 1 : 0, o.engine, o.model, o.effort, o.max_parallel);
-    o.workers.forEach((worker, position) => db.prepare('INSERT INTO policy_owner_workers(owner_id,worker_id,position,weight) VALUES (?,?,?,?)').run(id, worker, position, o.worker_weights?.[worker] ?? null));
+    o.workers.forEach((worker:string, position:number) => db.prepare('INSERT INTO policy_owner_workers(owner_id,worker_id,position,weight) VALUES (?,?,?,?)').run(id, worker, position, o.worker_weights?.[worker] ?? null));
   });
   blocks.forEach((b, index) => db.prepare('INSERT INTO policy_blocks(position,engine,model,worker,reason,since,release_at,by) VALUES (?,?,?,?,?,?,?,?)').run(index, b.engine, b.model ?? null, b.worker ?? null, b.reason, b.since, b.release_at ?? null, b.by ?? null));
   const { herdr, $schema, chatgpt_review, quota, free_channel_probe, janitor } = config as unknown as Record<string, unknown>;
@@ -53,7 +56,7 @@ test('an empty database installs at the current version with a default policy th
   assert.equal(version(db), SCHEMA_VERSION);
   assert.deepEqual(rows(db, 'SELECT * FROM policy_engines'), []);
   const store = new PolicyStore(db);
-  assert.deepEqual(Object.keys(store.snapshot().config.engines), Object.keys(defaultConfig().engines));
+  assert.deepEqual(Object.keys(store.snapshot().config.engines), Object.keys(currentConfig().engines));
   assert.ok(!Object.values(store.snapshot().config.engines).some(engine => engine.kind === 'zcode'));
   db.close();
 });
@@ -67,13 +70,13 @@ test('an older database holding the default policy with its zcode engine upgrade
   const store = new PolicyStore(db);
   assert.equal(version(db), SCHEMA_VERSION);
   const snapshot = store.snapshot();
-  assert.deepEqual(snapshot.config, defaultConfig());
+  assert.deepEqual(snapshot.config, currentConfig());
   assert.deepEqual(validateConfig(snapshot.config), []);
   assert.equal(snapshot.revision, 3, 'history is kept, not renumbered');
   assert.deepEqual(rows(db, "SELECT id FROM policy_engines WHERE kind='zcode'"), []);
   // The retained snapshots no longer carry the engine, so a rollback to the oldest one is accepted.
   assert.doesNotMatch(String((db.prepare('SELECT body FROM policy_revisions WHERE revision=1').get() as { body: string }).body), /zcode/);
-  assert.deepEqual(store.rollback(1).config, defaultConfig());
+  assert.deepEqual(store.rollback(1).config, currentConfig());
   db.close();
 });
 
@@ -109,7 +112,7 @@ test('zcode workers, owners, links, weights, blocks and runtime rows are removed
   const store = new PolicyStore(db);
   const { config } = store.snapshot();
   assert.deepEqual(validateConfig(config), []);
-  assert.deepEqual(Object.keys(config.engines), Object.keys(defaultConfig().engines));
+  assert.deepEqual(Object.keys(config.engines), Object.keys(currentConfig().engines));
   assert.deepEqual(Object.keys(config.workers), Object.keys(defaultConfig().workers));
   assert.deepEqual(Object.keys(config.owners), ['claude_owner', 'codex_owner']);
   assert.deepEqual(config.owners.claude_owner!.workers, ['claude_worker', 'qoder_worker']);
@@ -139,6 +142,7 @@ test('running the upgrade again changes nothing, including after the version is 
   const once = dump();
   migrate(db);
   assert.equal(dump(), once, 'a current database runs nothing');
+  db.exec(`UPDATE policy_owners SET channel=(SELECT json_extract(body, '$.engine') FROM policy_channels WHERE id=channel) WHERE channel IN (SELECT id FROM policy_channels); UPDATE policy_workers SET channel=(SELECT json_extract(body, '$.engine') FROM policy_channels WHERE id=channel) WHERE channel IN (SELECT id FROM policy_channels); DROP TABLE policy_channels; DROP TABLE channel_secrets; ALTER TABLE policy_owners RENAME COLUMN channel TO engine; ALTER TABLE policy_workers RENAME COLUMN channel TO engine; ALTER TABLE policy_blocks DROP COLUMN channel`);
   db.exec('PRAGMA user_version=10');
   migrate(db);
   assert.equal(version(db), SCHEMA_VERSION);
@@ -174,7 +178,7 @@ test('tasks recorded with the zcode engine stay readable through the store, task
     assert.equal(call('tasks.get', { taskId: task.id }).dispatch.engine, 'zcode');
     assert.ok(JSON.stringify(call('tasks.list', {})).includes(task.id));
     assert.equal(dispatchKind(task), 'zcode');
-    assert.equal(modelText(task), 'zcode / GLM-5.3-Flash · auto');
+    assert.equal(modelText(task), '历史渠道未记录 / zcode / GLM-5.3-Flash · auto');
     handler.draining = true;
     await manager.shutdown();
   } finally { rmSync(dir, { recursive: true, force: true }); }

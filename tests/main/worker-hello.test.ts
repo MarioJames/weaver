@@ -102,20 +102,21 @@ test('a missing command, an unknown engine and flag-like values are refused clea
 });
 
 test('input must name an engine with model and effort', () => {
-  assert.deepEqual(parseHelloInput({ engine: 'codex', model: 'gpt', effort: 'low' }), { engine: 'codex', model: 'gpt', effort: 'low' });
+  assert.deepEqual(parseHelloInput({ channel:'default_codex', engine: 'codex', model: 'gpt', effort: 'low' }), { channel:'default_codex', engine: 'codex', model: 'gpt', effort: 'low' });
   assert.throws(() => parseHelloInput({ engine: 'codex', model: '', effort: 'low' }));
   assert.throws(() => parseHelloInput({ engine: 'codex', model: 'gpt', effort: 'low', extra: 1 }));
   assert.throws(() => parseHelloInput(null));
+  assert.throws(() => parseHelloInput({engine:'codex',model:'gpt',effort:'low'}),/channel/);
 });
 
 test('greetings run as polled jobs: started at once, bounded, kept for a while after they finish', async () => {
   let now = 1_000_000;
   const pending: ((result: HelloResult) => void)[] = [];
   const jobs = new HelloJobs(() => new Promise(resolve => pending.push(resolve)), 2, 60_000, () => now);
-  const a = jobs.start({ engine: 'codex', model: 'm', effort: 'low' });
+  const a = jobs.start({ channel:'fixture', engine: 'codex', model: 'm', effort: 'low' });
   assert.equal(a.status, 'running');
-  jobs.start({ engine: 'pi', model: 'm', effort: 'low' });
-  assert.throws(() => jobs.start({ engine: 'claude', model: 'm', effort: 'low' }), /2 个探测/);
+  jobs.start({ channel:'fixture', engine: 'pi', model: 'm', effort: 'low' });
+  assert.throws(() => jobs.start({ channel:'fixture', engine: 'claude', model: 'm', effort: 'low' }), /2 个探测/);
   pending[0]!({ ok: true, reply: 'hi', durationMs: 5, checkedAt: 'x' });
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(jobs.get(a.id)?.result?.reply, 'hi');
@@ -124,7 +125,7 @@ test('greetings run as polled jobs: started at once, bounded, kept for a while a
   now += 61_000;
   assert.equal(jobs.get(a.id), undefined);
   const failing = new HelloJobs(() => Promise.reject(new Error('boom')));
-  const b = failing.start({ engine: 'codex', model: 'm', effort: 'low' });
+  const b = failing.start({ channel:'fixture', engine: 'codex', model: 'm', effort: 'low' });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(failing.get(b.id)?.result?.error, 'boom');
 });

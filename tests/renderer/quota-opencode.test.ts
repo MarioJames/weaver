@@ -10,8 +10,8 @@ function record(overrides: Partial<EngineQuotaRecord> = {}): EngineQuotaRecord {
 
 test('OpenCode recovery text never promises a whole-engine pause or a dollar balance', () => {
   assert.match(quotaRecoveryText(record({ status: 'unsupported' })), /免费模型与按量余额没有官方只读额度接口/);
-  assert.match(quotaRecoveryText(record({ status: 'unauthenticated' })), /重新连接 OpenCode Go/);
-  assert.match(quotaRecoveryText(record({ status: 'unauthenticated' })), /账号登录与切换/);
+  assert.match(quotaRecoveryText(record({ status: 'unauthenticated' })), /重新导入该账号的原生 OpenCode Go 登录/);
+  assert.match(quotaRecoveryText(record({ status: 'unauthenticated' })), /账号与渠道/);
   for (const status of ['unauthenticated', 'unsupported'] as const) assert.match(quotaRecoveryText(record({ status })), /额度读取本身不切换账号/);
   const exhausted = quotaRecoveryText(record({ status: 'exhausted' }));
   assert.match(exhausted, /不代表余额、免费模型或其他路线不可用/);

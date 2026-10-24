@@ -6,8 +6,8 @@ export interface ImConfig {
   appId: string;
   appSecretConfigured: boolean;
   allowedOpenIds: string[];
-  /** Actual policy engine ID; conversation parameters are independent of owner/worker profiles. */
-  engine: string;
+  /** Actual policy channel ID; conversation parameters are independent of owner/worker profiles. */
+  channel: string;
   model: string;
   effort: string;
   /** Configured project directories, canonicalized on save; never credential/config state. */
@@ -20,12 +20,13 @@ export interface ImConfig {
 /** One owner profile the Bot settings can pin as the dispatch master. No secret ever appears here. */
 export interface ImOwnerProfileOption {
   id: string;
+  channel: string;
   engine: string;
   engineKind: string;
   model: string;
   effort: string;
   selectable: boolean;
-  reason?: 'disabled' | 'engine_disabled' | 'not_launchable' | 'missing';
+  reason?: 'disabled' | 'channel_disabled' | 'engine_disabled' | 'not_launchable' | 'missing';
 }
 
 /** Live bridge status as the UI sees it. `message` is a fixed, safe string, never a vendor error. */

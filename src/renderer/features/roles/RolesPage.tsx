@@ -29,7 +29,7 @@ import { rolesStyles } from './roles-style';
 
 const NAMES: Record<RoleSection, string> = { owners: '父 Agent', workers: '子 Agent' };
 const DESCRIPTIONS: Record<RoleSection, string> = {
-  owners: '父 Agent 接收任务并派发给子 Agent。每个引擎最多启用一个父 Agent。',
+  owners: '父 Agent 接收任务并派发给子 Agent。可以为同一引擎配置不同账号的父 Agent。',
   workers: '子 Agent 执行父 Agent 派发的任务包。',
 };
 
@@ -38,6 +38,7 @@ export function availabilityText(availability: Availability | undefined): string
   if (!availability) return '尚未保存';
   if (availability.status === 'available') return '可派发';
   if (availability.status === 'disabled') return '已停用';
+  if (availability.status === 'channel_disabled') return '渠道未启用';
   if (availability.status === 'engine_disabled') return `引擎未启用`;
   return `已限制：${availability.reason ?? '未说明原因'}${availability.release_at ? `，${dateText(availability.release_at)} 恢复` : ''}`;
 }
@@ -45,6 +46,7 @@ export function availabilityText(availability: Availability | undefined): string
 /** The one line a list item needs beyond its switch: only states the switch does not already show. A pause written by the penalty ladders or the free probe also names its kind as a tag. Tag colors come from the shared semantic scheme. */
 export function roleNote(availability: Availability | undefined, unsaved: boolean, block?: Block): { text: string; warning?: boolean; tag?: { label: string; color?: string } } | undefined {
   if (unsaved) return { text: availability ? '有未保存的修改' : '尚未保存', warning: true };
+  if (availability?.status === 'channel_disabled') return { text: '渠道未启用' };
   if (availability?.status === 'engine_disabled') return { text: '引擎未启用' };
   if (availability?.status === 'blocked') {
     const pause = pauseOfBlock(block);
@@ -80,7 +82,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   const header = <PolicyHeader title={name} description={DESCRIPTIONS[section]} policy={policy} extra={config && <Button icon={Plus} disabled={policy.busy} onClick={add}>新建{name}</Button>} />;
   if (!config) return <>{header}{policy.loading && <Skeleton.Text animated rows={6} />}</>;
   const record = current ? config[section][current] : undefined;
-  const kind = record ? config.engines[record.engine]?.kind : undefined;
+  const kind = record ? config.engines[config.channels[record.channel]?.engine ?? '']?.kind : undefined;
   const efforts = kind ? EFFORTS[kind] : undefined;
   function add() {
     if (!config) return;
@@ -122,7 +124,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   }
   const impact = current ? roleDeleteImpact(config, section, current) : undefined;
   const savedWorker = section === 'workers' && current ? policy.snapshot?.config.workers[current] : undefined;
-  const pausedBy = savedWorker && current && policy.snapshot ? blockOf(policy.snapshot.blocks, savedWorker, Date.now(), current) : undefined;
+  const pausedBy = savedWorker && current && policy.snapshot ? blockOf(policy.snapshot.blocks, savedWorker, Date.now(), current, policy.snapshot.config) : undefined;
   const canSort = ids.length > 1 && !policy.busy && !toggling && !resuming;
   return <>
     {header}
@@ -136,24 +138,24 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           onChange={items => { if (canSort) policy.setConfig(current => current ? reorderRoles(current, section, items.map(item => item.id)) : current); }}
           renderItem={({ id }) => {
             const item = config[section][id]!;
-            const engineOn = config.engines[item.engine]?.enabled === true;
+            const engineOn = config.channels[item.channel]?.enabled === true && config.engines[config.channels[item.channel]!.engine]?.enabled === true;
             const saved = policy.snapshot?.config[section][id];
             const cap = section === 'workers' ? workerParallelText(item as Worker) : undefined;
-            const hit = policy.snapshot && saved ? blockOf(policy.snapshot.blocks, saved, Date.now(), section === 'workers' ? id : undefined) : undefined;
+            const hit = policy.snapshot && saved ? blockOf(policy.snapshot.blocks, saved, Date.now(), section === 'workers' ? id : undefined, policy.snapshot.config) : undefined;
             const note = roleNote(policy.snapshot?.[section][id], false, hit);
             return <SortableList.Item id={id} align="flex-start" className={rolesStyles.sortItem}>
               {ids.length > 1 && (canSort
                 ? <SortableList.DragHandle className={rolesStyles.roleGrip} aria-label={`拖动排序 ${id}`} size={{ blockSize: 44, borderRadius: 8, size: 16 }} style={{ touchAction: 'none' }} />
                 : <span className={rolesStyles.roleGripOff} aria-hidden="true"><GripVertical size={16} /></span>)}
               <div className={rolesStyles.roleItem} aria-current={id === current ? 'true' : undefined}>
-                <NamedSwitch size="small" aria-label={`启用 ${id}`} checked={item.enabled} loading={toggling === id} disabled={!engineOn || !!toggling} title={engineOn ? undefined : `引擎 ${item.engine || '未选择'} 未启用，先在引擎页打开它`} onChange={checked => void toggle(id, checked)} />
+                <NamedSwitch size="small" aria-label={`启用 ${id}`} checked={item.enabled} loading={toggling === id} disabled={!engineOn || !!toggling} title={engineOn ? undefined : '渠道或执行引擎未启用，请在账号与渠道、引擎页检查'} onChange={checked => void toggle(id, checked)} />
                 <button type="button" className={rolesStyles.roleButton} style={{ font: 'inherit' }} onClick={() => { acceptId(); setSelected(id); setPendingId(id); setIdError(''); scrollToEditor(); }}>
                   <span className={rolesStyles.roleTitle}>
                     <strong className={styles.wrap}>{id}</strong>
                     {section === 'workers' && 'free_channel' in item && item.free_channel === true && <FreeChannelTag />}
                   </span>
                   <span className={rolesStyles.roleNote}>
-                    <span className={`${styles.wrap} ${styles.meta}`}>{item.engine} · {item.model || '未填模型'}</span>
+                    <span className={`${styles.wrap} ${styles.meta}`}>{config.channels[item.channel]?.label ?? item.channel} · {item.model || '未填模型'}</span>
                     {cap && <Tag size="small" color={tagColor('neutral')}>{cap}</Tag>}
                   </span>
                   {note && (note.tag
@@ -168,13 +170,13 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
             const item = config[section][id];
             return <div className={rolesStyles.roleOverlay}>
               <strong className={styles.wrap}>{id}</strong>
-              <span className={`${styles.wrap} ${styles.meta}`}>{item ? `${item.engine} · ${item.model || '未填模型'}` : ''}</span>
+              <span className={`${styles.wrap} ${styles.meta}`}>{item ? `${config.channels[item.channel]?.label ?? item.channel} · ${item.model || '未填模型'}` : ''}</span>
             </div>;
           }}
         />}
       </nav>
       <div ref={editor} tabIndex={-1}><Surface padded>
-        {!record || !current ? <Empty title={`还没有${name}`} description={`新建一个${name}，选择引擎和模型后保存。`} action={<Button icon={Plus} onClick={add}>新建{name}</Button>} /> : <Form form={form} layout="vertical" className={styles.stack}>
+        {!record || !current ? <Empty title={`还没有${name}`} description={`新建一个${name}，选择渠道和模型后保存。`} action={<Button icon={Plus} onClick={add}>新建{name}</Button>} /> : <Form form={form} layout="vertical" className={styles.stack}>
           {pausedBy && current && <WorkerBlockNotice block={pausedBy} busy={resuming === current} disabled={policy.busy || (!!resuming && resuming !== current)} onResume={() => void resume(current, pausedBy)} />}
           <div className={styles.spread}>
             <Text strong>{name} 配置</Text>
@@ -184,14 +186,14 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           <Form.Field label="配置 ID" required desc="改名后按 Enter 或离开输入框，引用处一起更新。">
             <Input id={`${fieldId}-id`} aria-label="配置 ID" aria-invalid={!!idError} value={pendingId} placeholder={section === 'workers' ? '例如：research' : '例如：codex'} onChange={event => setPendingId(event.target.value)} onBlur={acceptId} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); acceptId(); } }} />
           </Form.Field>
-            <Form.Field label="所属引擎" required><NamedSelect id={`${fieldId}-engine`} aria-label="所属引擎" value={record.engine || undefined} options={Object.keys(config.engines).map(id => ({ value: id, label: `${id}${config.engines[id]?.enabled ? '' : '（未启用）'}` }))} onChange={value => { if (typeof value === 'string') update({ ...record, engine: value, effort: EFFORTS[config.engines[value]?.kind ?? '']?.includes(record.effort) === false ? EFFORTS[config.engines[value]!.kind]![0]! : record.effort, enabled: config.engines[value]?.enabled ? record.enabled : false }); }} /></Form.Field>
+            <Form.Field label="账号或渠道" required extra={config.channels[record.channel] ? `执行引擎：${config.channels[record.channel]!.engine}` : '渠道不存在，请重新选择；可在账号与渠道页添加。'}><NamedSelect id={`${fieldId}-channel`} aria-label="账号或渠道" value={record.channel || undefined} options={Object.entries(config.channels).map(([id, channel]) => ({ value: id, label: `${channel.label} · ${channel.engine}${channel.enabled ? '' : '（渠道停用）'}${config.engines[channel.engine]?.enabled ? '' : '（引擎停用）'}` }))} onChange={value => { if (typeof value !== 'string') return; const channel = config.channels[value]!; const supported = EFFORTS[config.engines[channel.engine]?.kind ?? '']; update({ ...record, channel: value, model: value === record.channel ? record.model : '', effort: supported?.includes(record.effort) === false ? supported[0]! : record.effort, enabled: channel.enabled && config.engines[channel.engine]?.enabled ? record.enabled : false }); }} /></Form.Field>
           </div>
           <div className={rolesStyles.pair} style={{ alignItems: 'start' }}>
-            <Form.Field label="模型" required><ModelPicker engine={record.engine} id={`${fieldId}-model`} value={record.model} onChange={model => update({ ...record, model })} /></Form.Field>
+            <Form.Field label="模型" required><ModelPicker kind={kind} channel={record.channel} engine={config.channels[record.channel]?.engine ?? ''} id={`${fieldId}-model`} value={record.model} onChange={model => update({ ...record, model })} /></Form.Field>
             <Form.Field label="推理强度" required><EffortPicker id={`${fieldId}-effort`} efforts={efforts} value={record.effort} onChange={effort => update({ ...record, effort })} /></Form.Field>
           </div>
-          {section === 'owners' && <HelloCheck id={`owners:${current}`} record={record} />}
-          {section === 'workers' ? <WorkerFields key={current} id={current} record={record as Worker} probe={freeProbe} update={next => update(next)} /> : <OwnerFields key={current} savedRecord={policy.snapshot?.config.owners[current]} config={config} blocks={policy.blocks} record={record as Owner} update={next => update(next)} />}
+          {section === 'owners' && <HelloCheck id={`owners:${current}`} record={record} engine={config.channels[record.channel]?.engine ?? ''} />}
+          {section === 'workers' ? <WorkerFields key={current} id={current} record={record as Worker} engine={config.channels[record.channel]?.engine ?? ''} probe={freeProbe} update={next => update(next)} /> : <OwnerFields key={current} savedRecord={policy.snapshot?.config.owners[current]} config={config} blocks={policy.blocks} record={record as Owner} update={next => update(next)} />}
           {impact && <Modal open={askDelete} title={impact.title} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onCancel={() => setAskDelete(false)} onOk={() => { policy.setConfig(removeRole(config, section, current)); setSelected(''); setPendingId(''); setAskDelete(false); }}>
             <Text>{impact.detail}</Text>
           </Modal>}
@@ -211,14 +213,14 @@ function EffortPicker({ efforts, id, value, onChange }: { efforts?: string[]; id
   </div>;
 }
 
-function WorkerFields({ id, record, probe, update }: { id: string; record: Worker; probe: ReturnType<typeof useFreeProbe>; update: (next: Worker) => void }) {
+function WorkerFields({ id, record, engine, probe, update }: { id: string; record: Worker; engine: string; probe: ReturnType<typeof useFreeProbe>; update: (next: Worker) => void }) {
   const fieldId = useId();
   return <>
     <Form.Field label="免费渠道" desc="仅跳过原生账户额度暂停；手动暂停、供应商限流仍生效。调度权重由父 Agent 分别设置。"><Checkbox checked={record.free_channel === true} onChange={checked => update({ ...record, free_channel: checked === true })}>此子 Agent 使用免费渠道</Checkbox></Form.Field>
     <Form.Field label="用途说明"><Input id={`${fieldId}-description`} aria-label="用途说明" value={record.description ?? ''} placeholder="例如：负责前端界面与浏览器验收" onChange={event => update({ ...record, description: event.target.value })} /></Form.Field>
     {record.free_channel === true && <FreeProbePanel worker={id} probe={probe} />}
     <WorkerParallelField record={record} update={update} />
-    <HelloCheck id={id} record={record} />
+    <HelloCheck id={id} record={record} engine={engine} />
   </>;
 }
 
@@ -237,13 +239,13 @@ export function WorkerParallelField({ record, update }: { record: Worker; update
 /** Why dispatch skips this worker right now, with the one button that lifts it. The ban is read from the saved policy, so the notice never shows an unsaved draft. */
 export function WorkerBlockNotice({ block, now = Date.now(), busy, disabled, onResume }: { block: Block; now?: number; busy?: boolean; disabled?: boolean; onResume: () => void }) {
   const text = engineBlockText(block, now);
-  const scope = block.worker ? '' : block.model ? `（作用于引擎 ${block.engine} 的模型 ${block.model}）` : `（作用于整个引擎 ${block.engine}，恢复后该引擎的所有子 Agent 都会恢复）`;
+  const scope = block.channel ? `（作用于渠道 ${block.channel}）` : block.worker ? '' : block.model ? `（作用于引擎 ${block.engine} 的模型 ${block.model}）` : `（作用于整个引擎 ${block.engine}，恢复后该引擎的所有子 Agent 都会恢复）`;
   return <Alert type="warning" title={`已暂停派发 · ${text.category}`} description={`${text.reason}；${text.release}${scope}`}
     style={{ marginBlockEnd: 12 }} action={<Button size="small" icon={Play} aria-label="恢复派发" loading={busy} disabled={disabled} onClick={onResume}>恢复派发</Button>} />;
 }
 
 /** Sends one real "say hi" through the route as currently filled in, saved or not. The run outlives this form. */
-export function HelloCheck({ id, record }: { id: string; record: Pick<Worker, 'engine' | 'model' | 'effort'> }) {
+export function HelloCheck({ id, record, engine }: { id: string; record: Pick<Worker, 'channel' | 'model' | 'effort'>; engine: string }) {
   const run = useHelloRun(id);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -251,15 +253,15 @@ export function HelloCheck({ id, record }: { id: string; record: Pick<Worker, 'e
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [run?.running]);
-  const ready = Boolean(record.engine && record.model.trim() && record.effort.trim());
+  const ready = Boolean(record.channel && engine && record.model.trim() && record.effort.trim());
   const elapsed = run?.running ? Math.max(0, Math.floor((now - run.startedAt) / 1000)) : 0;
   return <div className={`${styles.stack} ${styles.divided}`}>
     <div className={styles.spread} style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
       <div className={styles.tight}>
         <Text strong>可用性</Text>
-        <Text type="secondary" className={styles.meta}>用当前填写的引擎、模型和推理强度发送一条简短问候，检查能否正常回复。不调用工具，不保存会话，会消耗少量额度。</Text>
+        <Text type="secondary" className={styles.meta}>用当前填写的渠道、模型和推理强度发送一条简短问候，检查能否正常回复。不调用工具，不保存会话，会消耗少量额度。</Text>
       </div>
-      <Button icon={Zap} loading={run?.running} disabled={!ready} onClick={() => void startHello(id, { engine: record.engine, model: record.model.trim(), effort: record.effort.trim() }, `${record.engine} · ${record.model.trim()} · ${record.effort.trim()}`)}>连通测试</Button>
+      <Button icon={Zap} loading={run?.running} disabled={!ready} onClick={() => void startHello(id, { channel: record.channel, engine, model: record.model.trim(), effort: record.effort.trim() }, `${record.channel} · ${record.model.trim()} · ${record.effort.trim()}`)}>连通测试</Button>
     </div>
     {run?.running && <Text type="secondary" className={styles.meta} role="status">正在等待 {run.route.split(' · ')[0]} 回复… {elapsed} 秒</Text>}
     {run?.result && !run.running && <ReplyCard result={{ ...run.result, route: run.route }} />}

@@ -8,7 +8,8 @@
     "engines",
     "owners",
     "workers",
-    "herdr"
+    "herdr",
+    "channels"
   ],
   "additionalProperties": false,
   "properties": {
@@ -137,7 +138,7 @@
       "additionalProperties": false,
       "properties": {
         "max_wait_minutes": {
-          "description": "Decides the default timeout of tasks wait/watch when --for is omitted: the command waits max_wait_minutes × 60 seconds. It does not impose an execution deadline.",
+          "description": "Decides the default timeout of tasks wait/watch when --for is omitted: the command waits max_wait_minutes \u00d7 60 seconds. It does not impose an execution deadline.",
           "type": "integer",
           "minimum": 1
         },
@@ -147,6 +148,15 @@
           "minimum": 1,
           "maximum": 1440
         }
+      }
+    },
+    "channels": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/channelId"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/channel"
       }
     }
   },
@@ -202,10 +212,6 @@
             "maki",
             "muse"
           ]
-        },
-        "quota_refresh": {
-          "description": "Whether scheduled quota refresh probes this engine and may auto-block it when the account quota is exhausted. Missing means on for codex, claude, grok and opencode, which have a quota probe, and off for every other kind. OpenCode Go plan windows are display-only and never auto-block the engine.",
-          "type": "boolean"
         }
       }
     },
@@ -213,7 +219,7 @@
       "type": "object",
       "required": [
         "enabled",
-        "engine",
+        "channel",
         "model",
         "effort",
         "workers",
@@ -223,9 +229,6 @@
       "properties": {
         "enabled": {
           "type": "boolean"
-        },
-        "engine": {
-          "$ref": "#/$defs/id"
         },
         "model": {
           "type": "string",
@@ -258,6 +261,9 @@
             "type": "integer",
             "minimum": 0
           }
+        },
+        "channel": {
+          "$ref": "#/$defs/channelId"
         }
       }
     },
@@ -265,7 +271,7 @@
       "type": "object",
       "required": [
         "enabled",
-        "engine",
+        "channel",
         "model",
         "effort"
       ],
@@ -273,9 +279,6 @@
       "properties": {
         "enabled": {
           "type": "boolean"
-        },
-        "engine": {
-          "$ref": "#/$defs/id"
         },
         "model": {
           "type": "string",
@@ -296,8 +299,62 @@
         "free_channel": {
           "type": "boolean",
           "description": "Explicit free route; ignores native account quota blocks only. Manual and vendor limits still apply."
+        },
+        "channel": {
+          "$ref": "#/$defs/channelId"
         }
       }
+    },
+    "channel": {
+      "type": "object",
+      "required": [
+        "engine",
+        "label",
+        "enabled",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "kind": {
+          "enum": [
+            "subscription",
+            "api"
+          ]
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseUrl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol": {
+          "enum": [
+            "anthropic",
+            "openai",
+            "openai-responses"
+          ]
+        },
+        "quota_refresh": {
+          "type": "boolean",
+          "description": "Whether this subscription account participates in scheduled native quota refresh."
+        }
+      }
+    },
+    "channelId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
     }
   }
 }

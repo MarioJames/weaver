@@ -139,7 +139,7 @@ function schedule() {
 }
 const blockFor = (worker: 'qoder_worker' | 'opencode_worker', by: string, release_at?: string): Block => {
   const profile = schedule().workers[worker];
-  return { engine: profile.engine, model: profile.model, reason: by === FREE_PROBE_BLOCK_BY ? '额度耗尽：免费额度已用完' : '探测失败：超时', since: '2026-10-19T00:00:00Z', by, ...(release_at ? { release_at } : {}) };
+  return { engine: defaultConfig().channels[profile.channel]!.engine, model: profile.model, reason: by === FREE_PROBE_BLOCK_BY ? '额度耗尽：免费额度已用完' : '探测失败：超时', since: '2026-10-19T00:00:00Z', by, ...(release_at ? { release_at } : {}) };
 };
 
 test('parent schedule rows tell a temporary pause from exhausted free quota, with the reason', () => {
@@ -158,7 +158,7 @@ test('parent schedule rows tell a temporary pause from exhausted free quota, wit
   // Without a release time nobody but the user lifts a manual block, so it is named as such and locks the weight.
   assert.equal(workerStatusTag(config, [blockFor('qoder_worker', 'manual')], 'qoder_worker', 5)!.label, '已暂停 · 需手动恢复');
   assert.equal(workerStatusTag(config, [blockFor('qoder_worker', FREE_PROBE_BLOCK_BY)], 'opencode_worker', 5), undefined);
-  assert.equal(blockOf([blockFor('qoder_worker', STALL_BLOCK_BY)], config.workers.opencode_worker), undefined);
+  assert.equal(blockOf([blockFor('qoder_worker', STALL_BLOCK_BY)], config.workers.opencode_worker, Date.now(), undefined, config), undefined);
 });
 
 test('list notes carry the pause kind as a tag only for probe and penalty blocks', () => {

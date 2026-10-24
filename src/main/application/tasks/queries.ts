@@ -1,3 +1,4 @@
+import { roleEngine } from '../../../shared/policy/channels';
 import { API_VERSION, READ_COMMANDS, WRITE_COMMANDS, type DispatchNext } from '../../../shared/contracts/commands';
 import type { StallStatus } from '../../../shared/contracts/monitoring';
 import type { Task } from '../../../shared/contracts/tasks';
@@ -79,7 +80,7 @@ export class Queries {
     if(!Object.hasOwn(engines,engine))fail('NOT_FOUND',`Engine ${engine} is not configured and has no penalty record`);
     // The ladder is per worker; the engine view reports the most recently triggered step among its workers.
     const config=this.policy.snapshot().config;const ladders=this.manager.store.listVendorLimits();
-    const keys=[...Object.keys(config.workers).filter(id=>config.workers[id]!.engine===engine),engineLadderKey(engine)].filter(key=>ladders[key]);
+    const keys=[...Object.keys(config.workers).filter(id=>roleEngine(config,config.workers[id]!)===engine),engineLadderKey(engine)].filter(key=>ladders[key]);
     const latest=keys.sort((a,b)=>ladders[b]!.lastTriggerAt-ladders[a]!.lastTriggerAt)[0];
     return {engine,...engines[engine],vendorLimit:latest?{level:ladders[latest]!.level,lastTriggerAt:new Date(ladders[latest]!.lastTriggerAt).toISOString()}:null};
    }

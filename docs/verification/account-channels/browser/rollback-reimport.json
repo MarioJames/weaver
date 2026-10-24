@@ -1,0 +1,8 @@
+{
+  "fixture": "UI import + isolated policyRollback RPC + UI plain reimport",
+  "metadataRestored": true,
+  "managedRootRetained": true,
+  "managedCredentialDigestRetained": true,
+  "sourceDifferentFromManaged": true,
+  "newChannels": 1
+}

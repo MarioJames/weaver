@@ -9,8 +9,8 @@ test('a say hi run is kept per worker, polls until done, and ignores a second st
     sayHi: async (input: { engine: string }) => { calls.push(`start:${input.engine}`); return { id: 'a'.repeat(16), status: 'running', startedAt: 'x' }; },
     sayHiResult: async () => { polls += 1; return polls < 2 ? { id: 'a'.repeat(16), status: 'running', startedAt: 'x' } : { id: 'a'.repeat(16), status: 'done', startedAt: 'x', result: { ok: true, reply: 'hi', durationMs: 5, checkedAt: 'y' } }; },
   } };
-  const first = startHello('codex_worker', { engine: 'codex', model: 'm', effort: 'low' }, 'codex · m · low', 1);
-  await startHello('codex_worker', { engine: 'codex', model: 'm', effort: 'low' }, 'codex · m · low', 1);
+  const first = startHello('codex_worker', { channel: 'default_codex', engine: 'codex', model: 'm', effort: 'low' }, 'codex · m · low', 1);
+  await startHello('codex_worker', { channel: 'default_codex', engine: 'codex', model: 'm', effort: 'low' }, 'codex · m · low', 1);
   await first;
   assert.deepEqual(calls, ['start:codex']);
   assert.equal(polls, 2);

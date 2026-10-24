@@ -1,3 +1,4 @@
+import { inheritedChannel } from '../helpers/inherited-channel';
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
@@ -192,6 +193,7 @@ test('a native dispatch with capacity registers the run inside admission and sti
   const f = harness({ real: false });
   try {
     const task = f.call('tasks.create', { title: 'Native recovery', instruction: 'fixture work', workspace: f.dir, ownerProfileId: 'claude_owner' });
+    inheritedChannel(f.store,task.id);
     const accepted = f.raw('workers.spawn', { taskId: task.id });
     assert.equal(accepted.ok, true, JSON.stringify(accepted));
     const data: any = accepted.data;
@@ -209,6 +211,7 @@ test('a native dispatch replay returns the same registered attempt', async () =>
   const f = harness({ real: false });
   try {
     const task = f.call('tasks.create', { title: 'Native replay', instruction: 'fixture work', workspace: f.dir, ownerProfileId: 'claude_owner' });
+    inheritedChannel(f.store,task.id);
     const commandId = randomUUID();
     const args = { taskId: task.id };
     const first = f.raw('workers.spawn', args, commandId);

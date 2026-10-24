@@ -1,0 +1,33 @@
+{
+  "baseline": "780165e + task changes before importer rollback/publicTask fix",
+  "url": "http://127.0.0.1:44137",
+  "status": "historical evidence; final import and task DTO require retest",
+  "passed": [
+    "UI create codex API with provider/baseUrl/protocol/key and native TOML override",
+    "edit key left empty retains hasApiKey; engine and kind disabled",
+    "invalid ftp endpoint: 400, draft retained, corrected then saved",
+    "channel enable/disable",
+    "role-referenced delete disabled; unused imported subscription deleted",
+    "Owner and Worker bound by UI to API channel + synthetic-model, saved",
+    "fake codex model list and Hello success/failure/recovery",
+    "sourceDir synthetic official codex account import and repeat idempotence",
+    "policy revision fixture conflict retains draft; reload state then save succeeds",
+    "disabled channel is visible on worker with Channel is disabled error",
+    "type API and engine codex filters leave one matching article",
+    "390px document width=390; modal fits; Tab focus provider; Escape closes modal",
+    "engine page only tool installation/version/enable status, accounts moved to channels",
+    "Bot UI selects channel + synthetic model without enabling IM"
+  ],
+  "limitations": [
+    "fake codex only, no paid inference",
+    "theme provider fixed light; dark theme unsupported in current application",
+    "schedule/task detail not yet interacted",
+    "later source fixes will supersede affected acceptance"
+  ],
+  "fixture": {
+    "home": "task isolated fixture-home",
+    "nativeSource": "task isolated native-codex with synthetic account identity",
+    "engine": "scratch fake-bin/codex returns static model and hi; fail flag returns controlled error"
+  },
+  "artifact_errors": []
+}

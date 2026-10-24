@@ -1,0 +1,14 @@
+{
+  "fixture": "completed task stored via TaskStore; no engine launch",
+  "safeChannelVisible": true,
+  "publicDtoContainsSyntheticPrivatePath": true,
+  "ownerHostPrivateKeysPresent": [
+    "channelStateDir",
+    "channelProfilePath",
+    "channelEnvironmentPath"
+  ],
+  "runPrivateKeysPresent": [
+    "channelStateDir",
+    "channelProfilePath"
+  ]
+}

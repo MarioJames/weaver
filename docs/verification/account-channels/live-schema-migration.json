@@ -1,0 +1,72 @@
+{
+  "sourceSchema": 12,
+  "targetSchema": 13,
+  "metadataValid": true,
+  "repeatStable": true,
+  "historicalInvalid": [],
+  "revisionCountUnchanged": true,
+  "channels": 7,
+  "owners": 2,
+  "workers": 7,
+  "normalizedAndHistoricalBlocksAgree": true,
+  "preserved": {
+    "tasks": {
+      "count": 1230,
+      "unchanged": true
+    },
+    "task_events": {
+      "count": 101662,
+      "unchanged": true
+    },
+    "artifacts": {
+      "count": 849,
+      "unchanged": true
+    },
+    "owners": {
+      "count": 206,
+      "unchanged": true
+    },
+    "packages": {
+      "count": 1207,
+      "unchanged": true
+    },
+    "receipts": {
+      "count": 6245,
+      "unchanged": true
+    },
+    "kv": {
+      "count": 27,
+      "unchanged": true
+    },
+    "stall_penalties": {
+      "count": 0,
+      "unchanged": true
+    },
+    "stall_history": {
+      "count": 0,
+      "unchanged": true
+    },
+    "quota_records": {
+      "count": 4,
+      "unchanged": true
+    },
+    "quota_state": {
+      "count": 3,
+      "unchanged": true
+    },
+    "vendor_worker_limits": {
+      "count": 2,
+      "unchanged": true
+    },
+    "free_probe_workers": {
+      "count": 3,
+      "unchanged": true
+    },
+    "free_probe_history": {
+      "count": 50,
+      "unchanged": true
+    }
+  },
+  "historicalSnapshots": 333,
+  "sourceStillSchema12": true
+}

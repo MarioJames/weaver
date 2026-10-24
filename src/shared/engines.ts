@@ -1,3 +1,4 @@
+import { roleEngine } from './policy/channels';
 import type { Config } from './contracts/policy';
 
 /** Fixed allowlist. Discovery never accepts a caller-supplied command. */
@@ -42,10 +43,9 @@ export interface EngineReadiness {
   probe: EngineProbeRecord;
 }
 
-const REAL_ADAPTER_KINDS = new Set(['opencode', 'pi', 'grok', 'codex', 'qodercli', 'dsh']);
+const REAL_ADAPTER_KINDS = new Set(['claude', 'opencode', 'pi', 'grok', 'codex', 'qodercli', 'dsh']);
 
 function adapterStatusFor(kind: string): EngineReadiness['adapterStatus'] {
-  if (kind === 'claude') return 'deferred';
   if (REAL_ADAPTER_KINDS.has(kind)) return 'real';
   return 'not_implemented';
 }
@@ -57,7 +57,7 @@ export const EXECUTION_BOUNDARY = {
   roleAutoCreate: false,
   /** The same list adapterStatusFor answers 'real' with, so the published fact cannot drift from it. */
   realAdapter: [...REAL_ADAPTER_KINDS].join('|'),
-  deferredAdapter: 'claude',
+  deferredAdapter: '',
   mockExecution: 'explicit-in-task-detail',
   authenticated: false,
   modelUsable: false,
@@ -77,10 +77,10 @@ export function engineReadiness(probe: EngineProbeRecord, config: Config): Engin
     kind,
     installed: probe.status === 'installed',
     enabled: stored?.enabled === true,
-    ownerConfigured: Object.values(config.owners).some(owner => owner.engine === probe.id),
-    workerConfigured: Object.values(config.workers).some(worker => worker.engine === probe.id),
+    ownerConfigured: Object.values(config.owners).some(owner => roleEngine(config, owner) === probe.id),
+    workerConfigured: Object.values(config.workers).some(worker => roleEngine(config, worker) === probe.id),
     adapterStatus,
-    realExecution: adapterStatus === 'real' && stored?.enabled === true && Object.values(config.workers).some(worker => worker.enabled && worker.engine === probe.id),
+    realExecution: adapterStatus === 'real' && stored?.enabled === true && Object.values(config.workers).some(worker => worker.enabled && roleEngine(config, worker) === probe.id),
     probe,
   };
 }
@@ -90,7 +90,7 @@ export function readinessFor(probes: EngineProbeRecord[], config: Config): Engin
 }
 
 /** One worker route to greet: an engine id from the saved policy plus the model and effort to call. */
-export interface HelloInput { engine: string; model: string; effort: string }
+export interface HelloInput { channel: string; engine: string; model: string; effort: string }
 /** model is what the vendor reported answering, when it says; it can differ from the requested name. */
 export interface HelloResult { ok: boolean; reply?: string; model?: string; error?: string; durationMs: number; checkedAt: string }
 /** A greeting runs longer than one HTTP request may wait, so it is started and then polled. */
@@ -115,4 +115,4 @@ export interface EngineModelList {
   message?: string;
   fetchedAt: string;
 }
-export interface EngineModelListInput { engine: string; refresh?: boolean }
+export interface EngineModelListInput { channel?: string; engine: string; refresh?: boolean }

@@ -13,7 +13,7 @@ import { taskStyles } from './task-style';
 export function modelText(task: Task): string | undefined {
   const dispatch = task.dispatch;
   if (!dispatch) return undefined;
-  return [[dispatch.engine, dispatch.model].filter(Boolean).join(' / '), dispatch.effort].filter(Boolean).join(' · ') || undefined;
+  return [[dispatch.channelLabel ?? dispatch.channel ?? '历史渠道未记录', dispatch.engine, dispatch.model].filter(Boolean).join(' / '), dispatch.effort].filter(Boolean).join(' · ') || undefined;
 }
 
 /**

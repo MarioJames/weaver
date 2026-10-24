@@ -69,11 +69,13 @@ export interface ModelListSink {
 export class ModelListSession {
   private generation = 0;
   private engine = '';
+  private channel?: string;
 
   constructor(private readonly sink: ModelListSink, private readonly request: Request = requestEngineModels) {}
 
-  sync(engine: string): void {
-    if (engine === this.engine) return;
+  sync(engine: string, channel?: string): void {
+    if (engine === this.engine && channel === this.channel) return;
+    this.channel = channel;
     this.engine = engine;
     this.generation += 1;
     this.sink.list(undefined);
@@ -87,7 +89,7 @@ export class ModelListSession {
     const mine = ++this.generation;
     this.sink.loading(true);
     try {
-      const result = await this.request({ engine, ...(refresh ? { refresh: true } : {}) });
+      const result = await this.request({ engine, ...(this.channel ? { channel: this.channel } : {}), ...(refresh ? { refresh: true } : {}) });
       if (this.generation !== mine) return;
       this.sink.list(result);
       if (result.status === 'failed') this.sink.failed(result.message ?? '未获取到模型列表', '模型列表获取失败');
@@ -106,12 +108,12 @@ export class ModelListSession {
  * Loads one engine's model list as soon as the field mounts, and again whenever its engine changes; `load(true)` forces a refresh.
  * A failure is reported as a notification; the manual field stays usable whatever happens.
  */
-export function useEngineModels(engine: string) {
+export function useEngineModels(engine: string, channel?: string) {
   const [list, setList] = useState<EngineModelList>();
   const [loading, setLoading] = useState(false);
   const session = useRef<ModelListSession>(undefined);
   session.current ??= new ModelListSession({ list: setList, loading: setLoading, failed: notifyError });
-  useEffect(() => { session.current?.sync(engine); }, [engine]);
+  useEffect(() => { session.current?.sync(engine, channel); }, [engine, channel]);
   const load = useCallback((refresh = false) => session.current!.load(refresh), []);
   return { list, loading, load };
 }

@@ -8,7 +8,7 @@ import { defaultConfig } from '../../src/main/policy/routing';
 import type { ImConfig, ImSettingsSnapshot, ImStatus } from '../../src/shared/contracts/im';
 import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';
 import {
-  adoptServer, conflictNote, createRequestGate, draftOf, IM_ENGINE_KINDS, imModelDiscoveryEngine, keepImDraft, modifiedEdit, peekImDraft, savePlan, switchDraftEngine, validateDraft,
+  adoptServer, conflictNote, createRequestGate, draftOf, IM_ENGINE_KINDS, imModelDiscoveryEngine, keepImDraft, modifiedEdit, peekImDraft, savePlan, switchDraftChannel, validateDraft,
   type ImDraft, type ImEdit, type ImRequestKind,
 } from '../../src/renderer/features/bots/im-state';
 import { EFFORTS } from '../../src/shared/policy/settings';
@@ -24,7 +24,7 @@ const APP_ID = 'cli_a1b2c3d4e5f6a7b8';
 function configOf(over: Partial<ImConfig> = {}): ImConfig {
   return {
     enabled: true, appId: APP_ID, appSecretConfigured: true, allowedOpenIds: ['ou_1111111111111111'],
-    engine: 'claude', model: 'claude-opus-5-5', effort: 'medium', workspaces: ['/home/me/projects/weaver'], idleTimeoutMinutes: 30, ownerProfileId: '', ...over,
+    channel: 'default_claude', model: 'claude-opus-5-5', effort: 'medium', workspaces: ['/home/me/projects/weaver'], idleTimeoutMinutes: 30, ownerProfileId: '', ...over,
   };
 }
 
@@ -212,20 +212,21 @@ test('re-reads keep a draft whose visible idle is invalid: no silent normalizati
 
 test('validation turns the screen-readable failures into per-field messages and lets a disabled partial config save', () => {
   const base = configOf();
-  const blank: ImDraft = textOf(configOf({ enabled: false, appId: '', appSecretConfigured: false, allowedOpenIds: [], engine: '', model: '', effort: 'medium', workspaces: [] }));
+  const blank: ImDraft = textOf(configOf({ enabled: false, appId: '', appSecretConfigured: false, allowedOpenIds: [], channel: '', model: '', effort: 'medium', workspaces: [] }));
   assert.deepEqual(validateDraft(blank, configOf({ appId: '', appSecretConfigured: false }), undefined), {}, 'turning IM off does not require a complete configuration');
-  const enabled = validateDraft(textOf(configOf({ appId: '', appSecretConfigured: false, allowedOpenIds: [], engine: '', model: '', effort: '', workspaces: [] })), configOf({ appId: '', appSecretConfigured: false }), defaultConfig());
-  assert.equal(Object.keys(enabled).sort().join(','), 'appId,effort,engine,model,openIds,secret,workspaces');
+  const enabled = validateDraft(textOf(configOf({ appId: '', appSecretConfigured: false, allowedOpenIds: [], channel: '', model: '', effort: '', workspaces: [] })), configOf({ appId: '', appSecretConfigured: false }), defaultConfig());
+  assert.equal(Object.keys(enabled).sort().join(','), 'appId,channel,effort,model,openIds,secret,workspaces');
   assert.match(validateDraft(textOf(base, { appId: 'cli_xyz' }), base, undefined).appId, /cli_ 后跟 16 位十六进制字符/);
   assert.match(validateDraft(textOf(base, { appId: `${APP_ID}1` }), base, undefined).appId, /16 位十六进制字符/, '17 hex chars is not the real format either');
   assert.match(validateDraft(textOf(base, { appId: 'cli_0123456789ffffffZ' }), base, undefined).appId, /16 位十六进制字符/, 'non-hex is rejected');
   assert.match(validateDraft(textOf(base, { openIdsText: 'someone@example.com' }), base, undefined).openIds, /ou_ 开头/);
   assert.match(validateDraft(textOf(base, { openIdsText: 'ou_1111111111111111\nou_1111111111111111' }), base, undefined).openIds, /重复/);
-  const disabledPi = validateDraft(textOf(base, { engine: 'pi' }), base, defaultConfig());
-  assert.match(disabledPi.engine, /尚未启用/, 'pi is a supported catalog engine but disabled by default');
+  const disabledPi = validateDraft(textOf(base, { channel: 'default_pi' }), base, defaultConfig());
+  assert.match(disabledPi.channel, /未启用/, 'pi is a supported catalog engine but disabled by default');
   const withOther = defaultConfig();
-  (withOther.engines as Record<string, { enabled: boolean; kind: string; quota_refresh: boolean }>).zed = { enabled: true, kind: 'zed', quota_refresh: false };
-  assert.match(validateDraft(textOf(base, { engine: 'zed' }), base, withOther).engine ?? '', /已安装且已启用/, 'kinds outside the installed catalog are not offered');
+  (withOther.engines as Record<string, { enabled: boolean; kind: string; unused?: boolean }>).zed = { enabled: true, kind: 'zed' };
+  withOther.channels.default_zed = { engine: 'zed', label: 'zed', kind: 'api', enabled: true };
+  assert.match(validateDraft(textOf(base, { channel: 'default_zed' }), base, withOther).channel ?? '', /已安装、已启用/, 'kinds outside the installed catalog are not offered');
   const noOwners = defaultConfig(); noOwners.owners = {}; noOwners.workers = {};
   assert.deepEqual(validateDraft(textOf(base), base, noOwners), {}, 'Bot routing is independent of owner/worker profiles');
   assert.match(validateDraft(textOf(base, { effort: 'unknown' }), base, noOwners).effort, /思考力度/);
@@ -338,7 +339,7 @@ test('the Bot page shows its own heading and IM loading state before the global 
 test('Bot engine/model/effort changes are real drafts and save independently without owner profiles', () => {
   const base = configOf();
   const policy = defaultConfig(); policy.owners = {}; policy.workers = {};
-  for (const patch of [{ engine: 'codex' }, { model: 'custom/model' }, { effort: 'high' }]) {
+  for (const patch of [{ channel: 'default_codex' }, { model: 'custom/model' }, { effort: 'high' }]) {
     const edit: ImEdit = { base, revision: 5, values: textOf(base, patch) };
     assert.equal(modifiedEdit(edit), true);
     const next = adoptServer(snapshotOf(base, 9), edit);
@@ -349,7 +350,7 @@ test('Bot engine/model/effort changes are real drafts and save independently wit
     assert.deepEqual(plan.errors, {});
     assert.ok(plan.input);
     assert.equal(plan.input.expectedRevision, 5);
-    assert.equal(plan.input.config.engine, edit.values.engine);
+    assert.equal(plan.input.config.channel, edit.values.channel);
     assert.equal(plan.input.config.model, edit.values.model);
     assert.equal(plan.input.config.effort, edit.values.effort);
   }
@@ -358,18 +359,18 @@ test('Bot engine/model/effort changes are real drafts and save independently wit
 test('changing engines clears the model, preserves only a legal effort and never invents a replacement model', () => {
   const policy = defaultConfig();
   const draft = textOf(configOf(), { effort: 'high', secret: 'pending-secret' });
-  const same = switchDraftEngine(draft, 'claude', policy);
+  const same = switchDraftChannel(draft, 'default_claude', policy);
   assert.equal(same.model, draft.model);
-  const switched = switchDraftEngine(draft, 'codex', policy);
-  assert.deepEqual(switched, { engine: 'codex', model: '', effort: 'high' });
+  const switched = switchDraftChannel(draft, 'default_codex', policy);
+  assert.deepEqual(switched, { channel: 'default_codex', model: '', effort: 'high' });
   const next = { ...draft, ...switched };
   assert.equal(next.secret, 'pending-secret');
   assert.match(validateDraft(next, configOf(), policy).model, /模型/);
-  assert.equal(switchDraftEngine({ ...draft, effort: 'ultracode' }, 'codex', policy).effort, 'medium');
-  assert.equal(switchDraftEngine({ ...draft, effort: 'medium' }, 'dsh', policy).effort, 'low', 'medium is illegal for dsh and falls back to low');
-  assert.equal(switchDraftEngine({ ...draft, effort: 'high' }, 'dsh', policy).effort, 'high', 'a legal dsh effort is preserved');
+  assert.equal(switchDraftChannel({ ...draft, effort: 'ultracode' }, 'default_codex', policy).effort, 'medium');
+  assert.equal(switchDraftChannel({ ...draft, effort: 'medium' }, 'default_dsh', policy).effort, 'low', 'medium is illegal for dsh and falls back to low');
+  assert.equal(switchDraftChannel({ ...draft, effort: 'high' }, 'default_dsh', policy).effort, 'high', 'a legal dsh effort is preserved');
   for (const kind of ['codex', 'claude', 'dsh']) {
-    for (const effort of EFFORTS[kind]) assert.equal(validateDraft(textOf(configOf(), { engine: kind, effort }), configOf(), policy).effort, undefined);
+    for (const effort of EFFORTS[kind]) assert.equal(validateDraft(textOf(configOf(), { channel: `default_${kind}`, effort }), configOf(), policy).effort, undefined);
   }
 });
 
@@ -385,42 +386,35 @@ test('all seven catalog engines are offered, validated per kind, and OpenCode ke
     const efforts = kind === 'opencode' ? ['provider-default', 'high'] : EFFORTS[kind];
     assert.ok(efforts?.length, `${kind} has a fixed effort table (opencode uses free-form variants)`);
     for (const effort of efforts) {
-      const errors = validateDraft(textOf(configOf(), { engine, effort }), configOf(), policy);
-      assert.equal(errors.engine, undefined, `${kind} engine was rejected`);
+      const errors = validateDraft(textOf(configOf(), { channel: `default_${engine}`, effort }), configOf(), policy);
+      assert.equal(errors.channel, undefined, `${kind} engine was rejected`);
       assert.equal(errors.effort, undefined, `${kind} effort ${effort} was rejected`);
     }
   }
   // dsh 原生力度只有 off/low/high/max：medium 非法，切换到 dsh 时回退 low。
   assert.deepEqual(EFFORTS.dsh, ['off', 'low', 'high', 'max']);
-  assert.match(validateDraft(textOf(configOf(), { engine: 'dsh', effort: 'medium' }), configOf(), policy).effort ?? '', /思考力度/);
-  assert.equal(switchDraftEngine({ ...textOf(configOf()), effort: 'medium' }, 'dsh', policy).effort, 'low');
-  assert.equal(switchDraftEngine({ ...textOf(configOf()), effort: 'high' }, 'dsh', policy).effort, 'high');
-  assert.match(validateDraft(textOf(configOf(), { engine: 'opencode', effort: 'has space' }), configOf(), policy).effort ?? '', /variant/);
-  assert.equal(validateDraft(textOf(configOf(), { engine: 'opencode', effort: 'x'.repeat(32) }), configOf(), policy).effort, undefined);
-  assert.match(validateDraft(textOf(configOf(), { engine: 'opencode', effort: 'x'.repeat(33) }), configOf(), policy).effort ?? '', /variant/);
+  assert.match(validateDraft(textOf(configOf(), { channel: 'default_dsh', effort: 'medium' }), configOf(), policy).effort ?? '', /思考力度/);
+  assert.equal(switchDraftChannel({ ...textOf(configOf()), effort: 'medium' }, 'default_dsh', policy).effort, 'low');
+  assert.equal(switchDraftChannel({ ...textOf(configOf()), effort: 'high' }, 'default_dsh', policy).effort, 'high');
+  assert.match(validateDraft(textOf(configOf(), { channel: 'default_opencode', effort: 'has space' }), configOf(), policy).effort ?? '', /variant/);
+  assert.equal(validateDraft(textOf(configOf(), { channel: 'default_opencode', effort: 'x'.repeat(32) }), configOf(), policy).effort, undefined);
+  assert.match(validateDraft(textOf(configOf(), { channel: 'default_opencode', effort: 'x'.repeat(33) }), configOf(), policy).effort ?? '', /variant/);
   const disabled = defaultConfig();
-  const errors = validateDraft(textOf(configOf(), { engine: 'pi', effort: 'high' }), configOf(), disabled);
-  assert.match(errors.engine ?? '', /尚未启用/);
-  const dshDisabled = validateDraft(textOf(configOf(), { engine: 'dsh', effort: 'high' }), configOf(), disabled);
-  assert.match(dshDisabled.engine ?? '', /尚未启用/, 'a disabled dsh engine is not selectable either');
-  assert.equal(switchDraftEngine({ ...textOf(configOf()), effort: 'provider-x' }, 'opencode', policy).effort, 'provider-x');
-  assert.equal(switchDraftEngine({ ...textOf(configOf()), effort: 'not a variant' }, 'opencode', policy).effort, 'medium');
+  const errors = validateDraft(textOf(configOf(), { channel: 'default_pi', effort: 'high' }), configOf(), disabled);
+  assert.match(errors.channel ?? '', /尚未启用/);
+  const dshDisabled = validateDraft(textOf(configOf(), { channel: 'default_dsh', effort: 'high' }), configOf(), disabled);
+  assert.match(dshDisabled.channel ?? '', /尚未启用/, 'a disabled dsh engine is not selectable either');
+  assert.equal(switchDraftChannel({ ...textOf(configOf()), effort: 'provider-x' }, 'default_opencode', policy).effort, 'provider-x');
+  assert.equal(switchDraftChannel({ ...textOf(configOf()), effort: 'not a variant' }, 'default_opencode', policy).effort, 'medium');
 });
 
-test('policy alias engines resolve to the catalog id for model discovery while saves keep the alias', () => {
+test('model discovery resolves the channel engine alias and saves retain the channel', () => {
   const policy = defaultConfig();
-  policy.engines.ocode = { enabled: true, kind: 'opencode', quota_refresh: false };
-  policy.engines.pi_alt = { enabled: true, kind: 'pi', quota_refresh: false };
-  policy.engines.qoder_alias = { enabled: true, kind: 'qodercli', quota_refresh: false };
-  policy.engines.dsh_alias = { enabled: true, kind: 'dsh', quota_refresh: false };
-  assert.equal(imModelDiscoveryEngine('ocode', policy), 'opencode');
-  assert.equal(imModelDiscoveryEngine('pi_alt', policy), 'pi');
-  assert.equal(imModelDiscoveryEngine('qoder_alias', policy), 'qoder');
-  assert.equal(imModelDiscoveryEngine('qoder', policy), 'qoder', 'qoder kind qodercli maps to catalog qoder');
-  assert.equal(imModelDiscoveryEngine('claude', policy), 'claude');
-  assert.equal(imModelDiscoveryEngine('pi', policy), 'pi');
-  assert.equal(imModelDiscoveryEngine('dsh', policy), 'dsh');
-  assert.equal(imModelDiscoveryEngine('dsh_alias', policy), 'dsh', 'dsh alias kind maps to catalog dsh');
+  policy.engines.ocode = { enabled: true, kind: 'opencode' };
+  policy.channels.team = { label: '团队', engine: 'ocode', kind: 'api', enabled: true, provider: 'custom' };
+  assert.equal(imModelDiscoveryEngine('team', policy), 'ocode');
+  assert.equal(imModelDiscoveryEngine('default_claude', policy), 'claude');
+  assert.equal(imModelDiscoveryEngine('missing', policy), '');
 });
 
 test('the reused model-list consumer uses public API only after engine selection and keeps manual model saves on failure', async () => {
@@ -428,7 +422,7 @@ test('the reused model-list consumer uses public API only after engine selection
   const requests: EngineModelListInput[] = [];
   const pending = new Map<string, (list: EngineModelList) => void>();
   const state: { list?: EngineModelList; loading: boolean; errors: number } = { loading: false, errors: 0 };
-  (globalThis as { window?: object }).window = { weaver: { listEngineModels: (input: EngineModelListInput) => { requests.push(input); return new Promise<EngineModelList>(resolve => pending.set(input.engine, resolve)); } } };
+  (globalThis as { window?: object }).window = { weaver: { listEngineModels: (input: EngineModelListInput) => { requests.push(input); return new Promise<EngineModelList>(resolve => pending.set(input.engine!, resolve)); } } };
   try {
     const session = new ModelListSession({ list: list => { state.list = list; }, loading: value => { state.loading = value; }, failed: () => { state.errors++; } });
     session.sync(''); assert.deepEqual(requests, []);
@@ -440,7 +434,7 @@ test('the reused model-list consumer uses public API only after engine selection
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(state.list?.engine, 'codex', 'late old-engine suggestions never replace the new engine');
     assert.equal(state.loading, false); assert.equal(state.errors, 1);
-    const plan = savePlan(activeEdit({ engine: 'codex', model: 'custom/manual-model', effort: 'medium' }), policy);
+    const plan = savePlan(activeEdit({ channel: 'default_codex', model: 'custom/manual-model', effort: 'medium' }), policy);
     assert.deepEqual(plan.errors, {}, 'model list failure and no suggestion are not authority to reject manual models');
     assert.equal(plan.input?.config.model, 'custom/manual-model');
     const refresh = session.load(true);
@@ -453,7 +447,7 @@ test('the reused model-list consumer uses public API only after engine selection
 test('an unavailable saved engine never prevents explicitly disabling the Bot', () => {
   const policy = defaultConfig(); policy.engines.claude.enabled = false;
   const base = configOf();
-  assert.match(validateDraft(textOf(base), base, policy).engine, /未启用/);
+  assert.match(validateDraft(textOf(base), base, policy).channel, /未启用/);
   assert.deepEqual(validateDraft(textOf(base, { enabled: false }), base, policy), {});
   delete policy.engines.claude;
   assert.deepEqual(validateDraft(textOf(base, { enabled: false }), base, policy), {});
@@ -461,7 +455,7 @@ test('an unavailable saved engine never prevents explicitly disabling the Bot', 
 
 
 test('multiple project directories are one explicit draft alongside Secret and the original CAS revision', () => {
-  const base = configOf({ engine: 'codex', model: 'gpt-6.1-sol', effort: 'low', workspaces: ['/projects/alpha', '/projects/beta'] });
+  const base = configOf({ channel: 'default_codex', model: 'gpt-6.1-sol', effort: 'low', workspaces: ['/projects/alpha', '/projects/beta'] });
   const draft = draftOf(base);
   assert.notEqual(draft.workspaces, base.workspaces, 'editing the list cannot mutate the saved snapshot');
   assert.equal(modifiedEdit({ values: draft, base, revision: 12 }), false, 'equal list content is clean even after a new array projection');
@@ -550,8 +544,8 @@ function viewOf(over: Partial<ImSettingsViewProps> = {}): ImSettingsViewProps {
     reconnecting: false,
     forceReading: false,
     dirty: false,
-    engineOptions: [{ value: 'claude', label: 'claude', disabled: false }],
-    engineUsable: true,
+    channelOptions: [{ value: 'default_claude', label: 'Claude账号', disabled: false }],
+    channelUsable: true,
     discoveryEngine: 'claude',
     efforts: ['low', 'medium', 'high'],
     openCodeVariant: false,
@@ -561,7 +555,7 @@ function viewOf(over: Partial<ImSettingsViewProps> = {}): ImSettingsViewProps {
     onRefreshStatus: () => {},
     onReconnect: () => {},
     onUpdate: () => {},
-    onEngineChange: () => {},
+    onChannelChange: () => {},
     onRemoveWorkspace: () => {},
     onAddWorkspace: () => {},
     onDiscard: () => {},
@@ -639,11 +633,11 @@ test('the new channel layout keeps the conflict, workspace empty/limit, save fee
 });
 
 test('the effort description follows the engine kind: OpenCode variant versus no usable engine', () => {
-  const opencode = markup(React.createElement(ImSettingsView, viewOf({ efforts: undefined, openCodeVariant: true, engineUsable: false })));
+  const opencode = markup(React.createElement(ImSettingsView, viewOf({ efforts: undefined, openCodeVariant: true, channelUsable: false })));
   assert.match(opencode, /OpenCode 的 variant 由模型定义/);
-  assert.doesNotMatch(opencode, /先选择一个支持飞书对话的引擎/);
-  const none = markup(React.createElement(ImSettingsView, viewOf({ efforts: undefined, openCodeVariant: false, engineUsable: false })));
-  assert.match(none, /先选择一个支持飞书对话的引擎/);
+  assert.doesNotMatch(opencode, /先选择一个支持飞书对话的渠道/);
+  const none = markup(React.createElement(ImSettingsView, viewOf({ efforts: undefined, openCodeVariant: false, channelUsable: false })));
+  assert.match(none, /先选择一个支持飞书对话的渠道/);
   assert.doesNotMatch(none, /OpenCode 的 variant 由模型定义/);
 });
 

@@ -36,8 +36,8 @@ function fixture() {
   config.workers.qoder_worker!.enabled = true;
   config.workers.opencode_worker!.enabled = true;
   // A paid sibling on each engine keeps a single limited worker from taking its whole engine out (and the probe out of the picture).
-  config.workers.qoder_paid_worker = { engine: 'qoder', model: 'paid-model', effort: 'auto', enabled: true };
-  config.workers.opencode_paid_worker = { engine: 'opencode', model: 'paid-model', effort: 'max', enabled: true };
+  config.workers.qoder_paid_worker = { channel: "default_qoder", model: 'paid-model', effort: 'auto', enabled: true };
+  config.workers.opencode_paid_worker = { channel: "default_opencode", model: 'paid-model', effort: 'max', enabled: true };
   policy.save({ revision: base.revision, config, blocks: [] }, { allowEngineEnable: true });
   const handler = new CommandHandler(manager, policy);
   const ladder = dbVendorLadder(store.db);

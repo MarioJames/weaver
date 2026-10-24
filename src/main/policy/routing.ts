@@ -1,8 +1,9 @@
+import { roleEngine } from '../../shared/policy/channels';
 // Derived from skill-foundry agents-cooperation, revision 61989b1 (Apache-2.0).
 // Weaver adaptation: pure policy only; no CLI, sessions, launch flags, or host reads.
 import type { Availability, Block, Config, Dispatch, Issue, Owner, RouteOptions } from '../../shared/contracts/policy';
 import { availabilityOf, coveringBlock, isBlockActive } from '../../shared/policy/availability';
-import { VENDOR_BLOCK_BY, isEngineBlock } from '../../shared/policy/blocks';
+import { ENGINE_ALL_BLOCKED_REASON, VENDOR_BLOCK_BY, isEngineBlock } from '../../shared/policy/blocks';
 import { EFFORTS, FREE_CHANNEL_INTERVAL_RANGE, JANITOR_INTERVAL_RANGE, JANITOR_TTL_RANGE, MAX_COMMAND_MINUTES_RANGE, QUOTA_INTERVAL_RANGE, hasQuotaProbe, isValidTimezone } from '../../shared/policy/settings';
 import { WEIGHT_MAX, effectiveWeight } from '../../shared/policy/weights';
 import { type Schema, lintSchema, validate } from "./json-schema";
@@ -27,12 +28,21 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
     const allowed = kind ? EFFORTS[kind] : undefined;
     if (allowed && !allowed.includes(effort)) bad(`${path}.effort`, `${kind} effort must be one of ${allowed.join("|")}`);
   };
+  for (const [id, channel] of Object.entries(c.channels)) {
+    if (['__proto__','constructor','prototype'].includes(id)) bad(`$.channels.${id}`, 'Reserved channel id');
+    if (!Object.hasOwn(c.engines,channel.engine)) bad(`$.channels.${id}.engine`, 'Engine is not configured');
+    if ((['pi','dsh'].includes(c.engines[channel.engine]?.kind ?? '')) && channel.kind !== 'api') bad(`$.channels.${id}.kind`, 'This engine requires an API channel');
+    if (channel.kind === 'subscription' && (channel.provider !== undefined || channel.protocol !== undefined || channel.baseUrl !== undefined)) bad(`$.channels.${id}`, 'Subscription cannot carry API fields');
+    if (channel.baseUrl !== undefined) { try { const url=new URL(channel.baseUrl); if (!['http:','https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw new Error(); } catch { bad(`$.channels.${id}.baseUrl`, 'Expected HTTP(S) URL without credentials, query or fragment'); } }
+  }
+  for (const [section, roles] of [['owners',c.owners],['workers',c.workers]] as const) for (const [id, role] of Object.entries(roles)) if (!Object.hasOwn(c.channels,role.channel)) bad(`$.${section}.${id}.channel`, `Unknown channel ${role.channel}`);
+  if (issues.length) return issues;
   const owned = new Map<string, string>();
   for (const [id, owner] of Object.entries(c.owners)) {
     const at = `$.owners.${id}`;
-    const engine = Object.hasOwn(c.engines, owner.engine) ? c.engines[owner.engine] : undefined;
-    if (!engine) bad(`${at}.engine`, `unknown engine ${owner.engine}`);
-    else checkEffort(at, owner.engine, owner.effort);
+    const engine = Object.hasOwn(c.engines, roleEngine(c, owner)) ? c.engines[roleEngine(c, owner)] : undefined;
+    if (!engine) bad(`${at}.engine`, `unknown engine ${roleEngine(c, owner)}`);
+    else checkEffort(at, roleEngine(c, owner), owner.effort);
     owner.workers.forEach((worker, i) => { if (!Object.hasOwn(c.workers, worker)) bad(`${at}.workers[${i}]`, `unknown worker ${worker}`); });
     if (owner.worker_weights) {
       for (const [workerId, weight] of Object.entries(owner.worker_weights)) {
@@ -42,14 +52,14 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
       }
     }
     if (!owner.enabled) continue;
-    const other = owned.get(owner.engine);
-    if (other) bad(at, `engine ${owner.engine} already has enabled owner ${other}`);
-    else owned.set(owner.engine, id);
+    const other = owned.get(owner.channel);
+    if (other) bad(at, `engine ${roleEngine(c, owner)} already has enabled owner ${other}`);
+    else owned.set(owner.channel, id);
     const hasWorker = owner.workers.some(workerId => c.workers[workerId]?.enabled);
     if (!hasWorker) bad(`${at}.workers`, "enabled owner needs at least one enabled worker");
   }
-  for (const [id, engine] of Object.entries(c.engines)) {
-    if (engine.quota_refresh === true && !hasQuotaProbe(engine.kind)) bad(`$.engines.${id}.quota_refresh`, `kind ${engine.kind} has no quota probe`);
+  for (const [id, channel] of Object.entries(c.channels)) {
+    if (channel.quota_refresh === true && (channel.kind !== 'subscription' || !hasQuotaProbe(c.engines[channel.engine]!.kind))) bad(`$.channels.${id}.quota_refresh`, 'Channel has no native quota probe');
   }
   if (c.quota && (c.quota.interval_minutes < QUOTA_INTERVAL_RANGE.min || c.quota.interval_minutes > QUOTA_INTERVAL_RANGE.max)) bad("$.quota.interval_minutes", `interval must be ${QUOTA_INTERVAL_RANGE.min}-${QUOTA_INTERVAL_RANGE.max} minutes`);
   if (c.herdr.max_command_minutes !== undefined && (c.herdr.max_command_minutes < MAX_COMMAND_MINUTES_RANGE.min || c.herdr.max_command_minutes > MAX_COMMAND_MINUTES_RANGE.max)) bad("$.herdr.max_command_minutes", `max_command_minutes must be ${MAX_COMMAND_MINUTES_RANGE.min}-${MAX_COMMAND_MINUTES_RANGE.max} minutes`);
@@ -63,9 +73,9 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
   }
   for (const [id, worker] of Object.entries(c.workers)) {
     const at = `$.workers.${id}`;
-    const kind = Object.hasOwn(c.engines, worker.engine) ? c.engines[worker.engine]?.kind : undefined;
-    if (!kind) { bad(`${at}.engine`, `unknown engine ${worker.engine}`); continue; }
-    checkEffort(at, worker.engine, worker.effort);
+    const kind = Object.hasOwn(c.engines, roleEngine(c, worker)) ? c.engines[roleEngine(c, worker)]?.kind : undefined;
+    if (!kind) { bad(`${at}.engine`, `unknown engine ${roleEngine(c, worker)}`); continue; }
+    checkEffort(at, roleEngine(c, worker), worker.effort);
     if (!SUPPORTED_POLICY_KINDS.includes(kind)) bad(`${at}.engine`, `kind ${kind} has no migrated routing policy`);
   }
   return issues;
@@ -73,54 +83,48 @@ export function validateConfig(config: unknown, schema: Schema = CONFIG_SCHEMA):
 
 // ---- escalation ----
 const stamp = (value: string) => Date.parse(value);
-export const ENGINE_ALL_BLOCKED_REASON = "该引擎全部子 Agent 均被限流/额度耗尽";
+export { ENGINE_ALL_BLOCKED_REASON } from '../../shared/policy/blocks';
 /** The block that covers each enabled worker of the engine, or undefined when any of them is free (or the engine has none). `pool` holds live blocks only. */
-function coveringEnabledWorkers(config: Config, pool: Block[], engine: string): Block[] | undefined {
-  const workers = Object.entries(config.workers).filter(([, w]) => w.engine === engine && w.enabled);
+function coveringEnabledWorkers(config: Config, pool: Block[], engine: string, channel?: string): Block[] | undefined {
+  const workers = Object.entries(config.workers).filter(([, w]) => roleEngine(config, w) === engine && w.enabled && (channel === undefined || w.channel === channel));
   if (!workers.length) return undefined;
   const covering: Block[] = [];
   for (const [id, worker] of workers) {
-    const hit = coveringBlock(pool, worker, id);
+    const hit = coveringBlock(pool, worker, id, config);
     if (!hit) return undefined;
     covering.push(hit);
   }
   return covering;
 }
-/**
- * The user's 「恢复派发」 for one worker: every block naming it goes (any source, any model), and so does the
- * whole-engine 「全部子 Agent 均被限流」 vendor block when the engine is no longer fully blocked without it. Other workers'
- * blocks and whole-engine or model blocks from any other writer stay. Returns the same array when nothing goes.
- */
+/** Clear this worker's blocks and derived channel pauses that its recovery invalidates. */
 export function withoutWorkerBlocks(config: Config, blocks: Block[], engine: string, worker: string, now: number): { blocks: Block[]; removed: number } {
-  const kept = blocks.filter(b => b.worker !== worker);
-  const derived = kept.find(b => isEngineBlock(b, engine) && b.by === VENDOR_BLOCK_BY && b.reason === ENGINE_ALL_BLOCKED_REASON);
-  const rest = derived ? kept.filter(b => b !== derived) : kept;
-  const stillAllBlocked = derived !== undefined && coveringEnabledWorkers(config, rest.filter(b => isBlockActive(b, now)), engine) !== undefined;
-  const next = derived && !stillAllBlocked ? rest : kept;
+  let next = blocks.filter(b => b.worker !== worker);
+  for (const derived of next.filter(b => b.engine === engine && b.worker === undefined && b.model === undefined && b.by === VENDOR_BLOCK_BY && b.reason === ENGINE_ALL_BLOCKED_REASON)) {
+    const rest=next.filter(b=>b!==derived);
+    if (!coveringEnabledWorkers(config, rest.filter(b=>isBlockActive(b,now)), engine, derived.channel)) next=rest;
+  }
   return next.length === blocks.length ? { blocks, removed: 0 } : { blocks: next, removed: blocks.length - next.length };
 }
-/**
- * When every enabled worker of an engine is kept out by an active block, the engine itself is out: add one
- * whole-engine vendor block released at the earliest release_at among the blocks that cover those workers.
- * A whole-engine vendor block written earlier is refreshed in place; one from any other source already says so
- * and stays untouched; an expired one is replaced so the engine never holds two. Returns the same array when
- * nothing changes.
- */
+/** Vendor limits aggregate within a channel; an account's blocked pool cannot pause another account. */
 export function escalateEngineBlock(config: Config, blocks: Block[], engine: string, now: number): Block[] {
   if (!config.engines[engine]?.enabled) return blocks;
-  const live = (b: Block) => isBlockActive(b, now);
-  const wholeEngine = (b: Block) => isEngineBlock(b, engine);
-  if (blocks.some(b => wholeEngine(b) && live(b) && b.by !== VENDOR_BLOCK_BY)) return blocks;
-  const own = blocks.find(b => wholeEngine(b) && live(b));
-  const pool = blocks.filter(b => live(b) && b !== own);
-  const covering = coveringEnabledWorkers(config, pool, engine);
-  if (!covering) return blocks;
-  const releases = covering.flatMap(b => b.release_at ? [stamp(b.release_at)] : []);
-  const release_at = releases.length ? new Date(Math.min(...releases)).toISOString() : undefined;
-  const block: Block = { engine, reason: ENGINE_ALL_BLOCKED_REASON, since: own?.since ?? new Date(now).toISOString(), by: VENDOR_BLOCK_BY, ...(release_at ? { release_at } : {}) };
-  if (own) return own.release_at === release_at && own.reason === block.reason ? blocks : blocks.map(b => b === own ? block : b);
-  const stale = blocks.find(wholeEngine);
-  return [...blocks.filter(b => b !== stale), block];
+  const live=(b:Block)=>isBlockActive(b,now);
+  if(blocks.some(b=>isEngineBlock(b,engine)&&live(b))) return blocks;
+  let next=blocks;
+  for(const [channelId,channel] of Object.entries(config.channels)) {
+    if(channel.engine!==engine||!channel.enabled) continue;
+    const same=(b:Block)=>b.engine===engine&&b.channel===channelId&&b.worker===undefined&&b.model===undefined;
+    const own=next.find(b=>same(b)&&live(b));
+    if(own&&own.by!==VENDOR_BLOCK_BY) continue;
+    const covering=coveringEnabledWorkers(config,next.filter(b=>live(b)&&b!==own),engine,channelId);
+    if(!covering)continue;
+    const releases=covering.flatMap(b=>b.release_at?[stamp(b.release_at)]:[]);
+    const release_at=releases.length?new Date(Math.min(...releases)).toISOString():undefined;
+    const block:Block={engine,channel:channelId,reason:ENGINE_ALL_BLOCKED_REASON,since:own?.since??new Date(now).toISOString(),by:VENDOR_BLOCK_BY,...(release_at?{release_at}:{})};
+    if(own){if(own.release_at!==release_at||own.reason!==block.reason)next=next.map(b=>b===own?block:b);}
+    else next=[...next.filter(b=>!same(b)),block];
+  }
+  return next;
 }
 const describeUnavailable = (a: Availability) =>
   a.status === "blocked" ? `blocked (${a.model ? `${a.engine}/${a.model}` : a.worker ? `${a.engine} worker ${a.worker}` : a.engine}: ${a.reason}${a.release_at ? `, release_at ${a.release_at}` : ""})` : a.status;
@@ -142,7 +146,7 @@ export function parseReleaseAt(value: string, now: number): string {
 function previewSelection(config: Config, ownerId: string, workerId: string, warnings: string[]): Dispatch {
  const owner = config.owners[ownerId]!;
  const worker = config.workers[workerId]!;
- return {owner:ownerId,worker:workerId,engine:worker.engine,model:worker.model,effort:worker.effort,
+ return {owner:ownerId,worker:workerId,channel:worker.channel,engine:roleEngine(config, worker),model:worker.model,effort:worker.effort,
   execution:'disabled',dispatch:'preview',warnings,weight:effectiveWeight(owner,workerId)};
 }
 function requireOwner(config: Config, blocks: Block[], id: string, what = "owner"): Owner {
@@ -176,13 +180,15 @@ export const workerCapacityText = (running: number, limit: number): string => `$
 export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOptions): Dispatch {
   const owner = requireOwner(config, blocks, opts.owner);
   const excluded = new Set(opts.excludeEngines ?? []);
+  const excludedChannels = new Set(opts.excludeChannels ?? []);
   const excludedWorkers = new Set(opts.excludeWorkers ?? []);
   const capOf = (workerId: string): number | undefined => workerCap(config.workers[workerId]);
   if (opts.worker) {
     const worker = Object.hasOwn(config.workers,opts.worker) ? config.workers[opts.worker] : undefined;
     if (!worker) throw new PolicyError(`unknown worker ${opts.worker}`);
     if (excludedWorkers.has(opts.worker)) throw new PolicyError(`NO_ALTERNATIVE_WORKER: worker ${opts.worker} ${EXCLUDED_WORKER_REASON} (excluded: ${[...excludedWorkers].join(", ")})`, [{ path: `$.owners.${opts.owner}.workers`, message: `${opts.worker}: ${EXCLUDED_WORKER_REASON}` }]);
-    if (excluded.has(worker.engine)) throw new PolicyError(`NO_ALTERNATIVE_ENGINE: worker ${opts.worker} runs on engine ${worker.engine}, which ${EXCLUDED_ENGINE_REASON} (excluded: ${[...excluded].join(", ")})`, [{ path: `$.owners.${opts.owner}.workers`, message: `${opts.worker}: ${EXCLUDED_ENGINE_REASON}` }]);
+    if (excludedChannels.has(worker.channel)) throw new PolicyError(`NO_ALTERNATIVE_CHANNEL: channel ${worker.channel} failed earlier in this retry chain`);
+    if (excluded.has(roleEngine(config, worker))) throw new PolicyError(`NO_ALTERNATIVE_ENGINE: worker ${opts.worker} runs on engine ${roleEngine(config, worker)}, which ${EXCLUDED_ENGINE_REASON} (excluded: ${[...excluded].join(", ")})`, [{ path: `$.owners.${opts.owner}.workers`, message: `${opts.worker}: ${EXCLUDED_ENGINE_REASON}` }]);
     const a = availabilityOf(config, blocks, worker, opts.worker);
     if (a.status !== "available") throw new PolicyError(`worker ${opts.worker} unavailable: ${describeUnavailable(a)}`);
     if (effectiveWeight(owner, opts.worker) === 0) throw new PolicyError(`worker ${opts.worker} unavailable: priority weight 0`);
@@ -191,7 +197,7 @@ export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOpti
   }
   const load = (id: string) => opts.workerLoad?.[id] ?? 0;
   const candidates = owner.workers
-    .map((id, index) => ({ id, index, engine: config.workers[id]!.engine, weight: effectiveWeight(owner, id), running: load(id), availability: availabilityOf(config, blocks, config.workers[id]!, id) }));
+    .map((id, index) => ({ id, index, channel: config.workers[id]!.channel, engine: roleEngine(config, config.workers[id]!), weight: effectiveWeight(owner, id), running: load(id), availability: availabilityOf(config, blocks, config.workers[id]!, id) }));
   const atCap = (c: (typeof candidates)[number]) => {
     const cap = capOf(c.id);
     return cap !== undefined && c.running >= cap;
@@ -201,19 +207,19 @@ export function resolveDispatch(config: Config, blocks: Block[], opts: RouteOpti
     return c.weight === 0 ? "priority weight 0"
       : excludedWorkers.has(c.id) ? "excluded for this dispatch"
       : c.availability.status !== "available" ? describeUnavailable(c.availability)
-      : excluded.has(c.engine) ? EXCLUDED_ENGINE_REASON
+      : excluded.has(c.engine) || excludedChannels.has(c.channel) ? EXCLUDED_ENGINE_REASON
       : cap !== undefined ? workerCapacityText(c.running, cap)
       : "available";
   };
   const available = candidates.filter(c => c.weight > 0 && c.availability.status === "available");
   const usable = available.filter(c => !excludedWorkers.has(c.id));
   // (a+1)/wa < (b+1)/wb, compared without division.
-  const eligible = usable.filter(c => !excluded.has(c.engine) && !atCap(c))
+  const eligible = usable.filter(c => !excluded.has(c.engine) && !excludedChannels.has(c.channel) && !atCap(c))
     .sort((a, b) => (a.running + 1) * b.weight - (b.running + 1) * a.weight || b.weight - a.weight || a.index - b.index);
   const hit = eligible[0];
   if (!hit) {
     if (usable.length) {
-      const deferred = usable.filter(c => !excluded.has(c.engine));
+      const deferred = usable.filter(c => !excluded.has(c.engine) && !excludedChannels.has(c.channel));
       if (deferred.length) {
         // Every worker that could run this task is at its own cap. Freeze the one closest to a free slot
         // (smallest running over cap, then the stronger weight, then the list order); the queue waits on it.

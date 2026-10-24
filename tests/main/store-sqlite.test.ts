@@ -1,3 +1,5 @@
+import { policySchema12 } from '../helpers/policy-schema12';
+import { migrateChannelPolicy } from '../../src/shared/policy/channels';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
@@ -108,6 +110,7 @@ test('upgrading a version 6 database keeps its blocks, adds the worker column an
   seeded.save({revision:base.revision,config:base.config,blocks:[{engine:'codex',reason:'manual hold',since:'2026-10-19T00:00:00.000Z',by:'manual'},{engine:'qoder',model:'m1',reason:'model hold',since:'2026-10-19T00:00:00.000Z',release_at:'2030-01-01T00:00:00.000Z',by:'weaver-free-probe'}]});
   const before=seeded.snapshot().blocks;
   const raw=new DatabaseSync(path);
+  policySchema12(raw);
   raw.exec('ALTER TABLE policy_workers DROP COLUMN max_parallel; ALTER TABLE policy_owners ADD COLUMN proxy TEXT; ALTER TABLE policy_workers ADD COLUMN proxy TEXT; ALTER TABLE policy_blocks DROP COLUMN worker; DROP TABLE vendor_worker_limits; CREATE TABLE vendor_limits(engine TEXT PRIMARY KEY, level INTEGER NOT NULL, last_trigger_at INTEGER NOT NULL); INSERT INTO vendor_limits VALUES (\'codex\',2,123); PRAGMA user_version=6');
   assert.deepEqual((raw.prepare('PRAGMA table_info(policy_blocks)').all() as {name:string}[]).map(column=>column.name).includes('worker'),false);
   raw.close();
@@ -139,6 +142,7 @@ test('upgrading a version 7 database drops the role proxy columns and strips pro
   seeded.save({revision:first.revision,config:later,blocks:[]});
   const expected=seeded.snapshot().config;
   const raw=new DatabaseSync(path);
+  policySchema12(raw);
   // Rebuild the shape version 7 left behind: proxy columns with values, and snapshots that carry the field.
   raw.exec('ALTER TABLE policy_workers DROP COLUMN max_parallel; ALTER TABLE policy_owners ADD COLUMN proxy TEXT; ALTER TABLE policy_workers ADD COLUMN proxy TEXT');
   raw.prepare('UPDATE policy_owners SET proxy=?').run('direct');raw.prepare('UPDATE policy_workers SET proxy=?').run('http://127.0.0.1:7890');
@@ -161,7 +165,7 @@ test('upgrading a version 7 database drops the role proxy columns and strips pro
    for(const table of ['policy_owners','policy_workers'])assert.equal((upgraded.prepare(`PRAGMA table_info(${table})`).all() as {name:string}[]).some(column=>column.name==='proxy'),false,`${table}.proxy is gone`);
    assert.equal(Number(upgraded.prepare('SELECT count(*) n FROM policy_owners').get()!.n),Object.keys(expected.owners).length,'role rows survive');
    const bodies=new Map((upgraded.prepare('SELECT revision,body FROM policy_revisions').all() as {revision:number;body:string}[]).map(row=>[row.revision,row.body]));
-   for(const [revision,body] of originals)assert.equal(bodies.get(revision),body,`round ${round}: revision ${revision} is back to its pre-proxy snapshot, every other field intact`);
+   for(const [revision,body] of originals){const value=JSON.parse(body);const next=migrateChannelPolicy(value.config,value.blocks);assert.deepEqual(JSON.parse(bodies.get(revision)!),{...value,...next},`round ${round}: revision ${revision} is back to its pre-proxy snapshot, every other field intact`);}
    assert.equal(bodies.get(93),broken);assert.equal(bodies.get(90),empty);assert.equal(bodies.get(91),bare);
    assert.deepEqual(JSON.parse(bodies.get(92)!),{version:1,revision:92,config:{owners:{a:'text',b:{keep:1}},workers:[]},blocks:[]});
    upgraded.close();

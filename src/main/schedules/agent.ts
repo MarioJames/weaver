@@ -1,3 +1,4 @@
+import { roleEngine } from '../../shared/policy/channels';
 import { closeSync, constants, fchmodSync, fstatSync, lstatSync, mkdirSync, openSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -125,7 +126,7 @@ export function cleanupStateDir(dataDir: string, runId: string): void {
   } catch { /* internal temp only; business output lives in the workspace */ }
 }
 
-export interface ScheduleProfile { engineId: string; kind: string; model: string; effort: string }
+export interface ScheduleProfile { channel: string; engineId: string; kind: string; model: string; effort: string }
 
 /** Role selects the matching policy section; same id under owner/worker never mixes. Revalidates availability now. */
 export function resolveScheduleProfile(snapshot: PolicySnapshot, role: DirectRole, profileId: string): ScheduleProfile {
@@ -135,9 +136,9 @@ export function resolveScheduleProfile(snapshot: PolicySnapshot, role: DirectRol
     const reason = !profile ? 'missing' : availability?.status ?? 'unavailable';
     throw new Error(`POLICY_DENIED: Agent requires an available ${role} profile: ${profileId} (${reason})`);
   }
-  const kind = snapshot.config.engines[profile.engine]?.kind;
+  const kind = snapshot.config.engines[roleEngine(snapshot.config,profile)]?.kind;
   if (typeof kind !== 'string' || !kind) throw new Error(`Agent profile ${profileId} has no engine kind; refusing to launch without a real adapter`);
-  return { engineId: profile.engine, kind, model: profile.model, effort: profile.effort };
+  return { channel:profile.channel, engineId: roleEngine(snapshot.config,profile), kind, model: profile.model, effort: profile.effort };
 }
 
 /** Parent claude/codex keeps the existing owner root; other real kinds run direct CLI; only claude workers use native. */

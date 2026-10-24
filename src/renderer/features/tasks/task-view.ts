@@ -77,7 +77,8 @@ export function ownerKindLookup(config?: Config): (ownerId?: string) => string |
   const engines = config?.engines;
   return (ownerId?: string) => {
     if (!ownerId || !owners || !engines) return undefined;
-    const engineId = owners[ownerId]?.engine;
+    const channelId = owners[ownerId]?.channel;
+    const engineId = channelId ? config?.channels[channelId]?.engine : undefined;
     return engineId ? engines[engineId]?.kind : undefined;
   };
 }

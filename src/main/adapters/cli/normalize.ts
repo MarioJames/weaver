@@ -170,7 +170,8 @@ function accept(engine: RealEngineKind, state: MutableEvidence, event: Record<st
     case 'opencode': return acceptOpencode(state, event, markError);
     case 'grok': return acceptGrok(state, event, markError);
     case 'codex': return acceptCodex(state, event, markError);
-    case 'qodercli': return acceptQoder(state, event, markError);
+    case 'claude': return acceptQoder(state, event, markError, 'claude');
+    case 'qodercli': return acceptQoder(state, event, markError, 'qodercli');
     case 'dsh': return acceptDsh(state, event, markError);
   }
 }
@@ -337,12 +338,12 @@ function acceptCodex(state: MutableEvidence, event: Record<string, unknown>, mar
 }
 
 /** qodercli stream-json follows the Claude Code shape: system init, assistant/user turns, one result. */
-function acceptQoder(state: MutableEvidence, event: Record<string, unknown>, markError: () => void): WorkerRecord[] {
+function acceptQoder(state: MutableEvidence, event: Record<string, unknown>, markError: () => void, engine: 'claude'|'qodercli'): WorkerRecord[] {
   const out: WorkerRecord[] = [];
   if (event.type === 'system') {
     if (event.subtype !== 'init') return out;
     if (typeof event.session_id === 'string') state.vendorSessionId = identifier(state, 'vendor_session_id', event.session_id);
-    out.push(record('progress', 'qodercli session started', 20));
+    out.push(record('progress', `${engine} session started`, 20));
   } else if (event.type === 'assistant') {
     const message = asRecord(event.message);
     if (typeof message?.model === 'string') state.vendorModel = identifier(state, 'vendor_model', message.model);
@@ -365,8 +366,8 @@ function acceptQoder(state: MutableEvidence, event: Record<string, unknown>, mar
     if (event.is_error === true || event.subtype !== 'success') {
       state.failure = 'result';
       markError();
-      noteFailure(state, text.trim() || textOf(event.subtype) || 'unknown qodercli error');
-      out.push(record('log', state.failureDetail || 'unknown qodercli error'));
+      noteFailure(state, text.trim() || textOf(event.subtype) || `unknown ${engine} error`);
+      out.push(record('log', state.failureDetail || `unknown ${engine} error`));
     } else {
       if (text.trim()) rememberAssistant(state, text);
       const stop = typeof event.stop_reason === 'string' ? event.stop_reason : '';
@@ -376,7 +377,7 @@ function acceptQoder(state: MutableEvidence, event: Record<string, unknown>, mar
   } else if (event.type === 'error') {
     state.failure = 'error';
     markError();
-    const message = textOf(event.message) || 'qodercli error';
+    const message = textOf(event.message) || `${engine} error`;
     noteFailure(state, message);
     out.push(record('log', message));
   }

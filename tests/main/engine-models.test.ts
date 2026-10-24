@@ -181,7 +181,7 @@ async function withFakeCli<T>(name: string, run: (dir: string, dump: string) => 
 const read = (file: string) => JSON.parse(readFileSync(file, 'utf8')) as Record<string, string | null>;
 
 test('hello input rejects a proxy field like any other unknown field', () => {
-  assert.deepEqual(parseHelloInput({ engine: 'codex', model: 'm-1', effort: 'high' }), { engine: 'codex', model: 'm-1', effort: 'high' });
+  assert.deepEqual(parseHelloInput({ channel:'default_codex', engine: 'codex', model: 'm-1', effort: 'high' }), { channel:'default_codex', engine: 'codex', model: 'm-1', effort: 'high' });
   for (const bad of [{ engine: 'codex', model: 'm-1', effort: 'high', proxy: 'direct' }, { engine: 'codex', model: 'm-1', effort: 'high', proxy: 'http://127.0.0.1:7890' }, { engine: 'codex', model: 'm-1', effort: 'high', command: 'x' }]) {
     assert.throws(() => parseHelloInput(bad), /Unknown probe field/, JSON.stringify(bad));
   }
@@ -191,7 +191,7 @@ test('connectivity test starts the engine with the service process environment a
   await withFakeCli('codex', async (dir, dump) => {
     const root = join(dir, 'hello');
     mkdirSync(root, { recursive: true });
-    await sayHi({ engine: 'codex', kind: 'codex', model: 'm-1', effort: 'high' }, { root, timeoutMs: 8000 });
+    await sayHi({ channel:'fixture_codex', engine: 'codex', kind: 'codex', model: 'm-1', effort: 'high',channelConfig:{channel:{engine:'codex',kind:'api',enabled:true,label:'fixture'},secret:{apiKey:'fixture-key'}} }, { root, timeoutMs: 8000 });
     const seen = read(dump);
     assert.equal(seen.HTTPS_PROXY, 'http://host-proxy.invalid:3128');
     assert.equal(seen.HTTP_PROXY, 'http://host-proxy.invalid:3128');

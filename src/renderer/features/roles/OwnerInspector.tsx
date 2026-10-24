@@ -24,7 +24,7 @@ const DEFAULT_IDLE_MINUTES = 60;
 
 const enabledOwners = (config: Config): OwnerProfile[] => Object.entries(config.owners)
   .filter(([, owner]) => owner.enabled)
-  .map(([id, owner]) => ({ id, kind: config.engines[owner.engine]?.kind }));
+  .map(([id, owner]) => ({ id, kind: config.engines[config.channels[owner.channel]?.engine ?? '']?.kind }));
 
 /** The profile the task runs under: the frozen dispatch, or the registered owner when it is a policy key. */
 function currentProfile(task: Task, profiles: OwnerProfile[]): string | undefined {

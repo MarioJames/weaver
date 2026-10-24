@@ -1,0 +1,24 @@
+{
+  "empty": {
+    "exit": 0,
+    "logged_in": false,
+    "auth_source": null,
+    "login_method": null,
+    "version": "1.1.75",
+    "allow_byok": 0
+  },
+  "imported": {
+    "exit": 0,
+    "logged_in": true,
+    "auth_source": "local",
+    "login_method": "browser",
+    "version": "1.1.75",
+    "allow_byok": 0
+  },
+  "source_unchanged": true,
+  "copied_files": [
+    ".auth/user",
+    ".auth/machine_id",
+    "settings.json (security.auth only)"
+  ]
+}

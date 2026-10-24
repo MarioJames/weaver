@@ -133,7 +133,7 @@ async function until(seen: () => boolean, what: string): Promise<void> {
 }
 
 const routeOf = (engine: string, worker: string, model: string, effort: string): ProbeRoute =>
-  ({ engine, kind: engine === 'qoder' ? 'qodercli' : engine, worker, model, effort });
+  ({ channel:`default_${engine}`, engine, kind: engine === 'qoder' ? 'qodercli' : engine, worker, model, effort });
 
 test('silence is measured from the last event, and from the run start when there is none', () => {
   const task = makeTask({ silentMs: 4 * MINUTE });
@@ -988,7 +988,7 @@ test('a stall file written before recovery probes still loads', async () => {
 test('the history keeps the last fifty records', async () => {
   const h = await harness();
   try {
-    const seeded = { version: 1, engines: {}, history: Array.from({ length: 50 }, (_, index) => ({ engine: 'codex', level: 1, at: START - (50 - index) * MINUTE, tasks: [`seed-${index}`], stalledMinutes: 5 })) };
+    const seeded = { version: 1, engines: {},channels:{}, history: Array.from({ length: 50 }, (_, index) => ({ engine: 'codex', level: 1, at: START - (50 - index) * MINUTE, tasks: [`seed-${index}`], stalledMinutes: 5 })) };
     seedStall(h.statePath, seeded);
     const monitor = new StallMonitor({ tasks: () => h.tasks, policy: () => h.policy, stateStore: stallStoreAt(h.statePath), cpu: cpu().reader, now: () => h.now(), log: () => {} });
     const before = readStall(h.statePath);

@@ -1,0 +1,80 @@
+[
+  {
+    "args": [
+      {
+        "type": "string",
+        "value": "[vite] connecting..."
+      }
+    ],
+    "text": "[vite] connecting...",
+    "type": "debug"
+  },
+  {
+    "args": [
+      {
+        "type": "string",
+        "value": "[vite] connected."
+      }
+    ],
+    "text": "[vite] connected.",
+    "type": "debug"
+  },
+  {
+    "args": [
+      {
+        "type": "string",
+        "value": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools"
+      },
+      {
+        "type": "string",
+        "value": "font-weight:bold"
+      }
+    ],
+    "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+    "type": "info"
+  },
+  {
+    "args": [
+      {
+        "type": "string",
+        "value": "[vite] server connection lost. Polling for restart..."
+      }
+    ],
+    "text": "[vite] server connection lost. Polling for restart...",
+    "type": "log"
+  },
+  {
+    "args": [
+      {
+        "type": "string",
+        "value": "[vite] connecting..."
+      }
+    ],
+    "text": "[vite] connecting...",
+    "type": "debug"
+  },
+  {
+    "args": [
+      {
+        "type": "string",
+        "value": "[vite] connected."
+      }
+    ],
+    "text": "[vite] connected.",
+    "type": "debug"
+  },
+  {
+    "args": [
+      {
+        "type": "string",
+        "value": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools"
+      },
+      {
+        "type": "string",
+        "value": "font-weight:bold"
+      }
+    ],
+    "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+    "type": "info"
+  }
+]

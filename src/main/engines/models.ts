@@ -1,7 +1,9 @@
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { prepareChannelRun, cleanupChannelRun, type ChannelBinding } from '../channels/runtime';
 import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { catalogEntry, type EngineModel, type EngineModelList, type EngineModelListInput } from '../../shared/engines';
+import { ENGINE_CATALOG, catalogEntry, type EngineModel, type EngineModelList, type EngineModelListInput } from '../../shared/engines';
 import { findEngineExecutable, runCapture, type CaptureResult } from './probe';
 
 export const NO_LIST_MESSAGE = '该引擎不提供模型列表，请手动填写';
@@ -77,7 +79,7 @@ export function parseCodexModels(stdout: string): EngineModel[] {
 /** `qodercli --list-models`: a `MODEL` header and then one name per line. */
 export function parseQoderModels(stdout: string): EngineModel[] {
   const lines = cleanLines(stdout);
-  return unique(lines.slice(lines[0]?.toUpperCase() === 'MODEL' ? 1 : 0).filter(line => !/\s/.test(line)).map(line => ({ id: line })));
+  return unique(lines.slice(lines[0]?.toUpperCase() === 'MODEL' ? 1 : 0).flatMap(line=>{const custom=/\(([^()\s]+)\)$/.exec(line);return custom&&!custom[1]!.includes('…')?[{id:custom[1]!}]:/\s/.test(line)?[]:[{id:line}];}));
 }
 
 /**
@@ -127,13 +129,16 @@ export async function claudeKnownModels(env: NodeJS.ProcessEnv): Promise<EngineM
 export function parseModelListInput(value: unknown): EngineModelListInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('模型列表参数必须是对象');
   const raw = value as Record<string, unknown>;
-  if (Object.keys(raw).some(key => !['engine', 'refresh'].includes(key))) throw new Error('模型列表参数包含未知字段');
-  if (typeof raw.engine !== 'string' || !catalogEntry(raw.engine)) throw new Error('该引擎不在支持范围内');
+  if (Object.keys(raw).some(key => !['channel', 'engine', 'refresh'].includes(key))) throw new Error('模型列表参数包含未知字段');
+  if (typeof raw.engine !== 'string' || (!raw.channel && !catalogEntry(raw.engine))) throw new Error('该引擎不在支持范围内');
   if (raw.refresh !== undefined && typeof raw.refresh !== 'boolean') throw new Error('refresh 必须是布尔值');
-  return { engine: raw.engine, ...(raw.refresh ? { refresh: true } : {}) };
+  if (raw.channel !== undefined && (typeof raw.channel !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/.test(raw.channel))) throw new Error('渠道 ID 无效');
+  return { ...(raw.channel ? {channel:raw.channel as string} : {}), engine: raw.engine, ...(raw.refresh ? { refresh: true } : {}) };
 }
 
 export interface ModelListerOptions {
+  channel?: (id: string) => ChannelBinding;
+  root?: string;
   pathEnv?: string;
   env?: NodeJS.ProcessEnv;
   now?: () => Date;
@@ -152,12 +157,12 @@ export class EngineModelLister {
   constructor(private readonly options: ModelListerOptions = {}) {}
 
   invalidate(engine: string): void {
-    this.cache.delete(engine);
-    this.inflight.delete(engine);
+    this.cache.clear();
+    this.inflight.clear();
   }
 
   list(input: EngineModelListInput): Promise<EngineModelList> {
-    const key = input.engine;
+    const key = input.channel ?? input.engine;
     const clock = (this.options.now ?? (() => new Date()))().getTime();
     const hit = this.cache.get(key);
     if (!input.refresh && hit && clock - hit.at < CACHE_MS) return Promise.resolve(hit.list);
@@ -172,11 +177,26 @@ export class EngineModelLister {
   }
 
   private async execute(input: EngineModelListInput): Promise<EngineModelList> {
-    const entry = catalogEntry(input.engine);
+    if (input.channel) {
+      if (!this.options.channel || !this.options.root) throw new Error('渠道模型读取服务未配置');
+      const binding = this.options.channel(input.channel);
+      if (binding.channel.engine !== input.engine) throw new Error('渠道与模型引擎不匹配');
+      mkdirSync(this.options.root, {recursive:true,mode:0o700});
+      const scratch=mkdtempSync(path.join(this.options.root,'models-'));
+      try {
+        const runtime=prepareChannelRun({...binding,model:'model-list',purpose:'models',stateDir:scratch,env:this.options.env});
+        try{const result=await this.executeNative(input,runtime.env,runtime.argv,binding.engineKind);return runtime.allowedModels?{...result,models:result.models.filter(model=>runtime.allowedModels!.includes(model.id))}:result;}finally{cleanupChannelRun(runtime);}
+      } finally {rmSync(scratch,{recursive:true,force:true});}
+    }
+    return this.executeNative(input,this.options.env??process.env,[]);
+  }
+
+  private async executeNative(input: EngineModelListInput, sourceEnv: NodeJS.ProcessEnv, extraArgv: string[], engineKind?: string): Promise<EngineModelList> {
+    const entry = engineKind ? ENGINE_CATALOG.find(entry=>entry.kind===engineKind) : catalogEntry(input.engine);
     const fetchedAt = (this.options.now ?? (() => new Date()))().toISOString();
     const base = { engine: input.engine, fetchedAt, models: [] as EngineModel[] };
     if (!entry) return { ...base, status: 'unsupported', source: '', message: NO_LIST_MESSAGE };
-    const env = { ...(this.options.env ?? process.env) };
+    const env = { ...sourceEnv };
     delete env.ELECTRON_RUN_AS_NODE;
     if (entry.kind === 'claude') {
       return { ...base, status: 'ok', source: 'Claude Code 无列表命令，用内置名称与 settings.json 已配置的模型', models: await claudeKnownModels(env) };
@@ -190,7 +210,7 @@ export class EngineModelLister {
     const executable = await (this.options.find ?? findEngineExecutable)(entry.command, pathEnv);
     if (!executable) return { ...base, status: 'unavailable', source: lister.source, message: `未在本机找到 ${entry.command}，请手动填写` };
     env.PATH = pathEnv;
-    const result = await (this.options.run ?? runCapture)(executable, lister.args, lister.timeoutMs, lister.maxBytes, env);
+    const result = await (this.options.run ?? runCapture)(executable, [...extraArgv, ...lister.args], lister.timeoutMs, lister.maxBytes, env);
     if (result.error) return { ...base, status: 'failed', source: lister.source, message: `${lister.source} 无法运行` };
     if (result.timedOut) return { ...base, status: 'failed', source: lister.source, message: `${lister.source} 超时，请稍后重试或手动填写` };
     if (result.overflow) return { ...base, status: 'failed', source: lister.source, message: `${lister.source} 输出过大，无法解析` };

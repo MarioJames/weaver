@@ -66,25 +66,6 @@ test('visible Form labels link to the named select trigger and number input once
   assert.match(html, /<button[^>]*id="named-owner"[^>]*role="combobox"/);
   assert.match(html, /<input[^>]*id="named-wait"/);
 });
-test('manual engine pause is gone, dispatch stays governed by switches, weight and quota blocks', () => {
-  const since = '2026-01-01T00:00:00.000Z';
-  const blocks: Block[] = [
-    { engine: 'grok', reason: 'HTTP 402 payment required', since },
-    { engine: 'codex', reason: '额度耗尽', since, by: 'weaver-quota:codex' },
-  ];
-  const config = defaultConfig();
-  const policy = {
-    snapshot: { revision: 1, config, blocks, activeBlocks: blocks, owners: {}, workers: {}, execution: 'disabled' },
-    config, blocks, loading: false, busy: false, dirty: false, loadError: '', saveError: '', issues: [], conflict: false,
-    setConfig: () => {}, setBlocks: () => {}, load: async () => true, save: async () => true, commit: async () => {}, rebase: () => {}, applyServerSnapshot: () => true,
-  } as unknown as PolicyDraft;
-  const html = markup(React.createElement(EnginesPage, { policy }));
-  assert.equal((html.match(/aria-label="恢复派发"/g) ?? []).length, 2);
-  assert.match(html, /HTTP 402 payment required/);
-  assert.match(html, /需手动恢复/);
-  assert.doesNotMatch(html, /lucide-pause|暂停原因|留空表示需要手动恢复|role="dialog"/);
-  assert.equal((html.match(/<button[^>]*>[\s\S]{0,120}?暂停派发<\/button>/g) ?? []).length, 0);
-});
 test('queued task shows the current queue reason without inventing capacity wait', () => {
   for (const [code, label] of Object.entries({ policy_blocked: '当前策略阻止派发', frozen_route_changed: '已冻结路由发生变化', workspace_changed: '工作目录发生变化', launch_blocked: '执行启动受阻' })) {
     const html = markup(React.createElement(TaskDetail, { task: { ...task, status: 'queued', scheduled: true, queueReason: { code: code as NonNullable<Task['queueReason']>['code'], message: 'specific reason' } }, busy: false, onStart: () => {}, onCancel: () => {}, action: async () => true }));

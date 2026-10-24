@@ -14,6 +14,7 @@ const T = Date.parse('2030-01-01T12:00:00Z');
 function v8Database(): DatabaseSync {
   const db = new DatabaseSync(':memory:');
   migrate(db);
+  db.exec(`UPDATE policy_owners SET channel=(SELECT json_extract(body, '$.engine') FROM policy_channels WHERE id=channel) WHERE channel IN (SELECT id FROM policy_channels); UPDATE policy_workers SET channel=(SELECT json_extract(body, '$.engine') FROM policy_channels WHERE id=channel) WHERE channel IN (SELECT id FROM policy_channels); DROP TABLE policy_channels; DROP TABLE channel_secrets; ALTER TABLE policy_owners RENAME COLUMN channel TO engine; ALTER TABLE policy_workers RENAME COLUMN channel TO engine; ALTER TABLE policy_blocks DROP COLUMN channel`);
   // Step 10 added a column; the version 8 shape does not have it.
   db.exec('ALTER TABLE policy_workers DROP COLUMN max_parallel');
   db.exec('PRAGMA user_version=8');
@@ -128,6 +129,7 @@ test('running the migration again, even from version 8 once more, neither fails 
   migrate(db);
   assert.deepEqual({ ladders: ladders(db), probes: probes(db) }, merged, 'a current database is left alone');
   db.exec('ALTER TABLE policy_workers DROP COLUMN max_parallel');
+  db.exec(`UPDATE policy_owners SET channel=(SELECT json_extract(body, '$.engine') FROM policy_channels WHERE id=channel) WHERE channel IN (SELECT id FROM policy_channels); UPDATE policy_workers SET channel=(SELECT json_extract(body, '$.engine') FROM policy_channels WHERE id=channel) WHERE channel IN (SELECT id FROM policy_channels); DROP TABLE policy_channels; DROP TABLE channel_secrets; ALTER TABLE policy_owners RENAME COLUMN channel TO engine; ALTER TABLE policy_workers RENAME COLUMN channel TO engine; ALTER TABLE policy_blocks DROP COLUMN channel`);
   db.exec('PRAGMA user_version=8');
   migrate(db);
   assert.equal(version(db), SCHEMA_VERSION);

@@ -30,7 +30,7 @@ test('schema uses own keys and rejects prototype reference attacks',()=>{
   const c={...defaultConfig(),...JSON.parse(`{"${key}":1}`)}; assert.ok(validateConfig(c).some(i=>i.path===`$.${key}`));
   assert.throws(()=>validate({$ref:`#/$defs/${key}`,$defs:{}},'x'),/unresolved/);
  }
- const c=defaultConfig(); c.owners.claude_owner.engine='constructor'; assert.ok(validateConfig(c).some(i=>i.message.includes('unknown engine')));
+ const c=defaultConfig(); c.owners.claude_owner.channel='constructor'; assert.ok(validateConfig(c).some(i=>i.message.includes('Unknown channel')));
  assert.throws(()=>resolveDispatch(defaultConfig(),[],{owner:'constructor'}),/unknown owner/);
 });
 test('effort, worker references, parallel limits and unique enabled owners validated',()=>{
@@ -96,7 +96,7 @@ test('disabled pi template validates and stays out of claude routing',()=>{
  const badEffort=defaultConfig(); badEffort.workers.pi_worker.effort='ultra'; assert.ok(validateConfig(badEffort).some(issue=>issue.path.includes('pi_worker')&&issue.message.includes('effort')));
  assert.equal(c.owners.claude_owner.workers.includes('pi_worker'),false);
  const open=defaultConfig(); open.engines.opencode.enabled=true; open.workers.opencode_worker.enabled=true;
- open.owners.opencode_owner={enabled:true,engine:'opencode',model:'opencode/glm-5.3-flash-free',effort:'max',workers:['opencode_worker'],max_parallel:1};
+ open.owners.opencode_owner={enabled:true,channel:'default_opencode',model:'opencode/glm-5.3-flash-free',effort:'max',workers:['opencode_worker'],max_parallel:1};
  assert.deepEqual(validateConfig(open),[]);
  assert.equal(route(all()).worker,'claude_worker'); assert.equal(route(all()).weight,5);
 });
@@ -176,7 +176,7 @@ test('excluded workers are skipped by ID and a sibling on the same engine can ta
  assert.equal(moved.worker,'qoder_worker');
  assert.deepEqual(moved.skipped![0],{worker:'claude_worker',reason:'excluded for this dispatch'});
  const same=structuredClone(c);
- same.workers.claude_alt_worker={enabled:true,engine:'claude',model:'sonnet',effort:'high'};
+ same.workers.claude_alt_worker={enabled:true,channel:'default_claude',model:'sonnet',effort:'high'};
  same.owners.claude_owner.workers=['claude_worker','claude_alt_worker'];
  same.owners.claude_owner.worker_weights={claude_worker:10,claude_alt_worker:8};
  const sibling=resolveDispatch(same,[],{owner:'claude_owner',excludeWorkers:['claude_worker']});

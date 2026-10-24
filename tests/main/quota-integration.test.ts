@@ -22,7 +22,7 @@ function window(resetsAt: string | null = reset): QuotaWindow {
   return { id: 'account', label: 'Account', scope: 'account', model: null, usedPercent: 100, remainingPercent: 0, resetsAt, durationMinutes: null, used: null, total: null, remaining: null, unit: 'percent' };
 }
 function record(patch: Partial<EngineQuotaRecord> = {}): EngineQuotaRecord {
-  return { engine: 'codex', status: 'exhausted', source: 'codex_usage', checkedAt: new Date(now).toISOString(), observedAt: new Date(now).toISOString(), stale: false, windows: [window()], detail: 'safe fixture', retryAt: null, ...patch };
+  return { channel: patch.engine ? `default_${patch.engine}` : 'default_codex', engine: 'codex', status: 'exhausted', source: 'codex_usage', checkedAt: new Date(now).toISOString(), observedAt: new Date(now).toISOString(), stale: false, windows: [window()], detail: 'safe fixture', retryAt: null, ...patch };
 }
 async function fixture() {
   const dir = await mkdtemp(join(tmpdir(), 'bq-'));
@@ -36,18 +36,20 @@ test('quota merge preserves manual/model blocks and applies aliases without chan
     const current = f.policy.snapshot();
     current.config.engines.codex_alias = { kind: 'codex', enabled: false };
     current.config.engines.codex_foreign = { kind: 'codex', enabled: false };
+    current.config.channels.alias = {engine:'codex_alias',kind:'subscription',enabled:true,label:'Alias'};
+    current.config.channels.foreign = {engine:'codex_foreign',kind:'subscription',enabled:true,label:'Foreign'};
     current.config.owners.codex_owner.worker_weights = { codex_worker: 4 };
     const manual = { engine: 'codex', reason: 'manual', since, by: 'person' };
     const model = { engine: 'codex_alias', model: 'specific', reason: 'model only', since, by: 'external' };
-    const foreign = { engine: 'codex_foreign', reason: 'other quota source', since, by: 'weaver-quota:claude' };
+    const foreign = { engine: 'codex_foreign', channel:'foreign', reason: 'other quota source', since, by: 'weaver-quota:claude' };
     const saved = f.policy.save({ revision: current.revision, config: current.config, blocks: [manual, model, foreign] });
-    const result = applyQuotaSnapshot(f.policy, { records: [record()] }, {}, now);
+    const result = applyQuotaSnapshot(f.policy, { records: [record({channel:'alias'}),record({channel:'foreign'})] }, {}, now);
     assert.equal(result.policyChanged, true);
     assert.deepEqual(result.snapshot.config, saved.config);
     assert.deepEqual(result.snapshot.blocks.slice(0, 3), [manual, model, foreign]);
-    assert.deepEqual(result.snapshot.blocks[3], { engine: 'codex_alias', by: 'weaver-quota:codex', reason: 'Codex account quota exhausted', since: new Date(now).toISOString(), release_at: reset });
+    assert.deepEqual(result.snapshot.blocks[3], { engine: 'codex_alias', channel:'alias', by: 'weaver-quota:codex', reason: 'Codex account quota exhausted', since: new Date(now).toISOString(), release_at: reset });
     assert.equal(result.snapshot.blocks.filter(block => block.engine === 'codex' && !block.model).length, 1);
-    assert.equal(applyQuotaSnapshot(f.policy, { records: [record()] }, {}, now).policyChanged, false);
+    assert.equal(applyQuotaSnapshot(f.policy, { records: [record({channel:'alias'})] }, {}, now).policyChanged, false);
     assert.equal(f.policy.snapshot().revision, saved.revision + 1);
   } finally { await f.close(); }
 });
@@ -142,6 +144,15 @@ function usage(percent: number) {
   return Response.json({ rate_limit: { allowed: percent < 100, limit_reached: percent >= 100, primary_window: { used_percent: percent, reset_at: Date.parse(reset) / 1000, limit_window_seconds: 3600 } }, credits: { has_credits: false, unlimited: false, balance: '0' } });
 }
 
+/** Real native fixture identity scoped to the channel selected by the RPC. */
+function channelProber(dir:string,options:ConstructorParameters<typeof QuotaProber>[0]):QuotaProber {
+ const db=new DatabaseSync(join(dir,'weaver.db'));const config=new PolicyStore(db).snapshot().config;db.close();
+ const env=options?.env??{};const home=env.HOME!;
+ const roots:Record<string,string>={codex:env.CODEX_HOME??join(home,'.codex'),claude:env.CLAUDE_CONFIG_DIR??join(home,'.claude'),grok:env.GROK_HOME??join(home,'.grok')};
+ return new QuotaProber({...options,root:join(dir,'quota-state'),channels:()=>Object.fromEntries(Object.entries(config.channels).filter(([,channel])=>channel.engine in roots).map(([id,channel])=>[id,{channel,engineKind:config.engines[channel.engine].kind,secret:{authDir:roots[channel.engine]}}]))});
+}
+async function refreshAccounts(runtime:WeaverRuntime){await rpc(runtime,'refreshQuota',[{channel:'default_codex'}]);return rpc(runtime,'refreshQuota',[{channel:'default_claude'}]);}
+
 test('public CLI supports optional input and all output formats; HTTP shares strict quota validation', async () => {
   const f = await fixture();
   let runtime: WeaverRuntime | undefined;
@@ -158,7 +169,7 @@ test('public CLI supports optional input and all output formats; HTTP shares str
     assert.equal(requests, 0);
     const caps = JSON.parse((await cli(f.dir, ['capabilities'])).stdout).data;
     assert.equal(caps.quota.get.rpc, 'getQuota');
-    assert.equal(caps.quota.refresh.updatesPolicyBlocks, true);
+    assert.equal(caps.quota.refresh.updatesPolicyBlocks, false);
     for (const output of ['json', 'jsonl', 'text']) {
       const result = await cli(f.dir, ['quota', 'refresh', '--output', output]);
       assert.equal(result.status, 0, result.stdout);
@@ -166,8 +177,8 @@ test('public CLI supports optional input and all output formats; HTTP shares str
       if (output !== 'text') {
         const data = JSON.parse(result.stdout).data;
         assert.equal(data.records.find((item: EngineQuotaRecord) => item.engine === 'codex').status, 'exhausted');
-        assert.equal(data.snapshot.blocks[0].by, 'weaver-quota:codex');
-        assert.equal(data.policyChanged, output === 'json');
+        assert.deepEqual(data.snapshot.blocks, []);
+        assert.equal(data.policyChanged, false);
       }
     }
     assert.equal(requests, 1, 'cached refreshes do not cause more native HTTP requests');
@@ -209,8 +220,8 @@ test('a completed probe merges into latest saved config and preserves newly adde
   const response = new Promise<void>(resolve => { release = resolve; });
   try {
     const env = await nativeFixture(f.dir);
-    runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber: new QuotaProber({ env, now: () => new Date(now), fetch: async () => { entered(); await response; return usage(100); } }) });
-    const refresh = rpc(runtime, 'refreshQuota', [{ engine: 'codex' }]);
+    runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber: channelProber(f.dir,{ env, now: () => new Date(now), fetch: async () => { entered(); await response; return usage(100); } }) });
+    const refresh = rpc(runtime, 'refreshQuota', [{ engine: 'codex',channel:'default_codex' }]);
     await fetching;
     const current = (await rpc(runtime, 'getPolicy', [])).json.result;
     current.config.owners.codex_owner.model = 'preserve-concurrent-edit';
@@ -238,11 +249,11 @@ test('shutdown aborts a pending native request and prevents late policy writes',
   const fetching = new Promise<void>(resolve => { entered = resolve; });
   try {
     const env = await nativeFixture(f.dir);
-    runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber: new QuotaProber({ env, fetch: async (_url, init) => {
+    runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber: channelProber(f.dir,{ env, fetch: async (_url, init) => {
       entered();
       return new Promise<Response>((_resolve, reject) => init!.signal!.addEventListener('abort', () => { aborted = true; reject(new Error('fixture abort')); }, { once: true }));
     } }) });
-    const refresh = rpc(runtime, 'refreshQuota', [{ engine: 'codex' }]);
+    const refresh = rpc(runtime, 'refreshQuota', [{ engine: 'codex',channel:'default_codex' }]);
     await fetching;
     await runtime.close();
     assert.equal(aborted, true);
@@ -258,11 +269,11 @@ test('persistence failure is explicit and leaves the in-memory policy unchanged'
   let runtime: WeaverRuntime | undefined;
   try {
     const env = await nativeFixture(f.dir);
-    runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber: new QuotaProber({ env, now: () => new Date(now), fetch: async () => usage(100) }) });
+    runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber: channelProber(f.dir,{ env, now: () => new Date(now), fetch: async () => usage(100) }) });
     const saboteur = new DatabaseSync(join(f.dir, 'weaver.db'));
     saboteur.exec("CREATE TRIGGER refuse_policy BEFORE INSERT ON policy_revisions BEGIN SELECT RAISE(ABORT, 'disk full'); END");
     saboteur.close();
-    const failed = await rpc(runtime, 'refreshQuota', [{ engine: 'codex' }]);
+    const failed = await rpc(runtime, 'refreshQuota', [{ engine: 'codex',channel:'default_codex' }]);
     assert.equal(failed.status, 500);
     assert.equal(failed.json.error.code, 'PERSISTENCE_ERROR');
     assert.match(failed.json.error.message, /could not be saved/);
@@ -281,13 +292,13 @@ test('expired manual conflict reaches HTTP and CLI without overwriting the manua
     const current = policy.snapshot();
     const before = policy.save({ revision: current.revision, config: current.config, blocks: [{ engine: 'codex', reason: 'expired manual retained', since: '2020-01-01T00:00:00Z', release_at: '2021-01-01T00:00:00Z' }] });
     const bytes = JSON.stringify(new PolicyStore(policy.path).snapshot());
-    runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber: new QuotaProber({ env, now: () => new Date(now), fetch: async () => usage(100) }) });
-    const conflict = await rpc(runtime, 'refreshQuota', [{ engine: 'codex' }]);
+    runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber: channelProber(f.dir,{ env, now: () => new Date(now), fetch: async () => usage(100) }) });
+    const conflict = await rpc(runtime, 'refreshQuota', [{ engine: 'codex',channel:'default_codex' }]);
     assert.equal(conflict.status, 409);
     assert.equal(conflict.json.error.code, 'QUOTA_POLICY_CONFLICT');
     const fromCli = await cli(f.dir, ['quota', 'refresh']);
-    assert.equal(fromCli.status, 1);
-    assert.equal(JSON.parse(fromCli.stdout).error.code, 'QUOTA_POLICY_CONFLICT');
+    assert.equal(fromCli.status, 0);
+    assert.equal(JSON.parse(fromCli.stdout).data.policyChanged,false);
     assert.deepEqual((await rpc(runtime, 'getPolicy', [])).json.result, before);
     assert.equal(JSON.stringify(new PolicyStore(policy.path).snapshot()), bytes, 'the stored policy did not change');
   } finally { await runtime?.close(); await f.close(); }
@@ -304,19 +315,19 @@ test('live exhausted windows survive an older reset, then explicit Codex permiss
     const env = await nativeFixture(f.dir);
     await mkdir(join(env.HOME, '.claude'));
     await writeFile(join(env.HOME, '.claude', '.credentials.json'), JSON.stringify({ claudeAiOauth: { accessToken: 'fixture-claude', expiresAt: Date.parse('2100-01-01') } }));
-    const quotaProber = new QuotaProber({ env, now: () => new Date(clock), fetch: async url => {
+    const quotaProber = channelProber(f.dir,{ env, now: () => new Date(clock), fetch: async url => {
       if (String(url).includes('anthropic.com')) return Response.json({ five_hour: { utilization: 100, resets_at: reset }, extra_usage: allowance ? { is_enabled: true, monthly_limit: 100, used_credits: 1 } : { is_enabled: false } });
       return Response.json({ rate_limit: { allowed: allowance, limit_reached: !allowance, primary_window: { used_percent: 100, reset_at: expiredReset, limit_window_seconds: 3600 }, secondary_window: { used_percent: 100, reset_at: futureReset, limit_window_seconds: 604800 } }, credits: { has_credits: false, unlimited: false, balance: '0' } });
     } });
     runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber });
-    const exhausted = await rpc(runtime, 'refreshQuota', [{}]);
+    const exhausted = await refreshAccounts(runtime);
     assert.equal(exhausted.status, 200);
     assert.equal(exhausted.json.result.snapshot.blocks.length, 2);
     assert.equal(exhausted.json.result.records.find((item: EngineQuotaRecord) => item.engine === 'codex').stale, false);
     assert.equal(exhausted.json.result.snapshot.blocks.find((block: { engine: string }) => block.engine === 'codex').release_at, new Date(futureReset * 1000).toISOString());
     allowance = true;
     clock += 60_001;
-    const restored = await rpc(runtime, 'refreshQuota', [{}]);
+    const restored = await refreshAccounts(runtime);
     assert.equal(restored.status, 200);
     assert.deepEqual(restored.json.result.records.filter((item: EngineQuotaRecord) => item.engine === 'codex' || item.engine === 'claude').map((item: EngineQuotaRecord) => item.status), ['available', 'available']);
     assert.equal(restored.json.result.policyChanged, true);
@@ -335,7 +346,7 @@ test('refresh blocks the existing queue without cancelling its explicit mock fix
     policy.save({ revision: current.revision, config: current.config, blocks: [] });
     const workerScript = join(f.dir, 'mock-hang.mjs');
     await writeFile(workerScript, 'process.stdin.resume(); setInterval(() => {}, 1000);');
-    runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, workerScript, quotaProber: new QuotaProber({ env, now: () => new Date(now), fetch: async () => usage(100) }) });
+    runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, workerScript, quotaProber: channelProber(f.dir,{ env, now: () => new Date(now), fetch: async () => usage(100) }) });
     let id = 0;
     const command = async (command: string, args: Record<string, unknown>) => {
       const result = await rpc(runtime!, 'command', [{ apiVersion: 'weaver.v1', commandId: `quota-fixture-${++id}`, command, args }]);
@@ -348,7 +359,7 @@ test('refresh blocks the existing queue without cancelling its explicit mock fix
     const queued = await command('workers.spawn', { taskId: second.id, owner: 'codex_owner', worker: 'codex_worker', provider: 'mock-jsonl' });
     assert.equal(queued.status, 'queued');
     assert.equal(queued.queueReason.code, 'waiting_for_capacity');
-    assert.equal((await rpc(runtime, 'refreshQuota', [{ engine: 'codex' }])).status, 200);
+    assert.equal((await rpc(runtime, 'refreshQuota', [{ engine: 'codex',channel:'default_codex' }])).status, 200);
     const blocked = await command('tasks.get', { taskId: second.id });
     assert.equal(blocked.status, 'queued');
     assert.equal(blocked.queueReason.code, 'policy_blocked');
@@ -363,16 +374,16 @@ test('fresh global restriction with expired included windows blocks without an i
   try {
     const env = await nativeFixture(f.dir);
     const clock = Date.now();
-    const quotaProber = new QuotaProber({ env, now: () => new Date(clock), fetch: async () => Response.json({
+    const quotaProber = channelProber(f.dir,{ env, now: () => new Date(clock), fetch: async () => Response.json({
       rate_limit: { allowed: false, limit_reached: true, primary_window: { used_percent: 100, reset_at: Math.floor(clock / 1000) - 60 }, secondary_window: { used_percent: 100, reset_at: Math.floor(clock / 1000) + 3600 } },
       credits: { has_credits: false, unlimited: false, balance: '0' }, spend_control: { reached: true },
     }) });
     runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber });
-    const result = await rpc(runtime, 'refreshQuota', [{ engine: 'codex' }]);
+    const result = await rpc(runtime, 'refreshQuota', [{ engine: 'codex',channel:'default_codex' }]);
     assert.equal(result.status, 200);
     const data = result.json.result;
     assert.equal(data.policyChanged, true);
-    assert.equal(data.records[0].stale, false);
+    assert.equal(data.records.find((item:EngineQuotaRecord)=>item.channel==='default_codex').stale,false);
     assert.equal(data.snapshot.blocks[0].release_at, undefined);
     assert.equal(data.snapshot.owners.codex_owner.status, 'blocked');
   } finally { await runtime?.close(); await f.close(); }
@@ -389,14 +400,14 @@ test('an expired but renewable native token keeps the last published reading ins
     const file = join(codexHome, 'auth.json');
     const session = (exp: number, renewable: boolean) => JSON.stringify({ auth_mode: 'chatgpt', tokens: { access_token: `e30.${Buffer.from(JSON.stringify({ exp })).toString('base64url')}.fixture`, account_id: 'fixture-account', ...(renewable ? { refresh_token: 'never-send' } : {}) } });
     await writeFile(file, session(Date.parse('2100-01-01') / 1000, true));
-    const quotaProber = new QuotaProber({ env: { HOME: home, CODEX_HOME: codexHome }, now: () => new Date(clock), fetch: async () => { requests++; return usage(100); } });
+    const quotaProber = channelProber(f.dir,{ env: { HOME: home, CODEX_HOME: codexHome }, now: () => new Date(clock), fetch: async () => { requests++; return usage(100); } });
     runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber });
-    const exhausted = await rpc(runtime, 'refreshQuota', [{ engine: 'codex' }]);
+    const exhausted = await rpc(runtime, 'refreshQuota', [{ engine: 'codex',channel:'default_codex' }]);
     assert.equal(exhausted.status, 200);
     assert.equal(exhausted.json.result.snapshot.blocks.length, 1);
     await writeFile(file, session(Math.floor(clock / 1000) - 1, true));
     clock += 60_001;
-    const pending = await rpc(runtime, 'refreshQuota', [{ engine: 'codex' }]);
+    const pending = await rpc(runtime, 'refreshQuota', [{ engine: 'codex',channel:'default_codex' }]);
     assert.equal(pending.status, 200);
     assert.equal(requests, 1, 'an expired token the native CLI can renew must never reach the quota API');
     const record = pending.json.result.records.find((item: EngineQuotaRecord) => item.engine === 'codex');
@@ -407,7 +418,7 @@ test('an expired but renewable native token keeps the last published reading ins
     assert.doesNotMatch(JSON.stringify(pending.json.result), /登录|never-send/);
     await writeFile(file, session(Math.floor(clock / 1000) - 1, false));
     clock += 60_001;
-    const logout = await rpc(runtime, 'refreshQuota', [{ engine: 'codex' }]);
+    const logout = await rpc(runtime, 'refreshQuota', [{ engine: 'codex',channel:'default_codex' }]);
     assert.equal(logout.json.result.records.find((item: EngineQuotaRecord) => item.engine === 'codex').status, 'unauthenticated');
     assert.match(JSON.stringify(logout.json.result.records), /登录/);
   } finally { await runtime?.close(); await f.close(); }

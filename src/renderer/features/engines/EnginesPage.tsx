@@ -1,7 +1,4 @@
 import { EngineCleanup } from './EngineCleanup';
-import { OpenCodeAccounts } from './OpenCodeAccounts';
-import { OpenCodeAccountQuota } from './OpenCodeAccountQuota';
-import { QuotaSummary } from './QuotaSummary';
 import { notifyError, useNotifyError } from '../../api/notify';
 import { NamedSwitch } from '../../ui/NamedControls';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -9,11 +6,9 @@ import { Play, ScanSearch } from 'lucide-react';
 import { PageHeader, Surface } from '@lobehub/ui/dashboard';
 import { Button, Skeleton, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
 import { ENGINE_CATALOG, catalogEntry, type EngineProbeRecord } from '../../../shared/engines';
-import type { EngineQuotaRecord, QuotaEngine } from '../../../shared/contracts/quota';
-import { QUOTA_KINDS, quotaRefreshEnabled } from '../../../shared/policy/settings';
 import { STALL_BLOCK_BY, VENDOR_BLOCK_BY, isQuotaBlock } from '../../../shared/policy/blocks';
-import { type Block, type Engine } from '../../../shared/contracts/policy';
-import { acceptQuotaPolicy, dateText, quotaNextUpdateMs } from '../quota/quota-view';
+import { type Block } from '../../../shared/contracts/policy';
+import { dateText } from '../quota/quota-view';
 import type { PolicyDraft, PolicyUpdate } from '../../policy/usePolicyDraft';
 import { resumeWorker } from '../../policy/worker-resume';
 import type { StallEngineState, StallHistoryEntry, StallSnapshot } from '../../api/client';
@@ -47,57 +42,10 @@ function mergeProbes(current: EngineProbeRecord[], probe: EngineProbeRecord | nu
   return ENGINE_CATALOG.map(entry => next.find(item => item.id === entry.id)).filter((item): item is EngineProbeRecord => Boolean(item));
 }
 
-const isQuotaKind = (kind: string): kind is QuotaEngine => (QUOTA_KINDS as readonly string[]).includes(kind);
-
 /** Penalty blocks are ordinary policy blocks; this `by` value is what tells them apart from a quota or manual pause. */
 type EngineBlockState = StallEngineState & Partial<Pick<EngineStallStatus, 'blockedUntil'>>;
 const STALL_HISTORY = 5;
 const STALL_TASK_ID = 8;
-
-/** Quota observations live in the main process; reading them never calls a provider, so polling is cheap. */
-function useQuota(policy: PolicyDraft, onTick?: () => void) {
-  const [records, setRecords] = useState<EngineQuotaRecord[]>([]);
-  const [busy, setBusy] = useState<QuotaEngine | null>(null);
-  const [feedback, setFeedback] = useState<{ engine: QuotaEngine; text: string; error: boolean }>();
-  const [now, setNow] = useState(Date.now);
-  const mounted = useRef(true);
-  const policyRef = useRef(policy);
-  policyRef.current = policy;
-  const tick = useRef(onTick);
-  tick.current = onTick;
-  const load = useCallback(async () => {
-    if (!window.weaver) { notifyError('控制面不可用，请通过 weaver web 打开页面。'); return; }
-    try {
-      const result = await window.weaver.getQuota();
-      if (mounted.current) { setRecords(result.records); setNow(Date.now()); }
-    } catch (error) { if (mounted.current) notifyError(error, '额度读取失败'); }
-  }, []);
-  useEffect(() => {
-    mounted.current = true;
-    void load().then(() => tick.current?.());
-    const timer = setInterval(() => void load().then(() => tick.current?.()), 30_000);
-    return () => { mounted.current = false; clearInterval(timer); };
-  }, [load]);
-  useEffect(() => {
-    const delay = quotaNextUpdateMs(records, now);
-    if (delay === null) return;
-    const timer = setTimeout(() => setNow(Date.now()), delay);
-    return () => clearTimeout(timer);
-  }, [records, now]);
-  async function refresh(engine: QuotaEngine) {
-    if (busy || policyRef.current.busy || !window.weaver) return;
-    setBusy(engine); setFeedback(undefined);
-    try {
-      const result = await window.weaver.refreshQuota({ engine });
-      if (!mounted.current) return;
-      setRecords(result.records); setNow(Date.now());
-      setFeedback({ engine, text: acceptQuotaPolicy(policyRef.current, result), error: false });
-    } catch (error) {
-      if (mounted.current) notifyError(error, '刷新失败');
-    } finally { if (mounted.current) setBusy(null); }
-  }
-  return { records, busy, feedback, now, refresh, load };
-}
 
 /** The penalty ladder snapshot; when the read fails nothing is shown. */
 function useStall() {
@@ -155,9 +103,8 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
   const [scanning, setScanning] = useState(false);
   useNotifyError(policy.loadError, '配置读取失败');
   const [busyId, setBusyId] = useState('');
-  const [accountVersion, setAccountVersion] = useState(0);
   const stall = useStall();
-  const quota = useQuota(policy, stall.load);
+  useEffect(() => { void stall.load(); }, [stall.load]);
   const scan = useCallback(async () => {
     if (!window.weaver) { notifyError('控制面不可用，请通过 weaver web 打开页面。'); return; }
     setScanning(true);
@@ -191,12 +138,11 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
     try { if (await resumeWorker(block.worker, policy)) void stall.load(); }
     finally { setBusyId(''); }
   }
-  const setEngine = (id: string, patch: Partial<Engine>) => change(id, doc => ({ ...doc, config: { ...doc.config, engines: { ...doc.config.engines, [id]: { ...doc.config.engines[id]!, ...patch } } } }));
   const saved = policy.snapshot?.config;
   const savedBlocks = policy.snapshot?.blocks ?? [];
   const unsupported = Object.entries(saved?.engines ?? {}).filter(([id]) => !catalogEntry(id));
   return <>
-    <PageHeader title="引擎" description="本机已安装的 Agent CLI。这里的开关立即生效；是否派发还看额度是否自动暂停了这台引擎。" action={<Button icon={ScanSearch} loading={scanning} onClick={() => void scan()}>重新探测</Button>} />
+    <PageHeader title="引擎" description="本机已安装的 Agent CLI。这里的开关立即生效；账号、API 配置与额度在「账号与渠道」管理。" action={<Button icon={ScanSearch} loading={scanning} onClick={() => void scan()}>重新探测</Button>} />
     {!saved && policy.loading && <Skeleton.Text animated rows={6} />}
     {saved && <div className={engineStyles.cards}>
       {ENGINE_CATALOG.map(entry => {
@@ -207,23 +153,14 @@ export function EnginesPage({ policy }: { policy: PolicyDraft }) {
         const enabled = record?.enabled === true;
         const blocked = busyId !== '' || (!enabled && (probe?.status !== 'installed' || kindMismatch));
         const reason = !enabled && probe?.status !== 'installed' ? '未在本机找到这个命令' : kindMismatch ? '已保存的类型与目录不一致' : '';
-        const kind = record?.kind ?? entry.kind;
-        const engineBlocks = savedBlocks.filter(block => block.engine === entry.id);
+        const engineBlocks = savedBlocks.filter(block => block.engine === entry.id && !block.channel && !isQuotaBlock(block));
         return <Surface key={entry.id} aria-label={entry.id} title={entry.id} description={<span className={styles.row} style={{ gap: 6, flexWrap: 'nowrap' }}><Tag size="small" color={PROBE[status]?.color}>{PROBE[status]?.label ?? status}</Tag><Tooltip title={probe?.version || entry.command}><Text type="secondary" className={engineStyles.version}>{engineVersionText(probe?.version || entry.command)}</Text></Tooltip></span>}
           extra={<div className={engineStyles.enable}>{blocked && reason && <Tooltip title={reason}><Text type="secondary" data-switch-reason={entry.id} className={engineStyles.switchReason}>{reason}</Text></Tooltip>}<NamedSwitch aria-label={`启用 ${entry.id}`} size="small" checked={enabled} loading={busyId === entry.id} disabled={blocked} onChange={checked => void toggle(entry.id, checked)} /></div>}>
           <div className={engineStyles.cardBody}>
             <StallNotice state={stall.snapshot?.engines[entry.id]} now={stall.now} />
-            {entry.id === 'opencode' ? <OpenCodeAccountQuota autoRefresh={record ? quotaRefreshEnabled(record) : false} version={accountVersion} policyBusy={policy.busy} currentCredentialQuota={<QuotaSummary engine="opencode" record={quota.records.find(item => item.engine === 'opencode')} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === 'opencode' ? quota.feedback : undefined} onRefresh={() => void quota.refresh('opencode')} />} /> : isQuotaKind(kind) ? <QuotaSummary engine={kind} record={quota.records.find(item => item.engine === kind)} now={quota.now} busy={quota.busy} policyBusy={policy.busy} feedback={quota.feedback?.engine === kind ? quota.feedback : undefined} onRefresh={() => void quota.refresh(kind)} />
-              : <Text type="secondary" className={styles.meta}>未提供原生额度接口。</Text>}
             <BlockList blocks={engineBlocks} state={stall.snapshot?.engines[entry.id]} now={stall.now} disabled={busyId !== '' || !record} onRemove={block => void resume(entry.id, block)} />
-            {entry.id === 'opencode' && <><OpenCodeAccounts onChanged={async () => { setAccountVersion(current => current + 1); await quota.load(); await policy.load(); }} /><EngineCleanup /></>}
+            {entry.id === 'opencode' && <EngineCleanup />}
             <div className={engineStyles.cardFoot}>
-              <div className={styles.spread}>
-                <Text>主动刷新额度</Text>
-                <Tooltip title={kind === 'opencode' ? '定时刷新 Go 套餐窗口，实际限额按对应模型反馈处理；不会因套餐窗口耗尽暂停整个引擎。' : isQuotaKind(kind) ? '按设置页的间隔自动刷新；额度耗尽时自动暂停派发，恢复后自动解除。' : '这个引擎没有额度接口。'}>
-                  <span><NamedSwitch aria-label={`${entry.id} 主动刷新额度`} size="small" checked={record ? quotaRefreshEnabled(record) : false} disabled={!record || !isQuotaKind(kind) || busyId !== ''} onChange={checked => void setEngine(entry.id, { quota_refresh: checked })} /></span>
-                </Tooltip>
-              </div>
               {probe?.detail && status !== 'installed' && <Text type="secondary" className={`${styles.meta} ${styles.wrap}`}>{probe.detail}</Text>}
             </div>
           </div>
@@ -258,7 +195,7 @@ export function engineBlockText(block: Block, now: number, state?: EngineBlockSt
 
 /** Resume dispatch removes exactly one block: the one with the same engine, model and worker. Whole-engine, model and worker blocks of one engine are separate bans. */
 export function removeBlock(blocks: Block[], target: Block): Block[] {
-  return blocks.filter(item => !(item.engine === target.engine && item.model === target.model && item.worker === target.worker));
+  return blocks.filter(item => !(item.engine === target.engine && item.channel === target.channel && item.model === target.model && item.worker === target.worker));
 }
 
 export function BlockList({ blocks, disabled, onRemove, now = Date.now(), state }: { blocks: Block[]; disabled: boolean; onRemove: (block: Block) => void; now?: number; state?: EngineBlockState }) {

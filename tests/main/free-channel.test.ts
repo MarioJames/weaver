@@ -49,7 +49,7 @@ async function harness(options: HarnessOptions = {}) {
   config.workers.qoder_worker.enabled = true;
   config.workers.opencode_worker.enabled = true;
   // A paid worker shares the qoder engine and must never be touched by free-channel writes.
-  config.workers.qoder_paid_worker = { engine: 'qoder', model: 'paid-model', effort: 'auto', enabled: true };
+  config.workers.qoder_paid_worker = { channel: "default_qoder", model: 'paid-model', effort: 'auto', enabled: true };
   const policy = new PolicyStore(join(dir,'weaver.db'), () => now);
   const base = policy.snapshot();
   policy.save({ revision: base.revision, config, blocks: base.blocks }, { allowEngineEnable: true });
@@ -193,7 +193,7 @@ test('vendor quota exhaustion bans the marked engine+model with the given reset 
     await h.step(10);
     assert.deepEqual(h.calls.map((call: ProbeCall) => call.worker), ['qoder_worker', 'opencode_worker'], 'all marked workers are probed');
     const block = h.byBlock(FREE_PROBE_BLOCK_BY, 'qoder')!;
-    assert.deepEqual(Object.keys(block).filter(key => key !== 'reason').sort(), ['by', 'engine', 'model', 'release_at', 'since', 'worker']);
+    assert.deepEqual(Object.keys(block).filter(key => key !== 'reason').sort(), ['by', 'channel', 'engine', 'model', 'release_at', 'since', 'worker']);
     assert.equal(block.model, 'Qwen3.8-Flash');
     assert.equal(block.worker, 'qoder_worker', 'the ban is a worker-level block');
     assert.equal(block.release_at, iso(START + 40 * MINUTE), 'the vendor named the reset time');

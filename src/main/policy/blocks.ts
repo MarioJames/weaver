@@ -1,3 +1,4 @@
+import { roleEngine } from '../../shared/policy/channels';
 import type { Block, PolicySnapshot } from '../../shared/contracts/policy';
 import { withoutWorkerBlocks } from './routing';
 import { sameConnection, type Transactional } from '../storage/transaction';
@@ -93,10 +94,10 @@ export class PolicyBlockService {
   clearWorker(worker: string, options: UpdateOptions = {}): { engine: string; removed: number } {
     const first = this.snapshot();
     if (!Object.hasOwn(first.config.workers, worker)) throw new Error(`Unknown worker ${worker}`);
-    const engine = first.config.workers[worker]!.engine;
+    const engine = roleEngine(first.config, first.config.workers[worker]!);
     let removed = 0;
     const result = this.update(current => {
-      const plan = withoutWorkerBlocks(current.config, current.blocks, current.config.workers[worker]?.engine ?? engine, worker, Date.now());
+      const plan = withoutWorkerBlocks(current.config, current.blocks, current.config.workers[worker] ? roleEngine(current.config,current.config.workers[worker]!) : engine, worker, Date.now());
       removed = plan.removed;
       return plan.removed > 0 ? plan.blocks : undefined;
     }, options);

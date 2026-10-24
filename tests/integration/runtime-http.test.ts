@@ -112,7 +112,7 @@ async function listenPort(): Promise<{ port: number; close(): Promise<void> }> {
 }
 
 test('HTTP guards reject unsafe requests before any task state exists', async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-http-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const rendererRoot = join(dataDir, 'renderer');
   await mkdir(rendererRoot);
   await writeFile(join(rendererRoot, 'index.html'), 'INDEX');
@@ -199,7 +199,7 @@ test('HTTP guards reject unsafe requests before any task state exists', async t 
 });
 
 test('second web invocation does not open or recover live task state', async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-lock-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const taskPath = join(dataDir,'weaver.db');
   await writeFile(taskPath, '{');
   let lock: Awaited<ReturnType<typeof acquireInstanceLock>> | undefined;
@@ -211,7 +211,7 @@ test('second web invocation does not open or recover live task state', async t =
 });
 
 test('initialization failure releases the instance lock and leaves no late writer', async () => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-init-fail-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const taskPath = join(dataDir, 'weaver.db');
   const damaged = 'this is not a database file at all, just text';
   await writeFile(taskPath, damaged);
@@ -226,7 +226,7 @@ test('initialization failure releases the instance lock and leaves no late write
 });
 
 test('normal close releases the instance lock after the endpoint is gone', async () => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-lock-release-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   try {
     const held = await startRuntime({ dataDir, port: 0, open: false });
     await held.close();
@@ -236,7 +236,7 @@ test('normal close releases the instance lock after the endpoint is gone', async
 });
 
 test('failed HTTP bind releases only this attempt', async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-bind-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const taskPath = join(dataDir,'weaver.db');
   await writeFile(taskPath, '{');
   const held = await listenPort();
@@ -252,7 +252,7 @@ test('failed HTTP bind releases only this attempt', async t => {
 });
 
 test('weaver web reports bind and damaged-store failures', async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-cli-fail-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const held = await listenPort();
   try {
     const busy = await cli(dataDir, ['web', '--no-open', '--port', String(held.port)]);
@@ -279,11 +279,11 @@ test('weaver web reports bind and damaged-store failures', async t => {
 });
 
 test('headless CLI can create, dispatch, review, and leaving does not cancel work', { timeout: 30_000 }, async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-cli-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const runtime = await boot(t, dataDir);
   if (!runtime) { await rm(dataDir, { recursive: true, force: true }); return; }
   try {
-    const herdrBin = await mkdtemp(join(tmpdir(), 'wv-owner-path-'));
+    const herdrBin = await mkdtemp(join(tmpdir(), 't-'));
     const originalPath = process.env.PATH ?? '';
     try {
       const fakeHerdr = join(herdrBin, 'herdr');
@@ -339,7 +339,7 @@ test('headless CLI can create, dispatch, review, and leaving does not cancel wor
 });
 
 test('shutdown and restart keep task history', { timeout: 20_000 }, async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-restart-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const child: ChildProcess = spawn(process.execPath, ['--import', 'tsx', 'src/cli/main.ts', 'web', '--no-open', '--port', '0', '--data-dir', dataDir], { cwd: REPO, stdio: ['ignore', 'pipe', 'pipe'] });
   let stderr = '';
   child.stderr?.on('data', chunk => { stderr += chunk; });
@@ -382,7 +382,7 @@ test('shutdown and restart keep task history', { timeout: 20_000 }, async t => {
 });
 
 test('a repeated stop signal still drains and removes the endpoint', { timeout: 20_000 }, async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-resignal-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const child: ChildProcess = spawn(process.execPath, ['--import', 'tsx', 'src/cli/main.ts', 'web', '--dev', '--no-open', '--port', '0', '--data-dir', dataDir], { cwd: REPO, stdio: ['ignore', 'pipe', 'pipe'] });
   let stderr = '';
   child.stderr?.on('data', chunk => { stderr += chunk; });
@@ -412,7 +412,7 @@ test('a repeated stop signal still drains and removes the endpoint', { timeout: 
 });
 
 test('engine scan and enable do not create roles', { timeout: 30_000 }, async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-engines-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const runtime = await boot(t, dataDir);
   if (!runtime) { await rm(dataDir, { recursive: true, force: true }); return; }
   try {
@@ -436,7 +436,7 @@ test('engine scan and enable do not create roles', { timeout: 30_000 }, async t 
 });
 
 test('a rejected engine enable leaves the server and policy usable', async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-reject-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const runtime = await boot(t, dataDir);
   if (!runtime) { await rm(dataDir, { recursive: true, force: true }); return; }
   const unhandled: unknown[] = [];
@@ -467,7 +467,7 @@ test('a rejected engine enable leaves the server and policy usable', async t => 
 });
 
 test('production upgrades and idle sockets cannot hold shutdown', async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-close-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const runtime = await boot(t, dataDir);
   if (!runtime) { await rm(dataDir, { recursive: true, force: true }); return; }
   const idle = connect(runtime.port, '127.0.0.1');
@@ -491,7 +491,7 @@ test('production upgrades and idle sockets cannot hold shutdown', async t => {
 });
 
 test('a static read failure does not kill the server', { timeout: 10_000 }, async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-stream-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const rendererRoot = join(dataDir, 'renderer');
   await mkdir(rendererRoot);
   await writeFile(join(rendererRoot, 'index.html'), 'INDEX');
@@ -521,7 +521,7 @@ test('a static read failure does not kill the server', { timeout: 10_000 }, asyn
 });
 
 test('dev mode serves the renderer on the owned origin', { timeout: 60_000 }, async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-dev-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   let runtime: WeaverRuntime | undefined;
   try {
     try { runtime = await startRuntime({ dataDir, port: 0, open: false, dev: true }); }
@@ -574,8 +574,8 @@ test('dev mode serves the renderer on the owned origin', { timeout: 60_000 }, as
 });
 
 test('runtime janitor sweeps an injected temp root at startup and on demand', { timeout: 30_000 }, async t => {
-  const root = await mkdtemp(join(tmpdir(), 'wv-janitor-runtime-root-'));
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-janitor-runtime-data-'));
+  const root = await mkdtemp(join(tmpdir(), 't-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const old = new Date(Date.now() - 25 * 60 * 60_000);
   const stale = join(root, 'wv-janitor-stale');
   const fresh = join(root, 'wv-janitor-fresh');
@@ -649,7 +649,7 @@ test('HTTP startup timeout begins after origin and complete RPC validation and r
 });
 
 test('listEngineModels is a one-argument read RPC: valid input lists, malformed input is INVALID_REQUEST', async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-models-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const runtime = await boot(t, dataDir);
   if (!runtime) { await rm(dataDir, { recursive: true, force: true }); return; }
   const call = (args: unknown[]) => httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'listEngineModels', args }) });
@@ -668,14 +668,14 @@ test('listEngineModels is a one-argument read RPC: valid input lists, malformed 
   const client = await readFile(new URL('../../src/renderer/api/client.ts', import.meta.url), 'utf8');
   assert.equal(RPC_METHODS.listEngineModels.timeoutMs, 40_000, 'the renderer waits up to 40 seconds for a model list');
   assert.equal(RPC_METHODS.workerProbe.timeoutMs, 130_000);
-  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'timeoutMs' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['cancelOpenCodeLogin', 'listEngineModels', 'listOpenCodeAccounts', 'refreshOpenCodeAccountQuotas', 'switchOpenCodeAccount', 'workerProbe']);
-  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'retryable' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['capabilities', 'getEngineCleanup', 'getImSettings', 'getOpenCodeAccountQuotas', 'getOpenCodeLogin', 'getPolicy', 'getQuota', 'getStall', 'getTask', 'janitorStatus', 'listEngineModels', 'listTasks', 'previewRoute', 'sayHiResult', 'validatePolicy', 'workerProbeStatus']);
+  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'timeoutMs' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['listEngineModels', 'refreshChannelQuota', 'workerProbe']);
+  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'retryable' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['capabilities', 'getChannels', 'getEngineCleanup', 'getImSettings', 'getPolicy', 'getQuota', 'getStall', 'getTask', 'janitorStatus', 'listEngineModels', 'listTasks', 'previewRoute', 'sayHiResult', 'validatePolicy', 'workerProbeStatus']);
   assert.match(client, /from '\.\.\/\.\.\/shared\/contracts\/rpc'/, 'the renderer client derives its method table, deadlines and retryable reads from the shared RPC contract');
   assert.doesNotMatch(client, /call\('listEngineModels'|\w+: \d+_000/, 'the renderer client does not hand-write method wrappers or deadlines');
 });
 
 test('policy saves are numbered revisions over RPC: history lists them, rollback is a new revision, a stale save is a 409 conflict', async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'wv-revisions-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const runtime = await boot(t, dataDir);
   if (!runtime) { await rm(dataDir, { recursive: true, force: true }); return; }
   const call = (method: string, args: unknown[]) => httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method, args }) });

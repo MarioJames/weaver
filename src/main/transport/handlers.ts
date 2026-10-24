@@ -1,5 +1,4 @@
-import type { OpenCodeQuotaPool } from '../quota/opencode-pool';
-import type { OpenCodeAccounts } from '../engines/opencode-accounts';
+import type { ChannelsSnapshot, SaveChannelInput, DeleteChannelInput, ImportChannelsInput, RefreshChannelQuotaInput } from '../../shared/contracts/channels';
 import { EngineCleanupJobs, parseEngineCleanup } from '../engines/cleanup';
 import type { ImService } from '../im/service';
 import type { SaveImSettingsInput } from '../../shared/contracts/im';
@@ -10,6 +9,7 @@ import type { QuotaRefreshInput, QuotaRefreshResult, QuotaSchedule } from '../..
 import { EXECUTION_BOUNDARY, ENGINE_CATALOG, readinessFor, type EngineProbeRecord } from '../../shared/engines';
 import { parseId, parseTaskInput } from '../../shared/validation';
 import { VERSION } from '../../shared/version';
+import { publicTaskChannelPaths } from '../application/tasks/records';
 import { configuredParallel } from '../application/tasks/queries';
 import { workerLoad } from '../application/scheduling/dispatch';
 import type { CommandHandler } from '../commands';
@@ -41,10 +41,7 @@ export interface ActiveServices {
 
 /** What the runtime lends to the handlers: its in-flight tracking, shared quota refresh, monitors and identity. */
 export interface RpcHost {
-  openCodeAccounts?: OpenCodeAccounts;
-  openCodeQuotaPool?: OpenCodeQuotaPool;
-  assertOpenCodeAccess?: () => void;
-  onOpenCodeQuotaChanged?: () => void;
+  channels: {get():ChannelsSnapshot;save(input:SaveChannelInput):ChannelsSnapshot;delete(input:DeleteChannelInput):ChannelsSnapshot;import(input:ImportChannelsInput):Promise<ChannelsSnapshot>;refresh(input:RefreshChannelQuotaInput):Promise<ChannelsSnapshot>};
   im(): ImService;
   track<T>(job: Promise<T>): Promise<T>;
   /** Manual and scheduled refresh share one probe-then-merge path. */
@@ -155,6 +152,7 @@ function probeHandlers(host: RpcHost): Handlers<'getStall' | 'workerProbe' | 'wo
     },
     sayHi: (active, args) => {
       const input = parseHelloInput(args[0]);
+      if(!input.channel)throw new RpcError('INVALID_REQUEST','Select a channel before probing');
       if (!active.policy.snapshot().config.engines[input.engine]) throw new RpcError('INVALID_REQUEST', `Engine ${input.engine} is not configured`);
       try { return host.hellos.start(input); } catch (error) { throw new RpcError('CAPACITY_EXCEEDED', error instanceof Error ? error.message : String(error)); }
     },
@@ -171,25 +169,25 @@ function probeHandlers(host: RpcHost): Handlers<'getStall' | 'workerProbe' | 'wo
 function taskHandlers(): Handlers<'command' | 'listTasks' | 'getTask' | 'createTask' | 'startTask' | 'cancelTask'> {
   return {
     command: (active, args) => active.commands.handleAsync(args[0]),
-    listTasks: active => active.store.listSummaries(),
-    getTask: (active, args) => active.store.get(parseId(args[0],'task ID')),
+    listTasks: active => active.store.listSummaries().map(publicTaskChannelPaths),
+    getTask: (active, args) => publicTaskChannelPaths(active.store.get(parseId(args[0],'task ID'))),
     createTask: (active, args) => {
       const input = parseTaskInput(args[0]);
       const response = active.commands.handle({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'tasks.create', args: input as unknown as Record<string, unknown> });
       if (!response.ok) throw new RpcError(response.error?.code ?? 'COMMAND_FAILED', response.error?.message ?? 'Command failed');
-      return active.store.get((response.data as { id: string }).id);
+      return publicTaskChannelPaths(active.store.get((response.data as { id: string }).id));
     },
     startTask: async (active, args) => {
       const id = parseId(args[0],'task ID');
       const response = await active.commands.handleAsync({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'tasks.start', args: { taskId: id } });
       if (!response.ok) throw new RpcError(response.error?.code ?? 'COMMAND_FAILED', response.error?.message ?? 'Command failed');
-      return active.store.get(id);
+      return publicTaskChannelPaths(active.store.get(id));
     },
     cancelTask: (active, args) => {
       const id = parseId(args[0],'task ID');
       const response = active.commands.handle({ apiVersion: API_VERSION, commandId: randomUUID(), command: 'tasks.cancel', args: { taskId: id } });
       if (!response.ok) throw new RpcError(response.error?.code ?? 'COMMAND_FAILED', response.error?.message ?? 'Command failed');
-      return active.store.get(id);
+      return publicTaskChannelPaths(active.store.get(id));
     },
   };
 }
@@ -236,25 +234,17 @@ function janitorHandlers(host: RpcHost): Handlers<'janitorSweep' | 'janitorStatu
 /** The business implementation behind every RPC method; HTTP /api/rpc and the Unix socket both reach it through the runtime. */
 export function createRpcHandlers(host: RpcHost): RpcHandlers {
   return {
+    getChannels:()=>host.channels.get(),
+    saveChannel:(_active,args)=>host.channels.save(args[0] as SaveChannelInput),
+    deleteChannel:(_active,args)=>host.channels.delete(args[0] as DeleteChannelInput),
+    importChannels:(_active,args)=>{const input=object(args[0]);if(Object.keys(input).some(k=>!['revision','engine','sourceDir','replaceExisting'].includes(k))||(input.replaceExisting!==undefined&&typeof input.replaceExisting!=='boolean')||!Number.isSafeInteger(input.revision)||(input.engine!==undefined&&typeof input.engine!=='string')||(input.sourceDir!==undefined&&typeof input.sourceDir!=='string'))throw new RpcError('INVALID_REQUEST','Invalid channel import');return host.track(host.channels.import(input as unknown as ImportChannelsInput));},
+    refreshChannelQuota:(_active,args)=>{const input=object(args[0]);if(Object.keys(input).length!==1||typeof input.channel!=='string')throw new RpcError('INVALID_REQUEST','Expected channel');return host.track(host.channels.refresh({channel:input.channel}));},
     getImSettings: () => host.im().snapshot(),
     saveImSettings: (_active, args) => host.im().save(args[0] as SaveImSettingsInput),
     reconnectIm: () => host.im().reconnect(),
     ...policyHandlers(),
     ...quotaHandlers(host),
     ...engineHandlers(host),
-    getOpenCodeAccountQuotas: () => host.openCodeQuotaPool?.get() ?? { accounts: [], active: null, switching: false },
-    refreshOpenCodeAccountQuotas: (_active, args) => {
-      const input = object(args[0]);
-      if (Object.keys(input).some(k => !['accountID', 'orgID'].includes(k)) || (input.accountID === undefined) !== (input.orgID === undefined) || (input.accountID !== undefined && (typeof input.accountID !== 'string' || !/^[^\s\x00-\x1f\x7f]{1,256}$/.test(input.accountID) || typeof input.orgID !== 'string' || !/^[^\s\x00-\x1f\x7f]{1,256}$/.test(input.orgID)))) throw new RpcError('INVALID_REQUEST', '账号额度参数无效');
-      host.assertOpenCodeAccess?.();
-      if (!host.openCodeQuotaPool) throw new RpcError('OPENCODE_UNAVAILABLE', '账号额度服务尚未就绪');
-      return host.track(host.openCodeQuotaPool.refresh(input as { accountID?: string; orgID?: string }).then(snapshot => { host.onOpenCodeQuotaChanged?.(); return snapshot; }));
-    },
-    listOpenCodeAccounts: () => { if (!host.openCodeAccounts) throw new RpcError('OPENCODE_UNAVAILABLE', '账号服务不可用'); return host.track(host.openCodeAccounts.list()); },
-    startOpenCodeLogin: () => { if (!host.openCodeAccounts) throw new RpcError('OPENCODE_UNAVAILABLE', '账号服务不可用'); return host.openCodeAccounts.startLogin(); },
-    getOpenCodeLogin: (_active, args) => { if (!host.openCodeAccounts) throw new RpcError('OPENCODE_UNAVAILABLE', '账号服务不可用'); return host.openCodeAccounts.getLogin(args[0]); },
-    cancelOpenCodeLogin: (_active, args) => { if (!host.openCodeAccounts) throw new RpcError('OPENCODE_UNAVAILABLE', '账号服务不可用'); return host.track(host.openCodeAccounts.cancelLogin(args[0])); },
-    switchOpenCodeAccount: (_active, args) => { if (!host.openCodeAccounts) throw new RpcError('OPENCODE_UNAVAILABLE', '账号服务不可用'); return host.track(host.openCodeAccounts.switchAccount(args[0])); },
     ...probeHandlers(host),
     ...taskHandlers(),
     ...serverHandlers(host),

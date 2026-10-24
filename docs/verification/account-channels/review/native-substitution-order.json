@@ -1,0 +1,14 @@
+{
+  "exploration": {
+    "envResultRemainsLiteral": false,
+    "envResultIncorrectlyExpandedAsFile": true
+  },
+  "assessment": "not_a_blocker_native_semantics_match",
+  "primarySource": "https://github.com/anomalyco/opencode/blob/v1.19.4/packages/opencode/src/config/variable.ts",
+  "nativeOrder": [
+    "env substitution",
+    "scan resultant text for file substitution"
+  ],
+  "weaverOrderMatchesNative": true,
+  "thirdNativePassPreventedByUnicodeBrace": true
+}

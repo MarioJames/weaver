@@ -47,7 +47,7 @@ class GuardedPiAgent extends EventEmitter implements ManagedProcess {
 
   private async begin(): Promise<void> {
     let problem: string | undefined;
-    try { problem = await this.check(this.input.model); } catch (error) {
+    try { problem = this.input.channel ? undefined : await this.check(this.input.model); } catch (error) {
       problem = `无法确认 pi 是否提供模型 ${this.input.model}：${error instanceof Error ? error.message : String(error)}，未启动 pi`;
     }
     if (this.cancelled) { this.finish(null, 'SIGTERM'); return; }
@@ -82,7 +82,7 @@ class GuardedPiAgent extends EventEmitter implements ManagedProcess {
   }
 }
 
-/** Wraps a launcher so pi runs only after its configured model is confirmed; every other engine is launched as before. */
+/** Legacy engine routes check the global catalog; channel routes compile their own native model definitions. */
 export function guardPiLaunch(launch: StartCliAgent, check: PiModelCheck): StartCliAgent {
   return (input, beforeSpawn) => input.engine === 'pi' ? new GuardedPiAgent(launch, input, check, beforeSpawn) : launch(input, beforeSpawn);
 }
@@ -179,7 +179,7 @@ class GuardedPiRun extends EventEmitter implements CliRun {
   private async begin(): Promise<void> {
     let problem: string | undefined;
     try {
-      problem = await this.check(this.input.model);
+      problem = this.input.channel ? undefined : await this.check(this.input.model);
     } catch (error) {
       problem = `无法确认 pi 是否提供模型 ${this.input.model}：${error instanceof Error ? error.message : String(error)}，未启动 pi`;
     }

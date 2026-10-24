@@ -1,0 +1,19 @@
+[
+  {
+    "name": "pi-env-reference",
+    "resolvedCorrectly": false,
+    "storedLiteralReference": true
+  },
+  {
+    "name": "opencode-key-precedence",
+    "nativeInlineKeyPreserved": false,
+    "globalAuthOverrodeInlineKey": true
+  },
+  {
+    "name": "import-block-remap",
+    "roleRemapped": true,
+    "blockChannel": "default_codex",
+    "roleChannel": "import_a0f6863a04a05589fb68981a",
+    "priorBlockStillCovers": false
+  }
+]

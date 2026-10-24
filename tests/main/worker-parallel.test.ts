@@ -1,3 +1,5 @@
+import { inheritedChannel } from '../helpers/inherited-channel';
+import { policySchema12 } from '../helpers/policy-schema12';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -54,6 +56,7 @@ test('an empty database gets the column, an older database keeps its rows and up
   // The shape version 9 had: a fully migrated database without the column, stopped at 9.
   const old = new DatabaseSync(':memory:');
   migrate(old);
+  policySchema12(old);
   old.exec('ALTER TABLE policy_workers DROP COLUMN max_parallel; PRAGMA user_version=9');
   assert.ok(!columns(old).includes('max_parallel'));
   old.prepare('INSERT INTO policy_workers(id,position,enabled,engine,model,effort) VALUES (?,?,?,?,?,?)').run('legacy_worker', 0, 1, 'claude', 'sonnet', 'high');
@@ -156,7 +159,7 @@ function runtime(cap: number | undefined) {
     return result.data;
   };
   // Each create registers its own owner instance, so only the worker's cap can hold a task back.
-  const task = () => call('tasks.create', { title: 'Native', goal: 'edit a file', workspace: dir, ownerProfileId: 'claude_owner' });
+  const task = () => {const created=call('tasks.create', { title: 'Native', goal: 'edit a file', workspace: dir, ownerProfileId: 'claude_owner' });inheritedChannel(store,created.id);return created;};
   const settle = async (taskId: string, status: string) => {
     for (let i = 0; i < 100 && store.get(taskId).status !== status; i++) { handler.pump(); await new Promise(resolve => setTimeout(resolve, 10)); }
   };

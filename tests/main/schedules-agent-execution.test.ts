@@ -118,7 +118,7 @@ test('worker uses the selected worker profile directly with zero owner roots', a
 test('worker and owner with a shared id use their own section and parameters', async () => {
   const f = setup();
   try {
-    save(f.policy, snap => { snap.config.workers.codex_owner = { enabled: true, engine: 'codex', model: 'worker-model', effort: 'low' }; });
+    save(f.policy, snap => { snap.config.workers.codex_owner = { enabled: true, channel: "default_codex", model: 'worker-model', effort: 'low' }; });
     const seen: Array<{ role?: string; model: string }> = [];
     const mk = () => new ScheduleService({
       store: f.store, policy: f.policy, notify: () => {}, now: () => AT,

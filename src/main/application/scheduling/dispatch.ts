@@ -1,3 +1,4 @@
+import { roleEngine } from '../../../shared/policy/channels';
 import { randomUUID } from 'node:crypto';
 import type { DispatchNext } from '../../../shared/contracts/commands';
 import type { RoutePreview } from '../../../shared/contracts/policy';
@@ -49,23 +50,23 @@ export class Dispatcher {
   return full?this.workerCapacityWait(route.worker,route.workerCapacity!.running,route.workerCapacity!.limit):this.capacityWait(route.owner,ownerId,route.maxParallel);
  }
  /** maxWaitMinutes is frozen for the owner and the UI as their polling bound; Weaver never stops a worker with it. */
- decideExecution(engine:string,provider:unknown,task:Task,ownerEngine?:string):{execution:'real'|'mock'|'native';adapter:string;maxWaitMinutes:number;workspace?:string;engineKind?:string} {
+ decideExecution(engine:string,provider:unknown,task:Task,ownerChannel?:string,channel?:string):{execution:'real'|'mock'|'native';adapter:string;maxWaitMinutes:number;workspace?:string;engineKind?:string} {
   const minutes=this.policy.snapshot().config.herdr.max_wait_minutes;
   if(!Number.isSafeInteger(minutes)||minutes<1||minutes>1440)fail('INVALID_REQUEST','Configured max_wait_minutes is invalid');
   if(provider==='mock-jsonl'||this.manager.adapterId==='mock-jsonl') return {execution:'mock',adapter:'mock-jsonl',maxWaitMinutes:minutes};
   // A worker on the owner's own engine runs inside the owner with its built-in subagent tool; Weaver launches nothing.
-  if(ownerEngine!==undefined&&engine===ownerEngine) return {execution:'native',adapter:'native',maxWaitMinutes:minutes,...(task.workspace?{workspace:task.workspace}:{})};
+  const root=task.parentTaskId?this.manager.store.get(task.parentTaskId):undefined;
+  if(ownerChannel!==undefined&&channel===ownerChannel&&root?.run?.channel===channel&&root.run.policyRevision===this.policy.snapshot().revision) return {execution:'native',adapter:'native',maxWaitMinutes:minutes,...(task.workspace?{workspace:task.workspace}:{})};
   const kind=this.policy.snapshot().config.engines[engine]?.kind??'';
-  if(kind==='claude')fail('CAPABILITY_UNAVAILABLE','Claude Code real execution is deferred. No mock provider was substituted.');
   if(!isRealEngineKind(kind))fail('CAPABILITY_UNAVAILABLE',`Engine ${engine} (${kind||'unknown kind'}) cannot be launched. No mock provider was substituted.`);
   if(!this.manager.canLaunchReal)fail('CAPABILITY_UNAVAILABLE',`Real launcher for ${kind} is not loaded. No mock provider was substituted.`);
   return {execution:'real',adapter:kind,engineKind:kind,workspace:absoluteExistingWorkspace(task.workspace),maxWaitMinutes:minutes};
  }
  /** Route one owner's work under excluded workers, or engines when a queued task is rerouted by an engine block. */
- routeOf(owner:string,running:number,excludedEngines:string[],worker?:unknown,excludedWorkers:string[]=[]):RoutePreview {
+ routeOf(owner:string,running:number,excludedEngines:string[],worker?:unknown,excludedWorkers:string[]=[],excludedChannels:string[]=[]):RoutePreview {
   try {
    const live=this.policy.snapshot();
-   return previewRoute(live.config,live.blocks,Date.now(),{owner,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads()),...(worker!==undefined?{worker}:{}),...(excludedEngines.length?{excludeEngines:excludedEngines}:{}),...(excludedWorkers.length?{excludeWorkers:excludedWorkers}:{})});
+   return previewRoute(live.config,live.blocks,Date.now(),{owner,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads()),...(worker!==undefined?{worker}:{}),...(excludedChannels.length?{excludeChannels:excludedChannels}:{}),...(excludedEngines.length?{excludeEngines:excludedEngines}:{}),...(excludedWorkers.length?{excludeWorkers:excludedWorkers}:{})});
   } catch(error) {
    const message=error instanceof Error?error.message:String(error);
    if(message.startsWith('NO_ALTERNATIVE_ENGINE'))fail('NO_ALTERNATIVE_ENGINE',message);
@@ -97,7 +98,7 @@ export class Dispatcher {
   accept(task:Task,route:RoutePreview,decision:ReturnType<Dispatcher['decideExecution']>,pendingPackage:WorkPackage,excludedWorkers:string[]):{task:Task;response:unknown} {
    if(!task.packageId){this.manager.store.putPackage(pendingPackage);task.packageId=pendingPackage.id;}
    if(decision.workspace)task.workspace=decision.workspace;
-   task.dispatch={owner:route.owner,worker:route.worker,engine:route.engine,model:route.model,effort:route.effort,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,...(decision.execution==='real'?{workspaceIdentity:workspaceIdentity(decision.workspace)}:{})}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
+   task.dispatch={owner:route.owner,worker:route.worker,channel:route.channel,channelLabel:this.policy.snapshot().config.channels[route.channel]?.label,engine:route.engine,model:route.model,effort:route.effort,execution:decision.execution,maxParallel:route.maxParallel,maxWaitMinutes:decision.maxWaitMinutes,adapter:decision.adapter,...(decision.workspace?{workspace:decision.workspace,...(decision.execution==='real'?{workspaceIdentity:workspaceIdentity(decision.workspace)}:{})}:{}),...(decision.engineKind?{engineKind:decision.engineKind}:{})};
    const selected=decision.execution==='real'?`Policy selected ${route.worker}; launching ${decision.engineKind} in ${decision.workspace}`:decision.execution==='native'?`Policy selected ${route.worker} on the owner's engine; the owner runs it with its built-in subagent tool (${route.model}, ${route.effort})`:`Policy selected ${route.worker}; explicit mock-jsonl provider`;
    event(task,'lifecycle',`${selected}${excludedWorkers.length?`; workers excluded because they ${EXCLUDED_WORKER_REASON}: ${excludedWorkers.join(', ')}`:''}`);
    task.scheduled=true;
@@ -129,7 +130,7 @@ export class Dispatcher {
    for(const worker of forcedWorkers)if(!excludedWorkers.includes(worker))excludedWorkers.push(worker);
    const running=slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,owner));
    const route=this.routeOf(owner,running,[],a.worker,excludedWorkers);
-   const decision=this.decideExecution(route.engine,a.provider,task,this.policy.snapshot().config.owners[route.owner]?.engine);
+   const decision=this.decideExecution(route.engine,a.provider,task,this.policy.snapshot().config.owners[route.owner]?.channel,route.channel);
    const pendingPackage:WorkPackage=task.packageId?this.manager.store.getPackage(task.packageId!)!:{id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:[decision.workspace??task.workspace??'Explicit mock fixture'],acceptanceCriteria:task.acceptanceCriteria?.length?task.acceptanceCriteria:[decision.execution==='mock'?'Mock output returned for owner review':'Provider result returned for owner review'],createdAt:new Date().toISOString()};
    if(!pendingPackage||pendingPackage.taskId!==task.id)fail('INVALID_REQUEST','Frozen work package is missing');
    // Real launch and native handoff freeze the same instruction, so it must fit before any state changes.

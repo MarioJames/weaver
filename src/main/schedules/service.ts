@@ -1,9 +1,11 @@
+import type { ChannelBinding } from '../channels/runtime';
+import { quotaRefreshEnabled } from '../../shared/policy/settings';
 import { randomUUID } from 'node:crypto';
 import type { ScheduleDefinition, ScheduleInput, ScheduleRun, ScheduleRunStatus } from '../../shared/contracts/schedules';
 import type { CommandResponse } from '../../shared/contracts/commands';
 import type { Task } from '../../shared/contracts/tasks';
 import type { QuotaEngine, QuotaRefreshResult, QuotaSchedule } from '../../shared/contracts/quota';
-import { quotaSettings, QUOTA_INTERVAL_RANGE } from '../../shared/policy/settings';
+import { quotaSettings, QUOTA_INTERVAL_RANGE, QUOTA_KINDS } from '../../shared/policy/settings';
 import { object, parseId } from '../../shared/validation';
 import { fail } from '../application/commands/errors';
 import { recoverOwnedScope, startOwnedScope } from '../adapters/cli/scope';
@@ -28,12 +30,13 @@ export interface ScheduleOptions {
  createTask:(args:Record<string,unknown>)=>unknown;
  command:(command:'tasks.start'|'tasks.cancel',args:Record<string,unknown>,commandId:string)=>CommandResponse;
  notify:()=>void;
- refreshQuota?:(engine:QuotaEngine)=>Promise<QuotaRefreshResult>;
+ refreshQuota?:(channel:string)=>Promise<QuotaRefreshResult>;
  now?:()=>number;
  /** Strict scope cleanup confirmation; tests pause/fail this boundary without touching IM/CLI semantics. */
  recoverScope?:(unit:string,invocation?:string)=>Promise<void>;
  /** Direct execution wiring; all optional for legacy/script-only consumers. */
  dataDir?:string;
+ channelConfig?:(id:string)=>ChannelBinding;
  startCli?:(input:CliAgentInput,beforeSpawn?:(prepared:PreparedCliAgent)=>void)=>ManagedAgentProcess;
  parentFactory?:ParentAgentFactory;
  checkPiModel?:PiModelCheck;
@@ -62,6 +65,7 @@ function revision(def:ScheduleDefinition,value:unknown,optional=false):void {
 }
 /** A single app-owned poller. SQLite claims freeze execution parameters before any external effect. */
 export class ScheduleService {
+ referencesChannel(id:string):boolean {const state=this.storage.read();return state.definitions.some(def=>state.runs[def.id]?.some(run=>run.channel===id&&run.status==='running'));}
  readonly storage:ScheduleStore;
  private readonly clock:()=>number;
  private timer?:NodeJS.Timeout;
@@ -247,8 +251,9 @@ export class ScheduleService {
   let prompt:string;
   try{prompt=buildDirectPrompt({role:executor.role,profileId:executor.profileId,goal:frozen.agent.goal,workspace:effective,unspecified,dataDir});}
   catch(error){this.finish(run,'failed',{error:redactContext(error instanceof Error?error.message:String(error),2000)});return;}
-  if(kind==='cli')await this.runDirectCli(run,{engine:profile.kind as RealEngineKind,model:profile.model,effort:profile.effort,workspace:effective,prompt,role:executor.role});
-  else await this.runDirectClaude(run,{model:profile.model,effort:profile.effort,workspace:effective,prompt});
+  this.storage.transaction(state=>{const stored=state.runs[run.scheduleId]?.find(item=>item.id===run.id);if(stored)stored.channel=profile.channel;});
+  if(kind==='cli')await this.runDirectCli(run,{channel:profile.channel,engine:profile.kind as RealEngineKind,model:profile.model,effort:profile.effort,workspace:effective,prompt,role:executor.role});
+  else await this.runDirectClaude(run,{channel:profile.channel,model:profile.model,effort:profile.effort,workspace:effective,prompt});
  }
  private observeDirectCli(proc:ManagedAgentProcess,cancelled:()=>boolean):Promise<{status:'succeeded'|'failed'|'cancelled';output:string;error?:string;exitCode:number|null;truncated:boolean}> {
   return new Promise(resolve=>{
@@ -288,7 +293,7 @@ export class ScheduleService {
    });
   });
  }
- private async runDirectCli(run:StoredRun,opts:{engine:RealEngineKind;model:string;effort:string;workspace:string;prompt:string;role:'owner'|'worker'}):Promise<void> {
+ private async runDirectCli(run:StoredRun,opts:{channel:string;engine:RealEngineKind;model:string;effort:string;workspace:string;prompt:string;role:'owner'|'worker'}):Promise<void> {
   const dataDir=this.dataDir();
   const stateDir=directStateDir(dataDir,run.id);
   let capturedUnit:string|undefined;
@@ -303,7 +308,7 @@ export class ScheduleService {
   const base=(input:CliAgentInput)=>rawStart(input,beforeSpawn);
   const launch=this.options.checkPiModel?guardPiLaunch(base as (input:CliAgentInput)=>ManagedAgentProcess,this.options.checkPiModel):base;
   let proc:ManagedAgentProcess|undefined;
-  try{proc=launch({engine:opts.engine,model:opts.model,effort:opts.effort,workspace:opts.workspace,instruction:opts.prompt,stateDir,role:opts.role}) as ManagedAgentProcess;}
+  try{proc=launch({channel:opts.channel,channelConfig:this.options.channelConfig?.(opts.channel),engine:opts.engine,model:opts.model,effort:opts.effort,workspace:opts.workspace,instruction:opts.prompt,stateDir,role:opts.role}) as ManagedAgentProcess;}
   catch(error){
    if(!capturedUnit){
     const persisted=this.storage.read().runs[run.scheduleId]?.find(r=>r.id===run.id);
@@ -377,7 +382,7 @@ export class ScheduleService {
   * The lifecycle control is registered before the factory resolves so a cancel/stop during
   * initialization only records intent: a late factory must never send the goal, and the claim
   * is held until the owned scope is exactly confirmed. Initialization alone is not work. */
- private async runDirectClaude(run:StoredRun,opts:{model:string;effort:string;workspace:string;prompt:string}):Promise<void> {
+ private async runDirectClaude(run:StoredRun,opts:{channel:string;model:string;effort:string;workspace:string;prompt:string}):Promise<void> {
   const unit=`weaver-schedule-${run.id}`;
   try{
    this.storage.transaction(s=>{
@@ -404,7 +409,7 @@ export class ScheduleService {
   this.directs.set(run.id,{cancel:noteInitCancel});
   let session:Awaited<ReturnType<ParentAgentFactory>>|undefined;
   try{
-   session=await factory({engineKind:'claude',model:opts.model,effort:opts.effort,workspace:opts.workspace,instructions:opts.prompt},{launch:launcher});
+   session=await factory({channel:opts.channel,channelConfig:this.options.channelConfig?.(opts.channel),channelStateDir:directStateDir(this.options.dataDir??'',run.id),engineKind:'claude',model:opts.model,effort:opts.effort,workspace:opts.workspace,instructions:opts.prompt},{launch:launcher});
    pending.session=session;
   }catch(error){
    this.directs.delete(run.id);
@@ -553,13 +558,14 @@ export class ScheduleService {
  }
  private async runQuota(run:StoredRun):Promise<void> {
   if(!this.options.refreshQuota){this.finish(run,'failed',{error:'Quota refresh service unavailable'});return;}
-  const targets=quotaRefreshTargets(this.options.policy.snapshot().config),output:string[]=[];let failures=0,observations=0;
+  const config=this.options.policy.snapshot().config;
+  const targets=Object.entries(config.channels).filter(([,channel])=>channel.enabled&&config.engines[channel.engine]?.enabled&&quotaRefreshEnabled(channel,config.engines[channel.engine]?.kind)).sort(([,a],[,b])=>QUOTA_KINDS.indexOf(config.engines[a.engine].kind as typeof QUOTA_KINDS[number])-QUOTA_KINDS.indexOf(config.engines[b.engine].kind as typeof QUOTA_KINDS[number])).map(([id])=>id),output:string[]=[];let failures=0,observations=0;
   const cancelled=()=>this.storage.read().runs[run.scheduleId]?.find(r=>r.id===run.id)?.cancelRequested;
   for(const engine of targets){
    if(cancelled()){this.finish(run,'cancelled',{output:redactContext(output.join('\n'),65536)});return;}
    if(this.stopped){this.finish(run,'interrupted',{output:output.join('\n'),error:'Scheduler stopped'});return;}
    try {
-    const result=await this.options.refreshQuota(engine),record=result.records.find(r=>r.engine===engine);
+    const result=await this.options.refreshQuota(engine),record=result.records.find(r=>r.channel===engine);
     const fresh=record&&!record.stale&&record.checkedAt&&record.observedAt&&Date.parse(record.observedAt)>=Date.parse(run.startedAt)&&['available','exhausted'].includes(record.status);
     if(fresh){observations++;output.push(`${engine}: ${record.status} (fresh observation)`);}
     else{failures++;output.push(`${engine}: ${record?.status??'missing'} (${record?.retryAt?'cooldown; ':''}${record?.stale?'stale; ':''}${record?.detail??'no observation'})`);}

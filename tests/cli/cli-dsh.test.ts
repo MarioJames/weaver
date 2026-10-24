@@ -1,3 +1,4 @@
+import { roleEngine } from '../../src/shared/policy/channels';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -37,7 +38,7 @@ test('catalog lists dsh as its own real engine, unrelated to the opencode deepse
   assert.equal(isRealEngineKind('dsh'), true);
   // The opencode deepseek worker stays exactly where it was: a worker on the opencode engine.
   const config = defaultConfig();
-  assert.equal(config.workers.opencode_worker?.engine, 'opencode');
+  assert.equal(roleEngine(config,config.workers.opencode_worker!), 'opencode');
 });
 
 test('dsh launch runs headless json from stdin with a private per-run overlay patch', () => {
@@ -210,8 +211,8 @@ test('dsh effort values are off, low, high and max', () => {
 
 test('default policy ships a disabled dsh engine and worker, validates clean, and routes no owner to it', () => {
   const config = defaultConfig();
-  assert.deepEqual(config.engines.dsh, { enabled: false, kind: 'dsh', quota_refresh: false });
-  assert.equal(config.workers.dsh_worker?.engine, 'dsh');
+  assert.deepEqual(config.engines.dsh, { enabled: false, kind: 'dsh' });
+  assert.equal(roleEngine(config,config.workers.dsh_worker!), 'dsh');
   assert.equal(config.workers.dsh_worker?.model, 'deepseek-flash');
   assert.equal(config.workers.dsh_worker?.effort, 'high');
   assert.equal(config.workers.dsh_worker?.enabled, false);

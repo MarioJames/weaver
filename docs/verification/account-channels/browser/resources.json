@@ -1,0 +1,23 @@
+{
+  "scope": "dev-weaver-account-browser.scope",
+  "systemd": "LoadState=not-found\nActiveState=inactive",
+  "finalPid": 774041,
+  "pidReleased": true,
+  "finalPort": 37261,
+  "portReleased": true,
+  "previousPorts": [
+    41091,
+    44137,
+    46401
+  ],
+  "previousScopeInstancesStoppedBeforeRestart": true,
+  "browserSession": "weaver-account-channels",
+  "browserClosed": true,
+  "profileRemoved": true,
+  "profileFormerPath": "/tmp/weaver-accounts-7l88j2s9/browser/browser-profile",
+  "scratchFormerPath": "/tmp/weaver-accounts-7l88j2s9/browser",
+  "scratchRemoved": true,
+  "dataRemoved": "Only task-created isolated runtime-data (SQLite + Vite cache), fixtureHOME, fake CLI, synthetic source auth, completed task/schedule fixtures, disposable policy and temporary print artifacts",
+  "sharedServicesAndRealAuthUntouched": true,
+  "retainedRuntimeResources": []
+}

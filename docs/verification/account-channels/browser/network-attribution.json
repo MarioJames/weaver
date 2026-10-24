@@ -1,0 +1,122 @@
+{
+  "requests": [
+    {
+      "requestId": "746741.222",
+      "status": 400,
+      "method": "saveChannel",
+      "attribution": "非法FTP endpoint，纠正后保存成功",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.259",
+      "status": 400,
+      "method": "listEngineModels",
+      "attribution": "未导入认证渠道模型列表拒绝；切换至已配置合成渠道后成功",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.272",
+      "status": 400,
+      "method": "listEngineModels",
+      "attribution": "未导入认证渠道模型列表拒绝；切换至已配置合成渠道后成功",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.521",
+      "status": 400,
+      "method": "listEngineModels",
+      "attribution": "未导入认证渠道模型列表拒绝；切换至已配置合成渠道后成功",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.609",
+      "status": 400,
+      "method": "listEngineModels",
+      "attribution": "未导入认证渠道模型列表拒绝；切换至已配置合成渠道后成功",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.677",
+      "status": 400,
+      "method": "saveChannel",
+      "attribution": "独立API fixture制造revision冲突，重读后保存成功",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.701",
+      "status": 400,
+      "method": "listEngineModels",
+      "attribution": "未导入认证渠道模型列表拒绝；切换至已配置合成渠道后成功",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.712",
+      "status": 400,
+      "method": "listEngineModels",
+      "attribution": "渠道已停用，Worker明确显示原因",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.1055",
+      "status": 503,
+      "method": "command",
+      "attribution": "自有scope受控重启期间sync.status轮询503，重启后恢复",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.1056",
+      "status": 503,
+      "method": "command",
+      "attribution": "自有scope受控重启期间sync.status轮询503，重启后恢复",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.1257",
+      "status": 400,
+      "method": "importChannels",
+      "attribution": "删除后managed根无记录的归属保护，勾选替换恢复",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.1326",
+      "status": 400,
+      "method": "getTask",
+      "attribution": "验收fixture初始非UUID ID，改合法UUID后详情通过",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.1574",
+      "status": 400,
+      "method": "importChannels",
+      "attribution": "同上，替换恢复前的重复保护",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.1808",
+      "status": 503,
+      "method": "command",
+      "attribution": "自有scope受控重启期间sync.status轮询503，重启后恢复",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.1809",
+      "status": 503,
+      "method": "command",
+      "attribution": "自有scope受控重启期间sync.status轮询503，重启后恢复",
+      "unresolvedProductFailure": false
+    },
+    {
+      "requestId": "746741.2262",
+      "status": 400,
+      "method": "listEngineModels",
+      "attribution": "未导入认证渠道模型列表拒绝；切换至已配置合成渠道后成功",
+      "unresolvedProductFailure": false
+    }
+  ],
+  "consoleErrors": {
+    "count": 2,
+    "message": "React 19: Accessing element.ref was removed",
+    "impact": "依赖兼容开发期告警；本次已验交互未受影响"
+  },
+  "artifact_errors": []
+}

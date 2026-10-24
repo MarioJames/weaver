@@ -1,0 +1,31 @@
+{
+  "baseline": "780165e",
+  "check": {
+    "command": "npm run check",
+    "exitCode": 0,
+    "typecheck": "passed",
+    "tests": 2152,
+    "passed": 2120,
+    "failed": 0,
+    "skipped": 32,
+    "skipScope": "既有平台/真实外部环境条件测试",
+    "build": "passed",
+    "testDurationMs": 130460.455391
+  },
+  "ownerIndependent": {
+    "coreAndHerdrAndMigration": 65,
+    "routingRpcAndRealCliHttp": 23,
+    "helloOutput": {
+      "missingChannelRejected": true,
+      "mismatchRejectedBeforeSpawn": true,
+      "secretShapedErrorExposed": false
+    },
+    "finalDeltas": 12,
+    "realBackupRollbackRecovery": "all boolean checks passed; 6 channels restored and managed auth unchanged",
+    "httpTaskPrivatePaths": "real HTTP get/list and write-result contract covered; paths removed from public DTO, durable values retained"
+  },
+  "buildWarnings": [
+    "依赖use client模块级指令警告，构建退出0"
+  ],
+  "paidInference": false
+}

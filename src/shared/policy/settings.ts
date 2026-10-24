@@ -1,4 +1,4 @@
-import type { Engine, FreeChannelProbeSettings, JanitorSettings, QuotaSettings } from '../contracts/policy';
+import type { FreeChannelProbeSettings, JanitorSettings, QuotaSettings } from '../contracts/policy';
 
 /** The single kind -> legal effort table; kinds not listed accept any non-empty string. */
 export const EFFORTS: Record<string, string[]> = {
@@ -13,8 +13,9 @@ export const EFFORTS: Record<string, string[]> = {
 export const QUOTA_KINDS = ["codex", "claude", "grok", "opencode"] as const;
 export const hasQuotaProbe = (kind: string) => (QUOTA_KINDS as readonly string[]).includes(kind);
 /** Missing means on for kinds with a quota probe, off otherwise. */
-export function quotaRefreshEnabled(engine: Engine): boolean {
-  return engine.quota_refresh ?? hasQuotaProbe(engine.kind);
+export function quotaRefreshEnabled(channel: {kind: string; quota_refresh?: boolean}, engineKind?: string): boolean {
+  if (channel.kind === 'api') return false;
+  return channel.quota_refresh ?? hasQuotaProbe(engineKind ?? channel.kind);
 }
 export const QUOTA_INTERVAL_RANGE = { min: 5, max: 1440 } as const;
 export function quotaSettings(config: { quota?: QuotaSettings }): QuotaSettings {

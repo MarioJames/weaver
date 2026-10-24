@@ -9,7 +9,21 @@ export const digest=(value:unknown)=>createHash('sha256').update(canonical(value
 export const terminal=(t:Task)=>['completed','failed','cancelled'].includes(t.status);
 /** The attempt ended on a vendor rate limit or exhausted quota. */
 export const vendorLimited=(t:Task)=>t.status==='failed'&&(t.failure?.kind==='rate_limit'||t.failure?.kind==='quota');
-export function publicTask<T extends Pick<Task,'owner'|'run'>>(task:T){const {owner,run,...rest}=task;const withReport={...rest,ownerReport:(rest as Record<string,unknown>).ownerReport ?? null};if(!run)return withReport;const visible={...run};delete visible.pid;delete visible.stateDir;delete visible.logs;delete visible.nonce;delete visible.logIdentity;return {...withReport,run:visible};}
+/** Channel material paths are durable cleanup data, never public task metadata. */
+export function publicTaskChannelPaths<T extends Pick<Task,'run'|'ownerHost'>>(task:T):T {
+ const host=task.ownerHost?{...task.ownerHost}:undefined;
+ if(host){delete host.channelStateDir;delete host.channelProfilePath;delete host.channelEnvironmentPath;}
+ const run=task.run?{...task.run}:undefined;
+ if(run){delete run.channelStateDir;delete run.channelProfilePath;}
+ return {...task,...(host?{ownerHost:host}:{}),...(run?{run}:{})};
+}
+export function publicTask<T extends Pick<Task,'owner'|'run'|'ownerHost'>>(task:T){
+ const {owner,run,...rest}=publicTaskChannelPaths(task);
+ const withReport={...rest,ownerReport:(rest as Record<string,unknown>).ownerReport ?? null};
+ if(!run)return withReport;
+ const visible={...run};delete visible.pid;delete visible.stateDir;delete visible.logs;delete visible.nonce;delete visible.logIdentity;
+ return {...withReport,run:visible};
+}
 /** Looks tasks and owners up for the command units that share one manager; every miss is the same NOT_FOUND answer. */
 export class TaskRecords {
  constructor(readonly manager:TaskManager){}

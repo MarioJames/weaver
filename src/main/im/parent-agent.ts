@@ -1,3 +1,4 @@
+import { cleanupChannelRun, prepareChannelRun, type ChannelBinding } from '../channels/runtime';
 import { randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { redactSecrets } from '../../shared/redact';
@@ -25,6 +26,9 @@ export interface ParentProgressEvent {
 
 /** Input for one long-lived IM parent agent session. Engine/model/effort come from the owner profile. */
 export interface ParentAgentInput {
+  channel?: string;
+  channelConfig?: ChannelBinding;
+  channelStateDir?: string;
   engineKind: ImEngineKind;
   model: string;
   effort: string;
@@ -115,6 +119,9 @@ export function clipPublicText(value: string, max: number): string {
 }
 
 export interface PreparedParentAgent {
+  channel?: string;
+  channelConfig?: ChannelBinding;
+  channelStateDir?: string;
   engineKind: ImEngineKind;
   model: string;
   effort: string;
@@ -137,7 +144,7 @@ export function prepareParentAgentInput(input: ParentAgentInput): PreparedParent
   try { roots = resolveImWorkspaces([input.workspace, ...(input.additionalWorkspaces ?? [])]); }
   catch { failInput('workspace', 'workspaces must be distinct existing project directories outside credential state'); }
   const [workspace, ...additionalWorkspaces] = roots;
-  return { engineKind: input.engineKind, model: input.model, effort: input.effort, workspace, additionalWorkspaces, instructions: input.instructions };
+  return { channel:input.channel,channelConfig:input.channelConfig,channelStateDir:input.channelStateDir,engineKind: input.engineKind, model: input.model, effort: input.effort, workspace, additionalWorkspaces, instructions: input.instructions };
 }
 
 const STRIPPED_ENV = /^(CLAUDECODE$|CLAUDE_CODE_|CODEX_THREAD_ID$|CODEX_SESSION_ID$|HERDR_|WEAVER_TASK|WEAVER_WORKER)/;
@@ -233,17 +240,18 @@ export function abortReason(signal: AbortSignal): Error {
  */
 export const createParentAgent = async (input: ParentAgentInput, internals?: ParentAgentInternals): Promise<ParentAgentSession> => {
   const prepared = prepareParentAgentInput(input);
+  const launcher=internals?.launch ?? startParentScope;
+  const native=input.channelConfig ? prepareChannelRun({...input.channelConfig,model:input.model,stateDir:input.channelStateDir ?? failInput('channelStateDir','required for account configuration'),env:parentEnv()}) : undefined;
   const waits = {
     startupMs: internals?.startupMs ?? PARENT_STARTUP_MS,
     turnMs: internals?.turnMs ?? PARENT_TURN_MS,
     closeMs: internals?.closeMs ?? PARENT_CLOSE_MS,
-    launch: internals?.launch ?? startParentScope,
+    launch: native ? (command:readonly string[],cwd:string,env?:Readonly<Record<string,string>>)=>launcher([command[0],...native.argv,...command.slice(1)],cwd,{...env,...native.env} as Record<string,string>) : launcher,
   };
-  if (prepared.engineKind === 'codex') return startCodexParentSession(prepared, waits);
-  if (prepared.engineKind === 'opencode') return startOpenCodeParentSession(prepared, waits);
-  if (prepared.engineKind === 'pi') return startPiParentSession(prepared, waits);
-  if (prepared.engineKind === 'grok') return startGrokParentSession(prepared, waits);
-  if (prepared.engineKind === 'qodercli') return startQoderParentSession(prepared, waits);
-  if (prepared.engineKind === 'dsh') return startDshParentSession(prepared, waits);
-  return startClaudeParentSession(prepared, waits);
+  const start=prepared.engineKind==='codex'?startCodexParentSession:prepared.engineKind==='opencode'?startOpenCodeParentSession:prepared.engineKind==='pi'?startPiParentSession:prepared.engineKind==='grok'?startGrokParentSession:prepared.engineKind==='qodercli'?startQoderParentSession:prepared.engineKind==='dsh'?startDshParentSession:startClaudeParentSession;
+  try {
+    const session=await start(prepared,waits);
+    return {...session,send:session.send.bind(session),close:async()=>{await session.close();if(native)cleanupChannelRun(native);}};
+  }catch(error){if(native)cleanupChannelRun(native);throw error;}
+
 };

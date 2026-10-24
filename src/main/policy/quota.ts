@@ -3,7 +3,7 @@ import { quotaRefreshEnabled } from '../../shared/policy/settings';
 import { type Block, type Config } from '../../shared/contracts/policy';
 import { PolicyBlockService } from './blocks';
 import type { PolicyStore } from './store';
-import { isEngineBlock, quotaBlockBy } from '../../shared/policy/blocks';
+import { quotaBlockBy } from '../../shared/policy/blocks';
 import { object } from '../../shared/validation';
 import { rpcForCommand } from '../../shared/contracts/rpc';
 
@@ -12,21 +12,21 @@ const LABELS: Record<QuotaEngine, string> = { codex: 'Codex', claude: 'Claude Co
 export const QUOTA_CAPABILITIES = {
   engines: ENGINES,
   get: { command: 'quota.get', rpc: rpcForCommand('quota.get').method, network: false },
-  refresh: { command: 'quota.refresh', rpc: rpcForCommand('quota.refresh').method, updatesPolicyBlocks: true, inference: false },
+  refresh: { command: 'quota.refresh', rpc: rpcForCommand('quota.refresh').method, updatesPolicyBlocks: false, inference: false },
 };
 
 /** Distinct quota kinds of enabled engines that opted into scheduled refresh. */
 export function quotaRefreshTargets(config: Config): QuotaEngine[] {
-  const kinds = new Set(Object.values(config.engines).filter(engine => engine.enabled && quotaRefreshEnabled(engine)).map(engine => engine.kind));
+  const kinds = new Set(Object.values(config.channels).filter(channel => channel.enabled && config.engines[channel.engine]?.enabled && quotaRefreshEnabled(channel,config.engines[channel.engine]?.kind)).map(channel => config.engines[channel.engine]!.kind));
   return ENGINES.filter(engine => kinds.has(engine));
 }
 
 export function parseQuotaRefresh(value: unknown): QuotaRefreshInput {
   const raw = object(value);
-  if (![Object.prototype, null].includes(Object.getPrototypeOf(raw)) || Reflect.ownKeys(raw).some(key => key !== 'engine')) throw new Error('Unknown quota refresh field');
-  if (!Object.hasOwn(raw, 'engine')) return {};
-  if (typeof raw.engine !== 'string' || !ENGINES.includes(raw.engine as QuotaEngine)) throw new Error('Invalid quota engine; use codex, claude, grok, or opencode');
-  return { engine: raw.engine as QuotaEngine };
+  if (![Object.prototype, null].includes(Object.getPrototypeOf(raw)) || Reflect.ownKeys(raw).some(key => key !== 'engine' && key !== 'channel')) throw new Error('Unknown quota refresh field');
+  if (raw.engine !== undefined && (typeof raw.engine !== 'string' || !ENGINES.includes(raw.engine as QuotaEngine))) throw new Error('Invalid quota engine; use codex, claude, grok, or opencode');
+  if (raw.channel !== undefined && (typeof raw.channel !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/.test(raw.channel))) throw new Error('Invalid quota channel');
+  return { ...(raw.engine !== undefined ? { engine: raw.engine as QuotaEngine } : {}), ...(raw.channel !== undefined ? {channel:raw.channel as string} : {}) };
 }
 
 export class QuotaPolicyConflict extends Error {
@@ -62,10 +62,13 @@ export function applyQuotaSnapshot(store: PolicyStore, quota: QuotaSnapshot, inp
       if ((input.engine !== undefined && record.engine !== input.engine) || record.stale || !record.checkedAt || !record.observedAt) continue;
       if (record.status !== 'available' && record.status !== 'exhausted') continue;
       const source = quotaBlockBy(record.engine);
-      for (const [id, engine] of Object.entries(current.config.engines)) {
+      for (const [channelId, channel] of Object.entries(current.config.channels)) {
+        if(channel.kind !== 'subscription' || (input.channel !== undefined && channelId !== input.channel)) continue;
+        if(record.channel === undefined || record.channel !== channelId) continue;
+        const id=channel.engine; const engine=current.config.engines[id]!;
         // An engine whose quota is not tracked would never get a fresh observation to release the block.
-        if (engine.kind !== record.engine || !quotaRefreshEnabled(engine)) continue;
-        const existing = blocks.find(block => isEngineBlock(block, id));
+        if (engine.kind !== record.engine || !quotaRefreshEnabled(channel,engine.kind)) continue;
+        const existing = blocks.find(block => block.engine === id && (block.channel === channelId || block.channel === undefined) && block.model === undefined && block.worker === undefined);
         if (existing && existing.by !== source) {
           if (record.status === 'exhausted' && existing.release_at && Date.parse(existing.release_at) <= now) throw new QuotaPolicyConflict();
           continue;
@@ -76,7 +79,7 @@ export function applyQuotaSnapshot(store: PolicyStore, quota: QuotaSnapshot, inp
         }
         const release_at = releaseAt(record, now);
         const block: Block = {
-          engine: id, by: source, reason: `${LABELS[record.engine]} account quota exhausted`,
+          engine: id, channel: channelId, by: source, reason: `${LABELS[record.engine]} account quota exhausted`,
           since: existing?.since ?? new Date(now).toISOString(),
           ...(release_at ? { release_at } : {}),
         };
@@ -84,7 +87,7 @@ export function applyQuotaSnapshot(store: PolicyStore, quota: QuotaSnapshot, inp
         else blocks = [...blocks, block];
       }
     }
-    const fields: (keyof Block)[] = ['engine', 'model', 'worker', 'reason', 'since', 'release_at', 'by'];
+    const fields: (keyof Block)[] = ['engine', 'channel', 'model', 'worker', 'reason', 'since', 'release_at', 'by'];
     const policyChanged = blocks.length !== current.blocks.length || blocks.some((block, index) => fields.some(field => block[field] !== current.blocks[index]?.[field]));
     return policyChanged ? blocks : undefined;
   });

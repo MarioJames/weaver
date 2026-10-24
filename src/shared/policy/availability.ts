@@ -1,3 +1,4 @@
+import { roleEngine } from './channels';
 import type { Availability, Block, Config, Owner, State, Worker } from '../contracts/policy';
 import { isQuotaBlockBy, manualResumeKind, reaches } from './blocks';
 
@@ -7,8 +8,9 @@ export function activeBlocks(state: State, now: number): Block[] {
   return state.blocks.filter(b => isBlockActive(b, now));
 }
 /** The block that keeps a role out, if any. A worker-scoped block reaches only the worker it names, never an owner or a sibling. */
-export function coveringBlock(blocks: Block[], entity: Owner | Worker, workerId?: string): Block | undefined {
-  return blocks.find(b => b.engine === entity.engine
+export function coveringBlock(blocks: Block[], entity: Owner | Worker, workerId: string | undefined, config: Config): Block | undefined {
+  return blocks.find(b => b.engine === roleEngine(config, entity)
+    && (b.channel === undefined || b.channel === entity.channel)
     && (b.worker === undefined || b.worker === workerId)
     && (b.model === undefined || b.model === entity.model)
     && !("free_channel" in entity && entity.free_channel === true && isQuotaBlockBy(b.by)));
@@ -16,9 +18,10 @@ export function coveringBlock(blocks: Block[], entity: Owner | Worker, workerId?
 /** workerId is the policy key of a worker; omit it for owners, which no worker-scoped block can reach. */
 export function availabilityOf(config: Config, blocks: Block[], entity: Owner | Worker, workerId?: string): Availability {
   if (!entity.enabled) return { status: "disabled" };
-  if (!config.engines[entity.engine]?.enabled) return { status: "engine_disabled" };
-  const hit = coveringBlock(blocks, entity, workerId);
-  if (hit) return { status: "blocked", engine: hit.engine, ...(hit.model ? { model: hit.model } : {}), ...(hit.worker ? { worker: hit.worker } : {}), reason: hit.reason, ...(hit.release_at ? { release_at: hit.release_at } : {}) };
+  if (!config.engines[roleEngine(config, entity)]?.enabled) return { status: "engine_disabled" };
+  if (!config.channels[entity.channel]?.enabled) return { status: 'channel_disabled', channel: entity.channel };
+  const hit = coveringBlock(blocks, entity, workerId, config);
+  if (hit) return { status: "blocked", engine: hit.engine, ...(hit.channel ? { channel: hit.channel } : {}), ...(hit.model ? { model: hit.model } : {}), ...(hit.worker ? { worker: hit.worker } : {}), reason: hit.reason, ...(hit.release_at ? { release_at: hit.release_at } : {}) };
   return { status: "available" };
 }
 
@@ -31,7 +34,7 @@ export function availabilityOf(config: Config, blocks: Block[], entity: Owner | 
 export function manualPauseOf(config: Config, blocks: Block[], workerId: string, now: number): { kind: 'quota' | 'manual'; block: Block } | undefined {
   const worker = config.workers[workerId];
   if (!worker) return undefined;
-  const route = { engine: worker.engine, worker: workerId, model: worker.model };
+  const route = { channel: worker.channel, engine: roleEngine(config, worker), worker: workerId, model: worker.model };
   const hits = blocks
     .filter(block => isBlockActive(block, now) && reaches(block, route) && !(worker.free_channel === true && isQuotaBlockBy(block.by)))
     .flatMap(block => { const kind = manualResumeKind(block); return kind ? [{ kind, block }] : []; });

@@ -1,0 +1,83 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 2520939206296804400
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:46401/#/channels",
+  "refs": {
+    "e1": {
+      "name": "",
+      "role": "generic"
+    },
+    "e10": {
+      "name": "取消",
+      "role": "button"
+    },
+    "e11": {
+      "name": "导入",
+      "role": "button"
+    },
+    "e12": {
+      "name": "导入引擎",
+      "role": "combobox"
+    },
+    "e13": {
+      "name": "来源配置目录",
+      "role": "textbox"
+    },
+    "e14": {
+      "name": "",
+      "role": "LabelText"
+    },
+    "e15": {
+      "name": "更新已导入的配置与认证",
+      "role": "checkbox"
+    },
+    "e16": {
+      "name": "重新读取状态",
+      "role": "button"
+    },
+    "e2": {
+      "name": "Notifications",
+      "role": "region"
+    },
+    "e3": {
+      "name": "Notifications",
+      "role": "region"
+    },
+    "e4": {
+      "name": "Notifications",
+      "role": "region"
+    },
+    "e5": {
+      "name": "Notifications",
+      "role": "region"
+    },
+    "e6": {
+      "name": "Notifications",
+      "role": "region"
+    },
+    "e7": {
+      "name": "Notifications",
+      "role": "region"
+    },
+    "e8": {
+      "name": "导入原生账号与 API 配置",
+      "role": "heading"
+    },
+    "e9": {
+      "name": "Close",
+      "role": "button"
+    }
+  },
+  "snapshot": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - generic\n      - region \"Notifications\" [ref=e2]\n      - region \"Notifications\" [ref=e3]\n      - region \"Notifications\" [ref=e4]\n      - region \"Notifications\" [ref=e5]\n      - region \"Notifications\" [ref=e6]\n      - region \"Notifications\" [ref=e7]\n      - dialog \"导入原生账号与 API 配置\"\n        - generic\n          - heading \"导入原生账号与 API 配置\" [level=2, ref=e8]\n          - button \"Close\" [ref=e9]\n          - form\n            - LabelText\n              - StaticText \"导入引擎\"\n            - combobox \"导入引擎\" [expanded=false, ref=e12]: codex · codex\n              - StaticText \"codex · codex\"\n            - LabelText\n              - StaticText \"来源配置目录\"\n            - textbox \"来源配置目录\" [ref=e13]: /tmp/weaver-accounts-7l88j2s9/browser/native-codex\n              - StaticText \"/tmp/weaver-accounts-7l88j2s9/browser/native-codex\"\n            - StaticText \"Weaver 所在机器的原生 CLI 配置根；指定目录时请先选择对应引擎。留空使用默认位置。只复制必要配置与认证，不修改来源。\"\n            - LabelText [ref=e14] clickable [cursor:pointer]\n              - checkbox \"更新已导入的配置与认证\" [checked=false, ref=e15]\n              - StaticText \"更新已导入的配置与认证\"\n            - StaticText \"默认保留已有托管凭据，同一来源不会创建重复渠道。勾选后替换新启动使用的配置与认证；已有进程继续使用旧凭据根，名称、启停及角色选择保留。平台 keychain 或不支持的认证格式需在托管根重新登录。\"\n            - alert\n              - StaticText \"导入未完成，输入已保留\"\n              - StaticText \"INVALID_REQUEST: 目标账号根已存在但没有导入记录，请先核实归属\"\n              - button \"重新读取状态\" [ref=e16]\n          - button \"取消\" [ref=e10]\n          - button \"导入\" [ref=e11]"
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "engine": "grok",
+    "ok": true,
+    "fixtureRoutingRecognized": true,
+    "bytes": 3369
+  },
+  {
+    "engine": "codex",
+    "ok": true,
+    "fixtureRoutingRecognized": true,
+    "bytes": 658607
+  },
+  {
+    "engine": "opencode",
+    "ok": true,
+    "fixtureRoutingRecognized": true,
+    "bytes": 464
+  },
+  {
+    "engine": "claude",
+    "ok": true,
+    "fixtureRoutingRecognized": true,
+    "bytes": 343
+  },
+  {
+    "engine": "dsh",
+    "ok": true,
+    "fixtureRoutingRecognized": true,
+    "bytes": 13077
+  },
+  {
+    "engine": "qoder",
+    "ok": null,
+    "detail": "官方隔离根status由owner实测，未用虚构token模拟Qoder opaque登录"
+  }
+]

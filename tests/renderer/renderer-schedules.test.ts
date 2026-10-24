@@ -73,8 +73,9 @@ test('执行者直接读共享类型：goal 与 executor 透传，提交门以�
     config: {
       version: 1, herdr: { max_wait_minutes: 1 },
       engines: { e1: { enabled: true, kind: 'custom' } },
-      owners: { o1: { enabled: true, engine: 'e1', model: 'm1', effort: 'low', workers: [], max_parallel: 1 } },
-      workers: { w1: { enabled: true, engine: 'e1', model: 'm1', effort: 'low' } },
+      channels: { c1: { engine: 'e1', label: '团队渠道', kind: 'api', enabled: true, provider: 'custom' } },
+      owners: { o1: { enabled: true, channel: 'c1', model: 'm1', effort: 'low', workers: [], max_parallel: 1 } },
+      workers: { w1: { enabled: true, channel: 'c1', model: 'm1', effort: 'low' } },
     },
     owners: { o1: { status: 'available' } },
     workers: { w1: { status: 'disabled' } },
@@ -91,8 +92,9 @@ test('执行者选项覆盖全部父/子配置：同名独立、不可用禁用�
     config: {
       version: 1, herdr: { max_wait_minutes: 1 },
       engines: { e1: { enabled: true, kind: 'custom' } },
-      owners: { same: { enabled: true, engine: 'e1', model: 'm1', effort: 'low', workers: [], max_parallel: 1 } },
-      workers: { same: { enabled: true, engine: 'e1', model: 'm2', effort: 'low' } },
+      channels: { c1: { engine: 'e1', label: '团队渠道', kind: 'api', enabled: true, provider: 'custom' } },
+      owners: { same: { enabled: true, channel: 'c1', model: 'm1', effort: 'low', workers: [], max_parallel: 1 } },
+      workers: { same: { enabled: true, channel: 'c1', model: 'm2', effort: 'low' } },
     },
     owners: { same: { status: 'available' } },
     workers: { same: { status: 'disabled' } },

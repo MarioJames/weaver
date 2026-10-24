@@ -122,11 +122,11 @@ export function appendWorker(workers: readonly string[], available: readonly str
 
 
 export function blankOwner(config: Config): Owner {
-  return { enabled: false, engine: Object.keys(config.engines)[0] ?? '', model: '', effort: 'high', workers: Object.keys(config.workers).slice(0, 1), max_parallel: 1 };
+  return { enabled: false, channel: Object.keys(config.channels).find(id => config.channels[id]!.enabled && config.engines[config.channels[id]!.engine]?.enabled) ?? Object.keys(config.channels)[0] ?? '', model: '', effort: 'high', workers: Object.keys(config.workers).slice(0, 1), max_parallel: 1 };
 }
 
 export function blankWorker(config: Config): Worker {
-  return { enabled: false, engine: Object.keys(config.engines)[0] ?? '', model: '', effort: 'high', description: '' };
+  return { enabled: false, channel: Object.keys(config.channels).find(id => config.channels[id]!.enabled && config.engines[config.channels[id]!.engine]?.enabled) ?? Object.keys(config.channels)[0] ?? '', model: '', effort: 'high', description: '' };
 }
 
 /** Worker concurrency cap: off (or no longer limited) removes the key, on stores an integer 1–100; an empty or out-of-range input lands inside that range. */

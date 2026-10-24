@@ -12,7 +12,7 @@ import type { NormalizedMessage } from '@larksuite/channel';
 const ROOT = await mkdtemp(join(tmpdir(), 'weaver-im-launch-cancel-'));
 test.after(async () => { await rm(ROOT, { recursive: true, force: true }); });
 const tick = async () => { for (let n = 0; n < 12; n++) await new Promise<void>(r => setImmediate(r)); };
-function policy(): PolicySnapshot { return { revision: 0, config: { version: 1, engines: { codex: { enabled: true, kind: 'codex' } }, owners: { main: { enabled: true, engine: 'codex', model: 'gpt-test', effort: 'medium', workers: [], max_parallel: 1 } }, workers: {}, herdr: { max_wait_minutes: 30 } }, blocks: [], activeBlocks: [], owners: {}, workers: {}, execution: 'disabled' }; }
+function policy(): PolicySnapshot { return { revision: 0, config: { version: 1, engines: { codex: { enabled: true, kind: 'codex' } },channels:{"default_codex":{engine:"codex",label:"codex",kind:"subscription",enabled:true}}, owners: { main: { enabled: true, channel: "default_codex", model: 'gpt-test', effort: 'medium', workers: [], max_parallel: 1 } }, workers: {}, herdr: { max_wait_minutes: 30 } }, blocks: [], activeBlocks: [], owners: {}, workers: {}, execution: 'disabled' }; }
 function fixture() {
   let handlers!: ImChannelHandlers;
   const factory: ImChannelFactory = (_c, h) => { handlers = h; return { connect: async () => {}, close: async () => {}, state: () => 'connected', send: async () => {}, retireCard: async () => {}, stream: async () => '', updateCard: async () => {} }; };
@@ -43,7 +43,7 @@ test('rebuild during launch aborts the private startup signal and closes fast', 
   const live = policy();
   const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: parent, channelFactory: f.factory });
   t.after(async () => { await service.close(); });
-  const config = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 1, ownerProfileId: ''};
+  const config = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], channel: "default_codex", model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 1, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config });
   await tick();
   assert.equal(factoryCalls, 1);
@@ -70,7 +70,7 @@ test('late launch result after fence never creates a stale parent', { timeout: 1
   const live = policy();
   const service = new ImService({ dataDir: dir, policy: () => live, parentFactory: parent, channelFactory: f.factory });
   t.after(async () => { await service.close(); });
-  const config = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], engine: 'codex', model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 1, ownerProfileId: ''};
+  const config = { enabled: true, appId: 'cli_test', appSecret: 'SECRET', allowedOpenIds: ['ou_a'], channel: "default_codex", model: 'gpt-test', effort: 'medium', workspaces: [dir], idleTimeoutMinutes: 1, ownerProfileId: ''};
   await service.save({ expectedRevision: 0, config });
   await tick();
   f.handlers.message(message('late'));

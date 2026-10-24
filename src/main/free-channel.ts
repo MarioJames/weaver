@@ -1,3 +1,4 @@
+import { roleEngine } from '../shared/policy/channels';
 // Free-channel probe: scheduled light probes of free_channel workers to renew free quota.
 // Reuses the stall recovery ladder and its probe cadence; no second ladder is defined here.
 import { object } from '../shared/validation';
@@ -41,15 +42,15 @@ export function modeBlockBy(mode: NonNullable<WorkerProbe['mode']>): string {
 export function freeProbeEligible(config: Config, id: string): boolean {
   const worker = config.workers[id];
   if (!worker || worker.free_channel !== true || !worker.enabled) return false;
-  return config.engines[worker.engine]?.enabled === true;
+  return config.channels[worker.channel]?.enabled === true && config.engines[roleEngine(config, worker)]?.enabled === true;
 }
 
 /** The saved route of one free_channel worker. */
 function probeRouteOf(config: Config, worker: string): ProbeRoute | undefined {
   const profile = config.workers[worker];
-  const engine = profile ? config.engines[profile.engine] : undefined;
+  const engine = profile ? config.engines[roleEngine(config, profile)] : undefined;
   if (!profile || !engine) return undefined;
-  return { engine: profile.engine, kind: engine.kind, worker, model: profile.model, effort: profile.effort };
+  return { channel:profile.channel, engine: roleEngine(config, profile), kind: engine.kind, worker, model: profile.model, effort: profile.effort };
 }
 
 export interface FreeProbeInput { worker?: string }
@@ -126,7 +127,7 @@ export class FreeChannelProbeMonitor {
       const standing = this.standing(worker, item);
       const availability = route && eligible ? activeBlocks({ version: 1, blocks: snapshot.blocks }, now).find(block => reaches(block, route) && !isQuotaBlockBy(block.by)) : undefined;
       return {
-        worker, engine: profile.engine, model: profile.model, probed: eligible,
+        worker, engine: roleEngine(config, profile), model: profile.model, probed: eligible,
         level: standing.level, mode: item.mode, needsAttention: item.needsAttention,
         lastTriggerAt: standing.lastTriggerAt === null ? null : new Date(standing.lastTriggerAt).toISOString(),
         blockedUntil: item.blockedUntil === null ? null : new Date(item.blockedUntil).toISOString(),
@@ -243,7 +244,7 @@ export class FreeChannelProbeMonitor {
   /** The state half of the user's 「恢复派发」 for one worker: only this worker's question resets, and only if its block is gone. */
   resetWorker(engine: string, worker: string): void {
     const snapshot = this.options.policy().snapshot();
-    if (snapshot.config.workers[worker]?.engine !== engine) return;
+    if ((snapshot.config.workers[worker] ? roleEngine(snapshot.config,snapshot.config.workers[worker]!) : undefined) !== engine) return;
     this.closeOrphanedQuestions(snapshot, this.clock(), engine, worker);
     if (this.dirty) this.flushState();
   }
@@ -255,7 +256,7 @@ export class FreeChannelProbeMonitor {
     for (const [worker, item] of Object.entries(this.state.workers)) {
       if (!item.mode || !item.blockSince) continue;
       if (!freeProbeEligible(config, worker)) continue;
-      if (engine !== undefined && config.workers[worker]?.engine !== engine) continue;
+      if (engine !== undefined && (config.workers[worker] ? roleEngine(config,config.workers[worker]!) : undefined) !== engine) continue;
       if (only !== undefined && worker !== only) continue;
       const route = probeRouteOf(config, worker);
       if (!route) continue;
@@ -280,7 +281,7 @@ export class FreeChannelProbeMonitor {
       if (block.by !== FREE_PROBE_BLOCK_BY || block.model === undefined) continue;
       const worker = Object.keys(config.workers).find(id => {
         const profile = config.workers[id]!;
-        return freeProbeEligible(config, id) && (block.worker === undefined || block.worker === id) && profile.engine === block.engine && profile.model === block.model;
+        return freeProbeEligible(config, id) && (block.worker === undefined || block.worker === id) && roleEngine(config, profile) === block.engine && profile.model === block.model;
       });
       if (!worker) continue;
       const item = this.state.workers[worker];
@@ -503,7 +504,7 @@ export class FreeChannelProbeMonitor {
       const blocks = snapshot.blocks;
       if (foreignBlockOn(blocks, route)) return blocks;
       const previous = blocks.find(block => ownedOnRoute(block, route));
-      final = { engine: route.engine, model: route.model, worker: route.worker, reason, since: previous?.since ?? new Date(now).toISOString(), by, ...(release_at ? { release_at } : {}) };
+      final = { channel:route.channel, engine: route.engine, model: route.model, worker: route.worker, reason, since: previous?.since ?? new Date(now).toISOString(), by, ...(release_at ? { release_at } : {}) };
       const written = [...blocks.filter(block => !ownedOnRoute(block, route)), final];
       // A rate limit that leaves no enabled worker on the engine usable takes the engine out as well.
       return escalate ? escalateEngineBlock(snapshot.config, written, route.engine, now) : written;

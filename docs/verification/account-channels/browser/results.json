@@ -1,0 +1,93 @@
+{
+  "baseline": "780165e + final frozen task changes",
+  "appUrl": "http://127.0.0.1:37261",
+  "session": "weaver-account-channels",
+  "cases": [
+    {
+      "status": "通过",
+      "case": "入口、筛选与工具职责",
+      "evidence": "browser/engines.png",
+      "actual": "实际导航账号与渠道/引擎页；类型API与引擎codex组合仅显示匹配渠道。引擎页只展示CLI安装、版本、启停；账号和额度迁往渠道。"
+    },
+    {
+      "status": "通过",
+      "case": "API创建及类型限制",
+      "evidence": "browser/api-engine-options-final.json",
+      "actual": "UI填写provider、endpoint、协议、key并保存codex渠道；原生TOML通过高级文本框覆写。Qoder不出现在通用API创建菜单；Pi、dsh创建表单仅API，dsh仅deepseek-official/Messages。"
+    },
+    {
+      "status": "通过",
+      "case": "编辑与失败恢复",
+      "evidence": "browser/revision-conflict.png",
+      "actual": "引擎/类型只读；编辑key留空保存后仍显示已配置。非法FTP地址400保留全部输入，修正后成功；独立API fixture引发revision冲突，重读后保留草稿并保存成功。"
+    },
+    {
+      "status": "通过",
+      "case": "启停与删除保护",
+      "evidence": "browser/referenced-delete.png",
+      "actual": "实际开关停用/启用；引用中的渠道删除确认按钮禁用并列出角色；未引用渠道可删除。最终冻结后再走一次API新增→编辑→停用→删除。"
+    },
+    {
+      "status": "通过",
+      "case": "Owner / Worker渠道与模型",
+      "evidence": "browser/worker-disabled.png",
+      "actual": "真实UI选择渠道+synthetic-model并保存，两角色列表与表单均显示新渠道；执行引擎由渠道派生。停用后Worker显示“渠道未启用”，模型读取拒绝；恢复后可用。"
+    },
+    {
+      "status": "通过（合成CLI）",
+      "case": "模型与Hello恢复",
+      "evidence": "browser/final/screenshot.png",
+      "actual": "scratch fake codex返回模型列表及hi；UI连通测试成功→可控synthetic failure→恢复成功，最终backend再次确认成功。没有收费推理；不代表真实厂商连接。"
+    },
+    {
+      "status": "通过（合成账号）",
+      "case": "原生导入、幂等与额度归属",
+      "evidence": "browser/final-import-recovered-dom.json",
+      "actual": "用sourceDir导入独立codex订阅，重复导入渠道ID集合不变。API明确不显示订阅额度；合成订阅认证有效期不可确认时显示“当前认证方式不支持”，没有伪造余额。"
+    },
+    {
+      "status": "通过",
+      "case": "回滚后普通重导恢复",
+      "evidence": "browser/rollback-reimport.json",
+      "actual": "先UI导入新账号，再隔离RPC回滚至导入前，改变来源合成token，最后UI普通导入：metadata恢复、managed根不变、凭据digest不变，且与新来源不同。"
+    },
+    {
+      "status": "通过（预期拒绝及恢复）",
+      "case": "删除后重导归属保护",
+      "evidence": "browser/reimport-replaced.png",
+      "actual": "删除secret记录后遗留managed根不能被普通导入自动认领，UI保留草稿并提示核实归属。勾选“更新已导入的配置与认证”重导成功；未删除原来源或原managed根。"
+    },
+    {
+      "status": "通过（仅配置展示）",
+      "case": "Bot与定时任务",
+      "evidence": "browser/schedule-channel.png",
+      "actual": "Bot实际选择渠道和合成模型，未启用IM/未对外连接。UI新建停用Agent定时任务，执行器选项和编辑表单展示渠道/model及不可用原因；未运行定时推理。"
+    },
+    {
+      "status": "通过",
+      "case": "任务详情与公共DTO安全",
+      "evidence": "browser/task-dto-check.json",
+      "actual": "完成态TaskStore fixture不启动引擎；真实UI点击详情显示“合成渠道归属 / codex / synthetic-model”。最终HTTP getTask/listTasks均不含ownerHost三种路径及run两种路径，页面同样不含探针路径。"
+    },
+    {
+      "status": "通过",
+      "case": "390px、标签与键盘",
+      "evidence": "browser/mobile-modal.png",
+      "actual": "列表document宽390/scrollWidth390；编辑Modal在390px内可操作，底部保存/取消可达。字段具标签；Tab从名称跳过只读引擎/类型到Provider，Escape正常关闭。"
+    },
+    {
+      "status": "未支持",
+      "case": "暗主题",
+      "evidence": "browser/mobile-list.png",
+      "actual": "实际切换系统暗色偏好，页面仍为亮色；当前ThemeProvider固定light且无主题切换入口，因此没有把暗主题标成通过。"
+    },
+    {
+      "status": "通过（有非阻断告警）",
+      "case": "console / network采证",
+      "evidence": "browser/network-attribution.json",
+      "actual": "最终bh artifact_errors=[]；全会话16条HTTP异常均已逐条归因。console有2条相同React 19 element.ref依赖兼容error，未影响已验流程。无未解决影响目标流程的产品错误。"
+    }
+  ],
+  "paidInference": false,
+  "artifact_errors": []
+}

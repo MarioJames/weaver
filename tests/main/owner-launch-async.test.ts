@@ -11,6 +11,8 @@ import { CommandHandler } from '../../src/main/commands';
 import { TaskStore } from '../../src/main/store';
 import { event } from '../../src/main/domain/tasks';
 import { TaskManager } from '../../src/main/manager';
+import { ChannelStore } from '../../src/main/channels/store';
+import type { DatabaseSync } from 'node:sqlite';
 import { PolicyStore } from '../../src/main/policy/store';
 import { MockWorkerAdapter } from '../../src/main/adapters/worker';
 import { OwnerLaunchError, type OwnerLaunchInput, type OwnerLaunchResult, type launchOwnerAsync } from '../../src/main/owner-host';
@@ -28,7 +30,7 @@ function deferredLaunch() {
   return {pending,launcher};
 }
 function fixture(options:{closeFailure?:boolean}={}) {
-  const directory=mkdtempSync(join(tmpdir(),'wv-async-'));
+  const directory=mkdtempSync(join(tmpdir(),'t-'));
   const store=new TaskStore(join(directory,'weaver.db'));const policy=new PolicyStore(join(directory,'weaver.db'));
   const manager=new TaskManager(store,new MockWorkerAdapter(process.execPath,resolve('scripts/mock-worker.mjs')));
   const launch=deferredLaunch();const closed:OwnerLaunchResult[]=[];
@@ -129,12 +131,13 @@ async function httpCommand(port:number,request:unknown){
 }
 
 test('real CLI and HTTP launch concurrently beyond 15s while ordinary reads remain responsive', {timeout:45000},async t=>{
- const directory=mkdtempSync(join(tmpdir(),'wv-long-owner-'));const bin=join(directory,'bin');mkdirSync(bin);const log=join(directory,'herdr.jsonl');const previous=process.env.PATH;
+ const directory=mkdtempSync(join(tmpdir(),'t-'));const bin=join(directory,'bin');mkdirSync(bin);const log=join(directory,'herdr.jsonl');const previous=process.env.PATH;
  // Absolute interpreter and a PATH containing only this fake prevent reaching paid engines or real Herdr.
  writeFileSync(join(bin,'herdr'),`#!${process.execPath}\nconst fs=require('node:fs');const args=process.argv.slice(2);const action=args[3];fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({action,args,pid:process.pid})+'\\n');if(action==='list'&&args[2]==='workspace'){console.log(JSON.stringify({result:{workspaces:[]}}));}else if(action==='create'){console.log(JSON.stringify({result:{workspace:{workspace_id:'workspace-'+process.pid},root_pane:{pane_id:'pane-'+process.pid}}}));}else if(action==='start'){setTimeout(()=>console.log('{"result":{"status":"ready"}}'),16000);}else{console.log('{"result":{"status":"ok"}}');}\n`,{mode:0o755});
  process.env.PATH=bin;let runtime:Awaited<ReturnType<typeof startRuntime>>|undefined;
  try{
-  runtime=await startRuntime({dataDir:join(directory,'data'),port:0,open:false});const data=join(directory,'data');
+  const data=join(directory,'d');mkdirSync(data,{mode:0o700});const authDir=join(directory,'auth');mkdirSync(authDir);writeFileSync(join(authDir,'auth.json'),JSON.stringify({tokens:{access_token:'fixture-token'}}));const fixturePolicy=new PolicyStore(join(data,'weaver.db'));new ChannelStore(fixturePolicy.connection as DatabaseSync).putSecret('default_codex',{authDir});
+  runtime=await startRuntime({dataDir:data,port:0,open:false,channels:{autoImport:false,env:{HOME:directory}}});
   const createTask=async(title:string)=>{const value:any=await sendRequest(data,envelope('tasks.create',{title,goal:'safe fake launch',workspace:directory,ownerProfileId:'codex_owner'}));assert.equal(value.ok,true);return value.data;};
   const cliTask=await createTask('CLI slow owner');const httpTask=await createTask('HTTP slow owner');
   const cliId=randomUUID();const cliRequest={taskId:cliTask.id,expectedRevision:cliTask.revision,launch:true};

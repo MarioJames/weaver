@@ -110,7 +110,7 @@ export async function readNativeCredential(engine: QuotaEngine, env: NodeJS.Proc
   const home = env.HOME || homedir();
   const file = engine === 'codex' ? path.join(env.CODEX_HOME || path.join(home, '.codex'), 'auth.json')
     : engine === 'claude' ? path.join(env.CLAUDE_CONFIG_DIR || path.join(home, '.claude'), '.credentials.json')
-      : path.join(home, '.grok', 'auth.json');
+      : path.join(env.GROK_HOME || path.join(home, '.grok'), 'auth.json');
   const root = await readObject(file);
   let token: string | undefined;
   let accountId: string | undefined;

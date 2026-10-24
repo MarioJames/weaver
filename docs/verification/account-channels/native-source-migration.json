@@ -1,0 +1,110 @@
+{
+  "sourceOpenedReadOnly": true,
+  "engines": {
+    "codex": {
+      "ok": true,
+      "milliseconds": 7,
+      "imported": 1,
+      "subscription": 1,
+      "api": 0,
+      "withPrivateAuth": 1,
+      "disabled": 0
+    },
+    "claude": {
+      "ok": true,
+      "milliseconds": 5,
+      "imported": 1,
+      "subscription": 1,
+      "api": 0,
+      "withPrivateAuth": 1,
+      "disabled": 0
+    },
+    "grok": {
+      "ok": true,
+      "milliseconds": 2,
+      "imported": 1,
+      "subscription": 1,
+      "api": 0,
+      "withPrivateAuth": 1,
+      "disabled": 0
+    },
+    "qoder": {
+      "ok": true,
+      "milliseconds": 2209,
+      "imported": 1,
+      "subscription": 1,
+      "api": 0,
+      "withPrivateAuth": 1,
+      "disabled": 0
+    },
+    "dsh": {
+      "ok": true,
+      "milliseconds": 4,
+      "imported": 1,
+      "subscription": 0,
+      "api": 1,
+      "withPrivateAuth": 0,
+      "disabled": 0
+    },
+    "pi": {
+      "ok": true,
+      "milliseconds": 1,
+      "imported": 0,
+      "subscription": 0,
+      "api": 0,
+      "withPrivateAuth": 0,
+      "disabled": 0
+    },
+    "opencode": {
+      "ok": true,
+      "milliseconds": 13284,
+      "imported": 1,
+      "subscription": 1,
+      "api": 0,
+      "withPrivateAuth": 1,
+      "disabled": 0
+    }
+  },
+  "repeatedCodexStable": true,
+  "roleChannels": {
+    "opencode_muse": {
+      "channel": "import_ee32f57491d779f9ce7f0f0f",
+      "kind": "subscription",
+      "configured": true
+    },
+    "opencode_deepseek": {
+      "channel": "import_ee32f57491d779f9ce7f0f0f",
+      "kind": "subscription",
+      "configured": true
+    },
+    "codex_luna_max": {
+      "channel": "import_d56e030df4fb20d796d92a22",
+      "kind": "subscription",
+      "configured": true
+    },
+    "codex_sol_med": {
+      "channel": "import_d56e030df4fb20d796d92a22",
+      "kind": "subscription",
+      "configured": true
+    },
+    "claude_sonnet_med": {
+      "channel": "import_e6f3c04da52965f2b7c02668",
+      "kind": "subscription",
+      "configured": true
+    },
+    "grok_worker": {
+      "channel": "import_e9a31f0093aaaacc595255e0",
+      "kind": "subscription",
+      "configured": true
+    },
+    "qoder_worker": {
+      "channel": "import_46c108d104db423c8ebfde2c",
+      "kind": "subscription",
+      "configured": true
+    }
+  },
+  "previousWorkerBlocksPreserved": true,
+  "subscriptionQuotaSwitchesPreserved": true,
+  "sourceFilesUnchanged": true,
+  "noKnownCredentialValuesInPolicy": true
+}

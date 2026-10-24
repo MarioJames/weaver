@@ -1,3 +1,4 @@
+import { cleanupChannelRun } from '../../channels/runtime';
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import type { CliAgentEvidence, RealEngineKind, TaskFailure, WorkerRecord } from '../../../shared/contracts/tasks';
@@ -32,6 +33,8 @@ export interface RunCursor {
 
 /** Persisted launch identity for one file-mode run (§4.2). Written via beforeSpawn. */
 export interface RunLaunchRecord {
+  channelStateDir?: string;
+  channelProfilePath?: string;
   unit: string;
   stateDir: string;
   nonce: string;
@@ -637,6 +640,7 @@ class CliRunImpl extends EventEmitter implements CliRun {
     await this.sweepEscaped();
     if (this.done || this.detached) return;
     this.done = true;
+    cleanupChannelRun(this.launch);
     this.stopSweep();
     this.closeTailers();
     if (this.exitTimer !== undefined) {
@@ -681,6 +685,8 @@ export function startCliRun(input: CliAgentInput & { runId: string }, beforeSpaw
   const unit = runUnitPrefixForTests ? `${runUnitPrefixForTests}${prepared.unit.replace(/^weaver-cli-/, '')}` : prepared.unit;
   const launch: RunLaunchRecord = {
     unit,
+    channelStateDir:prepared.channelStateDir,
+    channelProfilePath:prepared.channelProfilePath,
     stateDir: prepared.stateDir,
     nonce: created.nonce,
     logs: { ...created.paths },
@@ -696,9 +702,10 @@ export function startCliRun(input: CliAgentInput & { runId: string }, beforeSpaw
     beforeSpawn(launch);
   } catch (error) {
     closeRunFiles(created.fds);
+    cleanupChannelRun(prepared);
     throw error;
   }
-  const env = { ...process.env };
+  const env = { ...(prepared.env ?? process.env) };
   delete env.ELECTRON_RUN_AS_NODE;
   let scope: OwnedScope;
   try {
@@ -720,6 +727,7 @@ export function startCliRun(input: CliAgentInput & { runId: string }, beforeSpaw
     });
   } catch (error) {
     closeRunFiles(created.fds);
+    cleanupChannelRun(prepared);
     throw error;
   }
   const run = new CliRunImpl({

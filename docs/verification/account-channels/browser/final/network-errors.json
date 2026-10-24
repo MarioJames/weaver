@@ -1,0 +1,450 @@
+[
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:41091/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"saveChannel\", \"args\": [{\"revision\": 1, \"id\": \"channel_1be76b535f7946a88f93e247\", \"channel\": {\"label\": \"浏览器合成 API\", \"engine\": \"codex\", \"kind\": \"api\", \"enabled\": true, \"provider\": \"openai\", \"baseUrl\": \"ftp://invalid.example\", \"protocol\": \"openai-responses\"}}]}",
+    "requestId": "746741.222",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:11:51 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "161",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 400,
+    "timestamp": 1792865512001,
+    "url": "http://127.0.0.1:41091/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:41091/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"listEngineModels\", \"args\": [{\"engine\": \"claude\", \"channel\": \"default_claude\"}]}",
+    "requestId": "746741.259",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:12:22 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "115",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 400,
+    "timestamp": 1792865542187,
+    "url": "http://127.0.0.1:41091/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:41091/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"listEngineModels\", \"args\": [{\"engine\": \"codex\", \"channel\": \"default_codex\"}]}",
+    "requestId": "746741.272",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:12:31 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "115",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 400,
+    "timestamp": 1792865551983,
+    "url": "http://127.0.0.1:41091/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:44137/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"listEngineModels\", \"args\": [{\"engine\": \"claude\", \"channel\": \"default_claude\"}]}",
+    "requestId": "746741.521",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:13:43 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "115",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 400,
+    "timestamp": 1792865623401,
+    "url": "http://127.0.0.1:44137/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:44137/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"listEngineModels\", \"args\": [{\"engine\": \"claude\", \"channel\": \"default_claude\"}]}",
+    "requestId": "746741.609",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:14:47 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "115",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 400,
+    "timestamp": 1792865687301,
+    "url": "http://127.0.0.1:44137/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:44137/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"saveChannel\", \"args\": [{\"revision\": 8, \"id\": \"channel_1be76b535f7946a88f93e247\", \"channel\": {\"label\": \"浏览器冲突恢复 API\", \"engine\": \"codex\", \"kind\": \"api\", \"enabled\": true, \"provider\": \"openai\", \"baseUrl\": \"https://api.example.invalid/v1\", \"protocol\": \"openai-responses\"}}]}",
+    "requestId": "746741.677",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:15:39 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "87",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 400,
+    "timestamp": 1792865739801,
+    "url": "http://127.0.0.1:44137/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:44137/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"listEngineModels\", \"args\": [{\"engine\": \"claude\", \"channel\": \"default_claude\"}]}",
+    "requestId": "746741.701",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:15:59 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "115",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 400,
+    "timestamp": 1792865759501,
+    "url": "http://127.0.0.1:44137/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:44137/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"listEngineModels\", \"args\": [{\"engine\": \"codex\", \"channel\": \"channel_1be76b535f7946a88f93e247\"}]}",
+    "requestId": "746741.712",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:16:06 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "69",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 400,
+    "timestamp": 1792865766201,
+    "url": "http://127.0.0.1:44137/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:44137/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"command\", \"args\": [{\"apiVersion\": \"weaver.v1\", \"command\": \"sync.status\", \"args\": {\"after\": 3}}]}",
+    "requestId": "746741.1055",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:21:02 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "69",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 503,
+    "timestamp": 1792866063001,
+    "url": "http://127.0.0.1:44137/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:44137/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"command\", \"args\": [{\"apiVersion\": \"weaver.v1\", \"command\": \"sync.status\", \"args\": {\"after\": 3}}]}",
+    "requestId": "746741.1056",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:21:03 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "69",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 503,
+    "timestamp": 1792866064001,
+    "url": "http://127.0.0.1:44137/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:46401/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"importChannels\", \"args\": [{\"revision\": 13, \"engine\": \"codex\", \"sourceDir\": \"/tmp/weaver-accounts-7l88j2s9/browser/native-codex\"}]}",
+    "requestId": "746741.1257",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:21:30 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "115",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 400,
+    "timestamp": 1792866115597,
+    "url": "http://127.0.0.1:46401/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:46401/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"getTask\", \"args\": [\"browser-safe-channel-fixture\"]}",
+    "requestId": "746741.1326",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:22:30 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "81",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 400,
+    "timestamp": 1792866150901,
+    "url": "http://127.0.0.1:46401/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:46401/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"importChannels\", \"args\": [{\"revision\": 13, \"engine\": \"codex\", \"sourceDir\": \"/tmp/weaver-accounts-7l88j2s9/browser/native-codex\"}]}",
+    "requestId": "746741.1574",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:23:33 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "115",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 400,
+    "timestamp": 1792866213701,
+    "url": "http://127.0.0.1:46401/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:46401/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"command\", \"args\": [{\"apiVersion\": \"weaver.v1\", \"command\": \"sync.status\", \"args\": {\"after\": 6}}]}",
+    "requestId": "746741.1808",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:27:03 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "69",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 503,
+    "timestamp": 1792866423601,
+    "url": "http://127.0.0.1:46401/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:46401/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"command\", \"args\": [{\"apiVersion\": \"weaver.v1\", \"command\": \"sync.status\", \"args\": {\"after\": 6}}]}",
+    "requestId": "746741.1809",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:27:04 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "69",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 503,
+    "timestamp": 1792866424609,
+    "url": "http://127.0.0.1:46401/api/rpc"
+  },
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:37261/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"listEngineModels\", \"args\": [{\"engine\": \"claude\", \"channel\": \"default_claude\"}]}",
+    "requestId": "746741.2262",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:31:14 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "115",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 400,
+    "timestamp": 1792866674501,
+    "url": "http://127.0.0.1:37261/api/rpc"
+  }
+]

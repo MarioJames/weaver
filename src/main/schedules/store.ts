@@ -1,7 +1,7 @@
 import type { ScheduleAgent, ScheduleDefinition, ScheduleRun } from '../../shared/contracts/schedules';
 import type { TaskStore } from '../store';
 
-export interface StoredRun extends ScheduleRun { definition: ScheduleDefinition; process?: {unit:string;invocation?:string}; recoveryError?:string; cancelRequested?:boolean; outputRef?:boolean; outputSlot?:number }
+export interface StoredRun extends ScheduleRun { channel?:string; definition: ScheduleDefinition; process?: {unit:string;invocation?:string}; recoveryError?:string; cancelRequested?:boolean; outputRef?:boolean; outputSlot?:number }
 export interface ScheduleState {definitions:ScheduleDefinition[];runs:Record<string,StoredRun[]>}
 
 const isRecord=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);

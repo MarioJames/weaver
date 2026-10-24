@@ -43,7 +43,7 @@ export function SettingsPage({ policy }: { policy: PolicyDraft }) {
   const quota = quotaSettings(saved);
   const probe = freeChannelProbeSettings(saved);
   const inputError = (key: string) => (message: string) => setInputErrors(current => ({ ...current, [key]: message }));
-  const scheduleText = !quota.auto_refresh ? '已关闭，只在引擎卡片上手动刷新。' : schedule?.nextRunAt ? `下次 ${dateText(schedule.nextRunAt)}${schedule.lastRunAt ? ` · 上次 ${dateText(schedule.lastRunAt)}` : ''}` : '按下方间隔自动查询订阅额度，不会调用模型。';
+  const scheduleText = !quota.auto_refresh ? '已关闭，只在账号与渠道页手动刷新。' : schedule?.nextRunAt ? `下次 ${dateText(schedule.nextRunAt)}${schedule.lastRunAt ? ` · 上次 ${dateText(schedule.lastRunAt)}` : ''}` : '按下方间隔自动查询订阅额度，不会调用模型。';
   return <>
     {header}
     <div className={settingsStyles.surface}>
@@ -52,7 +52,7 @@ export function SettingsPage({ policy }: { policy: PolicyDraft }) {
           <TimeZoneSelect id={`${id}-timezone`} value={displayTimeZone(saved)} disabled={saver.states.timezone?.status === 'saving'} onChange={next => void saver.save('timezone', config => ({ display: displayWithTimeZone(config, next) }))} />
         </Setting>
       </Group>
-      <Group title="额度" desc="只刷新已启用、并在引擎卡片上打开「主动刷新额度」的引擎。额度耗尽时自动暂停派发，恢复或到重置时间后自动解除。">
+      <Group title="额度" desc="只刷新已启用、并在账号与渠道页打开「自动刷新」的官方订阅渠道。额度耗尽时自动暂停派发，恢复或到重置时间后自动解除。">
         <Setting label="定时刷新额度" htmlFor={`${id}-auto`} desc={scheduleText} state={saver.states.auto}>
           <NamedSwitch id={`${id}-auto`} aria-label="定时刷新额度" checked={quota.auto_refresh} disabled={saver.states.auto?.status === 'saving'} onChange={checked => void saver.save('auto', config => ({ quota: { ...quotaSettings(config), auto_refresh: checked } }))} />
         </Setting>

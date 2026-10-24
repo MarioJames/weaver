@@ -23,14 +23,14 @@ export function ModelListWarning({ engine, value, list }: { engine: string; valu
  * A model name is typed or picked in one field. Its suggestions are what the engine itself reports (fetched when the field appears and whenever its engine changes),
  * the refresh button sits inside the field, and an engine with no list leaves a plain text field.
  */
-export function ModelPicker({ engine, value, onChange, id, placeholder = '例如：gpt-6.1-sol 或 provider/model', label = '模型' }: {
-  engine: string; value: string; onChange: (model: string) => void; id?: string; placeholder?: string; label?: string;
+export function ModelPicker({ engine, channel, kind, value, onChange, id, placeholder = '例如：gpt-6.1-sol 或 provider/model', label = '模型' }: {
+  engine: string; channel?: string; kind?: string; value: string; onChange: (model: string) => void; id?: string; placeholder?: string; label?: string;
 }) {
-  const models = useEngineModels(engine);
+  const models = useEngineModels(engine, channel);
   const [open, setOpen] = useState(false);
   const options = modelSelectOptions(models.list);
   const view = modelListView(models.list, models.loading);
-  const text = view.kind === 'idle' ? (engine ? `正在获取 ${engine} 的可用模型…` : '选择引擎后自动获取可用模型，也可以直接填写。')
+  const text = view.kind === 'idle' ? (engine ? `正在获取 ${engine} 的可用模型…` : '选择渠道后自动获取可用模型，也可以直接填写。')
     : view.kind === 'loading' ? '正在获取模型列表…'
       : view.kind === 'ready' ? `${view.count} 个模型 · 来源：${view.source}。也可以直接填写。`
         : view.text;
@@ -46,6 +46,6 @@ export function ModelPicker({ engine, value, onChange, id, placeholder = '例如
         <ActionIcon size="small" icon={RefreshCw} aria-label={`刷新 ${engine} 模型列表`} loading={models.loading} disabled={!engine || models.loading} onClick={() => void models.load(true)} />
       </Tooltip>} />
     <Text type="secondary" className={styles.meta} role="status">{text}</Text>
-    <ModelListWarning engine={engine} value={value} list={models.list} />
+    <ModelListWarning engine={kind ?? engine} value={value} list={models.list} />
   </div>;
 }

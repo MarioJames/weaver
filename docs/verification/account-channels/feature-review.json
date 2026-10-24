@@ -1,0 +1,13 @@
+{
+  "command": "feature-acceptance scan --base 780165e",
+  "exitCode": 0,
+  "verdict": "needs-review",
+  "rulesDigest": "7b8ca4c2ea52cab9016ab2a8b43f24a88df41405cac37f5c307f06cb4f1deb1b",
+  "findingRules": {
+    "seed-deep-import": 79
+  },
+  "reviewQueue": [],
+  "manualReview": "仅深相对路径候选；项目未配置路径alias，沿用现有入口，typecheck/test/build解析均通过；无激活gate失败。",
+  "reactReview": "组件使用既有LobeHub公开命名空间；轮询/异步generation与互斥保护；失败保留草稿。真实浏览器390px无横向溢出，键盘与只读字段标签核对通过。",
+  "sourceDigest": "28d983ff159b6b2a54a88e75e5287d52deea289994c6b70b916c9a121502adcc"
+}

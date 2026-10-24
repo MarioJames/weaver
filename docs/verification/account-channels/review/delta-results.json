@@ -1,0 +1,20 @@
+{
+  "opaqueCustomsCopied": true,
+  "machineIdCopied": true,
+  "autoRejected": true,
+  "officialRejected": true,
+  "unknownRejected": true,
+  "modelListAllowsOnlyVerified": true,
+  "changedMachineRejected": true,
+  "changedCustomsRejected": true,
+  "sourceUnchanged": true,
+  "emptyFailsClosed": true,
+  "truncatedFailsClosed": true,
+  "catalogDoesNotCreateApi": true,
+  "envAndFileMaterialized": true,
+  "nativeThirdExpansionPrevented": true,
+  "missingEnvRejected": true,
+  "missingFileRejected": true,
+  "escapeRejected": true,
+  "noSourceCommandExecuted": true
+}

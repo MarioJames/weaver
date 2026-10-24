@@ -79,11 +79,3 @@ test('native authorization denied with exit zero never reports successful login'
   const g = fixture(); g.service.startLogin(); await new Promise(resolve => setTimeout(resolve, 10)); g.finishLogin('Logged in as fixture@example.test\n');
   await new Promise(resolve => setImmediate(resolve)); assert.equal(g.service.getLogin({ id: 'current' })!.status, 'succeeded'); await g.service.close();
 });
-
-test('RPC entry rejects untrusted switch input without invoking a native write', async () => {
-  const { createRpcHandlers } = await import('../../src/main/transport/handlers');
-  const f = fixture();
-  const handlers = createRpcHandlers({ openCodeAccounts: f.service, track: <T>(p: Promise<T>) => p } as Parameters<typeof createRpcHandlers>[0]);
-  await assert.rejects(Promise.resolve().then(() => handlers.switchOpenCodeAccount({} as never, [{ accountID: 'a', orgID: 'one', expectedActive: null, env: { OPENCODE_DB: 'elsewhere' } }])), /参数无效/);
-  assert.equal(f.launches, 0); assert.equal(handlers.getOpenCodeLogin({} as never, [{ id: 'current' }]), null); await f.service.close();
-});

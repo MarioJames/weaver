@@ -1,6 +1,8 @@
+import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,chmodSync,writeFileSync,rmSync,realpathSync} from 'node:fs';
+import {existsSync,mkdtempSync,chmodSync,writeFileSync,rmSync,realpathSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,delimiter} from 'node:path';
 import {launchOwner, closeOwnerHost, ownerAgentName, herdrOnPath, defaultRunner, OWNER_AGENT_START_TIMEOUT_MS, OwnerLaunchError, type Runner, type RunnerInput} from '../../src/main/owner-host';
@@ -506,4 +508,28 @@ test('defaultRunner captures stdout, stderr, exit codes and timeouts without a s
   assert.ok(slow.code===143||slow.code===124,`unexpected slow code ${slow.code}`);
   assert.ok(slow.stderr.length>0);
  }finally{rmSync(base,{recursive:true,force:true});}
+});
+
+test('account configuration reaches Herdr through private files and never enters argv; exact host cleanup removes run files',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'oh-'));const previousEnv=process.env;process.env={HOME:dir,PATH:process.env.PATH,CUSTOM_API_KEY:'previous-private'};const calls:RunnerInput[]=[];
+ const base=fakeRunner({create:{stdout:createOk}},calls);
+ const runner:Runner=input=>{
+  if(input.args[2]==='pane'&&['run','wait-output'].includes(input.args[3])){calls.push(input);return {code:0,stdout:'',stderr:''};}
+  return base(input);
+ };
+ try{
+  const host=launch({workspace:dir,engineKind:'claude',channel:'api',channelStateDir:dir,channelConfig:{channel:{engine:'claude',kind:'api',enabled:true,label:'Fixture API'},secret:{apiKey:'canary-private-key'}},claudePath:CLAUDE},runner);
+  assert.doesNotMatch(JSON.stringify(calls),/canary-private-key/);
+  const started=calls.find(call=>call.args[2]==='agent'&&call.args[3]==='start')!;
+  assert.ok(started.args.includes('--settings'));assert.ok(calls.some(call=>call.args[2]==='pane'&&call.args[3]==='wait-output'));
+  assert.ok(host.channelStateDir);assert.ok(host.channelEnvironmentPath);
+  const settings=started.args[started.args.indexOf('--settings')+1];
+  const quote=(v:string)=>"'"+v.replaceAll("'", "'\"'\"'")+"'";
+  const check=`process.stdout.write(JSON.stringify({cleared:process.env.CUSTOM_API_KEY===undefined,selected:JSON.parse(require('fs').readFileSync(process.env.SETTINGS_FILE,'utf8')).env.ANTHROPIC_API_KEY==='canary-private-key'}))`;
+  const checked=spawnSync('/bin/sh',['-c',`. ${quote(host.channelEnvironmentPath!)} >/dev/null; ${quote(process.execPath)} -e ${quote(check)}`],{env:{...process.env,SETTINGS_FILE:settings,CUSTOM_API_KEY:'another-private-account'},encoding:'utf8'});
+  assert.equal(checked.status,0,checked.stderr);assert.deepEqual(JSON.parse(checked.stdout),{cleared:true,selected:true});
+
+  closeOwnerHost(host,{runner,herdrPath:HERDR});
+  assert.equal(existsSync(host.channelStateDir!),false);assert.equal(existsSync(host.channelEnvironmentPath!),false);
+ }finally{process.env=previousEnv;rmSync(dir,{recursive:true,force:true});}
 });

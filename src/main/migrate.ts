@@ -1,7 +1,8 @@
+import { migrateChannelPolicy } from '../shared/policy/channels';
 import type { DatabaseSync } from 'node:sqlite';
 
 /** Every schema change lands here as one ordered step; PRAGMA user_version tracks what ran. */
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 /** A step is plain SQL, or a function for data work SQL alone cannot express (here: rewriting JSON snapshots). */
 type Step = (string | ((db: DatabaseSync) => void))[];
@@ -121,6 +122,15 @@ const STEPS: Step[] = [
   [
     `CREATE TABLE IF NOT EXISTS janitor_sweeps(id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, body TEXT NOT NULL)`,
   ],
+  // 13: channel metadata and independent private native configuration. No cascading FK: policy rewrites metadata.
+  [
+    `CREATE TABLE policy_channels(id TEXT PRIMARY KEY, position INTEGER NOT NULL, body TEXT NOT NULL)`,
+    `CREATE TABLE channel_secrets(id TEXT PRIMARY KEY, body TEXT NOT NULL)`,
+    `ALTER TABLE policy_owners RENAME COLUMN engine TO channel`,
+    `ALTER TABLE policy_workers RENAME COLUMN engine TO channel`,
+    `ALTER TABLE policy_blocks ADD COLUMN channel TEXT`,
+    migrateChannels,
+  ],
 ];
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -180,4 +190,29 @@ export function migrate(db: DatabaseSync): void {
       throw new Error(`Weaver database migration to version ${version} failed: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
     }
   }
+}
+
+function migrateChannels(db: DatabaseSync): void {
+ const engines=Object.fromEntries((db.prepare('SELECT * FROM policy_engines ORDER BY position').all() as any[]).map(r=>[r.id,{kind:r.kind,enabled:!!r.enabled,...(r.quota_refresh!==null?{quota_refresh:!!r.quota_refresh}:{})}]));
+ const owners=Object.fromEntries((db.prepare('SELECT * FROM policy_owners').all() as any[]).map(r=>[r.id,{engine:r.channel,model:r.model}]));
+ const workers=Object.fromEntries((db.prepare('SELECT * FROM policy_workers').all() as any[]).map(r=>[r.id,{engine:r.channel,model:r.model}]));
+ const originalWorkers=structuredClone(workers);
+ const upgraded=migrateChannelPolicy({engines,owners,workers});
+ const insert=db.prepare('INSERT INTO policy_channels(id,position,body) VALUES (?,?,?)');
+ db.exec('UPDATE policy_engines SET quota_refresh=NULL');
+ Object.entries(upgraded.config.channels).forEach(([id,ch],i)=>insert.run(id,i,JSON.stringify(ch)));
+ for (const table of ['policy_owners','policy_workers']) db.exec(`UPDATE ${table} SET channel='default_' || channel`);
+ const blocks=(db.prepare('SELECT * FROM policy_blocks').all() as any[]).map(row=>Object.fromEntries(Object.entries(row).filter(([,value])=>value!==null))) as any[];
+ for(const block of blocks){
+  const result=migrateChannelPolicy({engines:structuredClone(engines),owners:{},workers:structuredClone(originalWorkers)},[block]).blocks;
+  if(!result.length) db.prepare('DELETE FROM policy_blocks WHERE position=?').run(block.position);
+  else if(result[0].channel) db.prepare('UPDATE policy_blocks SET channel=? WHERE position=?').run(result[0].channel,block.position);
+ }
+ const update=db.prepare('UPDATE policy_revisions SET body=? WHERE revision=?');
+ for(const row of db.prepare('SELECT revision,body FROM policy_revisions').all() as any[]){
+  let body:Record<string,any>;try{body=JSON.parse(row.body);}catch{continue;}
+  if(!isRecord(body)||!isRecord(body.config)||!isRecord(body.config.engines)||!isRecord(body.config.owners)||!isRecord(body.config.workers)||!Array.isArray(body.blocks))continue;
+  const next=migrateChannelPolicy(body.config,body.blocks??[]);body.config=next.config;body.blocks=next.blocks;
+  update.run(JSON.stringify(body),row.revision);
+ }
 }

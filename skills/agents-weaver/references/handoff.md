@@ -73,7 +73,7 @@ Omit `"worker"` to use the owner's weights; name one only for a justified choice
 
 ## Native execution report
 
-A dispatch marked `execution: "native"` launched nothing. Run the package with your built-in subagent tool at the frozen model/effort and scope, then report:
+A dispatch marked `execution: "native"` launched nothing. Weaver permits this only when worker/owner/root channel match and the parent root run policyRevision equals the current policy revision; a shared engine alone is insufficient. Follow the returned execution mode rather than choosing native yourself. Run the package with your built-in subagent tool at the frozen model/effort and scope, then report:
 
 ```sh
 weaver workers complete --task-id <id> --input report.json --command-id complete-001

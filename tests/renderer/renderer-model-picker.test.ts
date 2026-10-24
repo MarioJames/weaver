@@ -122,10 +122,20 @@ test('the picker no longer tells the user to open the field to fetch models, and
   assert.doesNotMatch(html, /点开输入框/);
   assert.match(html, /正在获取 claude 的可用模型/);
   assert.match(html, /aria-label="刷新 claude 模型列表"/);
-  assert.match(markup(React.createElement(ModelPicker, { engine: '', value: '', onChange: () => {} })), /选择引擎后自动获取/);
+  assert.match(markup(React.createElement(ModelPicker, { engine: '', value: '', onChange: () => {} })), /选择渠道后自动获取/);
 });
 
 test('the engines page has no model probe block, say-hi check or disable conflict', () => {
   const source = readFileSync(new URL('../../src/renderer/features/engines/EnginesPage.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /EngineModelProbe|HelloCheck|ModelPicker|模型探测|engineDisableConflict|请先停用/);
+});
+
+
+test('same engine with a different channel reloads models and forwards the selected identity', async () => {
+  const h = harness();
+  h.session.sync('codex', 'work-account');
+  await new Promise(resolve => setImmediate(resolve));
+  h.session.sync('codex', 'personal-account');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(h.requests, [{ engine: 'codex', channel: 'work-account' }, { engine: 'codex', channel: 'personal-account' }]);
 });

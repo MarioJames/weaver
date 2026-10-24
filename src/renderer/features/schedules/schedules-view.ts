@@ -96,7 +96,7 @@ export function buildExecutorOptions(policy?: PolicySnapshot): ExecutorOption[] 
   const options: ExecutorOption[] = [];
   for (const id of Object.keys(policy.config.owners)) {
     const available = policy.owners[id]?.status === 'available';
-    const detail = engineModelText(policy.config.owners[id]?.engine, policy.config.owners[id]?.model);
+    const detail = engineModelText(policy.config.channels[policy.config.owners[id]!.channel]?.label ?? policy.config.owners[id]?.channel, policy.config.owners[id]?.model);
     options.push({
       value: encodeExecutorValue('owner', id),
       label: `${id} · 父 Agent${detail ? ` · ${detail}` : ''}${available ? '' : ' · 不可用'}`,
@@ -105,7 +105,7 @@ export function buildExecutorOptions(policy?: PolicySnapshot): ExecutorOption[] 
   }
   for (const id of Object.keys(policy.config.workers)) {
     const available = policy.workers[id]?.status === 'available';
-    const detail = engineModelText(policy.config.workers[id]?.engine, policy.config.workers[id]?.model);
+    const detail = engineModelText(policy.config.channels[policy.config.workers[id]!.channel]?.label ?? policy.config.workers[id]?.channel, policy.config.workers[id]?.model);
     options.push({
       value: encodeExecutorValue('worker', id),
       label: `${id} · 子 Agent${detail ? ` · ${detail}` : ''}${available ? '' : ' · 不可用'}`,

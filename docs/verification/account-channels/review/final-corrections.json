@@ -1,0 +1,61 @@
+{
+  "taskId": "6d931ec5-81f6-4e30-8078-5791c98ad8b9",
+  "reviewMode": "source_tests_and_owner_archived_evidence_only",
+  "productOrTestsModified": false,
+  "testsRerun": false,
+  "newProcessesStarted": false,
+  "realPrivateDataRead": false,
+  "corrections": {
+    "managedSecretRecovery": {
+      "source": "src/main/channels/import.ts",
+      "fixture": "tests/main/channel-runtime.test.ts",
+      "ownerEvidence": "../rollback-recovery.json",
+      "result": {
+        "isolatedCopyOnly": true,
+        "restoredChannels": 6,
+        "metadataRestored": true,
+        "existingSecretPointersAndValuesPreserved": true,
+        "managedAuthFilesUnchanged": true,
+        "roleChannelsRestored": true,
+        "blocksRestored": true
+      }
+    },
+    "publicChannelPathProjection": {
+      "sources": [
+        "src/main/application/tasks/records.ts",
+        "src/main/transport/handlers.ts"
+      ],
+      "fixtures": [
+        "tests/main/task-public-paths.test.ts",
+        "tests/integration/channels-rpc.test.ts"
+      ],
+      "actualHttpFixtureUsesTemporaryRuntime": true,
+      "httpRerunByThisWorker": false,
+      "durablePathsRetainedByCopyingProjection": true
+    },
+    "sqlNullNormalization": {
+      "source": "src/main/migrate.ts",
+      "fixture": "tests/main/channels.test.ts",
+      "normalizedAndHistoricalBlocksAgree": true,
+      "sourceStillSchema12": true,
+      "tasks": {
+        "count": 1230,
+        "unchanged": true
+      },
+      "events": {
+        "count": 101662,
+        "unchanged": true
+      },
+      "historicalSnapshots": 333
+    }
+  },
+  "nativeSourceFilesUnchanged": true,
+  "noKnownCredentialValuesInPolicy": true,
+  "oldBooleanEvidenceModified": false,
+  "limitationsUnchanged": [
+    "Qoder真实BYOK计费未验",
+    "Pi未安装",
+    "OS keychain及多组织长期续期未验",
+    "共享服务未部署schema13"
+  ]
+}

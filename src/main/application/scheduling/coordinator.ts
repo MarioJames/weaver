@@ -1,4 +1,3 @@
-import type { OpenCodeAccountAdmission } from './opencode-accounts';
 import type { Task } from '../../../shared/contracts/tasks';
 import { event, slotGroupCount, slotGroupFor } from '../../domain/tasks';
 import type { TaskManager } from '../../manager';
@@ -20,7 +19,7 @@ export class Coordinator {
  private delivered=new Map<string,string>();
  constructor(private readonly manager:TaskManager,private readonly policy:PolicyStore,private readonly records:TaskRecords,
   private readonly dispatch:Pick<Dispatcher,'routeOf'|'decideExecution'|'capacityWait'|'queueWaitText'>,private readonly applyVendorBlocks:()=>void,
-  private readonly deliver:(taskId:string)=>void,private readonly isDraining:()=>boolean,private readonly accounts?:OpenCodeAccountAdmission){}
+  private readonly deliver:(taskId:string)=>void,private readonly isDraining:()=>boolean){}
  private queueBlocked(task:Task, code:NonNullable<Task['queueReason']>['code'], message:string):void {
   const bounded=redactContext(message,700);
   if(task.queueReason?.code===code&&task.queueReason.message===bounded)return;
@@ -45,18 +44,18 @@ export class Coordinator {
    let phase:NonNullable<Task['queueReason']>['code']='policy_blocked';
    try{
     const frozen=task.dispatch;
-    const accountWait=this.accounts?.admit(task);if(accountWait){this.queueBlocked(task,'launch_blocked',accountWait);continue;}
     // A whole-engine vendor block sends the task to another engine; a worker-level one only takes that worker out.
-    const vendorBlocks=this.policy.snapshot().blocks.filter(block=>block.engine===frozen.engine&&block.by===VENDOR_BLOCK_BY&&(!block.release_at||Date.parse(block.release_at)>Date.now()));
-    const engineBlocked=vendorBlocks.some(block=>block.worker===undefined);
-    const workerBlocked=!engineBlocked&&vendorBlocks.some(block=>block.worker===frozen.worker);
-    if(engineBlocked||workerBlocked){
+    const vendorBlocks=this.policy.snapshot().blocks.filter(block=>block.engine===frozen.engine&&(block.channel===undefined||block.channel===frozen.channel)&&block.by===VENDOR_BLOCK_BY&&(!block.release_at||Date.parse(block.release_at)>Date.now()));
+    const engineBlocked=vendorBlocks.some(block=>block.worker===undefined&&block.channel===undefined);
+    const channelBlocked=vendorBlocks.some(block=>block.worker===undefined&&block.channel===frozen.channel&&frozen.channel!==undefined);
+    const workerBlocked=!engineBlocked&&!channelBlocked&&vendorBlocks.some(block=>block.worker===frozen.worker);
+    if(engineBlocked||channelBlocked||workerBlocked){
       if(frozen.execution==='real'){phase='workspace_changed';assertFrozenWorkspace(frozen);phase='policy_blocked';}
       const excludedWorkers=chainWorkers(this.manager.store,task);
       if(workerBlocked&&!excludedWorkers.includes(frozen.worker))excludedWorkers.push(frozen.worker);
-      const reroute=this.dispatch.routeOf(frozen.owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner)),engineBlocked?[frozen.engine]:[],undefined,excludedWorkers);
-      const decision=this.dispatch.decideExecution(reroute.engine,undefined,{...task,workspace:frozen.workspace??task.workspace},this.policy.snapshot().config.owners[reroute.owner]?.engine);
-      task.dispatch={...frozen,worker:reroute.worker,engine:reroute.engine,model:reroute.model,effort:reroute.effort,execution:decision.execution,adapter:decision.adapter,engineKind:decision.engineKind,maxParallel:reroute.maxParallel,...(decision.workspace?{workspace:decision.workspace,workspaceIdentity:workspaceIdentity(decision.workspace)}:{})};
+      const reroute=this.dispatch.routeOf(frozen.owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner)),engineBlocked?[frozen.engine]:[],undefined,excludedWorkers,channelBlocked&&frozen.channel?[frozen.channel]:[]);
+      const decision=this.dispatch.decideExecution(reroute.engine,undefined,{...task,workspace:frozen.workspace??task.workspace},this.policy.snapshot().config.owners[reroute.owner]?.channel,reroute.channel);
+      task.dispatch={...frozen,worker:reroute.worker,channel:reroute.channel,channelLabel:this.policy.snapshot().config.channels[reroute.channel]?.label,engine:reroute.engine,model:reroute.model,effort:reroute.effort,execution:decision.execution,adapter:decision.adapter,engineKind:decision.engineKind,maxParallel:reroute.maxParallel,...(decision.workspace?{workspace:decision.workspace,workspaceIdentity:workspaceIdentity(decision.workspace)}:{})};
       event(task,'lifecycle',`Vendor limit rerouted queued worker to ${reroute.engine} (${reroute.worker})`);this.records.put(task);this.pump();continue;
     }
 

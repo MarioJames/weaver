@@ -7,10 +7,9 @@ import { RPC_METHODS } from '../../src/shared/contracts/rpc';
 import { RpcError, parseRpcBody } from '../../src/main/rpc';
 import { createRpcHandlers, type RpcHost } from '../../src/main/transport/handlers';
 
-/** Explicit public RPC methods and arity, including background OpenCode maintenance. */
+/** Explicit public RPC methods and arity, including channel CRUD and identity-scoped quota refresh. */
 const FROZEN_ARITY: Record<string, number> = {
-  getOpenCodeAccountQuotas: 0, refreshOpenCodeAccountQuotas: 1,
-  listOpenCodeAccounts: 0, startOpenCodeLogin: 0, getOpenCodeLogin: 1, cancelOpenCodeLogin: 1, switchOpenCodeAccount: 1,
+  getChannels:0,saveChannel:1,deleteChannel:1,importChannels:1,refreshChannelQuota:1,
   getImSettings: 0, saveImSettings: 1, reconnectIm: 0,
   command: 1, getPolicy: 0, policyHistory: 0, policyRollback: 1, validatePolicy: 1, savePolicy: 1, previewRoute: 1, scanEngines: 0,
   listEngineModels: 1, getQuota: 0, refreshQuota: 1, getStall: 0, workerProbe: 1, workerProbeStatus: 0, sayHi: 1, sayHiResult: 1, startEngineCleanup: 1, getEngineCleanup: 1,
@@ -40,6 +39,7 @@ test('CLI catalog rows that call RPC directly take method, arity and mutation fr
     ['workers.probe', 'workerProbe', 1, true], ['workers.probe-status', 'workerProbeStatus', 0, false],
     ['policy.get', 'getPolicy', 0, false], ['policy.validate', 'validatePolicy', 1, false], ['policy.save', 'savePolicy', 1, true],
     ['policy.preview', 'previewRoute', 1, false], ['policy.history', 'policyHistory', 0, false], ['policy.rollback', 'policyRollback', 1, true],
+    ['channels.list','getChannels',0,false], ['channels.save','saveChannel',1,true], ['channels.delete','deleteChannel',1,true], ['channels.import','importChannels',1,true], ['channels.quota','refreshChannelQuota',1,true],
     ['engines.scan', 'scanEngines', 0, false], ['engines.models', 'listEngineModels', 1, false],
     ['janitor.sweep', 'janitorSweep', 1, true], ['janitor.status', 'janitorStatus', 0, false],
     ['quota.get', 'getQuota', 0, false], ['quota.refresh', 'refreshQuota', 1, true], ['engines.set-enabled', 'setEngineEnabled', 1, true],

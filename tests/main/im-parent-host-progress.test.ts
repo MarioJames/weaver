@@ -48,7 +48,7 @@ function fakeRunnerFactory() {
 const CLI_MAIN = new URL('../../src/cli/main.ts', import.meta.url).pathname;
 
 function setupDshBin(scenario = 'default'): { dir: string; workspace: string; marker: string; previousPath: string; previousScenario?: string; previousMarker?: string } {
-  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-prog-'));
+  const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 't-'));
   chmodSync(dir, 0o700);
   const workspace = join(dir, 'ws');
   mkdirSync(workspace);
@@ -171,7 +171,7 @@ async function launchFakeHost(mode: string, dataDir: string) {
 
 test('dsh 开始与工具进度经宿主边界到达 onProgress', { timeout: 30000 }, async () => {
   const harness = setupDshBin();
-  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-prog-data-'));
+  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 't-'));
   const { runner } = fakeRunnerFactory();
   let session: Awaited<ReturnType<typeof createBackgroundParentAgent>> | undefined;
   try {
@@ -198,7 +198,7 @@ test('dsh 开始与工具进度经宿主边界到达 onProgress', { timeout: 300
 
 test('宿主把过长的工具标签截断后再发 progress 帧', { timeout: 30000 }, async () => {
   const harness = setupDshBin('long-tool');
-  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-prog-long-data-'));
+  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 't-'));
   const { runner } = fakeRunnerFactory();
   let session: Awaited<ReturnType<typeof createBackgroundParentAgent>> | undefined;
   try {
@@ -222,7 +222,7 @@ test('宿主把过长的工具标签截断后再发 progress 帧', { timeout: 30
 });
 
 test('abort 后进度被丢弃且不触发 lost', { timeout: 30000 }, async () => {
-  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-prog-abort-'));
+  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 't-'));
   const { session, restore } = await launchFakeHost('abort-discard', dataDir);
   try {
     const progress: Array<{ kind: string; name: string }> = [];
@@ -253,7 +253,7 @@ test('abort 后进度被丢弃且不触发 lost', { timeout: 30000 }, async () =
 });
 
 test('未 submitted 的 progress 帧触发 lost', { timeout: 30000 }, async () => {
-  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-prog-unsub-'));
+  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 't-'));
   const { session, restore } = await launchFakeHost('unsubmitted', dataDir);
   try {
     let unavailable = false;
@@ -270,7 +270,7 @@ test('未 submitted 的 progress 帧触发 lost', { timeout: 30000 }, async () =
 
 for (const mode of ['illegal-kind', 'illegal-name'] as const) {
   test(`非法 progress 帧触发 lost (${mode})`, { timeout: 30000 }, async () => {
-    const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-prog-illegal-'));
+    const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 't-'));
     const { session, restore } = await launchFakeHost(mode, dataDir);
     try {
       let unavailable = false;
@@ -287,7 +287,7 @@ for (const mode of ['illegal-kind', 'illegal-name'] as const) {
 }
 
 test('不传 onProgress 时行为不变：进度被忽略，正文照常到达', { timeout: 30000 }, async () => {
-  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-prog-noopt-'));
+  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 't-'));
   const { session, restore } = await launchFakeHost('no-onprogress', dataDir);
   try {
     const deltas: string[] = [];
@@ -307,7 +307,7 @@ test('不传 onProgress 时行为不变：进度被忽略，正文照常到达',
 });
 
 test('onProgress 回调抛错只吞掉，不影响正文 turn', { timeout: 30000 }, async () => {
-  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-prog-throw-'));
+  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 't-'));
   const { session, restore } = await launchFakeHost('callback-throws', dataDir);
   try {
     const deltas: string[] = [];
@@ -330,8 +330,8 @@ test('onProgress 回调抛错只吞掉，不影响正文 turn', { timeout: 30000
 
 test('dsh 进度经后台宿主到达 ImService 卡片并收口只剩答案', { timeout: 30000 }, async () => {
   const harness = setupDshBin();
-  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-prog-svc-data-'));
-  const serviceDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-prog-svc-'));
+  const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 't-'));
+  const serviceDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 't-'));
   const { runner } = fakeRunnerFactory();
   const { ImService } = await import('../../src/main/im/service');
   const chunks: string[] = [];
@@ -362,7 +362,8 @@ test('dsh 进度经后台宿主到达 ImService 卡片并收口只剩答案', { 
     config: {
       version: 1,
       engines: { dsh: { enabled: true, kind: 'dsh' } },
-      owners: { main: { enabled: true, engine: 'dsh', model: 'deepseek-flash', effort: 'high', workers: [], max_parallel: 1 } },
+      channels:{default_dsh:{engine:'dsh',kind:'api',label:'DSH',enabled:true}},
+      owners: { main: { enabled: true, channel:'default_dsh', model: 'deepseek-flash', effort: 'high', workers: [], max_parallel: 1 } },
       workers: {}, herdr: { max_wait_minutes: 30 },
     },
     blocks: [], activeBlocks: [], owners: {}, workers: {}, execution: 'disabled',
@@ -371,7 +372,7 @@ test('dsh 进度经后台宿主到达 ImService 卡片并收口只剩答案', { 
     createBackgroundParentAgent(input, { dataDir, signal: opts?.signal }, { hostCommand: [process.execPath, '--import', 'tsx', CLI_MAIN], startupMs: 20000, runner });
   const service = new ImService({ dataDir: serviceDir, policy, parentFactory: parentFactory as any, channelFactory: factory });
   try {
-    await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'CANARY_SECRET', allowedOpenIds: ['ou_a'], engine: 'dsh', model: 'deepseek-flash', effort: 'high', workspaces: [harness.workspace], idleTimeoutMinutes: 1, ownerProfileId: '' } as any });
+    await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'CANARY_SECRET', allowedOpenIds: ['ou_a'], channel:'default_dsh', model: 'deepseek-flash', effort: 'high', workspaces: [harness.workspace], idleTimeoutMinutes: 1, ownerProfileId: '' } as any });
     for (let i = 0; i < 24; i++) await new Promise(resolve => setImmediate(resolve));
     const now = Date.now();
     handlers.message({

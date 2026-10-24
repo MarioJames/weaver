@@ -203,7 +203,7 @@ function freeFixture(script: Record<string, ({ ok: boolean; ms: number; error?: 
   const config = defaultConfig();
   config.engines.qoder!.enabled = true;
   config.workers.qoder_worker!.enabled = true;
-  config.workers.qoder_paid_worker = { engine: 'qoder', model: 'paid-model', effort: 'auto', enabled: true };
+  config.workers.qoder_paid_worker = { channel: "default_qoder", model: 'paid-model', effort: 'auto', enabled: true };
   const policy = new PolicyStore(db, () => now);
   const base = policy.snapshot();
   policy.save({ revision: base.revision, config, blocks: [] }, { allowEngineEnable: true });

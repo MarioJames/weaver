@@ -81,6 +81,8 @@ export function buildLaunchSpec(input: {
   overlayPath: string;
 }): LaunchSpec {
   switch (input.engine) {
+    case 'claude':
+      return {stdin:input.instruction,argv:['claude','-p','--output-format','stream-json','--verbose','--model',input.model,'--effort',input.effort,'--permission-mode','bypassPermissions','--setting-sources','','--strict-mcp-config','--no-session-persistence']};
     case 'pi':
       if (!PI_THINKING.has(input.effort)) throw new Error(`Pi thinking level is not one of ${[...PI_THINKING].join(', ')}`);
       return {

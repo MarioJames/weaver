@@ -70,13 +70,8 @@ export function executionTimeoutMs(task: Pick<Task, 'dispatch'>, fallback?: numb
 }
 
 /** Main-process launch port: application services may capture safe metadata and synchronously veto spawn. */
-export interface TaskLaunchGuard {
-  capture(task: Task): import('../shared/contracts/tasks').AgentRun['consoleAccount'];
-  beforeSpawn(task: Task): void;
-}
 
 export class TaskManager {
-  launchGuard?: TaskLaunchGuard;
   readonly listeners = new Set<() => void>();
   notify(): void { this.changed(); for (const listener of this.listeners) listener(); }
   update(task: Task): void { this.persist(task); }
@@ -120,7 +115,6 @@ export class TaskManager {
       const running = slotGroupCount(this.store.listHeads(), group);
       if (running >= limit) throw new Error(`${slotGroupName(this.store.listOwners(), task.ownerId, task.dispatch.owner)} is at its configured concurrency limit (${limit})`);
     }
-    const consoleAccount = this.launchGuard?.capture(task);
     const timeoutMs = executionTimeoutMs(task, this.timeoutMs);
     const execution = task.dispatch?.execution ?? 'mock';
     delete task.failure;
@@ -129,12 +123,11 @@ export class TaskManager {
     task.status = 'running';
     task.run = {
       id: randomUUID(),
-      ...(consoleAccount ? { consoleAccount } : {}),
       adapter: task.dispatch?.adapter ?? (execution === 'mock' ? 'mock-jsonl' : this.adapter.id),
       execution,
       status: 'running',
       startedAt: new Date().toISOString(),
-      ...(task.dispatch ? { engine: task.dispatch.engine, model: task.dispatch.model, effort: task.dispatch.effort, workspace: task.dispatch.workspace ?? task.workspace } : {}),
+      ...(task.dispatch ? { channel:task.dispatch.channel,channelLabel:task.dispatch.channelLabel,engine: task.dispatch.engine, model: task.dispatch.model, effort: task.dispatch.effort, workspace: task.dispatch.workspace ?? task.workspace } : {}),
     };
     if (execution === 'native') {
       // The owner runs this worker itself and reports back through completeNative; there is no process or timer here.
@@ -177,12 +170,12 @@ export class TaskManager {
       const task = this.store.get(id);
       if (!task.run) throw new Error('Run disappeared before the launch permission commit');
       if (!this.launchGate) throw new Error('Task manager launch gate is closed');
-      this.launchGuard?.beforeSpawn(task);
       const at = new Date().toISOString();
       const started = parseIso(task.run.startedAt) ?? Date.now();
       task.run.launchPermittedAt = at;
       task.run.scopeUnit = record.unit;
       task.run.stateDir = record.stateDir;
+      task.run.channelStateDir=record.channelStateDir;task.run.channelProfilePath=record.channelProfilePath;
       task.run.nonce = record.nonce;
       task.run.logs = {
         stdout: record.logs.stdout,
@@ -201,7 +194,7 @@ export class TaskManager {
   }
   private startLegacyRun(id: string, task: Task, execution: 'real' | 'mock' | 'native', timeoutMs: number | undefined): Task {
     let child: ManagedProcess;
-    try { this.launchGuard?.beforeSpawn(task); child = this.adapter.start(task); } catch (error) {
+    try { child = this.adapter.start(task); } catch (error) {
       task.failure = { kind: 'early_exit', message: redactSecrets(error instanceof Error ? error.message : String(error)).slice(-4000) };
       task.status = 'failed'; task.run!.status = 'stopped'; task.run!.endedAt = new Date().toISOString(); task.run!.finalizedAt = new Date().toISOString();
       event(task, 'error', task.failure.message); this.persist(task); return task;
@@ -786,6 +779,7 @@ export class TaskManager {
       },
       launch: {
         unit: run.scopeUnit,
+        channelStateDir:run.channelStateDir,channelProfilePath:run.channelProfilePath,
         stateDir: run.stateDir,
         nonce: run.nonce,
         logs: { stdout: run.logs.stdout, stderr: run.logs.stderr, exit: run.logs.exit, exitTmp: run.logs.exitTmp ?? `${run.logs.exit}.tmp` },

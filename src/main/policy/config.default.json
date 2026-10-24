@@ -2,52 +2,193 @@
   "$schema": "./config.schema.json",
   "version": 1,
   "chatgpt_review": true,
-  "quota": { "auto_refresh": true, "interval_minutes": 15 },
-  "free_channel_probe": { "enabled": true, "interval_minutes": 10 },
-  "janitor": { "enabled": true, "ttl_hours": 24, "interval_hours": 6 },
+  "quota": {
+    "auto_refresh": true,
+    "interval_minutes": 15
+  },
+  "free_channel_probe": {
+    "enabled": true,
+    "interval_minutes": 10
+  },
+  "janitor": {
+    "enabled": true,
+    "ttl_hours": 24,
+    "interval_hours": 6
+  },
   "engines": {
-    "claude": { "enabled": true, "kind": "claude", "quota_refresh": true },
-    "codex": { "enabled": true, "kind": "codex", "quota_refresh": true },
-    "grok": { "enabled": false, "kind": "grok", "quota_refresh": true },
-    "opencode": { "enabled": false, "kind": "opencode", "quota_refresh": false },
-    "pi": { "enabled": false, "kind": "pi", "quota_refresh": false },
-    "qoder": { "enabled": false, "kind": "qodercli", "quota_refresh": false },
-    "dsh": { "enabled": false, "kind": "dsh", "quota_refresh": false }
+    "claude": {
+      "enabled": true,
+      "kind": "claude"
+    },
+    "codex": {
+      "enabled": true,
+      "kind": "codex"
+    },
+    "grok": {
+      "enabled": false,
+      "kind": "grok"
+    },
+    "opencode": {
+      "enabled": false,
+      "kind": "opencode"
+    },
+    "pi": {
+      "enabled": false,
+      "kind": "pi"
+    },
+    "qoder": {
+      "enabled": false,
+      "kind": "qodercli"
+    },
+    "dsh": {
+      "enabled": false,
+      "kind": "dsh"
+    }
   },
   "owners": {
     "claude_owner": {
       "enabled": true,
-      "engine": "claude",
       "model": "claude-opus-5-5",
       "effort": "high",
-      "workers": ["claude_worker", "qoder_worker", "opencode_worker", "grok_worker"],
-      "max_parallel": 4
+      "workers": [
+        "claude_worker",
+        "qoder_worker",
+        "opencode_worker",
+        "grok_worker"
+      ],
+      "max_parallel": 4,
+      "channel": "default_claude"
     },
     "codex_owner": {
       "enabled": true,
-      "engine": "codex",
       "model": "gpt-6-astra",
       "effort": "high",
-      "workers": ["codex_worker", "qoder_worker", "opencode_worker", "grok_worker"],
-      "max_parallel": 4
+      "workers": [
+        "codex_worker",
+        "qoder_worker",
+        "opencode_worker",
+        "grok_worker"
+      ],
+      "max_parallel": 4,
+      "channel": "default_codex"
     },
     "pi_owner": {
       "enabled": false,
-      "engine": "pi",
       "model": "glm-5.3-flash",
       "effort": "high",
-      "workers": ["pi_worker"],
-      "max_parallel": 1
+      "workers": [
+        "pi_worker"
+      ],
+      "max_parallel": 1,
+      "channel": "default_pi"
     }
   },
   "workers": {
-    "claude_worker": { "enabled": true, "engine": "claude", "model": "sonnet", "effort": "high", "description": "Default Claude Code worker (Sonnet)." },
-    "codex_worker": { "enabled": true, "engine": "codex", "model": "gpt-6.1-sol", "effort": "high", "description": "Default Codex worker (gpt-6.1-sol)." },
-    "grok_worker": { "enabled": false, "engine": "grok", "model": "grok-4.7", "effort": "high", "description": "Example Grok worker (grok-4.7)." },
-    "qoder_worker": { "enabled": false, "engine": "qoder", "model": "Qwen3.8-Flash", "effort": "xhigh", "description": "Free worker (Qwen3.8-Flash via qodercli).", "free_channel": true },
-    "opencode_worker": { "enabled": false, "engine": "opencode", "model": "opencode/glm-5.3-flash-free", "effort": "max", "description": "Free worker (glm-5.3-flash-free via opencode). Its TUI uses the variant remembered in ~/.local/state/opencode/model.json, which must match effort.", "free_channel": true },
-    "pi_worker": { "enabled": false, "engine": "pi", "model": "glm-5.3-flash", "effort": "high", "description": "Disabled Pi template (glm-5.3-flash). Enable the engine and this worker before dispatch." },
-    "dsh_worker": { "enabled": false, "engine": "dsh", "model": "deepseek-flash", "effort": "high", "description": "DeepSeek Harness worker (deepseek-flash via dsh headless). Uses the DeepSeek API key saved in dsh settings or DEEPSEEK_API_KEY." }
+    "claude_worker": {
+      "enabled": true,
+      "model": "sonnet",
+      "effort": "high",
+      "description": "Default Claude Code worker (Sonnet).",
+      "channel": "default_claude"
+    },
+    "codex_worker": {
+      "enabled": true,
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "description": "Default Codex worker (gpt-6.1-sol).",
+      "channel": "default_codex"
+    },
+    "grok_worker": {
+      "enabled": false,
+      "model": "grok-4.7",
+      "effort": "high",
+      "description": "Example Grok worker (grok-4.7).",
+      "channel": "default_grok"
+    },
+    "qoder_worker": {
+      "enabled": false,
+      "model": "Qwen3.8-Flash",
+      "effort": "xhigh",
+      "description": "Free worker (Qwen3.8-Flash via qodercli).",
+      "free_channel": true,
+      "channel": "default_qoder"
+    },
+    "opencode_worker": {
+      "enabled": false,
+      "model": "opencode/glm-5.3-flash-free",
+      "effort": "max",
+      "description": "Free worker (glm-5.3-flash-free via opencode). Its TUI uses the variant remembered in ~/.local/state/opencode/model.json, which must match effort.",
+      "free_channel": true,
+      "channel": "default_opencode"
+    },
+    "pi_worker": {
+      "enabled": false,
+      "model": "glm-5.3-flash",
+      "effort": "high",
+      "description": "Disabled Pi template (glm-5.3-flash). Enable the engine and this worker before dispatch.",
+      "channel": "default_pi"
+    },
+    "dsh_worker": {
+      "enabled": false,
+      "model": "deepseek-flash",
+      "effort": "high",
+      "description": "DeepSeek Harness worker (deepseek-flash via dsh headless). Uses the DeepSeek API key saved in dsh settings or DEEPSEEK_API_KEY.",
+      "channel": "default_dsh"
+    }
   },
-  "herdr": { "max_wait_minutes": 15, "max_command_minutes": 30 }
+  "herdr": {
+    "max_wait_minutes": 15,
+    "max_command_minutes": 30
+  },
+  "channels": {
+    "default_claude": {
+      "engine": "claude",
+      "label": "claude 官方订阅",
+      "enabled": true,
+      "kind": "subscription",
+      "quota_refresh": true
+    },
+    "default_codex": {
+      "engine": "codex",
+      "label": "codex 官方订阅",
+      "enabled": true,
+      "kind": "subscription",
+      "quota_refresh": true
+    },
+    "default_grok": {
+      "engine": "grok",
+      "label": "grok 官方订阅",
+      "enabled": true,
+      "kind": "subscription",
+      "quota_refresh": true
+    },
+    "default_opencode": {
+      "engine": "opencode",
+      "label": "opencode 官方订阅",
+      "enabled": true,
+      "kind": "subscription",
+      "quota_refresh": false
+    },
+    "default_pi": {
+      "engine": "pi",
+      "label": "pi API（待导入）",
+      "enabled": true,
+      "kind": "api",
+      "quota_refresh": false
+    },
+    "default_qoder": {
+      "engine": "qoder",
+      "label": "qoder 官方订阅",
+      "enabled": true,
+      "kind": "subscription",
+      "quota_refresh": false
+    },
+    "default_dsh": {
+      "engine": "dsh",
+      "label": "dsh API（待导入）",
+      "enabled": true,
+      "kind": "api",
+      "quota_refresh": false
+    }
+  }
 }

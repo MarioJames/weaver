@@ -79,7 +79,7 @@ function setup(scenario: 'success' | 'missing-terminal' | 'long') {
   const policy = new PolicyStore(store.db);
   const snap = policy.snapshot();
   snap.config.engines.codex = { ...snap.config.engines.codex!, enabled: true, kind: 'codex' };
-  snap.config.workers.scope_fixture = { enabled: true, engine: 'codex', model: 'fixture-model', effort: 'high' };
+  snap.config.workers.scope_fixture = { enabled: true, channel: "default_codex", model: 'fixture-model', effort: 'high' };
   policy.save({ revision: snap.revision, config: snap.config, blocks: snap.blocks }, { allowEngineEnable: true });
   const oldPath = process.env.PATH;
   process.env.PATH = `${bin}:${oldPath ?? ''}`;

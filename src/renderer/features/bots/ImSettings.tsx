@@ -16,7 +16,7 @@ import { BotChannel, BotSetting } from './BotSettingRows';
 import type { PolicyDraft } from '../../policy/usePolicyDraft';
 import {
   adoptServer, conflictNote, createRequestGate, draftOf, IDLE_RANGE, IM_ENGINE_KINDS, imModelDiscoveryEngine, keepImDraft, modifiedEdit,
-  ownerProfileError, ownerProfileOptions, ownerSelectDisplay, ownerSelectValue, peekImDraft, savePlan, switchDraftEngine, workspaceListError, IM_WORKSPACE_LIMIT, type ImDraft, type ImEdit,
+  ownerProfileError, ownerProfileOptions, ownerSelectDisplay, ownerSelectValue, peekImDraft, savePlan, switchDraftChannel, workspaceListError, IM_WORKSPACE_LIMIT, type ImDraft, type ImEdit,
 } from './im-state';
 import { IM_STABLE_POLL_MS, IM_TRANSITION_POLL_MS, nextImPollDelay } from './im-polling';
 
@@ -69,9 +69,10 @@ export interface ImSettingsViewProps {
   reconnecting: boolean;
   forceReading: boolean;
   dirty: boolean;
-  engineOptions: BotOption[];
-  engineUsable: boolean;
+  channelOptions: BotOption[];
+  channelUsable: boolean;
   discoveryEngine: string;
+  engineKind?: string;
   efforts?: readonly string[];
   openCodeVariant: boolean;
   effortOptions: BotOption[];
@@ -80,7 +81,7 @@ export interface ImSettingsViewProps {
   onRefreshStatus: () => void;
   onReconnect: () => void;
   onUpdate: (patch: Partial<ImDraft>) => void;
-  onEngineChange: (engine: string) => void;
+  onChannelChange: (engine: string) => void;
   onRemoveWorkspace: (index: number) => void;
   onAddWorkspace: (path: string) => void;
   onTimeoutError: (message: string) => void;
@@ -90,8 +91,8 @@ export interface ImSettingsViewProps {
 
 export function ImSettingsView({
   id, loading, loadError, saved, values, edit, conflict, fieldErrors, saveError, saving, savedTick, refreshing, reconnecting, forceReading, dirty,
-  engineOptions, engineUsable, discoveryEngine, efforts, openCodeVariant, effortOptions,
-  onRetryLoad, onReloadLatest, onRefreshStatus, onReconnect, onUpdate, onEngineChange, onRemoveWorkspace, onAddWorkspace, onTimeoutError, onDiscard, onSave,
+  channelOptions, channelUsable, discoveryEngine, engineKind, efforts, openCodeVariant, effortOptions,
+  onRetryLoad, onReloadLatest, onRefreshStatus, onReconnect, onUpdate, onChannelChange, onRemoveWorkspace, onAddWorkspace, onTimeoutError, onDiscard, onSave,
 }: ImSettingsViewProps) {
   const lockFields = saving || forceReading;
   const status = saved?.status;
@@ -138,23 +139,23 @@ export function ImSettingsView({
           <BotSetting label="open_id 白名单" htmlFor={`${id}-openids`} desc="只接受这些飞书用户发来的单聊文本消息，每行一个。open_id 的获取方式见接入文档，不做自动绑定。" error={fieldErrors.openIds}>
             <TextArea id={`${id}-openids`} aria-label="open_id 白名单，每行一个" value={values.openIdsText} placeholder={'ou_xxxxxxxxxxxxxxxx\n（每行一个）'} autoSize={{ minRows: 2, maxRows: 6 }} disabled={lockFields} style={{ inlineSize: '100%', maxInlineSize: 360 }} onChange={event => onUpdate({ openIdsText: event.target.value })} />
           </BotSetting>
-          <BotSetting label="引擎" htmlFor={`${id}-engine`} desc="选用已安装且已启用的引擎；这里只控制 Bot 聊天，不依赖父 Agent 或 worker 配置。" error={fieldErrors.engine || (values.engine && !engineUsable ? '已保存的引擎已失效、未启用或暂不支持，请重新选择。' : '')}>
-            <NamedSelect id={`${id}-engine`} aria-label="引擎" value={values.engine || undefined} options={engineOptions} style={{ inlineSize: '100%', maxInlineSize: 320 }} popupMatchSelectWidth={false} disabled={lockFields} placeholder="选择已启用的引擎" onChange={engine => { if (typeof engine === 'string') onEngineChange(engine); }} />
+          <BotSetting label="账号或渠道" htmlFor={`${id}-channel`} desc="选择已启用渠道及其引擎；这里只控制 Bot 聊天，不依赖父 Agent 或 worker 配置。" error={fieldErrors.channel || (values.channel && !channelUsable ? '已保存的渠道已失效、未启用或暂不支持，请重新选择。' : '')}>
+            <NamedSelect id={`${id}-channel`} aria-label="账号或渠道" value={values.channel || undefined} options={channelOptions} style={{ inlineSize: '100%', maxInlineSize: 320 }} popupMatchSelectWidth={false} disabled={lockFields} placeholder="选择已启用的渠道" onChange={engine => { if (typeof engine === 'string') onChannelChange(engine); }} />
           </BotSetting>
-          <BotSetting label="模型" htmlFor={`${id}-model`} desc="从引擎提供的模型中选择，也可手动填写；切换引擎后需重新明确模型。" error={fieldErrors.model}>
+          <BotSetting label="模型" htmlFor={`${id}-model`} desc="从引擎提供的模型中选择，也可手动填写；切换渠道后需重新明确模型。" error={fieldErrors.model}>
             <fieldset disabled={lockFields} inert={lockFields} style={{ border: 0, padding: 0, margin: 0, minInlineSize: 0, inlineSize: '100%', maxInlineSize: 360 }}>
-              <ModelPicker id={`${id}-model`} label="模型" engine={engineUsable ? discoveryEngine : ''} value={values.model} placeholder="例如：gpt-6.1-sol 或 claude-opus-5-5" onChange={model => { if (!lockFields) onUpdate({ model }); }} />
+              <ModelPicker kind={engineKind} channel={channelUsable ? values.channel : undefined} id={`${id}-model`} label="模型" engine={channelUsable ? discoveryEngine : ''} value={values.model} placeholder="例如：gpt-6.1-sol 或 claude-opus-5-5" onChange={model => { if (!lockFields) onUpdate({ model }); }} />
             </fieldset>
           </BotSetting>
-          <BotSetting label="思考力度" htmlFor={`${id}-effort`} desc={efforts ? 'Bot 独立使用的思考力度；保存后随模型一起生效。' : openCodeVariant ? 'OpenCode 的 variant 由模型定义，可直接填写；保存后随模型一起生效。' : '先选择一个支持飞书对话的引擎。'} error={fieldErrors.effort}>
+          <BotSetting label="思考力度" htmlFor={`${id}-effort`} desc={efforts ? 'Bot 独立使用的思考力度；保存后随模型一起生效。' : openCodeVariant ? 'OpenCode 的 variant 由模型定义，可直接填写；保存后随模型一起生效。' : '先选择一个支持飞书对话的渠道。'} error={fieldErrors.effort}>
             {efforts
-              ? <NamedSelect id={`${id}-effort`} aria-label="思考力度" value={values.effort || undefined} options={effortOptions} style={{ inlineSize: '100%', maxInlineSize: 320 }} disabled={lockFields || !engineUsable} placeholder="先选择引擎" onChange={effort => { if (typeof effort === 'string') onUpdate({ effort }); }} />
+              ? <NamedSelect id={`${id}-effort`} aria-label="思考力度" value={values.effort || undefined} options={effortOptions} style={{ inlineSize: '100%', maxInlineSize: 320 }} disabled={lockFields || !channelUsable} placeholder="先选择渠道" onChange={effort => { if (typeof effort === 'string') onUpdate({ effort }); }} />
               : <div className={botStyles.controlStack}>
-                  <Input id={`${id}-effort`} aria-label="思考力度" value={values.effort} placeholder={openCodeVariant ? '例如：high 或该模型接受的 variant' : '先选择引擎'} style={{ inlineSize: '100%', maxInlineSize: 320 }} disabled={lockFields || !engineUsable} onChange={event => onUpdate({ effort: event.target.value })} />
-                  {openCodeVariant && engineUsable && <Text type="secondary" fontSize={12} className={botStyles.wrap}>填写该模型接受的 variant。</Text>}
+                  <Input id={`${id}-effort`} aria-label="思考力度" value={values.effort} placeholder={openCodeVariant ? '例如：high 或该模型接受的 variant' : '先选择渠道'} style={{ inlineSize: '100%', maxInlineSize: 320 }} disabled={lockFields || !channelUsable} onChange={event => onUpdate({ effort: event.target.value })} />
+                  {openCodeVariant && channelUsable && <Text type="secondary" fontSize={12} className={botStyles.wrap}>填写该模型接受的 variant。</Text>}
                 </div>}
           </BotSetting>
-          <BotSetting label="调度主引擎" htmlFor={`${id}-owner`} desc="Bot 派发实际任务时使用的父 Agent：「自动（按策略）」由 Master 按策略选择可用的父 Agent；固定后 Master 只用该父 Agent，不回退。只影响任务派发，不影响 Bot 聊天引擎。" error={fieldErrors.ownerProfileId || ownerLiveError}>
+          <BotSetting label="调度主引擎" htmlFor={`${id}-owner`} desc="Bot 派发实际任务时使用的父 Agent：「自动（按策略）」由 Master 按策略选择可用的父 Agent；固定后 Master 只用该父 Agent，不回退。只影响任务派发，不影响 Bot 聊天渠道。" error={fieldErrors.ownerProfileId || ownerLiveError}>
             {/* 自动在草稿里是 ''，lobe Select 会把 '' 归一为空显示：这里经哨兵（见 ownerSelectDisplay）
                 让触发框直接显示「自动（按策略）」，回调里再映射回 ''（见 ownerSelectValue）。 */}
             <NamedSelect id={`${id}-owner`} aria-label="调度主引擎" value={ownerSelectDisplay(values.ownerProfileId)} options={ownerOptions} style={{ inlineSize: '100%', maxInlineSize: 320 }} popupMatchSelectWidth={false} disabled={lockFields} onChange={owner => onUpdate({ ownerProfileId: ownerSelectValue(owner) })} />
@@ -179,7 +180,7 @@ export function ImSettingsView({
           </BotSetting>
           <BotSetting
             label="保存" htmlFor={`${id}-save`}
-            desc="以上字段一起保存，保存后立即生效（含启停连接）；引擎、模型、力度或工作空间变化会结束旧上下文并重建 Agent，健康且凭据相同的飞书连接保持，凭据或启停变化以及显式「重建连接与会话」会完整重建。失败时草稿原样保留。未保存的修改切到其他页面后仍保留，回到本页继续编辑，只有保存成功或「放弃修改」会清掉它们。"
+            desc="以上字段一起保存，保存后立即生效（含启停连接）；渠道、模型、力度或工作空间变化会结束旧上下文并重建 Agent，健康且凭据相同的飞书连接保持，凭据或启停变化以及显式「重建连接与会话」会完整重建。失败时草稿原样保留。未保存的修改切到其他页面后仍保留，回到本页继续编辑，只有保存成功或「放弃修改」会清掉它们。"
             error={saveError}
           >
             <Button id={`${id}-save`} type="primary" size="small" loading={saving} disabled={!dirty || forceReading} onClick={onSave}>保存修改</Button>
@@ -455,30 +456,30 @@ export function ImSettings({ policy }: { policy: PolicyDraft }) {
   }, []);
 
   const config = policy.snapshot?.config;
-  const engineOptions = useMemo(() => {
+  const channelOptions = useMemo(() => {
     if (!config) return [];
-    const options = Object.entries(config.engines).map(([engineId, engine]) => {
-      const supported = IM_ENGINE_KINDS.has(engine.kind);
-      const suffix = !supported ? '（暂不支持飞书对话）' : !engine.enabled ? '（未启用）' : '';
-      return { value: engineId, label: `${engineId}${suffix}`, disabled: !supported || !engine.enabled };
+    const options = Object.entries(config.channels).map(([channelId, channel]) => {
+      const engine = config.engines[channel.engine];
+      const supported = !!engine && IM_ENGINE_KINDS.has(engine.kind);
+      const suffix = !supported ? '（暂不支持飞书对话）' : !channel.enabled || !engine?.enabled ? '（未启用）' : '';
+      return { value: channelId, label: `${channel.label} · ${channel.engine}${suffix}`, disabled: !supported || !channel.enabled || !engine?.enabled };
     });
-    const savedId = values?.engine;
-    if (savedId && !config.engines[savedId]) options.push({ value: savedId, label: `${savedId}（已失效）`, disabled: true });
+    const savedId = values?.channel;
+    if (savedId && !config.channels[savedId]) options.push({ value: savedId, label: `${savedId}（已失效）`, disabled: true });
     return options;
-  }, [config, values?.engine]);
-  const selectedEngine = values?.engine ? config?.engines[values.engine] : undefined;
-  const engineUsable = !!selectedEngine && selectedEngine.enabled && isImEngineKind(selectedEngine.kind);
-  // 模型发现只用目录 canonical id（别名按 kind 映射，如 ocode→opencode、pi_alt→pi、qoder kind→qoder）；
-  // 保存与运行仍用原 policy engine ID（values.engine）。
-  const discoveryEngine = values?.engine ? imModelDiscoveryEngine(values.engine, config) : '';
+  }, [config, values?.channel]);
+  const selectedChannel = values?.channel ? config?.channels[values.channel] : undefined;
+  const selectedEngine = selectedChannel ? config?.engines[selectedChannel.engine] : undefined;
+  const channelUsable = !!selectedChannel?.enabled && !!selectedEngine && selectedEngine.enabled && isImEngineKind(selectedEngine.kind);
+  const discoveryEngine = values?.channel ? imModelDiscoveryEngine(values.channel, config) : '';
   const efforts = selectedEngine && isImEngineKind(selectedEngine.kind) ? imEngineEfforts(selectedEngine.kind) : undefined;
   const openCodeVariant = selectedEngine?.kind === 'opencode';
   const effortOptions = (efforts ?? []).map(value => ({ value, label: value, disabled: false }));
-  if (values?.effort && efforts && !efforts.includes(values.effort)) effortOptions.push({ value: values.effort, label: !values.engine && values.effort === 'medium' ? 'medium' : `${values.effort}（请选择引擎支持的力度）`, disabled: true });
+  if (values?.effort && efforts && !efforts.includes(values.effort)) effortOptions.push({ value: values.effort, label: !values.channel && values.effort === 'medium' ? 'medium' : `${values.effort}（请选择引擎支持的力度）`, disabled: true });
 
-  const changeEngine = useCallback((engine: string) => {
+  const changeChannel = useCallback((engine: string) => {
     if (!values) return;
-    update(switchDraftEngine(values, engine, config));
+    update(switchDraftChannel(values, engine, config));
   }, [values, config, update]);
 
   return <ImSettingsView
@@ -497,9 +498,10 @@ export function ImSettings({ policy }: { policy: PolicyDraft }) {
     reconnecting={reconnecting}
     forceReading={forceReading}
     dirty={dirty}
-    engineOptions={engineOptions}
-    engineUsable={engineUsable}
+    channelOptions={channelOptions}
+    channelUsable={channelUsable}
     discoveryEngine={discoveryEngine}
+    engineKind={selectedEngine?.kind}
     efforts={efforts}
     openCodeVariant={openCodeVariant}
     effortOptions={effortOptions}
@@ -508,7 +510,7 @@ export function ImSettings({ policy }: { policy: PolicyDraft }) {
     onRefreshStatus={() => void refreshStatus()}
     onReconnect={() => void reconnect()}
     onUpdate={update}
-    onEngineChange={changeEngine}
+    onChannelChange={changeChannel}
     onRemoveWorkspace={removeWorkspace}
     onAddWorkspace={addWorkspace}
     onTimeoutError={setTimeoutError}

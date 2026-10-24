@@ -48,7 +48,7 @@ test('executor role selects the matching policy section, including a shared owne
     assert.throws(() => input(agent({ ...goal, executor: { role: 'worker', profileId: 'codex_owner' } }), f.policy), /available worker profile/);
 
     save(f.policy, snapshot => {
-      snapshot.config.workers.codex_owner = { enabled: true, engine: 'claude', model: 'sonnet', effort: 'high' };
+      snapshot.config.workers.codex_owner = { enabled: true, channel: "default_claude", model: 'sonnet', effort: 'high' };
     });
     const sameIdOwner = { ...goal, executor: { role: 'owner', profileId: 'codex_owner' } };
     const sameIdWorker = { ...goal, executor: { role: 'worker', profileId: 'codex_owner' } };
@@ -83,7 +83,7 @@ test('available profiles on any enabled engine are accepted without the old clau
       snapshot.config.engines.opencode.enabled = true;
       snapshot.config.workers.opencode_worker.enabled = true;
       snapshot.config.owners.opencode_owner = {
-        enabled: true, engine: 'opencode', model: 'opencode/glm-5.3-flash-free', effort: 'max',
+        enabled: true, channel: "default_opencode", model: 'opencode/glm-5.3-flash-free', effort: 'max',
         workers: ['opencode_worker'], max_parallel: 1,
       };
     });

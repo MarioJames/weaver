@@ -3,8 +3,8 @@ import { dirname, isAbsolute, join } from 'node:path';
 import type { TaskDispatch } from '../shared/contracts/tasks';
 import type { RealEngineKind } from '../shared/contracts/tasks';
 
-/** Kinds with a real worker launcher. Claude Code stays deferred. */
-export const REAL_ENGINE_KINDS = ['opencode', 'pi', 'grok', 'codex', 'qodercli', 'dsh'] as const;
+/** Kinds with a real worker launcher. */
+export const REAL_ENGINE_KINDS = ['claude', 'opencode', 'pi', 'grok', 'codex', 'qodercli', 'dsh'] as const;
 
 export function isRealEngineKind(kind: string): kind is RealEngineKind {
   return (REAL_ENGINE_KINDS as readonly string[]).includes(kind);

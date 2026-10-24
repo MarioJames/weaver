@@ -7,12 +7,16 @@ import { exact, text } from './input';
 
 /** A dry run of dispatch routing against the saved config and the blocks in force at `now`; writes nothing. */
 export function previewRoute(config: Config, blocks: Block[], now: number, value: unknown): RoutePreview {
-  const input=object(value); exact(input,['owner','worker','runningCount','workerLoad','excludeEngines','excludeWorkers']);
+  const input=object(value); exact(input,['owner','worker','runningCount','workerLoad','excludeEngines','excludeWorkers','excludeChannels']);
   const opts: RouteOptions={owner:text(input.owner,'owner')};
   if(input.worker!==undefined) opts.worker=text(input.worker,'worker');
   if(input.excludeEngines!==undefined){
    if(!Array.isArray(input.excludeEngines)||input.excludeEngines.length>50) throw new Error('Invalid excluded engines');
    opts.excludeEngines=input.excludeEngines.map(engine=>text(engine,'excluded engine'));
+  }
+  if(input.excludeChannels!==undefined){
+   if(!Array.isArray(input.excludeChannels)||input.excludeChannels.length>200) throw new Error('Invalid excluded channels');
+   opts.excludeChannels=input.excludeChannels.map(channel=>text(channel,'excluded channel'));
   }
   if(input.excludeWorkers!==undefined){
    if(!Array.isArray(input.excludeWorkers)||input.excludeWorkers.length>200) throw new Error('Invalid excluded workers');

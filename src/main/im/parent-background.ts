@@ -62,6 +62,7 @@ export async function createBackgroundParentAgent(input: ParentAgentInput, optio
       await cleanupHostRecord(previous.dir, previous.record, internals.runner);
     }
     const epoch = randomUUID(); dir = join(root, epoch);
+    prepared.channelStateDir=join(dir,'channel-config');
     privateDirectory(dir);
     const endpoint = join(dir, 's');
     if (Buffer.byteLength(endpoint) > 100) { rmdirSync(dir); throw parentError('invalid_input', 'Bot host private socket path is too long'); }

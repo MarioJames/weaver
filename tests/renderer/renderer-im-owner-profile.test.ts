@@ -19,7 +19,7 @@ const APP_ID = 'cli_a1b2c3d4e5f6a7b8';
 function configOf(over: Partial<ImConfig> = {}): ImConfig {
   return {
     enabled: true, appId: APP_ID, appSecretConfigured: true, allowedOpenIds: ['ou_1111111111111111'],
-    engine: 'claude', model: 'claude-opus-5-5', effort: 'medium', workspaces: ['/home/me/projects/weaver'], idleTimeoutMinutes: 30, ownerProfileId: '', ...over,
+    channel: 'default_claude', model: 'claude-opus-5-5', effort: 'medium', workspaces: ['/home/me/projects/weaver'], idleTimeoutMinutes: 30, ownerProfileId: '', ...over,
   };
 }
 
@@ -33,9 +33,9 @@ function snapshotOf(config: ImConfig, revision: number, ownerProfiles: ImOwnerPr
 
 function profilesOf(): ImOwnerProfileOption[] {
   return [
-    { id: 'claude_owner', engine: 'claude', engineKind: 'claude', model: 'claude-opus-5-5', effort: 'high', selectable: true },
-    { id: 'codex_owner', engine: 'codex', engineKind: 'codex', model: 'gpt-6.1-sol', effort: 'high', selectable: true },
-    { id: 'pi_owner', engine: 'pi', engineKind: 'pi', model: 'glm-5.3-flash', effort: 'high', selectable: false, reason: 'disabled' },
+    { id: 'claude_owner', channel: 'default_claude', engine: 'claude', engineKind: 'claude', model: 'claude-opus-5-5', effort: 'high', selectable: true },
+    { id: 'codex_owner', channel: 'default_codex', engine: 'codex', engineKind: 'codex', model: 'gpt-6.1-sol', effort: 'high', selectable: true },
+    { id: 'pi_owner', channel: 'default_pi', engine: 'pi', engineKind: 'pi', model: 'glm-5.3-flash', effort: 'high', selectable: false, reason: 'disabled' },
   ];
 }
 
@@ -55,9 +55,9 @@ test('owner options start with auto, keep snapshot order and label selectable pr
 
 test('owner options disable unselectable profiles with a per-reason suffix', () => {
   const profiles: ImOwnerProfileOption[] = [
-    { id: 'a_off', engine: 'claude', engineKind: 'claude', model: 'm', effort: 'high', selectable: false, reason: 'disabled' },
-    { id: 'b_noengine', engine: 'grok', engineKind: 'grok', model: 'm', effort: 'high', selectable: false, reason: 'engine_disabled' },
-    { id: 'c_worker', engine: 'pi', engineKind: 'pi', model: 'm', effort: 'high', selectable: false, reason: 'not_launchable' },
+    { id: 'a_off', channel: 'default_claude', engine: 'claude', engineKind: 'claude', model: 'm', effort: 'high', selectable: false, reason: 'disabled' },
+    { id: 'b_noengine', channel: 'default_grok', engine: 'grok', engineKind: 'grok', model: 'm', effort: 'high', selectable: false, reason: 'engine_disabled' },
+    { id: 'c_worker', channel: 'default_pi', engine: 'pi', engineKind: 'pi', model: 'm', effort: 'high', selectable: false, reason: 'not_launchable' },
   ];
   const options = ownerProfileOptions(profiles);
   assert.equal(options[1].label, 'a_off · claude · m（已停用）');
@@ -69,7 +69,7 @@ test('owner options disable unselectable profiles with a per-reason suffix', () 
 test('a missing owner appended by the backend keeps its id with the deleted suffix', () => {
   const options = ownerProfileOptions([
     ...profilesOf(),
-    { id: 'gone_owner', engine: '', engineKind: '', model: '', effort: '', selectable: false, reason: 'missing' },
+    { id: 'gone_owner', channel: '', engine: '', engineKind: '', model: '', effort: '', selectable: false, reason: 'missing' },
   ]);
   const last = options[options.length - 1];
   assert.equal(last.value, 'gone_owner');
@@ -110,9 +110,9 @@ test('an unselectable pin reports a per-reason error naming the parent agent', (
   ] as const;
   const profiles: ImOwnerProfileOption[] = [
     ...profilesOf(),
-    { id: 'b_noengine', engine: 'grok', engineKind: 'grok', model: 'm', effort: 'high', selectable: false, reason: 'engine_disabled' },
-    { id: 'c_worker', engine: 'pi', engineKind: 'pi', model: 'm', effort: 'high', selectable: false, reason: 'not_launchable' },
-    { id: 'gone_owner', engine: '', engineKind: '', model: '', effort: '', selectable: false, reason: 'missing' },
+    { id: 'b_noengine', channel: 'default_grok', engine: 'grok', engineKind: 'grok', model: 'm', effort: 'high', selectable: false, reason: 'engine_disabled' },
+    { id: 'c_worker', channel: 'default_pi', engine: 'pi', engineKind: 'pi', model: 'm', effort: 'high', selectable: false, reason: 'not_launchable' },
+    { id: 'gone_owner', channel: '', engine: '', engineKind: '', model: '', effort: '', selectable: false, reason: 'missing' },
   ];
   for (const [id, pattern] of cases) {
     const message = ownerProfileError(id, profiles, '', true);
@@ -185,11 +185,11 @@ test('the dispatch-master box itself shows the auto label when the pin is empty'
     id: 'bot', loading: false, loadError: '', saved, values: draftOf(base), edit: undefined, conflict: false,
     fieldErrors: {}, saveError: '', saving: false, savedTick: false, refreshing: false, reconnecting: false,
     forceReading: false, dirty: false,
-    engineOptions: [{ value: 'claude', label: 'claude', disabled: false }], engineUsable: true, discoveryEngine: 'claude',
+    channelOptions: [{ value: 'claude', label: 'claude', disabled: false }], channelUsable: true, discoveryEngine: 'claude',
     efforts: ['low', 'medium', 'high'], openCodeVariant: false,
     effortOptions: ['low', 'medium', 'high'].map(value => ({ value, label: value, disabled: false })),
     onRetryLoad: () => {}, onReloadLatest: () => {}, onRefreshStatus: () => {}, onReconnect: () => {},
-    onUpdate: () => {}, onEngineChange: () => {}, onRemoveWorkspace: () => {}, onAddWorkspace: () => {},
+    onUpdate: () => {}, onChannelChange: () => {}, onRemoveWorkspace: () => {}, onAddWorkspace: () => {},
     onTimeoutError: () => {}, onDiscard: () => {}, onSave: () => {},
   }));
   const rowStart = html.indexOf('data-bot-row="bot-owner"');
@@ -206,11 +206,11 @@ test('the settings row offers the dispatch master with auto first and surfaces t
     id: 'bot', loading: false, loadError: '', saved, values: draftOf(base), edit: undefined, conflict: false,
     fieldErrors: {}, saveError: '', saving: false, savedTick: false, refreshing: false, reconnecting: false,
     forceReading: false, dirty: false,
-    engineOptions: [{ value: 'claude', label: 'claude', disabled: false }], engineUsable: true, discoveryEngine: 'claude',
+    channelOptions: [{ value: 'claude', label: 'claude', disabled: false }], channelUsable: true, discoveryEngine: 'claude',
     efforts: ['low', 'medium', 'high'], openCodeVariant: false,
     effortOptions: ['low', 'medium', 'high'].map(value => ({ value, label: value, disabled: false })),
     onRetryLoad: () => {}, onReloadLatest: () => {}, onRefreshStatus: () => {}, onReconnect: () => {},
-    onUpdate: () => {}, onEngineChange: () => {}, onRemoveWorkspace: () => {}, onAddWorkspace: () => {},
+    onUpdate: () => {}, onChannelChange: () => {}, onRemoveWorkspace: () => {}, onAddWorkspace: () => {},
     onTimeoutError: () => {}, onDiscard: () => {}, onSave: () => {},
   }));
   const rowStart = html.indexOf('data-bot-row="bot-owner"');
@@ -231,11 +231,11 @@ test('the settings row offers the dispatch master with auto first and surfaces t
     edit: { values: { ...draftOf(base), ownerProfileId: 'pi_owner' }, base, revision: 5 }, conflict: false,
     fieldErrors: { ownerProfileId: '当前选择的父 Agent 已停用，请改选或切换为自动。' }, saveError: '', saving: false,
     savedTick: false, refreshing: false, reconnecting: false, forceReading: false, dirty: true,
-    engineOptions: [{ value: 'claude', label: 'claude', disabled: false }], engineUsable: true, discoveryEngine: 'claude',
+    channelOptions: [{ value: 'claude', label: 'claude', disabled: false }], channelUsable: true, discoveryEngine: 'claude',
     efforts: ['low', 'medium', 'high'], openCodeVariant: false,
     effortOptions: ['low', 'medium', 'high'].map(value => ({ value, label: value, disabled: false })),
     onRetryLoad: () => {}, onReloadLatest: () => {}, onRefreshStatus: () => {}, onReconnect: () => {},
-    onUpdate: () => {}, onEngineChange: () => {}, onRemoveWorkspace: () => {}, onAddWorkspace: () => {},
+    onUpdate: () => {}, onChannelChange: () => {}, onRemoveWorkspace: () => {}, onAddWorkspace: () => {},
     onTimeoutError: () => {}, onDiscard: () => {}, onSave: () => {},
   }));
   assert.match(invalid, /当前选择的父 Agent 已停用，请改选或切换为自动。/);
@@ -248,11 +248,11 @@ test('a stale pin closed with the Bot still surfaces the live hint without a sav
     id: 'bot', loading: false, loadError: '', saved, values: draftOf(base), edit: undefined, conflict: false,
     fieldErrors: {}, saveError: '', saving: false, savedTick: false, refreshing: false, reconnecting: false,
     forceReading: false, dirty: false,
-    engineOptions: [{ value: 'claude', label: 'claude', disabled: false }], engineUsable: true, discoveryEngine: 'claude',
+    channelOptions: [{ value: 'claude', label: 'claude', disabled: false }], channelUsable: true, discoveryEngine: 'claude',
     efforts: ['low', 'medium', 'high'], openCodeVariant: false,
     effortOptions: ['low', 'medium', 'high'].map(value => ({ value, label: value, disabled: false })),
     onRetryLoad: () => {}, onReloadLatest: () => {}, onRefreshStatus: () => {}, onReconnect: () => {},
-    onUpdate: () => {}, onEngineChange: () => {}, onRemoveWorkspace: () => {}, onAddWorkspace: () => {},
+    onUpdate: () => {}, onChannelChange: () => {}, onRemoveWorkspace: () => {}, onAddWorkspace: () => {},
     onTimeoutError: () => {}, onDiscard: () => {}, onSave: () => {},
   }));
   assert.match(html, /当前选择的父 Agent 已停用，请改选或切换为自动。/, 'the poll/refreshed snapshot warns immediately even while the Bot stays off');

@@ -33,7 +33,7 @@ test('cleanup rejects unsafe RPC inputs before touching storage', () => {
  assert.equal(parseEngineCleanup({ ...options, eventIdleMinutes: 0 }).eventIdleMinutes, 0);
 });
 test('real HTTP asynchronous cleanup is preview-gated, protects retained history/config and rejects changed previews', async () => {
- const dir = mkdtempSync(join(tmpdir(), 'wv-c-')); const path = join(dir, 'opencode.db'); const db = database(path);
+ const dir = mkdtempSync(join(tmpdir(), 't-')); const path = join(dir, 'opencode.db'); const db = database(path);
  const original = { env: process.env.OPENCODE_DB, argv: process.argv[1] };
  process.env.OPENCODE_DB = path; process.argv[1] = resolve('src/cli/main.ts');
  const runtime = await startRuntime({ dataDir: join(dir, 's'), port: 0, open: false, quotaProber: new QuotaProber({ env: { HOME: dir } }) });
@@ -80,7 +80,7 @@ test('real HTTP asynchronous cleanup is preview-gated, protects retained history
 });
 
 test('unsupported platform rejects maintenance before opening any database', () => {
- const dir = mkdtempSync(join(tmpdir(), 'wv-cleanup-platform-')); const path = join(dir, 'must-not-be-created.db');
+ const dir = mkdtempSync(join(tmpdir(), 't-')); const path = join(dir, 'must-not-be-created.db');
  try {
   const moduleURL = new URL('../../src/shared/engine-cleanup.ts', import.meta.url).href;
   const code = `import { runCleanupChild } from ${JSON.stringify(moduleURL)}; Object.defineProperty(process, 'platform', { value: 'win32' }); process.exitCode = runCleanupChild([${JSON.stringify(JSON.stringify({ input: options, now: Date.now() }))}]);`;
@@ -94,7 +94,7 @@ test('unsupported platform rejects maintenance before opening any database', () 
 });
 
 async function leaseFixture(run: (path: string, db: DatabaseSync) => Promise<void>) {
- const dir = mkdtempSync(join(process.env.ACCEPTANCE_TMPDIR || tmpdir(), 'wv-cleanup-lease-'));
+ const dir = mkdtempSync(join(process.env.ACCEPTANCE_TMPDIR || tmpdir(), 't-'));
  const path = join(dir, 'opencode.db'); const db = database(path);
  const original = { env: process.env.OPENCODE_DB, argv: process.argv[1] };
  process.env.OPENCODE_DB = path; process.argv[1] = resolve('src/cli/main.ts');

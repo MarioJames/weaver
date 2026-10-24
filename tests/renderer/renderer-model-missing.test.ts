@@ -30,15 +30,16 @@ test('no warning without a successful list, without a model, or for any other en
   for (const engine of ['claude', 'codex', 'grok', 'opencode', 'qoder']) assert.equal(missingModelWarning(engine, SAVED, { ...after, engine }), undefined, engine);
 });
 
-test('an aliased pi engine warns through its canonical discovery id', async () => {
+test('an aliased pi channel retains the engine alias and uses its kind for warnings', async () => {
   const { imModelDiscoveryEngine } = await import('../../src/renderer/features/bots/im-state');
   const { defaultConfig } = await import('../../src/main/policy/routing');
   const policy = defaultConfig();
-  policy.engines.pi_alt = { enabled: true, kind: 'pi', quota_refresh: false };
-  const discovery = imModelDiscoveryEngine('pi_alt', policy);
-  assert.equal(discovery, 'pi');
+  policy.engines.pi_alt = { enabled: true, kind: 'pi' };
+  policy.channels.api_alt = { label: 'API', engine: 'pi_alt', kind: 'api', enabled: true };
+  const discovery = imModelDiscoveryEngine('api_alt', policy);
+  assert.equal(discovery, 'pi_alt');
   const after = list('ok', 'cc-switch-zhipu-glm/glm-5.3');
-  assert.equal(missingModelWarning(discovery, SAVED, { ...after, engine: discovery }), PI_MISSING_MODEL_TEXT);
+  assert.equal(missingModelWarning(policy.engines[discovery]!.kind, SAVED, { ...after, engine: discovery }), PI_MISSING_MODEL_TEXT);
 });
 
 test('the warning renders under the field as a status line only while the model is missing', () => {

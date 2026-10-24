@@ -1,3 +1,4 @@
+import { prepareChannelRun, cleanupChannelRun } from '../../channels/runtime';
 import { classifyVendorError, classifyVendorEvent } from './vendor-errors';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
@@ -14,7 +15,7 @@ import { decodeLines, startOwnedScope, type LineOverflow, type OwnedScope } from
 import type { CliAgentInput, ManagedAgentProcess } from './types';
 import type { CliAgentEvidence, RealEngineKind } from '../../../shared/contracts/tasks';
 
-const ENGINES = new Set<RealEngineKind>(['opencode', 'pi', 'grok', 'codex', 'qodercli', 'dsh']);
+const ENGINES = new Set<RealEngineKind>(['claude', 'opencode', 'pi', 'grok', 'codex', 'qodercli', 'dsh']);
 const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/;
 const EFFORT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
 const STDERR_CAP = 24 * 1024;
@@ -43,6 +44,10 @@ export interface PreparedCliAgent {
   /** Only dsh carries a per-run --patch overlay file; other engines have none. */
   overlayPath?: string;
   unit: string;
+  /** Private launch-only environment; excluded from receipts and task evidence. */
+  env?: NodeJS.ProcessEnv;
+  channelStateDir?: string;
+  channelProfilePath?: string;
 }
 
 function fail(field: string, message: string): never {
@@ -87,7 +92,8 @@ function existingDirectory(field: string, value: string): string {
 
 /** Validate input and write the private prompt. Does not start a process. */
 export function prepareCliAgentInput(input: CliAgentInput): PreparedCliAgent {
-  if (!ENGINES.has(input.engine)) fail('engine', 'Engine must be opencode, pi, grok, codex, qodercli, or dsh');
+  if (input.channel && !input.channelConfig) fail('channel','Selected channel has no private runtime binding');
+  if (!ENGINES.has(input.engine)) fail('engine', 'Engine must be claude, opencode, pi, grok, codex, qodercli, or dsh');
   if (typeof input.model !== 'string' || !MODEL.test(input.model) || input.model.includes('..')) fail('model', 'Model must be a bounded identifier');
   if (typeof input.effort !== 'string' || !EFFORT.test(input.effort)) fail('effort', 'Effort must be a bounded identifier');
   if (typeof input.instruction !== 'string' || !input.instruction.trim() || input.instruction.length > 16000) fail('instruction', 'Instruction must be 1–16000 characters');
@@ -118,7 +124,12 @@ export function prepareCliAgentInput(input: CliAgentInput): PreparedCliAgent {
   } catch (error) {
     fail('effort', error instanceof Error ? error.message : 'Invalid effort');
   }
-  return { engine: input.engine, model: input.model, effort: input.effort, workspace, stateDir, instruction: input.instruction, role: input.role, argv: spec.argv, stdin: spec.stdin, promptPath, ...(input.engine === 'pi' ? { sessionDir } : {}), ...(input.engine === 'dsh' ? { overlayPath } : {}), unit: `weaver-cli-${input.engine}-${id}` };
+  const channelRun = input.channelConfig ? prepareChannelRun({ ...input.channelConfig, model: input.model, stateDir }) : undefined;
+  if (channelRun) {
+    // Global flags precede the subcommand, dsh provider patch precedes the final permission patch.
+    spec.argv.splice(1, 0, ...channelRun.argv);
+  }
+  return { ...(channelRun ? { env: channelRun.env, channelStateDir:channelRun.channelStateDir, channelProfilePath:channelRun.channelProfilePath } : {}), engine: input.engine, model: input.model, effort: input.effort, workspace, stateDir, instruction: input.instruction, role: input.role, argv: spec.argv, stdin: spec.stdin, promptPath, ...(input.engine === 'pi' ? { sessionDir } : {}), ...(input.engine === 'dsh' ? { overlayPath } : {}), unit: `weaver-cli-${input.engine}-${id}` };
 }
 
 class CliAgent extends EventEmitter implements ManagedAgentProcess {
@@ -142,9 +153,11 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
   private vendorFrames = 0;
   private stderrBuffer: ReturnType<typeof createRedactedLineBuffer>;
   private readonly requestedModel: string;
+  private readonly channelCleanup: () => void;
   private readonly reportedModels = new Set<string>();
   constructor(prepared: PreparedCliAgent) {
     super();
+    this.channelCleanup=()=>cleanupChannelRun(prepared);
     this.engine = prepared.engine;
     this.requestedModel = prepared.model;
     this.scopeUnit = prepared.unit;
@@ -163,7 +176,7 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
       if(this.engine==='pi'&&value)this.noteActualModel(value);
       this.emitRecords(records);
     }, detail => this.logOversizedLine(detail));
-    const env = { ...process.env };
+    const env = { ...(prepared.env ?? process.env) };
     delete env.ELECTRON_RUN_AS_NODE;
     this.scope = startOwnedScope({ command: prepared.argv, cwd: prepared.workspace, env, stdin: prepared.stdin, ...(prepared.stdin!==null?{stdinPath:prepared.promptPath}:{}), unit: prepared.unit });
     this.scope.on('identity', (invocation: string) => this.emit('identity', invocation));
@@ -228,6 +241,7 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
   }
   private complete(code: number | null): void {
     if (this.evidence.terminal !== 'pending') return;
+    this.channelCleanup();
     this.lines.end();
     this.stderrBuffer.flush();
     const finished = this.normalizer.finish({ exitCode: this.failed ? 1 : code, cancelled: this.cancelled, truncated: false });
@@ -246,6 +260,7 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
 
 function permissionNote(engine: RealEngineKind): string {
   switch (engine) {
+    case 'claude': return 'claude permission mode bypassPermissions is a CLI policy, not OS filesystem isolation';
     case 'grok': return 'grok permission mode bypassPermissions is a CLI policy, not OS filesystem isolation';
     case 'codex': return 'codex runs with danger-full-access (no vendor sandbox); this is not OS isolation';
     case 'opencode': return 'opencode --auto approves permissions inside the CLI; it is not OS isolation';
@@ -276,6 +291,7 @@ export function launcherRecords(input: { engine: RealEngineKind; model: string }
  * before any external effect; when it throws nothing is started. */
 export function startCliAgent(input: CliAgentInput, beforeSpawn?: (prepared: PreparedCliAgent) => void): ManagedAgentProcess {
   const prepared = prepareCliAgentInput(input);
-  if (beforeSpawn) beforeSpawn(prepared);
-  return new CliAgent(prepared);
+  try {if (beforeSpawn) beforeSpawn(prepared);
+    return new CliAgent(prepared);
+  } catch(error) {cleanupChannelRun(prepared);throw error;}
 }

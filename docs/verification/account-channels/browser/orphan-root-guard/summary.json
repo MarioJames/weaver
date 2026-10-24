@@ -1,0 +1,22 @@
+{
+  "target": "http://127.0.0.1:46401/#/channels",
+  "mode": "task",
+  "session": "weaver-account-channels",
+  "reuse_page": true,
+  "profile_dir": "[任务独占profile，收尾删除]",
+  "timestamp": "20261024T142213",
+  "evidence_dir": "/tmp/weaver-accounts-7l88j2s9/workspace/docs/verification/account-channels/browser/orphan-root-guard",
+  "artifacts": {
+    "screenshot": "screenshot.png",
+    "dom": "dom.json",
+    "console": "console.json",
+    "network_xhr": "network-xhr.json",
+    "network_errors": "network-errors.json"
+  },
+  "counts": {
+    "network_xhr": 804,
+    "network_errors": 11
+  },
+  "artifact_errors": [],
+  "archiveNote": "从有效bh证据复制；秘密postData已脱敏，原采集目录已回收"
+}

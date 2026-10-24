@@ -1,3 +1,4 @@
+import { migrateChannelPolicy } from '../../shared/policy/channels';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -15,10 +16,11 @@ function blocksOf(value: unknown, config: Config): Block[] {
  if(!Array.isArray(value)||value.length>500) throw new Error('Invalid quota blocks');
  const keys=new Set<string>();
  return value.map(raw=>{
-  const b=object(raw); exact(b,['engine','model','worker','reason','since','release_at','by']);
+  const b=object(raw); exact(b,['engine','channel','model','worker','reason','since','release_at','by']);
   const engine=text(b.engine,'engine'); if(!Object.hasOwn(config.engines,engine)) throw new Error(`Unknown engine ${engine}`);
   const block: Block={engine,reason:text(b.reason,'reason'),since:parseReleaseAt(text(b.since,'since'),0)};
   if (String(b.since).startsWith('+')) throw new Error('since must be an absolute timestamp');
+  if(b.channel!==undefined){block.channel=text(b.channel,'channel');if(!Object.hasOwn(config.channels,block.channel)||config.channels[block.channel]!.engine!==engine) throw new Error('Unknown channel or engine mismatch');}
   if(b.model!==undefined) block.model=text(b.model,'model');
   if(b.worker!==undefined){
    block.worker=text(b.worker,'worker');
@@ -30,7 +32,7 @@ function blocksOf(value: unknown, config: Config): Block[] {
    if(String(b.release_at).startsWith('+')) throw new Error('Stored release_at must be an absolute timestamp');
    block.release_at=parseReleaseAt(text(b.release_at,'release_at'),0);
   }
-  const key=JSON.stringify([engine,block.model??null,block.worker??null]); if(keys.has(key)) throw new Error('Duplicate engine/model/worker quota block'); keys.add(key);
+  const key=JSON.stringify([engine,block.channel??null,block.model??null,block.worker??null]); if(keys.has(key)) throw new Error('Duplicate engine/model/worker quota block'); keys.add(key);
   return block;
  }).filter((block):block is Block=>block!==undefined);
 }
@@ -73,7 +75,6 @@ export class PolicyStore {
   const engines:Config['engines']={};
   for(const row of this.db.prepare('SELECT * FROM policy_engines ORDER BY position').all() as Record<string,unknown>[]){
    const engine={enabled:Number(row.enabled)===1,kind:String(row.kind)} as Engine;
-   if(row.quota_refresh!==null&&row.quota_refresh!==undefined)engine.quota_refresh=Number(row.quota_refresh)===1;
    engines[String(row.id)]=engine;
   }
   const ownerWorkerRows=this.db.prepare('SELECT * FROM policy_owner_workers ORDER BY position').all() as Record<string,unknown>[];
@@ -81,7 +82,7 @@ export class PolicyStore {
   for(const row of this.db.prepare('SELECT * FROM policy_owners ORDER BY position').all() as Record<string,unknown>[]){
    const id=String(row.id);
    const links=ownerWorkerRows.filter(item=>String(item.owner_id)===id);
-   const owner={enabled:Number(row.enabled)===1,engine:String(row.engine),model:String(row.model),effort:String(row.effort),workers:links.map(item=>String(item.worker_id)),max_parallel:Number(row.max_parallel)} as Owner;
+   const owner={enabled:Number(row.enabled)===1,channel:String(row.channel),model:String(row.model),effort:String(row.effort),workers:links.map(item=>String(item.worker_id)),max_parallel:Number(row.max_parallel)} as Owner;
    const weights:Record<string,number>={};
    for(const item of links)if(item.weight!==null&&item.weight!==undefined)weights[String(item.worker_id)]=Number(item.weight);
    if(Object.keys(weights).length)owner.worker_weights=weights;
@@ -90,7 +91,7 @@ export class PolicyStore {
   const workers:Config['workers']={};
   for(const row of this.db.prepare('SELECT * FROM policy_workers ORDER BY position').all() as Record<string,unknown>[]){
    const id=String(row.id);
-   const worker={enabled:Number(row.enabled)===1,engine:String(row.engine),model:String(row.model),effort:String(row.effort)} as Worker;
+   const worker={enabled:Number(row.enabled)===1,channel:String(row.channel),model:String(row.model),effort:String(row.effort)} as Worker;
    if(row.description!==null&&row.description!==undefined)worker.description=String(row.description);
    if(row.free_channel!==null&&row.free_channel!==undefined)worker.free_channel=Number(row.free_channel)===1;
    if(row.max_parallel!==null&&row.max_parallel!==undefined)worker.max_parallel=Number(row.max_parallel);
@@ -103,6 +104,7 @@ export class PolicyStore {
   if(settings.$schema!==undefined)built.$schema=settings.$schema;
   built.version=1;
   if(settings.chatgpt_review!==undefined)built.chatgpt_review=settings.chatgpt_review;
+  built.channels=Object.fromEntries((this.db.prepare('SELECT id,body FROM policy_channels ORDER BY position').all() as {id:string;body:string}[]).map(row=>[row.id,JSON.parse(row.body)]));
   built.engines=engines;built.owners=owners;built.workers=workers;
   // Older policies carry no max_command_minutes; the snapshot exposes the effective default without rewriting the row.
   built.herdr={...defaultConfig().herdr,...(settings.herdr!==null&&typeof settings.herdr==='object'&&!Array.isArray(settings.herdr)?settings.herdr:{})};
@@ -110,6 +112,7 @@ export class PolicyStore {
   const config=built as unknown as Config;
   const blocks=(this.db.prepare('SELECT * FROM policy_blocks ORDER BY position').all() as Record<string,unknown>[]).map(row=>{
    const block:Block={engine:String(row.engine),reason:String(row.reason),since:String(row.since)};
+   if(row.channel!==null&&row.channel!==undefined)block.channel=String(row.channel);
    if(row.model!==null&&row.model!==undefined)block.model=String(row.model);
    if(row.worker!==null&&row.worker!==undefined)block.worker=String(row.worker);
    if(row.release_at!==null&&row.release_at!==undefined)block.release_at=String(row.release_at);
@@ -122,22 +125,25 @@ export class PolicyStore {
  }
  private writeAll(config:Config,blocks:Block[]):void {
   this.db.exec('DELETE FROM policy_blocks');
-  const insertBlock=this.db.prepare('INSERT INTO policy_blocks(position,engine,model,worker,reason,since,release_at,by) VALUES (?,?,?,?,?,?,?,?)');
-  blocks.forEach((block,index)=>insertBlock.run(index,block.engine,optionalText(block.model),optionalText(block.worker),block.reason,block.since,optionalText(block.release_at),optionalText(block.by)));
+  const insertBlock=this.db.prepare('INSERT INTO policy_blocks(position,engine,channel,model,worker,reason,since,release_at,by) VALUES (?,?,?,?,?,?,?,?,?)');
+  blocks.forEach((block,index)=>insertBlock.run(index,block.engine,optionalText(block.channel),optionalText(block.model),optionalText(block.worker),block.reason,block.since,optionalText(block.release_at),optionalText(block.by)));
+  this.db.exec('DELETE FROM policy_channels');
+  const insertChannel=this.db.prepare('INSERT INTO policy_channels(id,position,body) VALUES (?,?,?)');
+  Object.entries(config.channels).forEach(([id,channel],index)=>insertChannel.run(id,index,JSON.stringify(channel)));
   this.db.exec('DELETE FROM policy_engines');
   const insertEngine=this.db.prepare('INSERT INTO policy_engines(id,position,enabled,kind,quota_refresh) VALUES (?,?,?,?,?)');
-  Object.entries(config.engines).forEach(([id,engine],index)=>insertEngine.run(id,index,bit(engine.enabled),engine.kind,engine.quota_refresh===undefined?null:bit(engine.quota_refresh)));
+  Object.entries(config.engines).forEach(([id,engine],index)=>insertEngine.run(id,index,bit(engine.enabled),engine.kind,null));
   this.db.exec('DELETE FROM policy_owner_workers');
   this.db.exec('DELETE FROM policy_owners');
-  const insertOwner=this.db.prepare('INSERT INTO policy_owners(id,position,enabled,engine,model,effort,max_parallel) VALUES (?,?,?,?,?,?,?)');
+  const insertOwner=this.db.prepare('INSERT INTO policy_owners(id,position,enabled,channel,model,effort,max_parallel) VALUES (?,?,?,?,?,?,?)');
   const insertLink=this.db.prepare('INSERT INTO policy_owner_workers(owner_id,worker_id,position,weight) VALUES (?,?,?,?)');
   Object.entries(config.owners).forEach(([id,owner],index)=>{
-   insertOwner.run(id,index,bit(owner.enabled),owner.engine,owner.model,owner.effort,owner.max_parallel);
+   insertOwner.run(id,index,bit(owner.enabled),owner.channel,owner.model,owner.effort,owner.max_parallel);
    owner.workers.forEach((workerId,position)=>insertLink.run(id,workerId,position,owner.worker_weights&&Object.hasOwn(owner.worker_weights,workerId)?owner.worker_weights[workerId]!:null));
   });
   this.db.exec('DELETE FROM policy_workers');
-  const insertWorker=this.db.prepare('INSERT INTO policy_workers(id,position,enabled,engine,model,effort,description,free_channel,max_parallel) VALUES (?,?,?,?,?,?,?,?,?)');
-  Object.entries(config.workers).forEach(([id,worker],index)=>insertWorker.run(id,index,bit(worker.enabled),worker.engine,worker.model,worker.effort,optionalText(worker.description),worker.free_channel===undefined?null:bit(worker.free_channel),worker.max_parallel===undefined?null:worker.max_parallel));
+  const insertWorker=this.db.prepare('INSERT INTO policy_workers(id,position,enabled,channel,model,effort,description,free_channel,max_parallel) VALUES (?,?,?,?,?,?,?,?,?)');
+  Object.entries(config.workers).forEach(([id,worker],index)=>insertWorker.run(id,index,bit(worker.enabled),worker.channel,worker.model,worker.effort,optionalText(worker.description),worker.free_channel===undefined?null:bit(worker.free_channel),worker.max_parallel===undefined?null:worker.max_parallel));
   this.db.exec('DELETE FROM policy_settings');
   const insertSetting=this.db.prepare('INSERT INTO policy_settings(key,body) VALUES (?,?)');
   insertSetting.run('herdr',JSON.stringify(config.herdr));
@@ -199,7 +205,8 @@ export class PolicyStore {
   if(!row) throw new Error(`Policy revision ${revision} not found`);
   const data=object(JSON.parse(row.body)); exact(data,['version','revision','config','blocks']);
   if(data.version!==1) throw new Error('Unsupported policy snapshot');
-  const parsed=this.parse(dropRetiredFields(data.config),data.blocks);
+  const upgraded=migrateChannelPolicy(dropRetiredFields(data.config) as Record<string,any>,data.blocks as any[]);
+  const parsed=this.parse(upgraded.config,upgraded.blocks);
   this.commit(parsed.config,parsed.blocks,this.revision+1,`rollback:${revision}`);
   return this.snapshot();
  }

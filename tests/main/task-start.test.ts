@@ -19,7 +19,7 @@ import { PolicyStore } from '../../src/main/policy/store';
 import type { OwnerLaunchInput, OwnerLaunchResult } from '../../src/main/owner-host';
 
 function fixture() {
- const dir=mkdtempSync(join(tmpdir(),'weaver-task-start-'));
+ const dir=mkdtempSync(join(tmpdir(),'t-'));
  const store=new TaskStore(join(dir,'weaver.db'));const policy=new PolicyStore(join(dir,'weaver.db'));
  const manager=new TaskManager(store,{id:'forbidden',start(){throw new Error('No worker process allowed');}});
  const launches:{input:OwnerLaunchInput & {signal?:AbortSignal};resolve:(host:OwnerLaunchResult)=>void;reject:(error:Error)=>void}[]=[];
@@ -80,7 +80,7 @@ test('failed launch is visible, drain aborts pending launches, and cancellation 
 });
 
 test('HTTP startTask, tasks.start and CLI IPC acknowledge slow injected launchers within one second',async t=>{
- const directory=mkdtempSync(join(tmpdir(),'wvts-rt-'));const inputs:(OwnerLaunchInput & {signal?:AbortSignal})[]=[];
+ const directory=mkdtempSync(join(tmpdir(),'t-'));const inputs:(OwnerLaunchInput & {signal?:AbortSignal})[]=[];
  const quota=new QuotaProber({env:{HOME:directory}});quota.refresh=async()=>quota.get();
  const project=join(directory,'project');mkdirSync(project);
  const runtime=await startRuntime({dataDir:directory,port:0,open:false,quotaProber:quota,ownerHost:{launcher:input=>new Promise((_resolve,reject)=>{inputs.push(input);input.signal?.addEventListener('abort',()=>reject(new Error('fake drain')),{once:true});}),closer:async()=>{}}}).catch(error=>{rmSync(directory,{recursive:true,force:true});throw error;});
@@ -192,7 +192,7 @@ test('root cancel preserves host evidence and reports async cleanup failure with
 
 
 test('HTTP root cancellation responds while injected host closer is blocked',async()=>{
- const directory=mkdtempSync(join(tmpdir(),'wvts-cx-'));
+ const directory=mkdtempSync(join(tmpdir(),'t-'));
  const quota=new QuotaProber({env:{HOME:directory}});quota.refresh=async()=>quota.get();
  let release!:()=>void;let closing=false;
  const blocked=new Promise<void>(resolve=>{release=resolve;});

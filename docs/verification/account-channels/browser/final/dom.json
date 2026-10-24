@@ -1,0 +1,311 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 2520939206296804400
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:37261/#/owners",
+  "refs": {
+    "e1": {
+      "name": "",
+      "role": "generic"
+    },
+    "e10": {
+      "name": "父 Agent 列表",
+      "role": "navigation"
+    },
+    "e11": {
+      "name": "任务",
+      "role": "link"
+    },
+    "e12": {
+      "name": "定时任务",
+      "role": "link"
+    },
+    "e13": {
+      "name": "账号与渠道",
+      "role": "link"
+    },
+    "e14": {
+      "name": "引擎",
+      "role": "link"
+    },
+    "e15": {
+      "name": "父 Agent",
+      "role": "link"
+    },
+    "e16": {
+      "name": "子 Agent",
+      "role": "link"
+    },
+    "e17": {
+      "name": "Bot",
+      "role": "link"
+    },
+    "e18": {
+      "name": "设置",
+      "role": "link"
+    },
+    "e19": {
+      "name": "Notifications",
+      "role": "region"
+    },
+    "e2": {
+      "name": "跳到内容",
+      "role": "link"
+    },
+    "e20": {
+      "name": "Notifications",
+      "role": "region"
+    },
+    "e21": {
+      "name": "Notifications",
+      "role": "region"
+    },
+    "e22": {
+      "name": "Notifications",
+      "role": "region"
+    },
+    "e23": {
+      "name": "Notifications",
+      "role": "region"
+    },
+    "e24": {
+      "name": "Notifications",
+      "role": "region"
+    },
+    "e25": {
+      "name": "删除",
+      "role": "button"
+    },
+    "e26": {
+      "name": "配置 ID",
+      "role": "textbox"
+    },
+    "e27": {
+      "name": "账号或渠道",
+      "role": "combobox"
+    },
+    "e28": {
+      "name": "模型",
+      "role": "combobox"
+    },
+    "e29": {
+      "name": "刷新 codex 模型列表",
+      "role": "button"
+    },
+    "e3": {
+      "name": "Weaver 任务",
+      "role": "link"
+    },
+    "e30": {
+      "name": "推理强度",
+      "role": "combobox"
+    },
+    "e31": {
+      "name": "连通测试",
+      "role": "button"
+    },
+    "e32": {
+      "name": "并行上限 这个父 Agent 同时运行的子 Agent 数量。",
+      "role": "textbox"
+    },
+    "e33": {
+      "name": "Increase",
+      "role": "button"
+    },
+    "e34": {
+      "name": "Decrease",
+      "role": "button"
+    },
+    "e35": {
+      "name": "子 Agent",
+      "role": "region"
+    },
+    "e36": {
+      "name": "拖动排序 claude_owner",
+      "role": "button"
+    },
+    "e37": {
+      "name": "启用 claude_owner",
+      "role": "switch"
+    },
+    "e38": {
+      "name": "claude_owner claude 官方订阅 · claude-opus-5-5",
+      "role": "button"
+    },
+    "e39": {
+      "name": "拖动排序 codex_owner",
+      "role": "button"
+    },
+    "e4": {
+      "name": "主导航",
+      "role": "navigation"
+    },
+    "e40": {
+      "name": "拖动排序 pi_owner",
+      "role": "button"
+    },
+    "e41": {
+      "name": "启用 pi_owner",
+      "role": "switch"
+    },
+    "e42": {
+      "name": "pi_owner pi API（待导入） · glm-5.3-flash",
+      "role": "button"
+    },
+    "e43": {
+      "name": "添加子 Agent",
+      "role": "button"
+    },
+    "e44": {
+      "name": "codex_worker 的权重",
+      "role": "textbox"
+    },
+    "e45": {
+      "name": "Increase",
+      "role": "button"
+    },
+    "e46": {
+      "name": "Decrease",
+      "role": "button"
+    },
+    "e47": {
+      "name": "移除 codex_worker",
+      "role": "button"
+    },
+    "e48": {
+      "name": "qoder_worker 的权重",
+      "role": "textbox"
+    },
+    "e49": {
+      "name": "Increase",
+      "role": "button"
+    },
+    "e5": {
+      "name": "收起导航",
+      "role": "button"
+    },
+    "e50": {
+      "name": "Decrease",
+      "role": "button"
+    },
+    "e51": {
+      "name": "移除 qoder_worker",
+      "role": "button"
+    },
+    "e52": {
+      "name": "opencode_worker 的权重",
+      "role": "textbox"
+    },
+    "e53": {
+      "name": "Increase",
+      "role": "button"
+    },
+    "e54": {
+      "name": "Decrease",
+      "role": "button"
+    },
+    "e55": {
+      "name": "移除 opencode_worker",
+      "role": "button"
+    },
+    "e56": {
+      "name": "grok_worker 的权重",
+      "role": "textbox"
+    },
+    "e57": {
+      "name": "Increase",
+      "role": "button"
+    },
+    "e58": {
+      "name": "Decrease",
+      "role": "button"
+    },
+    "e59": {
+      "name": "移除 grok_worker",
+      "role": "button"
+    },
+    "e6": {
+      "name": "父 Agent",
+      "role": "heading"
+    },
+    "e60": {
+      "name": "启用 codex_owner",
+      "role": "switch"
+    },
+    "e61": {
+      "name": "codex_owner 浏览器冲突恢复 API · synthetic-model",
+      "role": "button"
+    },
+    "e62": {
+      "name": "codex_worker 不派发",
+      "role": "button"
+    },
+    "e63": {
+      "name": "codex_worker 默认",
+      "role": "button"
+    },
+    "e64": {
+      "name": "codex_worker 最高",
+      "role": "button"
+    },
+    "e65": {
+      "name": "qoder_worker 不派发",
+      "role": "button"
+    },
+    "e66": {
+      "name": "qoder_worker 默认",
+      "role": "button"
+    },
+    "e67": {
+      "name": "qoder_worker 最高",
+      "role": "button"
+    },
+    "e68": {
+      "name": "opencode_worker 不派发",
+      "role": "button"
+    },
+    "e69": {
+      "name": "opencode_worker 默认",
+      "role": "button"
+    },
+    "e7": {
+      "name": "新建父 Agent",
+      "role": "button"
+    },
+    "e70": {
+      "name": "opencode_worker 最高",
+      "role": "button"
+    },
+    "e71": {
+      "name": "grok_worker 不派发",
+      "role": "button"
+    },
+    "e72": {
+      "name": "grok_worker 默认",
+      "role": "button"
+    },
+    "e73": {
+      "name": "grok_worker 最高",
+      "role": "button"
+    },
+    "e8": {
+      "name": "放弃修改",
+      "role": "button"
+    },
+    "e9": {
+      "name": "保存",
+      "role": "button"
+    }
+  },
+  "snapshot": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - link \"跳到内容\" [ref=e2]\n    - complementary\n      - link \"Weaver 任务\" [ref=e3]\n      - navigation \"主导航\" [ref=e4]\n        - link \"任务\" [ref=e11]\n          - image\n          - StaticText \"任务\"\n        - link \"定时任务\" [ref=e12]\n          - image\n          - StaticText \"定时任务\"\n        - link \"账号与渠道\" [ref=e13]\n          - image\n          - StaticText \"账号与渠道\"\n        - link \"引擎\" [ref=e14]\n          - image\n          - StaticText \"引擎\"\n        - link \"父 Agent\" [ref=e15]\n          - image\n          - StaticText \"父 Agent\"\n        - link \"子 Agent\" [ref=e16]\n          - image\n          - StaticText \"子 Agent\"\n        - link \"Bot\" [ref=e17]\n          - image\n          - StaticText \"Bot\"\n        - link \"设置\" [ref=e18]\n          - image\n          - StaticText \"设置\"\n    - banner\n      - button \"收起导航\" [ref=e5]\n        - image\n    - main\n      - heading \"父 Agent\" [level=1, ref=e6]\n      - StaticText \"父 Agent 接收任务并派发给子 Agent。可以为同一引擎配置不同账号的父 Agent。\"\n      - button \"新建父 Agent\" [ref=e7]\n        - image\n        - StaticText \"新建父 Agent\"\n      - status\n        - StaticText \"已保存\"\n      - button \"放弃修改\" [disabled, ref=e8]\n      - button \"保存\" [disabled, ref=e9]\n        - image\n        - StaticText \"保存\"\n      - navigation \"父 Agent 列表\" [ref=e10]\n        - StaticText \"拖动左侧手柄调整顺序，保存后生效。\"\n        - list\n          - listitem [level=1]\n            - button \"拖动排序 claude_owner\" [ref=e36]\n              - image\n            - LabelText\n              - StaticText \"启用 claude_owner\"\n            - switch \"启用 claude_owner\" [checked=true, ref=e37]\n            - button \"claude_owner claude 官方订阅 · claude-opus-5-5\" [ref=e38]\n              - strong\n                - StaticText \"claude_owner\"\n              - StaticText \"claude 官方订阅\"\n              - StaticText \" · \"\n              - StaticText \"claude-opus-5-5\"\n          - listitem [level=1]\n            - button \"拖动排序 codex_owner\" [ref=e39]\n              - image\n            - generic\n              - LabelText\n                - StaticText \"启用 codex_owner\"\n              - switch \"启用 codex_owner\" [checked=true, ref=e60]\n              - button \"codex_owner 浏览器冲突恢复 API · synthetic-model\" [ref=e61]\n                - strong\n                  - StaticText \"codex_owner\"\n                - StaticText \"浏览器冲突恢复 API\"\n                - StaticText \" · \"\n                - StaticText \"synthetic-model\"\n          - listitem [level=1]\n            - button \"拖动排序 pi_owner\" [ref=e40]\n              - image\n            - LabelText\n              - StaticText \"启用 pi_owner\"\n            - switch \"启用 pi_owner\" [checked=false, disabled, ref=e41]\n            - button \"pi_owner pi API（待导入） · glm-5.3-flash\" [ref=e42]\n              - strong\n                - StaticText \"pi_owner\"\n              - StaticText \"pi API（待导入）\"\n              - StaticText \" · \"\n              - StaticText \"glm-5.3-flash\"\n        - status\n      - form\n        - generic\n          - StaticText \"父 Agent 配置\"\n        - button \"删除\" [ref=e25]\n          - image\n          - StaticText \"删除\"\n        - LabelText\n          - generic\n            - StaticText \"配置 ID\"\n            - StaticText \"改名后按 Enter 或离开输入框，引用处一起更新。\"\n        - textbox \"配置 ID\" [ref=e26]: codex_owner\n          - StaticText \"codex_owner\"\n        - LabelText\n          - StaticText \"账号或渠道\"\n        - combobox \"账号或渠道\" [expanded=false, ref=e27]: 浏览器冲突恢复 API · codex\n          - StaticText \"浏览器冲突恢复 API · codex\"\n        - StaticText \"执行引擎：codex\"\n        - LabelText\n          - StaticText \"模型\"\n        - combobox \"模型\" [expanded=false, ref=e28]: synthetic-model\n          - StaticText \"synthetic-model\"\n        - button \"刷新 codex 模型列表\" [ref=e29]\n          - image\n        - status\n          - StaticText \"1 个模型 · 来源：codex debug models。也可以直接填写。\"\n        - LabelText\n          - StaticText \"推理强度\"\n        - combobox \"推理强度\" [expanded=false, ref=e30]: high\n          - StaticText \"high\"\n        - StaticText \"可用性\"\n        - StaticText \"用当前填写的渠道、模型和推理强度发送一条简短问候，检查能否正常回复。不调用工具，不保存会话，会消耗少量额度。\"\n        - button \"连通测试\" [ref=e31]\n          - image\n          - StaticText \"连通测试\"\n        - status \"连通测试结果\"\n          - sectionheader\n            - StaticText \"可用\"\n            - StaticText \"channel_1be76b535f7946a88f93e247 · synthetic-model · high\"\n            - generic\n              - StaticText \"0.0 秒 · \"\n              - time\n                - StaticText \"14:31\"\n          - paragraph\n            - StaticText \"hi\"\n        - LabelText\n          - generic\n            - StaticText \"并行上限\"\n            - StaticText \"这个父 Agent 同时运行的子 Agent 数量。\"\n        - textbox \"并行上限 这个父 Agent 同时运行的子 Agent 数量。\" [ref=e32]: 4\n          - StaticText \"4\"\n        - button \"Increase\" [ref=e33]\n          - image\n        - button \"Decrease\" [ref=e34]\n          - image\n        - region \"子 Agent\" [ref=e35]\n          - generic\n            - StaticText \"子 Agent\"\n            - StaticText \"派发按权重分摊：空闲时先给权重高的，并发时按权重比例分配到各子 Agent；跳过停用或受限的子 Agent。权重为 0–10 的整数，默认 5；0 表示不派给它。\"\n          - button \"添加子 Agent\" [expanded=false, ref=e43]\n            - image\n            - StaticText \"添加子 Agent\"\n          - StaticText \"权重\"\n          - StaticText \"codex_worker\"\n          - LabelText\n            - StaticText \"codex_worker 的权重\"\n          - textbox \"codex_worker 的权重\" [ref=e44]: 5\n            - StaticText \"5\"\n          - button \"Increase\" [ref=e45]\n            - image\n          - button \"Decrease\" [ref=e46]\n            - image\n          - group \"codex_worker 权重预设\"\n            - button \"codex_worker 不派发\" [ref=e62]\n              - StaticText \"不派发\"\n            - button \"codex_worker 默认\" [ref=e63]\n              - StaticText \"默认\"\n            - button \"codex_worker 最高\" [ref=e64]\n              - StaticText \"最高\"\n          - button \"移除 codex_worker\" [ref=e47]\n            - image\n          - StaticText \"qoder_worker\"\n          - StaticText \"免费渠道\"\n          - StaticText \"子 Agent 已停用\"\n          - LabelText\n            - StaticText \"qoder_worker 的权重\"\n          - textbox \"qoder_worker 的权重\" [disabled, ref=e48]: 5\n            - StaticText \"5\"\n          - button \"Increase\" [disabled, ref=e49]\n            - image\n          - button \"Decrease\" [disabled, ref=e50]\n            - image\n          - group \"qoder_worker 权重预设\"\n            - button \"qoder_worker 不派发\" [disabled, ref=e65]\n              - StaticText \"不派发\"\n            - button \"qoder_worker 默认\" [disabled, ref=e66]\n              - StaticText \"默认\"\n            - button \"qoder_worker 最高\" [disabled, ref=e67]\n              - StaticText \"最高\"\n          - button \"移除 qoder_worker\" [ref=e51]\n            - image\n          - StaticText \"opencode_worker\"\n          - StaticText \"免费渠道\"\n          - StaticText \"子 Agent 已停用\"\n          - LabelText\n            - StaticText \"opencode_worker 的权重\"\n          - textbox \"opencode_worker 的权重\" [disabled, ref=e52]: 5\n            - StaticText \"5\"\n          - button \"Increase\" [disabled, ref=e53]\n            - image\n          - button \"Decrease\" [disabled, ref=e54]\n            - image\n          - group \"opencode_worker 权重预设\"\n            - button \"opencode_worker 不派发\" [disabled, ref=e68]\n              - StaticText \"不派发\"\n            - button \"opencode_worker 默认\" [disabled, ref=e69]\n              - StaticText \"默认\"\n            - button \"opencode_worker 最高\" [disabled, ref=e70]\n              - StaticText \"最高\"\n          - button \"移除 opencode_worker\" [ref=e55]\n            - image\n          - StaticText \"grok_worker\"\n          - StaticText \"子 Agent 已停用\"\n          - LabelText\n            - StaticText \"grok_worker 的权重\"\n          - textbox \"grok_worker 的权重\" [disabled, ref=e56]: 5\n            - StaticText \"5\"\n          - button \"Increase\" [disabled, ref=e57]\n            - image\n          - button \"Decrease\" [disabled, ref=e58]\n            - image\n          - group \"grok_worker 权重预设\"\n            - button \"grok_worker 不派发\" [disabled, ref=e71]\n              - StaticText \"不派发\"\n            - button \"grok_worker 默认\" [disabled, ref=e72]\n              - StaticText \"默认\"\n            - button \"grok_worker 最高\" [disabled, ref=e73]\n              - StaticText \"最高\"\n          - button \"移除 grok_worker\" [ref=e59]\n            - image\n    - generic\n      - region \"Notifications\" [ref=e19]\n      - region \"Notifications\" [ref=e20]\n      - region \"Notifications\" [ref=e21]\n      - region \"Notifications\" [ref=e22]\n      - region \"Notifications\" [ref=e23]\n      - region \"Notifications\" [ref=e24]"
+}

@@ -10,7 +10,7 @@ import { ImSettingsStore } from '../../src/main/im/settings';
 const root = mkdtempSync(join(tmpdir(), 'im-budget-'));
 test.after(() => rmSync(root, { recursive: true, force: true }));
 const epoch = '00000000-0000-0000-0000-000000000000';
-const enabled = (workspaces: string[]) => ({ enabled: true, appId: 'cli_budget', appSecret: 'FAKE_SECRET', allowedOpenIds: ['ou_fake'], engine: 'codex', model: 'gpt-test', effort: 'low', workspaces, idleTimeoutMinutes: 30, ownerProfileId: ''});
+const enabled = (workspaces: string[]) => ({ enabled: true, appId: 'cli_budget', appSecret: 'FAKE_SECRET', allowedOpenIds: ['ou_fake'], channel: "default_codex", model: 'gpt-test', effort: 'low', workspaces, idleTimeoutMinutes: 30, ownerProfileId: ''});
 
 test('startup checks the complete generated UTF-16 instructions at the exact shared budget without truncation', () => {
   const paths = [join(root, "项目 'quoted' \\ path 😀")];
@@ -43,7 +43,7 @@ test('all directories may be individually valid while the complete bootstrap is 
   // Genuine v3 files carry no ownerProfileId key, so the fixture strips it.
   const { ownerProfileId: _pin, ...legacyConfig } = enabled(directories);
   void _pin;
-  writeFileSync(store.path, JSON.stringify({ version: 3, revision: 8, config: legacyConfig }), { mode: 0o600 });
+  writeFileSync(store.path, JSON.stringify({ version: 3, revision: 8, config: {...legacyConfig,channel:undefined,engine:legacyConfig.channel.replace('default_','')} }), { mode: 0o600 });
   const legacy = new ImSettingsStore(dataDir);
   assert.equal(legacy.current().revision, 8, 'load does not misclassify an over-budget existing file as corrupt');
   const { appSecret: _secret, ...publicInput } = enabled(directories);
@@ -231,7 +231,7 @@ test('自动模式指令与旧实现逐字一致；预算按实际 pin 计算', 
   assert.ok(budgetLen(workspaces, '') > PARENT_TEXT_MAX - delta, 'auto is within one pin-delta of the budget');
   assert.throws(() => budgetLen(workspaces, maxPin), { code: 'IM_BOOTSTRAP_TOO_LARGE' }, 'the 128-char pin overflows the same list');
   const store = new ImSettingsStore(storeDir);
-  const mkConfig = (ws: string[], pin: string) => ({ enabled: true, appId: 'cli_budget', appSecret: 'FAKE_SECRET', allowedOpenIds: ['ou_fake'], engine: 'codex', model: 'gpt-test', effort: 'low', workspaces: ws, idleTimeoutMinutes: 30, ownerProfileId: pin });
+  const mkConfig = (ws: string[], pin: string) => ({ enabled: true, appId: 'cli_budget', appSecret: 'FAKE_SECRET', allowedOpenIds: ['ou_fake'], channel: "default_codex", model: 'gpt-test', effort: 'low', workspaces: ws, idleTimeoutMinutes: 30, ownerProfileId: pin });
   const savedAuto = store.save({ expectedRevision: 0, config: mkConfig(workspaces, '') });
   assert.equal(savedAuto.revision, 1);
   const bytes = readFileSync(store.path, 'utf8');

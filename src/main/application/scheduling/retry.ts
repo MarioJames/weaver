@@ -128,7 +128,7 @@ export class Retries {
   const route=this.dispatch.routeOf(owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(original.ownerId,owner)),[],undefined,excludedWorkers);
   // An explicit mock attempt stays a mock; a real one never falls back to a fixture because it failed.
   const provider=original.dispatch?.execution==='mock'?'mock-jsonl':undefined;
-  const decision=this.dispatch.decideExecution(route.engine,provider,original,this.policy.snapshot().config.owners[route.owner]?.engine);
+  const decision=this.dispatch.decideExecution(route.engine,provider,original,this.policy.snapshot().config.owners[route.owner]?.channel,route.channel);
   const instruction=this.retryInstruction(original,this.chainRoot(original).instruction);
   if(instruction.length>16000)fail('INVALID_REQUEST',`The retried instruction would be ${instruction.length} characters, over the 16000 task limit; shorten the original goal before retrying. Nothing was cancelled or created.`);
   // The package is only a value here, so the child is frozen under the original scope and criteria before any write.

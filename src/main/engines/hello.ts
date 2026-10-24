@@ -1,3 +1,5 @@
+import { redactSecrets,REDACTED } from '../../shared/redact';
+import { prepareChannelRun, cleanupChannelRun, type ChannelBinding } from '../channels/runtime';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -155,10 +157,10 @@ export interface HelloProcess {
   kill(signal?: NodeJS.Signals): boolean;
   once(event: string, listener: (...args: any[]) => void): unknown;
 }
-export type SpawnPrint = (command: string, argv: string[], cwd: string) => HelloProcess;
+export type SpawnPrint = (command: string, argv: string[], cwd: string, env?: NodeJS.ProcessEnv) => HelloProcess;
 
-const spawnPrint: SpawnPrint = (command, argv, cwd) => {
-  const env = { ...process.env };
+const spawnPrint: SpawnPrint = (command, argv, cwd, suppliedEnv) => {
+  const env = { ...(suppliedEnv ?? process.env) };
   delete env.ELECTRON_RUN_AS_NODE;
   return spawn(command, argv, { cwd, env, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 };
@@ -166,11 +168,12 @@ const spawnPrint: SpawnPrint = (command, argv, cwd) => {
 export function parseHelloInput(value: unknown): HelloInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Probe input must be an object');
   const raw = value as Record<string, unknown>;
-  if (Object.keys(raw).some(key => !['engine', 'model', 'effort'].includes(key))) throw new Error('Unknown probe field');
-  for (const key of ['engine', 'model', 'effort'] as const) {
+  if (Object.keys(raw).some(key => !['channel', 'engine', 'model', 'effort'].includes(key))) throw new Error('Unknown probe field');
+  for (const key of ['channel', 'engine', 'model', 'effort'] as const) {
     if (typeof raw[key] !== 'string' || !raw[key].trim() || raw[key].length > 200) throw new Error(`Probe ${key} is required`);
   }
-  return { engine: raw.engine as string, model: raw.model as string, effort: raw.effort as string };
+  if (raw.channel !== undefined && (typeof raw.channel !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/.test(raw.channel))) throw new Error('Invalid probe channel');
+  return { channel:raw.channel as string, engine: raw.engine as string, model: raw.model as string, effort: raw.effort as string };
 }
 
 function clip(text: string): string {
@@ -185,16 +188,19 @@ type Outcome = Omit<HelloResult, 'durationMs' | 'checkedAt'>;
  * reports whether the model answered. This is a real model call; it proves
  * the route works now, not that it will keep working.
  */
-export function sayHi(route: HelloInput & { kind: string }, deps: { root: string; timeoutMs?: number; signal?: AbortSignal; spawn?: SpawnPrint; /** Confirms a pi model exists before pi is started; a returned message ends the probe without launching. */ checkPiModel?: PiModelCheck }): Promise<HelloResult> {
+export function sayHi(route: Omit<HelloInput,'channel'> & { channel?:string; kind: string; channelConfig?: ChannelBinding }, deps: { root: string; timeoutMs?: number; signal?: AbortSignal; spawn?: SpawnPrint; /** Confirms a pi model exists before pi is started; a returned message ends the probe without launching. */ checkPiModel?: PiModelCheck }): Promise<HelloResult> {
   const started = Date.now();
   const timeoutMs = deps.timeoutMs ?? HELLO_TIMEOUT_MS;
-  const done = (result: Outcome): HelloResult => ({ ...result, durationMs: Date.now() - started, checkedAt: new Date().toISOString() });
+  const safe=(value:string):string=>{const key=route.channelConfig?.secret.apiKey;return redactSecrets(key?value.split(key).join(REDACTED):value);};
+  const done = (result: Outcome): HelloResult => ({ ...result,...(result.error!==undefined?{error:clip(safe(result.error))}:{}),...(result.reply!==undefined?{reply:clip(safe(result.reply))}:{}),...(result.model!==undefined?{model:clip(safe(result.model))}:{}),durationMs: Date.now() - started, checkedAt: new Date().toISOString() });
+  if((route.channel&&!route.channelConfig)||(!deps.spawn&&(!route.channel||!route.channelConfig)))return Promise.resolve(done({ok:false,error:'渠道缺少独立运行配置，请重新导入或配置后重试'}));
+  if(route.channelConfig&&(route.engine!==route.channelConfig.channel.engine||route.kind!==(route.channelConfig.engineKind??route.channelConfig.channel.engine)))return Promise.resolve(done({ok:false,error:'渠道与探测引擎不匹配，请重新选择渠道'}));
   const engine = HELLO_ENGINES[route.kind];
   if (!engine) return Promise.resolve(done({ ok: false, error: `${route.kind} 还没有接入，无法探测。` }));
   // Values become CLI arguments; a leading "-" would be read as a flag.
   if (!MODEL.test(route.model) || route.model.includes('..')) return Promise.resolve(done({ ok: false, error: '模型名称包含不支持的字符。' }));
   if (!EFFORT.test(route.effort)) return Promise.resolve(done({ ok: false, error: '推理强度包含不支持的字符。' }));
-  if (route.kind === 'pi' && deps.checkPiModel) {
+  if (route.kind === 'pi' && !route.channel && deps.checkPiModel) {
     return deps.checkPiModel(route.model).then(
       problem => problem ? done({ ok: false, error: problem }) : probeEngine(),
       error => done({ ok: false, error: `无法确认 pi 是否提供模型 ${route.model}：${error instanceof Error ? error.message : String(error)}，未启动 pi` }),
@@ -203,7 +209,8 @@ export function sayHi(route: HelloInput & { kind: string }, deps: { root: string
   return probeEngine();
   function probeEngine(): Promise<HelloResult> {
     const scratch = join(deps.root, `hello-${randomBytes(4).toString('hex')}`);
-    const cleanup = () => rmSync(scratch, { recursive: true, force: true });
+    let privateRun: ReturnType<typeof prepareChannelRun>|undefined;
+    const cleanup = () => {if(privateRun)cleanupChannelRun(privateRun);rmSync(scratch, { recursive: true, force: true });};
     let child: HelloProcess;
     try {
       mkdirSync(scratch, { recursive: true, mode: 0o700 });
@@ -217,7 +224,9 @@ export function sayHi(route: HelloInput & { kind: string }, deps: { root: string
           return engine.argv(route.model, route.effort, overlayPath);
         })()
         : engine.argv(route.model, route.effort);
-      child = (deps.spawn ?? spawnPrint)(engine.command, argv, scratch);
+      const runtime = privateRun = route.channelConfig ? prepareChannelRun({ ...route.channelConfig, model: route.model, stateDir: scratch }) : undefined;
+      if (runtime) { argv.unshift(...runtime.argv); const ignore=argv.indexOf('--ignore-user-config'); if(ignore>=0)argv.splice(ignore,1); }
+      child = (deps.spawn ?? spawnPrint)(engine.command, argv, scratch, runtime?.env);
     } catch (error) {
       cleanup();
       return Promise.resolve(done({ ok: false, error: error instanceof Error ? error.message : String(error) }));
@@ -241,9 +250,9 @@ export function sayHi(route: HelloInput & { kind: string }, deps: { root: string
         if (timedOut) { resolve(done({ ok: false, error: `等待回复超时（${Math.round(timeoutMs / 1000)} 秒），已停止进程。` })); return; }
         if (spawnError) { resolve(done({ ok: false, error: (spawnError as NodeJS.ErrnoException).code === 'ENOENT' ? `找不到命令 ${engine.command}，确认已安装并在 PATH 中。` : spawnError.message })); return; }
         const parsed = engine.parse(stdout);
-        if (code === 0 && parsed.reply?.trim() && !parsed.error) { resolve(done({ ok: true, reply: clip(parsed.reply), model: parsed.model })); return; }
+        if (code === 0 && parsed.reply?.trim() && !parsed.error) { resolve(done({ ok: true, reply: parsed.reply, model: parsed.model })); return; }
         const stderrLine = stderr.trim().split('\n').filter(Boolean).at(-1) ?? '';
-        resolve(done({ ok: false, model: parsed.model, error: clip(parsed.error || stderrLine || `进程退出码 ${code ?? '未知'}，没有回复。`) }));
+        resolve(done({ ok: false, model: parsed.model, error: parsed.error || stderrLine || `进程退出码 ${code ?? '未知'}，没有回复。` }));
       };
       // Output can still be in flight when the process closes; wait for the stream to drain, briefly.
       let ended = false;

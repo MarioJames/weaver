@@ -21,6 +21,7 @@ export interface QuotaWindow {
 }
 
 export interface EngineQuotaRecord {
+  channel?: string;
   engine: QuotaEngine;
   status: QuotaStatus;
   /** Independent account restriction; included quota-window resets cannot release it. */
@@ -36,7 +37,7 @@ export interface EngineQuotaRecord {
 
 export interface QuotaSchedule { enabled: boolean; intervalMinutes: number; lastRunAt: string | null; nextRunAt: string | null }
 export interface QuotaSnapshot { records: EngineQuotaRecord[]; schedule?: QuotaSchedule }
-export interface QuotaRefreshInput { engine?: QuotaEngine }
+export interface QuotaRefreshInput { engine?: QuotaEngine; channel?: string }
 export interface QuotaRefreshResult extends QuotaSnapshot { snapshot: PolicySnapshot; policyChanged: boolean }
 
 /** Shown for an engine whose CLI is switched to a third-party provider (for example by cc-switch). The renderer matches on this exact text. */

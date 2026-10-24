@@ -1,3 +1,4 @@
+import { roleEngine } from '../shared/policy/channels';
 import type { Config, Block } from '../shared/contracts/policy';
 import type { ProbeOutcome, RunningCommand, StallStatus, TaskHealth } from '../shared/contracts/monitoring';
 import type { Task } from '../shared/contracts/tasks';
@@ -34,7 +35,7 @@ const NS_PER_MS = 1_000_000;
 export type CpuSamples = Record<string, CpuSample[]>;
 
 /** The light call a penalty is lifted with: one enabled worker's own route on the penalized engine. */
-export interface ProbeRoute { engine: string; kind: string; worker: string; model: string; effort: string }
+export interface ProbeRoute { channel: string; engine: string; kind: string; worker: string; model: string; effort: string }
 export type RecoveryProbe = (route: ProbeRoute, signal: AbortSignal) => Promise<ProbeOutcome>;
 
 /** The main-process policy writer, narrowed to what a penalty needs. */
@@ -137,9 +138,9 @@ export function nextPenalty(state: StallState, engine: string, now: number, stal
 function probeRoute(config: Config, engine: string): ProbeRoute | null {
   const target = config.engines[engine];
   if (!target?.enabled) return null;
-  const worker = Object.entries(config.workers).find(([, item]) => item.enabled && item.engine === engine);
+  const worker = Object.entries(config.workers).find(([, item]) => item.enabled && roleEngine(config,item) === engine);
   if (!worker) return null;
-  return { engine, kind: target.kind, worker: worker[0], model: worker[1].model, effort: worker[1].effort };
+  return { channel:worker[1].channel, engine, kind: target.kind, worker: worker[0], model: worker[1].model, effort: worker[1].effort };
 }
 
 /** Is the worker burning CPU in its newest observed interval? Null when nothing was observed to compare. */
@@ -327,7 +328,7 @@ export class StallMonitor {
    */
   resetWorker(engine: string, worker: string): void {
     const snapshot = this.options.policy().snapshot();
-    if (snapshot.config.workers[worker]?.engine !== engine) return;
+    if ((snapshot.config.workers[worker] ? roleEngine(snapshot.config,snapshot.config.workers[worker]!) : undefined) !== engine) return;
     const stillHeld = activeBlocks({ version: 1, blocks: snapshot.blocks }, this.clock()).some(block => block.engine === engine && block.by === STALL_BLOCK_BY);
     const penalty = this.state.engines[engine];
     if (stillHeld || !penalty || !pending(penalty)) return;

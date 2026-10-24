@@ -1,0 +1,7 @@
+{
+  "src/main/channels/import.ts": "6042edf251256c37937fa500be169eb951c012a1d64358a93e56c12ca0601fa1",
+  "src/main/application/tasks/records.ts": "1018a773727f533876884ddcb61f4a7b4f75377dc6786131cbc03d56529efaed",
+  "src/main/transport/handlers.ts": "2cdbe343b7a230707ce1c3f5fff21fb69e0083286a30917cf60aef81b274921b",
+  "src/main/migrate.ts": "08866829eecb3f18ebda2a27cb2aabfdf5216def39afc146fc2960515258df4a",
+  "src/renderer/features/channels/ChannelsPage.tsx": "7fa41b5edd1c3818d1577e61014a51038e7b9b96a50ff705b8db60aa42c6c25c"
+}

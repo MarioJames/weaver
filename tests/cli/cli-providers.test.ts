@@ -20,7 +20,7 @@ test('rejects a missing workspace before any process is started', () => {
   const dir = mkdtempSync(join(tmpdir(), 'weaver-cli-input-'));
   try {
     assert.throws(() => startCliAgent(input(join(dir, 'missing'), 'pi')), (error: unknown) => error instanceof CliAgentInputError && error.field === 'workspace' && /existing directory/.test(error.message));
-    assert.throws(() => prepareCliAgentInput({ ...input(dir, 'codex'), engine: 'claude' as RealEngineKind }), (error: unknown) => error instanceof CliAgentInputError && error.field === 'engine');
+    assert.throws(() => prepareCliAgentInput({ ...input(dir, 'codex'), engine: 'unknown' as RealEngineKind }), (error: unknown) => error instanceof CliAgentInputError && error.field === 'engine');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -30,7 +30,7 @@ test('prepared argv is fixed, keeps the prompt off the command line, and refuses
   try {
     symlinkSync(join(homedir(), '.codex'), link);
     assert.throws(() => prepareCliAgentInput(input(link, 'codex')), (error: unknown) => error instanceof CliAgentInputError && error.field === 'workspace');
-    for (const engine of ['pi', 'opencode', 'grok', 'codex'] as const) {
+    for (const engine of ['claude', 'pi', 'opencode', 'grok', 'codex'] as const) {
       const prepared = prepareCliAgentInput(input(dir, engine));
       assert.equal(prepared.argv[0], engine);
       assert.equal(prepared.argv.some(arg => arg.includes('MARKER-do-not-put-this-on-argv')), false);

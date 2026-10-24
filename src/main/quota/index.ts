@@ -1,3 +1,7 @@
+import { createHash } from 'node:crypto';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { prepareChannelRun, cleanupChannelRun, type ChannelBinding } from '../channels/runtime';
 import type { EngineQuotaRecord, QuotaEngine, QuotaRefreshInput, QuotaSnapshot, QuotaStatus } from '../../shared/contracts/quota';
 import { QUOTA_FRESH_MS } from '../../shared/contracts/quota';
 import { VERSION } from '../../shared/version';
@@ -15,6 +19,8 @@ const MAX_BODY_BYTES = 256 * 1024;
 
 /** Dependency overrides are internal to the main process and tests, never accepted over RPC. */
 export interface QuotaProberOptions {
+  channels?: () => Record<string, ChannelBinding>;
+  root?: string;
   env?: NodeJS.ProcessEnv;
   now?: () => Date;
   fetch?: typeof globalThis.fetch;
@@ -40,6 +46,8 @@ function retryAfter(value: string | null, now: number): number | null {
 }
 
 export class QuotaProber {
+  private readonly channelFailures = new Map<string, EngineQuotaRecord>();
+  private readonly channelProbers = new Map<string, {signature:string;prober:QuotaProber;root:string;cleanup:()=>void}>();
   private readonly records = new Map(ENGINES.map(engine => [engine, initial(engine)]));
   private readonly fingerprints = new Map<QuotaEngine, string>();
   private readonly lastAccounts = new Map<QuotaEngine, string>();
@@ -84,6 +92,15 @@ export class QuotaProber {
   }
 
   get(): QuotaSnapshot {
+    if (this.options.channels) return {records:Object.entries(this.options.channels()).map(([id,binding])=>{
+      const kind=(binding.engineKind??binding.channel.engine) as QuotaEngine;
+      const existing=this.channelFailures.get(id)??this.channelProbers.get(id)?.prober.get().records.find(record=>record.engine===kind)??this.options.snapshotStore?.scope?.(id).load()?.records[kind];
+      const record:EngineQuotaRecord = {...(existing??{...initial((ENGINES.includes(binding.channel.engine as QuotaEngine)?binding.channel.engine:'codex') as QuotaEngine),engine:binding.channel.engine as QuotaEngine}),engine:kind,channel:id,...((binding.channel.kind==='api'||!ENGINES.includes(kind))?{source:'',status:'unsupported' as const,detail:binding.channel.kind==='api'?'API 渠道没有官方订阅额度接口':'该引擎没有可用的官方额度接口',stale:true,windows:[]}: {})};
+      const measured=record.windows.filter(window=>window.scope==='account'&&window.usedPercent!==null);
+      record.stale ||= !record.observedAt||this.clock().getTime()-Date.parse(record.observedAt)>=QUOTA_FRESH_MS||record.statusBasis!=='account_restriction'&&measured.length>0&&measured.every(window=>window.resetsAt!==null&&Date.parse(window.resetsAt)<=this.clock().getTime());
+      if(record.retryAt&&Date.parse(record.retryAt)<=this.clock().getTime())record.retryAt=null;
+      return record;
+    })};
     const now = this.clock().getTime();
     return { records: ENGINES.map(engine => {
       const record = structuredClone(this.records.get(engine)!);
@@ -97,13 +114,34 @@ export class QuotaProber {
 
   async refresh(input: QuotaRefreshInput): Promise<QuotaSnapshot> {
     if (this.closed) throw new Error('额度探测器已关闭');
-    if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(key => key !== 'engine') || input.engine !== undefined && !ENGINES.includes(input.engine)) throw new Error('额度刷新参数无效');
+    if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(key => key !== 'engine' && key !== 'channel') || input.engine !== undefined && !ENGINES.includes(input.engine)) throw new Error('额度刷新参数无效');
+    if (this.options.channels) {
+      const bindings=this.options.channels();
+      if(input.channel&&!Object.hasOwn(bindings,input.channel)) throw new Error('额度渠道不存在');
+      await Promise.all(Object.entries(bindings).filter(([id,binding])=>(!input.channel||input.channel===id)&&(!input.engine||input.engine===binding.channel.engine)).map(async ([id,binding])=>{
+        if(!binding.channel.enabled||binding.channel.kind==='api'||!ENGINES.includes((binding.engineKind??binding.channel.engine) as QuotaEngine))return;
+        const signature=createHash('sha256').update(JSON.stringify(binding)).digest('hex');
+        let cached=this.channelProbers.get(id);
+        if(cached?.signature!==signature){
+          if(cached){await cached.prober.close();cached.cleanup();rmSync(cached.root,{recursive:true,force:true});}
+          if(!this.options.root)throw new Error('渠道额度服务缺少独立临时根');
+          mkdirSync(this.options.root,{recursive:true,mode:0o700});const root=mkdtempSync(join(this.options.root,'quota-'));
+          try {const runtime=prepareChannelRun({...binding,model:'quota',stateDir:root,env:this.env});cached={signature,root,cleanup:()=>cleanupChannelRun(runtime),prober:new QuotaProber({...this.options,channels:undefined,snapshotStore:this.options.snapshotStore?.scope?.(id),env:runtime.env})};this.channelProbers.set(id,cached);}catch(error){rmSync(root,{recursive:true,force:true});this.channelProbers.delete(id);this.channelFailures.set(id,{...initial((binding.engineKind??binding.channel.engine) as QuotaEngine),channel:id,status:'unauthenticated',checkedAt:this.clock().toISOString(),detail:error instanceof Error?error.message:'渠道认证配置不可用'});return;}
+        }
+        this.channelFailures.delete(id);
+        await cached!.prober.refresh({engine:(binding.engineKind??binding.channel.engine) as QuotaEngine});
+      }));
+      return this.get();
+    }
+    if(input.channel)throw new Error('渠道额度服务尚未接线');
     await Promise.all((input.engine ? [input.engine] : ENGINES).map(engine => this.refreshOne(engine)));
     return this.get();
   }
 
   async close(): Promise<void> {
     this.closed = true;
+    await Promise.all([...this.channelProbers.values()].map(async cached=>{await cached.prober.close();cached.cleanup();rmSync(cached.root,{recursive:true,force:true});}));
+    this.channelProbers.clear();
     for (const controller of this.controllers) controller.abort();
     await Promise.allSettled(this.inflight.values());
   }

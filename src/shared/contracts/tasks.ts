@@ -1,6 +1,6 @@
 import type { ContextPack, ContinuationPolicy, HandoffRecord } from './continuation';
 
-export type RealEngineKind = 'opencode' | 'pi' | 'grok' | 'codex' | 'qodercli' | 'dsh';
+export type RealEngineKind = 'claude' | 'opencode' | 'pi' | 'grok' | 'codex' | 'qodercli' | 'dsh';
 
 /** Vendor facts actually present on the event stream. Absent fields stay unknown. */
 export interface CliAgentEvidence {
@@ -25,9 +25,9 @@ export interface OwnerRef { name: string; transport: 'herdr-visible'; session: s
 export interface TaskInput { workspace?: string; acceptanceCriteria?: string[]; constraints?: string[]; title?: string; instruction: string; owner: OwnerRef }
 export interface Artifact { id: string; name: string; mediaType: 'text/plain' | 'text/markdown' | 'application/json'; content: string; createdAt: string }
 export interface TaskEvent { id: string; at: string; kind: 'lifecycle' | 'log' | 'progress' | 'artifact' | 'result' | 'error'; message: string }
-export interface TaskOwnerHost { kind: 'herdr'; session: string; workspaceId: string; paneId: string; /** Exact tab of this host; absent on records created before tab-level launch/cleanup existed. */ tabId?: string; /** Terminal identity read after agent start; absent when the read failed or the record predates it. */ terminalId?: string; /** True only when this launch created the workspace; false/absent means an existing workspace was reused. */ createdWorkspace?: boolean; agentName: string; launchedAt: string }
+export interface TaskOwnerHost { channelStateDir?:string; channelProfilePath?:string; channelEnvironmentPath?:string; kind: 'herdr'; session: string; workspaceId: string; paneId: string; /** Exact tab of this host; absent on records created before tab-level launch/cleanup existed. */ tabId?: string; /** Terminal identity read after agent start; absent when the read failed or the record predates it. */ terminalId?: string; /** True only when this launch created the workspace; false/absent means an existing workspace was reused. */ createdWorkspace?: boolean; agentName: string; launchedAt: string }
 export interface TaskDispatch {
-  owner: string; worker: string; engine: string; model: string; effort: string;
+  owner: string; worker: string; /** Missing only on retained historical routes. */ channel?: string; channelLabel?: string; engine: string; model: string; effort: string;
   /** native: the owner runs this same-engine worker with its built-in subagent tool; no process is launched. */
   execution: 'real' | 'mock' | 'native'; maxParallel: number; maxWaitMinutes?: number;
   adapter?: string; workspace?: string; engineKind?: string; workspaceIdentity?: string;
@@ -36,7 +36,7 @@ export interface AgentRun {
   /** Safe native Console identity captured before launch; never a token. */
   consoleAccount?: { accountID: string; orgID: string; generation: number };
   id: string; adapter: string; execution?: 'real' | 'mock' | 'native'; status: AgentStatus;
-  engine?: string; model?: string; effort?: string; workspace?: string;
+  policyRevision?: number; channel?: string; channelLabel?: string; engine?: string; model?: string; effort?: string; workspace?: string;
   scopeUnit?: string; evidence?: CliAgentEvidence;
   pid?: number; firstOutputAt?: string; startedAt?: string; endedAt?: string; exitCode?: number | null;
   /** Startup permission commit time: absent means the run is still preparing and never allowed to spawn. */
@@ -44,6 +44,8 @@ export interface AgentRun {
   /** Scope attribution: the systemd InvocationID persisted once the identity event lands. */
   scopeInvocation?: string;
   /** Service-side only log/exit locations under stateDir. */
+  channelStateDir?:string;
+  channelProfilePath?:string;
   stateDir?: string;
   logs?: { stdout: string; stderr: string; exit: string; exitTmp?: string };
   /** Pre-spawn fstat of the log files; the anchor for FD-based attribution. */

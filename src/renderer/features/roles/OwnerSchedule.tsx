@@ -22,7 +22,9 @@ export function workerWeightLock(config: Config, workerId: string, blocks: Block
   const worker = config.workers[workerId];
   if (!worker) return undefined;
   if (!worker.enabled) return { label: '子 Agent 已停用', hint: '该子 Agent 已在「子 Agent」页停用，权重保持不变，重新启用后继续生效。' };
-  if (!config.engines[worker.engine]?.enabled) return { label: '引擎已停用', hint: `引擎 ${worker.engine} 已停用，权重保持不变，重新启用后继续生效。` };
+  const channel = config.channels[worker.channel];
+  if (!channel?.enabled) return { label: '渠道已停用', hint: `渠道 ${channel?.label ?? worker.channel} 不可用，请在账号与渠道页检查。` };
+  if (!config.engines[channel.engine]?.enabled) return { label: '引擎已停用', hint: `引擎 ${channel.engine} 已停用，权重保持不变，重新启用后继续生效。` };
   const pause = manualPauseOf(config, blocks, workerId, now);
   if (!pause) return undefined;
   const reason = pause.block.reason.replace(/\s+/g, ' ').trim() || '未说明原因';
@@ -42,7 +44,7 @@ export function workerStatusTag(config: Config, blocks: Block[], workerId: strin
   const availability = availabilityOf(config, activeBlocks({ version: 1, blocks }, Date.now()), worker, workerId);
   if (availability.status !== 'blocked') return undefined;
   // A pause written by the penalty ladders or the free probe says what kind it is; any other block stays a plain restriction.
-  const hit = blockOf(blocks, worker, Date.now(), workerId);
+  const hit = blockOf(blocks, worker, Date.now(), workerId, config);
   const pause = pauseOfBlock(hit);
   const reason = hit ? blockText(hit) : availability.reason;
   return { label: pause?.label ?? '已限制', color: statusTagColor(pause?.tone ?? 'warning'), hint: reason, reason };
@@ -62,7 +64,7 @@ export function OwnerScheduleFields({ config, blocks, record, savedRecord, updat
   return <section aria-label="子 Agent" className={styles.tight}>
     <div className={styles.spread} style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
       <Form.Title title="子 Agent" desc="派发按权重分摊：空闲时先给权重高的，并发时按权重比例分配到各子 Agent；跳过停用或受限的子 Agent。权重为 0–10 的整数，默认 5；0 表示不派给它。" />
-      <DropdownMenu placement="bottomRight" items={available.length ? available.map(id => ({ key: id, label: id, desc: [config.workers[id]?.engine, config.workers[id]?.model].filter(Boolean).join(' · '), onClick: () => { const next = appendWorker(record.workers, available, id); if (next) update({ ...record, workers: next }); } })) : [{ key: 'none', label: '没有可添加的子 Agent', disabled: true }]}>
+      <DropdownMenu placement="bottomRight" items={available.length ? available.map(id => ({ key: id, label: id, desc: [config.channels[config.workers[id]?.channel ?? '']?.label, config.workers[id]?.model].filter(Boolean).join(' · '), onClick: () => { const next = appendWorker(record.workers, available, id); if (next) update({ ...record, workers: next }); } })) : [{ key: 'none', label: '没有可添加的子 Agent', disabled: true }]}>
         <Button size="small" icon={Plus}>添加子 Agent</Button>
       </DropdownMenu>
     </div>

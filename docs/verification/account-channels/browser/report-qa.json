@@ -1,0 +1,19 @@
+{
+  "htmlOpened": true,
+  "viewport390": {
+    "scrollWidth": 390,
+    "viewport": 390,
+    "allImagesLoaded": true
+  },
+  "relativeLinksResolved": true,
+  "printGenerated": true,
+  "printPages": 3,
+  "printContains": {
+    "2152": true,
+    "资源回收": true,
+    "暗主题": true,
+    "React 19": true
+  },
+  "visualChecks": "HTML390px及打印首末页实际打开检查：无裁切，核心内容和限制直接可见",
+  "sensitiveSyntheticValuesAbsent": true
+}

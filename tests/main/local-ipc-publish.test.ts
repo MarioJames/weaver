@@ -21,7 +21,7 @@ async function startOrSkip(t: TestContext, directory: string, handler: (input: n
 }
 
 test('empty discovery + lockHeld starts and archives a .corrupt backup', async t => {
-  const directory = await mkdtemp(join(tmpdir(), 'wv-ipc-'));
+  const directory = await mkdtemp(join(tmpdir(), 't-'));
   try {
     await writeFile(join(directory, 'control.v1.json'), '', { mode: 0o600 });
     const app = await startOrSkip(t, directory, response, { lockHeld: true });
@@ -45,7 +45,7 @@ test('empty discovery + lockHeld starts and archives a .corrupt backup', async t
 });
 
 test('corrupt discovery without lockHeld fails ENDPOINT_EXISTS and is preserved', async t => {
-  const directory = await mkdtemp(join(tmpdir(), 'wv-ipc-'));
+  const directory = await mkdtemp(join(tmpdir(), 't-'));
   try {
     await writeFile(join(directory, 'control.v1.json'), 'not-json{{{', { mode: 0o600 });
     await assert.rejects(startLocalIPC(directory, response), { code: 'ENDPOINT_EXISTS' });
@@ -66,7 +66,7 @@ test('corrupt discovery without lockHeld fails ENDPOINT_EXISTS and is preserved'
 });
 
 test('publish is atomic: no empty discovery is visible before rename', async t => {
-  const directory = await mkdtemp(join(tmpdir(), 'wv-ipc-'));
+  const directory = await mkdtemp(join(tmpdir(), 't-'));
   try {
     let observed = false;
     const app = await startOrSkip(t, directory, response, {
@@ -94,7 +94,7 @@ test('publish is atomic: no empty discovery is visible before rename', async t =
 });
 
 test('lockHeld supersedes a live older instance without breaking inode-checked close', async t => {
-  const directory = await mkdtemp(join(tmpdir(), 'wv-ipc-'));
+  const directory = await mkdtemp(join(tmpdir(), 't-'));
   try {
     const first = await startOrSkip(t, directory, response);
     if (!first) return;

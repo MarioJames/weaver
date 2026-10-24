@@ -1,0 +1,12 @@
+[
+  {
+    "engine": "pi",
+    "nativeMessagesProtocolPreserved": true,
+    "compiledDefaultChat": false
+  },
+  {
+    "engine": "grok",
+    "nativeMessagesProtocolPreserved": true,
+    "compiledDefaultChat": false
+  }
+]

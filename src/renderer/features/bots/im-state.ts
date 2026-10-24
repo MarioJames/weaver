@@ -5,7 +5,6 @@
  */
 import type { ImConfig, ImOwnerProfileOption, ImSettingsSnapshot, SaveImSettingsInput } from '../../../shared/contracts/im';
 import type { Config } from '../../../shared/contracts/policy';
-import { ENGINE_CATALOG } from '../../../shared/engines';
 import { IM_EFFORT_PATTERN, IM_ENGINE_KINDS as IM_ENGINE_LIST, imEngineEffortAllowed, imEngineEfforts, isImEngineKind } from '../../../shared/im-engines';
 
 /** 页面上可编辑的表单值。Secret 只留在内存草稿里，从不写 localStorage 或磁盘。 */
@@ -15,7 +14,7 @@ export interface ImDraft {
   secret: string;
   clearSecret: boolean;
   openIdsText: string;
-  engine: string;
+  channel: string;
   model: string;
   effort: string;
   workspaces: string[];
@@ -58,25 +57,15 @@ const APP_ID_RE = /^cli_[0-9a-f]{16}$/;
 const OPEN_ID_PREFIX = 'ou_';
 
 /** 换引擎后必须重新明确模型；力度只有仍被新引擎支持时才保留，否则按新引擎原生表回退。 */
-export function switchDraftEngine(draft: ImDraft, engine: string, config: Config | undefined): Pick<ImDraft, 'engine' | 'model' | 'effort'> {
-  if (engine === draft.engine) return { engine, model: draft.model, effort: draft.effort };
-  const kind = config?.engines[engine]?.kind;
-  return { engine, model: '', effort: isImEngineKind(kind) && imEngineEffortAllowed(kind, draft.effort) ? draft.effort : fallbackEffort(typeof kind === 'string' ? kind : '') };
+export function switchDraftChannel(draft: ImDraft, channel: string, config: Config | undefined): Pick<ImDraft, 'channel' | 'model' | 'effort'> {
+  if (channel === draft.channel) return { channel, model: draft.model, effort: draft.effort };
+  const kind = config?.engines[config.channels[channel]?.engine ?? '']?.kind;
+  return { channel, model: '', effort: isImEngineKind(kind) && imEngineEffortAllowed(kind, draft.effort) ? draft.effort : fallbackEffort(typeof kind === 'string' ? kind : '') };
 }
 
-/**
- * 模型发现用的目录 ID：只把所选 policy 引擎的 kind 映射到现有目录项的 canonical id，
- * 例如别名 ocode（kind opencode）用 opencode 目录，pi_alt（kind pi）用 pi 目录，
- * Qoder 的 kind qodercli 对应目录 id qoder。仅用于模型列表发现；保存与运行仍用原 alias ID。
- * 同 native kind 的引擎共用同一份模型缓存；切引擎仍按原 draft 规则清空模型。
- */
-export function imModelDiscoveryEngine(engine: string, config: Config | undefined): string {
-  const kind = config?.engines[engine]?.kind;
-  if (typeof kind === 'string') {
-    const canonical = ENGINE_CATALOG.find(entry => entry.kind === kind)?.id;
-    if (canonical) return canonical;
-  }
-  return engine;
+/** 从所选渠道解析实际 policy engine ID；查询同时携带 channel，身份不由引擎全局状态决定。 */
+export function imModelDiscoveryEngine(channel: string, config: Config | undefined): string {
+  return config?.channels[channel]?.engine ?? '';
 }
 
 export function parseOpenIds(text: string): string[] {
@@ -104,7 +93,7 @@ export function draftOf(config: ImConfig): ImDraft {
     secret: '',
     clearSecret: false,
     openIdsText: config.allowedOpenIds.join('\n'),
-    engine: config.engine,
+    channel: config.channel,
     model: config.model,
     effort: config.effort,
     workspaces: [...config.workspaces],
@@ -117,7 +106,7 @@ export function draftOf(config: ImConfig): ImDraft {
 export function valuesMatchConfig(values: ImDraft, config: ImConfig): boolean {
   return values.enabled === config.enabled
     && values.appId.trim() === config.appId
-    && values.engine === config.engine
+    && values.channel === config.channel
     && values.model.trim() === config.model
     && values.effort === config.effort
     && JSON.stringify(values.workspaces) === JSON.stringify(config.workspaces)
@@ -132,7 +121,7 @@ export function modifiedEdit(edit: ImEdit): boolean {
     || edit.values.clearSecret
     || edit.values.enabled !== edit.base.enabled
     || edit.values.appId !== edit.base.appId
-    || edit.values.engine !== edit.base.engine
+    || edit.values.channel !== edit.base.channel
     || edit.values.model !== edit.base.model
     || edit.values.effort !== edit.base.effort
     || edit.values.ownerProfileId !== (edit.base.ownerProfileId ?? '')
@@ -198,7 +187,7 @@ export function savePlan(edit: ImEdit, config: Config | undefined, ownerProfiles
       enabled: values.enabled,
       appId: values.appId.trim(),
       allowedOpenIds: parseOpenIds(values.openIdsText),
-      engine: values.engine,
+      channel: values.channel,
       model: values.model.trim(),
       effort: values.effort,
       workspaces: [...values.workspaces],
@@ -231,14 +220,16 @@ export function validateDraft(draft: ImDraft, saved: ImConfig, config: Config | 
   if (draft.idleTimeoutMinutes === null || !Number.isInteger(draft.idleTimeoutMinutes) || draft.idleTimeoutMinutes < IDLE_RANGE.min || draft.idleTimeoutMinutes > IDLE_RANGE.max) {
     errors.timeout = `空闲超时是 ${IDLE_RANGE.min} 到 ${IDLE_RANGE.max} 之间的整数分钟。`;
   }
-  const engine = config?.engines[draft.engine];
-  if (draft.engine && !/^[A-Za-z0-9_-]{1,128}$/.test(draft.engine)) errors.engine = '引擎标识格式不正确，请重新选择。';
+  const channel = config?.channels[draft.channel];
+  const engine = channel ? config?.engines[channel.engine] : undefined;
+  if (draft.channel && !/^[A-Za-z0-9_-]{1,128}$/.test(draft.channel)) errors.channel = '渠道标识格式不正确，请重新选择。';
   if (draft.model.trim() && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(draft.model.trim())) errors.model = '模型名称格式不正确，可填写字母、数字及 . _ : / -，最多 200 字符。';
   if (draft.effort && !IM_EFFORT_PATTERN.test(draft.effort)) errors.effort = '思考力度格式不正确，请重新选择。';
   if (draft.enabled) {
-    if (!draft.engine) errors.engine = '开启时需要选择支持飞书对话的已启用引擎。';
-    else if (!engine || !isImEngineKind(engine.kind)) errors.engine = '请选择已安装且已启用的飞书对话引擎。';
-    else if (!engine.enabled) errors.engine = '该引擎尚未启用，请先在引擎页启用。';
+    if (!draft.channel) errors.channel = '开启时需要选择支持飞书对话的已启用渠道。';
+    else if (!channel?.enabled) errors.channel = '该渠道尚未启用，请在账号与渠道页检查。';
+    else if (!engine || !isImEngineKind(engine.kind)) errors.channel = '请选择使用已安装、已启用引擎的飞书对话渠道。';
+    else if (!engine.enabled) errors.channel = '该引擎尚未启用，请先在引擎页启用。';
     if (engine && isImEngineKind(engine.kind) && draft.effort && !imEngineEffortAllowed(engine.kind, draft.effort)) {
       errors.effort = engine.kind === 'opencode' ? '请填写该模型接受的 variant（最多 32 字符）。' : '请选择该引擎支持的思考力度。';
     }
@@ -281,6 +272,7 @@ export function ownerSelectValue(value: unknown): string {
 export function ownerProfileOptions(profiles: readonly ImOwnerProfileOption[]): { value: string; label: string; disabled: boolean }[] {
   const suffix: Record<string, string> = {
     disabled: '（已停用）',
+    channel_disabled: '（渠道未启用）',
     engine_disabled: '（引擎未启用）',
     not_launchable: '（不能作为父 Agent 启动）',
     missing: '（已删除）',
@@ -313,6 +305,7 @@ export function ownerProfileError(
   if (found.selectable) return '';
   switch (found.reason) {
     case 'disabled': return '当前选择的父 Agent 已停用，请改选或切换为自动。';
+    case 'channel_disabled': return '当前选择的父 Agent 所属渠道未启用，请改选或切换为自动。';
     case 'engine_disabled': return '当前选择的父 Agent 所属引擎未启用，请改选或切换为自动。';
     case 'not_launchable': return '当前选择的父 Agent 无法启动，请改选或切换为自动。';
     case 'missing':

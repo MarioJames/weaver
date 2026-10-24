@@ -1,5 +1,4 @@
-import type { OpenCodeAccountQuotas } from './opencode-account-quotas';
-import type { OpenCodeConsoleAccounts, OpenCodeConsoleLogin, OpenCodeAccountSwitchInput } from './opencode-accounts';
+import type { ChannelsSnapshot, RefreshChannelQuotaInput, SaveChannelInput, DeleteChannelInput, ImportChannelsInput } from './channels';
 import type { EngineCleanupInput, EngineCleanupJob } from './engine-cleanup';
 import type { ImSettingsSnapshot, SaveImSettingsInput } from './im';
 import type { PolicySnapshot, SavePolicyInput, PreviewInput, RoutePreview, Issue } from './policy';
@@ -12,13 +11,11 @@ export interface EngineScan { probedAt: string; probes: EngineProbeRecord[]; rea
 export interface EngineToggleInput { id: string; enabled: boolean; revision: number }
 export interface EngineToggleResult { snapshot: PolicySnapshot; probe: EngineProbeRecord | null; readiness: EngineReadiness[] }
 export interface WeaverAPI {
- getOpenCodeAccountQuotas(): Promise<OpenCodeAccountQuotas>;
- refreshOpenCodeAccountQuotas(input: { accountID?: string; orgID?: string }): Promise<OpenCodeAccountQuotas>;
- listOpenCodeAccounts(): Promise<OpenCodeConsoleAccounts>;
- startOpenCodeLogin(): Promise<OpenCodeConsoleLogin>;
- getOpenCodeLogin(input: { id: string }): Promise<OpenCodeConsoleLogin | null>;
- cancelOpenCodeLogin(input: { id: string }): Promise<OpenCodeConsoleLogin>;
- switchOpenCodeAccount(input: OpenCodeAccountSwitchInput): Promise<OpenCodeConsoleAccounts>;
+ refreshChannelQuota(input: RefreshChannelQuotaInput): Promise<ChannelsSnapshot>;
+ getChannels(): Promise<ChannelsSnapshot>;
+ saveChannel(input: SaveChannelInput): Promise<ChannelsSnapshot>;
+ deleteChannel(input: DeleteChannelInput): Promise<ChannelsSnapshot>;
+ importChannels(input: ImportChannelsInput): Promise<ChannelsSnapshot>;
  getImSettings(): Promise<ImSettingsSnapshot>;
  saveImSettings(input: SaveImSettingsInput): Promise<ImSettingsSnapshot>;
  reconnectIm(): Promise<ImSettingsSnapshot>;

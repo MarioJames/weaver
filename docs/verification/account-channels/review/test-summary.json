@@ -1,0 +1,19 @@
+{
+  "initialReview": {
+    "existingIsolatedTests": 77,
+    "passed": 77
+  },
+  "finalDeltaReview": {
+    "command": "node --import tsx --test tests/main/channel-runtime.test.ts",
+    "tests": 20,
+    "passed": 20,
+    "failed": 0,
+    "independentBooleanAssertions": 18,
+    "allTrue": true
+  },
+  "realPaidInference": false,
+  "realCredentialsReadByReviewer": false,
+  "persistentProcessesStarted": false,
+  "browserStarted": false,
+  "fixturesRemoved": true
+}

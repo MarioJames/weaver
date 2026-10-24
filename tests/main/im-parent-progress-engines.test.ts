@@ -63,7 +63,7 @@ const CLI_MAIN = new URL('../../src/cli/main.ts', import.meta.url).pathname;
 // Engine card transcript lives in a test-owned temp directory only: it is created
 // under WEAVER_PARENT_TEST_TMPDIR (or TMPDIR) and recycled by test.after. It never
 // touches any pre-existing external evidence path.
-const TRANSCRIPT_ROOT = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-engines-transcript-'));
+const TRANSCRIPT_ROOT = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 't-'));
 test.after(() => { rmSync(TRANSCRIPT_ROOT, { recursive: true, force: true }); });
 const TRANSCRIPT = join(TRANSCRIPT_ROOT, 'engines-transcript.log');
 const transcriptSections: string[] = [];
@@ -213,8 +213,8 @@ async function untilFixturesGone(marker: string, ms = 8000): Promise<void> {
 for (const c of ENGINES) {
   test(`${c.key} 统一进度经后台宿主到达卡片并收口只剩答案`, { timeout: 60000 }, async () => {
     const harness = setupBin(c, c.key === 'dsh' ? 'default' : 'progress');
-    const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), `wh-eng-${c.key}-data-`));
-    const serviceDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), `wh-eng-${c.key}-svc-`));
+    const dataDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'd-'));
+    const serviceDir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 's-'));
     const { runner } = fakeRunnerFactory();
     const { ImService } = await import('../../src/main/im/service');
     const chunks: string[] = [];
@@ -245,7 +245,8 @@ for (const c of ENGINES) {
       config: {
         version: 1,
         engines: { [c.key]: { enabled: true, kind: c.kind } },
-        owners: { main: { enabled: true, engine: c.key, model: c.model, effort: c.effort, workers: [], max_parallel: 1 } },
+        channels:{[`default_${c.key}`]:{engine:c.key,kind:c.kind==='pi'||c.kind==='dsh'?'api':'subscription',label:c.key,enabled:true}},
+        owners: { main: { enabled: true, channel:`default_${c.key}`, model: c.model, effort: c.effort, workers: [], max_parallel: 1 } },
         workers: {}, herdr: { max_wait_minutes: 30 },
       },
       blocks: [], activeBlocks: [], owners: {}, workers: {}, execution: 'disabled',
@@ -254,7 +255,7 @@ for (const c of ENGINES) {
       createBackgroundParentAgent(input, { dataDir, signal: opts?.signal }, { hostCommand: [process.execPath, '--import', 'tsx', CLI_MAIN], startupMs: 45000, runner });
     const service = new ImService({ dataDir: serviceDir, policy, parentFactory: parentFactory as any, channelFactory: factory });
     try {
-      await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'CANARY_SECRET', allowedOpenIds: ['ou_a'], engine: c.key, model: c.model, effort: c.effort, workspaces: [harness.workspace], idleTimeoutMinutes: 1, ownerProfileId: '' } as any });
+      await service.save({ expectedRevision: 0, config: { enabled: true, appId: 'cli_test', appSecret: 'CANARY_SECRET', allowedOpenIds: ['ou_a'], channel:`default_${c.key}`, model: c.model, effort: c.effort, workspaces: [harness.workspace], idleTimeoutMinutes: 1, ownerProfileId: '' } as any });
       for (let i = 0; i < 24; i++) await new Promise(resolve => setImmediate(resolve));
       const now = Date.now();
       handlers.message({

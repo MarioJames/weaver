@@ -197,7 +197,7 @@ test('weighted worker load stays global across owner instances', async () => {
   const f = setup();
   try {
     const s = f.policy.snapshot();
-    s.config.workers.codex_alt_worker = { enabled: true, engine: 'codex', model: 'gpt-6.1-sol', effort: 'high', description: 'Second codex worker for balancing.' };
+    s.config.workers.codex_alt_worker = { enabled: true, channel: "default_codex", model: 'gpt-6.1-sol', effort: 'high', description: 'Second codex worker for balancing.' };
     s.config.owners.codex_owner.workers = [...s.config.owners.codex_owner.workers, 'codex_alt_worker'];
     f.policy.save({ revision: s.revision, config: s.config, blocks: [] });
     const a = f.attach('Pane A', 'session-a');

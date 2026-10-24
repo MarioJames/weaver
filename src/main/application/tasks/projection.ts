@@ -29,6 +29,8 @@ function briefDispatch(dispatch: TaskDispatch): Record<string, unknown> {
   return {
     owner: dispatch.owner,
     worker: dispatch.worker,
+    ...(dispatch.channel ? {channel:dispatch.channel}:{}),
+    ...(dispatch.channelLabel ? {channelLabel:dispatch.channelLabel}:{}),
     engine: dispatch.engine,
     model: dispatch.model,
     effort: dispatch.effort,

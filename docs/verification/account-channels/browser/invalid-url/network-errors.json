@@ -1,0 +1,30 @@
+[
+  {
+    "headers": {
+      "Content-Type": "application/json",
+      "Referer": "http://127.0.0.1:41091/",
+      "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    },
+    "method": "POST",
+    "mimeType": "application/json",
+    "postData": "{\"method\": \"saveChannel\", \"args\": [{\"revision\": 1, \"id\": \"channel_1be76b535f7946a88f93e247\", \"channel\": {\"label\": \"浏览器合成 API\", \"engine\": \"codex\", \"kind\": \"api\", \"enabled\": true, \"provider\": \"openai\", \"baseUrl\": \"ftp://invalid.example\", \"protocol\": \"openai-responses\"}}]}",
+    "requestId": "746741.222",
+    "resourceType": "Fetch",
+    "responseHeaders": {
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "frame-ancestors 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'",
+      "Date": "Sat, 24 Oct 2026 18:11:51 GMT",
+      "Keep-Alive": "timeout=5",
+      "X-Content-Type-Options": "nosniff",
+      "content-length": "161",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "status": 400,
+    "timestamp": 1792865512001,
+    "url": "http://127.0.0.1:41091/api/rpc"
+  }
+]

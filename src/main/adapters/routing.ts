@@ -1,3 +1,4 @@
+import type { ChannelBinding } from '../channels/runtime';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Task } from '../../shared/contracts/tasks';
@@ -20,6 +21,7 @@ export class RoutingWorkerAdapter implements WorkerAdapter {
     private readonly stateRoot: string,
     private readonly packageById: (id: string) => WorkPackage | undefined = () => undefined,
     private readonly startRunFn?: StartCliRunFn,
+    private readonly channelResolver?: (id: string) => ChannelBinding,
   ) {}
   canLaunchReal(): boolean { return typeof this.launch === 'function'; }
   start(task: Task): ManagedProcess {
@@ -36,6 +38,7 @@ export class RoutingWorkerAdapter implements WorkerAdapter {
     const stateDir = join(this.stateRoot, task.id);
     mkdirSync(stateDir, { recursive: true, mode: 0o700 });
     return this.launch({
+      ...this.binding(task),
       engine: kind as RealEngineKind,
       model: task.dispatch.model,
       effort: task.dispatch.effort,
@@ -63,7 +66,8 @@ export class RoutingWorkerAdapter implements WorkerAdapter {
     mkdirSync(stateDir, { recursive: true, mode: 0o700 });
     return this.startRunFn(
       {
-        engine: kind as RealEngineKind,
+        ...this.binding(task),
+      engine: kind as RealEngineKind,
         model: task.dispatch.model,
         effort: task.dispatch.effort,
         workspace,
@@ -75,6 +79,14 @@ export class RoutingWorkerAdapter implements WorkerAdapter {
       },
       beforeSpawn,
     );
+  }
+
+  private binding(task: Task): {channel:string;channelConfig:ChannelBinding} {
+    if (!this.channelResolver) throw new Error('Real launcher requires a channel resolver');
+    if (!task.dispatch?.channel) throw new Error('Real dispatch has no frozen channel; select and freeze a channel before launch');
+    const channelConfig=this.channelResolver(task.dispatch.channel);
+    if(channelConfig.channel.engine!==task.dispatch.engine||(channelConfig.engineKind??channelConfig.channel.engine)!==task.dispatch.engineKind)throw new Error('Frozen channel engine changed; reselect dispatch before launch');
+    return {channel:task.dispatch.channel,channelConfig};
   }
 
   /** Reattach to a persisted file-mode run; emits no launcher records. */

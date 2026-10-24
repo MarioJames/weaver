@@ -1,4 +1,3 @@
-import type { OpenCodeAccountAdmission } from './application/scheduling/opencode-accounts';
 import { ScheduleService, type ScheduleOptions } from './schedules/service';
 import type { CommandResponse } from '../shared/contracts/commands';
 import type { OwnerMessage } from '../shared/contracts/owners';
@@ -33,13 +32,13 @@ export class CommandHandler {
  private readonly continuation:ContinuationService;
   constructor(readonly manager:TaskManager,readonly policy:PolicyStore,
    hostLauncher: typeof launchOwner = launchOwner, herdrPresent: () => boolean = () => herdrOnPath(),
-   diagnostics?: TaskDiagnostics, asyncHost:AsyncOwnerHost = {}, scheduleOptions:Pick<ScheduleOptions,'refreshQuota'|'now'|'dataDir'|'startCli'|'parentFactory'|'checkPiModel'> = {},
-   ownerFollowup:OwnerFollowupOptions = {}, accountAdmission?:OpenCodeAccountAdmission){
+   diagnostics?: TaskDiagnostics, asyncHost:AsyncOwnerHost = {}, scheduleOptions:Pick<ScheduleOptions,'refreshQuota'|'channelConfig'|'now'|'dataDir'|'startCli'|'parentFactory'|'checkPiModel'> = {},
+   ownerFollowup:OwnerFollowupOptions = {}){
    const ownerHost=new MockOwnerHostAdapter();
    const isDraining=()=>this.draining;
    this.continuation=new ContinuationService(manager.store,ownerHost);
    // Historical vendor failures must not recreate a block after an explicit unblock or restart; the seed happens on construction.
-   const vendor=new VendorLimits(manager,policy,accountAdmission);
+   const vendor=new VendorLimits(manager,policy);
    const applyVendorBlocks=()=>vendor.applyVendorBlocks();
    const records=new TaskRecords(manager);
    this.runner=new EffectRunner(manager,hostLauncher,asyncHost);
@@ -49,11 +48,11 @@ export class CommandHandler {
    const owners=new OwnerLifecycle(manager,policy,records,this.continuation,ownerHost,this.runner,isDraining,ownerFollowup);
    const queries=new Queries(manager,policy,records,diagnostics,{transportStatus:()=>this.transportStatus,herdrPresent},task=>dispatch.nextFor(task));
    const mutations=new Mutations(manager,records,policy,a=>owners.register('owners.spawn',a),task=>owners.closeCancelledRoot(task));
-   this.coordinator=new Coordinator(manager,policy,records,dispatch,applyVendorBlocks,taskId=>{results.deliver({taskId});},isDraining,accountAdmission);
+   this.coordinator=new Coordinator(manager,policy,records,dispatch,applyVendorBlocks,taskId=>{results.deliver({taskId});},isDraining);
    this.schedules=new ScheduleService({store:manager.store,policy,createTask:a=>mutations.create(a),notify:()=>manager.notify(),...scheduleOptions,
     command:(command,args,commandId)=>this.handle({apiVersion:'weaver.v1',command,args,commandId})});
    this.gateway=new CommandGateway(manager,this.runner,createRegistry({queries,mutations,results,owners,dispatch,retries,schedules:this.schedules}),isDraining);
-   manager.listeners.add(()=>{accountAdmission?.activityChanged();this.pump();});
+   manager.listeners.add(()=>{this.pump();});
    for(const owner of manager.store.listOwners()) if(owner.host)ownerHost.restore(owner.host as OwnerHostEvidence,(owner.messages??[]) as OwnerMessage[]);
    this.pump();
   }

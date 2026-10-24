@@ -406,3 +406,26 @@ test('a refused setting is left to the field that shows it; other save failures 
     cleanup();
   }
 });
+
+
+test('channel management uses its own public RPCs and forwards metadata separately from secrets', async () => {
+  installOrigin();
+  const gate = installFetch();
+  try {
+    const client = createBrowserClient();
+    const read = client.getChannels();
+    assert.deepEqual(gate.calls[0].body, { method: 'getChannels', args: [] });
+    gate.calls[0].resolve(jsonResponse({ result: { policy: { revision: 4 }, configurations: {} } }));
+    await read;
+    const input = { revision: 4, channel: { engine: 'codex', label: '团队API', kind: 'api' as const, enabled: true, provider: 'team' }, apiKey: 'synthetic-test-key' };
+    const save = client.saveChannel(input);
+    assert.deepEqual(gate.calls[1].body, { method: 'saveChannel', args: [input] });
+    gate.calls[1].resolve(jsonResponse({ result: { policy: { revision: 5 }, configurations: { team: { hasApiKey: true } } } }));
+    await save;
+    const refresh = client.refreshChannelQuota({ channel: 'team' });
+    assert.deepEqual(gate.calls[2].body, { method: 'refreshChannelQuota', args: [{ channel: 'team' }] });
+    gate.calls[2].resolve(jsonResponse({ result: { policy: { revision: 5 }, configurations: {} } }));
+    await refresh;
+    assert.equal(gate.calls.length, 3);
+  } finally { gate.restore(); cleanup(); }
+});

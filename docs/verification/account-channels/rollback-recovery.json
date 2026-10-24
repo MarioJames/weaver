@@ -1,0 +1,9 @@
+{
+  "isolatedCopyOnly": true,
+  "restoredChannels": 6,
+  "metadataRestored": true,
+  "existingSecretPointersAndValuesPreserved": true,
+  "managedAuthFilesUnchanged": true,
+  "roleChannelsRestored": true,
+  "blocksRestored": true
+}

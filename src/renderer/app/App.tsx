@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Bot, CalendarClock, Cpu, ListTodo, MessageSquare, Settings2, UserRound } from 'lucide-react';
+import { Bot, CalendarClock, Cpu, KeyRound, ListTodo, MessageSquare, Settings2, UserRound } from 'lucide-react';
 import { ConsoleBrand, ConsoleNav, ConsoleShell } from '@lobehub/ui/dashboard';
 import { ToastHost } from '@lobehub/ui/base-ui';
 import weaverIcon from '../assets/weaver-icon.png';
 import weaverLockup from '../assets/weaver-lockup.svg';
 import { useWorkbench } from '../features/tasks/useWorkbench';
 import { ownerKindLookup, freeChannelLookup } from '../features/tasks/task-view';
+import { ChannelsPage } from '../features/channels/ChannelsPage';
 import { EnginesPage } from '../features/engines/EnginesPage';
 import { RolesPage } from '../features/roles/RolesPage';
 import { BotsPage } from '../features/bots/BotsPage';
@@ -17,12 +18,13 @@ import { usePolicyDraft } from '../policy/usePolicyDraft';
 import { displayTimeZone } from '../policy/policy-edit';
 import { TimeZoneProvider } from '../format/timezone';
 
-const PAGES = ['tasks', 'schedules', 'engines', 'owners', 'workers', 'bots', 'settings'] as const;
+const PAGES = ['tasks', 'schedules', 'channels', 'engines', 'owners', 'workers', 'bots', 'settings'] as const;
 type Page = typeof PAGES[number];
 
 const NAVIGATION = [
   { href: '/#/tasks', label: '任务', icon: ListTodo },
   { href: '/#/schedules', label: '定时任务', icon: CalendarClock },
+  { href: '/#/channels', label: '账号与渠道', icon: KeyRound },
   { href: '/#/engines', label: '引擎', icon: Cpu },
   { href: '/#/owners', label: '父 Agent', icon: UserRound },
   { href: '/#/workers', label: '子 Agent', icon: Bot },
@@ -90,6 +92,7 @@ export function App() {
       : page === 'schedules' ? <SchedulesPage
           onOpenTask={taskId => { setRequestedTaskId(taskId); open('tasks'); }}
           onPolicyChanged={() => { void policy.load(); }} />
+        : page === 'channels' ? <ChannelsPage policy={policy} />
         : page === 'engines' ? <EnginesPage policy={policy} />
           : page === 'owners' ? <RolesPage key="owners" section="owners" policy={policy} />
             : page === 'workers' ? <RolesPage key="workers" section="workers" policy={policy} />

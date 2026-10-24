@@ -9,6 +9,8 @@ export const STALL_BLOCK_BY = 'weaver-stall';
 export const FREE_PROBE_BLOCK_BY = 'weaver-free-probe';
 /** Vendor rate limit or exhausted quota seen by a dispatch or a probe, plus the whole-engine block that follows from them. */
 export const VENDOR_BLOCK_BY = 'weaver-vendor-limit';
+/** Every worker of one account is limited; this is never an engine installation fault. */
+export const ENGINE_ALL_BLOCKED_REASON = '该引擎全部子 Agent 均被限流/额度耗尽';
 /** Account quota observations, one marker per quota kind: `weaver-quota:<kind>`. */
 export const QUOTA_BLOCK_PREFIX = 'weaver-quota:';
 
@@ -36,7 +38,7 @@ export const PROBE_OWNED_SOURCES: readonly string[] = [STALL_BLOCK_BY, VENDOR_BL
 
 /** A block on a whole engine: no model, no worker. Pass the engine to also require it. */
 export const isEngineBlock = (block: Block, engine?: string): boolean =>
-  (engine === undefined || block.engine === engine) && block.model === undefined && block.worker === undefined;
+  (engine === undefined || block.engine === engine) && block.model === undefined && block.worker === undefined && block.channel === undefined;
 
 /** A block on exactly this engine and worker with no model: the engine itself when no worker is named. */
 export const isScopeBlock = (block: Block, engine: string, worker: string | undefined): boolean =>
@@ -46,18 +48,18 @@ export const isScopeBlock = (block: Block, engine: string, worker: string | unde
 export const isStallEngineBlock = (block: Block, engine: string): boolean => isEngineBlock(block, engine) && block.by === STALL_BLOCK_BY;
 
 /** One worker's saved route, as far as block scope is concerned. */
-export interface BlockRoute { engine: string; worker: string; model: string }
+export interface BlockRoute { channel?: string; engine: string; worker: string; model: string }
 
 /** Does this block reach the route's worker? A worker-level block names exactly one worker. */
 export const reaches = (block: Block, route: BlockRoute): boolean =>
-  block.engine === route.engine && (block.worker === undefined || block.worker === route.worker) && (block.model === undefined || block.model === route.model);
+  block.engine === route.engine && (block.channel === undefined || block.channel === route.channel) && (block.worker === undefined || block.worker === route.worker) && (block.model === undefined || block.model === route.model);
 
 /**
  * A block the probe wrote for the route: its worker, its model and one of its markers (or the given one). A
  * pre-worker block (no worker field) on the same model is still recognised as ours.
  */
 export const ownedOnRoute = (block: Block, route: BlockRoute, by?: string): boolean =>
-  block.engine === route.engine && block.model === route.model && (block.worker === route.worker || block.worker === undefined) &&
+  block.engine === route.engine && (block.channel === undefined || block.channel === route.channel) && block.model === route.model && (block.worker === route.worker || block.worker === undefined) &&
   (by !== undefined ? block.by === by : block.by !== undefined && PROBE_OWNED_SOURCES.includes(block.by));
 
 /** Is this route currently kept out by a block that the probe did not write? */

@@ -1,3 +1,4 @@
+import type { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, symlinkSync }  from 'node:fs';
@@ -14,6 +15,9 @@ import type { CliAgentInput, StartCliAgent } from '../../src/main/adapters/launc
 import { CommandHandler } from '../../src/main/commands';
 import { PolicyStore } from '../../src/main/policy/store';
 import { workspaceIdentity } from '../../src/main/workspace';
+import { ChannelStore } from '../../src/main/channels/store';
+import { ChannelService } from '../../src/main/channels/service';
+import { inheritedChannel } from '../helpers/inherited-channel';
 import { metadataOf } from '../helpers/store-metadata';
 
 function hangProcess(): ManagedProcess {
@@ -46,7 +50,7 @@ function setup(launch?: StartCliAgent, mockTestTimeoutMs?: number) {
   let mockStarts = 0;
   const mock = { id: 'mock-jsonl', start() { mockStarts += 1; throw new Error('mock fallback'); } };
   const seen: CliAgentInput[] = [];
-  const adapter = new RoutingWorkerAdapter(mock, launch ? (input) => { seen.push(input); return launch(input); } : undefined, join(dir, 'agent-state'), id => metadataOf(store).packages.find(pkg => pkg.id === id));
+  const adapter = new RoutingWorkerAdapter(mock, launch ? (input) => { seen.push(input); return launch(input); } : undefined, join(dir, 'agent-state'), id => metadataOf(store).packages.find(pkg => pkg.id === id),undefined,id=>{const config=policy.snapshot().config;const channel=config.channels[id];return {channel,secret:new ChannelStore(store.db).getSecret(id)??{},engineKind:config.engines[channel.engine].kind};});
   const manager = new TaskManager(store, adapter, () => {}, mockTestTimeoutMs, error => { throw error; });
   const policy = new PolicyStore(join(dir,'weaver.db'));
   const handler = new CommandHandler(manager, policy);
@@ -75,7 +79,7 @@ test('server create does not invent a workspace and real dispatch never falls ba
     const claude = f.raw('tasks.create', { title: 'Claude', instruction: 'deferred', owner, workspace: '/tmp' });
     const denied = f.raw('workers.spawn', { taskId: claude.data.id, owner: 'codex_owner', worker: 'claude_worker' });
     assert.equal(denied.ok, false);
-    assert.match(denied.error?.message ?? '', /Claude Code real execution is deferred/);
+    assert.match(denied.error?.message ?? '', /Real launcher for claude is not loaded/);
     assert.equal(f.store.get(claude.data.id).status, 'queued');
     assert.equal(f.mockStarts(), 0);
   } finally { await f.close(); }
@@ -234,7 +238,7 @@ test('explicit mock provider still runs the mock worker from the real runtime ad
   const dir = mkdtempSync(join(tmpdir(), 'weaver-explicit-mock-'));
   const store = new TaskStore(join(dir,'weaver.db'));
   let launched = 0;
-  const adapter = new RoutingWorkerAdapter(new MockWorkerAdapter(process.execPath, resolve('scripts/mock-worker.mjs')), () => { launched += 1; return successProcess(); }, join(dir, 'agent-state'), id => metadataOf(store).packages.find(pkg => pkg.id === id));
+  const adapter = new RoutingWorkerAdapter(new MockWorkerAdapter(process.execPath, resolve('scripts/mock-worker.mjs')), () => { launched += 1; return successProcess(); }, join(dir, 'agent-state'), id => metadataOf(store).packages.find(pkg => pkg.id === id),undefined,id=>{const config=policy.snapshot().config;const channel=config.channels[id];return {channel,secret:new ChannelStore(store.db).getSecret(id)??{},engineKind:config.engines[channel.engine].kind};});
   const manager = new TaskManager(store, adapter);
   const policy = new PolicyStore(join(dir,'weaver.db'));
   const handler = new CommandHandler(manager, policy);
@@ -368,7 +372,7 @@ function attempt(f:ReturnType<typeof setup>,engine:'claude'|'codex',status:'fail
 /** Claude owns this owner, so only a second engine gives dispatch somewhere to move. */
 function addCodexWorker(f:ReturnType<typeof setup>):void {
  const s=f.policy.snapshot();
- s.config.workers.codex_alt_worker={enabled:true,engine:'codex',model:'gpt-6.1-sol',effort:'high',description:'Second codex worker for retry routing.'};
+ s.config.workers.codex_alt_worker={enabled:true,channel:"default_codex",model:'gpt-6.1-sol',effort:'high',description:'Second codex worker for retry routing.'};
  s.config.owners.claude_owner.workers=[...s.config.owners.claude_owner.workers,'codex_alt_worker'];
  f.policy.save({revision:s.revision,config:s.config,blocks:[]});
 }
@@ -383,12 +387,13 @@ test('a retry routes away from the worker that failed it and dispatches the link
   assert.equal(retry.ok,true,JSON.stringify(retry));
   // One owner action: the linked child is routed and dispatched by the same command, with no second call.
   assert.equal(retry.data.retryOf,first);
-  assert.equal(retry.data.status,'running','tasks.retry dispatches the child it just created');
+  assert.equal(retry.data.status,'queued','the accepted CLI retry waits for the coordinator pump');
   assert.deepEqual(retry.data.excludedWorkers,['codex_alt_worker']);
   assert.equal(retry.data.excludedEngines,undefined);
   assert.equal(retry.data.dispatch.engine,'claude');
-  assert.equal(retry.data.dispatch.execution,'native');
-  assert.equal(f.seen.length,0,'a native handoff launches no process');
+  assert.equal(retry.data.dispatch.execution,'real');
+  assert.equal(retry.data.dispatch.channel,'default_claude');
+  assert.equal(f.seen.length,0,'real launches happen after the admission commit');
   const note=f.store.get(retry.data.id).events.find(e=>e.message.startsWith('Policy selected'))!;
   assert.match(note.message,/workers excluded because they failed earlier in this retry chain/);
   assert.match(note.message,/codex_alt_worker/);
@@ -406,14 +411,13 @@ test('a retry routes away from the worker that failed it and dispatches the link
   assert.equal(f.store.get(first).status,'failed');
   assert.equal(f.store.get(first).packageId,originalPackage);
   assert.equal(f.store.get(first).dispatch?.engine,'codex');
-  // A native handoff carries the same full instruction a real worker would be launched with.
-  assert.equal(retry.data.next.action,'run_subagent');
-  assert.equal(retry.data.next.model,'sonnet');
-  assert.equal(retry.data.next.effort,'high');
-  assert.equal(retry.data.next.then,`weaver workers complete --task-id ${retry.data.id} --input report.json`);
-  assert.match(retry.data.next.prompt,/You are a Weaver worker/);
-  assert.ok(retry.data.next.prompt.includes('Read fixture.txt'),'the frozen scope reaches the handoff prompt');
-  assert.ok(retry.data.next.prompt.includes(child.instruction.slice(0,120)),'the handoff prompt carries the retried goal');
+  assert.deepEqual(retry.data.next,{action:'wait',command:`weaver tasks wait --task-id ${retry.data.id}`});
+  for(let i=0;i<20&&f.seen.length===0;i++)await new Promise<void>(resolve=>setImmediate(resolve));
+  assert.equal(f.seen.length,1);
+  assert.equal(f.seen[0].channel,'default_claude');
+  assert.match(f.seen[0].instruction,/You are a Weaver worker/);
+  assert.ok(f.seen[0].instruction.includes('Read fixture.txt'),'the frozen scope reaches the CLI worker');
+  assert.ok(f.seen[0].instruction.includes(child.instruction.slice(0,120)),'the CLI worker receives the retried goal');
  }finally{await f.close();}
 });
 
@@ -462,4 +466,42 @@ test('a chain with no worker left is refused by the retry itself before anything
   assert.equal(f.seen.length,0);
   assert.equal(f.mockStarts(),0);
  }finally{await f.close();}
+});
+
+
+test('editing the same channel secret makes a new child use the current CLI binding instead of inheriting its old parent', async () => {
+  const f=setup(()=>successProcess());
+  try {
+    const secrets=new ChannelStore(f.policy.connection as DatabaseSync);
+    const service=new ChannelService(f.policy,secrets);
+    let snapshot=f.policy.snapshot();
+    snapshot.config.channels.claude_api={engine:'claude',kind:'api',enabled:true,label:'Fixture API'};
+    snapshot.config.owners.claude_owner.channel='claude_api';
+    snapshot.config.workers.claude_worker.channel='claude_api';
+    f.policy.save({revision:snapshot.revision,config:snapshot.config,blocks:snapshot.blocks});
+    secrets.putSecret('claude_api',{apiKey:'old-fixture-key'});
+    const first=f.raw('tasks.create',{title:'Inherited child',instruction:'fixture',workspace:f.dir,ownerProfileId:'claude_owner'});
+    assert.equal(first.ok,true,JSON.stringify(first));
+    inheritedChannel(f.store,first.data.id,'claude_api');
+    const parent=f.store.get(first.data.id).parentTaskId!;
+    const native=f.raw('workers.spawn',{taskId:first.data.id,worker:'claude_worker'});
+    assert.equal(native.ok,true,JSON.stringify(native));
+    assert.equal(native.data.dispatch.execution,'native');
+    assert.equal(f.seen.length,0);
+    assert.equal(f.raw('workers.complete',{taskId:first.data.id,expectedRevision:f.store.get(first.data.id).revision,outcome:'completed',summary:'done'}).ok,true);
+    snapshot=f.policy.snapshot();
+    service.save({revision:snapshot.revision,id:'claude_api',channel:snapshot.config.channels.claude_api,apiKey:'new-fixture-key'});
+    const second=f.raw('tasks.create',{title:'Fresh child',instruction:'fixture',workspace:f.dir,ownerId:first.data.ownerId});
+    assert.equal(second.ok,true,JSON.stringify(second));
+    const child=f.store.get(second.data.id);child.parentTaskId=parent;f.store.put(child);
+    const fresh=f.raw('workers.spawn',{taskId:child.id,worker:'claude_worker'});
+    assert.equal(fresh.ok,true,JSON.stringify(fresh));
+    assert.equal(fresh.data.dispatch.execution,'real');
+    assert.equal(fresh.data.dispatch.channel,'claude_api');
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(f.seen.length,1);
+    assert.equal(f.seen[0].channelConfig?.secret?.apiKey,'new-fixture-key');
+    assert.equal(f.store.get(parent).run?.channel,'claude_api');
+    assert.notEqual(f.store.get(parent).run?.policyRevision,f.policy.snapshot().revision);
+  } finally {await f.close();}
 });

@@ -41,8 +41,8 @@ test('tasks.report/overview round-trip over real service and real CLI transport'
   // (base + control-<32 hex> + ipc.sock, 103-byte cap) cannot fit under a long
   // task scratch path, so both the input dir and the service dataDir are
   // short-lived directories under os.tmpdir(); both are removed in finally.
-  const scratchDir = mkdtempSync(join(tmpdir(), 'wvr-rp-input-'));
-  const dataDir = mkdtempSync(join(tmpdir(), 'wvr-rp-'));
+  const scratchDir = mkdtempSync(join(tmpdir(), 't-'));
+  const dataDir = mkdtempSync(join(tmpdir(), 't-'));
   const quota = new QuotaProber({ env: { HOME: dataDir } });
   quota.refresh = async () => quota.get();
   const runtime = await startRuntime({

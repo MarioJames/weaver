@@ -1,3 +1,4 @@
+import { inheritedChannel } from '../helpers/inherited-channel';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -29,7 +30,7 @@ function setup() {
   const raw = (command: string, args: Record<string, unknown> = {}) => handler.handle({ apiVersion: 'weaver.v1', commandId: randomUUID(), command, args });
   const call = (command: string, args: Record<string, unknown> = {}): any => { const r = raw(command, args); assert.equal(r.ok, true, JSON.stringify(r)); return r.data; };
   // Without an ownerId each create registers its own owner instance; passing one keeps the work on that instance.
-  const task = (ownerId?: string) => call('tasks.create', { title: 'Native', goal: 'edit a file', workspace: dir, ...(ownerId === undefined ? { ownerProfileId: 'claude_owner' } : { ownerId }) });
+  const task = (ownerId?: string) => {const created=call('tasks.create', { title: 'Native', goal: 'edit a file', workspace: dir, ...(ownerId === undefined ? { ownerProfileId: 'claude_owner' } : { ownerId }) });inheritedChannel(store,created.id);return created;};
   return { dir, store, policy, call, raw, task, close: async () => { handler.draining = true; await manager.shutdown(); rmSync(dir, { recursive: true, force: true }); } };
 }
 

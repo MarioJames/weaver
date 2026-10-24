@@ -1,3 +1,4 @@
+import { roleEngine } from '../../../shared/policy/channels';
 import { randomUUID } from 'node:crypto';
 import { API_VERSION, type CommandResponse } from '../../../shared/contracts/commands';
 import type { LogicalOwner, OwnerInstance } from '../../../shared/contracts/owners';
@@ -104,14 +105,14 @@ export class OwnerLifecycle {
     if(!workspace)throw new OwnerLaunchError('OWNER_LAUNCH_FAILED','Task has no workspace to launch the owner in');
     const config=this.policy.snapshot().config;const ownerConfig=config.owners[profile];
     if(!ownerConfig)throw new OwnerLaunchError('OWNER_LAUNCH_FAILED',`Owner profile ${profile} is missing from the policy`);
-    launched=(yield {kind:'launch',input:{taskId:task.id,epoch,title:task.title,workspace,engineKind:config.engines[ownerConfig.engine]?.kind??'',model:ownerConfig.model,effort:ownerConfig.effort,prompt}})!;
+    launched=(yield {kind:'launch',input:{taskId:task.id,epoch,title:task.title,workspace,channel:ownerConfig.channel,channelConfig:this.followupOptions.channelConfig?.(ownerConfig.channel),channelStateDir:this.followupOptions.channelStateDir,engineKind:config.engines[roleEngine(config,ownerConfig)]?.kind??'',model:ownerConfig.model,effort:ownerConfig.effort,prompt}})!;
     const fresh=current();
     if(!fresh){
      // A newer binding or shutdown owns the task now. Only this attempt's successful host is disposable.
      cleanupAttempted=true;try{yield {kind:'close',host:launched};}catch(error){throw new OwnerLaunchError('OWNER_LAUNCH_FAILED',`Owner launch superseded; host cleanup failed: ${error instanceof Error?error.message:String(error)}`);}
      throw new OwnerLaunchError('OWNER_LAUNCH_FAILED','Owner launch superseded by a newer binding or app shutdown');
     }
-    ownerHost={kind:'herdr',session:launched.session,workspaceId:launched.workspaceId,paneId:launched.paneId,...(launched.tabId?{tabId:launched.tabId}:{}),...(launched.terminalId?{terminalId:launched.terminalId}:{}),...(launched.createdWorkspace===undefined?{}:{createdWorkspace:launched.createdWorkspace}),agentName:launched.agentName,launchedAt:new Date().toISOString()};
+    ownerHost={...(launched.channelStateDir?{channelStateDir:launched.channelStateDir}:{}),...(launched.channelProfilePath?{channelProfilePath:launched.channelProfilePath}:{}),...(launched.channelEnvironmentPath?{channelEnvironmentPath:launched.channelEnvironmentPath}:{}),kind:'herdr',session:launched.session,workspaceId:launched.workspaceId,paneId:launched.paneId,...(launched.tabId?{tabId:launched.tabId}:{}),...(launched.terminalId?{terminalId:launched.terminalId}:{}),...(launched.createdWorkspace===undefined?{}:{createdWorkspace:launched.createdWorkspace}),agentName:launched.agentName,launchedAt:new Date().toISOString()};
     fresh.ownerHost=ownerHost;event(fresh,'lifecycle',`Started ${profile} in Herdr (${ownerHost.agentName})`);this.records.put(fresh);
     return {ownerHost};
    }catch(error){
@@ -173,7 +174,7 @@ export class OwnerLifecycle {
   const snapshot=this.policy.snapshot();
   const owner=task.ownerId?this.manager.store.getOwner(task.ownerId):undefined;
   const profile=owner?snapshot.config.owners[owner.profileId]:undefined;
-  const engineKind=profile?snapshot.config.engines[profile.engine]?.kind:undefined;
+  const engineKind=profile?snapshot.config.engines[roleEngine(snapshot.config,profile)]?.kind:undefined;
   try{
    const delivered=deliverOwnerFollowup({host,taskId:task.id,message,source,engineKind:String(engineKind??'')},this.followupOptions);
    const fresh=this.manager.store.get(task.id);
@@ -196,13 +197,13 @@ export class OwnerLifecycle {
   if(!task.ownerId)fail('INVALID_STATE','Root task must be bound to an owner profile');
   const owner=this.records.owner(task.ownerId);const snapshot=this.policy.snapshot();const profile=snapshot.config.owners[owner.profileId];
   if(snapshot.owners[owner.profileId]?.status!=='available'||!profile)fail('POLICY_DENIED','Owner profile is unavailable');
-  const engineKind=snapshot.config.engines[profile.engine]?.kind;
+  const engineKind=snapshot.config.engines[roleEngine(snapshot.config,profile)]?.kind;
   if(engineKind!=='claude'&&engineKind!=='codex')fail('OWNER_LAUNCH_UNSUPPORTED','Root owner requires a claude or codex profile');
   task.workspace=absoluteExistingWorkspace(task.workspace);
   // A fresh launch uses the full task briefing; the old context pack targets the previous epoch.
   if(restart){task.ownerEpoch=(task.ownerEpoch??0)+1;delete task.contextPack;}delete task.failure;
   task.executionRole='owner';task.status='running';task.ownerLastActivityAt=new Date().toISOString();
-  task.run={id:randomUUID(),adapter:'native',execution:'native',status:'running',startedAt:new Date().toISOString(),engine:profile.engine,model:profile.model,effort:profile.effort,workspace:task.workspace};
+  task.run={policyRevision:snapshot.revision,id:randomUUID(),adapter:'native',execution:'native',status:'running',startedAt:new Date().toISOString(),channel:profile.channel,channelLabel:snapshot.config.channels[profile.channel]?.label,engine:roleEngine(snapshot.config,profile),model:profile.model,effort:profile.effort,workspace:task.workspace};
   event(task,'lifecycle','Starting root owner in Herdr; the owner will describe, split, dispatch and review child tasks');this.records.put(task);
   // Defer the external effect until after the command has persisted its immediate receipt.
   this.runner.runDeferred(()=>this.launchRoot(task,owner.profileId));

@@ -22,12 +22,12 @@ const mode = (path: string) => statSync(path).mode & 0o777;
 
 const enabledInput = (overrides: Partial<Extract<SaveImSettingsInput['config'], { appSecret?: string }>> = {}, appSecret = 'secret-one'): SaveImSettingsInput => ({
   expectedRevision: 0,
-  config: { enabled: true, appId: 'cli_testapp', allowedOpenIds: ['ou_owner'], engine:'codex',model:'gpt-test',effort:'medium', workspaces: [ROOT], idleTimeoutMinutes: 30, ownerProfileId: '', appSecret, ...overrides } as SaveImSettingsInput['config'],
+  config: { enabled: true, appId: 'cli_testapp', allowedOpenIds: ['ou_owner'], channel:"default_codex",model:'gpt-test',effort:'medium', workspaces: [ROOT], idleTimeoutMinutes: 30, ownerProfileId: '', appSecret, ...overrides } as SaveImSettingsInput['config'],
 });
 
 const disabledInput = (): SaveImSettingsInput => ({
   expectedRevision: 0,
-  config: { enabled: false, appId: '', allowedOpenIds: [], engine:'',model:'',effort:'medium', workspaces: [], idleTimeoutMinutes: 30, ownerProfileId: ''},
+  config: { enabled: false, appId: '', allowedOpenIds: [], channel:'',model:'',effort:'medium', workspaces: [], idleTimeoutMinutes: 30, ownerProfileId: ''},
 });
 
 // --- Settings store: defaults and private file handling ---
@@ -82,7 +82,7 @@ test('settings: publicImConfig exposes a boolean and never the secret', () => {
   const store = new ImSettingsStore(dir);
   const saved = store.save(enabledInput());
   const pub = publicImConfig(saved.config);
-  assert.deepEqual(Object.keys(pub).sort(), ['allowedOpenIds', 'appId', 'appSecretConfigured', 'effort', 'enabled', 'engine', 'idleTimeoutMinutes', 'model', 'ownerProfileId', 'workspaces']);
+  assert.deepEqual(Object.keys(pub).sort(), ['allowedOpenIds', 'appId', 'appSecretConfigured', 'channel', 'effort', 'enabled', 'idleTimeoutMinutes', 'model', 'ownerProfileId', 'workspaces']);
   assert.equal(pub.appSecretConfigured, true);
   const cleared = publicImConfig(store.save({ expectedRevision: 1, config: { ...enabledInput().config, enabled: false, appSecret: '' } }).config);
   assert.equal(cleared.appSecretConfigured, false);
@@ -166,7 +166,7 @@ test('settings: save and load share one secret rule — a value that cannot be r
 test('settings: a disabled draft enforces the same secret rule and formatted history still loads', () => {
   const dir = scratch('secret-draft');
   const store = new ImSettingsStore(dir);
-  const draft = { enabled: false, appId: '', allowedOpenIds: [] as string[], engine:'',model:'',effort:'medium', workspaces: [], idleTimeoutMinutes: 30, ownerProfileId: ''};
+  const draft = { enabled: false, appId: '', allowedOpenIds: [] as string[], channel:'',model:'',effort:'medium', workspaces: [], idleTimeoutMinutes: 30, ownerProfileId: ''};
   store.save({ expectedRevision: 0, config: draft });
   assert.throws(() => store.save({ expectedRevision: 1, config: { ...draft, appSecret: ' padded ' } }), (error: unknown) =>
     error instanceof ImSettingsError && error.code === 'IM_SETTINGS_INVALID');
@@ -230,14 +230,14 @@ test('settings: unknown fields are rejected in input and on disk', () => {
 test('settings: disabled mode tolerates an incomplete config but not a malformed one', () => {
   const dir = scratch('partial');
   const store = new ImSettingsStore(dir);
-  const saved = store.save({ expectedRevision: 0, config: { enabled: false, appId: '', allowedOpenIds: [], engine:'',model:'',effort:'medium', workspaces: [], idleTimeoutMinutes: 30, ownerProfileId: ''} });
+  const saved = store.save({ expectedRevision: 0, config: { enabled: false, appId: '', allowedOpenIds: [], channel:'',model:'',effort:'medium', workspaces: [], idleTimeoutMinutes: 30, ownerProfileId: ''} });
   assert.equal(saved.config.enabled, false);
   // Malformed values stay malformed even when disabled.
-  assert.throws(() => store.save({ expectedRevision: 1, config: { enabled: false, appId: 'bad id!', allowedOpenIds: [], engine:'',model:'',effort:'medium', workspaces: [], idleTimeoutMinutes: 30, ownerProfileId: ''} }), (error: unknown) =>
+  assert.throws(() => store.save({ expectedRevision: 1, config: { enabled: false, appId: 'bad id!', allowedOpenIds: [], channel:'',model:'',effort:'medium', workspaces: [], idleTimeoutMinutes: 30, ownerProfileId: ''} }), (error: unknown) =>
     error instanceof ImSettingsError && error.code === 'IM_SETTINGS_INVALID');
-  assert.throws(() => store.save({ expectedRevision: 1, config: { enabled: false, appId: '', allowedOpenIds: [], engine:'',model:'',effort:'medium', workspaces: [], idleTimeoutMinutes: 0, ownerProfileId: ''} }), (error: unknown) =>
+  assert.throws(() => store.save({ expectedRevision: 1, config: { enabled: false, appId: '', allowedOpenIds: [], channel:'',model:'',effort:'medium', workspaces: [], idleTimeoutMinutes: 0, ownerProfileId: ''} }), (error: unknown) =>
     error instanceof ImSettingsError && error.code === 'IM_SETTINGS_INVALID');
-  assert.throws(() => store.save({ expectedRevision: 1, config: { enabled: false, appId: '', allowedOpenIds: ['ou_a', 'ou_a'], engine:'',model:'',effort:'medium', workspaces: [], idleTimeoutMinutes: 30, ownerProfileId: ''} }), (error: unknown) =>
+  assert.throws(() => store.save({ expectedRevision: 1, config: { enabled: false, appId: '', allowedOpenIds: ['ou_a', 'ou_a'], channel:'',model:'',effort:'medium', workspaces: [], idleTimeoutMinutes: 30, ownerProfileId: ''} }), (error: unknown) =>
     error instanceof ImSettingsError && error.code === 'IM_SETTINGS_INVALID');
 });
 
@@ -248,7 +248,7 @@ test('settings: enabling requires appId, secret, engine/model/effort, allowlist 
   for (const missing of [
     { ...base, appId: '' },
     { ...base, appSecret: '' },
-    { ...base, engine: '' },
+    { ...base, channel: '' },
     { ...base, model: '' },
     { ...base, effort: '' },
     { ...base, allowedOpenIds: [] },
@@ -488,34 +488,34 @@ test('inbox: interleaved claims stay serial and at-most-once', () => {
   assert.equal(inbox.claim('om_after_delete', START), true);
 });
 
- test('settings: strict v4 roundtrip and explicit legacy failure preserve bytes',()=>{
+ test('settings: strict v5 roundtrip and explicit legacy failure preserve bytes',()=>{
  const dir=scratch('v2');const store=new ImSettingsStore(dir);store.save(enabledInput());const path=join(dir,'im-settings.json');
- const v2=JSON.parse(readFileSync(path,'utf8'));assert.equal(v2.version,4);assert.equal(new ImSettingsStore(dir).current().config.model,'gpt-test');
- const legacy={...v2,version:1,config:{...v2.config,ownerProfileId:'legacy'}};delete legacy.config.engine;delete legacy.config.model;delete legacy.config.effort;const bytes=JSON.stringify(legacy);writeFileSync(path,bytes,{mode:0o600});
+ const v2=JSON.parse(readFileSync(path,'utf8'));assert.equal(v2.version,5);assert.equal(new ImSettingsStore(dir).current().config.model,'gpt-test');
+ const legacy={...v2,version:1,config:{...v2.config,ownerProfileId:'legacy'}};delete legacy.config.channel;delete legacy.config.model;delete legacy.config.effort;const bytes=JSON.stringify(legacy);writeFileSync(path,bytes,{mode:0o600});
  assert.throws(()=>new ImSettingsStore(dir).current(),{code:'IM_SETTINGS_CORRUPT'});assert.throws(()=>new ImSettingsStore(dir).save(disabledInput()),{code:'IM_SETTINGS_CORRUPT'});assert.equal(readFileSync(path,'utf8'),bytes);
  });
 
 test('settings: malformed independent route fields cannot overwrite a disabled draft',()=>{
  const dir=scratch('route-input');const store=new ImSettingsStore(dir);store.save(disabledInput());const path=join(dir,'im-settings.json');const bytes=readFileSync(path,'utf8');
- for(const patch of [{engine:'bad engine'},{engine:'x'.repeat(129)},{model:'x;echo bad'},{model:'x'.repeat(201)},{effort:'high\n'},{effort:'x'.repeat(33)}]){
+ for(const patch of [{channel:"default_bad engine"},{channel:`default_${'x'.repeat(129)}`},{model:'x;echo bad'},{model:'x'.repeat(201)},{effort:'high\n'},{effort:'x'.repeat(33)}]){
  assert.throws(()=>store.save({expectedRevision:1,config:{...disabledInput().config,...patch}}),{code:'IM_SETTINGS_INVALID'});assert.equal(readFileSync(path,'utf8'),bytes);
  }
 });
 
-test('settings: v2 normalizes without write/revision change, then CAS saves v4 preserving private values',()=>{
+test('settings: v2 normalizes without write/revision change, then CAS saves v5 preserving private values',()=>{
  const dir=scratch('migration');const path=join(dir,'im-settings.json');const {workspaces,ownerProfileId: _pin, ...config}=enabledInput({effort:'low'}).config;
  void _pin;
- const old={version:2,revision:4,config:{...config,workspace:ROOT}};const bytes=JSON.stringify(old);writeFileSync(path,bytes,{mode:0o600});
+ const old={version:2,revision:4,config:{...config,channel:undefined,engine:config.channel.replace('default_',''),workspace:ROOT}};const bytes=JSON.stringify(old);writeFileSync(path,bytes,{mode:0o600});
  const store=new ImSettingsStore(dir);const loaded=store.current();assert.equal(loaded.revision,4);assert.deepEqual(loaded.config.workspaces,[ROOT]);assert.equal(loaded.config.appSecret,'secret-one');assert.equal(loaded.config.effort,'low');assert.equal(readFileSync(path,'utf8'),bytes);
  assert.throws(()=>store.save({...enabledInput(),expectedRevision:3}),{code:'IM_SETTINGS_CONFLICT'});assert.equal(readFileSync(path,'utf8'),bytes);
  const {appSecret,...publicInput}=loaded.config;
  chmodSync(dir,0o500);try { assert.throws(()=>store.save({expectedRevision:4,config:publicInput}),{code:'IM_SETTINGS_IO'});assert.equal(readFileSync(path,'utf8'),bytes);assert.deepEqual(store.current(),loaded); } finally { chmodSync(dir,0o700); }
- const saved=store.save({expectedRevision:4,config:publicInput});assert.deepEqual(saved,{revision:5,config:loaded.config});assert.equal(JSON.parse(readFileSync(path,'utf8')).version,4);assert.equal(mode(path),0o600);
+ const saved=store.save({expectedRevision:4,config:publicInput});assert.deepEqual(saved,{revision:5,config:loaded.config});assert.equal(JSON.parse(readFileSync(path,'utf8')).version,5);assert.equal(mode(path),0o600);
 });
 test('settings: unavailable saved directories remain readable; rejected replacement preserves bytes',()=>{
  const dir=scratch('missing-project');const path=join(dir,'im-settings.json');const full=enabledInput().config;const {ownerProfileId: _pin, ...genuineV3}=full;
  void _pin;
- const cfg={...full,workspaces:[join(dir,'missing')]};const bytes=JSON.stringify({version:3,revision:2,config:{...genuineV3,workspaces:[join(dir,'missing')]}});writeFileSync(path,bytes,{mode:0o600});
+ const cfg={...full,workspaces:[join(dir,'missing')]};const bytes=JSON.stringify({version:3,revision:2,config:{...genuineV3,channel:undefined,engine:genuineV3.channel.replace('default_',''),workspaces:[join(dir,'missing')]}});writeFileSync(path,bytes,{mode:0o600});
  const store=new ImSettingsStore(dir);assert.deepEqual(store.current().config.workspaces,cfg.workspaces);assert.equal(store.current().config.ownerProfileId,'');assert.throws(()=>store.save({expectedRevision:2,config:cfg}),{code:'IM_SETTINGS_INVALID'});assert.equal(readFileSync(path,'utf8'),bytes);assert.equal(existsSync(cfg.workspaces[0]!),false);
  assert.equal(store.save({expectedRevision:2,config:{...cfg,workspaces:[ROOT]}}).revision,3);
 });
@@ -567,7 +567,8 @@ test('settings: genuine v2/v3 files without ownerProfileId migrate in memory to 
     const base = enabledInput().config;
     const { ownerProfileId: _drop, workspaces: _ws, ...fields } = base;
     void _drop; void _ws;
-    const fileConfig = version === 2 ? { ...fields, workspace: ROOT } : { ...fields, workspaces: [ROOT] };
+    const legacyFields={...fields,channel:undefined,engine:fields.channel.replace('default_','')};
+    const fileConfig = version === 2 ? { ...legacyFields, workspace: ROOT } : { ...legacyFields, workspaces: [ROOT] };
     assert.ok(!Object.hasOwn(fileConfig, 'ownerProfileId'), 'fixture models a genuine old file');
     const bytes = JSON.stringify({ version, revision: 6, config: fileConfig });
     writeFileSync(path, bytes, { mode: 0o600 });
@@ -582,7 +583,7 @@ test('settings: genuine v2/v3 files without ownerProfileId migrate in memory to 
     const saved = store.save({ expectedRevision: 6, config: publicInput });
     assert.equal(saved.revision, 7);
     assert.equal(saved.config.ownerProfileId, '');
-    assert.equal(JSON.parse(readFileSync(path, 'utf8')).version, 4);
+    assert.equal(JSON.parse(readFileSync(path, 'utf8')).version, 5);
     assert.equal(mode(path), 0o600);
   }
 });
