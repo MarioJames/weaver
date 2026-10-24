@@ -1,0 +1,67 @@
+{
+  "status": "passed",
+  "version": "0.7.9",
+  "release_url": "https://github.com/MarioJames/weaver/releases/tag/v0.7.9",
+  "workflow_url": "https://github.com/MarioJames/weaver/actions/runs/40063941257",
+  "workflow_conclusion": "success",
+  "published_at": "2026-10-24T04:55:19Z",
+  "release_commit": "81624db4f1933e2af0e32e158f06c44d3b0d106d",
+  "feature_commit": "bdf507efd6029b03cda9dc055f1bd8a4ae397099",
+  "branch": "main",
+  "tag": "v0.7.9",
+  "tag_and_remote_branch_verified_at_publication": true,
+  "next_changelog_range": "v0.7.9..HEAD",
+  "ci": {
+    "tests": 2133,
+    "passed": 2099,
+    "failed": 0,
+    "skipped": 34,
+    "typecheck": "passed",
+    "build": "passed",
+    "all_published_target_builds": "passed",
+    "artifact_install_and_cli_smoke": "passed",
+    "notes": "CI conditional skips differ from local run, including opt-in native fixture integrations. Existing GitHub action Node runtime deprecation annotations did not block publication."
+  },
+  "installed_binary": {
+    "asset": "weaver-linux-x64",
+    "sha256": "f31651698a9a6fa044165b7e932f8088f5e9efbfeb436138a3a52f74cc0d1697",
+    "matches_published_SHA256SUMS": true
+  },
+  "runtime": {
+    "version": "0.7.9",
+    "status": "running",
+    "managed_by": "systemd user service",
+    "url": "http://127.0.0.1:4737",
+    "workers_before_restart": 0,
+    "workers_after_restart": 0,
+    "started_at": "2026-10-24T04:55:50.991Z"
+  },
+  "local_verification": {
+    "schema_unchanged": true,
+    "all_existing_task_ids_preserved": true,
+    "policy_configuration_unchanged": true,
+    "im_settings_unchanged": true,
+    "counts_not_decreased": {
+      "tasks": true,
+      "task_events": true,
+      "artifacts": true,
+      "owners": true,
+      "packages": true,
+      "receipts": true
+    },
+    "http_root_200": true,
+    "new_ui_shipped": true,
+    "readonly_account_quota_rpc_200": true,
+    "account_quota_rpc_network": "cache only; no discovery/login/refresh/switch requested"
+  },
+  "resource_cleanup": {
+    "temporary_downloads_database_snapshot_and_old_executable_backup": "removed after verification",
+    "release_watch_process": "completed",
+    "production_service": "kept running as requested",
+    "user_persistent_data": "preserved",
+    "unrelated_workspace_changes": "preserved"
+  },
+  "limitations": [
+    "Real multiple-subscription authorization, online quota and provider inference remain untested; this release step did not access real OpenCode credentials or request discovery/login/refresh/switch."
+  ]
+}
