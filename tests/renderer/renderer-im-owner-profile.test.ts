@@ -56,12 +56,12 @@ test('owner options start with auto, keep snapshot order and label selectable pr
 test('owner options disable unselectable profiles with a per-reason suffix', () => {
   const profiles: ImOwnerProfileOption[] = [
     { id: 'a_off', channel: 'default_claude', engine: 'claude', engineKind: 'claude', model: 'm', effort: 'high', selectable: false, reason: 'disabled' },
-    { id: 'b_noengine', channel: 'default_grok', engine: 'grok', engineKind: 'grok', model: 'm', effort: 'high', selectable: false, reason: 'engine_disabled' },
+    { id: 'b_nochannel', channel: 'default_grok', engine: 'grok', engineKind: 'grok', model: 'm', effort: 'high', selectable: false, reason: 'channel_disabled' },
     { id: 'c_worker', channel: 'default_pi', engine: 'pi', engineKind: 'pi', model: 'm', effort: 'high', selectable: false, reason: 'not_launchable' },
   ];
   const options = ownerProfileOptions(profiles);
   assert.equal(options[1].label, 'a_off · claude · m（已停用）');
-  assert.equal(options[2].label, 'b_noengine · grok · m（引擎未启用）');
+  assert.equal(options[2].label, 'b_nochannel · grok · m（渠道未启用）');
   assert.equal(options[3].label, 'c_worker · pi · m（不能作为父 Agent 启动）');
   assert.ok(options.slice(1).every(option => option.disabled));
 });
@@ -110,7 +110,7 @@ test('an unselectable pin reports a per-reason error naming the parent agent', (
   ] as const;
   const profiles: ImOwnerProfileOption[] = [
     ...profilesOf(),
-    { id: 'b_noengine', channel: 'default_grok', engine: 'grok', engineKind: 'grok', model: 'm', effort: 'high', selectable: false, reason: 'engine_disabled' },
+    { id: 'b_nochannel', channel: 'default_grok', engine: 'grok', engineKind: 'grok', model: 'm', effort: 'high', selectable: false, reason: 'channel_disabled' },
     { id: 'c_worker', channel: 'default_pi', engine: 'pi', engineKind: 'pi', model: 'm', effort: 'high', selectable: false, reason: 'not_launchable' },
     { id: 'gone_owner', channel: '', engine: '', engineKind: '', model: '', effort: '', selectable: false, reason: 'missing' },
   ];
@@ -121,7 +121,7 @@ test('an unselectable pin reports a per-reason error naming the parent agent', (
     assert.match(message, /改选或切换为自动/);
     assert.doesNotMatch(message, /负责人|工作代理/);
   }
-  assert.match(ownerProfileError('b_noengine', profiles, '', true), /引擎未启用/);
+  assert.match(ownerProfileError('b_nochannel', profiles, '', true), /渠道未启用/);
   assert.match(ownerProfileError('c_worker', profiles, '', true), /无法启动/);
 });
 

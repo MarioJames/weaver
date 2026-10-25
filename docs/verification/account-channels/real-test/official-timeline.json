@@ -1,0 +1,677 @@
+[
+  {
+    "sample": "official-claude-cancel",
+    "at": "2026-10-25T05:04:47.031Z",
+    "engine": "claude",
+    "job": {
+      "channel": "channel_4ced3727a61348b390af7c6f",
+      "id": "6073d8fc-83c9-4c11-b122-3cfaab52900d",
+      "status": "cancelled",
+      "authorizationHostPath": null,
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "claude",
+          "source": "claude_oauth_usage",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_4ced3727a61348b390af7c6f"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "登录已取消"
+    ]
+  },
+  {
+    "sample": "official-claude-final-observation",
+    "at": "2026-10-25T05:07:21.207Z",
+    "engine": "claude",
+    "job": {
+      "channel": "channel_4ced3727a61348b390af7c6f",
+      "id": "60d3f19a-b653-494a-b7ac-43ffddcd56dd",
+      "status": "starting",
+      "authorizationHostPath": null,
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "claude",
+          "source": "claude_oauth_usage",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_4ced3727a61348b390af7c6f"
+        }
+      }
+    },
+    "uiStatus": [
+      "正在启动原生登录"
+    ]
+  },
+  {
+    "sample": "official-claude-initial",
+    "at": "2026-10-25T05:04:03.006Z",
+    "engine": "claude",
+    "job": {
+      "channel": "channel_4ced3727a61348b390af7c6f",
+      "id": "6073d8fc-83c9-4c11-b122-3cfaab52900d",
+      "status": "starting",
+      "authorizationHostPath": null,
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "claude",
+          "source": "claude_oauth_usage",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_4ced3727a61348b390af7c6f"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "正在启动原生登录"
+    ]
+  },
+  {
+    "sample": "official-claude-reopen",
+    "at": "2026-10-25T05:04:44.976Z",
+    "engine": "claude",
+    "job": {
+      "channel": "channel_4ced3727a61348b390af7c6f",
+      "id": "6073d8fc-83c9-4c11-b122-3cfaab52900d",
+      "status": "starting",
+      "authorizationHostPath": null,
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "claude",
+          "source": "claude_oauth_usage",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_4ced3727a61348b390af7c6f"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "正在启动原生登录"
+    ]
+  },
+  {
+    "sample": "official-claude-retry",
+    "at": "2026-10-25T05:04:52.090Z",
+    "engine": "claude",
+    "job": {
+      "channel": "channel_4ced3727a61348b390af7c6f",
+      "id": "60d3f19a-b653-494a-b7ac-43ffddcd56dd",
+      "status": "starting",
+      "authorizationHostPath": null,
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "claude",
+          "source": "claude_oauth_usage",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_4ced3727a61348b390af7c6f"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "正在启动原生登录"
+    ]
+  },
+  {
+    "sample": "official-codex-initial",
+    "at": "2026-10-25T05:07:45.382Z",
+    "engine": "codex",
+    "job": {
+      "channel": "channel_bce8566b32d34b089fb9191d",
+      "id": "3a03a30b-4f59-4748-a51c-83ba818aecdd",
+      "status": "authorizing",
+      "authorizationHostPath": "https://auth.openai.com/codex/device",
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "codex",
+          "source": "codex_usage",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_bce8566b32d34b089fb9191d"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "等待官方授权"
+    ]
+  },
+  {
+    "sample": "official-codex-reopen",
+    "at": "2026-10-25T05:07:46.620Z",
+    "engine": "codex",
+    "job": {
+      "channel": "channel_bce8566b32d34b089fb9191d",
+      "id": "3a03a30b-4f59-4748-a51c-83ba818aecdd",
+      "status": "authorizing",
+      "authorizationHostPath": "https://auth.openai.com/codex/device",
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "codex",
+          "source": "codex_usage",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_bce8566b32d34b089fb9191d"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "等待官方授权"
+    ]
+  },
+  {
+    "sample": "official-grok-initial",
+    "at": "2026-10-25T05:05:17.407Z",
+    "engine": "grok",
+    "job": {
+      "channel": "channel_24fae3142b5c48f898448d0a",
+      "id": "03dc66f4-c200-4e89-b0c1-77d12766b848",
+      "status": "authorizing",
+      "authorizationHostPath": "https://accounts.x.ai/oauth2/device",
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "grok",
+          "source": "grok_cli_billing",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_24fae3142b5c48f898448d0a"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "等待官方授权"
+    ]
+  },
+  {
+    "sample": "official-grok-reload",
+    "at": "2026-10-25T05:06:41.506Z",
+    "engine": "grok",
+    "job": {
+      "channel": "channel_24fae3142b5c48f898448d0a",
+      "id": "03dc66f4-c200-4e89-b0c1-77d12766b848",
+      "status": "authorizing",
+      "authorizationHostPath": "https://accounts.x.ai/oauth2/device",
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "grok",
+          "source": "grok_cli_billing",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_24fae3142b5c48f898448d0a"
+        }
+      }
+    },
+    "uiStatus": [
+      "等待官方授权"
+    ]
+  },
+  {
+    "sample": "official-grok-reopen",
+    "at": "2026-10-25T05:06:39.409Z",
+    "engine": "grok",
+    "job": {
+      "channel": "channel_24fae3142b5c48f898448d0a",
+      "id": "03dc66f4-c200-4e89-b0c1-77d12766b848",
+      "status": "authorizing",
+      "authorizationHostPath": "https://accounts.x.ai/oauth2/device",
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "grok",
+          "source": "grok_cli_billing",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_24fae3142b5c48f898448d0a"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "等待官方授权"
+    ]
+  },
+  {
+    "sample": "official-grok-retry",
+    "at": "2026-10-25T05:07:18.385Z",
+    "engine": "grok",
+    "job": {
+      "channel": "channel_24fae3142b5c48f898448d0a",
+      "id": "34f91014-ca64-4499-aa5d-8c1219973e0b",
+      "status": "authorizing",
+      "authorizationHostPath": "https://accounts.x.ai/oauth2/device",
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "grok",
+          "source": "grok_cli_billing",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_24fae3142b5c48f898448d0a"
+        }
+      }
+    },
+    "uiStatus": [
+      "等待官方授权"
+    ]
+  },
+  {
+    "sample": "official-opencode-cancel",
+    "at": "2026-10-25T05:06:03.631Z",
+    "engine": "opencode",
+    "job": {
+      "channel": "channel_90504ac6dfee41019ebc3fc0",
+      "id": "9d26b6cd-a305-42a2-a405-a8b905be0572",
+      "status": "cancelled",
+      "authorizationHostPath": "https://opencode.ai/console/device",
+      "hasDeviceCode": true,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "opencode",
+          "source": "opencode_go_usage",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_90504ac6dfee41019ebc3fc0"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "登录已取消"
+    ]
+  },
+  {
+    "sample": "official-opencode-initial",
+    "at": "2026-10-25T05:05:24.392Z",
+    "engine": "opencode",
+    "job": {
+      "channel": "channel_90504ac6dfee41019ebc3fc0",
+      "id": "9d26b6cd-a305-42a2-a405-a8b905be0572",
+      "status": "authorizing",
+      "authorizationHostPath": "https://opencode.ai/console/device",
+      "hasDeviceCode": true,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "opencode",
+          "source": "opencode_go_usage",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_90504ac6dfee41019ebc3fc0"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "等待官方授权"
+    ]
+  },
+  {
+    "sample": "official-opencode-later",
+    "at": "2026-10-25T05:05:43.898Z",
+    "engine": "opencode",
+    "job": {
+      "channel": "channel_90504ac6dfee41019ebc3fc0",
+      "id": "9d26b6cd-a305-42a2-a405-a8b905be0572",
+      "status": "authorizing",
+      "authorizationHostPath": "https://opencode.ai/console/device",
+      "hasDeviceCode": true,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "opencode",
+          "source": "opencode_go_usage",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_90504ac6dfee41019ebc3fc0"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "等待官方授权"
+    ]
+  },
+  {
+    "sample": "official-opencode-reopen",
+    "at": "2026-10-25T05:06:01.561Z",
+    "engine": "opencode",
+    "job": {
+      "channel": "channel_90504ac6dfee41019ebc3fc0",
+      "id": "9d26b6cd-a305-42a2-a405-a8b905be0572",
+      "status": "authorizing",
+      "authorizationHostPath": "https://opencode.ai/console/device",
+      "hasDeviceCode": true,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "opencode",
+          "source": "opencode_go_usage",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_90504ac6dfee41019ebc3fc0"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "等待官方授权"
+    ]
+  },
+  {
+    "sample": "official-opencode-retry",
+    "at": "2026-10-25T05:06:07.184Z",
+    "engine": "opencode",
+    "job": {
+      "channel": "channel_90504ac6dfee41019ebc3fc0",
+      "id": "29f72115-95e2-4928-8473-205d1c6ebe95",
+      "status": "authorizing",
+      "authorizationHostPath": "https://opencode.ai/console/device",
+      "hasDeviceCode": true,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "opencode",
+          "source": "opencode_go_usage",
+          "status": "unknown",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "尚未探测额度",
+          "retryAt": null,
+          "channel": "channel_90504ac6dfee41019ebc3fc0"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "等待官方授权"
+    ]
+  },
+  {
+    "sample": "official-qoder-initial",
+    "at": "2026-10-25T05:06:15.588Z",
+    "engine": "qoder",
+    "job": {
+      "channel": "channel_40c15c208bf84e45911b2b95",
+      "id": "a474fadc-aec5-45fc-bbb7-4058262877ee",
+      "status": "starting",
+      "authorizationHostPath": null,
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "qodercli",
+          "source": "",
+          "status": "unsupported",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "该引擎没有可用的官方额度接口",
+          "retryAt": null,
+          "channel": "channel_40c15c208bf84e45911b2b95"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "正在启动原生登录"
+    ]
+  },
+  {
+    "sample": "official-qoder-later",
+    "at": "2026-10-25T05:06:26.073Z",
+    "engine": "qoder",
+    "job": {
+      "channel": "channel_40c15c208bf84e45911b2b95",
+      "id": "a474fadc-aec5-45fc-bbb7-4058262877ee",
+      "status": "starting",
+      "authorizationHostPath": null,
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "qodercli",
+          "source": "",
+          "status": "unsupported",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "该引擎没有可用的官方额度接口",
+          "retryAt": null,
+          "channel": "channel_40c15c208bf84e45911b2b95"
+        }
+      }
+    },
+    "uiStatus": [
+      "账号配置已保存。",
+      "正在启动原生登录"
+    ]
+  },
+  {
+    "sample": "official-qoder-reopen",
+    "at": "2026-10-25T05:06:49.288Z",
+    "engine": "qoder",
+    "job": {
+      "channel": "channel_40c15c208bf84e45911b2b95",
+      "id": "a474fadc-aec5-45fc-bbb7-4058262877ee",
+      "status": "starting",
+      "authorizationHostPath": null,
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "qodercli",
+          "source": "",
+          "status": "unsupported",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "该引擎没有可用的官方额度接口",
+          "retryAt": null,
+          "channel": "channel_40c15c208bf84e45911b2b95"
+        }
+      }
+    },
+    "uiStatus": [
+      "正在启动原生登录"
+    ]
+  },
+  {
+    "sample": "official-qoder-retry",
+    "at": "2026-10-25T05:07:11.454Z",
+    "engine": "qoder",
+    "job": {
+      "channel": "channel_40c15c208bf84e45911b2b95",
+      "id": "8a000c70-ec5e-4fd5-8457-897c7c69aad1",
+      "status": "starting",
+      "authorizationHostPath": null,
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "qodercli",
+          "source": "",
+          "status": "unsupported",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "该引擎没有可用的官方额度接口",
+          "retryAt": null,
+          "channel": "channel_40c15c208bf84e45911b2b95"
+        }
+      }
+    },
+    "uiStatus": [
+      "正在启动原生登录"
+    ]
+  }
+]

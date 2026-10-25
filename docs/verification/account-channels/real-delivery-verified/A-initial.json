@@ -1,0 +1,8 @@
+{
+  "apiRevision": 0,
+  "apiChannelCount": 7,
+  "apiCredentialCount": 0,
+  "sqliteSecretCount": 0,
+  "sqlitePersistedChannelRows": 0,
+  "note": "Fresh policy defaults are seven placeholders; rows persist only upon first mutation."
+}

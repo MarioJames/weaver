@@ -1,0 +1,54 @@
+{
+  "engine": "opencode",
+  "channel": "channel_90504ac6dfee41019ebc3fc0",
+  "ui": {
+    "acceptsCode": false,
+    "backendHasCode": true,
+    "cancelRect": {
+      "bottom": 516,
+      "height": 32,
+      "left": 698.953125,
+      "right": 806.96875,
+      "top": 484,
+      "width": 108.015625,
+      "x": 698.953125,
+      "y": 484
+    },
+    "codeMatches": true,
+    "hasDeviceCode": true,
+    "linkClickable": true,
+    "linkRect": {
+      "bottom": 422,
+      "height": 44,
+      "left": 379,
+      "right": 987,
+      "top": 378,
+      "width": 608,
+      "x": 379,
+      "y": 378
+    },
+    "manualPassword": false,
+    "manualSubmit": false,
+    "reference": {
+      "channel": "channel_90504ac6dfee41019ebc3fc0",
+      "id": "67bbd098-5b83-48cc-acff-5251b11ff7f5"
+    },
+    "safeUrl": "https://opencode.ai/console/device",
+    "status": "authorizing",
+    "urlMatches": true
+  },
+  "nativeProcesses": [
+    {
+      "pid": 1339135,
+      "comm": "opencode",
+      "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native",
+      "roots": {
+        "XDG_CONFIG_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native/config",
+        "XDG_DATA_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native/data",
+        "XDG_STATE_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native/state",
+        "OPENCODE_DB": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native/opencode.db"
+      },
+      "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/dev-weaver-channel-login-c8f8f435-fe64-4a67-b034-56f62cda92ca.scope"
+    }
+  ]
+}

@@ -1,0 +1,903 @@
+{
+  "at": "2026-10-25T05:45:22.748409+00:00",
+  "overall": "FAIL: both fresh paths have material failures",
+  "version": {
+    "currentSourceDigest": "1c092161ceed7008012cdf22548f919e919033dc24d6df0601ed867be7117f88",
+    "frozenFiles": 291,
+    "beforeAfterSourceMismatch": [],
+    "oldSnapshot": "294b7f9",
+    "prod": {
+      "production": {
+        "pid": 1109320,
+        "alive": true,
+        "pathEnvironment": {
+          "HOME": "/home/mocha"
+        },
+        "binarySHA256": "2cbf137f8356101c242e4a4ba22aab0c879315ee69a201ac196dd8fda9aeb236"
+      },
+      "persistentTest": {
+        "pid": 1299907,
+        "alive": true,
+        "pathEnvironment": {
+          "HOME": "/home/mocha"
+        }
+      }
+    },
+    "finalSourceMismatch": []
+  },
+  "url": "http://127.0.0.1:4740/#/channels (temporary service now stopped)",
+  "environment": {
+    "HOME": "/home/mocha",
+    "sourcePathOverrides": [],
+    "origin": "Necessary native source environment taken in memory from persistent test process 1299907, not worker CODEX_HOME. No environment values with credentials were printed or archived.",
+    "sourceTypes": [
+      "~/.claude and ~/.claude.json",
+      "~/.codex",
+      "~/.grok",
+      "~/.qoder",
+      "~/.config/opencode + native SQLite",
+      "~/.pi/agent",
+      "~/.dsh"
+    ],
+    "autoImport": false,
+    "longPathWorkaround": "Existing runtime export is startRuntime. Scratch data path exceeded Unix-socket length; a held directory FD exposed the SAME scratch directory as /proc/<runtime-pid>/fd/<fd>/<case>. Private roots were realpath-checked under the corresponding scratch case. No source or runtime logic patched."
+  },
+  "fiveResults": [
+    {
+      "case": "Current Claude first",
+      "status": "FAIL readiness",
+      "calls": 1,
+      "revision": "0 → 1",
+      "added": 1,
+      "existing": 0,
+      "updated": 0,
+      "failures": [],
+      "hasCredentials": false
+    },
+    {
+      "case": "Current Claude repeat A",
+      "status": "PASS idempotence only",
+      "calls": 1,
+      "revision": "1 → 1",
+      "added": 0,
+      "existing": 1,
+      "updated": 0,
+      "failures": []
+    },
+    {
+      "case": "Current all first B2",
+      "status": "FAIL UI timeout",
+      "calls": 1,
+      "revision": "0 → 1 (observed after recovery)",
+      "added": null,
+      "existing": null,
+      "failures": null,
+      "persistedNewRows": 6,
+      "persistedEngines": [
+        "codex",
+        "claude",
+        "grok",
+        "qoder",
+        "opencode",
+        "dsh"
+      ],
+      "piImported": false
+    },
+    {
+      "case": "Claude repeat after all",
+      "status": "PASS idempotence only",
+      "calls": 1,
+      "revision": "1 → 1",
+      "added": 0,
+      "existing": 1,
+      "updated": 0,
+      "failures": []
+    },
+    {
+      "case": "Old snapshot direct replay",
+      "status": "PASS persistence; old readiness flag misleading",
+      "productionUI": false,
+      "claudeNewRows": 1,
+      "allNewRows": 6,
+      "claudeHasCredentialsReportedByOldCode": true,
+      "actualClaudeSourceTokensPresent": false
+    }
+  ],
+  "issues": [
+    {
+      "status": "FAIL",
+      "case": "Current fresh Claude",
+      "observed": "added=1, failures=[], but hasCredentials=false. Source Claude OAuth accessToken and refreshToken are absent; expiresAt=0. Managed credentials are byte-identical to source. Importer accepts the nonempty credential object plus oauthAccount identity without checking token readiness. No global login or token refresh performed."
+    },
+    {
+      "status": "FAIL",
+      "case": "Current fresh all",
+      "observed": "One UI request revision=0, default source, no replacement. UI shows TIMEOUT: 控制面在 15 秒内没有响应 and preserves all/default/unchecked input. Backend later committed 6 secret rows and 13 metadata rows. HTTP response was unavailable after browser abort, so returned added/existing/updated/notFound/failures are UNKNOWN, not asserted. Recovery through 重新读取状态 updates revision to 1; subsequent Claude returns existing=1."
+    }
+  ],
+  "currentEvidence": {
+    "A": {
+      "case": "case-a",
+      "at": "2026-10-25T05:41:10Z",
+      "url": "http://127.0.0.1:4740/#/channels",
+      "db": {
+        "inode": 7499546,
+        "channels": [
+          {
+            "id": "default_claude",
+            "engine": "claude",
+            "kind": "subscription",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "default_codex",
+            "engine": "codex",
+            "kind": "subscription",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "default_grok",
+            "engine": "grok",
+            "kind": "subscription",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "default_opencode",
+            "engine": "opencode",
+            "kind": "subscription",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "default_pi",
+            "engine": "pi",
+            "kind": "api",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "default_qoder",
+            "engine": "qoder",
+            "kind": "subscription",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "default_dsh",
+            "engine": "dsh",
+            "kind": "api",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "import_e6f3c04da52965f2b7c02668",
+            "engine": "claude",
+            "kind": "subscription",
+            "secretPresent": true,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": true,
+            "authExists": true,
+            "authFiles": [
+              ".claude.json",
+              ".credentials.json"
+            ]
+          }
+        ],
+        "channelRows": 8,
+        "secretRows": 1,
+        "tasks": 0,
+        "businessCounts": {
+          "owners": 0,
+          "packages": 0,
+          "receipts": 0
+        },
+        "kvKeys": [
+          "schedules.v1",
+          "sequence"
+        ]
+      },
+      "imports": [
+        {
+          "requestId": "1330383.238",
+          "timestamp": 1792906861257,
+          "status": 200,
+          "input": {
+            "method": "importChannels",
+            "args": [
+              {
+                "revision": 0,
+                "engine": "claude"
+              }
+            ]
+          },
+          "ok": true,
+          "error": null,
+          "revision": 1,
+          "channelCount": 8,
+          "configurations": {
+            "default_claude": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_codex": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_grok": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_opencode": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_pi": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_qoder": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_dsh": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "import_e6f3c04da52965f2b7c02668": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false
+            }
+          },
+          "importResult": {
+            "added": 1,
+            "existing": 0,
+            "updated": 0,
+            "notFound": [],
+            "failures": []
+          }
+        },
+        {
+          "requestId": "1330383.250",
+          "timestamp": 1792906870355,
+          "status": 200,
+          "input": {
+            "method": "importChannels",
+            "args": [
+              {
+                "revision": 1,
+                "engine": "claude"
+              }
+            ]
+          },
+          "ok": true,
+          "error": null,
+          "revision": 1,
+          "channelCount": 8,
+          "configurations": {
+            "default_claude": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_codex": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_grok": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_opencode": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_pi": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_qoder": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_dsh": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "import_e6f3c04da52965f2b7c02668": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false
+            }
+          },
+          "importResult": {
+            "added": 0,
+            "existing": 1,
+            "updated": 0,
+            "notFound": [],
+            "failures": []
+          }
+        }
+      ]
+    },
+    "B2": {
+      "case": "case-b2",
+      "at": "2026-10-25T05:42:50Z",
+      "url": "http://127.0.0.1:4740/#/channels",
+      "db": {
+        "inode": 7503162,
+        "channels": [
+          {
+            "id": "default_claude",
+            "engine": "claude",
+            "kind": "subscription",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "default_codex",
+            "engine": "codex",
+            "kind": "subscription",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "default_grok",
+            "engine": "grok",
+            "kind": "subscription",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "default_opencode",
+            "engine": "opencode",
+            "kind": "subscription",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "default_pi",
+            "engine": "pi",
+            "kind": "api",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "default_qoder",
+            "engine": "qoder",
+            "kind": "subscription",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "default_dsh",
+            "engine": "dsh",
+            "kind": "api",
+            "secretPresent": false,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          },
+          {
+            "id": "import_d56e030df4fb20d796d92a22",
+            "engine": "codex",
+            "kind": "subscription",
+            "secretPresent": true,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": true,
+            "authExists": true,
+            "authFiles": [
+              "auth.json"
+            ]
+          },
+          {
+            "id": "import_e6f3c04da52965f2b7c02668",
+            "engine": "claude",
+            "kind": "subscription",
+            "secretPresent": true,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": true,
+            "authExists": true,
+            "authFiles": [
+              ".claude.json",
+              ".credentials.json"
+            ]
+          },
+          {
+            "id": "import_e9a31f0093aaaacc595255e0",
+            "engine": "grok",
+            "kind": "subscription",
+            "secretPresent": true,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": true,
+            "authExists": true,
+            "authFiles": [
+              "auth.json"
+            ]
+          },
+          {
+            "id": "import_46c108d104db423c8ebfde2c",
+            "engine": "qoder",
+            "kind": "subscription",
+            "secretPresent": true,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": true,
+            "authExists": true,
+            "authFiles": [
+              ".auth/machine_id",
+              ".auth/user",
+              "settings.json"
+            ]
+          },
+          {
+            "id": "import_ee32f57491d779f9ce7f0f0f",
+            "engine": "opencode",
+            "kind": "subscription",
+            "secretPresent": true,
+            "hasApiKey": false,
+            "hasConfig": false,
+            "authRootOwned": true,
+            "authExists": true,
+            "authFiles": [
+              "cache/opencode/models.json",
+              "config/opencode/.gitignore",
+              "config/opencode/opencode.jsonc",
+              "data/opencode/log/opencode.log",
+              "opencode.db",
+              "opencode.db-shm",
+              "opencode.db-wal",
+              "state/opencode/locks/397afa7834c93017516a70d45d50fd85673fbcf2.lock/heartbeat",
+              "state/opencode/locks/397afa7834c93017516a70d45d50fd85673fbcf2.lock/meta.json"
+            ]
+          },
+          {
+            "id": "import_12c10a0745e6e2a1a214b91e",
+            "engine": "dsh",
+            "kind": "api",
+            "secretPresent": true,
+            "hasApiKey": true,
+            "hasConfig": false,
+            "authRootOwned": false,
+            "authExists": false,
+            "authFiles": []
+          }
+        ],
+        "channelRows": 13,
+        "secretRows": 6,
+        "tasks": 0,
+        "businessCounts": {
+          "owners": 0,
+          "packages": 0,
+          "receipts": 0
+        },
+        "kvKeys": [
+          "schedules.v1",
+          "sequence"
+        ]
+      },
+      "imports": [
+        {
+          "requestId": "1330383.468",
+          "timestamp": 1792906913755,
+          "status": null,
+          "input": {
+            "method": "importChannels",
+            "args": [
+              {
+                "revision": 0
+              }
+            ]
+          },
+          "ok": false,
+          "error": null,
+          "revision": null,
+          "channelCount": 0,
+          "configurations": {},
+          "importResult": null
+        },
+        {
+          "requestId": "1330383.533",
+          "timestamp": 1792906969655,
+          "status": 200,
+          "input": {
+            "method": "importChannels",
+            "args": [
+              {
+                "revision": 1,
+                "engine": "claude"
+              }
+            ]
+          },
+          "ok": true,
+          "error": null,
+          "revision": 1,
+          "channelCount": 13,
+          "configurations": {
+            "default_claude": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_codex": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_grok": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_opencode": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_pi": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_qoder": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "default_dsh": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false,
+              "detail": "尚未导入渠道配置或凭据"
+            },
+            "import_d56e030df4fb20d796d92a22": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": true
+            },
+            "import_e6f3c04da52965f2b7c02668": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": false
+            },
+            "import_e9a31f0093aaaacc595255e0": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": true
+            },
+            "import_46c108d104db423c8ebfde2c": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": true
+            },
+            "import_ee32f57491d779f9ce7f0f0f": {
+              "hasApiKey": false,
+              "hasConfig": false,
+              "hasCredentials": true
+            },
+            "import_12c10a0745e6e2a1a214b91e": {
+              "hasApiKey": true,
+              "hasConfig": false,
+              "hasCredentials": false
+            }
+          },
+          "importResult": {
+            "added": 0,
+            "existing": 1,
+            "updated": 0,
+            "notFound": [],
+            "failures": []
+          }
+        }
+      ]
+    }
+  },
+  "initialEvidence": {
+    "A": {
+      "db": {
+        "inode": 7499546,
+        "channels": [],
+        "channelRows": 0,
+        "secretRows": 0,
+        "tasks": 0,
+        "businessCounts": {
+          "owners": 0,
+          "packages": 0,
+          "receipts": 0
+        },
+        "kvKeys": [
+          "schedules.v1",
+          "sequence"
+        ]
+      },
+      "inputDom": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - generic\n      - region \"Notifications\" [ref=e2]\n      - region \"Notifications\" [ref=e3]\n      - region \"Notifications\" [ref=e4]\n      - region \"Notifications\" [ref=e5]\n      - region \"Notifications\" [ref=e6]\n      - region \"Notifications\" [ref=e7]\n      - dialog \"导入原生账号与 API 配置\"\n        - generic\n          - heading \"导入原生账号与 API 配置\" [level=2, ref=e8]\n          - button \"Close\" [ref=e9]\n          - form\n            - LabelText\n              - StaticText \"导入引擎\"\n            - combobox \"导入引擎\" [expanded=false, ref=e12]: claude · claude\n              - StaticText \"claude · claude\"\n            - LabelText\n              - StaticText \"来源配置目录\"\n            - textbox \"来源配置目录\" [ref=e13]\n            - StaticText \"Weaver 所在机器的原生 CLI 配置根；指定目录时请先选择对应引擎。留空使用默认位置。只复制必要配置与认证，不修改来源。\"\n            - LabelText [ref=e14] clickable [cursor:pointer]\n              - checkbox \"更新已导入的配置与认证\" [checked=false, ref=e15]\n              - StaticText \"更新已导入的配置与认证\"\n            - StaticText \"默认保留已有托管凭据，同一来源不会创建重复渠道。勾选后替换新启动使用的配置与认证；已有进程继续使用旧凭据根，名称、启停及角色选择保留。平台 keychain 或不支持的认证格式需在托管根重新登录。\"\n          - button \"取消\" [ref=e10]\n          - button \"导入\" [ref=e11]",
+      "uiPolicyRevision": 0,
+      "uiDefaultPlaceholders": 7
+    },
+    "B2": {
+      "db": {
+        "inode": 7503162,
+        "channels": [],
+        "channelRows": 0,
+        "secretRows": 0,
+        "tasks": 0,
+        "businessCounts": {
+          "owners": 0,
+          "packages": 0,
+          "receipts": 0
+        },
+        "kvKeys": [
+          "schedules.v1",
+          "sequence"
+        ]
+      },
+      "inputDom": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - generic\n      - region \"Notifications\" [ref=e2]\n      - region \"Notifications\" [ref=e3]\n      - region \"Notifications\" [ref=e4]\n      - region \"Notifications\" [ref=e5]\n      - region \"Notifications\" [ref=e6]\n      - region \"Notifications\" [ref=e7]\n      - dialog \"导入原生账号与 API 配置\"\n        - generic\n          - heading \"导入原生账号与 API 配置\" [level=2, ref=e8]\n          - button \"Close\" [ref=e9]\n          - form\n            - LabelText\n              - StaticText \"导入引擎\"\n            - combobox \"导入引擎\" [expanded=false, ref=e12]: 所有已有引擎配置\n              - StaticText \"所有已有引擎配置\"\n            - LabelText\n              - StaticText \"来源配置目录\"\n            - textbox \"来源配置目录\" [ref=e13]\n            - StaticText \"Weaver 所在机器的原生 CLI 配置根；指定目录时请先选择对应引擎。留空使用默认位置。只复制必要配置与认证，不修改来源。\"\n            - LabelText [ref=e14] clickable [cursor:pointer]\n              - checkbox \"更新已导入的配置与认证\" [checked=false, ref=e15]\n              - StaticText \"更新已导入的配置与认证\"\n            - StaticText \"默认保留已有托管凭据，同一来源不会创建重复渠道。勾选后替换新启动使用的配置与认证；已有进程继续使用旧凭据根，名称、启停及角色选择保留。平台 keychain 或不支持的认证格式需在托管根重新登录。\"\n          - button \"取消\" [ref=e10]\n          - button \"导入\" [ref=e11]",
+      "uiPolicyRevision": 0,
+      "uiDefaultPlaceholders": 7
+    }
+  },
+  "allTimeoutDom": "- generic [ref=e1] clickable [onclick]\n  - generic\n    - generic\n      - region \"Notifications\" [ref=e2]\n      - region \"Notifications\" [ref=e3]\n      - region \"Notifications\" [ref=e4]\n      - region \"Notifications\" [ref=e5]\n      - region \"Notifications\" [ref=e6]\n      - region \"Notifications\" [ref=e7]\n      - dialog \"导入原生账号与 API 配置\"\n        - generic\n          - heading \"导入原生账号与 API 配置\" [level=2, ref=e8]\n          - button \"Close\" [ref=e9]\n          - form\n            - LabelText\n              - StaticText \"导入引擎\"\n            - combobox \"导入引擎\" [expanded=false, ref=e12]: 所有已有引擎配置\n              - StaticText \"所有已有引擎配置\"\n            - LabelText\n              - StaticText \"来源配置目录\"\n            - textbox \"来源配置目录\" [ref=e13]\n            - StaticText \"Weaver 所在机器的原生 CLI 配置根；指定目录时请先选择对应引擎。留空使用默认位置。只复制必要配置与认证，不修改来源。\"\n            - LabelText [ref=e14] clickable [cursor:pointer]\n              - checkbox \"更新已导入的配置与认证\" [checked=false, ref=e15]\n              - StaticText \"更新已导入的配置与认证\"\n            - StaticText \"默认保留已有托管凭据，同一来源不会创建重复渠道。勾选后替换新启动使用的配置与认证；已有进程继续使用旧凭据根，名称、启停及角色选择保留。平台 keychain 或不支持的认证格式需在托管根重新登录。\"\n            - alert\n              - StaticText \"导入未完成，输入已保留\"\n              - StaticText \"TIMEOUT: 控制面在 15 秒内没有响应\"\n              - button \"重新读取状态\" [ref=e16]\n          - button \"取消\" [ref=e10]\n          - button \"导入\" [ref=e11]",
+  "oldReplays": [
+    {
+      "version": "294b7f9",
+      "kind": "old-source replay, not production UI",
+      "input": {
+        "revision": 0,
+        "engine": "claude"
+      },
+      "before": {
+        "revision": 0,
+        "count": 7
+      },
+      "after": {
+        "revision": 1,
+        "count": 8
+      },
+      "channels": [
+        {
+          "id": "import_e6f3c04da52965f2b7c02668",
+          "engine": "claude",
+          "kind": "subscription",
+          "hasSecret": true,
+          "hasCredentials": true
+        }
+      ],
+      "resultWrittenAt": "2026-10-25T05:43:03.037669+00:00"
+    },
+    {
+      "version": "294b7f9",
+      "kind": "old-source replay, not production UI",
+      "input": {
+        "revision": 0
+      },
+      "before": {
+        "revision": 0,
+        "count": 7
+      },
+      "after": {
+        "revision": 1,
+        "count": 13
+      },
+      "channels": [
+        {
+          "id": "import_d56e030df4fb20d796d92a22",
+          "engine": "codex",
+          "kind": "subscription",
+          "hasSecret": true,
+          "hasCredentials": true
+        },
+        {
+          "id": "import_e6f3c04da52965f2b7c02668",
+          "engine": "claude",
+          "kind": "subscription",
+          "hasSecret": true,
+          "hasCredentials": true
+        },
+        {
+          "id": "import_e9a31f0093aaaacc595255e0",
+          "engine": "grok",
+          "kind": "subscription",
+          "hasSecret": true,
+          "hasCredentials": true
+        },
+        {
+          "id": "import_46c108d104db423c8ebfde2c",
+          "engine": "qoder",
+          "kind": "subscription",
+          "hasSecret": true,
+          "hasCredentials": true
+        },
+        {
+          "id": "import_ee32f57491d779f9ce7f0f0f",
+          "engine": "opencode",
+          "kind": "subscription",
+          "hasSecret": true,
+          "hasCredentials": true
+        },
+        {
+          "id": "import_12c10a0745e6e2a1a214b91e",
+          "engine": "dsh",
+          "kind": "api",
+          "hasSecret": true,
+          "hasCredentials": false
+        }
+      ],
+      "resultWrittenAt": "2026-10-25T05:43:18.829668+00:00"
+    }
+  ],
+  "sourceIntegrity": {
+    "filesChecked": 17,
+    "existingFilesChecked": 14,
+    "unchanged": true,
+    "changedPaths": [],
+    "claude": {
+      "source": "/home/mocha/.claude/.credentials.json",
+      "accessTokenPresent": false,
+      "refreshTokenPresent": false,
+      "expiresAt": 0,
+      "sourceConfigNonempty": true,
+      "sourceMetadataIdentityPresent": true,
+      "copiedByteEqual": {
+        "case-a": true,
+        "case-b2": true,
+        "old-claude": true
+      }
+    },
+    "limitation": "OpenCode live source DB was read through readonly backup, but no before/after whole-database byte hash was taken. Concurrent native source changes cannot be excluded beyond the listed file comparisons."
+  },
+  "staticFindings": [
+    {
+      "kind": "source-verified",
+      "finding": "Current importChannels has no timeoutMs override in src/shared/contracts/rpc.ts, so renderer uses its default 15-second deadline. Sequential native source validation/SQLite copying may exceed that budget. The exact slow sub-operation is not profiled."
+    },
+    {
+      "kind": "source-verified",
+      "finding": "294b7f9 ChannelService.get reports hasCredentials using only !!authDir. Current nativeCredentialsReady checks real credential fields. This explains the observed old=true/current=false for the same byte-identical Claude file."
+    },
+    {
+      "kind": "source-verified",
+      "finding": "Old importer lacked per-engine partial failure reporting and returned no importResult counters; the source-discovery branches for Claude and SQLite backup already existed. Old direct replay did not reproduce a database-size or identity exception."
+    },
+    {
+      "kind": "inference",
+      "finding": "The observed timeout can explain an apparent all-import failure while persistence completed. This is not evidence of a production UI request, and does not establish the cause of the user’s historical Claude failure."
+    }
+  ],
+  "artifactErrors": [
+    "Initial scratch launcher used package-requested createRuntime name; actual export is startRuntime; corrected scratch launcher only.",
+    "Initial scratch absolute data-dir exceeded Unix socket path limit; corrected with owned directory FD alias.",
+    "First B attempt reused same-origin React state because open(hash) did not reload; stale Claude revision=1 failed Policy revision conflict, with zero DB writes. Excluded from fresh-all result; a new B2 database and full reload were used.",
+    "Browser wrapper printed KeyError on clear-request response (clear itself succeeded); corrected evidence interpretation.",
+    "Two capture attempts ran while all request had no response body; no pass evidence was fabricated. Final evidence records unavailable response and visible timeout.",
+    "No product screenshot of the transient timeout was saved; preserved exact accessibility DOM, request ID/input and SQLite facts instead."
+  ],
+  "console": {
+    "messages": 8,
+    "errorWarnMessages": 0
+  },
+  "cleanup": {
+    "disposableOwnedRootsRemoved": [
+      "case-a",
+      "case-b",
+      "case-b2",
+      "old-claude",
+      "old-all",
+      "old-source"
+    ],
+    "allServiceScopesInactive": true,
+    "databaseAndCopiedCredentialRootsDeleted": true,
+    "herdrWorkspaceClosed": true,
+    "herdrSessionStopped": true,
+    "browserClosed": true,
+    "profileDeleted": true,
+    "profileProcessMatches": [],
+    "productionAlive": true,
+    "persistentTestAlive": true
+  },
+  "reportChecks": {
+    "fileOpen": true,
+    "viewportWidth": 390,
+    "scrollWidth": 390,
+    "narrowVisuallyInspected": true,
+    "pdfGeneratedAndTextExtracted": true,
+    "pdfPages": 2,
+    "relativeLinksExist": true,
+    "finalPdfPages": 2,
+    "finalPrintContainsConclusion": true,
+    "finalPrintContainsCleanup": true
+  }
+}

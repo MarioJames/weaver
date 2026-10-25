@@ -9,11 +9,12 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync
 import { homedir } from 'node:os';
 import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
 import { backup, DatabaseSync } from 'node:sqlite';
-import type { Channel, ChannelSecret, ChannelsSnapshot, ImportChannelsInput } from '../../shared/contracts/channels';
+import type { Channel, ChannelSecret, ImportChannelsResult, ImportChannelsInput } from '../../shared/contracts/channels';
 import { PolicyStore } from '../policy/store';
 import { ChannelStore } from './store';
 import { ChannelService } from './service';
 import { channelEnvironment } from './runtime';
+import { claudeCredentialsReady, nativeCredentialsReady } from './native';
 import { OpenCodeAccounts } from '../engines/opencode-accounts';
 import { openCodeConsoleDbPath } from '../quota/opencode-console';
 
@@ -72,13 +73,17 @@ interface Candidate { models?: string[]; selected?: boolean; channel: Channel; s
 /** Read-only source import. Stable identities preserve credentials refreshed in managed roots on repeated imports. */
 export class NativeChannelImporter {
  constructor(private policy: PolicyStore, private secrets: ChannelStore, private options: ChannelImportOptions) {}
- async import(input: ImportChannelsInput): Promise<ChannelsSnapshot> {
+ async import(input: ImportChannelsInput): Promise<ImportChannelsResult> {
   if(input.replaceExisting!==undefined&&typeof input.replaceExisting!=='boolean')throw new Error('replaceExisting 必须为布尔值');
   const snapshot = this.policy.snapshot();
   if (input.revision !== snapshot.revision) throw new Error('Policy revision conflict');
   if (input.sourceDir && !input.engine) throw new Error('自定义来源目录需要指定引擎');
   const env = this.options.env ?? process.env;
   const candidates: Candidate[] = [];
+  const failures=new Map<string,string>();
+  const notFound=new Set<string>();
+  const counts={added:0,existing:0,updated:0};
+  const initialIds=new Set(Object.keys(snapshot.config.channels));
   const originalRoles=new Map([...Object.values(snapshot.config.owners),...Object.values(snapshot.config.workers)].map(role=>[role,role.channel]));
   const temporary: string[]=[];
   const createdTargets:string[]=[];let committed=false;
@@ -88,10 +93,12 @@ export class NativeChannelImporter {
    if (!['codex','claude','grok','qoder','opencode','pi','dsh'].includes(engine)) throw new Error('不支持该导入引擎');
    const engineId=input.engine&&snapshot.config.engines[input.engine]?input.engine:Object.keys(snapshot.config.engines).find(id=>snapshot.config.engines[id]!.kind===(engine==='qoder'?'qodercli':engine));
    if(!engineId)continue;
+   const before=candidates.length;
+   try {
    const home = env.HOME ?? homedir();
    const defaults: Record<string,string> = { codex: env.CODEX_HOME ?? join(home,'.codex'), claude: env.CLAUDE_CONFIG_DIR ?? join(home,'.claude'), grok: env.GROK_HOME ?? join(home,'.grok'), qoder: env.QODER_CONFIG_DIR ?? join(home,'.qoder'), pi: env.PI_CODING_AGENT_DIR ?? join(home,'.pi','agent'), dsh: env.DSH_HOME ?? join(home,'.dsh'), opencode: env.OPENCODE_CONFIG_DIR ?? join(env.XDG_CONFIG_HOME ?? join(home,'.config'),'opencode') };
    const source = resolve(input.sourceDir ?? defaults[engine]!);
-   if (!existsSync(source)) continue;
+   if (!existsSync(source)) {notFound.add(engineId);continue;}
    const canonical = realpathSync(source);
    const add = (kind: Channel['kind'], identity: string, secret: ChannelSecret, extra: Partial<Candidate> = {}, provider?: string) => candidates.push({ channel: { engine:engineId, kind, label: `${engine} ${provider ?? (kind === 'api' ? 'API' : `官方订阅 ${hash(identity).slice(0,8)}`)}`, enabled: true, ...(provider ? {provider}: {}) }, identity: `${engineId}:${canonical}:${identity}`, secret, ...extra });
    if (engine === 'codex' || engine === 'grok') {
@@ -116,13 +123,13 @@ export class NativeChannelImporter {
     }
    } else if (engine === 'claude') {
     const credentials=read(join(source,'.credentials.json'));
-    if(credentials&&Object.keys(object(credentials)).length){
+    {
       const local=read(join(source,'.claude.json'),16*1024*1024);
       const metadata=object(local??(source===resolve(defaults.claude!)?read(join(home,'.claude.json'),16*1024*1024):undefined));
       const account=metadata.oauthAccount;
       const identity=typeof account?.accountUuid==='string'?`${account.accountUuid}:${account.organizationUuid??''}`:undefined;
-      if(!identity)throw new Error('Claude 原生登录缺少稳定 oauthAccount 身份，需在独立目录重新登录后导入');
-      add('subscription',`official:${identity}`,{}, {authFiles:{'.credentials.json':credentials,'.claude.json':JSON.stringify({oauthAccount:account})}});
+      if(!identity&&credentials&&Object.keys(object(credentials)).length)throw new Error('Claude 原生登录缺少稳定 oauthAccount 身份，需在独立目录重新登录后导入');
+      if(identity)add('subscription',`official:${identity}`,{}, {authFiles:{'.credentials.json':credentials??'{}','.claude.json':JSON.stringify({oauthAccount:account})}});
     }
     const config=object(read(join(source,'settings.json'))); const key=config.env?.ANTHROPIC_API_KEY??config.env?.ANTHROPIC_AUTH_TOKEN;
     if(typeof key==='string'&&key) add('api','api',{config:JSON.stringify({env:config.env}),apiKey:key});
@@ -192,19 +199,33 @@ export class NativeChannelImporter {
      for(const org of [...orgs].sort((a,b)=>Number(b.active)-Number(a.active))) { const repeated=seen.has(org.accountID);seen.add(org.accountID); add('subscription',`account:${org.accountID}:${org.orgID}`,{}, {database:join(enumeration,'opencode.db'),account:org,modelProvider:'opencode-go',selected:org.active===true, channel:{engine:engineId,kind:'subscription',label:`opencode ${org.accountEmail??org.accountID} / ${org.orgName??org.orgID}${repeated?'（需独立登录）':''}`.slice(0,120),enabled:!repeated}}); }
     }
    }
+   if(candidates.length===before)notFound.add(engineId);
+   } catch(error) {
+    candidates.splice(before);
+    const message=`${engine} 来源无法导入；请检查原生登录、配置格式和读取权限，单独选择该引擎重试`;
+    if(input.engine){if(error&&typeof error==='object'&&'code' in error)throw new Error(`${engine} 来源读取或原生账号验证失败，请检查目录权限与登录后重试`);throw error;}
+    failures.set(engineId,message);
+   }
   }
-  mkdirSync(this.options.root,{recursive:true,mode:0o700});
+  if(!candidates.length)throw new Error(failures.size?[...failures.values()].join('；'):'未找到可导入的原生账号或 API 配置，请检查所选来源目录与原生登录');
   const staged: string[]=[];
   const pendingSecrets=new Map<string,ChannelSecret>();
+  const accepted:Candidate[]=[];
   try {
    for(const candidate of candidates) {
+    const stagingBefore=staged.length,targetsBefore=createdTargets.length;
+    try {
     const id=`import_${hash(candidate.identity)}`;
     const existingSecret=this.secrets.getSecret(id);
-    if(existingSecret&&snapshot.config.channels[id]&&!input.replaceExisting) continue;
+    const claudeSubscription=snapshot.config.engines[candidate.channel.engine]?.kind==='claude'&&candidate.channel.kind==='subscription';
+    if(claudeSubscription&&existingSecret&&!input.replaceExisting&&!nativeCredentialsReady('claude',existingSecret))throw new Error('Claude 托管账号凭据不可用，请独立登录、选择有效来源或勾选更新后重试');
+    if(existingSecret&&snapshot.config.channels[id]&&!input.replaceExisting){counts.existing++;accepted.push(candidate);continue;}
+    if(claudeSubscription&&!(existingSecret&&!input.replaceExisting)&&!claudeCredentialsReady(object(candidate.authFiles?.['.credentials.json']?.toString())))throw new Error('Claude 未找到可用 OAuth 登录凭据，请重新登录或选择已登录目录后导入');
     // Policy rollback retains private credentials; restore metadata without recopying stale native auth.
     const preserveExisting=existingSecret&&!input.replaceExisting;
     const secret=preserveExisting?existingSecret:{...candidate.secret};
     if(!preserveExisting&&(candidate.channel.kind==='subscription'&&candidate.channel.enabled||candidate.channel.kind==='api'&&candidate.authFiles)) {
+     mkdirSync(this.options.root,{recursive:true,mode:0o700});
      const target=join(this.options.root,input.replaceExisting?`${id}-${randomUUID()}`:id);const stage=join(this.options.root,`.stage-${id}`); if(existsSync(stage)) throw new Error('存在未完成的账号导入现场，请先核实归属');mkdirSync(stage,{mode:0o700});staged.push(stage);
      for(const [name,body] of Object.entries(candidate.authFiles??{})){mkdirSync(dirname(join(stage,name)),{recursive:true,mode:0o700});writeFileSync(join(stage,name),body,{mode:0o600});}
      if(candidate.database) {
@@ -227,8 +248,16 @@ export class NativeChannelImporter {
      if(provider){if(candidate.modelProvider===provider&&(candidate.selected||role.channel===original))role.channel=id;}
      else if(legacy&&(candidate.selected||!candidate.modelProvider&&candidate.channel.kind==='subscription'&&role.channel===original))role.channel=id;
     }
-    pendingSecrets.set(id,secret);
+    pendingSecrets.set(id,secret);counts[initialIds.has(id)?input.replaceExisting?'updated':'existing':'added']++;accepted.push(candidate);
+    }catch(error){
+     for(const path of staged.splice(stagingBefore))rmSync(path,{recursive:true,force:true});
+     for(const path of createdTargets.splice(targetsBefore))rmSync(path,{recursive:true,force:true});
+     if(input.engine){if(error&&typeof error==='object'&&'code' in error)throw new Error('原生账号私有配置建立或身份验证失败，请检查目录权限与登录后重试');throw error;}
+     failures.set(candidate.channel.engine,snapshot.config.engines[candidate.channel.engine]?.kind==='claude'&&error instanceof Error?error.message:`${candidate.channel.engine} 来源账号复验失败；其他可用来源已保留，请单独选择该引擎重试`);
+    }
    }
+   candidates.splice(0,candidates.length,...accepted);
+   if(!candidates.length)throw new Error([...failures.values()].join('；'));
   } finally {for(const stage of staged)rmSync(stage,{recursive:true,force:true});}
   const subscriptions=new Map<string,Set<string>>();
   for(const candidate of candidates){if(candidate.channel.kind!=='subscription'||!candidate.channel.enabled)continue;const id=`import_${hash(candidate.identity)}`;const set=subscriptions.get(candidate.channel.engine)??new Set<string>();set.add(id);subscriptions.set(candidate.channel.engine,set);}
@@ -239,7 +268,11 @@ export class NativeChannelImporter {
    for(const [id,secret] of pendingSecrets)this.secrets.putSecret(id,secret);
   });
   committed=true;
-  return new ChannelService(this.policy,this.secrets).get();
+  const result=new ChannelService(this.policy,this.secrets).get();
+  for(const [id,channel] of Object.entries(result.policy.config.channels)){
+   const detail=failures.get(channel.engine);if(detail)result.configurations[id]!.detail=detail;
+  }
+  return {...result,importResult:{...counts,notFound:[...notFound],failures:[...failures].map(([engine,message])=>({engine,message}))}};
   } finally {for(const dir of temporary)rmSync(dir,{recursive:true,force:true});if(!committed)for(const dir of createdTargets)rmSync(dir,{recursive:true,force:true});}
  }
 }

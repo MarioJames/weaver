@@ -1,0 +1,86 @@
+{
+  "fileOpen": "PASS; actual file URL in own Google Chrome",
+  "viewport390": {
+    "status": "PASS",
+    "width": 390,
+    "scrollWidth": 390,
+    "screenshot": "report-390.png",
+    "visualInspected": true,
+    "privacy": "Report contains no account identifiers or secrets; geometry checked before screenshot; no DOM masking needed"
+  },
+  "print": {
+    "status": "PASS",
+    "artifact": "REPORT.pdf",
+    "pages": 2,
+    "method": "Actual Chrome print-to-PDF; both rasterized pages visually inspected",
+    "finalOwnerSummaryIncluded": true
+  },
+  "links": {
+    "status": "PASS for all local artifacts and anchors; external app URL not navigated",
+    "checks": [
+      {
+        "href": "#blocker",
+        "status": "PASS",
+        "kind": "browser-confirmed-anchor"
+      },
+      {
+        "href": "#cases",
+        "status": "PASS",
+        "kind": "browser-confirmed-anchor"
+      },
+      {
+        "href": "#history",
+        "status": "PASS",
+        "kind": "browser-confirmed-anchor"
+      },
+      {
+        "href": "#resources",
+        "status": "PASS",
+        "kind": "browser-confirmed-anchor"
+      },
+      {
+        "href": "results.json",
+        "status": "PASS",
+        "kind": "local-artifact-exists"
+      },
+      {
+        "href": "../import-specific/REPORT.html",
+        "status": "PASS",
+        "kind": "local-artifact-exists"
+      },
+      {
+        "href": "../real-test-final/REPORT.html",
+        "status": "PASS",
+        "kind": "local-artifact-exists"
+      },
+      {
+        "href": "../real-test-final/engine-evidence.json",
+        "status": "PASS",
+        "kind": "local-artifact-exists"
+      },
+      {
+        "href": "http://127.0.0.1:4738",
+        "status": "NOT NAVIGATED",
+        "kind": "persistent test URL; product not exercised"
+      },
+      {
+        "href": "cleanup.json",
+        "status": "PASS",
+        "kind": "local-artifact-exists"
+      },
+      {
+        "href": "report-validation.json",
+        "status": "PASS",
+        "kind": "local-artifact-exists"
+      },
+      {
+        "href": "owner-check-summary.json",
+        "status": "PASS",
+        "kind": "local artifact exists; final browser saw owner link and exitCode=1"
+      }
+    ]
+  },
+  "pageErrors": [],
+  "productAcceptance": "NOT RUN; report validation does not prove UI import",
+  "artifactErrors": []
+}

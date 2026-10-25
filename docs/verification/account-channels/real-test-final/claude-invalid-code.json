@@ -1,0 +1,9 @@
+{
+  "errors": [
+    "无法确认最新状态\nINVALID_REQUEST: 请粘贴完整的官方授权码（含 # 后的部分），不能包含空格或换行，最多 4096 字符。可重新读取；若服务已重启或登录已失效，请重试登录。"
+  ],
+  "inputRetained": true,
+  "jobStillWaiting": true,
+  "stillAcceptsCode": true,
+  "nativeStdinObservation": "No direct stdin trace; real INVALID_REQUEST and unchanged acceptsCode/job state plus source validation before write. No format-valid fabricated code submitted."
+}

@@ -132,7 +132,7 @@ test('builtin projects policy save/rollback, block changes preserve cadence, out
   assert.equal(service.quotaStatus().nextRunAt,next);
   snap=f.policy.snapshot();snap.config.quota={auto_refresh:false,interval_minutes:30};f.policy.save({revision:snap.revision,config:snap.config,blocks:[]});assert.equal(service.quotaStatus().nextRunAt,null);
   f.policy.rollback(original);assert.equal(service.quotaStatus().enabled,true);assert.equal(service.quotaStatus().intervalMinutes,15);
-  const run=service.run({scheduleId:builtin.id});await new Promise(r=>setTimeout(r,20));assert.equal(service.runs({scheduleId:builtin.id,runId:run.id}).runs[0].status,'succeeded');assert.deepEqual(calls,['default_codex','default_claude']);
+  const run=service.run({scheduleId:builtin.id});await new Promise(r=>setTimeout(r,20));assert.equal(service.runs({scheduleId:builtin.id,runId:run.id}).runs[0].status,'succeeded');assert.deepEqual(calls,['default_codex','default_claude','default_grok']);
   stale=true;const bad=service.run({scheduleId:builtin.id});await new Promise(r=>setTimeout(r,20));assert.equal(service.runs({scheduleId:builtin.id,runId:bad.id}).runs[0].status,'succeeded');
   snap=f.policy.snapshot();for(const e of Object.values(snap.config.channels))e.quota_refresh=false;f.policy.save({revision:snap.revision,config:snap.config,blocks:snap.blocks});
   const empty=service.run({scheduleId:builtin.id});await new Promise(r=>setTimeout(r,20));assert.equal(service.runs({scheduleId:builtin.id,runId:empty.id}).runs[0].status,'skipped');
@@ -146,7 +146,7 @@ test('builtin quota run refreshes an explicitly enabled OpenCode target through 
   service=new ScheduleService({store:f.store,policy:f.policy,now:()=>AT,notify:()=>{},createTask:()=>{},command:()=>({apiVersion:'weaver.v1',ok:true}),refreshQuota:async engine=>{calls.push(engine);return {records:[{...record(engine.replace('default_','') as QuotaEngine),channel:engine}],snapshot:f.policy.snapshot(),policyChanged:false};}});
   let snap=f.policy.snapshot();snap.config.engines.opencode.enabled=true;snap.config.channels.default_opencode.quota_refresh=true;f.policy.save({revision:snap.revision,config:snap.config,blocks:snap.blocks},{allowEngineEnable:true});
   const builtin=service.list({}).schedules.find(d=>d.builtin)!;const run=service.run({scheduleId:builtin.id});await new Promise(r=>setTimeout(r,20));
-  assert.deepEqual(calls,['default_codex','default_claude','default_opencode']);
+  assert.deepEqual(calls,['default_codex','default_claude','default_grok','default_opencode']);
   assert.equal(service.runs({scheduleId:builtin.id,runId:run.id}).runs[0].status,'succeeded','an unsupported Go observation stays observable in output without failing the run');
   }finally{await service?.stop();await f.close();}
 });
@@ -196,7 +196,7 @@ test('quota.refresh probe miss stays succeeded with per-engine output and a summ
   assert.equal(detail.status,'succeeded','a throwing engine probe must not fail the quota.refresh run');
   assert.ok(!detail.error,`expected empty error, got: ${detail.error}`);
   assert.match(detail.output,/codex/);assert.match(detail.output,/probe boom/);assert.match(detail.output,/claude/);
-  assert.match(detail.output,/未获得新鲜额度观测/);assert.match(detail.output,/1 个成功/);
+  assert.match(detail.output,/未获得新鲜额度观测/);assert.match(detail.output,/2 个成功/);
  }finally{await service?.stop();await f.close();}
 });
 

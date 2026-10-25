@@ -256,3 +256,15 @@ test('account cache invalidation prevents an old inflight model result from repo
   assert.equal((await lister.list({ engine: 'opencode' })).models[0]?.id, fresh.models[0]?.id);
   assert.equal(runs, 2);
 });
+
+
+test('Codex account model listing uses its private root without runtime-only profile flags',async()=>{
+ const root=mkdtempSync('/tmp/weaver-accounts-correction-0m5vxumu/backend-correction/models-');
+ try{
+  writeFileSync(join(root,'auth.json'),JSON.stringify({tokens:{account_id:'fixture',access_token:'fixture'}}));
+  const lister=new EngineModelLister({root:join(root,'scratch'),channel:()=>({channel:{engine:'codex',kind:'subscription',enabled:true,label:'fixture'},secret:{authDir:root}}),find:async()=>'/fixture/codex',run:async(_exe,args,_timeout,_max,env)=>{
+   assert.equal(env.CODEX_HOME,root);assert.deepEqual(args,['debug','models']);return ok(CODEX);
+  }});
+  assert.equal((await lister.list({engine:'codex',channel:'fixture'})).status,'ok');
+ }finally{rmSync(root,{recursive:true,force:true});}
+});

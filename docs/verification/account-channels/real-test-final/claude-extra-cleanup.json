@@ -1,0 +1,7 @@
+{
+  "jobStatus": "cancelled",
+  "noOwnedProcesses": true,
+  "scopes": {
+    "dev-weaver-channel-login-18f55e04-8e22-48d1-99a7-126c1543a371.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive"
+  }
+}

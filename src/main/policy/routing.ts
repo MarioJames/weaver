@@ -107,7 +107,7 @@ export function withoutWorkerBlocks(config: Config, blocks: Block[], engine: str
 }
 /** Vendor limits aggregate within a channel; an account's blocked pool cannot pause another account. */
 export function escalateEngineBlock(config: Config, blocks: Block[], engine: string, now: number): Block[] {
-  if (!config.engines[engine]?.enabled) return blocks;
+  if (!Object.hasOwn(config.engines,engine)) return blocks;
   const live=(b:Block)=>isBlockActive(b,now);
   if(blocks.some(b=>isEngineBlock(b,engine)&&live(b))) return blocks;
   let next=blocks;

@@ -11,7 +11,7 @@ import type { CommandRequest } from '../../src/shared/contracts/commands';
 import { manualPauseOf } from '../../src/shared/policy/availability';
 import { FREE_PROBE_BLOCK_BY, STALL_BLOCK_BY, VENDOR_BLOCK_BY, isQuotaBlock, manualResumeKind } from '../../src/shared/policy/blocks';
 import { OwnerScheduleFields, workerStatusTag, workerWeightLock } from '../../src/renderer/features/roles/OwnerSchedule';
-import { engineBlockText } from '../../src/renderer/features/engines/EnginesPage';
+import { engineBlockText } from '../../src/renderer/policy/worker-resume';
 import { resumeAction, resumeWorker } from '../../src/renderer/policy/worker-resume';
 
 const FUTURE = '2999-01-01T00:00:00.000Z';
@@ -30,7 +30,7 @@ function grokConfig() {
 }
 const GROK_402 = block({ by: 'codex_owner', reason: 'Grok 最终 high 调用返回 402 余额耗尽，未提供恢复时间' });
 
-test('quota is recognised from the marker or the wording, one rule for the engines page and the schedule list', () => {
+test('quota is recognised from the marker or the wording, one rule for role recovery and the schedule list', () => {
   for (const [by, reason] of [['weaver-quota:grok', 'x'], [VENDOR_BLOCK_BY, '额度耗尽：FreeUsageLimitError'], [VENDOR_BLOCK_BY, 'GoUsageLimitError: out'], ['codex_owner', 'Grok 返回 402 余额耗尽'], ['manual', 'quota exceeded for this key']] as const) {
     assert.equal(isQuotaBlock({ by, reason }), true, `${by} ${reason}`);
     assert.equal(engineBlockText(block({ by, reason }), NOW).category, '额度耗尽', `${by} ${reason}`);
@@ -54,7 +54,7 @@ test('an exhausted quota or a release-less block locks the worker\'s weight; a t
   assert.equal(lock.label, '额度耗尽');
   assert.match(lock.hint, /402 余额耗尽/);
   assert.match(lock.hint, /恢复派发/);
-  assert.match(lock.hint, /引擎页或子 Agent 页/);
+  assert.match(lock.hint, /在子 Agent 页/);
   assert.equal(workerWeightLock(config, 'grok_worker', [block({ by: 'manual', reason: '人工暂停' })], NOW)!.label, '已暂停 · 需手动恢复');
   assert.equal(workerWeightLock(config, 'grok_worker', [block({ worker: 'grok_worker', by: 'manual', reason: '人工暂停' })], NOW)!.label, '已暂停 · 需手动恢复', 'a worker-level ban locks it too');
   assert.equal(workerWeightLock(config, 'grok_worker', [block({ by: VENDOR_BLOCK_BY, reason: '限流：429', release_at: FUTURE })], NOW), undefined);
@@ -146,4 +146,17 @@ test('the shown ban decides the resume call: a worker\'s own ban (or the engine-
   assert.equal(resumeAction([manualEngine, own], 'codex_worker', manualEngine), 'remove', 'a manual engine ban is not the server\'s to lift here');
   assert.equal(resumeAction([modelBan, own], 'codex_worker', modelBan), 'remove');
   assert.equal(resumeAction([own], 'claude_worker', block({ engine: 'claude', worker: 'other_worker', by: 'manual' })), 'remove', 'another worker\'s ban is not this worker\'s call');
+});
+
+test('account and role switches control weight availability while legacy engine flags never hide pause recovery', () => {
+  const config = grokConfig();
+  config.engines.grok.enabled = false;
+  assert.equal(workerWeightLock(config, 'grok_worker', [], NOW), undefined);
+  assert.equal(workerWeightLock(config, 'grok_worker', [GROK_402], NOW)?.paused, true);
+  const channel = config.workers.grok_worker.channel;
+  config.channels[channel].enabled = false;
+  assert.equal(workerWeightLock(config, 'grok_worker', [GROK_402], NOW)?.label, '渠道已停用');
+  config.channels[channel].enabled = true;
+  config.workers.grok_worker.enabled = false;
+  assert.equal(workerWeightLock(config, 'grok_worker', [GROK_402], NOW)?.label, '子 Agent 已停用');
 });

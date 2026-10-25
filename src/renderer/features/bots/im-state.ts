@@ -228,8 +228,7 @@ export function validateDraft(draft: ImDraft, saved: ImConfig, config: Config | 
   if (draft.enabled) {
     if (!draft.channel) errors.channel = '开启时需要选择支持飞书对话的已启用渠道。';
     else if (!channel?.enabled) errors.channel = '该渠道尚未启用，请在账号与渠道页检查。';
-    else if (!engine || !isImEngineKind(engine.kind)) errors.channel = '请选择使用已安装、已启用引擎的飞书对话渠道。';
-    else if (!engine.enabled) errors.channel = '该引擎尚未启用，请先在引擎页启用。';
+    else if (!engine || !isImEngineKind(engine.kind)) errors.channel = '请选择使用受支持引擎的飞书对话渠道。';
     if (engine && isImEngineKind(engine.kind) && draft.effort && !imEngineEffortAllowed(engine.kind, draft.effort)) {
       errors.effort = engine.kind === 'opencode' ? '请填写该模型接受的 variant（最多 32 字符）。' : '请选择该引擎支持的思考力度。';
     }
@@ -273,7 +272,6 @@ export function ownerProfileOptions(profiles: readonly ImOwnerProfileOption[]): 
   const suffix: Record<string, string> = {
     disabled: '（已停用）',
     channel_disabled: '（渠道未启用）',
-    engine_disabled: '（引擎未启用）',
     not_launchable: '（不能作为父 Agent 启动）',
     missing: '（已删除）',
   };
@@ -306,7 +304,6 @@ export function ownerProfileError(
   switch (found.reason) {
     case 'disabled': return '当前选择的父 Agent 已停用，请改选或切换为自动。';
     case 'channel_disabled': return '当前选择的父 Agent 所属渠道未启用，请改选或切换为自动。';
-    case 'engine_disabled': return '当前选择的父 Agent 所属引擎未启用，请改选或切换为自动。';
     case 'not_launchable': return '当前选择的父 Agent 无法启动，请改选或切换为自动。';
     case 'missing':
     default: return '当前选择的父 Agent 已删除，请改选或切换为自动。';

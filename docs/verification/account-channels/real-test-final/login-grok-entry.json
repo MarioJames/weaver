@@ -1,0 +1,51 @@
+{
+  "engine": "grok",
+  "channel": "channel_24fae3142b5c48f898448d0a",
+  "ui": {
+    "acceptsCode": false,
+    "backendHasCode": true,
+    "cancelRect": {
+      "bottom": 505,
+      "height": 32,
+      "left": 698.953125,
+      "right": 806.96875,
+      "top": 473,
+      "width": 108.015625,
+      "x": 698.953125,
+      "y": 473
+    },
+    "codeMatches": true,
+    "hasDeviceCode": true,
+    "linkClickable": true,
+    "linkRect": {
+      "bottom": 411,
+      "height": 22,
+      "left": 379,
+      "right": 987,
+      "top": 389,
+      "width": 608,
+      "x": 379,
+      "y": 389
+    },
+    "manualPassword": false,
+    "manualSubmit": false,
+    "reference": {
+      "channel": "channel_24fae3142b5c48f898448d0a",
+      "id": "13fa86cd-6707-412e-9945-32c7c23b25d3"
+    },
+    "safeUrl": "https://accounts.x.ai/oauth2/device",
+    "status": "authorizing",
+    "urlMatches": true
+  },
+  "nativeProcesses": [
+    {
+      "pid": 1338891,
+      "comm": "grok-1.0.70-lin",
+      "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_24fae3142b5c48f898448d0a/native",
+      "roots": {
+        "GROK_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_24fae3142b5c48f898448d0a/native"
+      },
+      "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/dev-weaver-channel-login-15644705-7fb9-4c65-9ca9-373ee1d65332.scope"
+    }
+  ]
+}

@@ -126,6 +126,10 @@ export function prepareCliAgentInput(input: CliAgentInput): PreparedCliAgent {
   }
   const channelRun = input.channelConfig ? prepareChannelRun({ ...input.channelConfig, model: input.model, stateDir }) : undefined;
   if (channelRun) {
+    // The channel socket owns this account; retain --no-leader and all permission flags.
+    if(input.engine==='grok'&&channelRun.argv.includes('--leader-socket')){
+      for(let index=spec.argv.indexOf('--leader-socket');index>=0;index=spec.argv.indexOf('--leader-socket'))spec.argv.splice(index,2);
+    }
     // Global flags precede the subcommand, dsh provider patch precedes the final permission patch.
     spec.argv.splice(1, 0, ...channelRun.argv);
   }

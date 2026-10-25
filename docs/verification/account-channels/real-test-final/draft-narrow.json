@@ -1,0 +1,64 @@
+{
+  "dialog": [
+    {
+      "inputs": [],
+      "text": "已有未保存的账号草稿\n「验收官方claude1025」有未保存的输入。要打开「验收官方grok1025」，请先选择继续原草稿或放弃后切换。\n继续原草稿\n放弃原草稿并切换"
+    }
+  ],
+  "geometry": [
+    {
+      "buttons": [
+        {
+          "rect": {
+            "bottom": 369,
+            "height": 32,
+            "left": 330,
+            "right": 362,
+            "top": 337,
+            "width": 32,
+            "x": 330,
+            "y": 337
+          },
+          "text": ""
+        },
+        {
+          "rect": {
+            "bottom": 503,
+            "height": 32,
+            "left": 120.96875,
+            "right": 215.984375,
+            "top": 471,
+            "width": 95.015625,
+            "x": 120.96875,
+            "y": 471
+          },
+          "text": "继续原草稿"
+        },
+        {
+          "rect": {
+            "bottom": 503,
+            "height": 32,
+            "left": 223.984375,
+            "right": 358,
+            "top": 471,
+            "width": 134.015625,
+            "x": 223.984375,
+            "y": 471
+          },
+          "text": "放弃原草稿并切换"
+        }
+      ],
+      "rect": {
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "top": 0,
+        "width": 390,
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "restoredLabel": "验收官方claude1025-narrow-unsaved"
+}

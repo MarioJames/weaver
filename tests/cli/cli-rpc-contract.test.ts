@@ -9,11 +9,11 @@ import { createRpcHandlers, type RpcHost } from '../../src/main/transport/handle
 
 /** Explicit public RPC methods and arity, including channel CRUD and identity-scoped quota refresh. */
 const FROZEN_ARITY: Record<string, number> = {
-  getChannels:0,saveChannel:1,deleteChannel:1,importChannels:1,refreshChannelQuota:1,
+  startChannelLogin:1,getChannelLogin:1,submitChannelLoginCode:1,cancelChannelLogin:1,getChannels:0,saveChannel:1,deleteChannel:1,importChannels:1,refreshChannelQuota:1,
   getImSettings: 0, saveImSettings: 1, reconnectIm: 0,
   command: 1, getPolicy: 0, policyHistory: 0, policyRollback: 1, validatePolicy: 1, savePolicy: 1, previewRoute: 1, scanEngines: 0,
   listEngineModels: 1, getQuota: 0, refreshQuota: 1, getStall: 0, workerProbe: 1, workerProbeStatus: 0, sayHi: 1, sayHiResult: 1, startEngineCleanup: 1, getEngineCleanup: 1,
-  setEngineEnabled: 1, listTasks: 0, getTask: 1, createTask: 1, startTask: 1, cancelTask: 1, capabilities: 0, serverInfo: 0,
+  listTasks: 0, getTask: 1, createTask: 1, startTask: 1, cancelTask: 1, capabilities: 0, serverInfo: 0,
   janitorSweep: 1, janitorStatus: 0,
 };
 
@@ -39,10 +39,11 @@ test('CLI catalog rows that call RPC directly take method, arity and mutation fr
     ['workers.probe', 'workerProbe', 1, true], ['workers.probe-status', 'workerProbeStatus', 0, false],
     ['policy.get', 'getPolicy', 0, false], ['policy.validate', 'validatePolicy', 1, false], ['policy.save', 'savePolicy', 1, true],
     ['policy.preview', 'previewRoute', 1, false], ['policy.history', 'policyHistory', 0, false], ['policy.rollback', 'policyRollback', 1, true],
+    ['channels.login.start','startChannelLogin',1,true], ['channels.login.get','getChannelLogin',1,false], ['channels.login.cancel','cancelChannelLogin',1,true],
     ['channels.list','getChannels',0,false], ['channels.save','saveChannel',1,true], ['channels.delete','deleteChannel',1,true], ['channels.import','importChannels',1,true], ['channels.quota','refreshChannelQuota',1,true],
     ['engines.scan', 'scanEngines', 0, false], ['engines.models', 'listEngineModels', 1, false],
     ['janitor.sweep', 'janitorSweep', 1, true], ['janitor.status', 'janitorStatus', 0, false],
-    ['quota.get', 'getQuota', 0, false], ['quota.refresh', 'refreshQuota', 1, true], ['engines.set-enabled', 'setEngineEnabled', 1, true],
+    ['quota.get', 'getQuota', 0, false], ['quota.refresh', 'refreshQuota', 1, true],
   ]);
   const cliCommands = Object.values(RPC_METHODS).flatMap(spec => ('cli' in spec ? [spec.cli] : []));
   assert.deepEqual([...cliCommands].sort(), direct.map(row => row[0]).sort());

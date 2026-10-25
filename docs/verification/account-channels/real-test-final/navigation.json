@@ -1,0 +1,69 @@
+{
+  "ui": {
+    "hash": "#/tasks",
+    "headings": [
+      "任务"
+    ],
+    "navigation": [
+      {
+        "href": "/#/tasks",
+        "text": "任务"
+      },
+      {
+        "href": "/#/schedules",
+        "text": "定时任务"
+      },
+      {
+        "href": "/#/channels",
+        "text": "账号与渠道"
+      },
+      {
+        "href": "/#/owners",
+        "text": "父 Agent"
+      },
+      {
+        "href": "/#/workers",
+        "text": "子 Agent"
+      },
+      {
+        "href": "/#/bots",
+        "text": "Bot"
+      },
+      {
+        "href": "/#/settings",
+        "text": "设置"
+      }
+    ]
+  },
+  "engines": {
+    "claude": {
+      "enabled": true,
+      "kind": "claude"
+    },
+    "codex": {
+      "enabled": true,
+      "kind": "codex"
+    },
+    "grok": {
+      "enabled": true,
+      "kind": "grok"
+    },
+    "opencode": {
+      "enabled": true,
+      "kind": "opencode"
+    },
+    "pi": {
+      "enabled": true,
+      "kind": "pi"
+    },
+    "qoder": {
+      "enabled": true,
+      "kind": "qodercli"
+    },
+    "dsh": {
+      "enabled": true,
+      "kind": "dsh"
+    }
+  },
+  "allSevenEnabled": true
+}

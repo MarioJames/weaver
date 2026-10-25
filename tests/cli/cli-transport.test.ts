@@ -154,3 +154,14 @@ test('explicit shorter client deadlines remain binding for launch and ordinary r
   }
  }finally{for(const reply of replies)reply();await app.close();await rm(directory,{recursive:true,force:true});}
 });
+
+
+test('import allowance reaches Unix server and CLI client, while malformed envelopes retain default',async t=>{
+ const {requestTimeoutMs}=await import('../../src/main/local-ipc');const {Socket}=await import('node:net');const socket=t.mock.method(Socket.prototype,'setTimeout');const timer=t.mock.method(globalThis,'setTimeout');
+ const request={method:'importChannels',args:[{revision:0}]};assert.equal(requestTimeoutMs(request),180000);
+ for(const [method,deadline] of [['refreshChannelQuota',180000],['cancelChannelLogin',60000],['listEngineModels',40000],['workerProbe',130000]] as const)assert.equal(requestTimeoutMs({method,args:[{}]}),deadline);
+ for(const bad of [null,[],{...request,args:[]},{...request,args:[{},{}]},{...request,args:{}},{...request,extra:true},{method:'getPolicy',args:[]},{method:'constructor',args:[]},{method:'__proto__',args:[{}]},Object.assign(Object.create({method:'importChannels'}),{args:[{}],extra:true}),{}])assert.equal(requestTimeoutMs(bad),15000);
+ const directory=await mkdtemp(join(tmpdir(),'wv-'));let calls=0;const app=await startLocalIPC(directory,()=>{calls++;return {apiVersion:'weaver.v1',ok:true,data:{added:5}};});try{
+  assert.deepEqual(await sendRequest(directory,request),{apiVersion:'weaver.v1',ok:true,data:{added:5}});assert.equal(calls,1);assert.ok(socket.mock.calls.some(call=>call.arguments[0]===180000));assert.ok(timer.mock.calls.some(call=>call.arguments[1]===180000));assert.ok(timer.mock.calls.filter(call=>Number(call.arguments[1])>15000).length>=2);
+ }finally{await app.close();await rm(directory,{recursive:true,force:true});}
+});

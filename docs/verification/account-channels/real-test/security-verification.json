@@ -1,0 +1,11 @@
+{
+  "at": "2026-10-25T05:20:29.961Z",
+  "filesScanned": 67,
+  "knownRealApiKeyAbsent": true,
+  "filesContainingRealApiKey": [],
+  "oauthQueryUrlSuspects": [],
+  "rawRequestBodiesExported": false,
+  "HARExported": false,
+  "screenshotAuthorizationRegionsMasked": true,
+  "notes": "Only original dsh key was loaded into memory for equality/absence check. No key, code, cookie or raw native auth output printed. Device code values were never exported."
+}

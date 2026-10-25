@@ -1,0 +1,19 @@
+{
+  "configuration": {
+    "hasApiKey": true,
+    "hasConfig": false,
+    "hasCredentials": false,
+    "quota": {
+      "engine": "dsh",
+      "source": "",
+      "status": "unsupported",
+      "checkedAt": null,
+      "observedAt": null,
+      "stale": true,
+      "windows": [],
+      "detail": "API 渠道没有官方订阅额度接口",
+      "retryAt": null,
+      "channel": "channel_ca46ee07b37c4a0cacd86747"
+    }
+  }
+}

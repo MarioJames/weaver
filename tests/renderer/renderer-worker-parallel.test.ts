@@ -10,7 +10,6 @@ import { VENDOR_BLOCK_BY } from '../../src/shared/policy/blocks';
 import { withWorkerParallel, workerParallelText } from '../../src/renderer/policy/policy-edit';
 import { RolesPage, WorkerBlockNotice, WorkerParallelField } from '../../src/renderer/features/roles/RolesPage';
 import { OwnerScheduleFields } from '../../src/renderer/features/roles/OwnerSchedule';
-import { BlockList } from '../../src/renderer/features/engines/EnginesPage';
 import { tagColor } from '../../src/renderer/format/tag-colors';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
 import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';
@@ -144,19 +143,4 @@ test('the pause notice names the reason and release time and its button calls re
   assert.deepEqual(calls, ['resume']);
   assert.match(markup(WorkerBlockNotice({ block: vendorEngine(), now: NOW, onResume: () => {} })), /整个引擎 opencode/);
   assert.match(markup(WorkerBlockNotice({ block: { ...vendorWorker('w'), release_at: undefined, by: 'manual' }, now: NOW, onResume: () => {} })), /需手动恢复/);
-});
-
-test('every engine ban has a text button for resuming dispatch', () => {
-  const blocks = [vendorWorker('opencode_worker'), vendorEngine()];
-  const removed: Block[] = [];
-  const tree = BlockList({ blocks, now: NOW, disabled: false, onRemove: block => removed.push(block) })!;
-  const html = markup(tree);
-  assert.equal((html.match(/aria-label="恢复派发"/g) ?? []).length, 2);
-  const labels = html.split('<button').slice(1).map(part => part.split('</button>')[0]!.replace(/^[^>]*>/, '').replace(/<[^>]*>/g, ''));
-  assert.deepEqual(labels, ['恢复派发', '恢复派发'], 'the label is visible text, not only an icon tooltip');
-  const buttons = elements(tree).filter(element => element.props['aria-label'] === '恢复派发');
-  buttons[1]!.props.onClick();
-  assert.deepEqual(removed, [blocks[1]]);
-  const disabled = elements(BlockList({ blocks, now: NOW, disabled: true, onRemove: () => {} })!).filter(element => element.props['aria-label'] === '恢复派发');
-  assert.ok(disabled.every(element => element.props.disabled === true));
 });

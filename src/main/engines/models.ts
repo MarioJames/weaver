@@ -185,7 +185,8 @@ export class EngineModelLister {
       const scratch=mkdtempSync(path.join(this.options.root,'models-'));
       try {
         const runtime=prepareChannelRun({...binding,model:'model-list',purpose:'models',stateDir:scratch,env:this.options.env});
-        try{const result=await this.executeNative(input,runtime.env,runtime.argv,binding.engineKind);return runtime.allowedModels?{...result,models:result.models.filter(model=>runtime.allowedModels!.includes(model.id))}:result;}finally{cleanupChannelRun(runtime);}
+        // debug models rejects runtime profiles; the account's CODEX_HOME and API config still apply.
+        try{const result=await this.executeNative(input,runtime.env,(binding.engineKind??binding.channel.engine)==='codex'?[]:runtime.argv,binding.engineKind);return runtime.allowedModels?{...result,models:result.models.filter(model=>runtime.allowedModels!.includes(model.id))}:result;}finally{cleanupChannelRun(runtime);}
       } finally {rmSync(scratch,{recursive:true,force:true});}
     }
     return this.executeNative(input,this.options.env??process.env,[]);

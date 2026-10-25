@@ -6,10 +6,8 @@ import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { ENGINE_KINDS, defaultConfig, validateConfig } from '../../src/main/policy/routing';
 import { availabilityOf } from '../../src/shared/policy/availability';
-import { PolicyStore } from '../../src/main/policy/store';
-import { ENGINE_CATALOG } from '../../src/shared/engines';
+import { ENGINE_CATALOG, engineReadiness, EXECUTION_BOUNDARY, type EngineProbeRecord } from '../../src/shared/engines';
 import { EngineProber } from '../../src/main/engines/probe';
-import { applyEngineEnabled, parseEngineToggle } from '../../src/main/engines/control';
 
 test('pi is a fixed catalog engine and only claude and codex advertise native subagents', () => {
   const pi = ENGINE_CATALOG.find(entry => entry.id === 'pi');
@@ -87,68 +85,14 @@ test('overlapping scans share one version probe per command', async () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('enabling an installed engine does not create or enable roles and preserves them on disable', async () => {
-  const installed = bin('pi', '#!/bin/sh\necho "pi 0.9 ${SECRET_TOKEN:-clean}"\n');
-  const root = mkdtempSync(join(tmpdir(), 'weaver-policy-'));
-  try {
-    const store = new PolicyStore(join(root,'weaver.db'));
-    const before = store.snapshot();
-    const prober = new EngineProber({ pathEnv: installed.pathEnv, timeoutMs: 1000, env: { SECRET_TOKEN: 'super-secret', PATH: installed.pathEnv } });
-    const enabled = await applyEngineEnabled(store, prober, { id: 'pi', enabled: true, revision: before.revision });
-    assert.equal(enabled.probe?.status, 'installed');
-    assert.equal(enabled.probe?.version?.includes('super-secret'), false);
-    assert.equal(enabled.probe?.version?.includes('clean'), true);
-    assert.deepEqual(enabled.snapshot.config.owners, before.config.owners);
-    assert.deepEqual(enabled.snapshot.config.workers, before.config.workers);
-    assert.equal(enabled.snapshot.config.engines.pi.enabled, true);
-    assert.equal(enabled.snapshot.config.engines.pi.kind, 'pi');
-    const disabled = await applyEngineEnabled(store, prober, { id: 'pi', enabled: false, revision: enabled.snapshot.revision });
-    assert.equal(disabled.snapshot.config.engines.pi.enabled, false);
-    assert.deepEqual(disabled.snapshot.config.owners, before.config.owners);
-    assert.deepEqual(disabled.snapshot.config.workers, before.config.workers);
-    assert.equal(disabled.probe, null);
-  } finally {
-    rmSync(installed.root, { recursive: true, force: true });
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('failed probe and stale revision block enablement without writing, while an engine with enabled roles can always be disabled', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'weaver-policy-'));
-  const absent = mkdtempSync(join(tmpdir(), 'weaver-cli-'));
-  try {
-    const store = new PolicyStore(join(root,'weaver.db'));
-    const prober = new EngineProber({ pathEnv: absent, timeoutMs: 300 });
-    await assert.rejects(() => applyEngineEnabled(store, prober, { id: 'opencode', enabled: true, revision: 0 }), /not installed|missing|Version/);
-    assert.equal(store.snapshot().revision, 0);
-    assert.equal(store.snapshot().config.engines.opencode.enabled, false);
-    // Disabling never asks the roles on the engine to be disabled first; they stay enabled and just stop being scheduled.
-    const off = await applyEngineEnabled(store, prober, { id: 'claude', enabled: false, revision: 0 });
-    assert.equal(off.snapshot.revision, 1);
-    assert.equal(store.snapshot().config.owners.claude_owner.enabled, true);
-    assert.equal(store.snapshot().config.workers.claude_worker.enabled, true);
-    assert.equal(store.snapshot().config.engines.claude.enabled, false);
-    assert.equal(store.snapshot().owners.claude_owner.status, 'engine_disabled');
-    assert.equal(store.snapshot().workers.claude_worker.status, 'engine_disabled');
-    store.save({ revision: 1, config: store.snapshot().config, blocks: [] });
-    await assert.rejects(() => applyEngineEnabled(store, prober, { id: 'grok', enabled: false, revision: 1 }), /reload/);
-    assert.equal(store.snapshot().revision, 2);
-    assert.equal(store.snapshot().config.engines.grok.enabled, false);
-    assert.throws(() => parseEngineToggle({ id: 'grok', enabled: true, revision: 1, argv: ['grok'] }), /Unknown/);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(absent, { recursive: true, force: true });
-  }
-});
-
-test('an enabled role on a disabled engine is valid: it is simply not scheduled', () => {
+test('legacy engine flags do not prevent enabled channel roles from routing', () => {
   const config = defaultConfig();
   config.workers.grok_worker.enabled = true;
   assert.deepEqual(validateConfig(config), []);
   config.engines.claude.enabled = false;
   assert.deepEqual(validateConfig(config), []);
-  assert.equal(availabilityOf(config, [], config.owners.claude_owner).status, 'engine_disabled');
-  assert.equal(availabilityOf(config, [], config.workers.claude_worker, 'claude_worker').status, 'engine_disabled');
+  assert.equal(availabilityOf(config, [], config.owners.claude_owner).status, 'available');
+  assert.equal(availabilityOf(config, [], config.workers.claude_worker, 'claude_worker').status, 'available');
 });
 
 test('version probe stops descendants that keep the pipes open', async () => {
@@ -194,43 +138,6 @@ test('version text drops controls and rejects an empty success', async () => {
   } finally { rmSync(empty.root, { recursive: true, force: true }); }
 });
 
-test('policy save cannot enable an engine, and a mismatched kind is not probed or converted', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'weaver-policy-'));
-  const marker = join(root, 'probed');
-  const trap = bin('grok', `#!/bin/sh\necho probed > ${JSON.stringify(marker)}\necho "grok 1.0"\n`);
-  try {
-    const store = new PolicyStore(join(root,'weaver.db'));
-    const enabled = structuredClone(store.snapshot().config);
-    enabled.engines.grok.enabled = true;
-    assert.throws(() => store.save({ revision: 0, config: enabled, blocks: [] }), /probe toggle/);
-    assert.equal(store.snapshot().config.engines.grok.enabled, false);
-    assert.equal(store.snapshot().revision, 0);
-    const blocked = structuredClone(store.snapshot().config);
-    blocked.engines.claude.enabled = false;
-    // Policy save may disable an engine whose roles are still enabled; only enabling stays behind the probe toggle.
-    store.save({ revision: 0, config: blocked, blocks: [] });
-    assert.equal(store.snapshot().config.engines.claude.enabled, false);
-    assert.equal(store.snapshot().config.owners.claude_owner.enabled, true);
-    const preserved = structuredClone(store.snapshot().config);
-    preserved.engines.pi = { enabled: false, kind: 'pi' };
-    preserved.engines.grok.kind = 'claude';
-    const saved = store.save({ revision: 1, config: preserved, blocks: [] });
-    await assert.rejects(() => applyEngineEnabled(store, new EngineProber({ pathEnv: trap.pathEnv, timeoutMs: 1000 }), { id: 'grok', enabled: true, revision: saved.revision }), /does not match|not probed/);
-    assert.equal(existsSync(marker), false);
-    assert.equal(store.snapshot().config.engines.grok.kind, 'claude');
-    assert.equal(store.snapshot().config.engines.grok.enabled, false);
-    assert.equal(store.snapshot().config.engines.pi?.kind, 'pi');
-    assert.equal(store.snapshot().config.engines.pi?.enabled, false);
-    await assert.rejects(() => applyEngineEnabled(store, new EngineProber({ pathEnv: trap.pathEnv, timeoutMs: 500 }), { id: 'pi', enabled: true, revision: store.snapshot().revision }), /not installed/);
-    assert.equal(store.snapshot().config.engines.pi?.kind, 'pi');
-    assert.equal(store.snapshot().config.engines.pi?.enabled, false);
-    await assert.rejects(() => applyEngineEnabled(store, new EngineProber({ pathEnv: trap.pathEnv, timeoutMs: 500 }), { id: 'cursor', enabled: true, revision: store.snapshot().revision }), /outside the supported catalog/);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-    rmSync(trap.root, { recursive: true, force: true });
-  }
-});
-
 function executable(pid: number): boolean {
   try { process.kill(pid, 0); } catch (error) { return (error as NodeJS.ErrnoException).code !== 'ESRCH'; }
   if (process.platform === 'linux') {
@@ -242,3 +149,20 @@ function executable(pid: number): boolean {
   }
   return true;
 }
+
+
+test('readiness follows channel enablement and diagnoses missing adapters separately',()=>{
+ const config=defaultConfig();
+ config.engines.claude.enabled=false;
+ const probe:EngineProbeRecord={id:'claude',kind:'claude',command:'claude',status:'installed',probedAt:new Date().toISOString(),authenticated:false,modelUsable:false};
+ assert.equal(engineReadiness(probe,config).realExecution,true);
+ assert.equal(EXECUTION_BOUNDARY.enablementAuthority,'policy.channels.enabled');
+ assert.equal(engineReadiness({...probe,status:'missing'},config).installed,false);
+ assert.equal(engineReadiness({...probe,status:'missing'},config).realExecution,false);
+ config.channels.default_claude.enabled=false;
+ assert.equal(engineReadiness(probe,config).realExecution,false);
+ config.channels.default_claude.enabled=true;
+ config.engines.claude.kind='unknown' as never;
+ assert.equal(engineReadiness(probe,config).adapterStatus,'not_implemented');
+ assert.equal(engineReadiness(probe,config).realExecution,false);
+});

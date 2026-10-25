@@ -1,3 +1,4 @@
+import { nativeCredentialsReady, nativeEnvironment, channelEnvironment } from './native';
 import { qoderApiModels } from './qoder';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
@@ -7,22 +8,19 @@ import type { Channel, ChannelSecret } from '../../shared/contracts/channels';
 
 export interface ChannelBinding { channel: Channel; secret: ChannelSecret; /** Resolved policy engine kind (channel.engine may be an alias). */ engineKind?: string }
 export interface ChannelRun { allowedModels?: string[]; channelStateDir: string; channelProfilePath?: string; env: NodeJS.ProcessEnv; configFiles: string[]; argv: string[] }
-/** Shared by direct process launch and the Herdr shell launch boundary. Constants are safe shell case patterns. */
-export const CHANNEL_AUTH_ENV_PATTERNS = ['ANTHROPIC_*','OPENAI_*','AZURE_OPENAI_*','XAI_*','GROK_*','CODEX_*','CLAUDE_*','QODER_*','OPENCODE_*','PI_CODING_AGENT_DIR','DSH_*','DEEPSEEK_*','GOOGLE_API_KEY','GEMINI_API_KEY','WEAVER_CHANNEL_KEY','*API_KEY','*APIKEY','*ACCESS_TOKEN','*REFRESH_TOKEN','*AUTH_TOKEN','*BEARER_TOKEN','*CLIENT_SECRET','ELECTRON_RUN_AS_NODE'] as const;
-export function isChannelCredentialVariable(name:string): boolean {
- return CHANNEL_AUTH_ENV_PATTERNS.some(pattern=>pattern.startsWith('*')?name.endsWith(pattern.slice(1)):pattern.endsWith('*')?name.startsWith(pattern.slice(0,-1)):name===pattern);
-}
-/** Authentication and routing variables must never leak from another account. */
-export function channelEnvironment(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
- const env = { ...source };
- for (const name of Object.keys(env)) if (isChannelCredentialVariable(name)) delete env[name];
- return env;
-}
+export { CHANNEL_AUTH_ENV_PATTERNS, channelEnvironment, isChannelCredentialVariable } from './native';
 export function cleanupChannelRun(run: {channelStateDir?:string;channelProfilePath?:string}): void {
  if(run.channelProfilePath&&/^weaver-channel-[a-zA-Z0-9_-]+\.config\.toml$/.test(basename(run.channelProfilePath)))rmSync(run.channelProfilePath,{force:true});
  if(run.channelStateDir&&/^channel-[a-zA-Z0-9_-]+$/.test(basename(run.channelStateDir)))rmSync(run.channelStateDir,{recursive:true,force:true});
 }
 const scalar = (value: string) => JSON.stringify(value);
+/** The same native patch contract applies at save and at launch. */
+export function parseDshConfig(config: string): unknown[] {
+ let patch:unknown;try{patch=parseYaml(config,{logLevel:'error'});}catch{throw new Error('dsh 渠道 YAML 配置无法解析');}
+ if(!Array.isArray(patch))throw new Error('dsh 原生配置必须是 patch 列表');
+ return patch;
+}
+
 function toml(text: string | undefined): Record<string, any> {
  if(!text)return {};try{return parseToml(text);}catch{throw new Error('渠道原生 TOML 配置无法解析，请修正后重试');}
 }
@@ -37,6 +35,7 @@ export function prepareChannelRun(input: ChannelBinding & { model: string; purpo
  const engine = input.engineKind ?? c.engine;
  if (!c.enabled) throw new Error('渠道已停用');
  if ((engine === 'pi' || engine === 'dsh') && c.kind !== 'api') throw new Error('该引擎仅支持 API 渠道');
+ if(c.kind==='subscription'&&!nativeCredentialsReady(engine,s))throw new Error('官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试');
  mkdirSync(input.stateDir, { recursive: true, mode: 0o700 });
  const run = mkdtempSync(join(input.stateDir, 'channel-')); chmodSync(run, 0o700);
  const env = channelEnvironment(input.env ?? process.env);
@@ -45,6 +44,7 @@ export function prepareChannelRun(input: ChannelBinding & { model: string; purpo
  const root = c.kind === 'subscription' || engine==='qoder' || engine==='qodercli' ? s.authDir : run;
  if (!root || !isAbsolute(root) || !existsSync(root) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) throw new Error('渠道缺少可用的独立认证目录，请重新导入或登录');
  if (c.kind === 'api' && !s.apiKey && !s.config && !(s.authDir && (engine==='qoder'||engine==='qodercli'))) throw new Error('API 渠道缺少凭据或原生配置，请配置后重试');
+ Object.assign(env,nativeEnvironment(engine,root,env));
  const argv: string[] = [];
  let channelProfilePath:string|undefined;let allowedModels:string[]|undefined;
  switch (engine) {
@@ -54,7 +54,8 @@ export function prepareChannelRun(input: ChannelBinding & { model: string; purpo
    if (c.kind === 'subscription') {
     if (!existsSync(join(root, 'auth.json'))) throw new Error('Codex 渠道未导入文件认证；keyring 登录需重新认证');
     if(config.model_provider && config.model_provider!=='openai')throw new Error('官方订阅渠道不能使用第三方 model_provider，请创建 API 渠道');
-    config.model_provider='openai';
+    config.model_provider='openai';config.cli_auth_credentials_store='file';config.forced_login_method='chatgpt';
+    if(input.purpose==='models')break;
     const profile=`weaver-${basename(run)}`;
     const file=join(root,`${profile}.config.toml`);writeFileSync(file,stringifyToml(config),{mode:0o600});chmodSync(file,0o600);files.push(file);channelProfilePath=file;argv.push('--profile',profile);
     break;
@@ -78,7 +79,7 @@ export function prepareChannelRun(input: ChannelBinding & { model: string; purpo
    argv.push('--settings', put('settings.json', JSON.stringify(config)), '--setting-sources', ''); break;
   }
   case 'grok': {
-   env.GROK_HOME = root;
+   env.GROK_HOME = root; argv.push('--leader-socket',join(root,'leader.sock'));
    const config=toml(s.config);
    if (c.kind === 'subscription') {
     if (!existsSync(join(root, 'auth.json'))) throw new Error('Grok 渠道缺少官方认证');
@@ -127,7 +128,7 @@ export function prepareChannelRun(input: ChannelBinding & { model: string; purpo
    if(!s.apiKey)throw new Error('dsh 渠道缺少独立 API key，请导入原生凭据后重试');
    if (c.provider && c.provider !== 'deepseek' && c.provider !== 'deepseek-official') throw new Error('dsh 目前仅接入 deepseek-official 原生 API provider');
    if (c.protocol && c.protocol !== 'anthropic') throw new Error('dsh deepseek-official 仅支持 Anthropic Messages 协议');
-   if (s.config) { let patch:unknown;try{patch=parseYaml(s.config,{logLevel:'silent'});}catch{throw new Error('dsh 渠道 YAML 配置无法解析');}if(!Array.isArray(patch))throw new Error('dsh 原生配置必须是 patch 列表');argv.push('--patch', put('channel.yml', stringifyYaml(patch))); }
+   if (s.config) { const patch=parseDshConfig(s.config);argv.push('--patch', put('channel.yml', stringifyYaml(patch))); }
    if (s.apiKey) {
     const credential = put('.credentials.yaml', `version: 1\nrefs:\n  DEEPSEEK_API_KEY: ${scalar(s.apiKey)}\nrecords: {}\n`);
     argv.push('--patch', put('credentials.yml', `- id: credentials\n  disabled: false\n  config:\n    path: ${scalar(credential)}\n- id: llm-deepseek\n  config:\n    apiKeyEnv: DEEPSEEK_API_KEY\n    baseURL: ${scalar(c.baseUrl ?? 'https://api.deepseek.com/anthropic')}\n`));

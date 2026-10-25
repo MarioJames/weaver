@@ -1,0 +1,21 @@
+{
+  "at": "2026-10-25T05:07:45.402919+00:00",
+  "ownedNativeProcesses": [
+    {
+      "pid": 1253406,
+      "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d/native",
+      "exe": "/home/mocha/.codex/packages/standalone/releases/0.164.0-x86_64-unknown-linux-musl/bin/codex",
+      "argv": [
+        "/home/mocha/.codex/packages/standalone/releases/0.164.0-x86_64-unknown-linux-musl/bin/codex",
+        "login",
+        "--device-auth",
+        ""
+      ],
+      "env": {
+        "HOME": "/home/mocha",
+        "CODEX_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d/native"
+      },
+      "cgroup": "0::/user.slice/user-1000.slice/[email redacted]/app.slice/dev-weaver-channel-login-c9314ca0-4abb-4d38-bf21-d3cd89f626eb.scope"
+    }
+  ]
+}

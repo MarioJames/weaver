@@ -129,3 +129,68 @@ test('greetings run as polled jobs: started at once, bounded, kept for a while a
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(failing.get(b.id)?.result?.error, 'boom');
 });
+
+// Grok 1.0.70 native json output, captured from the isolated real-account Hello.
+test('Grok reads the native pretty JSON text envelope and keeps terminal errors as failures', async () => {
+  const native = { text: 'hi', stopReason: 'end_turn', sessionId: 'session', requestId: 'request', cwd: '/private/hello', thought: 'private reasoning', usage: {}, num_turns: 1, total_cost_usd: 0, total_cost_usd_ticks: 0, modelUsage: { 'grok-4.7-build': {} } };
+  const result = await probe('grok', fake(JSON.stringify(native, null, 2)));
+  assert.deepEqual([result.ok, result.reply, result.model], [true, 'hi', 'grok-4.7-build']);
+  for (const value of [
+    { ...native, is_error: true },
+    { ...native, error: { message: 'provider rejected request' } },
+    { ...native, stopReason: 'error' },
+    { ...native, stopReason: 'max_turns' },
+  ]) {
+    const failed = await probe('grok', fake(JSON.stringify(value, null, 2)));
+    assert.equal(failed.ok, false);
+    assert.equal(failed.reply, undefined);
+  }
+  assert.equal((await probe('grok', fake(JSON.stringify(native, null, 2), 1))).ok, false);
+  const streamError = await probe('grok', fake('{"type":"error","message":"provider rejected request"}\n{"type":"result","result":"hi","is_error":false}'));
+  assert.equal(streamError.ok, false);
+  assert.match(streamError.error ?? '', /provider rejected/);
+});
+
+test('OpenCode retains a native error even if text arrived first', async () => {
+  const result = await probe('opencode', fake('{"type":"text","part":{"text":"hi"}}\n{"type":"error","error":{"data":{"message":"Go usage limit exceeded"}}}'));
+  assert.equal(result.ok, false);
+  assert.match(result.error ?? '', /Go usage limit exceeded/);
+});
+
+test('OpenCode timeout includes the captured native stream error without claiming a reply', async () => {
+  const spawn: SpawnPrint = (...args) => {
+    const child = hang(...args);
+    setImmediate(() => child.stderr.emit('data', 'timestamp=2026-10-25T04:34:07.578Z level=ERROR run=daaa9255 message="stream error" providerID=opencode-go modelID=muse-spark-1.3-contributor error.error="AI_APICallError: Go usage limit exceeded"\n'));
+    return child;
+  };
+  const result = await probe('opencode', spawn, { timeoutMs: 20 });
+  assert.equal(result.ok, false);
+  assert.match(result.error ?? '', /超时/);
+  assert.match(result.error ?? '', /AI_APICallError: Go usage limit exceeded/);
+  assert.equal(result.reply, undefined);
+});
+
+test('OpenCode timeout diagnostics redact credentials and ignore incomplete log fragments', async () => {
+  for (const [stderr, expected] of [
+    ['message="stream error" error.error="provider rejected Bearer secret-fixture123456"\n', /provider rejected Bearer \[REDACTED\]/],
+    ['message="stream error" error.error="incomplete secret-fixture123456', /^等待回复超时.*已停止进程。$/],
+  ] as const) {
+    const result = await probe('opencode', (...args) => {
+      const child = hang(...args);
+      setImmediate(() => child.stderr.emit('data', stderr));
+      return child;
+    }, { timeoutMs: 20 });
+    assert.equal(result.ok, false);
+    assert.match(result.error ?? '', expected);
+    assert.doesNotMatch(JSON.stringify(result), /secret-fixture123456/);
+  }
+});
+
+test('OpenCode hello pins its absolute scratch directory despite inherited repository PWD',async()=>{
+ const before=process.env.PWD;process.env.PWD='/different/repository';
+ try{
+  const calls:Call[]=[];await probe('opencode',fake('{"type":"text","part":{"text":"hi"}}',0,'',calls));
+  assert.ok(calls[0].cwd.startsWith('/'));assert.notEqual(calls[0].cwd,process.env.PWD);
+  assert.equal(calls[0].argv[calls[0].argv.indexOf('--dir')+1],calls[0].cwd);
+ }finally{if(before===undefined)delete process.env.PWD;else process.env.PWD=before;}
+});

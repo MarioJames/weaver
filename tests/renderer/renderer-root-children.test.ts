@@ -117,17 +117,17 @@ function scheduleConfig() {
 }
 const rowOf = (html: string, id: string) => html.replace(/<style[\s\S]*?<\/style>/g, '').match(new RegExp(`<div[^>]*>(?:(?!<div)[\\s\\S])*?${id} 的权重[\\s\\S]*?移除 ${id}`))?.[0] ?? '';
 
-test('a disabled worker or disabled engine locks its weight; a temporary block does not', () => {
+test('a disabled worker, disabled account or manual pause locks its weight; a temporary block does not', () => {
   const { config, record } = scheduleConfig();
   const blocks: Block[] = [{ engine: 'qoder', reason: 'rate limit', since: '2026-10-19T00:00:00Z', release_at: '2999-01-01T00:00:00Z' }];
   assert.deepEqual(workerWeightLock(config, 'pi_worker')?.label, '子 Agent 已停用');
   assert.equal(workerWeightLock(config, 'qoder_worker'), undefined);
   assert.equal(workerWeightLock(config, 'claude_worker'), undefined);
-  // The engine is off while the worker itself is still on (a draft toggled on the engines page).
+  // The account is off while the worker itself is still on.
   const draft = structuredClone(config);
-  draft.engines.claude.enabled = false;
-  assert.equal(workerWeightLock(draft, 'claude_worker')?.label, '引擎已停用');
-  assert.equal(workerStatusTag(draft, [], 'claude_worker', 5)?.label, '引擎已停用');
+  draft.channels[draft.workers.claude_worker.channel].enabled = false;
+  assert.equal(workerWeightLock(draft, 'claude_worker')?.label, '渠道已停用');
+  assert.equal(workerStatusTag(draft, [], 'claude_worker', 5)?.label, '渠道已停用');
   assert.equal(workerStatusTag(config, blocks, 'qoder_worker', 3)?.label, '已限制');
 
   const html = markup(React.createElement(OwnerScheduleFields, { config, blocks, record, update: () => {} }));
@@ -143,6 +143,16 @@ test('a disabled worker or disabled engine locks its weight; a temporary block d
   assert.match(blocked, /已限制/);
   assert.doesNotMatch(blocked, /data-disabled|\sdisabled=""/);
   assert.doesNotMatch(rowOf(html, 'claude_worker'), /data-disabled|\sdisabled=""/);
+
+  const paused: Block[] = [{ engine: 'qoder', worker: 'qoder_worker', by: 'manual', reason: '人工暂停', since: '2026-10-19T00:00:00Z' }];
+  assert.equal(workerWeightLock(config, 'qoder_worker', paused)?.label, '已暂停 · 需手动恢复');
+  for (const [settings, restrictions, id, weight] of [[draft, [], 'claude_worker', 5], [config, paused, 'qoder_worker', 3]] as const) {
+    const locked = markup(React.createElement(OwnerScheduleFields, { config: settings, blocks: [...restrictions], record, update: () => {} }));
+    const row = rowOf(locked, id);
+    assert.match(row, /<input[^>]*id=[^>]*disabled=""/);
+    assert.match(row, new RegExp(`value="${weight}"`));
+    for (const label of ['不派发', '默认', '最高']) assert.match(locked.match(new RegExp(`<button[^>]*aria-label="${id} ${label}"[^>]*>`))?.[0] ?? '', /disabled=""/);
+  }
 });
 
 test('the composer has no title field, an optional acceptance-criteria field, and a directory picker rather than a path input', () => {

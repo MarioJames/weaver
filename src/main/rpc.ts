@@ -1,26 +1,4 @@
-import { RPC_METHODS, type RpcMethod } from '../shared/contracts/rpc';
-
-export class RpcError extends Error {
-  constructor(readonly code: string, message: string) {
-    super(message);
-    this.name = 'RpcError';
-  }
-}
-
-/** Browser and Unix method calls share one allowlist, the RPC contract table. There is no reflective dispatch. */
-export function parseRpcBody(value: unknown): { method: string; args: unknown[] } {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new RpcError('INVALID_REQUEST', 'Request must be a JSON object');
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record);
-  if (keys.length !== 2 || !Object.hasOwn(record, 'method') || !Object.hasOwn(record, 'args')) {
-    throw new RpcError('INVALID_REQUEST', 'Request must contain only method and args');
-  }
-  const method = record.method;
-  const args = record.args;
-  if (typeof method !== 'string' || !Object.hasOwn(RPC_METHODS, method)) throw new RpcError('INVALID_REQUEST', 'Unknown method');
-  if (!Array.isArray(args) || args.length !== RPC_METHODS[method as RpcMethod].arity) throw new RpcError('INVALID_REQUEST', 'Invalid argument arity');
-  return { method, args };
-}
+export { RpcError, parseRpcBody } from '../shared/contracts/rpc';
 
 export function statusFor(code: string): number {
   if (code === 'INVALID_HOST' || code === 'INVALID_ORIGIN' || code === 'INVALID_FETCH_SITE') return 403;

@@ -1,0 +1,65 @@
+{
+  "bumpSucceeded": true,
+  "dialogs": [
+    {
+      "inputs": [],
+      "text": "请求失败\n\nSettings changed; reload before saving"
+    },
+    {
+      "inputs": [
+        {
+          "id": "_r_r2_-label",
+          "type": "text",
+          "value": "recheck-disposable-dsh-acd97205-CAS-draft"
+        },
+        {
+          "id": "_r_r2_-kind-hidden-input",
+          "type": "text",
+          "value": "api"
+        },
+        {
+          "id": "_r_r2_-engine-hidden-input",
+          "type": "text",
+          "value": "dsh"
+        },
+        {
+          "id": "_r_r2_-provider",
+          "type": "text",
+          "value": "deepseek-official"
+        },
+        {
+          "id": "_r_r2_-url",
+          "type": "url",
+          "value": ""
+        },
+        {
+          "id": "_r_r2_-protocol-hidden-input",
+          "type": "text",
+          "value": "anthropic"
+        },
+        {
+          "id": "_r_r2_-key",
+          "type": "password",
+          "value": "[password]"
+        },
+        {
+          "id": "base-ui-_r_s0_",
+          "type": "checkbox",
+          "value": "on"
+        },
+        {
+          "id": "base-ui-_r_s2_",
+          "type": "textarea",
+          "value": ""
+        },
+        {
+          "id": "",
+          "type": "file",
+          "value": ""
+        }
+      ],
+      "text": "编辑 recheck-disposable-dsh-acd97205\n名称\n*\n类型\n*\nAPI provider 渠道\n执行引擎\n*\ndsh · dsh\n已有凭据归属于这个引擎；更换引擎请创建新渠道。\nProvider\n*\nBase URL\nAPI 协议\nAnthropic Messages\nAPI 密钥\n已配置；留空保留已有密钥，不会回显。\n模型和推理强度在父、子 Agent 中选择。 当前仅支持 deepseek-official API provider，使用 Messages 协议。\n高级：原生配置覆写\n放弃此草稿\n保存失败，输入已保留\nINVALID_REQUEST: Settings changed; reload before saving\n重新读取状态\n暂存并关闭\n保存配置"
+    }
+  ],
+  "expectedConflict": true
+}

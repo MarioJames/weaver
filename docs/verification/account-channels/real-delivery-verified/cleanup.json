@@ -1,0 +1,18 @@
+{
+  "sourceCredentialsAndMetadataByteEqual": true,
+  "freshDatabasesAndAuthCopiesDeleted": true,
+  "freshScopesInactive": true,
+  "production4737PidAlive": true,
+  "persistent4738PidAlive": true,
+  "productionAndPersistentDataPreserved": true,
+  "chromeClosed": true,
+  "profileDeleted": true,
+  "herdrWorkspaceClosed": true,
+  "note": "Only exact owned units stopped; databases/auth/cache in created A/B roots removed. No persistent reset/cleanup.",
+  "chromeProfileProcessesRemaining": [],
+  "herdrSessionStopped": true,
+  "herdrCreatedSession": "weaver-real-delivery-verified",
+  "herdrWorkspace": "w1",
+  "port4740Closed": true,
+  "privateHashSnapshotsAndHelpersDeleted": true
+}

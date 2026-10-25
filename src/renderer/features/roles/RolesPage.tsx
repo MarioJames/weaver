@@ -18,8 +18,7 @@ import { type Availability, type Block, type Owner, type Worker } from '../../..
 import { blankOwner, blankWorker, removeRole, renameRole, reorderRoles, roleDeleteImpact, roleIdError, syncRoleEditor, withWorkerParallel, workerParallelText, type RoleSection } from '../../policy/policy-edit';
 import { OwnerScheduleFields } from './OwnerSchedule';
 import { ModelPicker } from '../engines/ModelPicker';
-import { engineBlockText, removeBlock } from '../engines/EnginesPage';
-import { resumeAction, resumeWorker } from '../../policy/worker-resume';
+import { engineBlockText, removeBlock, resumeAction, resumeWorker } from '../../policy/worker-resume';
 import { FreeChannelTag } from '../../ui/FreeChannelTag';
 import { statusTagColor, tagColor } from '../../format/tag-colors';
 import { PolicyHeader } from '../../policy/PolicyHeader';
@@ -39,7 +38,6 @@ export function availabilityText(availability: Availability | undefined): string
   if (availability.status === 'available') return '可派发';
   if (availability.status === 'disabled') return '已停用';
   if (availability.status === 'channel_disabled') return '渠道未启用';
-  if (availability.status === 'engine_disabled') return `引擎未启用`;
   return `已限制：${availability.reason ?? '未说明原因'}${availability.release_at ? `，${dateText(availability.release_at)} 恢复` : ''}`;
 }
 
@@ -47,7 +45,6 @@ export function availabilityText(availability: Availability | undefined): string
 export function roleNote(availability: Availability | undefined, unsaved: boolean, block?: Block): { text: string; warning?: boolean; tag?: { label: string; color?: string } } | undefined {
   if (unsaved) return { text: availability ? '有未保存的修改' : '尚未保存', warning: true };
   if (availability?.status === 'channel_disabled') return { text: '渠道未启用' };
-  if (availability?.status === 'engine_disabled') return { text: '引擎未启用' };
   if (availability?.status === 'blocked') {
     const pause = pauseOfBlock(block);
     if (pause && block) return { text: blockText(block), warning: true, tag: { label: pause.label, color: statusTagColor(pause.tone) } };
@@ -138,7 +135,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           onChange={items => { if (canSort) policy.setConfig(current => current ? reorderRoles(current, section, items.map(item => item.id)) : current); }}
           renderItem={({ id }) => {
             const item = config[section][id]!;
-            const engineOn = config.channels[item.channel]?.enabled === true && config.engines[config.channels[item.channel]!.engine]?.enabled === true;
+            const channelOn = config.channels[item.channel]?.enabled === true;
             const saved = policy.snapshot?.config[section][id];
             const cap = section === 'workers' ? workerParallelText(item as Worker) : undefined;
             const hit = policy.snapshot && saved ? blockOf(policy.snapshot.blocks, saved, Date.now(), section === 'workers' ? id : undefined, policy.snapshot.config) : undefined;
@@ -148,7 +145,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
                 ? <SortableList.DragHandle className={rolesStyles.roleGrip} aria-label={`拖动排序 ${id}`} size={{ blockSize: 44, borderRadius: 8, size: 16 }} style={{ touchAction: 'none' }} />
                 : <span className={rolesStyles.roleGripOff} aria-hidden="true"><GripVertical size={16} /></span>)}
               <div className={rolesStyles.roleItem} aria-current={id === current ? 'true' : undefined}>
-                <NamedSwitch size="small" aria-label={`启用 ${id}`} checked={item.enabled} loading={toggling === id} disabled={!engineOn || !!toggling} title={engineOn ? undefined : '渠道或执行引擎未启用，请在账号与渠道、引擎页检查'} onChange={checked => void toggle(id, checked)} />
+                <NamedSwitch size="small" aria-label={`启用 ${id}`} checked={item.enabled} loading={toggling === id} disabled={!channelOn || !!toggling} title={channelOn ? undefined : '账号或渠道未启用，请在账号与渠道页检查'} onChange={checked => void toggle(id, checked)} />
                 <button type="button" className={rolesStyles.roleButton} style={{ font: 'inherit' }} onClick={() => { acceptId(); setSelected(id); setPendingId(id); setIdError(''); scrollToEditor(); }}>
                   <span className={rolesStyles.roleTitle}>
                     <strong className={styles.wrap}>{id}</strong>
@@ -186,7 +183,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           <Form.Field label="配置 ID" required desc="改名后按 Enter 或离开输入框，引用处一起更新。">
             <Input id={`${fieldId}-id`} aria-label="配置 ID" aria-invalid={!!idError} value={pendingId} placeholder={section === 'workers' ? '例如：research' : '例如：codex'} onChange={event => setPendingId(event.target.value)} onBlur={acceptId} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); acceptId(); } }} />
           </Form.Field>
-            <Form.Field label="账号或渠道" required extra={config.channels[record.channel] ? `执行引擎：${config.channels[record.channel]!.engine}` : '渠道不存在，请重新选择；可在账号与渠道页添加。'}><NamedSelect id={`${fieldId}-channel`} aria-label="账号或渠道" value={record.channel || undefined} options={Object.entries(config.channels).map(([id, channel]) => ({ value: id, label: `${channel.label} · ${channel.engine}${channel.enabled ? '' : '（渠道停用）'}${config.engines[channel.engine]?.enabled ? '' : '（引擎停用）'}` }))} onChange={value => { if (typeof value !== 'string') return; const channel = config.channels[value]!; const supported = EFFORTS[config.engines[channel.engine]?.kind ?? '']; update({ ...record, channel: value, model: value === record.channel ? record.model : '', effort: supported?.includes(record.effort) === false ? supported[0]! : record.effort, enabled: channel.enabled && config.engines[channel.engine]?.enabled ? record.enabled : false }); }} /></Form.Field>
+            <Form.Field label="账号或渠道" required extra={config.channels[record.channel] ? `执行引擎：${config.channels[record.channel]!.engine}` : '渠道不存在，请重新选择；可在账号与渠道页添加。'}><NamedSelect id={`${fieldId}-channel`} aria-label="账号或渠道" value={record.channel || undefined} options={Object.entries(config.channels).map(([id, channel]) => ({ value: id, label: `${channel.label} · ${channel.engine}${channel.enabled ? '' : '（渠道停用）'}` }))} onChange={value => { if (typeof value !== 'string') return; const channel = config.channels[value]!; const supported = EFFORTS[config.engines[channel.engine]?.kind ?? '']; update({ ...record, channel: value, model: value === record.channel ? record.model : '', effort: supported?.includes(record.effort) === false ? supported[0]! : record.effort, enabled: channel.enabled ? record.enabled : false }); }} /></Form.Field>
           </div>
           <div className={rolesStyles.pair} style={{ alignItems: 'start' }}>
             <Form.Field label="模型" required><ModelPicker kind={kind} channel={record.channel} engine={config.channels[record.channel]?.engine ?? ''} id={`${fieldId}-model`} value={record.model} onChange={model => update({ ...record, model })} /></Form.Field>

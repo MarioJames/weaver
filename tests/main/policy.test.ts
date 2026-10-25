@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { activeBlocks, availabilityOf } from '../../src/shared/policy/availability';
 import { chatgptReviewEnabled, EFFORTS } from '../../src/shared/policy/settings';
 import { defaultConfig, parseReleaseAt, resolveDispatch, validateConfig } from '../../src/main/policy/routing';
+import { ENGINE_CATALOG } from '../../src/shared/engines';
 import { effectiveWeight } from '../../src/shared/policy/weights';
 import { type Config, type Block } from '../../src/shared/contracts/policy';
 import { lintSchema, validate } from '../../src/main/policy/json-schema';
@@ -90,7 +91,7 @@ test('a saved policy with a gemini engine fails with the ordinary schema error',
 }));
 test('disabled pi template validates and stays out of claude routing',()=>{
  const c=defaultConfig(); assert.deepEqual(validateConfig(c),[]);
- assert.equal(c.engines.pi?.enabled,false); assert.equal(c.engines.pi?.kind,'pi');
+ assert.equal(c.engines.pi?.enabled,true); assert.equal(c.engines.pi?.kind,'pi');
  assert.equal(c.workers.pi_worker?.enabled,false); assert.equal(c.workers.pi_worker?.model,'glm-5.3-flash'); assert.equal(c.owners.pi_owner?.enabled,false); assert.deepEqual(EFFORTS.pi,['off','minimal','low','medium','high','xhigh','max']);
  for (const effort of EFFORTS.pi) { const sample=defaultConfig(); sample.workers.pi_worker.effort=effort; sample.owners.pi_owner.effort=effort; assert.deepEqual(validateConfig(sample),[]); }
  const badEffort=defaultConfig(); badEffort.workers.pi_worker.effort='ultra'; assert.ok(validateConfig(badEffort).some(issue=>issue.path.includes('pi_worker')&&issue.message.includes('effort')));
@@ -313,3 +314,97 @@ test('max_command_minutes: default 30, optional for older policies, and bounded 
  for(const value of [1,1440]){const c=defaultConfig();c.herdr.max_command_minutes=value;assert.deepEqual(validateConfig(c),[],String(value));}
  for(const value of [0,1441,1.5]){const c=defaultConfig();c.herdr.max_command_minutes=value;assert.ok(validateConfig(c).some(issue=>issue.path==='$.herdr.max_command_minutes'),String(value));}
 }));
+
+
+test('historical SQL engine flags never gate routes, while accounts, roles and blocks still do',()=>{
+ const db=new DatabaseSync(':memory:');
+ try {
+  const initial=new PolicyStore(db,()=>now);
+  const seed=initial.snapshot();
+  const blocks:Block[]=[{engine:'codex',reason:'quota exhausted',since:new Date(now).toISOString(),by:'weaver-quota-codex'},
+   {engine:'grok',reason:'stall penalty',since:new Date(now).toISOString(),by:'weaver-stall',release_at:new Date(now+60_000).toISOString()}];
+  initial.save({revision:0,config:seed.config,blocks});
+  db.exec("UPDATE policy_engines SET enabled=0; DELETE FROM policy_engines WHERE id='qoder'; INSERT INTO policy_engines(id,position,enabled,kind) VALUES ('personal',99,0,'codex')");
+  const store=new PolicyStore(db,()=>now);
+  const loaded=store.snapshot();
+  assert.ok(Object.values(loaded.config.engines).every(engine=>engine.enabled));
+  assert.equal(route(loaded.config,loaded.activeBlocks).worker,'claude_worker');
+  assert.deepEqual(loaded.config.engines.personal,{enabled:true,kind:'codex'});
+  assert.equal(loaded.config.engines.qoder.kind,ENGINE_CATALOG.find(entry=>entry.id==='qoder')!.kind);
+  assert.deepEqual(loaded.blocks,blocks);
+  assert.throws(()=>resolveDispatch(loaded.config,loaded.activeBlocks,{owner:'codex_owner'}),/blocked.*quota exhausted/);
+  loaded.config.workers.grok_worker.enabled=true;
+  assert.equal(availabilityOf(loaded.config,loaded.activeBlocks,loaded.config.workers.grok_worker,'grok_worker').status,'blocked');
+  loaded.config.channels.default_claude.enabled=false;
+  assert.throws(()=>route(loaded.config,loaded.activeBlocks),/channel_disabled/);
+  loaded.config.channels.default_claude.enabled=true;
+  loaded.config.owners.claude_owner.enabled=false;
+  assert.throws(()=>route(loaded.config,loaded.activeBlocks),/unavailable: disabled/);
+  assert.ok((db.prepare('SELECT enabled FROM policy_engines').all() as {enabled:number}[]).every(row=>row.enabled===0),'reads do not rewrite historical storage');
+ } finally { db.close(); }
+});
+
+test('historical rollback normalizes the catalog, preserves aliases and keeps account and block restrictions',()=>{
+ const db=new DatabaseSync(':memory:');
+ try {
+  const store=new PolicyStore(db,()=>now);
+  const snapshot=store.save({revision:0,config:defaultConfig(),blocks:[]});
+  const historic=structuredClone(snapshot);
+  for(const engine of Object.values(historic.config.engines))engine.enabled=false;
+  historic.config.engines.personal={enabled:false,kind:'codex'};
+  delete historic.config.engines.qoder;
+  historic.config.channels.default_codex.enabled=false;
+  const blocks=[{engine:'grok',reason:'stall',since:new Date(now).toISOString(),by:'weaver-stall'}];
+  db.prepare('UPDATE policy_revisions SET body=? WHERE revision=1').run(JSON.stringify({version:1,revision:1,config:historic.config,blocks}));
+  const restored=store.rollback(1);
+  assert.equal(route(restored.config,restored.activeBlocks).worker,'claude_worker');
+  assert.deepEqual(restored.config.engines.personal,{enabled:true,kind:'codex'});
+  for(const entry of ENGINE_CATALOG)assert.ok(restored.config.engines[entry.id]?.enabled,entry.id);
+  assert.equal(restored.config.channels.default_codex.enabled,false);
+  assert.deepEqual(restored.blocks,blocks);
+  assert.throws(()=>resolveDispatch(restored.config,restored.activeBlocks,{owner:'codex_owner'}),/channel_disabled/);
+  const next=store.save({revision:restored.revision,config:restored.config,blocks:restored.blocks});
+  assert.deepEqual(new PolicyStore(db,()=>now).snapshot(),next);
+  assert.ok((db.prepare('SELECT enabled FROM policy_engines').all() as {enabled:number}[]).every(row=>row.enabled===1));
+ } finally { db.close(); }
+});
+
+test('fresh defaults cover the catalog and new saves report attempts to disable engines',()=>{
+ const db=new DatabaseSync(':memory:');
+ try {
+  const store=new PolicyStore(db,()=>now);
+  const fresh=store.snapshot();
+  for(const entry of ENGINE_CATALOG)assert.deepEqual(fresh.config.engines[entry.id],{enabled:true,kind:entry.kind});
+  fresh.config.engines.claude.enabled=false;
+  assert.throws(()=>store.save({revision:0,config:fresh.config,blocks:[]}),/Engines are always available.*channel/i);
+  assert.equal(store.snapshot().revision,0);
+  const sparse=store.snapshot().config;
+  delete sparse.engines.qoder;
+  const saved=store.save({revision:0,config:sparse,blocks:[]});
+  assert.equal(saved.config.engines.qoder.kind,ENGINE_CATALOG.find(entry=>entry.id==='qoder')!.kind);
+ } finally { db.close(); }
+});
+
+
+test('pre-channel JSON history restores through the same catalog normalization without reviving engine switches',()=>{
+ const db=new DatabaseSync(':memory:');
+ try {
+  const store=new PolicyStore(db,()=>now);
+  const current=store.save({revision:0,config:defaultConfig(),blocks:[]});
+  const legacy:Record<string,any>=structuredClone(current.config);
+  for(const engine of Object.values(legacy.engines) as any[])engine.enabled=false;
+  for(const role of [...Object.values(legacy.owners),...Object.values(legacy.workers)] as any[]) {
+   role.engine=legacy.channels[role.channel].engine;delete role.channel;
+  }
+  delete legacy.channels;
+  const blocks=[{engine:'codex',reason:'manual quota',since:new Date(now).toISOString(),by:'person'}];
+  db.prepare('UPDATE policy_revisions SET body=? WHERE revision=1').run(JSON.stringify({version:1,revision:1,config:legacy,blocks}));
+  const restored=store.rollback(1);
+  assert.equal(route(restored.config,restored.activeBlocks).worker,'claude_worker');
+  assert.ok(Object.values(restored.config.engines).every(engine=>engine.enabled));
+  assert.equal(restored.config.workers.pi_worker.enabled,false);
+  assert.equal(restored.config.owners.pi_owner.enabled,false);
+  assert.deepEqual(restored.blocks,blocks);
+  assert.throws(()=>resolveDispatch(restored.config,restored.activeBlocks,{owner:'codex_owner'}),/blocked/);
+ } finally { db.close(); }
+});

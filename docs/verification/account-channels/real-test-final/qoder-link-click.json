@@ -1,0 +1,14 @@
+{
+  "nativeUiLinkClick": true,
+  "opened": {
+    "host": "qoder.com",
+    "path": "/users/sign-in"
+  },
+  "cleanup": {
+    "jobStatus": "cancelled",
+    "noOwnedProcesses": true,
+    "scopes": {
+      "dev-weaver-channel-login-3aaf4f42-e154-43cc-9849-c5ee21668928.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive"
+    }
+  }
+}

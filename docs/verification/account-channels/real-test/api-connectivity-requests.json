@@ -1,0 +1,35 @@
+[
+  {
+    "requestId": "1238482.1093",
+    "at": "2026-10-25T04:59:56.394000+00:00",
+    "status": 200,
+    "binding": {
+      "channel": "channel_0803af5d91db4df38611d340",
+      "engine": "dsh",
+      "model": "deepseek-flash",
+      "effort": "off"
+    }
+  },
+  {
+    "requestId": "1238482.1139",
+    "at": "2026-10-25T05:00:31.244000+00:00",
+    "status": 200,
+    "binding": {
+      "channel": "channel_0803af5d91db4df38611d340",
+      "engine": "dsh",
+      "model": "deepseek-flash",
+      "effort": "off"
+    }
+  },
+  {
+    "requestId": "1238482.1192",
+    "at": "2026-10-25T05:01:11.557000+00:00",
+    "status": 400,
+    "binding": {
+      "channel": "channel_0803af5d91db4df38611d340",
+      "engine": "dsh",
+      "model": "deepseek-flash",
+      "effort": "off"
+    }
+  }
+]

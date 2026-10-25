@@ -1,0 +1,761 @@
+[
+  {
+    "viewport": [
+      1366,
+      768
+    ],
+    "nativeWheelXY": [
+      683,
+      384
+    ],
+    "before": {
+      "buttons": [
+        {
+          "rect": {
+            "bottom": 538,
+            "height": 32,
+            "left": 379,
+            "right": 987,
+            "top": 506,
+            "width": 608,
+            "x": 379,
+            "y": 506
+          },
+          "text": "提交官方返回授权码"
+        },
+        {
+          "rect": {
+            "bottom": 632,
+            "height": 32,
+            "left": 698.953125,
+            "right": 806.96875,
+            "top": 600,
+            "width": 108.015625,
+            "x": 698.953125,
+            "y": 600
+          },
+          "text": "取消此次登录"
+        },
+        {
+          "rect": {
+            "bottom": 632,
+            "height": 32,
+            "left": 814.96875,
+            "right": 922.984375,
+            "top": 600,
+            "width": 108.015625,
+            "x": 814.96875,
+            "y": 600
+          },
+          "text": "重新读取状态"
+        },
+        {
+          "rect": {
+            "bottom": 632,
+            "height": 32,
+            "left": 930.984375,
+            "right": 987,
+            "top": 600,
+            "width": 56.015625,
+            "x": 930.984375,
+            "y": 600
+          },
+          "text": "关闭"
+        }
+      ],
+      "dialog": {
+        "bottom": 768,
+        "height": 768,
+        "left": 0,
+        "right": 1366,
+        "top": 0,
+        "width": 1366,
+        "x": 0,
+        "y": 0
+      },
+      "input": {
+        "bottom": 489,
+        "height": 22,
+        "left": 392,
+        "right": 950,
+        "top": 467,
+        "width": 558,
+        "x": 392,
+        "y": 467
+      },
+      "scroll": [],
+      "viewport": {
+        "h": 768,
+        "w": 1366
+      }
+    },
+    "wheel": {
+      "buttons": [
+        {
+          "rect": {
+            "bottom": 538,
+            "height": 32,
+            "left": 379,
+            "right": 987,
+            "top": 506,
+            "width": 608,
+            "x": 379,
+            "y": 506
+          },
+          "text": "提交官方返回授权码"
+        },
+        {
+          "rect": {
+            "bottom": 632,
+            "height": 32,
+            "left": 698.953125,
+            "right": 806.96875,
+            "top": 600,
+            "width": 108.015625,
+            "x": 698.953125,
+            "y": 600
+          },
+          "text": "取消此次登录"
+        },
+        {
+          "rect": {
+            "bottom": 632,
+            "height": 32,
+            "left": 814.96875,
+            "right": 922.984375,
+            "top": 600,
+            "width": 108.015625,
+            "x": 814.96875,
+            "y": 600
+          },
+          "text": "重新读取状态"
+        },
+        {
+          "rect": {
+            "bottom": 632,
+            "height": 32,
+            "left": 930.984375,
+            "right": 987,
+            "top": 600,
+            "width": 56.015625,
+            "x": 930.984375,
+            "y": 600
+          },
+          "text": "关闭"
+        }
+      ],
+      "dialog": {
+        "bottom": 768,
+        "height": 768,
+        "left": 0,
+        "right": 1366,
+        "top": 0,
+        "width": 1366,
+        "x": 0,
+        "y": 0
+      },
+      "input": {
+        "bottom": 489,
+        "height": 22,
+        "left": 392,
+        "right": 950,
+        "top": 467,
+        "width": 558,
+        "x": 392,
+        "y": 467
+      },
+      "scroll": [],
+      "viewport": {
+        "h": 768,
+        "w": 1366
+      }
+    },
+    "pageDown": {
+      "buttons": [
+        {
+          "rect": {
+            "bottom": 538,
+            "height": 32,
+            "left": 379,
+            "right": 987,
+            "top": 506,
+            "width": 608,
+            "x": 379,
+            "y": 506
+          },
+          "text": "提交官方返回授权码"
+        },
+        {
+          "rect": {
+            "bottom": 632,
+            "height": 32,
+            "left": 698.953125,
+            "right": 806.96875,
+            "top": 600,
+            "width": 108.015625,
+            "x": 698.953125,
+            "y": 600
+          },
+          "text": "取消此次登录"
+        },
+        {
+          "rect": {
+            "bottom": 632,
+            "height": 32,
+            "left": 814.96875,
+            "right": 922.984375,
+            "top": 600,
+            "width": 108.015625,
+            "x": 814.96875,
+            "y": 600
+          },
+          "text": "重新读取状态"
+        },
+        {
+          "rect": {
+            "bottom": 632,
+            "height": 32,
+            "left": 930.984375,
+            "right": 987,
+            "top": 600,
+            "width": 56.015625,
+            "x": 930.984375,
+            "y": 600
+          },
+          "text": "关闭"
+        }
+      ],
+      "dialog": {
+        "bottom": 768,
+        "height": 768,
+        "left": 0,
+        "right": 1366,
+        "top": 0,
+        "width": 1366,
+        "x": 0,
+        "y": 0
+      },
+      "input": {
+        "bottom": 489,
+        "height": 22,
+        "left": 392,
+        "right": 950,
+        "top": 467,
+        "width": 558,
+        "x": 392,
+        "y": 467
+      },
+      "scroll": [],
+      "viewport": {
+        "h": 768,
+        "w": 1366
+      }
+    }
+  },
+  {
+    "viewport": [
+      1440,
+      900
+    ],
+    "nativeWheelXY": [
+      720,
+      450
+    ],
+    "before": {
+      "buttons": [
+        {
+          "rect": {
+            "bottom": 604,
+            "height": 32,
+            "left": 416,
+            "right": 1024,
+            "top": 572,
+            "width": 608,
+            "x": 416,
+            "y": 572
+          },
+          "text": "提交官方返回授权码"
+        },
+        {
+          "rect": {
+            "bottom": 698,
+            "height": 32,
+            "left": 735.953125,
+            "right": 843.96875,
+            "top": 666,
+            "width": 108.015625,
+            "x": 735.953125,
+            "y": 666
+          },
+          "text": "取消此次登录"
+        },
+        {
+          "rect": {
+            "bottom": 698,
+            "height": 32,
+            "left": 851.96875,
+            "right": 959.984375,
+            "top": 666,
+            "width": 108.015625,
+            "x": 851.96875,
+            "y": 666
+          },
+          "text": "重新读取状态"
+        },
+        {
+          "rect": {
+            "bottom": 698,
+            "height": 32,
+            "left": 967.984375,
+            "right": 1024,
+            "top": 666,
+            "width": 56.015625,
+            "x": 967.984375,
+            "y": 666
+          },
+          "text": "关闭"
+        }
+      ],
+      "dialog": {
+        "bottom": 900,
+        "height": 900,
+        "left": 0,
+        "right": 1440,
+        "top": 0,
+        "width": 1440,
+        "x": 0,
+        "y": 0
+      },
+      "input": {
+        "bottom": 555,
+        "height": 22,
+        "left": 429,
+        "right": 987,
+        "top": 533,
+        "width": 558,
+        "x": 429,
+        "y": 533
+      },
+      "scroll": [],
+      "viewport": {
+        "h": 900,
+        "w": 1440
+      }
+    },
+    "wheel": {
+      "buttons": [
+        {
+          "rect": {
+            "bottom": 604,
+            "height": 32,
+            "left": 416,
+            "right": 1024,
+            "top": 572,
+            "width": 608,
+            "x": 416,
+            "y": 572
+          },
+          "text": "提交官方返回授权码"
+        },
+        {
+          "rect": {
+            "bottom": 698,
+            "height": 32,
+            "left": 735.953125,
+            "right": 843.96875,
+            "top": 666,
+            "width": 108.015625,
+            "x": 735.953125,
+            "y": 666
+          },
+          "text": "取消此次登录"
+        },
+        {
+          "rect": {
+            "bottom": 698,
+            "height": 32,
+            "left": 851.96875,
+            "right": 959.984375,
+            "top": 666,
+            "width": 108.015625,
+            "x": 851.96875,
+            "y": 666
+          },
+          "text": "重新读取状态"
+        },
+        {
+          "rect": {
+            "bottom": 698,
+            "height": 32,
+            "left": 967.984375,
+            "right": 1024,
+            "top": 666,
+            "width": 56.015625,
+            "x": 967.984375,
+            "y": 666
+          },
+          "text": "关闭"
+        }
+      ],
+      "dialog": {
+        "bottom": 900,
+        "height": 900,
+        "left": 0,
+        "right": 1440,
+        "top": 0,
+        "width": 1440,
+        "x": 0,
+        "y": 0
+      },
+      "input": {
+        "bottom": 555,
+        "height": 22,
+        "left": 429,
+        "right": 987,
+        "top": 533,
+        "width": 558,
+        "x": 429,
+        "y": 533
+      },
+      "scroll": [],
+      "viewport": {
+        "h": 900,
+        "w": 1440
+      }
+    },
+    "pageDown": {
+      "buttons": [
+        {
+          "rect": {
+            "bottom": 604,
+            "height": 32,
+            "left": 416,
+            "right": 1024,
+            "top": 572,
+            "width": 608,
+            "x": 416,
+            "y": 572
+          },
+          "text": "提交官方返回授权码"
+        },
+        {
+          "rect": {
+            "bottom": 698,
+            "height": 32,
+            "left": 735.953125,
+            "right": 843.96875,
+            "top": 666,
+            "width": 108.015625,
+            "x": 735.953125,
+            "y": 666
+          },
+          "text": "取消此次登录"
+        },
+        {
+          "rect": {
+            "bottom": 698,
+            "height": 32,
+            "left": 851.96875,
+            "right": 959.984375,
+            "top": 666,
+            "width": 108.015625,
+            "x": 851.96875,
+            "y": 666
+          },
+          "text": "重新读取状态"
+        },
+        {
+          "rect": {
+            "bottom": 698,
+            "height": 32,
+            "left": 967.984375,
+            "right": 1024,
+            "top": 666,
+            "width": 56.015625,
+            "x": 967.984375,
+            "y": 666
+          },
+          "text": "关闭"
+        }
+      ],
+      "dialog": {
+        "bottom": 900,
+        "height": 900,
+        "left": 0,
+        "right": 1440,
+        "top": 0,
+        "width": 1440,
+        "x": 0,
+        "y": 0
+      },
+      "input": {
+        "bottom": 555,
+        "height": 22,
+        "left": 429,
+        "right": 987,
+        "top": 533,
+        "width": 558,
+        "x": 429,
+        "y": 533
+      },
+      "scroll": [],
+      "viewport": {
+        "h": 900,
+        "w": 1440
+      }
+    }
+  },
+  {
+    "viewport": [
+      390,
+      844
+    ],
+    "nativeWheelXY": [
+      195,
+      422
+    ],
+    "before": {
+      "buttons": [
+        {
+          "rect": {
+            "bottom": 631,
+            "height": 32,
+            "left": 32,
+            "right": 358,
+            "top": 599,
+            "width": 326,
+            "x": 32,
+            "y": 599
+          },
+          "text": "提交官方返回授权码"
+        },
+        {
+          "rect": {
+            "bottom": 747,
+            "height": 32,
+            "left": 69.953125,
+            "right": 177.96875,
+            "top": 715,
+            "width": 108.015625,
+            "x": 69.953125,
+            "y": 715
+          },
+          "text": "取消此次登录"
+        },
+        {
+          "rect": {
+            "bottom": 747,
+            "height": 32,
+            "left": 185.96875,
+            "right": 293.984375,
+            "top": 715,
+            "width": 108.015625,
+            "x": 185.96875,
+            "y": 715
+          },
+          "text": "重新读取状态"
+        },
+        {
+          "rect": {
+            "bottom": 747,
+            "height": 32,
+            "left": 301.984375,
+            "right": 358,
+            "top": 715,
+            "width": 56.015625,
+            "x": 301.984375,
+            "y": 715
+          },
+          "text": "关闭"
+        }
+      ],
+      "dialog": {
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "top": 0,
+        "width": 390,
+        "x": 0,
+        "y": 0
+      },
+      "input": {
+        "bottom": 582,
+        "height": 22,
+        "left": 45,
+        "right": 321,
+        "top": 560,
+        "width": 276,
+        "x": 45,
+        "y": 560
+      },
+      "scroll": [],
+      "viewport": {
+        "h": 844,
+        "w": 390
+      }
+    },
+    "wheel": {
+      "buttons": [
+        {
+          "rect": {
+            "bottom": 631,
+            "height": 32,
+            "left": 32,
+            "right": 358,
+            "top": 599,
+            "width": 326,
+            "x": 32,
+            "y": 599
+          },
+          "text": "提交官方返回授权码"
+        },
+        {
+          "rect": {
+            "bottom": 747,
+            "height": 32,
+            "left": 69.953125,
+            "right": 177.96875,
+            "top": 715,
+            "width": 108.015625,
+            "x": 69.953125,
+            "y": 715
+          },
+          "text": "取消此次登录"
+        },
+        {
+          "rect": {
+            "bottom": 747,
+            "height": 32,
+            "left": 185.96875,
+            "right": 293.984375,
+            "top": 715,
+            "width": 108.015625,
+            "x": 185.96875,
+            "y": 715
+          },
+          "text": "重新读取状态"
+        },
+        {
+          "rect": {
+            "bottom": 747,
+            "height": 32,
+            "left": 301.984375,
+            "right": 358,
+            "top": 715,
+            "width": 56.015625,
+            "x": 301.984375,
+            "y": 715
+          },
+          "text": "关闭"
+        }
+      ],
+      "dialog": {
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "top": 0,
+        "width": 390,
+        "x": 0,
+        "y": 0
+      },
+      "input": {
+        "bottom": 582,
+        "height": 22,
+        "left": 45,
+        "right": 321,
+        "top": 560,
+        "width": 276,
+        "x": 45,
+        "y": 560
+      },
+      "scroll": [],
+      "viewport": {
+        "h": 844,
+        "w": 390
+      }
+    },
+    "pageDown": {
+      "buttons": [
+        {
+          "rect": {
+            "bottom": 631,
+            "height": 32,
+            "left": 32,
+            "right": 358,
+            "top": 599,
+            "width": 326,
+            "x": 32,
+            "y": 599
+          },
+          "text": "提交官方返回授权码"
+        },
+        {
+          "rect": {
+            "bottom": 747,
+            "height": 32,
+            "left": 69.953125,
+            "right": 177.96875,
+            "top": 715,
+            "width": 108.015625,
+            "x": 69.953125,
+            "y": 715
+          },
+          "text": "取消此次登录"
+        },
+        {
+          "rect": {
+            "bottom": 747,
+            "height": 32,
+            "left": 185.96875,
+            "right": 293.984375,
+            "top": 715,
+            "width": 108.015625,
+            "x": 185.96875,
+            "y": 715
+          },
+          "text": "重新读取状态"
+        },
+        {
+          "rect": {
+            "bottom": 747,
+            "height": 32,
+            "left": 301.984375,
+            "right": 358,
+            "top": 715,
+            "width": 56.015625,
+            "x": 301.984375,
+            "y": 715
+          },
+          "text": "关闭"
+        }
+      ],
+      "dialog": {
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "top": 0,
+        "width": 390,
+        "x": 0,
+        "y": 0
+      },
+      "input": {
+        "bottom": 582,
+        "height": 22,
+        "left": 45,
+        "right": 321,
+        "top": 560,
+        "width": 276,
+        "x": 45,
+        "y": 560
+      },
+      "scroll": [],
+      "viewport": {
+        "h": 844,
+        "w": 390
+      }
+    }
+  }
+]

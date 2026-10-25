@@ -1,0 +1,79 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Weaver真实账号冻结版复验</title><style>
+*{box-sizing:border-box}body{font:16px/1.65 system-ui,sans-serif;color:#18232c;background:#fafbfc;margin:0}main{max-width:1180px;margin:auto;padding:28px}h1{font-size:29px;line-height:1.3}h2{margin-top:40px}p,li,td,pre,a{overflow-wrap:anywhere}a{color:#175f99}.banner{border-left:5px solid #b42318;background:#fff2f0;padding:16px}.pass{color:#176b36}.fail{color:#b42318}.missing,.partial{color:#805a00}table{border-collapse:collapse;width:100%;background:white;font-size:14px}td,th{padding:12px;border:1px solid #dce1e5;text-align:left;vertical-align:top}td:nth-child(1){width:15%}td:nth-child(2){width:9%}td p{margin:8px 0 0}code,pre{font:13px/1.5 ui-monospace,monospace}pre{white-space:pre-wrap;padding:14px;background:#eef1f4}nav{display:flex;flex-wrap:wrap;gap:15px}.gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}figure{margin:0;padding:12px;background:white;border:1px solid #dce1e5}img{max-width:100%;height:auto;max-height:650px;object-fit:contain}figcaption{font-size:13px}@media(max-width:600px){main{padding:16px}h1{font-size:24px}table,tbody,tr,td{display:block;width:100%!important}thead{display:none}tr{margin-bottom:15px}td{border-bottom:0}td:last-child{border-bottom:1px solid #dce1e5}.gallery{grid-template-columns:1fr}}@media print{body{background:white;font-size:11pt}main{padding:0;max-width:none}nav{display:none}a{color:inherit}table{font-size:9pt}tr,figure{break-inside:avoid}.gallery{display:block}figure{max-width:65%;margin:16px auto}pre{font-size:8pt}}
+</style><main><h1>Weaver真实账号：冻结版独立复验</h1><div class="banner"><strong>环境已就绪；整体未通过。</strong> 本包修复路径复验通过；独立首次导入仍有2项FAIL，5种新官方OAuth完整授权为MISSING。不是全Weaver所有功能通过。</div><p>测试地址 http://127.0.0.1:4738/#/channels。应用0.7.9，生产4737与持久test均保留。生成时间 2026-10-25T05:52:53.911081+00:00。</p><p>冻结摘要 <code>1c092161ceed7008012cdf22548f919e919033dc24d6df0601ed867be7117f88</code>，291文件进出场核对；test PID1299907、startedAt 2026-10-25T05:29:26.659Z保持一致。<a href="source-verification.json">版本与归属</a> · <a href="results.json">机器结果</a> · <a href="../real-test/REPORT.html">保留首轮失败报告</a></p><nav><a href="#checks">逐项复验</a><a href="#issues">失败与缺失</a><a href="#evidence">安全截图</a><a href="#resources">资源与移交</a></nav>
+<h2 id="checks">实际步骤与结论</h2><table><thead><tr><th>项目</th><th>状态</th><th>真实操作与证据</th></tr></thead><tbody><tr><td>drafts</td><td class="pass">PASS</td><td>Claude未保存改名→暂存→同记录恢复；转Grok显式继续返回Claude；放弃才切换Grok；新建/已有草稿交叉、取消、390弹框均实际操作。原metadata不变。<p><a href="drafts.json">drafts.json</a> · <a href="draft-narrow.json">draft-narrow.json</a> · <a href="same-key-regression.json">same-key-regression.json</a></p></td></tr><tr><td>dsh</td><td class="pass">PASS</td><td>真实UI上传{}保存：INVALID_REQUEST，保留key/config/name，revision及secret记录不变。再上传[]保存，空key保留；CAS失败→重读→保存恢复；显式清配置读回。一次性worker/new API/deepseek-flash/off，UI连通测试精确hi。随后先删role再删API/secret/root。<p><a href="dsh-invalid.json">dsh-invalid.json</a> · <a href="dsh-valid.json">dsh-valid.json</a> · <a href="dsh-empty-key.json">dsh-empty-key.json</a> · <a href="dsh-cas.json">dsh-cas.json</a> · <a href="dsh-cas-recovery.json">dsh-cas-recovery.json</a> · <a href="dsh-cleared.json">dsh-cleared.json</a> · <a href="dsh-role.json">dsh-role.json</a> · <a href="dsh-hello.json">dsh-hello.json</a></p></td></tr><tr><td>official-entry</td><td class="pass">PASS</td><td>五种真实原生入口均有安全URL；Codex/Grok/OpenCode有同job一致设备码，Claude有manual密码输入/按钮，Qoder链接真实点击到官方登录页。关闭重开同活动job；取消→重试新job；scope与/proc精确回收。非法Claude非code#state文本返回400，输入保留，job仍authorizing/acceptsCode。<p><a href="official-entry-results.json">official-entry-results.json</a> · <a href="claude-invalid-code.json">claude-invalid-code.json</a> · <a href="qoder-link-click.json">qoder-link-click.json</a></p></td></tr><tr><td>scroll</td><td class="pass">PASS</td><td>1366×768、1440×900、390×844；指定坐标CDP原生wheel与聚焦后PageDown，记录scrollTop/height/overflow/末行和底按钮rect。列表及API表单均到底；Claude完整链接+输入窗原始几何可达，无需额外overflow滚动。测量先于DOM脱敏截图，未JS强设scroll。<p><a href="list-scroll.json">list-scroll.json</a> · <a href="form-scroll.json">form-scroll.json</a> · <a href="claude-manual-scroll.json">claude-manual-scroll.json</a></p></td></tr><tr><td>pending-negative</td><td class="pass">PASS</td><td>实际sayHi接受异步job，再在0–1ms返回凭据未就绪失败；不是HTTP同步拒绝。调用前后目标私有root无原生进程，未启动推理；未改owner/现有role。<p><a href="pending-sayhi-negative.json">pending-sayhi-negative.json</a></p></td></tr><tr><td>persistent-import</td><td class="pass">PASS</td><td>本轮4738 UI真实提交：全部/default/不替换→added0 existing6 updated0 notFound[pi] failures[]；单Claude/default/不替换→added0 existing1 updated0 notFound[] failures[]。18条metadata保持、6条来源不重复，原全部筛选保留。<p><a href="import-all.json">import-all.json</a> · <a href="import-claude.json">import-claude.json</a></p></td></tr><tr><td>navigation</td><td class="pass">PASS</td><td>导航无旧引擎页；真实访问#/engines回到#/tasks；7个engine enabled=true。<p><a href="navigation.json">navigation.json</a></p></td></tr><tr><td>fresh-import</td><td class="fail">FAIL</td><td>独立worker在临时4740全新DB验证，非4738幂等结果：Claude新增1但来源无token，hasCredentials=false；首次全部UI15秒超时，后端稍后提交6条来源，完整HTTP回执未知。旧snapshot直接回放可持久化但旧ready旗标误导；未改全局来源或补凭据。<p><a href="../import-specific/REPORT.html">../import-specific/REPORT.html</a> · <a href="../import-specific/results.json">../import-specific/results.json</a></p></td></tr><tr><td>personal-oauth</td><td class="missing">MISSING</td><td>5种新官方OAuth完整完成未由本人执行。启动/取消、URL/code和manual输入可见不算完整登录。最终仅保留Codex待本人授权的当前job，详见安全移交。<p><a href="resources.json">resources.json</a></p></td></tr><tr><td>engine-history</td><td class="partial">PARTIAL</td><td>较早时点Codex/Claude/Qoder/dsh hi，Grok首轮失败后原生及HTTP复验hi；Codex正式任务completed/real/精确WEAVER_REAL_OK/ack/accepted且早期runner观察CODEX_HOME绑定。OpenCode仍Go用量耗尽，Pi无key。未在最终digest重跑全矩阵。<p><a href="engine-evidence.json">engine-evidence.json</a></p></td></tr></tbody></table>
+<h2 id="issues">未解决的问题与覆盖边界</h2><p class="fail"><strong>首次导入不能放行：</strong>无可用token的Claude来源显示新增而未就绪；首次全部导入超过UI15秒期限后才提交。专项服务4740已停止，数据与过程由独立worker回收，<a href="../import-specific/REPORT.html">最终安全报告</a>保留首次/重复/旧snapshot的区别。本包4738上的existing结果不替代这两条失败。</p><ul><li>没有完整OAuth本人授权、五种新身份远端执行证明；Qoder BYOK/license未验，Pi/dsh无官方选项。</li><li>未重复首轮额度刷新/启停/删除引用保护/完整新API矩阵；旧证据仅代表首轮时点。</li><li>无所有引擎正式worker、owner/IM/定时推理全链路或长期多组织续期验收。</li><li>Claude非法code未直接追踪stdin；真实拒绝与job状态加当前源码前置校验表明未进入write分支。</li><li>初次脚本在取消异步回收完成前找重试按钮，属于harness同步问题，已等待按钮后复验。</li><li>一次滚动聚焦误点真实Claude链接，诊断tab-list工具输出含临时公开OAuth query/state；立即关闭额外tab，最终产物无query/token/code，未替本人授权。不能宣称整个工具轨迹从未显示query。</li><li>原Claude额度block未解除；最终release_at比revision36少705ms，其他归属/原因/起点相同，未独立追踪该时间差生成者。</li></ul><p>工程检查由owner运行：2145 pass / 32 skip / 0 fail，typecheck/build通过；<a href="engineering-checks.json">安全回执</a>。它不替代UI验收。原生dsh合法[]本轮实际调用成功；此前其他引擎调用见<a href="engine-evidence.json">分时点证据</a>，其中OpenCode限额与Pi无凭据仍非推理通过。</p><p>控制台/网络仅保存安全元数据，预期400与page error分开：<a href="runtime-health.json">runtime-health.json</a> · <a href="login-safe-network.json">login-safe-network.json</a> · <a href="same-key-regression.json">same-key-regression.json</a>。Chrome导航后的console buffer不能替代完整早期日志；同key回归另在精确操作后立即核对为0。</p>
+<h2 id="evidence">最小安全截图</h2><p>截图前先观测未脱敏DOM的几何/可用性；仅截图时遮盖邮箱、完整OAuth query及设备码，随后恢复DOM。截图的脱敏文字可能改变换行，scroll/rect结论以未遮盖前的JSON为准。未归档HAR、请求正文、原生raw输出或授权码。报告可读性检查不算产品验收。<a href="report-readability.json">报告文件/打印/链接核对</a></p><div class="gallery"><figure><img src="draft-switch-390.png" alt="窄屏草稿归属确认" loading="lazy"><figcaption>窄屏草稿归属确认</figcaption></figure><figure><img src="dsh-invalid-preserved.png" alt="dsh拒绝{}并保留输入" loading="lazy"><figcaption>dsh拒绝{}并保留输入</figcaption></figure><figure><img src="dsh-hello.png" alt="一次性新API真实hi" loading="lazy"><figcaption>一次性新API真实hi</figcaption></figure><figure><img src="list-390.png" alt="窄屏末行" loading="lazy"><figcaption>窄屏末行</figcaption></figure><figure><img src="api-form-390.png" alt="窄屏长表单底部" loading="lazy"><figcaption>窄屏长表单底部</figcaption></figure><figure><img src="claude-manual-390-masked.png" alt="Claude手工输入窗，query已DOM脱敏" loading="lazy"><figcaption>Claude手工输入窗，query已DOM脱敏</figcaption></figure><figure><img src="codex-final-pending-masked.png" alt="最终Codex待本人授权入口，验证码已DOM脱敏" loading="lazy"><figcaption>最终Codex待本人授权入口，验证码已DOM脱敏</figcaption></figure><figure><img src="login-opencode-masked.png" alt="OpenCode设备入口，验证码已DOM脱敏" loading="lazy"><figcaption>OpenCode设备入口，验证码已DOM脱敏</figcaption></figure></div>
+<h2 id="resources">资源闭环与本人授权移交</h2><p>一次性role先于API删除，secret/root已无；原账号/owner/worker元数据与revision36逐项相同。所有本包登录scope在最终Codex前已回收。生产与持久test不停止。<a href="retention-audit.json">逐项保留核对</a> · <a href="resources.json">最终资源回执</a>。</p><p id="handoff">Codex可用待授权入口已保留：账号 验收官方codex1025 / channel_bce8566b32d34b089fb9191d；job 3801d09c-8248-4472-adf8-3ce0203520be；设备码可见且与后端一致（不归档码）；截止 2026-10-25T06:02:40.390000+00:00。本人打开4738账号页，点此账号登录按钮，打开官方链接并在官方页面输入UI设备码。关闭本任务Chrome不会取消服务器job；超时或精确取消回收自有scope。<a href="pending-auth.json">安全移交详情</a></p><pre>{
+  &quot;serviceOwnership&quot;: &quot;Borrowed persistent test 4738 / dev-weaver-real-accounts.scope; production weaver.service preserved. No prepare, cleanup, stop or restart.&quot;,
+  &quot;browser&quot;: {
+    &quot;session&quot;: &quot;weaver-accounts-recheck&quot;,
+    &quot;mode&quot;: &quot;owned Google Chrome task profile&quot;,
+    &quot;closed&quot;: true,
+    &quot;profileRemoved&quot;: true,
+    &quot;ownedBrowserPids&quot;: [],
+    &quot;remainingProfileProcesses&quot;: []
+  },
+  &quot;disposable&quot;: {
+    &quot;roleAbsent&quot;: true,
+    &quot;channelAbsent&quot;: true,
+    &quot;originalChannelStillPresent&quot;: true
+  },
+  &quot;privateAncestors&quot;: [
+    {
+      &quot;path&quot;: &quot;/home/mocha/.local/share/weaver-real-test&quot;,
+      &quot;mode&quot;: &quot;0o700&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/home/mocha/.local/share/weaver-real-test/channels&quot;,
+      &quot;mode&quot;: &quot;0o700&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/home/mocha/.local/share/weaver-real-test/channels/channel_4ced3727a61348b390af7c6f&quot;,
+      &quot;mode&quot;: &quot;0o700&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d&quot;,
+      &quot;mode&quot;: &quot;0o700&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/home/mocha/.local/share/weaver-real-test/channels/channel_24fae3142b5c48f898448d0a&quot;,
+      &quot;mode&quot;: &quot;0o700&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0&quot;,
+      &quot;mode&quot;: &quot;0o700&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/home/mocha/.local/share/weaver-real-test/channels/channel_40c15c208bf84e45911b2b95&quot;,
+      &quot;mode&quot;: &quot;0o700&quot;
+    }
+  ],
+  &quot;finalCodex&quot;: {
+    &quot;status&quot;: &quot;authorizing&quot;,
+    &quot;handoff&quot;: &quot;pending-auth.json&quot;,
+    &quot;reference&quot;: {
+      &quot;channel&quot;: &quot;channel_bce8566b32d34b089fb9191d&quot;,
+      &quot;id&quot;: &quot;3801d09c-8248-4472-adf8-3ce0203520be&quot;
+    },
+    &quot;scope&quot;: &quot;dev-weaver-channel-login-c028bb13-2c0f-4798-a53c-e6898dc48f05.scope&quot;,
+    &quot;pid&quot;: 1350045,
+    &quot;ownerUid&quot;: 1000,
+    &quot;deadlineUtc&quot;: &quot;2026-10-25T06:02:40.390000+00:00&quot;,
+    &quot;reason&quot;: &quot;Preserved exclusively for person authorization; no inference&quot;,
+    &quot;nativeProcessesStillPresent&quot;: true
+  },
+  &quot;testServer&quot;: {
+    &quot;pid&quot;: 1299907,
+    &quot;url&quot;: &quot;http://127.0.0.1:4738&quot;,
+    &quot;port&quot;: 4738,
+    &quot;dataDir&quot;: &quot;/home/mocha/.local/share/weaver-real-test&quot;,
+    &quot;version&quot;: &quot;0.7.9&quot;,
+    &quot;startedAt&quot;: &quot;2026-10-25T05:29:26.659Z&quot;,
+    &quot;runningWorkers&quot;: 0,
+    &quot;managedBy&quot;: null
+  },
+  &quot;productionPid&quot;: 1109320,
+  &quot;otherOfficialLoginProcessesAbsent&quot;: true,
+  &quot;scratchCleanup&quot;: &quot;Only safe scripts and JSON remain; own profile removed. Print PDF/text/render intermediates removed after actual readability checks. No raw auth/HAR/body/native logs archived.&quot;
+}</pre><p><a href="../../../account-channels-design.md">账号合同</a> · <a href="../../../testing-real-engines.md">持久测试环境说明</a></p></main></html>

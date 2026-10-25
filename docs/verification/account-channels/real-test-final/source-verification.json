@@ -1,0 +1,40 @@
+{
+  "digest": "1c092161ceed7008012cdf22548f919e919033dc24d6df0601ed867be7117f88",
+  "head": "294b7f91e974e0a4dc134fbe398810207198ebdc",
+  "frozenFiles": 291,
+  "entry": {
+    "at": "2026-10-25T05:37:14.036330+00:00",
+    "digest": "1c092161ceed7008012cdf22548f919e919033dc24d6df0601ed867be7117f88",
+    "checked": 291,
+    "changed": [],
+    "testService": {
+      "pid": 1299907,
+      "startedAt": "2026-10-25T05:29:26.659Z",
+      "scope": "dev-weaver-real-accounts.scope",
+      "entryPidEvidence": "ss observed pid1299907 at entry; later serverInfo supplies unchanged process startup timestamp"
+    },
+    "production": {
+      "pid": 1109320,
+      "activeEnterTimestamp": "Sat 2026-10-24 23:49:32 EDT"
+    }
+  },
+  "exit": {
+    "at": "2026-10-25T05:53:56.553756+00:00",
+    "mismatches": [],
+    "testServer": {
+      "pid": 1299907,
+      "url": "http://127.0.0.1:4738",
+      "port": 4738,
+      "dataDir": "/home/mocha/.local/share/weaver-real-test",
+      "version": "0.7.9",
+      "startedAt": "2026-10-25T05:29:26.659Z",
+      "runningWorkers": 0,
+      "managedBy": null
+    },
+    "production": "MainPID=1109320\nActiveEnterTimestamp=Sat 2026-10-24 23:49:32 EDT"
+  },
+  "stableTestPIDAndStartedAt": true,
+  "owner": "root",
+  "workerTaskId": "acd97205-77af-4c3b-a543-60cf1e0af4c8",
+  "workerRole": "independent real-browser Weaver worker; no delegation, product/test changes, commit or push"
+}

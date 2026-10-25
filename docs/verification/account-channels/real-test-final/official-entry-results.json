@@ -1,0 +1,715 @@
+[
+  {
+    "engine": "claude",
+    "channel": "channel_4ced3727a61348b390af7c6f",
+    "first": {
+      "acceptsCode": true,
+      "backendHasCode": false,
+      "cancelRect": {
+        "bottom": 632,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 600,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 600
+      },
+      "codeMatches": true,
+      "hasDeviceCode": false,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 416,
+        "height": 154,
+        "left": 379,
+        "right": 987,
+        "top": 262,
+        "width": 608,
+        "x": 379,
+        "y": 262
+      },
+      "manualPassword": true,
+      "manualRect": {
+        "bottom": 489,
+        "height": 22,
+        "left": 392,
+        "right": 950,
+        "top": 467,
+        "width": 558,
+        "x": 392,
+        "y": 467
+      },
+      "manualSubmit": true,
+      "reference": {
+        "channel": "channel_4ced3727a61348b390af7c6f",
+        "id": "3c2f7b2f-eca5-45b8-94bf-01e4991e6c35"
+      },
+      "safeUrl": "https://claude.com/cai/oauth/authorize",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "firstPrivateRootObserved": true,
+    "firstScopeReleased": true,
+    "firstJobRefPreserved": true,
+    "retryNewJob": true,
+    "retry": {
+      "acceptsCode": true,
+      "backendHasCode": false,
+      "cancelRect": {
+        "bottom": 643,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 611,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 611
+      },
+      "codeMatches": true,
+      "hasDeviceCode": false,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 427,
+        "height": 176,
+        "left": 379,
+        "right": 987,
+        "top": 251,
+        "width": 608,
+        "x": 379,
+        "y": 251
+      },
+      "manualPassword": true,
+      "manualRect": {
+        "bottom": 500,
+        "height": 22,
+        "left": 392,
+        "right": 950,
+        "top": 478,
+        "width": 558,
+        "x": 392,
+        "y": 478
+      },
+      "manualSubmit": true,
+      "reference": {
+        "channel": "channel_4ced3727a61348b390af7c6f",
+        "id": "6e6d145a-90c9-427c-bdab-09920aec9f13"
+      },
+      "safeUrl": "https://claude.com/cai/oauth/authorize",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "nativeProcesses": [
+      {
+        "pid": 1340372,
+        "comm": "2.1.310",
+        "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_4ced3727a61348b390af7c6f/native",
+        "roots": {
+          "CLAUDE_CONFIG_DIR": "/home/mocha/.local/share/weaver-real-test/channels/channel_4ced3727a61348b390af7c6f/native"
+        },
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/dev-weaver-channel-login-f530aa6c-151b-42d7-95cb-5591e4fc0c90.scope"
+      }
+    ],
+    "closeReopenSameActiveJob": true,
+    "reopened": {
+      "acceptsCode": true,
+      "backendHasCode": false,
+      "cancelRect": {
+        "bottom": 643,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 611,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 611
+      },
+      "codeMatches": true,
+      "hasDeviceCode": false,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 427,
+        "height": 176,
+        "left": 379,
+        "right": 987,
+        "top": 251,
+        "width": 608,
+        "x": 379,
+        "y": 251
+      },
+      "manualPassword": true,
+      "manualRect": {
+        "bottom": 500,
+        "height": 22,
+        "left": 392,
+        "right": 950,
+        "top": 478,
+        "width": 558,
+        "x": 392,
+        "y": 478
+      },
+      "manualSubmit": true,
+      "reference": {
+        "channel": "channel_4ced3727a61348b390af7c6f",
+        "id": "6e6d145a-90c9-427c-bdab-09920aec9f13"
+      },
+      "safeUrl": "https://claude.com/cai/oauth/authorize",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "cancel": {
+      "jobStatus": "cancelled",
+      "noOwnedProcesses": true,
+      "scopes": {
+        "dev-weaver-channel-login-f530aa6c-151b-42d7-95cb-5591e4fc0c90.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive"
+      }
+    },
+    "oauthCompleted": false
+  },
+  {
+    "engine": "codex",
+    "channel": "channel_bce8566b32d34b089fb9191d",
+    "first": {
+      "acceptsCode": false,
+      "backendHasCode": true,
+      "cancelRect": {
+        "bottom": 505,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 473,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 473
+      },
+      "codeMatches": true,
+      "hasDeviceCode": true,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 411,
+        "height": 22,
+        "left": 379,
+        "right": 987,
+        "top": 389,
+        "width": 608,
+        "x": 379,
+        "y": 389
+      },
+      "manualPassword": false,
+      "manualSubmit": false,
+      "reference": {
+        "channel": "channel_bce8566b32d34b089fb9191d",
+        "id": "2ac8944b-71a6-4384-9ed5-988e1891b7c7"
+      },
+      "safeUrl": "https://auth.openai.com/codex/device",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "firstPrivateRootObserved": true,
+    "firstScopeReleased": true,
+    "firstJobRefPreserved": true,
+    "retryNewJob": true,
+    "retry": {
+      "acceptsCode": false,
+      "backendHasCode": true,
+      "cancelRect": {
+        "bottom": 505,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 473,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 473
+      },
+      "codeMatches": true,
+      "hasDeviceCode": true,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 411,
+        "height": 22,
+        "left": 379,
+        "right": 987,
+        "top": 389,
+        "width": 608,
+        "x": 379,
+        "y": 389
+      },
+      "manualPassword": false,
+      "manualSubmit": false,
+      "reference": {
+        "channel": "channel_bce8566b32d34b089fb9191d",
+        "id": "96fda48a-ab62-46bd-a406-cd0e0a64031f"
+      },
+      "safeUrl": "https://auth.openai.com/codex/device",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "nativeProcesses": [
+      {
+        "pid": 1340734,
+        "comm": "codex",
+        "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d/native",
+        "roots": {
+          "CODEX_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d/native"
+        },
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/dev-weaver-channel-login-5157e2a0-34f3-4fc5-b7a1-55cce7f4bfa6.scope"
+      }
+    ],
+    "closeReopenSameActiveJob": true,
+    "reopened": {
+      "acceptsCode": false,
+      "backendHasCode": true,
+      "cancelRect": {
+        "bottom": 505,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 473,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 473
+      },
+      "codeMatches": true,
+      "hasDeviceCode": true,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 411,
+        "height": 22,
+        "left": 379,
+        "right": 987,
+        "top": 389,
+        "width": 608,
+        "x": 379,
+        "y": 389
+      },
+      "manualPassword": false,
+      "manualSubmit": false,
+      "reference": {
+        "channel": "channel_bce8566b32d34b089fb9191d",
+        "id": "96fda48a-ab62-46bd-a406-cd0e0a64031f"
+      },
+      "safeUrl": "https://auth.openai.com/codex/device",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "cancel": {
+      "jobStatus": "cancelled",
+      "noOwnedProcesses": true,
+      "scopes": {
+        "dev-weaver-channel-login-5157e2a0-34f3-4fc5-b7a1-55cce7f4bfa6.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive"
+      }
+    },
+    "oauthCompleted": false
+  },
+  {
+    "engine": "grok",
+    "channel": "channel_24fae3142b5c48f898448d0a",
+    "first": {
+      "acceptsCode": false,
+      "backendHasCode": true,
+      "cancelRect": {
+        "bottom": 505,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 473,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 473
+      },
+      "codeMatches": true,
+      "hasDeviceCode": true,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 411,
+        "height": 22,
+        "left": 379,
+        "right": 987,
+        "top": 389,
+        "width": 608,
+        "x": 379,
+        "y": 389
+      },
+      "manualPassword": false,
+      "manualSubmit": false,
+      "reference": {
+        "channel": "channel_24fae3142b5c48f898448d0a",
+        "id": "13fa86cd-6707-412e-9945-32c7c23b25d3"
+      },
+      "safeUrl": "https://accounts.x.ai/oauth2/device",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "firstPrivateRootObserved": true,
+    "firstScopeReleased": true,
+    "firstJobRefPreserved": true,
+    "retryNewJob": true,
+    "retry": {
+      "acceptsCode": false,
+      "backendHasCode": true,
+      "cancelRect": {
+        "bottom": 505,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 473,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 473
+      },
+      "codeMatches": true,
+      "hasDeviceCode": true,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 411,
+        "height": 22,
+        "left": 379,
+        "right": 987,
+        "top": 389,
+        "width": 608,
+        "x": 379,
+        "y": 389
+      },
+      "manualPassword": false,
+      "manualSubmit": false,
+      "reference": {
+        "channel": "channel_24fae3142b5c48f898448d0a",
+        "id": "10769e30-1573-4929-b5eb-d6ab78f25b2c"
+      },
+      "safeUrl": "https://accounts.x.ai/oauth2/device",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "nativeProcesses": [
+      {
+        "pid": 1341010,
+        "comm": "grok-1.0.70-lin",
+        "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_24fae3142b5c48f898448d0a/native",
+        "roots": {
+          "GROK_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_24fae3142b5c48f898448d0a/native"
+        },
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/dev-weaver-channel-login-d49e9e96-1721-4e1a-b6b4-9556be0f39a7.scope"
+      }
+    ],
+    "closeReopenSameActiveJob": true,
+    "reopened": {
+      "acceptsCode": false,
+      "backendHasCode": true,
+      "cancelRect": {
+        "bottom": 505,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 473,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 473
+      },
+      "codeMatches": true,
+      "hasDeviceCode": true,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 411,
+        "height": 22,
+        "left": 379,
+        "right": 987,
+        "top": 389,
+        "width": 608,
+        "x": 379,
+        "y": 389
+      },
+      "manualPassword": false,
+      "manualSubmit": false,
+      "reference": {
+        "channel": "channel_24fae3142b5c48f898448d0a",
+        "id": "10769e30-1573-4929-b5eb-d6ab78f25b2c"
+      },
+      "safeUrl": "https://accounts.x.ai/oauth2/device",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "cancel": {
+      "jobStatus": "cancelled",
+      "noOwnedProcesses": true,
+      "scopes": {
+        "dev-weaver-channel-login-d49e9e96-1721-4e1a-b6b4-9556be0f39a7.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive"
+      }
+    },
+    "oauthCompleted": false
+  },
+  {
+    "engine": "opencode",
+    "channel": "channel_90504ac6dfee41019ebc3fc0",
+    "first": {
+      "acceptsCode": false,
+      "backendHasCode": true,
+      "cancelRect": {
+        "bottom": 516,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 484,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 484
+      },
+      "codeMatches": true,
+      "hasDeviceCode": true,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 422,
+        "height": 44,
+        "left": 379,
+        "right": 987,
+        "top": 378,
+        "width": 608,
+        "x": 379,
+        "y": 378
+      },
+      "manualPassword": false,
+      "manualSubmit": false,
+      "reference": {
+        "channel": "channel_90504ac6dfee41019ebc3fc0",
+        "id": "67bbd098-5b83-48cc-acff-5251b11ff7f5"
+      },
+      "safeUrl": "https://opencode.ai/console/device",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "firstPrivateRootObserved": true,
+    "firstScopeReleased": true,
+    "firstJobRefPreserved": true,
+    "retryNewJob": true,
+    "retry": {
+      "acceptsCode": false,
+      "backendHasCode": true,
+      "cancelRect": {
+        "bottom": 516,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 484,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 484
+      },
+      "codeMatches": true,
+      "hasDeviceCode": true,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 422,
+        "height": 44,
+        "left": 379,
+        "right": 987,
+        "top": 378,
+        "width": 608,
+        "x": 379,
+        "y": 378
+      },
+      "manualPassword": false,
+      "manualSubmit": false,
+      "reference": {
+        "channel": "channel_90504ac6dfee41019ebc3fc0",
+        "id": "121dd6f4-915b-492d-9f4e-7b31ed6dedcb"
+      },
+      "safeUrl": "https://opencode.ai/console/device",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "nativeProcesses": [
+      {
+        "pid": 1341334,
+        "comm": "opencode",
+        "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native",
+        "roots": {
+          "XDG_CONFIG_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native/config",
+          "XDG_DATA_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native/data",
+          "XDG_STATE_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native/state",
+          "OPENCODE_DB": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native/opencode.db"
+        },
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/dev-weaver-channel-login-3a1b4f43-a793-429a-8889-c9a0362772f7.scope"
+      }
+    ],
+    "closeReopenSameActiveJob": true,
+    "reopened": {
+      "acceptsCode": false,
+      "backendHasCode": true,
+      "cancelRect": {
+        "bottom": 516,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 484,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 484
+      },
+      "codeMatches": true,
+      "hasDeviceCode": true,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 422,
+        "height": 44,
+        "left": 379,
+        "right": 987,
+        "top": 378,
+        "width": 608,
+        "x": 379,
+        "y": 378
+      },
+      "manualPassword": false,
+      "manualSubmit": false,
+      "reference": {
+        "channel": "channel_90504ac6dfee41019ebc3fc0",
+        "id": "121dd6f4-915b-492d-9f4e-7b31ed6dedcb"
+      },
+      "safeUrl": "https://opencode.ai/console/device",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "cancel": {
+      "jobStatus": "cancelled",
+      "noOwnedProcesses": true,
+      "scopes": {
+        "dev-weaver-channel-login-3a1b4f43-a793-429a-8889-c9a0362772f7.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive"
+      }
+    },
+    "oauthCompleted": false
+  },
+  {
+    "engine": "qoder",
+    "channel": "channel_40c15c208bf84e45911b2b95",
+    "first": {
+      "acceptsCode": false,
+      "backendHasCode": false,
+      "cancelRect": {
+        "bottom": 543,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 511,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 511
+      },
+      "codeMatches": true,
+      "hasDeviceCode": false,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 483,
+        "height": 132,
+        "left": 379,
+        "right": 987,
+        "top": 351,
+        "width": 608,
+        "x": 379,
+        "y": 351
+      },
+      "manualPassword": false,
+      "manualSubmit": false,
+      "reference": {
+        "channel": "channel_40c15c208bf84e45911b2b95",
+        "id": "91614bab-63f2-4b4f-95c5-56fb7aab93be"
+      },
+      "safeUrl": "https://qoder.com/device/selectAccounts",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "firstPrivateRootObserved": true,
+    "firstScopeReleased": true,
+    "firstJobRefPreserved": true,
+    "retryNewJob": true,
+    "retry": {
+      "acceptsCode": false,
+      "backendHasCode": false,
+      "cancelRect": {
+        "bottom": 543,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 511,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 511
+      },
+      "codeMatches": true,
+      "hasDeviceCode": false,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 483,
+        "height": 132,
+        "left": 379,
+        "right": 987,
+        "top": 351,
+        "width": 608,
+        "x": 379,
+        "y": 351
+      },
+      "manualPassword": false,
+      "manualSubmit": false,
+      "reference": {
+        "channel": "channel_40c15c208bf84e45911b2b95",
+        "id": "9b9cd7b6-f003-47d9-b43e-a1015805707d"
+      },
+      "safeUrl": "https://qoder.com/device/selectAccounts",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "nativeProcesses": [
+      {
+        "pid": 1341703,
+        "comm": "qodercli-1.1.75",
+        "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_40c15c208bf84e45911b2b95/native",
+        "roots": {
+          "QODER_CONFIG_DIR": "/home/mocha/.local/share/weaver-real-test/channels/channel_40c15c208bf84e45911b2b95/native"
+        },
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/dev-weaver-channel-login-aeb69b8b-369e-40c3-bda4-750208d7a792.scope"
+      }
+    ],
+    "closeReopenSameActiveJob": true,
+    "reopened": {
+      "acceptsCode": false,
+      "backendHasCode": false,
+      "cancelRect": {
+        "bottom": 543,
+        "height": 32,
+        "left": 698.953125,
+        "right": 806.96875,
+        "top": 511,
+        "width": 108.015625,
+        "x": 698.953125,
+        "y": 511
+      },
+      "codeMatches": true,
+      "hasDeviceCode": false,
+      "linkClickable": true,
+      "linkRect": {
+        "bottom": 483,
+        "height": 132,
+        "left": 379,
+        "right": 987,
+        "top": 351,
+        "width": 608,
+        "x": 379,
+        "y": 351
+      },
+      "manualPassword": false,
+      "manualSubmit": false,
+      "reference": {
+        "channel": "channel_40c15c208bf84e45911b2b95",
+        "id": "9b9cd7b6-f003-47d9-b43e-a1015805707d"
+      },
+      "safeUrl": "https://qoder.com/device/selectAccounts",
+      "status": "authorizing",
+      "urlMatches": true
+    },
+    "cancel": {
+      "jobStatus": "cancelled",
+      "noOwnedProcesses": true,
+      "scopes": {
+        "dev-weaver-channel-login-aeb69b8b-369e-40c3-bda4-750208d7a792.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive"
+      }
+    },
+    "oauthCompleted": false
+  }
+]

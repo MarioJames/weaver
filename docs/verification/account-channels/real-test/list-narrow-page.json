@@ -1,0 +1,110 @@
+{
+  "artifact_errors": [],
+  "input": "native PageDown with explicit scroll container focus",
+  "viewport": [
+    390,
+    844
+  ],
+  "before": {
+    "url": "http://127.0.0.1:4738/#/channels",
+    "viewport": [
+      390,
+      844
+    ],
+    "horizontal": false,
+    "containers": [
+      {
+        "tag": "MAIN",
+        "role": null,
+        "top": 0,
+        "height": 788,
+        "total": 7006,
+        "overflow": "auto scroll",
+        "clip": "none",
+        "rect": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 788,
+          "top": 56,
+          "right": 390,
+          "bottom": 844,
+          "left": 0
+        }
+      }
+    ],
+    "lastArticle": {
+      "x": 17,
+      "y": 6648.625,
+      "width": 346,
+      "height": 396.59375,
+      "top": 6648.625,
+      "right": 363,
+      "bottom": 7045.21875,
+      "left": 17
+    },
+    "lastButton": {
+      "x": 217.03125,
+      "y": 7005.21875,
+      "width": 42.015625,
+      "height": 24,
+      "top": 7005.21875,
+      "right": 259.046875,
+      "bottom": 7029.21875,
+      "left": 217.03125
+    },
+    "focus": "BODY"
+  },
+  "after": {
+    "url": "http://127.0.0.1:4738/#/channels",
+    "viewport": [
+      390,
+      844
+    ],
+    "horizontal": false,
+    "containers": [
+      {
+        "tag": "MAIN",
+        "role": null,
+        "top": 6218,
+        "height": 788,
+        "total": 7006,
+        "overflow": "auto scroll",
+        "clip": "none",
+        "rect": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 788,
+          "top": 56,
+          "right": 390,
+          "bottom": 844,
+          "left": 0
+        }
+      }
+    ],
+    "lastArticle": {
+      "x": 17,
+      "y": 430.625,
+      "width": 346,
+      "height": 396.59375,
+      "top": 430.625,
+      "right": 363,
+      "bottom": 827.21875,
+      "left": 17
+    },
+    "lastButton": {
+      "x": 217.03125,
+      "y": 787.21875,
+      "width": 42.015625,
+      "height": 24,
+      "top": 787.21875,
+      "right": 259.046875,
+      "bottom": 811.21875,
+      "left": 217.03125
+    },
+    "focus": "MAIN"
+  },
+  "screenshot": "list-narrow-page.png",
+  "jsScrollMutationUsed": false
+}

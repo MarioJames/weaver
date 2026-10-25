@@ -1,0 +1,87 @@
+{
+  "serviceOwnership": "Borrowed persistent test 4738 / dev-weaver-real-accounts.scope; production weaver.service preserved. No prepare, cleanup, stop or restart.",
+  "browser": {
+    "session": "weaver-accounts-recheck",
+    "mode": "owned Google Chrome task profile",
+    "closed": true,
+    "profileRemoved": true,
+    "ownedBrowserPids": [],
+    "remainingProfileProcesses": []
+  },
+  "disposable": {
+    "roleAbsent": true,
+    "channelAbsent": true,
+    "originalChannelStillPresent": true
+  },
+  "privateAncestors": [
+    {
+      "path": "/home/mocha/.local/share/weaver-real-test",
+      "mode": "0o700"
+    },
+    {
+      "path": "/home/mocha/.local/share/weaver-real-test/channels",
+      "mode": "0o700"
+    },
+    {
+      "path": "/home/mocha/.local/share/weaver-real-test/channels/channel_4ced3727a61348b390af7c6f",
+      "mode": "0o700"
+    },
+    {
+      "path": "/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d",
+      "mode": "0o700"
+    },
+    {
+      "path": "/home/mocha/.local/share/weaver-real-test/channels/channel_24fae3142b5c48f898448d0a",
+      "mode": "0o700"
+    },
+    {
+      "path": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0",
+      "mode": "0o700"
+    },
+    {
+      "path": "/home/mocha/.local/share/weaver-real-test/channels/channel_40c15c208bf84e45911b2b95",
+      "mode": "0o700"
+    }
+  ],
+  "finalCodex": {
+    "status": "authorizing",
+    "handoff": "pending-auth.json",
+    "reference": {
+      "channel": "channel_bce8566b32d34b089fb9191d",
+      "id": "3801d09c-8248-4472-adf8-3ce0203520be"
+    },
+    "scope": "dev-weaver-channel-login-c028bb13-2c0f-4798-a53c-e6898dc48f05.scope",
+    "pid": 1350045,
+    "ownerUid": 1000,
+    "deadlineUtc": "2026-10-25T06:02:40.390000+00:00",
+    "reason": "Preserved exclusively for person authorization; no inference",
+    "nativeProcessesStillPresent": true
+  },
+  "testServer": {
+    "pid": 1299907,
+    "url": "http://127.0.0.1:4738",
+    "port": 4738,
+    "dataDir": "/home/mocha/.local/share/weaver-real-test",
+    "version": "0.7.9",
+    "startedAt": "2026-10-25T05:29:26.659Z",
+    "runningWorkers": 0,
+    "managedBy": null
+  },
+  "productionPid": 1109320,
+  "otherOfficialLoginProcessesAbsent": true,
+  "scratchCleanup": "Only safe scripts and JSON remain; own profile removed. Print PDF/text/render intermediates removed after actual readability checks. No raw auth/HAR/body/native logs archived.",
+  "cancelledScopeFinalStates": {
+    "dev-weaver-channel-login-0bcd740c-ba7e-4e88-bb00-3fb3dd20341a.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+    "dev-weaver-channel-login-15644705-7fb9-4c65-9ca9-373ee1d65332.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+    "dev-weaver-channel-login-18f55e04-8e22-48d1-99a7-126c1543a371.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+    "dev-weaver-channel-login-3a1b4f43-a793-429a-8889-c9a0362772f7.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+    "dev-weaver-channel-login-3aaf4f42-e154-43cc-9849-c5ee21668928.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+    "dev-weaver-channel-login-5157e2a0-34f3-4fc5-b7a1-55cce7f4bfa6.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+    "dev-weaver-channel-login-6aeedfa7-29c2-484d-ac32-ff3f0add05a9.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+    "dev-weaver-channel-login-88e77011-fb76-496c-8d86-c00b913c3055.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+    "dev-weaver-channel-login-aeb69b8b-369e-40c3-bda4-750208d7a792.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+    "dev-weaver-channel-login-c8f8f435-fe64-4a67-b034-56f62cda92ca.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+    "dev-weaver-channel-login-d49e9e96-1721-4e1a-b6b4-9556be0f39a7.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+    "dev-weaver-channel-login-f530aa6c-151b-42d7-95cb-5591e4fc0c90.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive"
+  }
+}

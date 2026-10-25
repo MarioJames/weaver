@@ -1,0 +1,18 @@
+{
+  "status": [
+    "等待官方授权"
+  ],
+  "links": [
+    {
+      "hostPath": "https://auth.openai.com/codex/device",
+      "queryKeys": []
+    }
+  ],
+  "codePresent": false,
+  "buttons": [
+    "",
+    "取消此次登录",
+    "重新读取状态",
+    "关闭"
+  ]
+}

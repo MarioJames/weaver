@@ -1,0 +1,26 @@
+{
+  "actualUiSubmit": true,
+  "defaultSource": true,
+  "replaceExisting": false,
+  "result": [
+    {
+      "importResult": {
+        "added": 0,
+        "existing": 6,
+        "failures": [],
+        "notFound": [
+          "pi"
+        ],
+        "updated": 0
+      },
+      "input": {
+        "revision": 36
+      },
+      "status": 200
+    }
+  ],
+  "afterCount": 18,
+  "ui": [
+    "本次导入结果\n新增 0、已有 6、更新 0 条。未发现可导入配置：pi。"
+  ]
+}

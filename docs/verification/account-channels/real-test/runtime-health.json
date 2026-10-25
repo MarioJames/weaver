@@ -1,0 +1,230 @@
+{
+  "at": "2026-10-25T05:18:17.229831+00:00",
+  "consoleErrorOrWarning": [
+    {
+      "type": "error",
+      "text": "Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. channel_4ced3727a61348b390af7c6f"
+    },
+    {
+      "type": "error",
+      "text": "Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. channel_4ced3727a61348b390af7c6f"
+    },
+    {
+      "type": "error",
+      "text": "Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. channel_4ced3727a61348b390af7c6f"
+    }
+  ],
+  "pageErrors": [],
+  "httpErrors": [
+    {
+      "requestId": "1238482.1006",
+      "method": "saveChannel",
+      "status": 400,
+      "path": "/api/rpc",
+      "at": "2026-10-25T04:58:47.283000+00:00"
+    },
+    {
+      "requestId": "1238482.1067",
+      "method": "listEngineModels",
+      "status": 400,
+      "path": "/api/rpc",
+      "at": "2026-10-25T04:59:37.355000+00:00"
+    },
+    {
+      "requestId": "1238482.1077",
+      "method": "listEngineModels",
+      "status": 400,
+      "path": "/api/rpc",
+      "at": "2026-10-25T04:59:45.491000+00:00"
+    },
+    {
+      "requestId": "1238482.1192",
+      "method": "sayHi",
+      "status": 400,
+      "path": "/api/rpc",
+      "at": "2026-10-25T05:01:11.557000+00:00"
+    },
+    {
+      "requestId": "1238482.1262",
+      "method": "importChannels",
+      "status": 400,
+      "path": "/api/rpc",
+      "at": "2026-10-25T05:02:02.231000+00:00"
+    },
+    {
+      "requestId": "1238482.1282",
+      "method": "importChannels",
+      "status": 400,
+      "path": "/api/rpc",
+      "at": "2026-10-25T05:02:19.504000+00:00"
+    },
+    {
+      "requestId": "1238482.1301",
+      "method": "importChannels",
+      "status": 400,
+      "path": "/api/rpc",
+      "at": "2026-10-25T05:02:35.502000+00:00"
+    },
+    {
+      "requestId": "1238482.1317",
+      "method": "importChannels",
+      "status": 400,
+      "path": "/api/rpc",
+      "at": "2026-10-25T05:02:49.042000+00:00"
+    },
+    {
+      "requestId": "1238482.1332",
+      "method": "importChannels",
+      "status": 400,
+      "path": "/api/rpc",
+      "at": "2026-10-25T05:03:01.513000+00:00"
+    },
+    {
+      "requestId": "1238482.2532",
+      "method": "getChannelLogin",
+      "status": 400,
+      "path": "/api/rpc",
+      "at": "2026-10-25T05:11:49.292000+00:00"
+    },
+    {
+      "requestId": "1238482.2565",
+      "method": "getChannelLogin",
+      "status": 404,
+      "path": "/api/rpc",
+      "at": "2026-10-25T05:12:14.242000+00:00"
+    }
+  ],
+  "rpcStatusCounts": [
+    {
+      "method": "scanEngines",
+      "status": 200,
+      "count": 16
+    },
+    {
+      "method": "getChannels",
+      "status": 200,
+      "count": 48
+    },
+    {
+      "method": "command",
+      "status": 200,
+      "count": 1167
+    },
+    {
+      "method": "listTasks",
+      "status": 200,
+      "count": 99
+    },
+    {
+      "method": "capabilities",
+      "status": 200,
+      "count": 11
+    },
+    {
+      "method": "getPolicy",
+      "status": 200,
+      "count": 46
+    },
+    {
+      "method": "saveChannel",
+      "status": 400,
+      "count": 1
+    },
+    {
+      "method": "saveChannel",
+      "status": 200,
+      "count": 13
+    },
+    {
+      "method": "listEngineModels",
+      "status": 200,
+      "count": 8
+    },
+    {
+      "method": "workerProbeStatus",
+      "status": 200,
+      "count": 6
+    },
+    {
+      "method": "listEngineModels",
+      "status": 400,
+      "count": 2
+    },
+    {
+      "method": "validatePolicy",
+      "status": 200,
+      "count": 2
+    },
+    {
+      "method": "savePolicy",
+      "status": 200,
+      "count": 2
+    },
+    {
+      "method": "sayHi",
+      "status": 200,
+      "count": 2
+    },
+    {
+      "method": "sayHiResult",
+      "status": 200,
+      "count": 3
+    },
+    {
+      "method": "sayHi",
+      "status": 400,
+      "count": 1
+    },
+    {
+      "method": "deleteChannel",
+      "status": 200,
+      "count": 2
+    },
+    {
+      "method": "importChannels",
+      "status": 200,
+      "count": 3
+    },
+    {
+      "method": "importChannels",
+      "status": 400,
+      "count": 5
+    },
+    {
+      "method": "startChannelLogin",
+      "status": 200,
+      "count": 12
+    },
+    {
+      "method": "getChannelLogin",
+      "status": 200,
+      "count": 229
+    },
+    {
+      "method": "cancelChannelLogin",
+      "status": 200,
+      "count": 11
+    },
+    {
+      "method": "refreshChannelQuota",
+      "status": 200,
+      "count": 1
+    },
+    {
+      "method": "getChannelLogin",
+      "status": 400,
+      "count": 1
+    },
+    {
+      "method": "getChannelLogin",
+      "status": 404,
+      "count": 1
+    }
+  ],
+  "notes": [
+    "Negative paths intentionally exercised: CAS save, invalid config model lookup, disabled-channel sayHi, invalid import, missing login job. HTTP 200 by itself is not treated as business success.",
+    "No request bodies, headers, cookies, HAR or raw native authorization output exported.",
+    "Agent-browser tool errors included stale refs/covered points/empty-fill quirk and unavailable historical response body; these were not used as passing evidence. Final artifacts were independently read and checked."
+  ],
+  "artifact_errors": []
+}

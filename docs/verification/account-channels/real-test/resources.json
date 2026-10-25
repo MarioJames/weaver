@@ -1,0 +1,47 @@
+{
+  "at": "2026-10-25T05:20:00.614942+00:00",
+  "browser": {
+    "session": "weaver-accounts-final",
+    "closed": true,
+    "profileRemoved": true,
+    "remainingProcessesForExactProfile": [],
+    "cdpPort": 41933,
+    "ownsBrowser": true
+  },
+  "testService": {
+    "port": 4738,
+    "unit": "dev-weaver-real-accounts.scope",
+    "active": true,
+    "httpStatus": 200,
+    "borrowed": true,
+    "stoppedOrRestartedByWorker": false,
+    "dataDirPreserved": "/home/mocha/.local/share/weaver-real-test",
+    "listenerPid": 1217964
+  },
+  "production": {
+    "port": 4737,
+    "unit": "weaver.service",
+    "active": true,
+    "mainPid": 1109320,
+    "businessDataAccessed": false,
+    "stoppedOrRestartedByWorker": false
+  },
+  "nativeLogin": {
+    "retainedCount": 1,
+    "accountLabel": "验收官方codex1025",
+    "jobRef": {
+      "channel": "channel_bce8566b32d34b089fb9191d",
+      "id": "1adade39-a8a3-4541-820b-a0e09aa05cdd"
+    },
+    "pid": 1274098,
+    "unit": "dev-weaver-channel-login-de1ac5e0-321c-4d91-8bd4-e54833370034.scope",
+    "activeState": "active",
+    "startedAt": "Sun 2026-10-25 01:15:26 EDT",
+    "timeoutDeadlineUtc": "2026-10-25T05:25:26+00:00",
+    "reason": "Owner/user handoff; UI currently lacks device code, product blocker remains. Only user may perform third-party authorization.",
+    "cancel": "Open test channels, exact account, 登录官方账号 → 取消此次登录; verify exact scope absent. Timeout is server fallback."
+  },
+  "data": "Both disposable API records/secrets and disposable role removed; five official acceptance metadata/private roots retained; original policy channels/owners/workers unchanged versus revision 7. Test history retained.",
+  "rawPrivateArtifacts": "Removed after sanitized export; only pending-auth and blockers handoff files retained in task scratch.",
+  "reportReadability": "Actual file:// open at 390px, images loaded/no horizontal overflow; results.json link navigated; eight-page PDF generated and first page visually reviewed; core conclusion/resources verified in print text."
+}

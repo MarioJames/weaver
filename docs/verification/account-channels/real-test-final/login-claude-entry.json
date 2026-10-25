@@ -1,0 +1,61 @@
+{
+  "engine": "claude",
+  "channel": "channel_4ced3727a61348b390af7c6f",
+  "ui": {
+    "acceptsCode": true,
+    "backendHasCode": false,
+    "cancelRect": {
+      "bottom": 632,
+      "height": 32,
+      "left": 698.953125,
+      "right": 806.96875,
+      "top": 600,
+      "width": 108.015625,
+      "x": 698.953125,
+      "y": 600
+    },
+    "codeMatches": true,
+    "hasDeviceCode": false,
+    "linkClickable": true,
+    "linkRect": {
+      "bottom": 416,
+      "height": 154,
+      "left": 379,
+      "right": 987,
+      "top": 262,
+      "width": 608,
+      "x": 379,
+      "y": 262
+    },
+    "manualPassword": true,
+    "manualRect": {
+      "bottom": 489,
+      "height": 22,
+      "left": 392,
+      "right": 950,
+      "top": 467,
+      "width": 558,
+      "x": 392,
+      "y": 467
+    },
+    "manualSubmit": true,
+    "reference": {
+      "channel": "channel_4ced3727a61348b390af7c6f",
+      "id": "3c2f7b2f-eca5-45b8-94bf-01e4991e6c35"
+    },
+    "safeUrl": "https://claude.com/cai/oauth/authorize",
+    "status": "authorizing",
+    "urlMatches": true
+  },
+  "nativeProcesses": [
+    {
+      "pid": 1338349,
+      "comm": "2.1.310",
+      "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_4ced3727a61348b390af7c6f/native",
+      "roots": {
+        "CLAUDE_CONFIG_DIR": "/home/mocha/.local/share/weaver-real-test/channels/channel_4ced3727a61348b390af7c6f/native"
+      },
+      "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/dev-weaver-channel-login-6aeedfa7-29c2-484d-ac32-ff3f0add05a9.scope"
+    }
+  ]
+}

@@ -65,7 +65,6 @@ test('rpc posts the exact method and arity and returns result once', async () =>
       client.validatePolicy({ version: 1 }),
       client.savePolicy({ revision: 2, config: { version: 1 }, blocks: [] } as never),
       client.previewRoute({ owner: 'claude_owner', runningCount: 0 }),
-      client.setEngineEnabled({ id: 'claude', enabled: true, revision: 2 }),
       client.createTask({ title: '交接', instruction: '做', owner: { name: 'o', transport: 'herdr-visible', session: 's', pane: 'p' } }),
       client.startTask('task-1'),
       client.cancelTask('task-1'),
@@ -79,7 +78,6 @@ test('rpc posts the exact method and arity and returns result once', async () =>
       { method: 'validatePolicy', args: [{ version: 1 }] },
       { method: 'savePolicy', args: [{ revision: 2, config: { version: 1 }, blocks: [] }] },
       { method: 'previewRoute', args: [{ owner: 'claude_owner', runningCount: 0 }] },
-      { method: 'setEngineEnabled', args: [{ id: 'claude', enabled: true, revision: 2 }] },
       { method: 'createTask', args: [{ title: '交接', instruction: '做', owner: { name: 'o', transport: 'herdr-visible', session: 's', pane: 'p' } }] },
       { method: 'startTask', args: ['task-1'] },
       { method: 'cancelTask', args: ['task-1'] },
@@ -95,9 +93,9 @@ test('rpc posts the exact method and arity and returns result once', async () =>
       call.resolve(jsonResponse({ result: { echoed: call.body.method } }));
     }
     const results = await pending;
-    assert.equal(gate.calls.length, 12);
+    assert.equal(gate.calls.length, 11);
     assert.deepEqual(results[3], { echoed: 'capabilities' });
-    assert.deepEqual(results[11], { echoed: 'command' });
+    assert.deepEqual(results[10], { echoed: 'command' });
   } finally {
     gate.restore();
     cleanup();
@@ -428,4 +426,50 @@ test('channel management uses its own public RPCs and forwards metadata separate
     await refresh;
     assert.equal(gate.calls.length, 3);
   } finally { gate.restore(); cleanup(); }
+});
+
+test('official login RPCs preserve the saved channel and exact job reference', async () => {
+  installOrigin(); const gate = installFetch();
+  try {
+    const client = createBrowserClient();
+    const start = client.startChannelLogin({ channel: 'second-codex-account' });
+    assert.deepEqual(gate.calls[0].body, { method: 'startChannelLogin', args: [{ channel: 'second-codex-account' }] });
+    const job = { channel: 'second-codex-account', id: 'owned-job', status: 'authorizing' };
+    gate.calls[0].resolve(jsonResponse({ result: job }));
+    assert.deepEqual(await start, job);
+    const reference = { channel: job.channel, id: job.id };
+    const read = client.getChannelLogin(reference);
+    assert.deepEqual(gate.calls[1].body, { method: 'getChannelLogin', args: [reference] });
+    gate.calls[1].resolve(jsonResponse({ result: job })); await read;
+    const cancel = client.cancelChannelLogin(reference);
+    assert.deepEqual(gate.calls[2].body, { method: 'cancelChannelLogin', args: [reference] });
+    gate.calls[2].resolve(jsonResponse({ result: { ...job, status: 'cancelled' } }));
+    assert.equal((await cancel).status, 'cancelled');
+    assert.equal(gate.calls.length, 3);
+  } finally { gate.restore(); cleanup(); }
+});
+
+test('manual authorization code uses the shared RPC transport once and is never retried',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ installOrigin();const mock=installFetch();
+ try{
+  const client=createBrowserClient();const input={channel:'official_claude',id:'00000000-0000-0000-0000-000000000000',code:'fixture-private#fixture-state'};
+  const pending=client.submitChannelLoginCode(input);await flush();
+  assert.equal(mock.calls.length,1);assert.deepEqual(mock.calls[0].body,{method:'submitChannelLoginCode',args:[input]});
+  const rejected=assert.rejects(pending,/network failure/);mock.calls[0].reject(new TypeError('network failure'));await rejected;await flush();
+  assert.deepEqual(mock.calls.map(call=>call.body.method),['submitChannelLoginCode','getPolicy']);
+  mock.calls[1].resolve(jsonResponse({result:{revision:1}}));await flush();t.mock.timers.tick(15000);await flush();
+  assert.equal(mock.calls.filter(call=>call.body.method==='submitChannelLoginCode').length,1);
+ }finally{mock.restore();cleanup();}
+});
+
+
+test('import mutation waits beyond 15 seconds, returns its result once, and times out only at 180 seconds without replay',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});installOrigin();const gate=installFetch();try{
+  const client=createBrowserClient();let settled=false;const pending=client.importChannels({revision:0}).then(value=>{settled=true;return value;});
+  const failure=assert.doesNotReject(pending);t.mock.timers.tick(15001);await flush();assert.equal(settled,false);assert.equal(gate.calls.length,1);assert.equal(gate.calls[0].init.signal!.aborted,false);
+  const result={importResult:{added:5,failures:[{engine:'claude'}]}};gate.calls[0].resolve(jsonResponse({result}));assert.deepEqual(await pending,result);await failure;
+  const timeout=client.importChannels({revision:1});const rejected=assert.rejects(timeout,/TIMEOUT: 控制面在 180 秒内没有响应/);t.mock.timers.tick(179999);await flush();assert.equal(gate.calls[1].init.signal!.aborted,false);t.mock.timers.tick(1);await rejected;await flush();assert.equal(gate.calls.filter(call=>call.body.method==='importChannels').length,2);
+  gate.calls.find(call=>call.body.method==='getPolicy')?.resolve(jsonResponse({result:{revision:2}}));await flush();
+ }finally{gate.restore();cleanup();}
 });

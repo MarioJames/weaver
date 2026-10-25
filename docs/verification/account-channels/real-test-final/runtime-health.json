@@ -1,0 +1,49 @@
+{
+  "consoleMessageCount": 4,
+  "consoleErrorCount": 0,
+  "sameKeyWarnings": 0,
+  "pageErrorCount": 0,
+  "consoleCategories": {
+    "expectedHttp400": 0,
+    "otherWarnings": 1
+  },
+  "failedRequests": [
+    {
+      "method": "POST",
+      "host": "127.0.0.1",
+      "path": "/api/rpc",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "host": "127.0.0.1",
+      "path": "/api/rpc",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "host": "127.0.0.1",
+      "path": "/api/rpc",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "host": "127.0.0.1",
+      "path": "/api/rpc",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "host": "127.0.0.1",
+      "path": "/api/rpc",
+      "status": 400
+    },
+    {
+      "method": "POST",
+      "host": "127.0.0.1",
+      "path": "/api/rpc",
+      "status": 400
+    }
+  ],
+  "boundary": "Only necessary metadata retained. Expected INVALID_REQUEST for dsh {}, stale channel save, Claude malformed manual code and default unauthenticated role model listing are separated from unhandled page errors."
+}

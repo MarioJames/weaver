@@ -1,3 +1,4 @@
+import { RPC_METHODS, parseRpcBody, type RpcMethodSpec, type RpcMethod } from '../shared/contracts/rpc';
 import { createServer, connect, type Socket } from 'node:net';
 import { constants } from 'node:fs';
 import { chmod, lstat, mkdir, open, readFile, rename, rm, unlink } from 'node:fs/promises';
@@ -9,9 +10,13 @@ export const TRANSPORT_TIMEOUT_MS = 15_000;
 export const OWNER_LAUNCH_REQUEST_TIMEOUT_MS = 210_000;
 const record = (value:unknown):value is Record<string,unknown> => !!value && typeof value==='object' && !Array.isArray(value);
 const shortText = (value:unknown, max:number):value is string => typeof value==='string' && !!value.trim() && value.length<=max;
-/** Only a complete, cheap-validated launch envelope earns the fixed startup allowance. Authentication stays at the caller boundary. */
+/** Valid RPC envelopes share their method deadline; complete launch commands get the startup allowance. Authentication stays at the caller boundary. */
 export function requestTimeoutMs(value:unknown):number {
   if(!record(value))return TRANSPORT_TIMEOUT_MS;
+  if(value.method!==undefined&&value.method!=='command'){
+    try {const {method}=parseRpcBody(value);return (RPC_METHODS[method as RpcMethod] as RpcMethodSpec).timeoutMs??TRANSPORT_TIMEOUT_MS;}
+    catch {return TRANSPORT_TIMEOUT_MS;}
+  }
   if(value.method==='command'){
     if(Object.keys(value).length!==2||!Array.isArray(value.args)||value.args.length!==1)return TRANSPORT_TIMEOUT_MS;
     value=value.args[0];

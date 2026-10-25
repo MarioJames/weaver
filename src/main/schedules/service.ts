@@ -559,7 +559,7 @@ export class ScheduleService {
  private async runQuota(run:StoredRun):Promise<void> {
   if(!this.options.refreshQuota){this.finish(run,'failed',{error:'Quota refresh service unavailable'});return;}
   const config=this.options.policy.snapshot().config;
-  const targets=Object.entries(config.channels).filter(([,channel])=>channel.enabled&&config.engines[channel.engine]?.enabled&&quotaRefreshEnabled(channel,config.engines[channel.engine]?.kind)).sort(([,a],[,b])=>QUOTA_KINDS.indexOf(config.engines[a.engine].kind as typeof QUOTA_KINDS[number])-QUOTA_KINDS.indexOf(config.engines[b.engine].kind as typeof QUOTA_KINDS[number])).map(([id])=>id),output:string[]=[];let failures=0,observations=0;
+  const targets=Object.entries(config.channels).filter(([,channel])=>channel.enabled&&quotaRefreshEnabled(channel,config.engines[channel.engine]?.kind)).sort(([,a],[,b])=>QUOTA_KINDS.indexOf(config.engines[a.engine].kind as typeof QUOTA_KINDS[number])-QUOTA_KINDS.indexOf(config.engines[b.engine].kind as typeof QUOTA_KINDS[number])).map(([id])=>id),output:string[]=[];let failures=0,observations=0;
   const cancelled=()=>this.storage.read().runs[run.scheduleId]?.find(r=>r.id===run.id)?.cancelRequested;
   for(const engine of targets){
    if(cancelled()){this.finish(run,'cancelled',{output:redactContext(output.join('\n'),65536)});return;}

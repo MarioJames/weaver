@@ -1,0 +1,17 @@
+{
+  "freshScopesStarted": [],
+  "freshDatabasesCreated": [],
+  "authRootsCopied": [],
+  "nativeJobsStarted": [],
+  "nativeSourceOperations": 0,
+  "persistentServiceOperations": 0,
+  "browserClosed": true,
+  "profileDeleted": true,
+  "profileChromeProcessMatches": [],
+  "herdrWorkspaceClosed": true,
+  "herdrSessionStopped": true,
+  "production4737Preserved": true,
+  "test4738Preserved": true,
+  "sourceFilesUnchanged": true,
+  "scope": "Only own report browser and Herdr workspace/session were created and reclaimed; no fresh credential storage existed to delete."
+}

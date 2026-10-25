@@ -1,0 +1,44 @@
+{
+  "at": "2026-10-25T05:15:06.728881+00:00",
+  "baselineRevision": 7,
+  "finalRevision": 25,
+  "originalChannelsUnchanged": true,
+  "originalOwnersUnchanged": true,
+  "originalWorkersUnchanged": true,
+  "temporaryRoleRemoved": true,
+  "temporaryApiAccountsRemoved": true,
+  "temporaryApiSecretsRemoved": true,
+  "originalDshKeyStillPresent": true,
+  "retainedOfficialRoots": [
+    {
+      "id": "channel_4ced3727a61348b390af7c6f",
+      "label": "验收官方claude1025",
+      "root": "/home/mocha/.local/share/weaver-real-test/channels/channel_4ced3727a61348b390af7c6f/native",
+      "mode": "0o700"
+    },
+    {
+      "id": "channel_24fae3142b5c48f898448d0a",
+      "label": "验收官方grok1025",
+      "root": "/home/mocha/.local/share/weaver-real-test/channels/channel_24fae3142b5c48f898448d0a/native",
+      "mode": "0o700"
+    },
+    {
+      "id": "channel_90504ac6dfee41019ebc3fc0",
+      "label": "验收官方opencode1025",
+      "root": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native",
+      "mode": "0o700"
+    },
+    {
+      "id": "channel_40c15c208bf84e45911b2b95",
+      "label": "验收官方qoder1025",
+      "root": "/home/mocha/.local/share/weaver-real-test/channels/channel_40c15c208bf84e45911b2b95/native",
+      "mode": "0o700"
+    },
+    {
+      "id": "channel_bce8566b32d34b089fb9191d",
+      "label": "验收官方codex1025",
+      "root": "/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d/native",
+      "mode": "0o700"
+    }
+  ]
+}

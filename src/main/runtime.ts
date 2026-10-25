@@ -1,3 +1,4 @@
+import { ChannelLogins } from './channels/login';
 import { ChannelStore } from './channels/store';
 import { ChannelService } from './channels/service';
 import { NativeChannelImporter } from './channels/import';
@@ -131,7 +132,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   let manager: TaskManager | undefined;
   let store: TaskStore | undefined;
   let policy: PolicyStore | undefined;
-  let channelStore:ChannelStore;let channelService:ChannelService;let importer:NativeChannelImporter;
+  let channelStore:ChannelStore;let channelService:ChannelService;let importer:NativeChannelImporter;let channelLogins:ChannelLogins|undefined;
   let quotaProber: QuotaProber | undefined;
   let stall: StallMonitor | undefined;
   let freeProbe: FreeChannelProbeMonitor | undefined;
@@ -145,7 +146,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     const config=policy!.snapshot().config;const channel=Object.hasOwn(config.channels,id)?config.channels[id]:undefined;
     if(!channel)throw new RpcError('INVALID_REQUEST','Unknown channel');
     if(!channel.enabled)throw new RpcError('CHANNEL_DISABLED','Channel is disabled');
-    const engine=config.engines[channel.engine];if(!engine?.enabled)throw new RpcError('ENGINE_DISABLED','Channel engine is disabled');
+    const engine=config.engines[channel.engine];if(!engine)throw new RpcError('INVALID_REQUEST','Channel engine is missing');
     return {channel,secret:channelStore.getSecret(id)??{},engineKind:engine.kind};
   };
   const bindings=():Record<string,ChannelBinding>=>{const config=policy!.snapshot().config;return Object.fromEntries(Object.entries(config.channels).map(([id,channel])=>[id,{channel,secret:channelStore.getSecret(id)??{},engineKind:config.engines[channel.engine]?.kind}]));};
@@ -157,6 +158,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     return result;
   };
   const deleteChannel=(input:import('../shared/contracts/channels').DeleteChannelInput)=>{
+    if(channelLogins?.hasActive(input.id))throw new RpcError('CHANNEL_IN_USE','请先取消该账号的原生登录');
     if(store!.listHeads().some(task=>(task.dispatch?.channel===input.id||task.run?.channel===input.id)&&(task.status==='queued'||task.status==='running'||task.status==='cancelling'||(task.run?.execution==='real'&&!task.run.finalizedAt))))throw new RpcError('CHANNEL_IN_USE','Channel is still referenced by an active run');
     if(im?.snapshot().config.channel===input.id)throw new RpcError('CHANNEL_IN_USE','Channel is configured for IM');
     if(commands?.schedules.referencesChannel(input.id))throw new RpcError('CHANNEL_IN_USE','Channel is still referenced by an active schedule');
@@ -203,9 +205,13 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
   const handlers = createRpcHandlers({
     channels: {
       get:channelSnapshot,
-      save:input=>{channelService.save(input);commands?.pump();return channelSnapshot();},
+      save:input=>{const result=channelService.save(input);commands?.pump();return {...channelSnapshot(),savedChannel:result.savedChannel};},
+      startLogin:input=>channelLogins!.start(input),
+      getLogin:input=>channelLogins!.get(input),
+      submitCode:input=>channelLogins!.submitCode(input),
+      cancelLogin:input=>channelLogins!.cancel(input),
       delete:deleteChannel,
-      import:async input=>{if(testContext&&!options.channels?.env&&!input.sourceDir)throw new RpcError('CHANNEL_TEST_ISOLATION','Tests require an isolated channel source');await importer.import(input);return channelSnapshot();},
+      import:async input=>{if(testContext&&!options.channels?.env&&!input.sourceDir)throw new RpcError('CHANNEL_TEST_ISOLATION','Tests require an isolated channel source');const imported=await importer.import(input);const result=channelSnapshot();for(const [id,configuration] of Object.entries(imported.configurations)){if(configuration.detail)result.configurations[id]!.detail=configuration.detail;}return {...result,importResult:imported.importResult};},
       refresh:async input=>{
         const selected=binding(input.channel);if(selected.channel.kind!=='subscription')throw new RpcError('CAPABILITY_UNAVAILABLE','API channels have no official subscription quota');
         await refreshQuota({channel:input.channel});return channelSnapshot();
@@ -281,7 +287,8 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     });
     store = new TaskStore(join(dataDir, 'weaver.db'));
     policy = new PolicyStore(store.db);
-    channelStore=new ChannelStore(store.db);channelService=new ChannelService(policy,channelStore);
+    channelStore=new ChannelStore(store.db);channelService=new ChannelService(policy,channelStore,{root:join(dataDir,'channels')});
+    channelLogins=new ChannelLogins(binding,{env:options.channels?.env,initialize:id=>channelService.initializeLogin(id)});
     importer=new NativeChannelImporter(policy,channelStore,{root:join(dataDir,'channels'),env:options.channels?.env});
     // One read-only source import per managed data directory; tests require an explicit isolated source.
     if(options.channels?.autoImport!==false&&(!testContext||options.channels?.env?.HOME)&&!store.getValue('channels.native-import.v1')){
@@ -378,6 +385,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     await commands?.drain().catch(() => {});
     await stall?.stop().catch(() => {});
     await freeProbe?.stop().catch(() => {});
+    await channelLogins?.close().catch(()=>console.error('Native channel login cleanup requires attention'));
     await quotaProber?.close().catch(() => {});
     greetings.abort();
     await Promise.allSettled([...inflight]);
@@ -399,11 +407,13 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     ready = false;
     janitor?.stop();
     let imCloseFailure: unknown;
+    let loginCloseFailure: unknown;
     try { await im?.close(); } catch (error) { imCloseFailure = error; }
     const ownerDrain = commands?.drain();
     await commands?.schedules.stop().catch(() => {});
     await stall?.stop().catch(() => {});
     await freeProbe?.stop().catch(() => {});
+    try { await channelLogins?.close(); } catch(error) { loginCloseFailure=error; }
     await quotaProber?.close().catch(() => {});
     greetings.abort();
     await ownerDrain;
@@ -418,5 +428,6 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     await lock?.release().catch(error => console.error(error instanceof Error ? error.message : 'instance lock release failed'));
     resolveDone();
     if (imCloseFailure) throw imCloseFailure;
+    if (loginCloseFailure) throw loginCloseFailure;
   }
 }

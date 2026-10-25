@@ -1,0 +1,172 @@
+{
+  "artifact_errors": [],
+  "input": "native PageDown with explicit scroll container focus",
+  "viewport": [
+    1440,
+    900
+  ],
+  "before": {
+    "at": "2026-10-25T05:09:45.429Z",
+    "viewport": [
+      1440,
+      900
+    ],
+    "horizontal": false,
+    "containers": [
+      {
+        "tag": "MAIN",
+        "top": 0,
+        "total": 3092,
+        "height": 826,
+        "overflow": "auto scroll",
+        "clip": "none",
+        "rect": {
+          "x": 249,
+          "y": 65,
+          "width": 1182,
+          "height": 826,
+          "top": 65,
+          "right": 1431,
+          "bottom": 891,
+          "left": 249
+        }
+      },
+      {
+        "tag": "DIV",
+        "top": 0,
+        "total": 1002,
+        "height": 764,
+        "overflow": "auto",
+        "clip": "none",
+        "rect": {
+          "x": 400,
+          "y": 64,
+          "width": 640,
+          "height": 764,
+          "top": 64,
+          "right": 1040,
+          "bottom": 828,
+          "left": 400
+        }
+      }
+    ],
+    "focus": {
+      "tag": "DIV",
+      "isScrollContainer": true
+    },
+    "lastContent": {
+      "x": 416,
+      "y": 1025.53125,
+      "width": 608,
+      "height": 24,
+      "top": 1025.53125,
+      "right": 1024,
+      "bottom": 1049.53125,
+      "left": 416
+    },
+    "config": {
+      "x": 429,
+      "y": 803.53125,
+      "width": 582,
+      "height": 147,
+      "top": 803.53125,
+      "right": 1011,
+      "bottom": 950.53125,
+      "left": 429
+    },
+    "save": {
+      "x": 941.984375,
+      "y": 840,
+      "width": 82.015625,
+      "height": 32,
+      "top": 840,
+      "right": 1024,
+      "bottom": 872,
+      "left": 941.984375
+    },
+    "summaryExpanded": true
+  },
+  "after": {
+    "at": "2026-10-25T05:09:46.680Z",
+    "viewport": [
+      1440,
+      900
+    ],
+    "horizontal": false,
+    "containers": [
+      {
+        "tag": "MAIN",
+        "top": 0,
+        "total": 3092,
+        "height": 826,
+        "overflow": "auto scroll",
+        "clip": "none",
+        "rect": {
+          "x": 249,
+          "y": 65,
+          "width": 1182,
+          "height": 826,
+          "top": 65,
+          "right": 1431,
+          "bottom": 891,
+          "left": 249
+        }
+      },
+      {
+        "tag": "DIV",
+        "top": 238,
+        "total": 1002,
+        "height": 764,
+        "overflow": "auto",
+        "clip": "none",
+        "rect": {
+          "x": 400,
+          "y": 64,
+          "width": 640,
+          "height": 764,
+          "top": 64,
+          "right": 1040,
+          "bottom": 828,
+          "left": 400
+        }
+      }
+    ],
+    "focus": {
+      "tag": "DIV",
+      "isScrollContainer": true
+    },
+    "lastContent": {
+      "x": 416,
+      "y": 787.53125,
+      "width": 608,
+      "height": 24,
+      "top": 787.53125,
+      "right": 1024,
+      "bottom": 811.53125,
+      "left": 416
+    },
+    "config": {
+      "x": 429,
+      "y": 565.53125,
+      "width": 582,
+      "height": 147,
+      "top": 565.53125,
+      "right": 1011,
+      "bottom": 712.53125,
+      "left": 429
+    },
+    "save": {
+      "x": 941.984375,
+      "y": 840,
+      "width": 82.015625,
+      "height": 32,
+      "top": 840,
+      "right": 1024,
+      "bottom": 872,
+      "left": 941.984375
+    },
+    "summaryExpanded": true
+  },
+  "screenshot": "form-desktop-page.png",
+  "jsScrollMutationUsed": false
+}

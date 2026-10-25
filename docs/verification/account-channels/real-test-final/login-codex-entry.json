@@ -1,0 +1,51 @@
+{
+  "engine": "codex",
+  "channel": "channel_bce8566b32d34b089fb9191d",
+  "ui": {
+    "acceptsCode": false,
+    "backendHasCode": true,
+    "cancelRect": {
+      "bottom": 505,
+      "height": 32,
+      "left": 698.953125,
+      "right": 806.96875,
+      "top": 473,
+      "width": 108.015625,
+      "x": 698.953125,
+      "y": 473
+    },
+    "codeMatches": true,
+    "hasDeviceCode": true,
+    "linkClickable": true,
+    "linkRect": {
+      "bottom": 411,
+      "height": 22,
+      "left": 379,
+      "right": 987,
+      "top": 389,
+      "width": 608,
+      "x": 379,
+      "y": 389
+    },
+    "manualPassword": false,
+    "manualSubmit": false,
+    "reference": {
+      "channel": "channel_bce8566b32d34b089fb9191d",
+      "id": "2ac8944b-71a6-4384-9ed5-988e1891b7c7"
+    },
+    "safeUrl": "https://auth.openai.com/codex/device",
+    "status": "authorizing",
+    "urlMatches": true
+  },
+  "nativeProcesses": [
+    {
+      "pid": 1338655,
+      "comm": "codex",
+      "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d/native",
+      "roots": {
+        "CODEX_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d/native"
+      },
+      "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/dev-weaver-channel-login-88e77011-fb76-496c-8d86-c00b913c3055.scope"
+    }
+  ]
+}

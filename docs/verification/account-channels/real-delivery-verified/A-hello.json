@@ -1,0 +1,27 @@
+{
+  "sourceUnchangedBefore": true,
+  "requestCount": 1,
+  "model": "sonnet",
+  "effort": "medium",
+  "startedAt": 1792908887.5359364,
+  "processSelectors": [
+    {
+      "pid": 1396242,
+      "claudePrivate": true,
+      "secureStoragePrivate": true,
+      "anthropicPrivate": true,
+      "physicalRootInsideA": true
+    }
+  ],
+  "jobId": "d269f77b4623b16f",
+  "status": "done",
+  "result": {
+    "ok": true,
+    "reply": "hi",
+    "model": "claude-sonnet-5-5",
+    "durationMs": 4940,
+    "checkedAt": "2026-10-25T06:14:52.477Z"
+  },
+  "sourceUnchangedAfter": true,
+  "elapsedMs": 5832
+}

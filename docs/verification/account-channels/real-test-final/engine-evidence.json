@@ -1,0 +1,196 @@
+{
+  "provenance": "Owner-reviewed earlier real-engine packages, not newly executed by browser worker and not all on final source digest. First runtime source/runner stayed frozen while four test files changed; later Grok/OpenCode/native fixes followed. No new full inference matrix was run in this final browser package.",
+  "firstRun": {
+    "generatedAt": "2026-10-25T04:37:37.154710+00:00",
+    "serverPid": 1177677,
+    "runtimeFrozen": true,
+    "hello": [
+      {
+        "channel": "import_d56e030df4fb20d796d92a22",
+        "engine": "codex",
+        "model": "gpt-6-luna",
+        "effort": "max",
+        "jobId": "7f758d4fced9cf2c",
+        "status": "pass",
+        "startedAt": "2026-10-25T04:33:14.840Z",
+        "checkedAt": "2026-10-25T04:33:23.249Z",
+        "ok": true,
+        "durationMs": 8409,
+        "error": null,
+        "exactHi": true,
+        "nativeExitCode": 0,
+        "actualNativeCall": true
+      },
+      {
+        "channel": "import_e6f3c04da52965f2b7c02668",
+        "engine": "claude",
+        "model": "sonnet",
+        "effort": "medium",
+        "jobId": "94378202fe9a4961",
+        "status": "pass",
+        "startedAt": "2026-10-25T04:33:24.003Z",
+        "checkedAt": "2026-10-25T04:33:28.640Z",
+        "ok": true,
+        "durationMs": 4637,
+        "error": null,
+        "exactHi": true,
+        "nativeExitCode": 0,
+        "actualNativeCall": true
+      },
+      {
+        "channel": "import_e9a31f0093aaaacc595255e0",
+        "engine": "grok",
+        "model": "grok-4.7",
+        "effort": "medium",
+        "jobId": "58fa57f4b4c23479",
+        "status": "fail",
+        "startedAt": "2026-10-25T04:33:32.467Z",
+        "checkedAt": "2026-10-25T04:33:48.625Z",
+        "ok": false,
+        "durationMs": 16157,
+        "error": "进程退出码 0，没有回复。",
+        "exactHi": false,
+        "nativeExitCode": 0,
+        "actualNativeCall": true
+      },
+      {
+        "channel": "import_46c108d104db423c8ebfde2c",
+        "engine": "qoder",
+        "model": "Qwen3.8-Flash",
+        "effort": "xhigh",
+        "jobId": "d02b0834f9aceea2",
+        "status": "pass",
+        "startedAt": "2026-10-25T04:33:55.083Z",
+        "checkedAt": "2026-10-25T04:34:02.811Z",
+        "ok": true,
+        "durationMs": 7728,
+        "error": null,
+        "exactHi": true,
+        "nativeExitCode": 0,
+        "actualNativeCall": true
+      },
+      {
+        "channel": "import_ee32f57491d779f9ce7f0f0f",
+        "engine": "opencode",
+        "model": "opencode-go/muse-spark-1.3-contributor",
+        "effort": "max",
+        "jobId": "deaaf5b46857cb97",
+        "status": "fail",
+        "startedAt": "2026-10-25T04:34:04.792Z",
+        "checkedAt": "2026-10-25T04:36:04.852Z",
+        "ok": false,
+        "durationMs": 120060,
+        "error": "等待回复超时（120 秒），已停止进程。",
+        "exactHi": false,
+        "nativeExitCode": null,
+        "actualNativeCall": true
+      },
+      {
+        "channel": "import_12c10a0745e6e2a1a214b91e",
+        "engine": "dsh",
+        "model": "deepseek-flash",
+        "effort": "off",
+        "jobId": "78192e9424b10d70",
+        "status": "pass",
+        "startedAt": "2026-10-25T04:36:19.576Z",
+        "checkedAt": "2026-10-25T04:36:22.663Z",
+        "ok": true,
+        "durationMs": 3087,
+        "error": null,
+        "exactHi": true,
+        "nativeExitCode": 0,
+        "actualNativeCall": true
+      }
+    ]
+  },
+  "grokCorrection": {
+    "generatedAt": "2026-10-25T04:47:37.943983+00:00",
+    "native": {
+      "diagnostic": "grok-before-fix.json",
+      "postFix": "grok-after-fix.json",
+      "calls": 2,
+      "sameSelectedModel": "grok-4.7",
+      "sameEffort": "medium",
+      "postFixVendorModel": "grok-4.7-build",
+      "postFixExactHi": true,
+      "postFixExitCode": 0,
+      "postFixReportedCostUSD": 0.01308592,
+      "costLimit": "No monetary cap flag available in existing Hello argv. Bounded one prompt, max-turns 1, 120s per call; first call monetary usage not retained."
+    },
+    "ownerHttpRecheck": {
+      "jobId": "57e7035c42f8f4f3",
+      "status": "done",
+      "ok": true,
+      "reply": "hi",
+      "error": null,
+      "model": "grok-4.7-build",
+      "durationMs": 26769,
+      "method": "real HTTP same selected test channel after app watch reload"
+    }
+  },
+  "opencode": {
+    "earlierProcess": {
+      "time": "2026-10-25T04:34:14.740273+00:00",
+      "pid": 1196779,
+      "comm": "opencode",
+      "roots": {
+        "HOME": "/home/mocha",
+        "XDG_CONFIG_HOME": "/home/mocha/.local/share/weaver-real-test/channels/import_ee32f57491d779f9ce7f0f0f/config",
+        "XDG_DATA_HOME": "/home/mocha/.local/share/weaver-real-test/channels/import_ee32f57491d779f9ce7f0f0f/data",
+        "XDG_STATE_HOME": "/home/mocha/.local/share/weaver-real-test/channels/import_ee32f57491d779f9ce7f0f0f/state",
+        "OPENCODE_DB": "/home/mocha/.local/share/weaver-real-test/channels/import_ee32f57491d779f9ce7f0f0f/opencode.db"
+      },
+      "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/dev-weaver-real-accounts.scope\n"
+    },
+    "correction": {
+      "diagnostic": "opencode-diagnostic.json",
+      "postFix": "opencode-after-fix-diagnostic.json",
+      "calls": 2,
+      "sameSelectedModel": "opencode-go/muse-spark-1.3-contributor",
+      "sameEffort": "max",
+      "costLimit": "One prompt / 120s per call; no added retry or timeout extension. Native CLI has its own retries (title error reports 3 attempts), not Weaver-added retries; charged amount unknown.",
+      "postFixOk": false,
+      "postFixResult": {
+        "ok": false,
+        "error": "等待回复超时（120 秒），已停止进程。 原生错误：AI_RetryError: Failed after 3 attempts. Last error: Go usage limit exceeded",
+        "durationMs": 120077,
+        "checkedAt": "2026-10-25T04:47:24.262Z"
+      },
+      "postFixExitCode": null,
+      "postFixExitSignal": "SIGTERM",
+      "postFixStdoutBytes": 0,
+      "classification": "Native provider Go usage limit, accurately exposed alongside unchanged timeout; not an inference pass"
+    },
+    "inferencePass": false
+  },
+  "pi": {
+    "installed": true,
+    "credentialsAvailable": false,
+    "inferencePass": false
+  },
+  "formalCodex": {
+    "taskId": "ac722880-d7b1-4886-842d-bc69047846b3",
+    "status": "completed",
+    "execution": "real",
+    "completedAt": "2026-10-25T04:36:45.277Z",
+    "exitCode": 0,
+    "exactReply": "WEAVER_REAL_OK",
+    "markerExact": true,
+    "acknowledged": true,
+    "reviewState": "accepted",
+    "route": {
+      "owner": "codex_owner",
+      "worker": "codex_sol_med",
+      "channel": "import_d56e030df4fb20d796d92a22",
+      "engine": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "medium"
+    },
+    "processBinding": {
+      "observedByEarlierRunner": true,
+      "environmentVariable": "CODEX_HOME",
+      "expectedRoot": "/home/mocha/.local/share/weaver-real-test/agent-state/ac722880-d7b1-4886-842d-bc69047846b3/channel-syFGL3",
+      "evidenceBoundary": "Earlier owner-reviewed runner /proc check, independently persisted route/marker/ack/accepted in readonly DB. No new process observation in final browser package."
+    }
+  }
+}

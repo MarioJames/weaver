@@ -1,0 +1,10 @@
+{
+  "role": [
+    "acceptance_dsh_1025",
+    "channel_0803af5d91db4df38611d340",
+    "deepseek-flash",
+    "off",
+    1
+  ],
+  "ownerWhitelistReferences": 0
+}

@@ -14,7 +14,6 @@ import { workspacePathError } from '../../src/renderer/features/tasks/TaskCompos
 import { ArtifactsPanel } from '../../src/renderer/features/tasks/ArtifactsPanel';
 import { NamedInputNumber, NamedSelect, NamedSwitch } from '../../src/renderer/ui/NamedControls';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
-import { EnginesPage } from '../../src/renderer/features/engines/EnginesPage';
 import { defaultConfig } from '../../src/main/policy/routing';
 import { type Block } from '../../src/shared/contracts/policy';
 import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';

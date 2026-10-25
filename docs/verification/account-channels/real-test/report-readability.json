@@ -1,0 +1,35 @@
+{
+  "url": "file:",
+  "heading": "账号与渠道：真实浏览器验收",
+  "width": 390,
+  "scrollWidth": 390,
+  "overflow": false,
+  "images": [
+    {
+      "src": "list-desktop-wheel.png",
+      "loaded": true
+    },
+    {
+      "src": "form-narrow-page.png",
+      "loaded": true
+    },
+    {
+      "src": "edit-switch-draft.png",
+      "loaded": true
+    },
+    {
+      "src": "codex-pending-masked.png",
+      "loaded": true
+    }
+  ],
+  "print": {
+    "renderedPdf": true,
+    "firstPageRenderedForReview": true,
+    "coreConclusionPresent": true,
+    "resourcesSectionPresent": true,
+    "pages": 8
+  },
+  "relativeLinksMissing": [],
+  "actualLinkNavigation": "Clicked results.json from file:// report and reached local JSON; navigated back",
+  "finalRelativeLinksMissing": []
+}

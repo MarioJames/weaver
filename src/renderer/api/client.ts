@@ -35,7 +35,7 @@ const specOf = (method: string): RpcMethodSpec | undefined => (RPC_METHODS as Re
 const BROWSER_METHODS = (Object.keys(RPC_METHODS) as RpcMethod[]).filter((method): method is BrowserMethod => !(NOT_BROWSER_METHODS as readonly string[]).includes(method));
 /** Reads the shared table marks retryable: repeated after a transient failure and de-duplicated while in flight. */
 const RETRYABLE_READS: ReadonlySet<string> = new Set(BROWSER_METHODS.filter(method => specOf(method)?.retryable));
-/** Deadline overrides from the shared table. A probe waits on a real model reply, so its call outlives the default deadline. */
+/** Deadline overrides from the shared table. Native imports and probes can outlive the default deadline. */
 const METHOD_DEADLINE_MS: ReadonlyMap<string, number> = new Map(BROWSER_METHODS.flatMap(method => { const ms = specOf(method)?.timeoutMs; return ms === undefined ? [] : [[method, ms] as const]; }));
 /** Logical commands the renderer repeats and de-duplicates: the polling and detail reads, a deliberate subset of READ_COMMANDS. */
 const RETRYABLE_COMMAND_READS: ReadonlySet<string> = new Set<ReadCommand>(['sync.status', 'tasks.list', 'tasks.get', 'tasks.events', 'tasks.results', 'owners.list', 'owners.continuation.get']);
@@ -54,8 +54,8 @@ function abortError(): Error {
   return Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
 }
 
-function timeoutError(): Error {
-  return controlError('TIMEOUT', '控制面在 15 秒内没有响应');
+function timeoutError(ms: number): Error {
+  return controlError('TIMEOUT', `控制面在 ${ms / 1000} 秒内没有响应`);
 }
 
 interface Deadline {
@@ -69,7 +69,7 @@ function linkDeadline(external: AbortSignal | undefined, ms: number): Deadline {
   let timedOut = false;
   const timer = setTimeout(() => {
     timedOut = true;
-    controller.abort(timeoutError());
+    controller.abort(timeoutError(ms));
   }, ms);
   const onExternal = () => controller.abort(external?.reason);
   if (external) {
@@ -123,24 +123,24 @@ async function rpc(method: string, args: unknown[], external?: AbortSignal, dead
       });
     } catch (error) {
       if (external?.aborted) throw isAbort(error) ? error : abortError();
-      if (deadline.timedOut()) throw timeoutError();
+      if (deadline.timedOut()) throw timeoutError(deadlineMs);
       if (isAbort(error)) throw error;
       const message = error instanceof Error && error.message ? error.message : '网络请求失败';
       throw controlError('NETWORK', message);
     }
     if (external?.aborted) throw abortError();
-    if (deadline.timedOut()) throw timeoutError();
+    if (deadline.timedOut()) throw timeoutError(deadlineMs);
     let payload: unknown;
     try {
       payload = await readPayload(response, deadline.signal);
     } catch (error) {
       if (external?.aborted) throw isAbort(error) ? error : abortError();
-      if (deadline.timedOut()) throw timeoutError();
+      if (deadline.timedOut()) throw timeoutError(deadlineMs);
       if (isAbort(error)) throw error;
       payload = undefined;
     }
     if (external?.aborted) throw abortError();
-    if (deadline.timedOut()) throw timeoutError();
+    if (deadline.timedOut()) throw timeoutError(deadlineMs);
     if (!response.ok) {
       const error = payload && typeof payload === 'object' && 'error' in payload ? payload.error : undefined;
       const record = error && typeof error === 'object' ? error as { code?: unknown; message?: unknown } : {};

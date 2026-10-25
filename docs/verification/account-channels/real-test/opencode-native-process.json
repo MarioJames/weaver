@@ -1,0 +1,60 @@
+{
+  "at": "2026-10-25T05:05:24.410159+00:00",
+  "ownedNativeProcesses": [
+    {
+      "pid": 1249521,
+      "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_4ced3727a61348b390af7c6f/native",
+      "exe": "/home/mocha/.local/share/claude/versions/2.1.310",
+      "argv": [
+        "/home/mocha/.local/share/claude/versions/2.1.310",
+        "auth",
+        "login",
+        "--claudeai",
+        ""
+      ],
+      "env": {
+        "HOME": "/home/mocha",
+        "CLAUDE_CONFIG_DIR": "/home/mocha/.local/share/weaver-real-test/channels/channel_4ced3727a61348b390af7c6f/native"
+      },
+      "cgroup": "0::/user.slice/user-1000.slice/[email redacted]/app.slice/dev-weaver-channel-login-87600e85-372f-403f-829b-808bbcc624eb.scope"
+    },
+    {
+      "pid": 1250011,
+      "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_24fae3142b5c48f898448d0a/native",
+      "exe": "/home/mocha/.grok/downloads/grok-1.0.70-linux-x86_64",
+      "argv": [
+        "/home/mocha/.grok/downloads/grok-1.0.70-linux-x86_64",
+        "--leader-socket",
+        "/home/mocha/.local/share/weaver-real-test/channels/channel_24fae3142b5c48f898448d0a/native/leader.sock",
+        "login",
+        "--device-auth",
+        ""
+      ],
+      "env": {
+        "HOME": "/home/mocha",
+        "GROK_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_24fae3142b5c48f898448d0a/native"
+      },
+      "cgroup": "0::/user.slice/user-1000.slice/[email redacted]/app.slice/dev-weaver-channel-login-6e0d4262-1a01-4e36-b22a-82838d6ab6be.scope"
+    },
+    {
+      "pid": 1250263,
+      "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native",
+      "exe": "/home/mocha/.opencode/bin/opencode",
+      "argv": [
+        "/home/mocha/.opencode/bin/opencode",
+        "console",
+        "login",
+        "https://opencode.ai/console",
+        "--pure",
+        ""
+      ],
+      "env": {
+        "HOME": "/home/mocha",
+        "XDG_CONFIG_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native/config",
+        "XDG_DATA_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native/data",
+        "XDG_STATE_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0/native/state"
+      },
+      "cgroup": "0::/user.slice/user-1000.slice/[email redacted]/app.slice/dev-weaver-channel-login-daa2f9a4-53ea-4664-bd1e-784967d9682f.scope"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "channel": "channel_24fae3142b5c48f898448d0a",
+  "hadCredentials": false,
+  "start": {
+    "result": {
+      "id": "8763ede105969eb0",
+      "status": "running",
+      "startedAt": "2026-10-25T05:51:56.162Z"
+    }
+  },
+  "terminal": {
+    "id": "8763ede105969eb0",
+    "status": "done",
+    "startedAt": "2026-10-25T05:51:56.162Z",
+    "result": {
+      "ok": false,
+      "error": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试",
+      "durationMs": 0,
+      "checkedAt": "2026-10-25T05:51:56.162Z"
+    }
+  },
+  "beforeProcesses": [],
+  "afterProcesses": [],
+  "rejectedBeforeNativeInference": true,
+  "rejectionMode": "Asynchronous job fails before native spawn, not synchronous HTTP rejection.",
+  "earlierAttempt": {
+    "existingLoginProcessBeforeAndAfterSame": true,
+    "nativeScopeType": "dev-weaver-channel-login-*",
+    "terminal": {
+      "id": "f9f33cffa7c1fd62",
+      "status": "done",
+      "startedAt": "2026-10-25T05:44:26.548Z",
+      "result": {
+        "ok": false,
+        "error": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试",
+        "durationMs": 1,
+        "checkedAt": "2026-10-25T05:44:26.549Z"
+      }
+    },
+    "boundary": "First negative overlapped an existing Grok login process, no additional process observed; repeated after all login scopes cancelled to remove ambiguity."
+  }
+}

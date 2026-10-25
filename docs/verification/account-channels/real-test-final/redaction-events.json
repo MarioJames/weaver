@@ -1,0 +1,3 @@
+{
+  "event": "A generic center click intended to focus the login scroll area clicked the real Claude link and opened an owned external authorization tab. While diagnosing, one tab-list tool output exposed its full public OAuth query/state. No code, token or identity authorization was submitted. The external tab was immediately closed; final artifacts contain only safe host/path and masked screenshots. Focus input was corrected to the dialog gutter. Cannot claim all transient OAuth query values never appeared in tool output."
+}

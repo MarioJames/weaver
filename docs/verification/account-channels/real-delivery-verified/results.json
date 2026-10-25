@@ -1,0 +1,602 @@
+{
+  "overall": "Scoped real import and one Claude Hello acceptance passed; full multi-engine OAuth/inference acceptance remains incomplete",
+  "generatedAt": "2026-10-25T06:22:39.863544+00:00",
+  "version": {
+    "head": "294b7f91e974e0a4dc134fbe398810207198ebdc",
+    "digest": "0c424a5506a69109cfbac6c75ef71624caf8ade40751dd57c57e231ee5fc3be2",
+    "sourceBeforeUnchanged": true,
+    "sourceAfterUnchanged": true
+  },
+  "urls": {
+    "fresh": "http://127.0.0.1:4740 (owned disposable A then B; stopped)",
+    "persistentTest": "http://127.0.0.1:4738",
+    "production": "http://127.0.0.1:4737 (not deployed with these corrections)"
+  },
+  "freshA": {
+    "status": "pass",
+    "autoImport": false,
+    "initial": {
+      "apiRevision": 0,
+      "apiChannelCount": 7,
+      "apiCredentialCount": 0,
+      "sqliteSecretCount": 0,
+      "sqlitePersistedChannelRows": 0,
+      "note": "Fresh policy defaults are seven placeholders; rows persist only upon first mutation."
+    },
+    "imports": [
+      {
+        "args": [
+          {
+            "engine": "claude",
+            "replaceExisting": false,
+            "revision": 0,
+            "sourceDirEmpty": true
+          }
+        ],
+        "channelCount": 8,
+        "credentialCount": 1,
+        "durationMs": 39,
+        "httpStatus": 200,
+        "importResult": {
+          "added": 1,
+          "existing": 0,
+          "failures": [],
+          "notFound": [],
+          "updated": 0
+        },
+        "method": "importChannels",
+        "revision": 1,
+        "startedAt": "2026-10-25T06:14:19.053Z",
+        "structureKeys": [
+          "result"
+        ]
+      },
+      {
+        "args": [
+          {
+            "engine": "claude",
+            "replaceExisting": false,
+            "revision": 1,
+            "sourceDirEmpty": true
+          }
+        ],
+        "channelCount": 8,
+        "credentialCount": 1,
+        "durationMs": 44,
+        "httpStatus": 200,
+        "importResult": {
+          "added": 0,
+          "existing": 1,
+          "failures": [],
+          "notFound": [],
+          "updated": 0
+        },
+        "method": "importChannels",
+        "revision": 1,
+        "startedAt": "2026-10-25T06:14:47.459Z",
+        "structureKeys": [
+          "result"
+        ]
+      }
+    ],
+    "database": {
+      "secrets": 1,
+      "metadataCount": 8,
+      "records": [
+        {
+          "authDirPrivate": true,
+          "secretPresent": true,
+          "sourceCredentialsCopyEqual": true
+        }
+      ]
+    },
+    "hello": {
+      "sourceUnchangedBefore": true,
+      "requestCount": 1,
+      "model": "sonnet",
+      "effort": "medium",
+      "startedAt": 1792908887.5359364,
+      "processSelectors": [
+        {
+          "pid": 1396242,
+          "claudePrivate": true,
+          "secureStoragePrivate": true,
+          "anthropicPrivate": true,
+          "physicalRootInsideA": true
+        }
+      ],
+      "jobId": "d269f77b4623b16f",
+      "status": "done",
+      "result": {
+        "ok": true,
+        "reply": "hi",
+        "model": "claude-sonnet-5-5",
+        "durationMs": 4940,
+        "checkedAt": "2026-10-25T06:14:52.477Z"
+      },
+      "sourceUnchangedAfter": true,
+      "elapsedMs": 5832
+    },
+    "ui": {
+      "modalClosed": true,
+      "noticePresent": true,
+      "windowErrors": []
+    },
+    "credentialCopyBoundary": "Byte equality was checked for .credentials.json; imported account metadata is intentionally minimized by the importer, not an identical full source metadata copy."
+  },
+  "freshB": {
+    "status": "pass",
+    "autoImport": false,
+    "initial": {
+      "channelCount": 7,
+      "credentialCount": 0,
+      "revision": 0
+    },
+    "initialSqliteSecrets": 0,
+    "imports": [
+      {
+        "args": [
+          {
+            "engine": "all",
+            "replaceExisting": false,
+            "revision": 0,
+            "sourceDirEmpty": true
+          }
+        ],
+        "channelCount": 13,
+        "credentialCount": 5,
+        "durationMs": 16102,
+        "httpStatus": 200,
+        "importResult": {
+          "added": 6,
+          "existing": 0,
+          "failures": [],
+          "notFound": [
+            "pi"
+          ],
+          "updated": 0
+        },
+        "method": "importChannels",
+        "revision": 1,
+        "startedAt": "2026-10-25T06:15:26.133Z",
+        "structureKeys": [
+          "result"
+        ]
+      },
+      {
+        "args": [
+          {
+            "engine": "claude",
+            "replaceExisting": false,
+            "revision": 1,
+            "sourceDirEmpty": true
+          }
+        ],
+        "channelCount": 13,
+        "credentialCount": 5,
+        "durationMs": 51,
+        "httpStatus": 200,
+        "importResult": {
+          "added": 0,
+          "existing": 1,
+          "failures": [],
+          "notFound": [],
+          "updated": 0
+        },
+        "method": "importChannels",
+        "revision": 1,
+        "startedAt": "2026-10-25T06:16:04.883Z",
+        "structureKeys": [
+          "result"
+        ]
+      }
+    ],
+    "database": {
+      "secretCount": 6,
+      "metadataCount": 13,
+      "newMetadataAndSecretCountMatch": true,
+      "records": [
+        {
+          "engine": "codex",
+          "kind": "subscription",
+          "secretPresent": true,
+          "privateRootInsideB": true,
+          "rootExists": true,
+          "hasApiKey": false,
+          "hasConfig": false
+        },
+        {
+          "engine": "claude",
+          "kind": "subscription",
+          "secretPresent": true,
+          "privateRootInsideB": true,
+          "rootExists": true,
+          "hasApiKey": false,
+          "hasConfig": false,
+          "credentialsSourceEqual": true
+        },
+        {
+          "engine": "grok",
+          "kind": "subscription",
+          "secretPresent": true,
+          "privateRootInsideB": true,
+          "rootExists": true,
+          "hasApiKey": false,
+          "hasConfig": false
+        },
+        {
+          "engine": "qoder",
+          "kind": "subscription",
+          "secretPresent": true,
+          "privateRootInsideB": true,
+          "rootExists": true,
+          "hasApiKey": false,
+          "hasConfig": false
+        },
+        {
+          "engine": "opencode",
+          "kind": "subscription",
+          "secretPresent": true,
+          "privateRootInsideB": true,
+          "rootExists": true,
+          "hasApiKey": false,
+          "hasConfig": false
+        },
+        {
+          "engine": "dsh",
+          "kind": "api",
+          "secretPresent": true,
+          "privateRootInsideB": false,
+          "rootExists": false,
+          "hasApiKey": true,
+          "hasConfig": false,
+          "note": "dsh API key is stored in B SQLite; a persistent native auth root is not applicable."
+        }
+      ]
+    },
+    "final": {
+      "channelCount": 13,
+      "claudeReady": [
+        false,
+        true
+      ],
+      "credentialCount": 5,
+      "revision": 1
+    },
+    "ui": {
+      "modalClosed": true,
+      "noticePresent": true,
+      "windowErrors": []
+    },
+    "rootClarification": "Five subscription accounts have private native roots. dsh is an API account with its API key solely in this SQLite database; no persistent authDir is expected."
+  },
+  "persistent4738": {
+    "status": "pass",
+    "initial": {
+      "channelCount": 18,
+      "credentialCount": 5,
+      "revision": 47
+    },
+    "imports": [
+      {
+        "args": [
+          {
+            "engine": "claude",
+            "replaceExisting": false,
+            "revision": 47,
+            "sourceDirEmpty": true
+          }
+        ],
+        "channelCount": 18,
+        "credentialCount": 5,
+        "durationMs": 73,
+        "httpStatus": 200,
+        "importResult": {
+          "added": 0,
+          "existing": 1,
+          "failures": [],
+          "notFound": [],
+          "updated": 0
+        },
+        "method": "importChannels",
+        "revision": 47,
+        "startedAt": "2026-10-25T06:16:26.434Z",
+        "structureKeys": [
+          "result"
+        ]
+      },
+      {
+        "args": [
+          {
+            "engine": "all",
+            "replaceExisting": false,
+            "revision": 47,
+            "sourceDirEmpty": true
+          }
+        ],
+        "channelCount": 18,
+        "credentialCount": 5,
+        "durationMs": 6051,
+        "httpStatus": 200,
+        "importResult": {
+          "added": 0,
+          "existing": 6,
+          "failures": [],
+          "notFound": [
+            "pi"
+          ],
+          "updated": 0
+        },
+        "method": "importChannels",
+        "revision": 47,
+        "startedAt": "2026-10-25T06:16:38.516Z",
+        "structureKeys": [
+          "result"
+        ]
+      }
+    ],
+    "comparison": {
+      "beforeSecrets": 11,
+      "afterSecrets": 11,
+      "newSecretCount": 0,
+      "allExistingSecretsAndRootsUnchanged": true,
+      "existingSecretBodiesUnchanged": true,
+      "existingRootPathsUnchanged": true,
+      "existingRootFileBytesUnchanged": true
+    },
+    "claudeUi": {
+      "modalClosed": true,
+      "noticePresent": true,
+      "windowErrors": []
+    },
+    "allUi": {
+      "modalClosed": true,
+      "noticePresent": true,
+      "windowErrors": []
+    }
+  },
+  "selectors": {
+    "runConstruction": {
+      "claude": true,
+      "secureStorage": true,
+      "anthropic": true
+    },
+    "loginEnvironmentConstruction": {
+      "claude": true,
+      "secureStorage": true,
+      "anthropic": true
+    },
+    "loginProcessLevel": false,
+    "helloProcessLevel": true
+  },
+  "sourceRestoration": "User personally restored default Claude global login before this run. Source restoration is not a Weaver code repair or a new official-account OAuth end-to-end pass. Claude credential and metadata byte equality checked before/after the one Hello and at cleanup. No native auth status/login/logout/refresh command executed.",
+  "mutationEvidence": "Exactly one actual UI confirmation and one renderer importChannels fetch per listed operation. No mutation retransmission. Full importResult retained; policy, secret, account label/email and raw request payload omitted.",
+  "engineering": {
+    "exitCode": 0,
+    "startedAt": "2026-10-25T06:12:18.336348+00:00",
+    "completedAt": "2026-10-25T06:14:34.046692+00:00",
+    "digest": "0c424a5506a69109cfbac6c75ef71624caf8ade40751dd57c57e231ee5fc3be2",
+    "counts": {
+      "tests": 2184,
+      "pass": 2152,
+      "fail": 0,
+      "skipped": 32
+    },
+    "typecheckPassed": true,
+    "buildPassed": true,
+    "latestFinalCheck": {
+      "exitCode": 0,
+      "startedAt": "2026-10-25T06:17:57.762171+00:00",
+      "completedAt": "2026-10-25T06:18:45.546073+00:00",
+      "digest": "0c424a5506a69109cfbac6c75ef71624caf8ade40751dd57c57e231ee5fc3be2",
+      "counts": {
+        "tests": 2184,
+        "pass": 2152,
+        "fail": 0,
+        "skipped": 32
+      },
+      "typecheckPassed": true,
+      "buildPassed": true,
+      "log": "final-check-delivery-complete.log",
+      "testLifecycleSha256": "2961a88648fc87205df6b16cd4418f19240e4d457b3b55e4adcb70e38603ba1d",
+      "naturalExit": true,
+      "persistentClaudeHello": {
+        "target": "persistent4738",
+        "requestCount": 1,
+        "channel": "import_e6f3c04da52965f2b7c02668",
+        "model": "sonnet",
+        "effort": "medium",
+        "jobId": "229f75d999095d70",
+        "processSelectors": [
+          {
+            "claudePrivate": true,
+            "secureStoragePrivate": true,
+            "anthropicPrivate": true
+          }
+        ],
+        "status": "done",
+        "ok": true,
+        "replyIsHi": true,
+        "returnedModel": "claude-sonnet-5-5",
+        "durationMs": 6271,
+        "globalSourceFilesUnchanged": true
+      },
+      "environmentAudit": {
+        "at": "2026-10-25T06:10:05.682915+00:00",
+        "production": {
+          "dataDir": "/home/mocha/.local/share/weaver",
+          "port": 4737,
+          "device": 2050,
+          "inode": 1907011,
+          "integrity": "ok",
+          "http": 200,
+          "rootMode": "0o700",
+          "pidAlive": true,
+          "runningScriptHashes": [],
+          "binarySHA256": "2cbf137f8356101c242e4a4ba22aab0c879315ee69a201ac196dd8fda9aeb236",
+          "matchesPreviousBinary": true
+        },
+        "test": {
+          "dataDir": "/home/mocha/.local/share/weaver-real-test",
+          "port": 4738,
+          "device": 2050,
+          "inode": 1991412,
+          "integrity": "ok",
+          "http": 200,
+          "rootMode": "0o700"
+        },
+        "databaseDistinct": true
+      }
+    }
+  },
+  "browser": {
+    "console": {
+      "success": true,
+      "messageCount": 10,
+      "levels": {
+        "debug": 6,
+        "info": 3,
+        "log": 1
+      },
+      "scope": "cumulative task session; includes A shutdown/B startup navigations"
+    },
+    "errors": {
+      "success": true,
+      "errorCount": 0
+    },
+    "network": {
+      "success": true,
+      "count": 288,
+      "statusCounts": {
+        "200": 286,
+        "503": 1,
+        "unknown": 1
+      },
+      "failed": 1
+    },
+    "shutdown503": {
+      "httpStatus": 503,
+      "rpcMethod": "command",
+      "timestamp": 1792908907884,
+      "port": 4740,
+      "context": "Owned A runtime shutdown before B restart; import mutation responses all HTTP 200"
+    },
+    "privacy": "Geometry recorded before explicit DOM label/email masking for persistent screenshot. No HAR, auth contents, token hashes, device codes or URL query archived."
+  },
+  "historical": {
+    "priorUiDigest": "1c092161ceed7008012cdf22548f919e919033dc24d6df0601ed867be7117f88",
+    "priorUiGeneratedAt": "2026-10-25T05:53:56.559900+00:00",
+    "scope": "Scrolling, draft ownership/continue/discard, dsh config save and five official login entry UI had prior evidence; not repeated. This digest adds import deadlines/Claude credential validation/private selector corrections.",
+    "failureReports": [
+      "../import-specific/REPORT.html",
+      "../real-test-final/REPORT.html"
+    ],
+    "engineEvidence": "../real-test-final/engine-evidence.json",
+    "minimalEngineSummary": "historical-engine-summary.json"
+  },
+  "limitations": [
+    "Five newly created official accounts have not all completed personal OAuth. Default Claude source restoration and importing do not prove those new-account OAuth flows end to end.",
+    "OpenCode Go usage limit and Pi without a key remain external limitations, never inference passes. Other engines were not called again in this package.",
+    "Native login selectors checked by actual shared environment construction only; no new login process or authorization was started. The one Claude Hello selectors were observed in /proc.",
+    "Production port 4737 was preserved and has not deployed this correction. Persistent test URL is port 4738.",
+    "Historical reports record temporary device-code/query exposure. This run does not erase that incident or claim it never occurred."
+  ],
+  "harnessNotes": [
+    "Initial helper .ts failed because scratch had CJS default; changed only task helper extension to .mts.",
+    "The long fixed scratch path exceeded the existing Unix socket length limit. Runtime dataDir used a held /proc/PID/fd directory alias resolving to the authorized A/B roots. No filesystem writes outside those roots; aliases ceased with owned runtime shutdown.",
+    "No product code, tests, dependency changes, commits, pushes, or delegation."
+  ],
+  "cleanup": {
+    "sourceCredentialsAndMetadataByteEqual": true,
+    "freshDatabasesAndAuthCopiesDeleted": true,
+    "freshScopesInactive": true,
+    "production4737PidAlive": true,
+    "persistent4738PidAlive": true,
+    "productionAndPersistentDataPreserved": true,
+    "chromeClosed": true,
+    "profileDeleted": true,
+    "herdrWorkspaceClosed": true,
+    "note": "Only exact owned units stopped; databases/auth/cache in created A/B roots removed. No persistent reset/cleanup.",
+    "chromeProfileProcessesRemaining": [],
+    "herdrSessionStopped": true,
+    "herdrCreatedSession": "weaver-real-delivery-verified",
+    "herdrWorkspace": "w1",
+    "port4740Closed": true,
+    "privateHashSnapshotsAndHelpersDeleted": true
+  },
+  "reportReadability": {
+    "status": "pass",
+    "fileOpenedInOwnedChrome": true,
+    "viewport390": {
+      "anchorTargetsPresent": true,
+      "bodyWidth": 390,
+      "imagesLoaded": true,
+      "noExternalDependencies": true,
+      "protocol": "file:",
+      "scrollWidth": 390,
+      "tableScrollable": false,
+      "title": "默认账号导入真实交付复验",
+      "width": 390
+    },
+    "screenshot": "report-390.png",
+    "visualNarrowReview": "Viewed screenshot at 390px; main conclusions and source digest wrap within body.",
+    "print": {
+      "generatedByChrome": true,
+      "pageCount": 4,
+      "format": "US Letter",
+      "firstPageRasterViewed": true,
+      "firstPageLayoutReadable": true,
+      "coreTextPresent": {
+        "freshA": true,
+        "freshB": true,
+        "completeBResponse": true,
+        "hello": true,
+        "limitations": true,
+        "production": true,
+        "cleanup": true
+      },
+      "temporaryPdfRemovedAtCleanup": true
+    },
+    "links": {
+      "checkedCount": 28,
+      "missing": [],
+      "machineResultActuallyClicked": true,
+      "helloAnchorActuallyClicked": true,
+      "historicalFailureLinkActuallyClicked": true
+    },
+    "scope": "Browser checks were performed before owned browser cleanup; final cleanup status and JSON references are updated afterward without changing tested layout."
+  },
+  "artifacts": [
+    "A-imports.json",
+    "A-db-first.json",
+    "A-ui-feedback.json",
+    "A-hello.json",
+    "B-initial.json",
+    "B-imports.json",
+    "B-db-first.json",
+    "B-final-state.json",
+    "B-ui-feedback.json",
+    "persistent-initial.json",
+    "persistent-imports.json",
+    "persistent-db-comparison.json",
+    "persistent-claude-ui.json",
+    "persistent-all-ui.json",
+    "selectors.json",
+    "freeze-before.json",
+    "freeze-after.json",
+    "cleanup.json",
+    "console-summary.json",
+    "browser-errors.json",
+    "network-summary.json",
+    "network-503.json",
+    "persistent-geometry.json",
+    "A-initial.json",
+    "engineering-summary.json",
+    "historical-engine-summary.json",
+    "persistent-all-masked.png",
+    "REPORT.html",
+    "report-readability.json",
+    "report-390.png",
+    "delivery-validation.json"
+  ]
+}

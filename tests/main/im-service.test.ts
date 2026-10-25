@@ -86,13 +86,13 @@ test('独立Bot参数不依赖owner/worker；无关profile变化保留session，
 });
 test('独立chat尊重engine/model真实block，忽略单worker block；非法参数拒绝且不保存',async t=>{
  let launches=0;let closes=0;const {f,service,live,config}=await setup(t,async()=>{launches++;return {send:async()=> 'ok',close:async()=>{closes++;}};});
- live.blocks=[{engine:'codex',worker:'other',reason:'worker',since:new Date().toISOString()}];f.handlers.message(message('worker-block'));await tick();assert.equal(launches,1);
+ live.config.engines.codex!.enabled=false;live.blocks=[{engine:'codex',worker:'other',reason:'worker',since:new Date().toISOString()}];f.handlers.message(message('worker-block'));await tick();assert.equal(launches,1);
  for(const patch of [{channel:"default_missing"},{model:'bad; command'},{effort:'ultra'}])await assert.rejects(service.save({expectedRevision:1,config:{...config,...patch}}),{code:'IM_CONFIG_UNAVAILABLE'});
  assert.equal(service.snapshot().revision,1);
  for(const block of [{engine:'codex',reason:'manual'},{engine:'codex',model:'gpt-test',reason:'额度耗尽',by:'weaver-quota:codex'}]){
   live.blocks=[{...block,since:new Date().toISOString()}];await assert.rejects(service.save({expectedRevision:1,config}),{code:'IM_CONFIG_UNAVAILABLE'});
  }
- live.blocks=[];live.config.engines.codex!.enabled=false;
+ live.blocks=[];live.config.channels.default_codex!.enabled=false;
  const liveHandlers=f.handlers;const launchesBefore=launches;const cardsBefore=f.cards.length;
  await service.reconcile();await tick();
  // Healthy same-credential WS stays connected; only agent admission/output is revoked.
@@ -107,7 +107,7 @@ test('独立chat尊重engine/model真实block，忽略单worker block；非法�
  assert.equal(f.cards.length,cardsBefore);
  assert.equal(service.snapshot().status.connection,'connected');
  await assert.rejects(service.save({expectedRevision:1,config}),{code:'IM_CONFIG_UNAVAILABLE'});
-  live.config.engines.codex={enabled:true,kind:'not-an-engine'};await assert.rejects(service.save({expectedRevision:1,config}),{code:'IM_CONFIG_UNAVAILABLE'});
+  live.config.channels.default_codex!.enabled=true;live.config.engines.codex={enabled:true,kind:'not-an-engine'};await assert.rejects(service.save({expectedRevision:1,config}),{code:'IM_CONFIG_UNAVAILABLE'});
 });
 test('单卡任意选项只消费一次，idle到期旧卡不能复活父Agent，new_session撤销旧nonce',async t=>{
  let now=Date.now();let launches=0;let sends=0;
@@ -172,7 +172,7 @@ test('pending在撤权/关机后不会随late close启动；同ID等待重发保
   let now=Date.now();const close=deferred<void>();t.after(()=>close.resolve());let launches=0;
   const {f,service,live}=await setup(t,async()=>{launches++;return {send:async()=> '完成',close:async()=>close.promise};},{now:()=>now});
   f.handlers.message(message(`old_${mode}`,'ou_a','oc_a','旧',now));await tick();now+=61_000;const input=message(`wait_${mode}`,'ou_a','oc_a','已准入',now);f.handlers.message(input);await tick();const notices=f.notices.length;f.handlers.message(input);await tick();assert.equal(f.notices.length,notices);
-  let shutting:Promise<void>|undefined;if(mode==='revoke'){live.config.engines.codex!.enabled=false;void service.reconcile();}else shutting=service.close();await tick();close.resolve();await shutting;await tick();assert.equal(launches,1);
+  let shutting:Promise<void>|undefined;if(mode==='revoke'){live.config.channels.default_codex!.enabled=false;void service.reconcile();}else shutting=service.close();await tick();close.resolve();await shutting;await tick();assert.equal(launches,1);
  }
 });
 test('父close明确失败不启动下一代，持久等待消息收到失败回执且旧引用仍可见',async t=>{
@@ -954,8 +954,8 @@ test('快照 ownerProfiles 按 id 排序、selectable 与 reason 正确、无 se
   assert.equal(byId.zeta.selectable, true);
   assert.equal(byId.zeta.reason, undefined);
   assert.equal(byId.alpha.selectable, false); assert.equal(byId.alpha.reason, 'disabled');
-  assert.equal(byId.beta.selectable, false); assert.equal(byId.beta.reason, 'engine_disabled');
-  assert.equal(byId.gamma.selectable, false); assert.equal(byId.gamma.reason, 'engine_disabled');
+  assert.equal(byId.beta.selectable, false); assert.equal(byId.beta.reason, 'not_launchable');
+  assert.equal(byId.gamma.selectable, true); assert.equal(byId.gamma.reason, undefined);
   assert.equal(byId.delta.selectable, false); assert.equal(byId.delta.reason, 'not_launchable');
   assert.equal(byId.zeta.engine, 'codex'); assert.equal(byId.zeta.engineKind, 'codex');
   assert.ok(!JSON.stringify(snap).includes('CANARY_SECRET'));

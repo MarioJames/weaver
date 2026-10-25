@@ -1,0 +1,17 @@
+{
+  "observations": [
+    {
+      "at": "2026-10-25T04:58Z",
+      "operation": "Upload file 131073 bytes",
+      "actualUi": "配置文件不能超过 128 KiB。",
+      "recovery": "Valid upload still possible; saved config, then explicit clear retaining key."
+    },
+    {
+      "at": "2026-10-25T05:00Z",
+      "operation": "Role page after saving {} dsh native config and requesting model/Hello path",
+      "actualUi": "INVALID_REQUEST: dsh 原生配置必须是 patch 列表",
+      "recovery": "Explicitly cleared config through UI; subsequent saved role/API connectivity showed hi in 2.6 seconds."
+    }
+  ],
+  "source": "Contemporaneous worker browser Runtime.evaluate output; raw response body was not archived. This is an observation record, not a replacement screenshot."
+}

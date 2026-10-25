@@ -3,7 +3,7 @@ import test from 'node:test';
 import { CHANNEL_CONFIG_MAX_BYTES } from '../../src/shared/contracts/channels';
 import { blankOwner, blankWorker } from '../../src/renderer/policy/policy-edit';
 import { defaultConfig } from '../../src/main/policy/routing';
-import { channelContentError, channelImportInput, channelQuota, channelSaveInput, channelUsers, directApiAllowed, mergeChannelPolicy, subscriptionAllowed } from '../../src/renderer/features/channels/channels-view';
+import { channelContentError, channelImportInput, channelImportNotice, channelQuota, channelSaveInput, channelUsers, directApiAllowed, mergeChannelPolicy, subscriptionAllowed } from '../../src/renderer/features/channels/channels-view';
 
 test('channel edit preserves secrets and native config unless explicitly replaced', () => {
   const channel = { label: '私有渠道', engine: 'codex', kind: 'api' as const, enabled: true, provider: 'example' };
@@ -82,4 +82,28 @@ test('native text and API key guard uses UTF-8 bytes and never repeats secret co
   const error = channelContentError(secret);
   assert.match(error, /KiB/);
   assert.equal(error.includes(secret), false);
+});
+
+test('official creation sends only account metadata even when API editor state is stale', () => {
+  const channel = { label: '工作订阅', engine: 'codex', kind: 'subscription' as const, enabled: true, provider: 'old-provider', baseUrl: 'https://old.example', protocol: 'openai' as const };
+  assert.deepEqual(channelSaveInput(9, undefined, channel, 'stale-private-key', 'stale-config', true), {
+    revision: 9, channel: { label: '工作订阅', engine: 'codex', kind: 'subscription', enabled: true },
+  });
+});
+
+test('only catalogued official engines can be offered for subscription login', () => {
+  assert.equal(subscriptionAllowed('custom-executable'), false);
+  assert.equal(subscriptionAllowed(''), false);
+  assert.equal(subscriptionAllowed('qodercli'), true);
+});
+
+test('import receipts distinguish added, existing, updated, empty sources and partial failure', () => {
+  const result = { added: 2, existing: 3, updated: 1, notFound: ['grok'], failures: [{ engine: 'codex', message: '来源不可读取' }] };
+  const text = channelImportNotice(result);
+  assert.match(text, /新增 2、已有 3、更新 1/);
+  assert.match(text, /未发现可导入配置：grok/);
+  assert.match(text, /codex：来源不可读取/);
+  assert.match(text, /修正来源.*重试/);
+  assert.match(channelImportNotice({ added: 0, existing: 0, updated: 0, notFound: ['claude'], failures: [] }), /未发现可导入项/);
+  assert.doesNotMatch(channelImportNotice({ ...result, failures: [] }), /部分引擎导入失败/);
 });

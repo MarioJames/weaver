@@ -90,8 +90,6 @@ export function usePolicyDraft() {
     try {
       const found = await window.weaver.validatePolicy(config);
       if (found.length) { setIssues(found); setSaveError('配置有错误，还不能保存。'); return false; }
-      const enabledWithoutProbe = Object.entries(config.engines).filter(([id, engine]) => engine.enabled && snapshot.config.engines[id]?.enabled !== true).map(([id]) => id);
-      if (enabledWithoutProbe.length) { setSaveError(`引擎 ${enabledWithoutProbe.join('、')} 需要在引擎页用启用开关打开，保存不会启用引擎。草稿已保留。`); return false; }
       accept(await window.weaver.savePolicy({ revision: snapshot.revision, config, blocks }));
       return true;
     } catch (error) {

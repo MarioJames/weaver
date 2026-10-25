@@ -1,0 +1,22 @@
+{
+  "at": "2026-10-25T05:03:50.694096+00:00",
+  "ownedNativeProcesses": [
+    {
+      "pid": 1248139,
+      "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_4ced3727a61348b390af7c6f/native",
+      "exe": "/home/mocha/.local/share/claude/versions/2.1.310",
+      "argv": [
+        "/home/mocha/.local/share/claude/versions/2.1.310",
+        "auth",
+        "login",
+        "--claudeai",
+        ""
+      ],
+      "env": {
+        "HOME": "/home/mocha",
+        "CLAUDE_CONFIG_DIR": "/home/mocha/.local/share/weaver-real-test/channels/channel_4ced3727a61348b390af7c6f/native"
+      },
+      "cgroup": "0::/user.slice/user-1000.slice/[email redacted]/app.slice/dev-weaver-channel-login-006060cc-a3ee-4647-8550-5f42e19bca3a.scope"
+    }
+  ]
+}

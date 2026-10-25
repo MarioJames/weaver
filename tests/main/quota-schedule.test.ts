@@ -39,10 +39,10 @@ test('quota settings reject intervals out of range and refresh on engines withou
   assert.deepEqual(validateConfig(config), [], 'OpenCode has a native quota probe, so its scheduled refresh validates');
 });
 
-test('scheduled targets are the distinct kinds of enabled engines that refresh quota', () => {
+test('scheduled quota targets follow channel enablement despite historical engine flags', () => {
   const config = defaultConfig();
-  assert.deepEqual(quotaRefreshTargets(config), ['codex', 'claude']);
-  config.engines.grok.enabled = true;
+  assert.deepEqual(quotaRefreshTargets(config), ['codex', 'claude', 'grok']);
+  config.engines.grok.enabled = false;
   config.engines.codex_alias = { enabled: true, kind: 'codex' };
   config.channels.default_codex_alias={engine:'codex_alias',kind:'subscription',label:'Alias',enabled:true,quota_refresh:true};
   config.channels.default_codex.quota_refresh = false;
@@ -52,6 +52,8 @@ test('scheduled targets are the distinct kinds of enabled engines that refresh q
   config.engines.opencode.enabled = true;
   config.channels.default_opencode.quota_refresh = true;
   assert.deepEqual(quotaRefreshTargets(config), ['claude', 'grok', 'opencode']);
+  config.channels.default_grok.enabled = false;
+  assert.deepEqual(quotaRefreshTargets(config), ['claude', 'opencode']);
 });
 
 function exhausted(engine: QuotaEngine): EngineQuotaRecord {
@@ -87,7 +89,7 @@ test('an engine that does not refresh quota is never auto-blocked', async () => 
     const policy = new PolicyStore(join(dir,'weaver.db'), () => now);
     const current = policy.snapshot();
     current.config.channels.default_codex.quota_refresh = false;
-    current.config.engines.codex_alias = { enabled: false, kind: 'codex' };
+    current.config.engines.codex_alias = { enabled: true, kind: 'codex' };
     policy.save({ revision: current.revision, config: current.config, blocks: [] });
     const result = applyQuotaSnapshot(policy, { records: [exhausted('codex')] }, {}, now);
     assert.deepEqual(result.snapshot.blocks, []);

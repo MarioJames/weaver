@@ -221,12 +221,13 @@ test('validation turns the screen-readable failures into per-field messages and 
   assert.match(validateDraft(textOf(base, { appId: 'cli_0123456789ffffffZ' }), base, undefined).appId, /16 位十六进制字符/, 'non-hex is rejected');
   assert.match(validateDraft(textOf(base, { openIdsText: 'someone@example.com' }), base, undefined).openIds, /ou_ 开头/);
   assert.match(validateDraft(textOf(base, { openIdsText: 'ou_1111111111111111\nou_1111111111111111' }), base, undefined).openIds, /重复/);
-  const disabledPi = validateDraft(textOf(base, { channel: 'default_pi' }), base, defaultConfig());
-  assert.match(disabledPi.channel, /未启用/, 'pi is a supported catalog engine but disabled by default');
+  const disabledPolicy = defaultConfig(); disabledPolicy.channels.default_pi.enabled = false;
+  const disabledPi = validateDraft(textOf(base, { channel: 'default_pi' }), base, disabledPolicy);
+  assert.match(disabledPi.channel, /未启用/, 'a stopped account cannot be selected');
   const withOther = defaultConfig();
   (withOther.engines as Record<string, { enabled: boolean; kind: string; unused?: boolean }>).zed = { enabled: true, kind: 'zed' };
   withOther.channels.default_zed = { engine: 'zed', label: 'zed', kind: 'api', enabled: true };
-  assert.match(validateDraft(textOf(base, { channel: 'default_zed' }), base, withOther).channel ?? '', /已安装、已启用/, 'kinds outside the installed catalog are not offered');
+  assert.match(validateDraft(textOf(base, { channel: 'default_zed' }), base, withOther).channel ?? '', /受支持引擎/, 'kinds outside the installed catalog are not offered');
   const noOwners = defaultConfig(); noOwners.owners = {}; noOwners.workers = {};
   assert.deepEqual(validateDraft(textOf(base), base, noOwners), {}, 'Bot routing is independent of owner/worker profiles');
   assert.match(validateDraft(textOf(base, { effort: 'unknown' }), base, noOwners).effort, /思考力度/);
@@ -400,10 +401,11 @@ test('all seven catalog engines are offered, validated per kind, and OpenCode ke
   assert.equal(validateDraft(textOf(configOf(), { channel: 'default_opencode', effort: 'x'.repeat(32) }), configOf(), policy).effort, undefined);
   assert.match(validateDraft(textOf(configOf(), { channel: 'default_opencode', effort: 'x'.repeat(33) }), configOf(), policy).effort ?? '', /variant/);
   const disabled = defaultConfig();
+  disabled.channels.default_pi.enabled = false; disabled.channels.default_dsh.enabled = false;
   const errors = validateDraft(textOf(configOf(), { channel: 'default_pi', effort: 'high' }), configOf(), disabled);
   assert.match(errors.channel ?? '', /尚未启用/);
   const dshDisabled = validateDraft(textOf(configOf(), { channel: 'default_dsh', effort: 'high' }), configOf(), disabled);
-  assert.match(dshDisabled.channel ?? '', /尚未启用/, 'a disabled dsh engine is not selectable either');
+  assert.match(dshDisabled.channel ?? '', /尚未启用/, 'a disabled dsh account is not selectable either');
   assert.equal(switchDraftChannel({ ...textOf(configOf()), effort: 'provider-x' }, 'default_opencode', policy).effort, 'provider-x');
   assert.equal(switchDraftChannel({ ...textOf(configOf()), effort: 'not a variant' }, 'default_opencode', policy).effort, 'medium');
 });
@@ -444,9 +446,11 @@ test('the reused model-list consumer uses public API only after engine selection
 });
 
 
-test('an unavailable saved engine never prevents explicitly disabling the Bot', () => {
+test('account availability controls Bot saves and a stopped account still allows disabling the Bot', () => {
   const policy = defaultConfig(); policy.engines.claude.enabled = false;
   const base = configOf();
+  assert.deepEqual(validateDraft(textOf(base), base, policy), {}, 'legacy engine flag does not gate an enabled account');
+  policy.channels.default_claude.enabled = false;
   assert.match(validateDraft(textOf(base), base, policy).channel, /未启用/);
   assert.deepEqual(validateDraft(textOf(base, { enabled: false }), base, policy), {});
   delete policy.engines.claude;

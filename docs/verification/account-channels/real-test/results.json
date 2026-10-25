@@ -1,0 +1,426 @@
+{
+  "taskId": "c0cd2115-ebc5-41bd-81d8-c296249fa2c6",
+  "overall": "fail",
+  "blocked_user_auth": true,
+  "at": "2026-10-25T05:18:17.234591+00:00",
+  "url": "http://127.0.0.1:4738/#/channels",
+  "source": {
+    "head": "294b7f91e974e0a4dc134fbe398810207198ebdc",
+    "applicationDigest": "befa8adfb3603b89e5cc285298d29644a6eb4b918e324ac1f841f7ade5ae5c1f",
+    "mismatches": []
+  },
+  "cases": [
+    {
+      "id": "list-scroll",
+      "status": "pass",
+      "title": "账号长列表真实滚动",
+      "steps": "1366×768 wheel；1440×900 PageDown；390×844 两种输入。均从顶部开始，坐标落内容区或显式聚焦 MAIN。",
+      "result": "到达最终账号与按钮；scrollTop 达 total−height，末行 rect 位于可见区。未用 JS 强设滚动。",
+      "evidence": [
+        "list-desktop-wheel.json",
+        "list-desktop-page.json",
+        "list-narrow-wheel.json",
+        "list-narrow-page.json"
+      ]
+    },
+    {
+      "id": "form-scroll",
+      "status": "pass",
+      "title": "高级 API 长表单可达",
+      "steps": "先用真实 wheel 回顶部，再分别 wheel / 明确 DIV 焦点 PageDown；实际点击 summary 展开。",
+      "result": "两桌面尺寸与390×844下末内容、保存按钮均可见；PageDown 从0到238/331，wheel 从0到370/331。",
+      "evidence": [
+        "form-desktop-wheel.json",
+        "form-desktop-page.json",
+        "form-narrow-wheel.json",
+        "form-narrow-page.json"
+      ]
+    },
+    {
+      "id": "navigation",
+      "status": "pass",
+      "title": "页头、筛选、窄屏导航与旧引擎入口",
+      "steps": "390×844打开导航抽屉；直接打开 #/engines。",
+      "result": "未见横向溢出；导航无旧引擎项；旧路由正常回退 #/tasks。所有7引擎 enabled=true。",
+      "evidence": [
+        "narrow-header.png",
+        "narrow-nav.png",
+        "narrow-nav.json",
+        "legacy-route.json",
+        "engines-and-pending.json"
+      ]
+    },
+    {
+      "id": "filters",
+      "status": "pass",
+      "title": "类型/引擎筛选与重新读取",
+      "steps": "选择 API+dsh，再官方订阅+dsh，实际点击重新读取。",
+      "result": "API+dsh返回正确两条；订阅+dsh明确无匹配，重新读取保留两个筛选。",
+      "evidence": [
+        "filter-api-dsh.json",
+        "filter-empty-reload.json"
+      ]
+    },
+    {
+      "id": "draft",
+      "status": "fail",
+      "title": "跨记录编辑草稿归属",
+      "steps": "编辑新建Claude账号名为草稿→暂存并关闭→点击Grok编辑。",
+      "result": "实际打开Claude旧草稿，无提示说明正在恢复另一个账号。未保存以免误改；放弃草稿后Grok编辑恢复正确。",
+      "evidence": [
+        "edit-switch-draft.json",
+        "edit-switch-draft.png",
+        "edit-after-discard.json"
+      ]
+    },
+    {
+      "id": "api-save",
+      "status": "pass",
+      "title": "真实 API 新建/编辑/密钥保留",
+      "steps": "UI创建明确一次性dsh账号；从test ChannelStore内存取真实key，用本任务CDP Input.insertText填写；编辑留空key。",
+      "result": "首次真实CAS冲突保留输入，重新读取状态再保存成功；编辑密钥空白不回显，keyRetained=true。已有kind/engine禁用。",
+      "evidence": [
+        "api-cas-preserved.png",
+        "api-upload-state.json",
+        "api-clear-state.json"
+      ]
+    },
+    {
+      "id": "upload",
+      "status": "pass",
+      "title": "配置上传大小与合法配置保存",
+      "steps": "上传>128KiB被拒；上传{}保存后清配置；另一次性账号上传有效dsh YAML []。",
+      "result": "超过128KiB明确错误且可继续上传；[]保存hasConfig=true；清配置后hasConfig=false且key保留。补充账号已删除。",
+      "evidence": [
+        "api-upload-state.json",
+        "api-clear-state.json",
+        "api-valid-config-state.json",
+        "config-error-observations.json"
+      ]
+    },
+    {
+      "id": "config-shape",
+      "status": "fail",
+      "title": "无效引擎配置保存未即时拒绝",
+      "steps": "上传语法有效但不符合dsh补丁列表形状的{}并保存，再打开角色模型读取/连通流程。",
+      "result": "账号保存成功；角色页出现 INVALID_REQUEST: dsh 原生配置必须是 patch 列表。清配置恢复。失败形状未在账号保存阶段阻止。",
+      "evidence": [
+        "api-upload-state.json",
+        "api-connectivity-requests.json",
+        "config-error-observations.json"
+      ]
+    },
+    {
+      "id": "api-hello",
+      "status": "pass",
+      "title": "UI新建 API 实际轻量 Hello",
+      "steps": "UI新建临时角色 acceptance_dsh_1025，绑定新API/deepseek-flash/off，保存后点击连通测试。",
+      "result": "实际显示可用、2.6秒、hi；对应渠道channel_0803af5d91db4df38611d340，父Agent白名单引用0。API在已有Claude额度block仍存在时可用。",
+      "evidence": [
+        "api-hello-result.json",
+        "api-role-binding.json",
+        "api-connectivity-requests.json"
+      ]
+    },
+    {
+      "id": "api-toggle-delete",
+      "status": "pass",
+      "title": "账号启停与引用删除保护",
+      "steps": "角色引用时点删除→删除禁用；停用账号，角色显示渠道未启用，再点击测试；恢复此账号；UI删除临时角色保存，再删除账号。",
+      "result": "停用后sayHi HTTP400；此前成功结果短暂仍留在角色页直到重测。精确清理两条一次性API及临时角色、secret；原账号/角色保留。",
+      "evidence": [
+        "delete-protection.json",
+        "api-disabled-role.json",
+        "api-connectivity-requests.json",
+        "data-retention.json"
+      ]
+    },
+    {
+      "id": "import",
+      "status": "pass",
+      "title": "真实本机默认导入幂等",
+      "steps": "默认全引擎、默认来源、不勾更新，UI实际提交（两轮）；指定/home/mocha/.codex再导入。",
+      "result": "默认added0/existing6/updated0/notFound[pi]/failures[]；首次已有13账号，默认幂等不增。最终18含本包5官方metadata。指定Codex existing1。首次6条真实导入属于environment包，不由本包证明。",
+      "evidence": [
+        "import-before.json",
+        "import-after.json",
+        "import-structured.json",
+        "import-explicit-codex.json"
+      ]
+    },
+    {
+      "id": "import-recovery",
+      "status": "pass",
+      "title": "导入错误目录与Pi未发现",
+      "steps": "指定本包不存在目录提交，读取输入；改真实Codex目录重试。Pi清空目录（原生键盘清除）走默认路径提交。",
+      "result": "错误明确未完成并保留目录；合法目录恢复已有1。无配置Pi明确未发现，无假成功。工具空fill未触发受控值变化，已用Control+A/Backspace复验。",
+      "evidence": [
+        "import-invalid-directory.json",
+        "import-explicit-codex.json",
+        "import-pi.json"
+      ]
+    },
+    {
+      "id": "official-roots",
+      "status": "pass",
+      "title": "五官方账号独立私有根与原生命令",
+      "steps": "逐个UI创建claude/grok/opencode/qoder/codex账号并启动原生登录。",
+      "result": "5个不同0700私有root；hasCredentials=false。实际/proc cwd与CLAUDE_CONFIG_DIR/GROK_HOME/XDG*/QODER_CONFIG_DIR/CODEX_HOME归属各自root，无复制旧auth。Pi/dsh官方选项不存在；Qoder通用API选项不存在。",
+      "evidence": [
+        "data-retention.json",
+        "claude-native-process.json",
+        "grok-native-process.json",
+        "opencode-native-process.json",
+        "qoder-native-process.json",
+        "codex-native-process.json"
+      ]
+    },
+    {
+      "id": "official-url",
+      "status": "fail",
+      "title": "官方授权入口完整性",
+      "steps": "各CLI启动后等待、关闭/重开、取消和重试。",
+      "result": "Grok有accounts.x.ai/oauth2/device；OpenCode有opencode.ai/console/device及设备码；Codex有auth.openai.com/codex/device但无设备码。Claude首次约1分钟、重试约3分钟仍starting无URL；Qoder首轮约1分钟仍starting无URL。原生stderr未通过产品API暴露，未猜测原因。",
+      "evidence": [
+        "official-timeline.json",
+        "codex-final-ui.json",
+        "codex-pending-masked.png"
+      ]
+    },
+    {
+      "id": "official-recovery",
+      "status": "pass",
+      "title": "官方关闭找回/取消/重试与陈旧job恢复",
+      "steps": "每个账号实际关闭重开、取消并重试；Grok reload后找回同job；自有Claude sessionStorage注入合法格式不存在jobRef后打开真实backend错误并重试。",
+      "result": "cancel/retry有新job；无全局logout/杀全局进程。陈旧引用明确NOT_FOUND并可恢复。未重启server；不能据此宣称真实server重启已验。",
+      "evidence": [
+        "official-timeline.json",
+        "official-stale-ref.json",
+        "official-all-cancelled-processes.json",
+        "official-final-jobs.json"
+      ]
+    },
+    {
+      "id": "oauth",
+      "status": "missing",
+      "title": "本人授权完成及原生落盘严格验证",
+      "steps": "未替本人操作任何第三方授权。",
+      "result": "五条新官方账号均未完成OAuth。只留最终Codex活job给owner接管，且缺设备码仍需先解决。不能算官方登录完成。",
+      "evidence": [
+        "official-final-jobs.json",
+        "engines-and-pending.json",
+        "final-native-process.json"
+      ]
+    },
+    {
+      "id": "quota",
+      "status": "pass",
+      "title": "原有账号额度真实刷新与自动开关",
+      "steps": "UI刷新原有Codex账号；仅在新Codex验收账号关/开自动刷新并回读。",
+      "result": "原有Codex7天已用60%（当次观察），归属该账号；新鲜未知/unsupported未伪0，API界面不展示官方订阅额度。未解除Claude真实额度block；未改原账号自动刷新偏好。",
+      "evidence": [
+        "quota-refresh.json",
+        "quota-auto-off.json",
+        "quota-auto-on.json",
+        "engines-and-pending.json",
+        "data-retention.json"
+      ]
+    },
+    {
+      "id": "limits",
+      "status": "missing",
+      "title": "尚未覆盖的严格分支",
+      "steps": "无安全真实条件触发混合partial failure；未替换原订阅或人为改旧source。",
+      "result": "managed较新认证与旧source分歧替换场景未构造；API Hello子进程env未及时采到；pending官方实际角色执行拒绝未另行调用；真实server重启恢复未测；未对新建保存进行快速双击压力测试（导入加载时控件禁用已观察）。不把这些写成pass。",
+      "evidence": []
+    },
+    {
+      "id": "health",
+      "status": "pass",
+      "title": "console/network与证据卫生",
+      "steps": "记录实际console、page errors、HTTP状态；只导出最小安全字段。",
+      "result": "选定证据artifact_errors=[]；业务负向路径400与工具失效ref/遮挡等采证错误分开。无HAR、request body、key、cookie、device code或OAuth query归档。",
+      "evidence": [
+        "runtime-health.json",
+        "source-verification.json"
+      ]
+    }
+  ],
+  "blockers": [
+    {
+      "id": "config-validation",
+      "status": "fail",
+      "steps": [
+        "UI 上传 {} YAML 到一次性 dsh API 账号",
+        "保存成功",
+        "绑定临时 role，点连通测试"
+      ],
+      "actual": "INVALID_REQUEST: dsh 原生配置必须是 patch 列表",
+      "impact": "上传/保存未校验引擎配置形状；会在实际使用阶段失败。将清配置并继续真实 API 验收。"
+    },
+    {
+      "id": "official-url-missing",
+      "status": "fail",
+      "steps": [
+        "新建验收官方claude1025，创建并登录",
+        "关闭/重开并取消后重试"
+      ],
+      "actual": "原生 Claude auth login --claudeai 在独立 CLAUDE_CONFIG_DIR 运行；持续 starting，无官方 URL、设备码或 UI 错误。已观察超过 3 分钟。Qoder 首次约 1 分钟仍 starting；分别记录。",
+      "impact": "没有可交接给本人操作的官方授权入口；不能归类为仅等待本人授权。stderr 未被产品 API 暴露，未猜测根因。"
+    },
+    {
+      "id": "codex-device-code-missing",
+      "status": "fail",
+      "steps": [
+        "UI 新建验收官方codex1025",
+        "创建并登录并等官方授权状态"
+      ],
+      "actual": "authorizing，官方链接 https://auth.openai.com/codex/device，但 hasDeviceCode=false，UI 无设备验证码。",
+      "impact": "设备授权页还需要一次性码；不能把缺少验证码的界面算作可交接的完整登录。最终仅保留待接管 job，OAuth missing。"
+    },
+    {
+      "id": "record-switch-old-draft",
+      "status": "fail",
+      "steps": [
+        "编辑验收官方claude1025并改名为草稿",
+        "暂存并关闭",
+        "点击验收官方grok1025编辑"
+      ],
+      "actual": "打开编辑验收官方claude1025，名称仍为Claude旧草稿，没有说明正在恢复不同账号的草稿。",
+      "impact": "点击另一记录时实际编辑对象不对应；未保存避免误改。放弃草稿后再次点Grok才打开正确账号。"
+    }
+  ],
+  "artifact_errors": [],
+  "scope": "Only this real-test account/channel browser package. No claim of full engine task matrix or IM acceptance.",
+  "resources": {
+    "testScope": "dev-weaver-real-accounts.scope",
+    "testPort": 4738,
+    "testDataDir": "/home/mocha/.local/share/weaver-real-test",
+    "productionService": "weaver.service",
+    "productionPort": 4737,
+    "temporaryApiAndRoleDeleted": true,
+    "officialMetadataRetained": 5,
+    "pendingCodex": {
+      "at": "2026-10-25T05:15:32.016Z",
+      "accountLabel": "验收官方codex1025",
+      "accountId": "channel_bce8566b32d34b089fb9191d",
+      "jobRef": {
+        "channel": "channel_bce8566b32d34b089fb9191d",
+        "id": "1adade39-a8a3-4541-820b-a0e09aa05cdd"
+      },
+      "jobStatus": "authorizing",
+      "localPage": "http://127.0.0.1:4738/#/channels",
+      "safeAuthorizationHostPath": "https://auth.openai.com/codex/device",
+      "hasDeviceCode": false,
+      "needsPersonalAction": "第三方账户授权只能由本人完成；当前 UI 未显示设备码，还存在产品阻断，不能要求本人凭缺失验证码完成授权。",
+      "uiSteps": [
+        "打开本地账号与渠道页",
+        "找到 验收官方codex1025，点击 登录官方账号；服务会找回此账号的活 job",
+        "核对等待官方授权状态；当前设备验证码缺失，需 owner 先处理该阻断",
+        "仅本人打开官方页面并完成授权；worker 未完成任何第三方授权",
+        "放弃时点击 取消此次登录，并核对 scope 释放"
+      ],
+      "timeout": "Native login auto timeout 10 minutes from start; scope cleanup is server-owned.",
+      "retainedNativeProcess": [
+        {
+          "pid": 1274098,
+          "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d/native",
+          "exe": "/home/mocha/.codex/packages/standalone/releases/0.164.0-x86_64-unknown-linux-musl/bin/codex",
+          "argv": [
+            "/home/mocha/.codex/packages/standalone/releases/0.164.0-x86_64-unknown-linux-musl/bin/codex",
+            "login",
+            "--device-auth",
+            ""
+          ],
+          "env": {
+            "HOME": "/home/mocha",
+            "CODEX_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d/native"
+          },
+          "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/dev-weaver-channel-login-de1ac5e0-321c-4d91-8bd4-e54833370034.scope"
+        }
+      ],
+      "cleanupCondition": "Owner/user no longer proceeding: UI cancel exact job; timeout auto-terminates own scope. Do not stop test/prod services.",
+      "testScope": "dev-weaver-real-accounts.scope",
+      "testPort": 4738,
+      "productionServicePreserved": "weaver.service",
+      "nativeScope": "dev-weaver-channel-login-de1ac5e0-321c-4d91-8bd4-e54833370034.scope",
+      "nativePid": 1274098,
+      "startedAt": "Sun 2026-10-25 01:15:26 EDT",
+      "timeoutDeadlineUtc": "2026-10-25T05:25:26+00:00"
+    },
+    "browserCleanup": "Own Chrome closed; bh task profile removed; external exact-profile process check found no remaining process.",
+    "finalState": "resources.json",
+    "testListenerPid": 1217964
+  },
+  "artifacts": [
+    "REPORT.html",
+    "api-cas-preserved.png",
+    "api-clear-state.json",
+    "api-connectivity-requests.json",
+    "api-deleted-state.json",
+    "api-disabled-role.json",
+    "api-hello-result.json",
+    "api-role-binding.json",
+    "api-upload-state.json",
+    "api-valid-config-state.json",
+    "claude-after-cancel.json",
+    "claude-native-process.json",
+    "codex-final-ui.json",
+    "codex-native-process.json",
+    "codex-pending-masked.png",
+    "config-error-observations.json",
+    "data-retention.json",
+    "delete-protection.json",
+    "edit-after-discard.json",
+    "edit-switch-draft.json",
+    "edit-switch-draft.png",
+    "engines-and-pending.json",
+    "filter-api-dsh.json",
+    "filter-empty-reload.json",
+    "final-native-process.json",
+    "form-desktop-page.json",
+    "form-desktop-page.png",
+    "form-desktop-wheel.json",
+    "form-desktop-wheel.png",
+    "form-narrow-page.json",
+    "form-narrow-page.png",
+    "form-narrow-wheel.json",
+    "form-narrow-wheel.png",
+    "grok-native-process.json",
+    "import-after.json",
+    "import-before.json",
+    "import-default-result.json",
+    "import-explicit-codex.json",
+    "import-invalid-directory.json",
+    "import-pi.json",
+    "import-structured.json",
+    "legacy-route.json",
+    "list-desktop-page.json",
+    "list-desktop-page.png",
+    "list-desktop-wheel.json",
+    "list-desktop-wheel.png",
+    "list-narrow-page.json",
+    "list-narrow-page.png",
+    "list-narrow-wheel.json",
+    "list-narrow-wheel.png",
+    "narrow-header.png",
+    "narrow-nav.json",
+    "narrow-nav.png",
+    "official-all-cancelled-processes.json",
+    "official-final-jobs.json",
+    "official-stale-ref.json",
+    "official-timeline.json",
+    "opencode-native-process.json",
+    "qoder-native-process.json",
+    "quota-auto-off.json",
+    "quota-auto-on.json",
+    "quota-refresh.json",
+    "report-readability.json",
+    "resources.json",
+    "results.json",
+    "runtime-health.json",
+    "security-verification.json",
+    "source-verification.json"
+  ],
+  "securityVerification": "security-verification.json"
+}

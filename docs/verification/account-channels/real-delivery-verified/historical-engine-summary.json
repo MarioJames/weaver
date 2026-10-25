@@ -1,0 +1,72 @@
+{
+  "provenance": "Owner-reviewed earlier real-engine packages, not newly executed by browser worker and not all on final source digest. First runtime source/runner stayed frozen while four test files changed; later Grok/OpenCode/native fixes followed. No new full inference matrix was run in this final browser package.",
+  "firstRunAt": "2026-10-25T04:37:37.154710+00:00",
+  "earlierHello": [
+    {
+      "engine": "codex",
+      "model": "gpt-6-luna",
+      "ok": true,
+      "exactHi": true,
+      "checkedAt": "2026-10-25T04:33:23.249Z"
+    },
+    {
+      "engine": "claude",
+      "model": "sonnet",
+      "ok": true,
+      "exactHi": true,
+      "checkedAt": "2026-10-25T04:33:28.640Z"
+    },
+    {
+      "engine": "grok",
+      "model": "grok-4.7",
+      "ok": false,
+      "exactHi": false,
+      "checkedAt": "2026-10-25T04:33:48.625Z"
+    },
+    {
+      "engine": "qoder",
+      "model": "Qwen3.8-Flash",
+      "ok": true,
+      "exactHi": true,
+      "checkedAt": "2026-10-25T04:34:02.811Z"
+    },
+    {
+      "engine": "opencode",
+      "model": "opencode-go/muse-spark-1.3-contributor",
+      "ok": false,
+      "exactHi": false,
+      "checkedAt": "2026-10-25T04:36:04.852Z"
+    },
+    {
+      "engine": "dsh",
+      "model": "deepseek-flash",
+      "ok": true,
+      "exactHi": true,
+      "checkedAt": "2026-10-25T04:36:22.663Z"
+    }
+  ],
+  "grokLater": {
+    "jobId": "57e7035c42f8f4f3",
+    "status": "done",
+    "ok": true,
+    "reply": "hi",
+    "error": null,
+    "model": "grok-4.7-build",
+    "durationMs": 26769,
+    "method": "real HTTP same selected test channel after app watch reload"
+  },
+  "opencodeInferencePass": false,
+  "opencodeLimit": "Go usage limit exceeded; previous 120s timeout remains a failure",
+  "piInferencePass": false,
+  "piLimit": "No credentials/key",
+  "formalCodex": {
+    "taskId": "ac722880-d7b1-4886-842d-bc69047846b3",
+    "status": "completed",
+    "execution": "real",
+    "completedAt": "2026-10-25T04:36:45.277Z",
+    "exactReply": "WEAVER_REAL_OK",
+    "acknowledged": true,
+    "reviewState": "accepted"
+  },
+  "formalFinalized": "Earlier owner-reviewed evidence; not re-executed here"
+}

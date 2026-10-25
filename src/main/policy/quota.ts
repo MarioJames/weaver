@@ -15,9 +15,9 @@ export const QUOTA_CAPABILITIES = {
   refresh: { command: 'quota.refresh', rpc: rpcForCommand('quota.refresh').method, updatesPolicyBlocks: false, inference: false },
 };
 
-/** Distinct quota kinds of enabled engines that opted into scheduled refresh. */
+/** Distinct quota kinds of enabled channels that opted into scheduled refresh. */
 export function quotaRefreshTargets(config: Config): QuotaEngine[] {
-  const kinds = new Set(Object.values(config.channels).filter(channel => channel.enabled && config.engines[channel.engine]?.enabled && quotaRefreshEnabled(channel,config.engines[channel.engine]?.kind)).map(channel => config.engines[channel.engine]!.kind));
+  const kinds = new Set(Object.values(config.channels).filter(channel => channel.enabled && quotaRefreshEnabled(channel,config.engines[channel.engine]?.kind)).map(channel => config.engines[channel.engine]!.kind));
   return ENGINES.filter(engine => kinds.has(engine));
 }
 

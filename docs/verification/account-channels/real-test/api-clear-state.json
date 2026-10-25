@@ -1,0 +1,24 @@
+{
+  "at": "2026-10-25T05:00:30.906Z",
+  "count": 14,
+  "revisions": {
+    "revision": 11
+  },
+  "owned": [
+    {
+      "id": "channel_0803af5d91db4df38611d340",
+      "label": "验收一次性dsh1025",
+      "enabled": true,
+      "kind": "api",
+      "engine": "dsh",
+      "provider": "deepseek-official",
+      "protocol": "anthropic",
+      "hasApiKey": true,
+      "keyRetained": true,
+      "hasConfig": false,
+      "secretFields": [
+        "apiKey"
+      ]
+    }
+  ]
+}

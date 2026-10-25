@@ -26,7 +26,7 @@ function cmd(command: CatalogName, spec: { inputFields?: CatalogCommand['inputFi
   };
 }
 
-/** One known catalog. Words join with dots; `engines set-enabled` stays hyphenated. */
+/** One known catalog. Words join with dots. */
 export const CLI_CATALOG: CatalogCommand[] = [
   cmd('capabilities.get', { usage: 'capabilities | capabilities get' }),
   cmd('sync.snapshot', { usage: 'sync snapshot' }),
@@ -87,6 +87,9 @@ export const CLI_CATALOG: CatalogCommand[] = [
   cmd('policy.preview', { inputFields: {"required": {"owner": "owner profile ID"}, "optional": {"worker": "explicit worker ID", "runningCount": "integer ≥0"}}, usage: 'policy preview --input <preview.json>' }),
   cmd('policy.history', { inputFields: {"required": {}, "optional": {}, "notes": "Every saved policy revision, newest first: revision, savedAt, source (save, import or rollback:<n>). Each holds a full snapshot that policy rollback can restore."}, usage: 'policy history' }),
   cmd('policy.rollback', { inputFields: {"required": {"revision": "already-saved policy revision integer to restore"}, "optional": {}, "notes": "Restores the stored snapshot of that revision as a NEW revision (history is never rewritten). Needs the user's consent."}, usage: 'policy rollback --input <rollback.json>' }),
+  cmd('channels.login.start', { inputFields:{required:{channel:'official channel ID'}},usage:'channels login start --input <login.json>' }),
+  cmd('channels.login.get', { inputFields:{required:{channel:'official channel ID',id:'login job ID'}},usage:'channels login get --input <login.json>' }),
+  cmd('channels.login.cancel', { inputFields:{required:{channel:'official channel ID',id:'login job ID'}},usage:'channels login cancel --input <login.json>' }),
   cmd('channels.list', { usage: 'channels list' }),
   cmd('channels.save', { inputFields: {required: {revision:'current policy revision',channel:'channel metadata'},optional:{id:'existing channel ID',config:'native CLI config; private',apiKey:'replacement API key; empty keeps existing key'}},usage:'channels save --input <channel.json>' }),
   cmd('channels.delete', { inputFields: {required:{revision:'current policy revision',id:'channel ID'}},usage:'channels delete --input <delete.json>' }),
@@ -102,7 +105,6 @@ export const CLI_CATALOG: CatalogCommand[] = [
   cmd('janitor.status', { usage: 'janitor status    Janitor settings, next run and the retained sweep history, newest first.' }),
   cmd('quota.get', { usage: 'quota get' }),
   cmd('quota.refresh', { inputFields: { required: {}, optional: { engine: 'codex | claude | grok | opencode (omitted refreshes all four; OpenCode Go windows are display-only)' }, notes: 'Runs the legacy quota diagnostic without inference or policy changes. Use channels quota with a channel ID to refresh that account and synchronize its policy blocks. Does not accept commandId, taskId, --command-id, or --task-id.' }, usage: 'quota refresh [--input <refresh.json>]' }),
-  cmd('engines.set-enabled', { inputFields: {"required": {"id": "engine ID", "enabled": "boolean", "revision": "current policy revision integer"}, "optional": {}}, usage: 'engines set-enabled --input <toggle.json>' }),
 ];
 
 for (const item of CLI_CATALOG) item.inputFields ??= { required: {} };
@@ -165,7 +167,7 @@ tasks wait and tasks watch poll tasks get and tasks events. They check tasks hea
 
 --engine <id> is the engine argument of engines penalty, engines unblock and engines models. --worker <id> is the optional worker argument of workers probe and the required worker argument of workers unblock. --cancel is a valueless flag that sets cancel on tasks retry. --refresh is a valueless flag that bypasses the model-list cache on engines models. All of these are rejected on any other command, repeated, missing their value, or when the --input body already carries a different one. tasks retry returns the linked task already dispatched, together with the one thing to do next.
 
-Mutations need --command-id, except channels save/delete/import/quota, policy save, policy rollback, engines set-enabled, quota refresh, and workers probe, which send the JSON body shown in their usage. quota refresh defaults to {} and runs diagnostics without inference or policy changes; channels quota refreshes the selected channel and its policy blocks; workers probe defaults to {} and probes every eligible free_channel worker; neither accepts command or task IDs. operations get reads that same --command-id. owners attach stores a name and profile plus optional caller labels. A first attach needs no --owner-file and returns the logical owner plus credentialPath; a host claiming an existing row passes optional ownerId, then reuses that credentialPath through the fixed weaver --data-dir <instance> --owner-file <credentialPath> prefix for the rest of its work. It does not contact a host. owners describe sets or updates one instance's title for the web board once its main task is clear. owners spawn does not start an owner model. capabilities.realExecution means the worker launcher is loaded, not that a model ran or a login was proven. mock-jsonl is an explicit provider. A real route does not fall back to mock.
+Mutations need --command-id, except channels save/delete/import/quota and channels login start/cancel, policy save, policy rollback, quota refresh, and workers probe, which send the JSON body shown in their usage. quota refresh defaults to {} and runs diagnostics without inference or policy changes; channels quota refreshes the selected channel and its policy blocks; workers probe defaults to {} and probes every eligible free_channel worker; neither accepts command or task IDs. operations get reads that same --command-id. owners attach stores a name and profile plus optional caller labels. A first attach needs no --owner-file and returns the logical owner plus credentialPath; a host claiming an existing row passes optional ownerId, then reuses that credentialPath through the fixed weaver --data-dir <instance> --owner-file <credentialPath> prefix for the rest of its work. It does not contact a host. owners describe sets or updates one instance's title for the web board once its main task is clear. owners spawn does not start an owner model. capabilities.realExecution means the worker launcher is loaded, not that a model ran or a login was proven. mock-jsonl is an explicit provider. A real route does not fall back to mock.
 
 ${catalogHelp}
 

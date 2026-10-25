@@ -1,0 +1,110 @@
+{
+  "artifact_errors": [],
+  "input": "native PageDown with explicit scroll container focus",
+  "viewport": [
+    1440,
+    900
+  ],
+  "before": {
+    "url": "http://127.0.0.1:4738/#/channels",
+    "viewport": [
+      1440,
+      900
+    ],
+    "horizontal": false,
+    "containers": [
+      {
+        "tag": "MAIN",
+        "role": null,
+        "top": 0,
+        "height": 826,
+        "total": 3400,
+        "overflow": "auto scroll",
+        "clip": "none",
+        "rect": {
+          "x": 249,
+          "y": 65,
+          "width": 1182,
+          "height": 826,
+          "top": 65,
+          "right": 1431,
+          "bottom": 891,
+          "left": 249
+        }
+      }
+    ],
+    "lastArticle": {
+      "x": 274,
+      "y": 3245.890625,
+      "width": 1122,
+      "height": 194.0625,
+      "top": 3245.890625,
+      "right": 1396,
+      "bottom": 3439.953125,
+      "left": 274
+    },
+    "lastButton": {
+      "x": 1333.984375,
+      "y": 3266.890625,
+      "width": 42.015625,
+      "height": 24,
+      "top": 3266.890625,
+      "right": 1376,
+      "bottom": 3290.890625,
+      "left": 1333.984375
+    },
+    "focus": "BODY"
+  },
+  "after": {
+    "url": "http://127.0.0.1:4738/#/channels",
+    "viewport": [
+      1440,
+      900
+    ],
+    "horizontal": false,
+    "containers": [
+      {
+        "tag": "MAIN",
+        "role": null,
+        "top": 722,
+        "height": 826,
+        "total": 3400,
+        "overflow": "auto scroll",
+        "clip": "none",
+        "rect": {
+          "x": 249,
+          "y": 65,
+          "width": 1182,
+          "height": 826,
+          "top": 65,
+          "right": 1431,
+          "bottom": 891,
+          "left": 249
+        }
+      }
+    ],
+    "lastArticle": {
+      "x": 274,
+      "y": 2523.890625,
+      "width": 1122,
+      "height": 194.0625,
+      "top": 2523.890625,
+      "right": 1396,
+      "bottom": 2717.953125,
+      "left": 274
+    },
+    "lastButton": {
+      "x": 1333.984375,
+      "y": 2544.890625,
+      "width": 42.015625,
+      "height": 24,
+      "top": 2544.890625,
+      "right": 1376,
+      "bottom": 2568.890625,
+      "left": 1333.984375
+    },
+    "focus": "DIV"
+  },
+  "screenshot": "list-desktop-page.png",
+  "jsScrollMutationUsed": false
+}

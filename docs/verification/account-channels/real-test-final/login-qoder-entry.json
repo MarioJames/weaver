@@ -1,0 +1,51 @@
+{
+  "engine": "qoder",
+  "channel": "channel_40c15c208bf84e45911b2b95",
+  "ui": {
+    "acceptsCode": false,
+    "backendHasCode": false,
+    "cancelRect": {
+      "bottom": 543,
+      "height": 32,
+      "left": 698.953125,
+      "right": 806.96875,
+      "top": 511,
+      "width": 108.015625,
+      "x": 698.953125,
+      "y": 511
+    },
+    "codeMatches": true,
+    "hasDeviceCode": false,
+    "linkClickable": true,
+    "linkRect": {
+      "bottom": 483,
+      "height": 132,
+      "left": 379,
+      "right": 987,
+      "top": 351,
+      "width": 608,
+      "x": 379,
+      "y": 351
+    },
+    "manualPassword": false,
+    "manualSubmit": false,
+    "reference": {
+      "channel": "channel_40c15c208bf84e45911b2b95",
+      "id": "91614bab-63f2-4b4f-95c5-56fb7aab93be"
+    },
+    "safeUrl": "https://qoder.com/device/selectAccounts",
+    "status": "authorizing",
+    "urlMatches": true
+  },
+  "nativeProcesses": [
+    {
+      "pid": 1339400,
+      "comm": "qodercli-1.1.75",
+      "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_40c15c208bf84e45911b2b95/native",
+      "roots": {
+        "QODER_CONFIG_DIR": "/home/mocha/.local/share/weaver-real-test/channels/channel_40c15c208bf84e45911b2b95/native"
+      },
+      "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/dev-weaver-channel-login-0bcd740c-ba7e-4e88-bb00-3fb3dd20341a.scope"
+    }
+  ]
+}

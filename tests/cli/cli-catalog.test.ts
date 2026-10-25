@@ -13,7 +13,7 @@ import { runCLI } from '../../src/cli/run';
 import { READ_COMMANDS, WRITE_COMMANDS } from '../../src/shared/contracts/commands';
 
 const serverCommands = [...READ_COMMANDS, ...WRITE_COMMANDS];
-const rpcCommands = ['policy.get', 'policy.validate', 'policy.save', 'policy.preview', 'engines.scan', 'engines.set-enabled', 'quota.get', 'quota.refresh', 'janitor.sweep', 'janitor.status'];
+const rpcCommands = ['policy.get', 'policy.validate', 'policy.save', 'policy.preview', 'engines.scan', 'quota.get', 'quota.refresh', 'janitor.sweep', 'janitor.status'];
 
 test('catalog covers every handler command, nested continuation, and output flags', () => {
   for (const name of [...serverCommands, ...rpcCommands, 'tasks.wait', 'tasks.watch']) {
@@ -224,7 +224,7 @@ test('--worker is refused on any command but workers probe and workers unblock, 
 });
 
 test('--engine and --cancel are refused on any other command, repeated or without a value',()=>{
- for(const words of [['tasks','health','--task-id','t'],['engines','health'],['tasks','get','--task-id','t'],['tasks','retry','--task-id','t'],['owners','launch','--task-id','t'],['engines','scan'],['engines','set-enabled','--input','{}']]){
+ for(const words of [['tasks','health','--task-id','t'],['engines','health'],['tasks','get','--task-id','t'],['tasks','retry','--task-id','t'],['owners','launch','--task-id','t'],['engines','scan']]){
   assert.throws(()=>parseCLI([...words,'--engine','qoder']),/--engine is only valid for engines penalty, engines unblock and engines models/);
  }
  for(const words of [['tasks','cancel','--task-id','t'],['tasks','health','--task-id','t'],['engines','unblock','--engine','qoder'],['tasks','list']]){

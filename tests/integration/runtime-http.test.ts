@@ -411,59 +411,26 @@ test('a repeated stop signal still drains and removes the endpoint', { timeout: 
   } finally { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); await rm(dataDir, { recursive: true, force: true }); }
 });
 
-test('engine scan and enable do not create roles', { timeout: 30_000 }, async t => {
+test('engine scan does not create roles', { timeout: 30_000 }, async t => {
   const dataDir = await mkdtemp(join(tmpdir(), 't-'));
   const runtime = await boot(t, dataDir);
   if (!runtime) { await rm(dataDir, { recursive: true, force: true }); return; }
   try {
+    const before = await httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'getPolicy', args: [] }) });
     const scan = await httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'scanEngines', args: [] }) });
     assert.equal(scan.status, 200, scan.text);
     assert.equal(scan.json.result.probes.length, ENGINE_CATALOG.length);
     assert.equal(scan.json.result.boundary.roleAutoCreate, false);
     assert.equal(scan.json.result.boundary.realAdapter, EXECUTION_BOUNDARY.realAdapter);
-    const installed = scan.json.result.probes.find((probe: { status: string }) => probe.status === 'installed');
-    if (!installed) return;
-    const before = await httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'getPolicy', args: [] }) });
-    const enabled = await httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'setEngineEnabled', args: [{ id: installed.id, enabled: true, revision: before.json.result.revision }] }) });
-    assert.equal(enabled.status, 200, enabled.text);
-    assert.equal(enabled.json.result.snapshot.config.engines[installed.id].enabled, true);
-    assert.deepEqual(enabled.json.result.snapshot.config.owners, before.json.result.config.owners);
-    assert.deepEqual(enabled.json.result.snapshot.config.workers, before.json.result.config.workers);
+    const after = await httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'getPolicy', args: [] }) });
+    assert.equal(after.status, 200, after.text);
+    assert.deepEqual(after.json.result.config.owners,before.json.result.config.owners);
+    assert.deepEqual(after.json.result.config.workers,before.json.result.config.workers);
+
     const cliScan = await cli(dataDir, ['engines', 'scan']);
     assert.equal(cliScan.status, 0, cliScan.stdout + cliScan.stderr);
     assert.equal(cliScan.json.data.probes.length, ENGINE_CATALOG.length);
   } finally { await runtime.close(); await rm(dataDir, { recursive: true, force: true }); }
-});
-
-test('a rejected engine enable leaves the server and policy usable', async t => {
-  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
-  const runtime = await boot(t, dataDir);
-  if (!runtime) { await rm(dataDir, { recursive: true, force: true }); return; }
-  const unhandled: unknown[] = [];
-  const onUnhandled = (error: unknown) => { unhandled.push(error); };
-  process.on('unhandledRejection', onUnhandled);
-  try {
-    const before = await httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'getPolicy', args: [] }) });
-    assert.equal(before.status, 200, before.text);
-    const history = async () => (await httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'policyHistory', args: [] }) })).json.result;
-    const beforeHistory = await history();
-    const rejected = await httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'setEngineEnabled', args: [{ id: 'claude', enabled: true, revision: before.json.result.revision + 999 }] }) });
-    assert.notEqual(rejected.status, 200);
-    assert.equal(rejected.json.error.code.length > 0, true);
-    await new Promise(resolve => setTimeout(resolve, 50));
-    assert.deepEqual(unhandled, []);
-    const caps = await httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'capabilities', args: [] }) });
-    assert.equal(caps.status, 200, caps.text);
-    const after = await httpCall(runtime.port, { method: 'POST', path: '/api/rpc', headers: rpcHeaders(runtime.port), body: JSON.stringify({ method: 'getPolicy', args: [] }) });
-    assert.equal(after.status, 200, after.text);
-    assert.equal(after.json.result.revision, before.json.result.revision);
-    assert.deepEqual(after.json.result.config, before.json.result.config);
-    assert.deepEqual(await history(), beforeHistory, 'a rejected enable records no policy revision');
-  } finally {
-    process.off('unhandledRejection', onUnhandled);
-    await runtime.close();
-    await rm(dataDir, { recursive: true, force: true });
-  }
 });
 
 test('production upgrades and idle sockets cannot hold shutdown', async t => {
@@ -668,8 +635,8 @@ test('listEngineModels is a one-argument read RPC: valid input lists, malformed 
   const client = await readFile(new URL('../../src/renderer/api/client.ts', import.meta.url), 'utf8');
   assert.equal(RPC_METHODS.listEngineModels.timeoutMs, 40_000, 'the renderer waits up to 40 seconds for a model list');
   assert.equal(RPC_METHODS.workerProbe.timeoutMs, 130_000);
-  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'timeoutMs' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['listEngineModels', 'refreshChannelQuota', 'workerProbe']);
-  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'retryable' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['capabilities', 'getChannels', 'getEngineCleanup', 'getImSettings', 'getPolicy', 'getQuota', 'getStall', 'getTask', 'janitorStatus', 'listEngineModels', 'listTasks', 'previewRoute', 'sayHiResult', 'validatePolicy', 'workerProbeStatus']);
+  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'timeoutMs' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['cancelChannelLogin', 'importChannels', 'listEngineModels', 'refreshChannelQuota', 'workerProbe']);
+  assert.deepEqual(Object.keys(RPC_METHODS).filter(method => 'retryable' in RPC_METHODS[method as keyof typeof RPC_METHODS]).sort(), ['capabilities', 'getChannelLogin', 'getChannels', 'getEngineCleanup', 'getImSettings', 'getPolicy', 'getQuota', 'getStall', 'getTask', 'janitorStatus', 'listEngineModels', 'listTasks', 'previewRoute', 'sayHiResult', 'validatePolicy', 'workerProbeStatus']);
   assert.match(client, /from '\.\.\/\.\.\/shared\/contracts\/rpc'/, 'the renderer client derives its method table, deadlines and retryable reads from the shared RPC contract');
   assert.doesNotMatch(client, /call\('listEngineModels'|\w+: \d+_000/, 'the renderer client does not hand-write method wrappers or deadlines');
 });
@@ -702,4 +669,13 @@ test('policy saves are numbered revisions over RPC: history lists them, rollback
     const files = await readdir(dataDir);
     assert.deepEqual(files.filter(name => /\.v1\.json|\.bak|pre-weight/.test(name) && name !== 'control.v1.json'), [], 'no backup or JSON policy files');
   } finally { await runtime.close(); await rm(dataDir, { recursive: true, force: true }); }
+});
+
+
+test('HTTP import uses the shared 180 second socket allowance then restores the default deadline',async t=>{
+ const {Socket}=await import('node:net');const {startHttpServer}=await import('../../src/main/http');const timeout=t.mock.method(Socket.prototype,'setTimeout');let calls=0;
+ const server=await startHttpServer({port:0,call:async()=>{calls++;return {importResult:{added:5}};}});try{
+  const response=await httpCall(server.port,{method:'POST',path:'/api/rpc',headers:rpcHeaders(server.port),body:JSON.stringify({method:'importChannels',args:[{revision:0}]})});assert.equal(response.status,200);assert.equal(response.json.result.importResult.added,5);assert.equal(calls,1);
+  const values=timeout.mock.calls.map(call=>call.arguments[0]);assert.ok(values.includes(180000));assert.ok(values.lastIndexOf(15000)>values.indexOf(180000));
+ }finally{await server.close();}
 });

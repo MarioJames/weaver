@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "scope": "Safe summary of existing owner evidence; this documentation package ran no engines, browsers, tests or services.",
+  "report": "REPORT.html",
+  "browserResults": "results.json",
+  "engineeringCheck": {
+    "exitCode": 0,
+    "naturalExit": true,
+    "startedAt": "2026-10-25T06:17:57.762171+00:00",
+    "completedAt": "2026-10-25T06:18:45.546073+00:00",
+    "digest": "0c424a5506a69109cfbac6c75ef71624caf8ade40751dd57c57e231ee5fc3be2",
+    "counts": {
+      "tests": 2184,
+      "pass": 2152,
+      "fail": 0,
+      "skipped": 32
+    },
+    "typecheckPassed": true,
+    "buildPassed": true,
+    "testLifecycleSha256": "2961a88648fc87205df6b16cd4418f19240e4d457b3b55e4adcb70e38603ba1d"
+  },
+  "previousCheck": {
+    "completedAt": "2026-10-25T06:14:34.046692+00:00",
+    "naturalExit": true,
+    "exitCode": 0,
+    "durationSecondsApprox": 136,
+    "sigtermSent": false
+  },
+  "persistentClaudeHello": {
+    "performedBy": "owner",
+    "targetUrl": "http://127.0.0.1:4738",
+    "timing": "After persistent idempotent imports, before final engineering summary at 2026-10-25T06:18:45.546073Z; exact call timestamp not recorded in safe Hello receipt.",
+    "requestCount": 1,
+    "model": "sonnet",
+    "effort": "medium",
+    "status": "done",
+    "ok": true,
+    "replyIsHi": true,
+    "returnedModel": "claude-sonnet-5-5",
+    "durationMs": 6271,
+    "globalSourceFilesUnchanged": true,
+    "globalSourceFileCount": 3,
+    "privateSelectors": {
+      "claudePrivate": true,
+      "secureStoragePrivate": true,
+      "anthropicPrivate": true
+    }
+  },
+  "environmentAudit": {
+    "at": "2026-10-25T06:10:05.682915+00:00",
+    "databaseDistinct": true,
+    "production": {
+      "url": "http://127.0.0.1:4737",
+      "device": 2050,
+      "inode": 1907011,
+      "integrity": "ok",
+      "http": 200,
+      "pidAlive": true,
+      "matchesPreviousBinary": true,
+      "pid": 1109320,
+      "correctionDeployed": false
+    },
+    "test": {
+      "url": "http://127.0.0.1:4738",
+      "device": 2050,
+      "inode": 1991412,
+      "integrity": "ok",
+      "http": 200
+    }
+  },
+  "featureAcceptanceScan": {
+    "verdict": "incomplete",
+    "exitCode": 2,
+    "skippedNonRegularWorktreeDirectories": 3,
+    "candidateCount": 24,
+    "deepRelativeImportCandidates": 21,
+    "reportColorCandidates": 3,
+    "review": "Owner manual review recorded these as candidate clues, with no activated gate; incomplete scan is not an all-green result.",
+    "projectChecksExecutedByScan": false
+  },
+  "preciseOrphanCleanup": {
+    "at": "2026-10-25T06:21:55.680739+00:00",
+    "pid": 1367928,
+    "fixture": "Simulated OpenCode fixture in task-owned final-check-tmp, left by first invalid /proc TMPDIR full test attempt; not a real vendor process.",
+    "signals": [
+      "SIGTERM"
+    ],
+    "processAbsent": true,
+    "persistentServicesTargeted": false,
+    "schemaOrDataDeleted": false
+  },
+  "limitations": [
+    "Five new official OAuth flows have not all completed personal authorization.",
+    "OpenCode Go usage limit and Pi missing credentials remain; no new full-engine inference matrix.",
+    "Production 4737 has not deployed this correction.",
+    "Historical failures and temporary device-code/query incident remain recorded."
+  ],
+  "safety": "No identity, channel/job identifier, token, credential body, private-source hash or raw log copied. Existing owner evidence was read; private runtime data was not accessed."
+}

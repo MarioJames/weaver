@@ -1,0 +1,110 @@
+{
+  "artifact_errors": [],
+  "input": "native CDP mouseWheel with explicit coordinates",
+  "viewport": [
+    1366,
+    768
+  ],
+  "before": {
+    "url": "http://127.0.0.1:4738/#/channels",
+    "viewport": [
+      1366,
+      768
+    ],
+    "horizontal": false,
+    "containers": [
+      {
+        "tag": "MAIN",
+        "role": null,
+        "top": 0,
+        "height": 694,
+        "total": 3456,
+        "overflow": "auto scroll",
+        "clip": "none",
+        "rect": {
+          "x": 249,
+          "y": 65,
+          "width": 1108,
+          "height": 694,
+          "top": 65,
+          "right": 1357,
+          "bottom": 759,
+          "left": 249
+        }
+      }
+    ],
+    "lastArticle": {
+      "x": 274,
+      "y": 3302.421875,
+      "width": 1048,
+      "height": 194.0625,
+      "top": 3302.421875,
+      "right": 1322,
+      "bottom": 3496.484375,
+      "left": 274
+    },
+    "lastButton": {
+      "x": 1259.984375,
+      "y": 3323.421875,
+      "width": 42.015625,
+      "height": 24,
+      "top": 3323.421875,
+      "right": 1302,
+      "bottom": 3347.421875,
+      "left": 1259.984375
+    },
+    "focus": "BODY"
+  },
+  "after": {
+    "url": "http://127.0.0.1:4738/#/channels",
+    "viewport": [
+      1366,
+      768
+    ],
+    "horizontal": false,
+    "containers": [
+      {
+        "tag": "MAIN",
+        "role": null,
+        "top": 2762,
+        "height": 694,
+        "total": 3456,
+        "overflow": "auto scroll",
+        "clip": "none",
+        "rect": {
+          "x": 249,
+          "y": 65,
+          "width": 1108,
+          "height": 694,
+          "top": 65,
+          "right": 1357,
+          "bottom": 759,
+          "left": 249
+        }
+      }
+    ],
+    "lastArticle": {
+      "x": 274,
+      "y": 540.421875,
+      "width": 1048,
+      "height": 194.0625,
+      "top": 540.421875,
+      "right": 1322,
+      "bottom": 734.484375,
+      "left": 274
+    },
+    "lastButton": {
+      "x": 1259.984375,
+      "y": 561.421875,
+      "width": 42.015625,
+      "height": 24,
+      "top": 561.421875,
+      "right": 1302,
+      "bottom": 585.421875,
+      "left": 1259.984375
+    },
+    "focus": "BODY"
+  },
+  "screenshot": "list-desktop-wheel.png",
+  "jsScrollMutationUsed": false
+}

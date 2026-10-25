@@ -1,0 +1,11 @@
+{
+  "sourceFrozen": true,
+  "filesChecked": 291,
+  "reportRelativeLinksChecked": 30,
+  "missingLinks": [],
+  "sensitivePatternFindings": [],
+  "scanLimit": "Pattern scan plus masked screenshot visual inspection; no claim of universal secret detection.",
+  "allowedProductTestDependencyWrites": 0,
+  "jsonFilesParse": true,
+  "finalCleanupFlagsChecked": true
+}

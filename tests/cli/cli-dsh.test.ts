@@ -209,9 +209,9 @@ test('dsh effort values are off, low, high and max', () => {
   assert.deepEqual(EFFORTS.dsh, ['off', 'low', 'high', 'max']);
 });
 
-test('default policy ships a disabled dsh engine and worker, validates clean, and routes no owner to it', () => {
+test('default policy ships an enabled dsh engine and disabled worker, validates clean, and routes no owner to it', () => {
   const config = defaultConfig();
-  assert.deepEqual(config.engines.dsh, { enabled: false, kind: 'dsh' });
+  assert.deepEqual(config.engines.dsh, { enabled: true, kind: 'dsh' });
   assert.equal(roleEngine(config,config.workers.dsh_worker!), 'dsh');
   assert.equal(config.workers.dsh_worker?.model, 'deepseek-flash');
   assert.equal(config.workers.dsh_worker?.effort, 'high');

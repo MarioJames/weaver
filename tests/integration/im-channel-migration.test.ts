@@ -73,7 +73,7 @@ test('legacy resolution preserves explicit identities and refuses unavailable or
   t.after(async () => { db.close(); await rm(root, { recursive: true, force: true }); });
   migrate(db); const base = new PolicyStore(db).snapshot();
   const channel: Channel = { engine: 'alias', kind: 'api', provider: 'deepseek-official', enabled: true, label: 'fake' };
-  const cases: { name: string; version?: number; kind?: string; model?: string; engineEnabled?: boolean; original?: Partial<Channel>; candidate?: Partial<Channel>; second?: Partial<Channel>; secret?: ChannelSecret; defaultSecret?: ChannelSecret; selection?: string; expected: string }[] = [
+  const cases: { name: string; version?: number; kind?: string; model?: string; original?: Partial<Channel>; candidate?: Partial<Channel>; second?: Partial<Channel>; secret?: ChannelSecret; defaultSecret?: ChannelSecret; selection?: string; expected: string }[] = [
     { name: 'single plain dsh model', model: 'deepseek-chat', expected: 'import_one' },
     { name: 'v5 empty default', version: 5, expected: 'default_alias' },
     { name: 'v5 missing key', version: 5, selection: 'chosen_account', expected: 'chosen_account' },
@@ -81,7 +81,6 @@ test('legacy resolution preserves explicit identities and refuses unavailable or
     { name: 'configured default', defaultSecret: { apiKey: 'FAKE_DEFAULT' }, expected: 'default_alias' },
     { name: 'incomplete default config belongs to user', defaultSecret: { config: '[]' }, expected: 'default_alias' },
     { name: 'disabled default', original: { enabled: false }, expected: 'default_alias' },
-    { name: 'disabled engine', engineEnabled: false, expected: 'default_alias' },
     { name: 'disabled import', candidate: { enabled: false }, expected: '' },
     { name: 'missing import key', secret: {}, expected: '' },
     { name: 'config without dsh key', secret: { config: '[]' }, expected: '' },
@@ -100,7 +99,7 @@ test('legacy resolution preserves explicit identities and refuses unavailable or
   for (const [n, scenario] of cases.entries()) {
     const dir = join(root, String(n)); await mkdir(dir);
     const live = structuredClone(base);
-    live.config.engines = { alias: { kind: scenario.kind ?? 'dsh', enabled: scenario.engineEnabled ?? true } };
+    live.config.engines = { alias: { kind: scenario.kind ?? 'dsh', enabled: true } };
     live.config.channels = { default_alias: { ...channel, ...scenario.original }, import_one: { ...channel, ...scenario.candidate }, ...(scenario.second ? { import_two: { ...channel, ...scenario.second } } : {}) };
     const version = scenario.version ?? 4;
     const config = { enabled: false, appId: 'cli_fake', appSecret: 'FAKE_PRIVATE', allowedOpenIds: ['ou_fake'], model: scenario.model ?? 'deepseek/deepseek-chat', effort: 'high', idleTimeoutMinutes: 30, workspaces: [dir], ownerProfileId: '',

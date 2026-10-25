@@ -1,0 +1,133 @@
+{
+  "at": "2026-10-25T05:15:32.016Z",
+  "jobs": [
+    {
+      "channel": "channel_4ced3727a61348b390af7c6f",
+      "id": "600983c8-c406-489a-a829-32fec500e0b6",
+      "status": "cancelled",
+      "authorizationHostPath": null,
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "claude",
+          "source": "claude_oauth_usage",
+          "status": "unauthenticated",
+          "checkedAt": "2026-10-25T05:12:49.339Z",
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试",
+          "retryAt": null,
+          "channel": "channel_4ced3727a61348b390af7c6f"
+        }
+      }
+    },
+    {
+      "channel": "channel_24fae3142b5c48f898448d0a",
+      "id": "34f91014-ca64-4499-aa5d-8c1219973e0b",
+      "status": "cancelled",
+      "authorizationHostPath": "https://accounts.x.ai/oauth2/device",
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "grok",
+          "source": "grok_cli_billing",
+          "status": "unauthenticated",
+          "checkedAt": "2026-10-25T05:12:50.500Z",
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试",
+          "retryAt": null,
+          "channel": "channel_24fae3142b5c48f898448d0a"
+        }
+      }
+    },
+    {
+      "channel": "channel_90504ac6dfee41019ebc3fc0",
+      "id": "29f72115-95e2-4928-8473-205d1c6ebe95",
+      "status": "cancelled",
+      "authorizationHostPath": "https://opencode.ai/console/device",
+      "hasDeviceCode": true,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "opencode",
+          "source": "opencode_go_usage",
+          "status": "unauthenticated",
+          "checkedAt": "2026-10-25T05:12:50.501Z",
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试",
+          "retryAt": null,
+          "channel": "channel_90504ac6dfee41019ebc3fc0"
+        }
+      }
+    },
+    {
+      "channel": "channel_bce8566b32d34b089fb9191d",
+      "id": "1adade39-a8a3-4541-820b-a0e09aa05cdd",
+      "status": "authorizing",
+      "authorizationHostPath": "https://auth.openai.com/codex/device",
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "codex",
+          "source": "codex_usage",
+          "status": "unauthenticated",
+          "checkedAt": "2026-10-25T05:12:48.047Z",
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试",
+          "retryAt": null,
+          "channel": "channel_bce8566b32d34b089fb9191d"
+        }
+      }
+    },
+    {
+      "channel": "channel_40c15c208bf84e45911b2b95",
+      "id": "8a000c70-ec5e-4fd5-8457-897c7c69aad1",
+      "status": "cancelled",
+      "authorizationHostPath": null,
+      "hasDeviceCode": false,
+      "error": null,
+      "configuration": {
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": false,
+        "quota": {
+          "engine": "qodercli",
+          "source": "",
+          "status": "unsupported",
+          "checkedAt": null,
+          "observedAt": null,
+          "stale": true,
+          "windows": [],
+          "detail": "该引擎没有可用的官方额度接口",
+          "retryAt": null,
+          "channel": "channel_40c15c208bf84e45911b2b95"
+        }
+      }
+    }
+  ],
+  "uiStatus": [
+    "等待官方授权"
+  ]
+}

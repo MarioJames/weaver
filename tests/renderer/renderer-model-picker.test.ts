@@ -4,7 +4,6 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
 import { motion } from 'motion/react';
-import { readFileSync } from 'node:fs';
 import { ModelListSession, type ModelListSink } from '../../src/renderer/features/engines/engine-models';
 import type { EngineModelList, EngineModelListInput } from '../../src/shared/engines';
 import { ModelPicker } from '../../src/renderer/features/engines/ModelPicker';
@@ -124,12 +123,6 @@ test('the picker no longer tells the user to open the field to fetch models, and
   assert.match(html, /aria-label="刷新 claude 模型列表"/);
   assert.match(markup(React.createElement(ModelPicker, { engine: '', value: '', onChange: () => {} })), /选择渠道后自动获取/);
 });
-
-test('the engines page has no model probe block, say-hi check or disable conflict', () => {
-  const source = readFileSync(new URL('../../src/renderer/features/engines/EnginesPage.tsx', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /EngineModelProbe|HelloCheck|ModelPicker|模型探测|engineDisableConflict|请先停用/);
-});
-
 
 test('same engine with a different channel reloads models and forwards the selected identity', async () => {
   const h = harness();

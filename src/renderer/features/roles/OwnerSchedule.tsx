@@ -13,7 +13,7 @@ import { styles } from '../../ui/styles';
 import { scheduleStyles } from './owner-schedule-style';
 
 /**
- * Why this worker's weight cannot be edited. A disabled worker or engine is never dispatched, and neither is a worker
+ * Why this worker's weight cannot be edited. A disabled worker or channel is never dispatched, and neither is a worker
  * kept out by an exhausted quota or by any block without a release time: nobody lifts those but the user, so the saved
  * weight stays as it is and applies again once dispatch is resumed. Blocks that lift themselves (a rate limit with its
  * release time, a stall penalty, a probe's ban) do not lock editing.
@@ -24,11 +24,10 @@ export function workerWeightLock(config: Config, workerId: string, blocks: Block
   if (!worker.enabled) return { label: '子 Agent 已停用', hint: '该子 Agent 已在「子 Agent」页停用，权重保持不变，重新启用后继续生效。' };
   const channel = config.channels[worker.channel];
   if (!channel?.enabled) return { label: '渠道已停用', hint: `渠道 ${channel?.label ?? worker.channel} 不可用，请在账号与渠道页检查。` };
-  if (!config.engines[channel.engine]?.enabled) return { label: '引擎已停用', hint: `引擎 ${channel.engine} 已停用，权重保持不变，重新启用后继续生效。` };
   const pause = manualPauseOf(config, blocks, workerId, now);
   if (!pause) return undefined;
   const reason = pause.block.reason.replace(/\s+/g, ' ').trim() || '未说明原因';
-  const recovery = `没有自动解除时间；在引擎页或子 Agent 页点「恢复派发」，恢复后权重继续生效，已保存的权重保持不变。`;
+  const recovery = `没有自动解除时间；在子 Agent 页点「恢复派发」，恢复后权重继续生效，已保存的权重保持不变。`;
   return pause.kind === 'quota'
     ? { label: '额度耗尽', hint: `${reason}。额度耗尽后${recovery}`, paused: true }
     : { label: '已暂停 · 需手动恢复', hint: `${reason}。该暂停${recovery}`, paused: true };

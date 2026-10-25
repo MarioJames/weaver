@@ -55,3 +55,55 @@ test('actual HTTP task reads hide private channel paths while preserving durable
   assert.deepEqual(store.get(task.id),before);
  }finally{store.close();await runtime.close();rmSync(dir,{recursive:true,force:true});}
 });
+
+test('official account RPC creates private roots, exposes bounded jobs and refuses API and cross-channel references',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'r-'));
+ // Runtime's Unix socket needs the same short temporary root as the adjacent RPC tests.
+ const runtime=await startRuntime({dataDir:dir,port:0,channels:{autoImport:false,env:{HOME:dir,PATH:join(dir,'missing-bin')}}});
+ const rpc=async(method:string,input?:unknown)=>{
+  const response=await fetch(`${runtime.url}/api/rpc`,{method:'POST',headers:{origin:runtime.url,'content-type':'application/json'},body:JSON.stringify({method,args:input===undefined?[]:[input]})});
+  return {status:response.status,body:await response.json() as any};
+ };
+ try{
+  const initial=(await rpc('getChannels')).body.result;
+  const channel={engine:'codex',kind:'subscription',enabled:true,label:'New official'};
+  const first=await rpc('saveChannel',{revision:initial.policy.revision,channel});assert.equal(first.status,200);
+  const id=first.body.result.savedChannel;assert.equal(typeof id,'string');assert.equal(first.body.result.configurations[id].hasCredentials,false);
+  const second=await rpc('saveChannel',{revision:first.body.result.policy.revision,channel});assert.equal(second.status,200);
+  const other=second.body.result.savedChannel;
+  const job=await rpc('startChannelLogin',{channel:id});assert.equal(job.status,200);
+  assert.equal(job.body.result.channel,id);assert.equal(typeof job.body.result.id,'string');
+  assert.equal((await rpc('getChannelLogin',{channel:other,id:job.body.result.id})).status,404);
+  assert.equal((await rpc('cancelChannelLogin',{channel:other,id:job.body.result.id})).status,404);
+  let state=await rpc('getChannelLogin',{channel:id,id:job.body.result.id});
+  for(let attempt=0;state.body.result.status==='starting'&&attempt<100;attempt++){await new Promise(resolve=>setTimeout(resolve,10));state=await rpc('getChannelLogin',{channel:id,id:job.body.result.id});}
+  assert.equal(state.status,200);assert.equal(state.body.result.status,'failed');assert.equal(state.body.result.error.code,'ENGINE_NOT_INSTALLED');
+  const legacy=await rpc('startChannelLogin',{channel:'default_codex'});assert.equal(legacy.status,200);
+  let legacyState=await rpc('getChannelLogin',{channel:'default_codex',id:legacy.body.result.id});
+  for(let attempt=0;legacyState.body.result.status==='starting'&&attempt<100;attempt++){await new Promise(resolve=>setTimeout(resolve,10));legacyState=await rpc('getChannelLogin',{channel:'default_codex',id:legacy.body.result.id});}
+  assert.equal(legacyState.body.result.error.code,'ENGINE_NOT_INSTALLED');
+  for(const reference of [{channel:other,id:job.body.result.id},{channel:id,id:job.body.result.id}]){
+   const denied=await rpc('submitChannelLoginCode',{...reference,code:'fixture-private-code#fixture-state'});assert.equal(denied.status,reference.channel===other?404:400);assert.doesNotMatch(JSON.stringify(denied.body),/fixture-private-code|fixture-state/);
+  }
+  const api=await rpc('saveChannel',{revision:second.body.result.policy.revision,channel:{...channel,kind:'api'},apiKey:'rpc-private-key'});assert.equal(api.status,200);
+  assert.equal((await rpc('startChannelLogin',{channel:api.body.result.savedChannel})).status,400);
+  assert.doesNotMatch(JSON.stringify([first.body,second.body,job.body,state.body,api.body]),/rpc-private-key|\/tmp\/|authDir|CODEX_HOME/);
+ }finally{await runtime.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+
+test('import RPC returns the actual operation receipt without persisting it on getChannels',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'r-')),source=join(dir,'source');mkdirSync(source);writeFileSync(join(source,'auth.json'),JSON.stringify({OPENAI_API_KEY:'fixture-private'}));
+ const runtime=await startRuntime({dataDir:dir,port:0,channels:{autoImport:false,env:{HOME:dir}}});
+ const rpc=async(method:string,input?:unknown)=>{
+  const response=await fetch(`${runtime.url}/api/rpc`,{method:'POST',headers:{origin:runtime.url,'content-type':'application/json'},body:JSON.stringify({method,args:input===undefined?[]:[input]})});
+  assert.equal(response.status,200);return (await response.json() as any).result;
+ };
+ try{
+  const result=await rpc('importChannels',{revision:0,engine:'codex',sourceDir:source});
+  assert.deepEqual(result.importResult,{added:1,existing:0,updated:0,notFound:[],failures:[]});
+  assert.equal((await rpc('getChannels')).importResult,undefined);
+  assert.equal((await rpc('importChannels',{revision:result.policy.revision,engine:'codex',sourceDir:source})).importResult.existing,1);
+  assert.doesNotMatch(JSON.stringify(result),/fixture-private/);
+ }finally{await runtime.close();rmSync(dir,{recursive:true,force:true});}
+});

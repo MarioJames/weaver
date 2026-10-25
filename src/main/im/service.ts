@@ -86,7 +86,7 @@ export class ImService {
     const { engines, channels } = this.options.policy().config;
     const engine = engines[engineId];
     const original = channels[fallback];
-    if (!engine?.enabled || !isImEngineKind(engine.kind) || !original?.enabled || original.engine !== engineId) return fallback;
+    if (!engine || !isImEngineKind(engine.kind) || !original?.enabled || original.engine !== engineId) return fallback;
     const configured = (id: string): boolean => {
       const { secret } = this.options.channelConfig!(id);
       return Boolean(secret.apiKey || secret.config || secret.authDir);
@@ -127,8 +127,7 @@ export class ImService {
       let reason: ImOwnerProfileOption['reason'];
       if (!owner.enabled) { selectable = false; reason = 'disabled'; }
       else if (!config.channels[owner.channel]?.enabled) { selectable=false; reason='channel_disabled'; }
-      else if (!engine || !engine.enabled) { selectable = false; reason = 'engine_disabled'; }
-      else if (!(OWNER_HOST_KINDS as readonly string[]).includes(engine.kind)) { selectable = false; reason = 'not_launchable'; }
+      else if (!engine || !(OWNER_HOST_KINDS as readonly string[]).includes(engine.kind)) { selectable = false; reason = 'not_launchable'; }
       return { id, channel:owner.channel, engine: engineId, engineKind: engine?.kind ?? '', model: owner.model, effort: owner.effort, selectable, ...(selectable ? {} : { reason }) };
     }).sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
     if (savedOwner !== '' && !Object.hasOwn(owners, savedOwner)) {
@@ -333,7 +332,7 @@ export class ImService {
       if (!/^cli_[a-zA-Z0-9]+$/.test(config.appId) || !config.appSecret || !config.allowedOpenIds.length || config.allowedOpenIds.some(id => !/^ou_[A-Za-z0-9_-]+$/.test(id))) throw 0;
       const policy = this.options.policy(); const engine = policy.config.engines[policy.config.channels[config.channel]?.engine ?? ''];
       const entity = { enabled: true, channel: config.channel, model: config.model, effort: config.effort, workers: [], max_parallel: 1 };
-      // Independent chat: only the real engine availability (enabled + active engine/model
+      // Independent chat: only the real channel availability (enabled + active engine/model
       // blocks) gates admission. Owner/worker presence never matters; worker-scoped blocks
       // never reach this owner-less entity. The kind allowlist is the single shared module.
       if (!engine || !isImEngineKind(engine.kind) || availabilityOf(policy.config, activeBlocks({ version: 1, blocks: policy.blocks }, this.now()), entity).status !== 'available') throw 0;

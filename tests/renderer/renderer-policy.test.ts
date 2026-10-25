@@ -112,7 +112,7 @@ test('a role list item only notes states its enable switch does not already show
   const { roleNote } = await import('../../src/renderer/features/roles/RolesPage');
   assert.equal(roleNote({ status: 'available' }, false), undefined);
   assert.equal(roleNote({ status: 'disabled' }, false), undefined);
-  assert.deepEqual(roleNote({ status: 'engine_disabled' }, false), { text: '引擎未启用' });
+  assert.deepEqual(roleNote({ status: 'channel_disabled', channel: 'default_claude' }, false), { text: '渠道未启用' });
   assert.equal(roleNote({ status: 'blocked', reason: '额度耗尽' }, false)?.warning, true);
   assert.match(roleNote({ status: 'blocked', reason: '额度耗尽' }, false)!.text, /额度耗尽/);
   assert.deepEqual(roleNote(undefined, true), { text: '尚未保存', warning: true });

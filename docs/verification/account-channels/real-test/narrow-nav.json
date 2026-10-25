@@ -1,0 +1,34 @@
+{
+  "nav": [
+    {
+      "name": "任务",
+      "href": "/#/tasks"
+    },
+    {
+      "name": "定时任务",
+      "href": "/#/schedules"
+    },
+    {
+      "name": "账号与渠道",
+      "href": "/#/channels"
+    },
+    {
+      "name": "父 Agent",
+      "href": "/#/owners"
+    },
+    {
+      "name": "子 Agent",
+      "href": "/#/workers"
+    },
+    {
+      "name": "Bot",
+      "href": "/#/bots"
+    },
+    {
+      "name": "设置",
+      "href": "/#/settings"
+    }
+  ],
+  "viewport": 390,
+  "horizontal": false
+}

@@ -25,23 +25,23 @@
       "kind": "codex"
     },
     "grok": {
-      "enabled": false,
+      "enabled": true,
       "kind": "grok"
     },
     "opencode": {
-      "enabled": false,
+      "enabled": true,
       "kind": "opencode"
     },
     "pi": {
-      "enabled": false,
+      "enabled": true,
       "kind": "pi"
     },
     "qoder": {
-      "enabled": false,
+      "enabled": true,
       "kind": "qodercli"
     },
     "dsh": {
-      "enabled": false,
+      "enabled": true,
       "kind": "dsh"
     }
   },
@@ -125,7 +125,7 @@
       "enabled": false,
       "model": "glm-5.3-flash",
       "effort": "high",
-      "description": "Disabled Pi template (glm-5.3-flash). Enable the engine and this worker before dispatch.",
+      "description": "Disabled Pi worker template (glm-5.3-flash). Configure its account and enable this worker before dispatch.",
       "channel": "default_pi"
     },
     "dsh_worker": {

@@ -8,7 +8,7 @@ import { availabilityOf, coveringBlock } from '../../src/shared/policy/availabil
 import { defaultConfig } from '../../src/main/policy/routing';
 import { type Block } from '../../src/shared/contracts/policy';
 import { workerStatusTag } from '../../src/renderer/features/roles/OwnerSchedule';
-import { BlockList, removeBlock } from '../../src/renderer/features/engines/EnginesPage';
+import { removeBlock } from '../../src/renderer/policy/worker-resume';
 import { roleNote } from '../../src/renderer/features/roles/RolesPage';
 import { blockOf } from '../../src/renderer/features/probes/probe-view';
 import { VENDOR_BLOCK_BY } from '../../src/shared/policy/blocks';
@@ -76,14 +76,6 @@ test('the sub-agent list tags the banned worker and leaves its sibling plain', (
   assert.equal(roleNote({ status: 'available' }, false, sibling), undefined);
 });
 
-test('engine card lists each worker ban by name next to the whole-engine escalation', () => {
-  const blocks = [workerBlock('opencode_worker'), workerBlock('opencode_twin'), engineBlock()];
-  const html = markup(React.createElement(BlockList, { blocks, now: NOW, disabled: false, onRemove: () => {} }));
-  assert.equal((html.match(/data-engine-block="/g) ?? []).length, 3, 'worker blocks are not merged away');
-  assert.match(html, /opencode_worker · /);
-  assert.match(html, /opencode_twin · /);
-  assert.match(html, /该引擎全部子 Agent 均被限流\/额度耗尽/);
-});
 
 test('resume dispatch removes exactly the block with the same engine, model and worker', () => {
   const a = workerBlock('opencode_worker');

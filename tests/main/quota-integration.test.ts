@@ -34,8 +34,8 @@ test('quota merge preserves manual/model blocks and applies aliases without chan
   const f = await fixture();
   try {
     const current = f.policy.snapshot();
-    current.config.engines.codex_alias = { kind: 'codex', enabled: false };
-    current.config.engines.codex_foreign = { kind: 'codex', enabled: false };
+    current.config.engines.codex_alias = { kind: 'codex', enabled: true };
+    current.config.engines.codex_foreign = { kind: 'codex', enabled: true };
     current.config.channels.alias = {engine:'codex_alias',kind:'subscription',enabled:true,label:'Alias'};
     current.config.channels.foreign = {engine:'codex_foreign',kind:'subscription',enabled:true,label:'Foreign'};
     current.config.owners.codex_owner.worker_weights = { codex_worker: 4 };

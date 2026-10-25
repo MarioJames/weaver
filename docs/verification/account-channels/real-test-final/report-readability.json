@@ -1,0 +1,57 @@
+{
+  "actualFinalFile": true,
+  "geometry": {
+    "clientWidth": 390,
+    "hasHandoff": true,
+    "protocol": "file:",
+    "scrollWidth": 390,
+    "width": 390
+  },
+  "images": [
+    {
+      "loaded": true,
+      "src": "draft-switch-390.png"
+    },
+    {
+      "loaded": true,
+      "src": "dsh-invalid-preserved.png"
+    },
+    {
+      "loaded": true,
+      "src": "dsh-hello.png"
+    },
+    {
+      "loaded": true,
+      "src": "list-390.png"
+    },
+    {
+      "loaded": true,
+      "src": "api-form-390.png"
+    },
+    {
+      "loaded": true,
+      "src": "claude-manual-390-masked.png"
+    },
+    {
+      "loaded": true,
+      "src": "codex-final-pending-masked.png"
+    },
+    {
+      "loaded": true,
+      "src": "login-opencode-masked.png"
+    }
+  ],
+  "relativeLinksChecked": 52,
+  "brokenLinks": [],
+  "print": {
+    "actualChromePDFGenerated": true,
+    "pages": 11,
+    "containsFailureAndOAuth": true,
+    "containsExactFinalJobId": true,
+    "firstPrintPageVisuallyReviewed": true,
+    "finalPrintLastPageReview": "visually reviewed, no clipped resource text or broken document links",
+    "pdfRetainedInGit": false
+  },
+  "reportReadabilityOnly": true,
+  "cleanupStateUpdate": "Last Chrome rendering/11-page print included exact final pending job. After closing Chrome, resource closure receipt fields were finalized; detailed 12 cancelled-scope states live in linked resources.json, not expanded in the HTML."
+}

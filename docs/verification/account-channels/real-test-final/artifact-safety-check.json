@@ -1,0 +1,7 @@
+{
+  "findings": [],
+  "rawAuthBodyHarArchived": false,
+  "systemdUnitExemption": "user@1000.service is Linux ownership metadata, not a personal email",
+  "transientToolOutputEvent": "redaction-events.json",
+  "scope": "Final HTML and JSON pattern scan; screenshot masks applied before capture. Not a proof that every historical tool output was secret-free."
+}

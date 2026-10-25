@@ -1,0 +1,43 @@
+{
+  "actualUiSubmit": true,
+  "input": [
+    {
+      "inputs": [
+        {
+          "id": "_r_fa_-engine-hidden-input",
+          "type": "text",
+          "value": "claude"
+        },
+        {
+          "id": "_r_fa_-source",
+          "type": "text",
+          "value": ""
+        },
+        {
+          "id": "base-ui-_r_fj_",
+          "type": "checkbox",
+          "value": "on"
+        }
+      ],
+      "text": "导入原生账号与 API 配置\n本次导入结果\n新增 0、已有 6、更新 0 条。未发现可导入配置：pi。\n导入引擎\nclaude · claude\n来源配置目录\nWeaver 所在机器的原生 CLI 配置根；指定目录时请先选择对应引擎。留空使用默认位置。只复制必要配置与认证，不修改来源。\n更新已导入的配置与认证\n默认保留已有托管凭据，同一来源不会创建重复渠道。勾选后替换新启动使用的配置与认证；已有进程继续使用旧凭据根，名称、启停及角色选择保留。平台 keychain 或不支持的认证格式需在托管根重新登录。\n取消\n导入"
+    }
+  ],
+  "result": {
+    "importResult": {
+      "added": 0,
+      "existing": 1,
+      "failures": [],
+      "notFound": [],
+      "updated": 0
+    },
+    "input": {
+      "engine": "claude",
+      "revision": 36
+    },
+    "status": 200
+  },
+  "afterCount": 18,
+  "ui": [
+    "本次导入结果\n新增 0、已有 1、更新 0 条。"
+  ]
+}

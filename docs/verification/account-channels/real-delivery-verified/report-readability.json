@@ -1,0 +1,42 @@
+{
+  "status": "pass",
+  "fileOpenedInOwnedChrome": true,
+  "viewport390": {
+    "anchorTargetsPresent": true,
+    "bodyWidth": 390,
+    "imagesLoaded": true,
+    "noExternalDependencies": true,
+    "protocol": "file:",
+    "scrollWidth": 390,
+    "tableScrollable": false,
+    "title": "默认账号导入真实交付复验",
+    "width": 390
+  },
+  "screenshot": "report-390.png",
+  "visualNarrowReview": "Viewed screenshot at 390px; main conclusions and source digest wrap within body.",
+  "print": {
+    "generatedByChrome": true,
+    "pageCount": 4,
+    "format": "US Letter",
+    "firstPageRasterViewed": true,
+    "firstPageLayoutReadable": true,
+    "coreTextPresent": {
+      "freshA": true,
+      "freshB": true,
+      "completeBResponse": true,
+      "hello": true,
+      "limitations": true,
+      "production": true,
+      "cleanup": true
+    },
+    "temporaryPdfRemovedAtCleanup": true
+  },
+  "links": {
+    "checkedCount": 28,
+    "missing": [],
+    "machineResultActuallyClicked": true,
+    "helloAnchorActuallyClicked": true,
+    "historicalFailureLinkActuallyClicked": true
+  },
+  "scope": "Browser checks were performed before owned browser cleanup; final cleanup status and JSON references are updated afterward without changing tested layout."
+}

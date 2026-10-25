@@ -1,0 +1,43 @@
+{
+  "at": "2026-10-25T05:52:43.385831+00:00",
+  "accountLabel": "验收官方codex1025",
+  "accountId": "channel_bce8566b32d34b089fb9191d",
+  "jobRef": {
+    "channel": "channel_bce8566b32d34b089fb9191d",
+    "id": "3801d09c-8248-4472-adf8-3ce0203520be"
+  },
+  "jobStatus": "authorizing",
+  "localPage": "http://127.0.0.1:4738/#/channels",
+  "safeAuthorizationHostPath": "https://auth.openai.com/codex/device",
+  "hasDeviceCode": true,
+  "uiCodeMatchesSameBackendJob": true,
+  "uiSteps": [
+    "打开4738账号与渠道页，找到验收官方codex1025",
+    "点击登录官方账号，服务会找回此账号当前活job",
+    "本人打开官方授权链接，并使用本地UI显示的设备验证码",
+    "仅本人完成官方登录与确认，等待Weaver strict凭据验证；未授权前不能执行",
+    "放弃时在此精确账号job点取消此次登录，再确认scope inactive/无进程"
+  ],
+  "oauthCompleted": false,
+  "nativeScope": "dev-weaver-channel-login-c028bb13-2c0f-4798-a53c-e6898dc48f05.scope",
+  "nativePid": 1350045,
+  "nativeOwnerUid": 1000,
+  "nativeOwnerUser": "mocha",
+  "nativeStartedAtUtc": "2026-10-25T05:52:40.390000+00:00",
+  "timeoutDeadlineUtc": "2026-10-25T06:02:40.390000+00:00",
+  "timeout": "Server native login 10min from startup; scope server-owned. Native vendor code may advertise a different expiry; Weaver 10min deadline applies.",
+  "ownerDependency": "root owner must immediately ask the person to authorize; worker never performs third-party authorization.",
+  "cleanupCondition": "Exact UI cancel account/job or server 10min timeout releases own scope. Chrome/profile removal does not stop native login. Do not stop test/prod services.",
+  "nativeProcess": {
+    "pid": 1350045,
+    "comm": "codex",
+    "cwd": "/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d/native",
+    "roots": {
+      "CODEX_HOME": "/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d/native"
+    },
+    "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/dev-weaver-channel-login-c028bb13-2c0f-4798-a53c-e6898dc48f05.scope"
+  },
+  "sourceDigest": "1c092161ceed7008012cdf22548f919e919033dc24d6df0601ed867be7117f88",
+  "finalObservedStatus": "authorizing",
+  "browserClosedAndProfileRemoved": true
+}

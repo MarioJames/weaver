@@ -1,4 +1,4 @@
-import type { ChannelsSnapshot, RefreshChannelQuotaInput, SaveChannelInput, DeleteChannelInput, ImportChannelsInput } from './channels';
+import type { ImportChannelsResult, ChannelsSnapshot, ChannelLogin, ChannelLoginRef, StartChannelLoginInput, SubmitChannelLoginCodeInput, SaveChannelResult, RefreshChannelQuotaInput, SaveChannelInput, DeleteChannelInput, ImportChannelsInput } from './channels';
 import type { EngineCleanupInput, EngineCleanupJob } from './engine-cleanup';
 import type { ImSettingsSnapshot, SaveImSettingsInput } from './im';
 import type { PolicySnapshot, SavePolicyInput, PreviewInput, RoutePreview, Issue } from './policy';
@@ -8,14 +8,16 @@ import type { CommandRequest, CommandResponse } from './commands';
 import type { Capabilities, Task, TaskInput, TaskSummary } from './tasks';
 
 export interface EngineScan { probedAt: string; probes: EngineProbeRecord[]; readiness: EngineReadiness[]; boundary: ExecutionBoundary }
-export interface EngineToggleInput { id: string; enabled: boolean; revision: number }
-export interface EngineToggleResult { snapshot: PolicySnapshot; probe: EngineProbeRecord | null; readiness: EngineReadiness[] }
 export interface WeaverAPI {
  refreshChannelQuota(input: RefreshChannelQuotaInput): Promise<ChannelsSnapshot>;
  getChannels(): Promise<ChannelsSnapshot>;
- saveChannel(input: SaveChannelInput): Promise<ChannelsSnapshot>;
+ saveChannel(input: SaveChannelInput): Promise<SaveChannelResult>;
+ startChannelLogin(input: StartChannelLoginInput): Promise<ChannelLogin>;
+ getChannelLogin(input: ChannelLoginRef): Promise<ChannelLogin>;
+ submitChannelLoginCode(input: SubmitChannelLoginCodeInput): Promise<ChannelLogin>;
+ cancelChannelLogin(input: ChannelLoginRef): Promise<ChannelLogin>;
  deleteChannel(input: DeleteChannelInput): Promise<ChannelsSnapshot>;
- importChannels(input: ImportChannelsInput): Promise<ChannelsSnapshot>;
+ importChannels(input: ImportChannelsInput): Promise<ImportChannelsResult>;
  getImSettings(): Promise<ImSettingsSnapshot>;
  saveImSettings(input: SaveImSettingsInput): Promise<ImSettingsSnapshot>;
  reconnectIm(): Promise<ImSettingsSnapshot>;
@@ -27,7 +29,6 @@ export interface WeaverAPI {
  scanEngines(): Promise<EngineScan>;
  getQuota(): Promise<QuotaSnapshot>;
  refreshQuota(input: QuotaRefreshInput): Promise<QuotaRefreshResult>;
- setEngineEnabled(input: EngineToggleInput): Promise<EngineToggleResult>;
  startEngineCleanup(input: EngineCleanupInput): Promise<EngineCleanupJob>;
  getEngineCleanup(id: string): Promise<EngineCleanupJob | null>;
  sayHi(input: HelloInput): Promise<HelloJob>;

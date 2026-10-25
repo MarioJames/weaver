@@ -1,0 +1,170 @@
+{
+  "taskId": "9fbd5c66-b22c-4bfb-ad7e-1e62778ef8f9",
+  "status": "BLOCKED",
+  "generatedAt": "2026-10-25T06:07:06.543641+00:00",
+  "version": {
+    "head": "294b7f91e974e0a4dc134fbe398810207198ebdc",
+    "sourceDigest": "e9cd50ee62b494b07c9da53a939e5bc7de53a2a734f3acf57e45944760c4bc21",
+    "filesChecked": 291,
+    "beforeAndAfterEqual": true,
+    "sourceFreezeEvidence": "source-freeze.json"
+  },
+  "blockers": [
+    {
+      "id": "required-helper-unavailable",
+      "requirement": "Audit and reuse the verified minimal runtime/helper and Chrome control from scratch/import-specific; do not rebuild the framework.",
+      "observation": "The import-specific directory contains only BLOCKERS.json, ownership.json and result.json. The required runtime/browser/helper implementation is absent. No source helper is available there to audit or copy.",
+      "impact": "Fresh A/B, persistent 4738 UI imports and private selector verification have not been executed. This is a missing handoff prerequisite, not a product failure.",
+      "needed": "Owner must restore the verified helper artifacts or supply an explicitly authorized replacement implementation and new frozen handoff."
+    }
+  ],
+  "newVerification": {
+    "freshAClaudeFirst": "NOT RUN",
+    "freshAClaudeRepeat": "NOT RUN",
+    "freshBAllFirst": "NOT RUN",
+    "freshBClaudeRepeat": "NOT RUN",
+    "persistent4738ClaudeAndAll": "NOT RUN",
+    "privateSelectors": "NOT RUN; no construction or process verification",
+    "mutationRequests": 0,
+    "durationMs": null,
+    "added": null,
+    "existing": null,
+    "failures": null,
+    "revision": null,
+    "secretCount": null,
+    "nativeSourceBeforeAfter": "NOT CHECKED; no native source operation performed"
+  },
+  "history": {
+    "importSpecific": "../import-specific/REPORT.html",
+    "realTestFinal": "../real-test-final/REPORT.html",
+    "oldFailures": [
+      "Claude added=1 with hasCredentials=false before user restored login",
+      "All first UI aborted at 15s; later six DB rows did not establish delivered response"
+    ],
+    "engines": {
+      "provenance": "Earlier owner-reviewed evidence, different time/version; not rerun here",
+      "fiveImportedAccountsHi": [
+        "codex",
+        "claude",
+        "qoder",
+        "dsh",
+        "grok (later correction)"
+      ],
+      "openCode": "Go usage limit; not inference pass",
+      "pi": "no credentials; not inference pass",
+      "formalCodex": "ac722880-d7b1-4886-842d-bc69047846b3: real/completed/acknowledged/accepted per earlier evidence"
+    },
+    "previousUI": "Earlier 1c092 digest UI coverage is historical only; no final-import behavior is established here",
+    "oauthGap": "Five new official accounts have not all completed owner OAuth; restored default Claude source is not new official-account end-to-end completion",
+    "security": "Earlier reports record temporary device-code/query output exposure; this run did not repeat it"
+  },
+  "deployment": {
+    "production4737": "Not deployed with this round of fixes; no write/stop",
+    "testUrl": "http://127.0.0.1:4738",
+    "test4738": "Persistent; no mutation, reset, cleanup or stop"
+  },
+  "ownerFullCheck": "Owner summary arrived at handoff: exitCode=1, same frozen digest, completedAt=2026-10-25T06:06:16.020210+00:00; log not inspected; counts and cause unknown.",
+  "resources": {
+    "freshScopesStarted": [],
+    "freshDatabasesCreated": [],
+    "authRootsCopied": [],
+    "nativeJobsStarted": [],
+    "nativeSourceOperations": 0,
+    "persistentServiceOperations": 0,
+    "browserClosed": true,
+    "profileDeleted": true,
+    "profileChromeProcessMatches": [],
+    "herdrWorkspaceClosed": true,
+    "herdrSessionStopped": true,
+    "production4737Preserved": true,
+    "test4738Preserved": true,
+    "sourceFilesUnchanged": true,
+    "scope": "Only own report browser and Herdr workspace/session were created and reclaimed; no fresh credential storage existed to delete."
+  },
+  "reportValidation": {
+    "fileOpen": "PASS; actual file URL in own Google Chrome",
+    "viewport390": {
+      "status": "PASS",
+      "width": 390,
+      "scrollWidth": 390,
+      "screenshot": "report-390.png",
+      "visualInspected": true,
+      "privacy": "Report contains no account identifiers or secrets; geometry checked before screenshot; no DOM masking needed"
+    },
+    "print": {
+      "status": "PASS",
+      "artifact": "REPORT.pdf",
+      "pages": 2,
+      "method": "Actual Chrome print-to-PDF; both rasterized pages visually inspected",
+      "finalOwnerSummaryIncluded": true
+    },
+    "links": {
+      "status": "PASS for all local artifacts and anchors; external app URL not navigated",
+      "checks": [
+        {
+          "href": "#blocker",
+          "status": "PASS",
+          "kind": "browser-confirmed-anchor"
+        },
+        {
+          "href": "#cases",
+          "status": "PASS",
+          "kind": "browser-confirmed-anchor"
+        },
+        {
+          "href": "#history",
+          "status": "PASS",
+          "kind": "browser-confirmed-anchor"
+        },
+        {
+          "href": "#resources",
+          "status": "PASS",
+          "kind": "browser-confirmed-anchor"
+        },
+        {
+          "href": "results.json",
+          "status": "PASS",
+          "kind": "local-artifact-exists"
+        },
+        {
+          "href": "../import-specific/REPORT.html",
+          "status": "PASS",
+          "kind": "local-artifact-exists"
+        },
+        {
+          "href": "../real-test-final/REPORT.html",
+          "status": "PASS",
+          "kind": "local-artifact-exists"
+        },
+        {
+          "href": "../real-test-final/engine-evidence.json",
+          "status": "PASS",
+          "kind": "local-artifact-exists"
+        },
+        {
+          "href": "http://127.0.0.1:4738",
+          "status": "NOT NAVIGATED",
+          "kind": "persistent test URL; product not exercised"
+        },
+        {
+          "href": "cleanup.json",
+          "status": "PASS",
+          "kind": "local-artifact-exists"
+        },
+        {
+          "href": "report-validation.json",
+          "status": "PASS",
+          "kind": "local-artifact-exists"
+        },
+        {
+          "href": "owner-check-summary.json",
+          "status": "PASS",
+          "kind": "local artifact exists; final browser saw owner link and exitCode=1"
+        }
+      ]
+    },
+    "pageErrors": [],
+    "productAcceptance": "NOT RUN; report validation does not prove UI import",
+    "artifactErrors": []
+  }
+}

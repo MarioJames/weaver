@@ -1,0 +1,63 @@
+{
+  "baselineRevision": 36,
+  "finalRevision": 45,
+  "originalChannelsUnchanged": true,
+  "originalOwnersUnchanged": true,
+  "originalWorkersUnchanged": true,
+  "originalBlocksUnchanged": false,
+  "disposableSecretAbsent": true,
+  "disposableRootAbsent": true,
+  "loginJobsBeforeFinalCodex": [
+    {
+      "channel": "channel_4ced3727a61348b390af7c6f",
+      "reference": {
+        "channel": "channel_4ced3727a61348b390af7c6f",
+        "id": "fa97784f-d160-4149-9c8b-4ec9d9451abc"
+      },
+      "status": "cancelled",
+      "hasCredentials": false,
+      "ownedProcesses": []
+    },
+    {
+      "channel": "channel_bce8566b32d34b089fb9191d",
+      "reference": {
+        "channel": "channel_bce8566b32d34b089fb9191d",
+        "id": "96fda48a-ab62-46bd-a406-cd0e0a64031f"
+      },
+      "status": "cancelled",
+      "hasCredentials": false,
+      "ownedProcesses": []
+    },
+    {
+      "channel": "channel_24fae3142b5c48f898448d0a",
+      "reference": {
+        "channel": "channel_24fae3142b5c48f898448d0a",
+        "id": "10769e30-1573-4929-b5eb-d6ab78f25b2c"
+      },
+      "status": "cancelled",
+      "hasCredentials": false,
+      "ownedProcesses": []
+    },
+    {
+      "channel": "channel_90504ac6dfee41019ebc3fc0",
+      "reference": {
+        "channel": "channel_90504ac6dfee41019ebc3fc0",
+        "id": "121dd6f4-915b-492d-9f4e-7b31ed6dedcb"
+      },
+      "status": "cancelled",
+      "hasCredentials": false,
+      "ownedProcesses": []
+    },
+    {
+      "channel": "channel_40c15c208bf84e45911b2b95",
+      "reference": {
+        "channel": "channel_40c15c208bf84e45911b2b95",
+        "id": "5af9fda8-1885-42ec-9cc3-097e833007df"
+      },
+      "status": "cancelled",
+      "hasCredentials": false,
+      "ownedProcesses": []
+    }
+  ],
+  "blockObservation": "Same Claude channel quota block, reason, since and by retained; release_at changed from 02:00:00.223Z to 01:59:59.518Z (705ms). No quota/vendor block was cleared or manually altered by this worker. Normal policy save incorporated current block state; precise producer of timestamp delta not independently traced."
+}

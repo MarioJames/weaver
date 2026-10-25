@@ -1,0 +1,833 @@
+[
+  {
+    "viewport": [
+      1366,
+      768
+    ],
+    "nativeWheelXY": [
+      683,
+      384
+    ],
+    "before": {
+      "dialog": {
+        "bottom": 768,
+        "height": 768,
+        "left": 0,
+        "right": 1366,
+        "top": 0,
+        "width": 1366,
+        "x": 0,
+        "y": 0
+      },
+      "last": [
+        {
+          "rect": {
+            "bottom": 1044.375,
+            "height": 32,
+            "left": 379,
+            "right": 507.015625,
+            "top": 1012.375,
+            "width": 128.015625,
+            "x": 379,
+            "y": 1012.375
+          },
+          "text": "选择配置文件"
+        },
+        {
+          "rect": {
+            "bottom": 1068.375,
+            "height": 24,
+            "left": 379,
+            "right": 457.015625,
+            "top": 1044.375,
+            "width": 78.015625,
+            "x": 379,
+            "y": 1044.375
+          },
+          "text": "放弃此草稿"
+        },
+        {
+          "rect": {
+            "bottom": 740,
+            "height": 32,
+            "left": 801.96875,
+            "right": 896.984375,
+            "top": 708,
+            "width": 95.015625,
+            "x": 801.96875,
+            "y": 708
+          },
+          "text": "暂存并关闭"
+        },
+        {
+          "rect": {
+            "bottom": 740,
+            "height": 32,
+            "left": 904.984375,
+            "right": 987,
+            "top": 708,
+            "width": 82.015625,
+            "x": 904.984375,
+            "y": 708
+          },
+          "text": "保存配置"
+        }
+      ],
+      "scroll": [
+        {
+          "clientHeight": 632,
+          "overflow": "auto",
+          "rect": {
+            "bottom": 696,
+            "height": 632,
+            "left": 363,
+            "right": 1003,
+            "top": 64,
+            "width": 640,
+            "x": 363,
+            "y": 64
+          },
+          "scrollHeight": 1020,
+          "scrollTop": 0,
+          "tag": "DIV"
+        }
+      ],
+      "viewport": {
+        "h": 768,
+        "w": 1366
+      }
+    },
+    "wheel": {
+      "dialog": {
+        "bottom": 768,
+        "height": 768,
+        "left": 0,
+        "right": 1366,
+        "top": 0,
+        "width": 1366,
+        "x": 0,
+        "y": 0
+      },
+      "last": [
+        {
+          "rect": {
+            "bottom": 656.375,
+            "height": 32,
+            "left": 379,
+            "right": 507.015625,
+            "top": 624.375,
+            "width": 128.015625,
+            "x": 379,
+            "y": 624.375
+          },
+          "text": "选择配置文件"
+        },
+        {
+          "rect": {
+            "bottom": 680.375,
+            "height": 24,
+            "left": 379,
+            "right": 457.015625,
+            "top": 656.375,
+            "width": 78.015625,
+            "x": 379,
+            "y": 656.375
+          },
+          "text": "放弃此草稿"
+        },
+        {
+          "rect": {
+            "bottom": 740,
+            "height": 32,
+            "left": 801.96875,
+            "right": 896.984375,
+            "top": 708,
+            "width": 95.015625,
+            "x": 801.96875,
+            "y": 708
+          },
+          "text": "暂存并关闭"
+        },
+        {
+          "rect": {
+            "bottom": 740,
+            "height": 32,
+            "left": 904.984375,
+            "right": 987,
+            "top": 708,
+            "width": 82.015625,
+            "x": 904.984375,
+            "y": 708
+          },
+          "text": "保存配置"
+        }
+      ],
+      "scroll": [
+        {
+          "clientHeight": 632,
+          "overflow": "auto",
+          "rect": {
+            "bottom": 696,
+            "height": 632,
+            "left": 363,
+            "right": 1003,
+            "top": 64,
+            "width": 640,
+            "x": 363,
+            "y": 64
+          },
+          "scrollHeight": 1020,
+          "scrollTop": 388,
+          "tag": "DIV"
+        }
+      ],
+      "viewport": {
+        "h": 768,
+        "w": 1366
+      }
+    },
+    "pageDown": {
+      "dialog": {
+        "bottom": 768,
+        "height": 768,
+        "left": 0,
+        "right": 1366,
+        "top": 0,
+        "width": 1366,
+        "x": 0,
+        "y": 0
+      },
+      "last": [
+        {
+          "rect": {
+            "bottom": 656.375,
+            "height": 32,
+            "left": 379,
+            "right": 507.015625,
+            "top": 624.375,
+            "width": 128.015625,
+            "x": 379,
+            "y": 624.375
+          },
+          "text": "选择配置文件"
+        },
+        {
+          "rect": {
+            "bottom": 680.375,
+            "height": 24,
+            "left": 379,
+            "right": 457.015625,
+            "top": 656.375,
+            "width": 78.015625,
+            "x": 379,
+            "y": 656.375
+          },
+          "text": "放弃此草稿"
+        },
+        {
+          "rect": {
+            "bottom": 740,
+            "height": 32,
+            "left": 801.96875,
+            "right": 896.984375,
+            "top": 708,
+            "width": 95.015625,
+            "x": 801.96875,
+            "y": 708
+          },
+          "text": "暂存并关闭"
+        },
+        {
+          "rect": {
+            "bottom": 740,
+            "height": 32,
+            "left": 904.984375,
+            "right": 987,
+            "top": 708,
+            "width": 82.015625,
+            "x": 904.984375,
+            "y": 708
+          },
+          "text": "保存配置"
+        }
+      ],
+      "scroll": [
+        {
+          "clientHeight": 632,
+          "overflow": "auto",
+          "rect": {
+            "bottom": 696,
+            "height": 632,
+            "left": 363,
+            "right": 1003,
+            "top": 64,
+            "width": 640,
+            "x": 363,
+            "y": 64
+          },
+          "scrollHeight": 1020,
+          "scrollTop": 388,
+          "tag": "DIV"
+        }
+      ],
+      "viewport": {
+        "h": 768,
+        "w": 1366
+      }
+    }
+  },
+  {
+    "viewport": [
+      1440,
+      900
+    ],
+    "nativeWheelXY": [
+      720,
+      450
+    ],
+    "before": {
+      "dialog": {
+        "bottom": 900,
+        "height": 900,
+        "left": 0,
+        "right": 1440,
+        "top": 0,
+        "width": 1440,
+        "x": 0,
+        "y": 0
+      },
+      "last": [
+        {
+          "rect": {
+            "bottom": 1044.375,
+            "height": 32,
+            "left": 416,
+            "right": 544.015625,
+            "top": 1012.375,
+            "width": 128.015625,
+            "x": 416,
+            "y": 1012.375
+          },
+          "text": "选择配置文件"
+        },
+        {
+          "rect": {
+            "bottom": 1068.375,
+            "height": 24,
+            "left": 416,
+            "right": 494.015625,
+            "top": 1044.375,
+            "width": 78.015625,
+            "x": 416,
+            "y": 1044.375
+          },
+          "text": "放弃此草稿"
+        },
+        {
+          "rect": {
+            "bottom": 872,
+            "height": 32,
+            "left": 838.96875,
+            "right": 933.984375,
+            "top": 840,
+            "width": 95.015625,
+            "x": 838.96875,
+            "y": 840
+          },
+          "text": "暂存并关闭"
+        },
+        {
+          "rect": {
+            "bottom": 872,
+            "height": 32,
+            "left": 941.984375,
+            "right": 1024,
+            "top": 840,
+            "width": 82.015625,
+            "x": 941.984375,
+            "y": 840
+          },
+          "text": "保存配置"
+        }
+      ],
+      "scroll": [
+        {
+          "clientHeight": 764,
+          "overflow": "auto",
+          "rect": {
+            "bottom": 828,
+            "height": 764,
+            "left": 400,
+            "right": 1040,
+            "top": 64,
+            "width": 640,
+            "x": 400,
+            "y": 64
+          },
+          "scrollHeight": 1020,
+          "scrollTop": 0,
+          "tag": "DIV"
+        }
+      ],
+      "viewport": {
+        "h": 900,
+        "w": 1440
+      }
+    },
+    "wheel": {
+      "dialog": {
+        "bottom": 900,
+        "height": 900,
+        "left": 0,
+        "right": 1440,
+        "top": 0,
+        "width": 1440,
+        "x": 0,
+        "y": 0
+      },
+      "last": [
+        {
+          "rect": {
+            "bottom": 788.375,
+            "height": 32,
+            "left": 416,
+            "right": 544.015625,
+            "top": 756.375,
+            "width": 128.015625,
+            "x": 416,
+            "y": 756.375
+          },
+          "text": "选择配置文件"
+        },
+        {
+          "rect": {
+            "bottom": 812.375,
+            "height": 24,
+            "left": 416,
+            "right": 494.015625,
+            "top": 788.375,
+            "width": 78.015625,
+            "x": 416,
+            "y": 788.375
+          },
+          "text": "放弃此草稿"
+        },
+        {
+          "rect": {
+            "bottom": 872,
+            "height": 32,
+            "left": 838.96875,
+            "right": 933.984375,
+            "top": 840,
+            "width": 95.015625,
+            "x": 838.96875,
+            "y": 840
+          },
+          "text": "暂存并关闭"
+        },
+        {
+          "rect": {
+            "bottom": 872,
+            "height": 32,
+            "left": 941.984375,
+            "right": 1024,
+            "top": 840,
+            "width": 82.015625,
+            "x": 941.984375,
+            "y": 840
+          },
+          "text": "保存配置"
+        }
+      ],
+      "scroll": [
+        {
+          "clientHeight": 764,
+          "overflow": "auto",
+          "rect": {
+            "bottom": 828,
+            "height": 764,
+            "left": 400,
+            "right": 1040,
+            "top": 64,
+            "width": 640,
+            "x": 400,
+            "y": 64
+          },
+          "scrollHeight": 1020,
+          "scrollTop": 256,
+          "tag": "DIV"
+        }
+      ],
+      "viewport": {
+        "h": 900,
+        "w": 1440
+      }
+    },
+    "pageDown": {
+      "dialog": {
+        "bottom": 900,
+        "height": 900,
+        "left": 0,
+        "right": 1440,
+        "top": 0,
+        "width": 1440,
+        "x": 0,
+        "y": 0
+      },
+      "last": [
+        {
+          "rect": {
+            "bottom": 788.375,
+            "height": 32,
+            "left": 416,
+            "right": 544.015625,
+            "top": 756.375,
+            "width": 128.015625,
+            "x": 416,
+            "y": 756.375
+          },
+          "text": "选择配置文件"
+        },
+        {
+          "rect": {
+            "bottom": 812.375,
+            "height": 24,
+            "left": 416,
+            "right": 494.015625,
+            "top": 788.375,
+            "width": 78.015625,
+            "x": 416,
+            "y": 788.375
+          },
+          "text": "放弃此草稿"
+        },
+        {
+          "rect": {
+            "bottom": 872,
+            "height": 32,
+            "left": 838.96875,
+            "right": 933.984375,
+            "top": 840,
+            "width": 95.015625,
+            "x": 838.96875,
+            "y": 840
+          },
+          "text": "暂存并关闭"
+        },
+        {
+          "rect": {
+            "bottom": 872,
+            "height": 32,
+            "left": 941.984375,
+            "right": 1024,
+            "top": 840,
+            "width": 82.015625,
+            "x": 941.984375,
+            "y": 840
+          },
+          "text": "保存配置"
+        }
+      ],
+      "scroll": [
+        {
+          "clientHeight": 764,
+          "overflow": "auto",
+          "rect": {
+            "bottom": 828,
+            "height": 764,
+            "left": 400,
+            "right": 1040,
+            "top": 64,
+            "width": 640,
+            "x": 400,
+            "y": 64
+          },
+          "scrollHeight": 1020,
+          "scrollTop": 256,
+          "tag": "DIV"
+        }
+      ],
+      "viewport": {
+        "h": 900,
+        "w": 1440
+      }
+    }
+  },
+  {
+    "viewport": [
+      390,
+      844
+    ],
+    "nativeWheelXY": [
+      195,
+      422
+    ],
+    "before": {
+      "dialog": {
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "top": 0,
+        "width": 390,
+        "x": 0,
+        "y": 0
+      },
+      "last": [
+        {
+          "rect": {
+            "bottom": 1082.0625,
+            "height": 32,
+            "left": 32,
+            "right": 160.015625,
+            "top": 1050.0625,
+            "width": 128.015625,
+            "x": 32,
+            "y": 1050.0625
+          },
+          "text": "选择配置文件"
+        },
+        {
+          "rect": {
+            "bottom": 1106.0625,
+            "height": 24,
+            "left": 32,
+            "right": 110.015625,
+            "top": 1082.0625,
+            "width": 78.015625,
+            "x": 32,
+            "y": 1082.0625
+          },
+          "text": "放弃此草稿"
+        },
+        {
+          "rect": {
+            "bottom": 816,
+            "height": 32,
+            "left": 172.96875,
+            "right": 267.984375,
+            "top": 784,
+            "width": 95.015625,
+            "x": 172.96875,
+            "y": 784
+          },
+          "text": "暂存并关闭"
+        },
+        {
+          "rect": {
+            "bottom": 816,
+            "height": 32,
+            "left": 275.984375,
+            "right": 358,
+            "top": 784,
+            "width": 82.015625,
+            "x": 275.984375,
+            "y": 784
+          },
+          "text": "保存配置"
+        }
+      ],
+      "scroll": [
+        {
+          "clientHeight": 708,
+          "overflow": "auto",
+          "rect": {
+            "bottom": 772,
+            "height": 708,
+            "left": 16,
+            "right": 374,
+            "top": 64,
+            "width": 358,
+            "x": 16,
+            "y": 64
+          },
+          "scrollHeight": 1058,
+          "scrollTop": 0,
+          "tag": "DIV"
+        }
+      ],
+      "viewport": {
+        "h": 844,
+        "w": 390
+      }
+    },
+    "wheel": {
+      "dialog": {
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "top": 0,
+        "width": 390,
+        "x": 0,
+        "y": 0
+      },
+      "last": [
+        {
+          "rect": {
+            "bottom": 732.0625,
+            "height": 32,
+            "left": 32,
+            "right": 160.015625,
+            "top": 700.0625,
+            "width": 128.015625,
+            "x": 32,
+            "y": 700.0625
+          },
+          "text": "选择配置文件"
+        },
+        {
+          "rect": {
+            "bottom": 756.0625,
+            "height": 24,
+            "left": 32,
+            "right": 110.015625,
+            "top": 732.0625,
+            "width": 78.015625,
+            "x": 32,
+            "y": 732.0625
+          },
+          "text": "放弃此草稿"
+        },
+        {
+          "rect": {
+            "bottom": 816,
+            "height": 32,
+            "left": 172.96875,
+            "right": 267.984375,
+            "top": 784,
+            "width": 95.015625,
+            "x": 172.96875,
+            "y": 784
+          },
+          "text": "暂存并关闭"
+        },
+        {
+          "rect": {
+            "bottom": 816,
+            "height": 32,
+            "left": 275.984375,
+            "right": 358,
+            "top": 784,
+            "width": 82.015625,
+            "x": 275.984375,
+            "y": 784
+          },
+          "text": "保存配置"
+        }
+      ],
+      "scroll": [
+        {
+          "clientHeight": 708,
+          "overflow": "auto",
+          "rect": {
+            "bottom": 772,
+            "height": 708,
+            "left": 16,
+            "right": 374,
+            "top": 64,
+            "width": 358,
+            "x": 16,
+            "y": 64
+          },
+          "scrollHeight": 1058,
+          "scrollTop": 350,
+          "tag": "DIV"
+        }
+      ],
+      "viewport": {
+        "h": 844,
+        "w": 390
+      }
+    },
+    "pageDown": {
+      "dialog": {
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "top": 0,
+        "width": 390,
+        "x": 0,
+        "y": 0
+      },
+      "last": [
+        {
+          "rect": {
+            "bottom": 732.0625,
+            "height": 32,
+            "left": 32,
+            "right": 160.015625,
+            "top": 700.0625,
+            "width": 128.015625,
+            "x": 32,
+            "y": 700.0625
+          },
+          "text": "选择配置文件"
+        },
+        {
+          "rect": {
+            "bottom": 756.0625,
+            "height": 24,
+            "left": 32,
+            "right": 110.015625,
+            "top": 732.0625,
+            "width": 78.015625,
+            "x": 32,
+            "y": 732.0625
+          },
+          "text": "放弃此草稿"
+        },
+        {
+          "rect": {
+            "bottom": 816,
+            "height": 32,
+            "left": 172.96875,
+            "right": 267.984375,
+            "top": 784,
+            "width": 95.015625,
+            "x": 172.96875,
+            "y": 784
+          },
+          "text": "暂存并关闭"
+        },
+        {
+          "rect": {
+            "bottom": 816,
+            "height": 32,
+            "left": 275.984375,
+            "right": 358,
+            "top": 784,
+            "width": 82.015625,
+            "x": 275.984375,
+            "y": 784
+          },
+          "text": "保存配置"
+        }
+      ],
+      "scroll": [
+        {
+          "clientHeight": 708,
+          "overflow": "auto",
+          "rect": {
+            "bottom": 772,
+            "height": 708,
+            "left": 16,
+            "right": 374,
+            "top": 64,
+            "width": 358,
+            "x": 16,
+            "y": 64
+          },
+          "scrollHeight": 1058,
+          "scrollTop": 350,
+          "tag": "DIV"
+        }
+      ],
+      "viewport": {
+        "h": 844,
+        "w": 390
+      }
+    }
+  }
+]

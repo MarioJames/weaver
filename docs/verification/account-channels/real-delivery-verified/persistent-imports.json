@@ -1,0 +1,58 @@
+[
+  {
+    "args": [
+      {
+        "engine": "claude",
+        "replaceExisting": false,
+        "revision": 47,
+        "sourceDirEmpty": true
+      }
+    ],
+    "channelCount": 18,
+    "credentialCount": 5,
+    "durationMs": 73,
+    "httpStatus": 200,
+    "importResult": {
+      "added": 0,
+      "existing": 1,
+      "failures": [],
+      "notFound": [],
+      "updated": 0
+    },
+    "method": "importChannels",
+    "revision": 47,
+    "startedAt": "2026-10-25T06:16:26.434Z",
+    "structureKeys": [
+      "result"
+    ]
+  },
+  {
+    "args": [
+      {
+        "engine": "all",
+        "replaceExisting": false,
+        "revision": 47,
+        "sourceDirEmpty": true
+      }
+    ],
+    "channelCount": 18,
+    "credentialCount": 5,
+    "durationMs": 6051,
+    "httpStatus": 200,
+    "importResult": {
+      "added": 0,
+      "existing": 6,
+      "failures": [],
+      "notFound": [
+        "pi"
+      ],
+      "updated": 0
+    },
+    "method": "importChannels",
+    "revision": 47,
+    "startedAt": "2026-10-25T06:16:38.516Z",
+    "structureKeys": [
+      "result"
+    ]
+  }
+]

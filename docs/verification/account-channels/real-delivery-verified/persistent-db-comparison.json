@@ -1,0 +1,9 @@
+{
+  "beforeSecrets": 11,
+  "afterSecrets": 11,
+  "newSecretCount": 0,
+  "allExistingSecretsAndRootsUnchanged": true,
+  "existingSecretBodiesUnchanged": true,
+  "existingRootPathsUnchanged": true,
+  "existingRootFileBytesUnchanged": true
+}

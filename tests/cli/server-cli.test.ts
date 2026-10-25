@@ -78,7 +78,7 @@ const ran = (runs: string[][], ...prefix: string[]) => runs.some(call => call.sl
 
 // ---------------------------------------------------------------- real CLI lifecycle
 
-test('weaver server start, status and stop drive a real control plane on a free port', () => {
+test('weaver server start, status and stop drive a real control plane on a free port', async () => {
   const dataDir = mkdtempSync(join(tmpdir(), 'live-'));
   // Strip service-manager wiring (env var and unit path) so the spawned CLI sees an unmanaged server regardless of host.
   const isolatedEnv = (): NodeJS.ProcessEnv => {
@@ -116,6 +116,11 @@ test('weaver server start, status and stop drive a real control plane on a free 
     assert.equal(stop.status, 0, stop.stderr);
     assert.equal(JSON.parse(stop.stdout).data.status, 'stopped');
     started = false;
+    // Stop observes the closed socket before asynchronous discovery cleanup finishes.
+    const cleanupDeadline = Date.now() + 2_000;
+    while (existsSync(join(dataDir, 'control.v1.json')) && Date.now() < cleanupDeadline) {
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
     assert.equal(existsSync(join(dataDir, 'control.v1.json')), false, 'the endpoint is cleaned up');
 
     const twice = cli(['stop']);

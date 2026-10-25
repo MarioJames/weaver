@@ -1,0 +1,294 @@
+{
+  "environmentReady": true,
+  "overall": "FAIL: fresh-import has 2 unresolved failures; scoped browser corrections passed; 5 personal OAuth completions missing",
+  "generatedAt": "2026-10-25T05:53:56.559900+00:00",
+  "version": {
+    "digest": "1c092161ceed7008012cdf22548f919e919033dc24d6df0601ed867be7117f88",
+    "head": "294b7f91e974e0a4dc134fbe398810207198ebdc",
+    "frozenFiles": 291,
+    "entry": {
+      "at": "2026-10-25T05:37:14.036330+00:00",
+      "digest": "1c092161ceed7008012cdf22548f919e919033dc24d6df0601ed867be7117f88",
+      "checked": 291,
+      "changed": [],
+      "testService": {
+        "pid": 1299907,
+        "startedAt": "2026-10-25T05:29:26.659Z",
+        "scope": "dev-weaver-real-accounts.scope",
+        "entryPidEvidence": "ss observed pid1299907 at entry; later serverInfo supplies unchanged process startup timestamp"
+      },
+      "production": {
+        "pid": 1109320,
+        "activeEnterTimestamp": "Sat 2026-10-24 23:49:32 EDT"
+      }
+    },
+    "exit": {
+      "at": "2026-10-25T05:53:56.553756+00:00",
+      "mismatches": [],
+      "testServer": {
+        "pid": 1299907,
+        "url": "http://127.0.0.1:4738",
+        "port": 4738,
+        "dataDir": "/home/mocha/.local/share/weaver-real-test",
+        "version": "0.7.9",
+        "startedAt": "2026-10-25T05:29:26.659Z",
+        "runningWorkers": 0,
+        "managedBy": null
+      },
+      "production": "MainPID=1109320\nActiveEnterTimestamp=Sat 2026-10-24 23:49:32 EDT"
+    },
+    "stableTestPIDAndStartedAt": true,
+    "owner": "root",
+    "workerTaskId": "acd97205-77af-4c3b-a543-60cf1e0af4c8",
+    "workerRole": "independent real-browser Weaver worker; no delegation, product/test changes, commit or push"
+  },
+  "url": "http://127.0.0.1:4738/#/channels",
+  "checks": [
+    {
+      "id": "drafts",
+      "status": "pass",
+      "steps": "Claude未保存改名→暂存→同记录恢复；转Grok显式继续返回Claude；放弃才切换Grok；新建/已有草稿交叉、取消、390弹框均实际操作。原metadata不变。",
+      "evidence": [
+        "drafts.json",
+        "draft-narrow.json",
+        "same-key-regression.json"
+      ]
+    },
+    {
+      "id": "dsh",
+      "status": "pass",
+      "steps": "真实UI上传{}保存：INVALID_REQUEST，保留key/config/name，revision及secret记录不变。再上传[]保存，空key保留；CAS失败→重读→保存恢复；显式清配置读回。一次性worker/new API/deepseek-flash/off，UI连通测试精确hi。随后先删role再删API/secret/root。",
+      "evidence": [
+        "dsh-invalid.json",
+        "dsh-valid.json",
+        "dsh-empty-key.json",
+        "dsh-cas.json",
+        "dsh-cas-recovery.json",
+        "dsh-cleared.json",
+        "dsh-role.json",
+        "dsh-hello.json"
+      ]
+    },
+    {
+      "id": "official-entry",
+      "status": "pass",
+      "steps": "五种真实原生入口均有安全URL；Codex/Grok/OpenCode有同job一致设备码，Claude有manual密码输入/按钮，Qoder链接真实点击到官方登录页。关闭重开同活动job；取消→重试新job；scope与/proc精确回收。非法Claude非code#state文本返回400，输入保留，job仍authorizing/acceptsCode。",
+      "evidence": [
+        "official-entry-results.json",
+        "claude-invalid-code.json",
+        "qoder-link-click.json"
+      ]
+    },
+    {
+      "id": "scroll",
+      "status": "pass",
+      "steps": "1366×768、1440×900、390×844；指定坐标CDP原生wheel与聚焦后PageDown，记录scrollTop/height/overflow/末行和底按钮rect。列表及API表单均到底；Claude完整链接+输入窗原始几何可达，无需额外overflow滚动。测量先于DOM脱敏截图，未JS强设scroll。",
+      "evidence": [
+        "list-scroll.json",
+        "form-scroll.json",
+        "claude-manual-scroll.json"
+      ]
+    },
+    {
+      "id": "pending-negative",
+      "status": "pass",
+      "steps": "实际sayHi接受异步job，再在0–1ms返回凭据未就绪失败；不是HTTP同步拒绝。调用前后目标私有root无原生进程，未启动推理；未改owner/现有role。",
+      "evidence": [
+        "pending-sayhi-negative.json"
+      ]
+    },
+    {
+      "id": "persistent-import",
+      "status": "pass",
+      "steps": "本轮4738 UI真实提交：全部/default/不替换→added0 existing6 updated0 notFound[pi] failures[]；单Claude/default/不替换→added0 existing1 updated0 notFound[] failures[]。18条metadata保持、6条来源不重复，原全部筛选保留。",
+      "evidence": [
+        "import-all.json",
+        "import-claude.json"
+      ]
+    },
+    {
+      "id": "navigation",
+      "status": "pass",
+      "steps": "导航无旧引擎页；真实访问#/engines回到#/tasks；7个engine enabled=true。",
+      "evidence": [
+        "navigation.json"
+      ]
+    },
+    {
+      "id": "fresh-import",
+      "status": "fail",
+      "steps": "独立worker在临时4740全新DB验证，非4738幂等结果：Claude新增1但来源无token，hasCredentials=false；首次全部UI15秒超时，后端稍后提交6条来源，完整HTTP回执未知。旧snapshot直接回放可持久化但旧ready旗标误导；未改全局来源或补凭据。",
+      "evidence": [
+        "../import-specific/REPORT.html",
+        "../import-specific/results.json"
+      ]
+    },
+    {
+      "id": "personal-oauth",
+      "status": "missing",
+      "steps": "5种新官方OAuth完整完成未由本人执行。启动/取消、URL/code和manual输入可见不算完整登录。最终仅保留Codex待本人授权的当前job，详见安全移交。",
+      "evidence": [
+        "resources.json"
+      ]
+    },
+    {
+      "id": "engine-history",
+      "status": "partial",
+      "steps": "较早时点Codex/Claude/Qoder/dsh hi，Grok首轮失败后原生及HTTP复验hi；Codex正式任务completed/real/精确WEAVER_REAL_OK/ack/accepted且早期runner观察CODEX_HOME绑定。OpenCode仍Go用量耗尽，Pi无key。未在最终digest重跑全矩阵。",
+      "evidence": [
+        "engine-evidence.json"
+      ]
+    }
+  ],
+  "resources": {
+    "serviceOwnership": "Borrowed persistent test 4738 / dev-weaver-real-accounts.scope; production weaver.service preserved. No prepare, cleanup, stop or restart.",
+    "browser": {
+      "session": "weaver-accounts-recheck",
+      "mode": "owned Google Chrome task profile",
+      "closed": true,
+      "profileRemoved": true,
+      "ownedBrowserPids": [],
+      "remainingProfileProcesses": []
+    },
+    "disposable": {
+      "roleAbsent": true,
+      "channelAbsent": true,
+      "originalChannelStillPresent": true
+    },
+    "privateAncestors": [
+      {
+        "path": "/home/mocha/.local/share/weaver-real-test",
+        "mode": "0o700"
+      },
+      {
+        "path": "/home/mocha/.local/share/weaver-real-test/channels",
+        "mode": "0o700"
+      },
+      {
+        "path": "/home/mocha/.local/share/weaver-real-test/channels/channel_4ced3727a61348b390af7c6f",
+        "mode": "0o700"
+      },
+      {
+        "path": "/home/mocha/.local/share/weaver-real-test/channels/channel_bce8566b32d34b089fb9191d",
+        "mode": "0o700"
+      },
+      {
+        "path": "/home/mocha/.local/share/weaver-real-test/channels/channel_24fae3142b5c48f898448d0a",
+        "mode": "0o700"
+      },
+      {
+        "path": "/home/mocha/.local/share/weaver-real-test/channels/channel_90504ac6dfee41019ebc3fc0",
+        "mode": "0o700"
+      },
+      {
+        "path": "/home/mocha/.local/share/weaver-real-test/channels/channel_40c15c208bf84e45911b2b95",
+        "mode": "0o700"
+      }
+    ],
+    "finalCodex": {
+      "status": "authorizing",
+      "handoff": "pending-auth.json",
+      "reference": {
+        "channel": "channel_bce8566b32d34b089fb9191d",
+        "id": "3801d09c-8248-4472-adf8-3ce0203520be"
+      },
+      "scope": "dev-weaver-channel-login-c028bb13-2c0f-4798-a53c-e6898dc48f05.scope",
+      "pid": 1350045,
+      "ownerUid": 1000,
+      "deadlineUtc": "2026-10-25T06:02:40.390000+00:00",
+      "reason": "Preserved exclusively for person authorization; no inference",
+      "nativeProcessesStillPresent": true
+    },
+    "testServer": {
+      "pid": 1299907,
+      "url": "http://127.0.0.1:4738",
+      "port": 4738,
+      "dataDir": "/home/mocha/.local/share/weaver-real-test",
+      "version": "0.7.9",
+      "startedAt": "2026-10-25T05:29:26.659Z",
+      "runningWorkers": 0,
+      "managedBy": null
+    },
+    "productionPid": 1109320,
+    "otherOfficialLoginProcessesAbsent": true,
+    "scratchCleanup": "Only safe scripts and JSON remain; own profile removed. Print PDF/text/render intermediates removed after actual readability checks. No raw auth/HAR/body/native logs archived.",
+    "cancelledScopeFinalStates": {
+      "dev-weaver-channel-login-0bcd740c-ba7e-4e88-bb00-3fb3dd20341a.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+      "dev-weaver-channel-login-15644705-7fb9-4c65-9ca9-373ee1d65332.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+      "dev-weaver-channel-login-18f55e04-8e22-48d1-99a7-126c1543a371.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+      "dev-weaver-channel-login-3a1b4f43-a793-429a-8889-c9a0362772f7.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+      "dev-weaver-channel-login-3aaf4f42-e154-43cc-9849-c5ee21668928.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+      "dev-weaver-channel-login-5157e2a0-34f3-4fc5-b7a1-55cce7f4bfa6.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+      "dev-weaver-channel-login-6aeedfa7-29c2-484d-ac32-ff3f0add05a9.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+      "dev-weaver-channel-login-88e77011-fb76-496c-8d86-c00b913c3055.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+      "dev-weaver-channel-login-aeb69b8b-369e-40c3-bda4-750208d7a792.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+      "dev-weaver-channel-login-c8f8f435-fe64-4a67-b034-56f62cda92ca.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+      "dev-weaver-channel-login-d49e9e96-1721-4e1a-b6b4-9556be0f39a7.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive",
+      "dev-weaver-channel-login-f530aa6c-151b-42d7-95cb-5591e4fc0c90.scope": "ControlGroup=\nLoadState=not-found\nActiveState=inactive"
+    }
+  },
+  "limitations": [
+    "没有完整OAuth本人授权、五种新身份远端执行证明；Qoder BYOK/license未验，Pi/dsh无官方选项。",
+    "未重复首轮额度刷新/启停/删除引用保护/完整新API矩阵；旧证据仅代表首轮时点。",
+    "无所有引擎正式worker、owner/IM/定时推理全链路或长期多组织续期验收。",
+    "Claude非法code未直接追踪stdin；真实拒绝与job状态加当前源码前置校验表明未进入write分支。",
+    "初次脚本在取消异步回收完成前找重试按钮，属于harness同步问题，已等待按钮后复验。",
+    "一次滚动聚焦误点真实Claude链接，诊断tab-list工具输出含临时公开OAuth query/state；立即关闭额外tab，最终产物无query/token/code，未替本人授权。不能宣称整个工具轨迹从未显示query。",
+    "原Claude额度block未解除；最终release_at比revision36少705ms，其他归属/原因/起点相同，未独立追踪该时间差生成者。"
+  ],
+  "historicalFailureReport": "../real-test/REPORT.html",
+  "engineeringEvidence": "engineering-checks.json",
+  "reportReadability": "report-readability.json: file:// 390px, 8 images, 52 links and actual 11-page Chrome print reviewed; cleanup state finalized afterwards",
+  "artifacts": [
+    "REPORT.html",
+    "api-form-390.png",
+    "artifact-safety-check.json",
+    "claude-extra-cleanup.json",
+    "claude-invalid-code.json",
+    "claude-manual-390-masked.png",
+    "claude-manual-scroll.json",
+    "codex-final-pending-masked.png",
+    "disposable-ui-cleanup.json",
+    "draft-narrow.json",
+    "draft-switch-390.png",
+    "drafts.json",
+    "dsh-cas-recovery.json",
+    "dsh-cas.json",
+    "dsh-cleared.json",
+    "dsh-empty-key.json",
+    "dsh-hello.json",
+    "dsh-hello.png",
+    "dsh-invalid-preserved.png",
+    "dsh-invalid.json",
+    "dsh-role.json",
+    "dsh-valid.json",
+    "engine-evidence.json",
+    "engineering-checks.json",
+    "form-scroll.json",
+    "import-all.json",
+    "import-claude.json",
+    "list-390.png",
+    "list-scroll.json",
+    "login-claude-entry.json",
+    "login-codex-entry.json",
+    "login-grok-entry.json",
+    "login-opencode-entry.json",
+    "login-opencode-masked.png",
+    "login-qoder-entry.json",
+    "login-safe-network.json",
+    "navigation.json",
+    "official-entry-results.json",
+    "pending-auth.json",
+    "pending-sayhi-negative.json",
+    "qoder-link-click.json",
+    "redaction-events.json",
+    "report-390.png",
+    "report-readability.json",
+    "resources.json",
+    "results.json",
+    "retention-audit.json",
+    "runtime-health.json",
+    "same-key-regression.json",
+    "source-verification.json"
+  ]
+}

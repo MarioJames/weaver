@@ -1,4 +1,4 @@
-import type { ChannelsSnapshot, SaveChannelInput, DeleteChannelInput, ImportChannelsInput, RefreshChannelQuotaInput } from '../../shared/contracts/channels';
+import type { ImportChannelsResult, ChannelsSnapshot, SaveChannelResult, ChannelLogin, ChannelLoginRef, StartChannelLoginInput, SubmitChannelLoginCodeInput, SaveChannelInput, DeleteChannelInput, ImportChannelsInput, RefreshChannelQuotaInput } from '../../shared/contracts/channels';
 import { EngineCleanupJobs, parseEngineCleanup } from '../engines/cleanup';
 import type { ImService } from '../im/service';
 import type { SaveImSettingsInput } from '../../shared/contracts/im';
@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { API_VERSION } from '../../shared/contracts/commands';
 import type { RpcMethod } from '../../shared/contracts/rpc';
 import type { QuotaRefreshInput, QuotaRefreshResult, QuotaSchedule } from '../../shared/contracts/quota';
-import { EXECUTION_BOUNDARY, ENGINE_CATALOG, readinessFor, type EngineProbeRecord } from '../../shared/engines';
+import { EXECUTION_BOUNDARY, readinessFor } from '../../shared/engines';
 import { parseId, parseTaskInput } from '../../shared/validation';
 import { VERSION } from '../../shared/version';
 import { publicTaskChannelPaths } from '../application/tasks/records';
@@ -14,7 +14,6 @@ import { configuredParallel } from '../application/tasks/queries';
 import { workerLoad } from '../application/scheduling/dispatch';
 import type { CommandHandler } from '../commands';
 import { HelloJobs, parseHelloInput } from '../engines/hello';
-import { applyEngineEnabled, parseEngineToggle } from '../engines/control';
 import { EngineModelLister, parseModelListInput } from '../engines/models';
 import { EngineProber } from '../engines/probe';
 import { FreeChannelProbeMonitor, parseFreeProbeInput } from '../free-channel';
@@ -41,7 +40,7 @@ export interface ActiveServices {
 
 /** What the runtime lends to the handlers: its in-flight tracking, shared quota refresh, monitors and identity. */
 export interface RpcHost {
-  channels: {get():ChannelsSnapshot;save(input:SaveChannelInput):ChannelsSnapshot;delete(input:DeleteChannelInput):ChannelsSnapshot;import(input:ImportChannelsInput):Promise<ChannelsSnapshot>;refresh(input:RefreshChannelQuotaInput):Promise<ChannelsSnapshot>};
+  channels: {get():ChannelsSnapshot;save(input:SaveChannelInput):SaveChannelResult;startLogin(input:StartChannelLoginInput):Promise<ChannelLogin>;getLogin(input:ChannelLoginRef):ChannelLogin;cancelLogin(input:ChannelLoginRef):Promise<ChannelLogin>;submitCode(input:SubmitChannelLoginCodeInput):Promise<ChannelLogin>;delete(input:DeleteChannelInput):ChannelsSnapshot;import(input:ImportChannelsInput):Promise<ImportChannelsResult>;refresh(input:RefreshChannelQuotaInput):Promise<ChannelsSnapshot>};
   im(): ImService;
   track<T>(job: Promise<T>): Promise<T>;
   /** Manual and scheduled refresh share one probe-then-merge path. */
@@ -105,20 +104,12 @@ function quotaHandlers(host: RpcHost): Handlers<'getQuota' | 'refreshQuota'> {
   };
 }
 
-function engineHandlers(host: RpcHost): Handlers<'scanEngines' | 'listEngineModels' | 'setEngineEnabled'> {
+function engineHandlers(host: RpcHost): Handlers<'scanEngines' | 'listEngineModels'> {
   const prober = new EngineProber();
   const modelLister = host.modelLister ?? new EngineModelLister();
-  let probes: EngineProbeRecord[] | null = null;
-  const remember = (probe: EngineProbeRecord | null) => {
-    if (!probe) return probes;
-    const next = [...(probes ?? []).filter(item => item.id !== probe.id), probe];
-    probes = ENGINE_CATALOG.map(entry => next.find(item => item.id === entry.id)).filter((item): item is EngineProbeRecord => Boolean(item));
-    return probes;
-  };
   return {
     scanEngines: async active => {
       const found = await host.track(prober.scan());
-      probes = found;
       const snapshot = active.policy.snapshot();
       return { probedAt: new Date().toISOString(), probes: found, readiness: readinessFor(found, snapshot.config), boundary: EXECUTION_BOUNDARY };
     },
@@ -126,12 +117,6 @@ function engineHandlers(host: RpcHost): Handlers<'scanEngines' | 'listEngineMode
       let input;
       try { input = parseModelListInput(args[0]); } catch (error) { throw new RpcError('INVALID_REQUEST', error instanceof Error ? error.message : String(error)); }
       return host.track(modelLister.list(input));
-    },
-    setEngineEnabled: async (active, args) => {
-      const result = await host.track(applyEngineEnabled(active.policy, prober, parseEngineToggle(args[0])));
-      active.commands.pump();
-      const known = remember(result.probe) ?? [];
-      return { snapshot: result.snapshot, probe: result.probe, readiness: readinessFor(known, result.snapshot.config) };
     },
   };
 }
@@ -234,6 +219,10 @@ function janitorHandlers(host: RpcHost): Handlers<'janitorSweep' | 'janitorStatu
 /** The business implementation behind every RPC method; HTTP /api/rpc and the Unix socket both reach it through the runtime. */
 export function createRpcHandlers(host: RpcHost): RpcHandlers {
   return {
+    startChannelLogin:(_active,args)=>host.channels.startLogin(args[0] as StartChannelLoginInput),
+    getChannelLogin:(_active,args)=>host.channels.getLogin(args[0] as ChannelLoginRef),
+    submitChannelLoginCode:(_active,args)=>host.channels.submitCode(args[0] as SubmitChannelLoginCodeInput),
+    cancelChannelLogin:(_active,args)=>host.channels.cancelLogin(args[0] as ChannelLoginRef),
     getChannels:()=>host.channels.get(),
     saveChannel:(_active,args)=>host.channels.save(args[0] as SaveChannelInput),
     deleteChannel:(_active,args)=>host.channels.delete(args[0] as DeleteChannelInput),

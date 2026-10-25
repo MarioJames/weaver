@@ -34,11 +34,12 @@ export interface EngineReadiness {
   id: string;
   kind: string;
   installed: boolean;
+  /** Catalog support; account enablement is controlled by channels. */
   enabled: boolean;
   ownerConfigured: boolean;
   workerConfigured: boolean;
   adapterStatus: 'real' | 'deferred' | 'not_implemented';
-  /** True only when this real-adapter engine is enabled and an enabled worker uses it. */
+  /** True only for an installed real adapter with an enabled worker and channel. */
   realExecution: boolean;
   probe: EngineProbeRecord;
 }
@@ -52,7 +53,7 @@ function adapterStatusFor(kind: string): EngineReadiness['adapterStatus'] {
 
 export const EXECUTION_BOUNDARY = {
   discovery: 'path-and-readonly-version',
-  enablementAuthority: 'policy.engines.enabled',
+  enablementAuthority: 'policy.channels.enabled',
   probeIsNotAuthority: true,
   roleAutoCreate: false,
   /** The same list adapterStatusFor answers 'real' with, so the published fact cannot drift from it. */
@@ -76,11 +77,11 @@ export function engineReadiness(probe: EngineProbeRecord, config: Config): Engin
     id: probe.id,
     kind,
     installed: probe.status === 'installed',
-    enabled: stored?.enabled === true,
+    enabled: adapterStatus === 'real',
     ownerConfigured: Object.values(config.owners).some(owner => roleEngine(config, owner) === probe.id),
     workerConfigured: Object.values(config.workers).some(worker => roleEngine(config, worker) === probe.id),
     adapterStatus,
-    realExecution: adapterStatus === 'real' && stored?.enabled === true && Object.values(config.workers).some(worker => worker.enabled && roleEngine(config, worker) === probe.id),
+    realExecution: probe.status === 'installed' && adapterStatus === 'real' && Object.values(config.workers).some(worker => worker.enabled && config.channels[worker.channel]?.enabled && roleEngine(config, worker) === probe.id),
     probe,
   };
 }

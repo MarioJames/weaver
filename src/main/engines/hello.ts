@@ -3,7 +3,7 @@ import { prepareChannelRun, cleanupChannelRun, type ChannelBinding } from '../ch
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { Readable } from 'node:stream';
 import type { HelloInput, HelloJob, HelloResult } from '../../shared/engines';
 import type { PiModelCheck } from './pi-model-check';
@@ -55,6 +55,38 @@ function parseResultObject(stdout: string): Parsed {
   return error ? { error: innerMessage(error.message) } : {};
 }
 
+/** Grok's json mode emits a single, pretty-printed text envelope, unlike its result events. */
+function parseGrok(stdout: string): Parsed {
+  let values: Json[];
+  try {
+    const value = JSON.parse(stdout);
+    values = value && typeof value === 'object' && !Array.isArray(value) ? [value] : [];
+  } catch { values = jsonLines(stdout); }
+  for (const value of values) {
+    const error = typeof value.error === 'string' ? value.error : value.error?.message;
+    if (value.is_error === true || value.type === 'error' || value.error) {
+      return { error: innerMessage(typeof error === 'string' ? error : typeof value.message === 'string' ? value.message : typeof value.result === 'string' ? value.result : 'Grok error') };
+    }
+  }
+  const envelope = values.find(value => typeof value.text === 'string');
+  if (envelope) {
+    if (!['end_turn', 'EndTurn'].includes(envelope.stopReason)) return { error: `Grok stop: ${envelope.stopReason ?? 'unknown'}` };
+    const models = Object.keys(envelope.modelUsage ?? {});
+    return { reply: envelope.text, model: models.length === 1 ? models[0] : undefined };
+  }
+  return parseResultObject(stdout);
+}
+
+/** OpenCode can log a provider failure while its native retry loop keeps the process alive. */
+function opencodeStreamError(stderr: string): string | undefined {
+  for (const line of stderr.split('\n').reverse()) {
+    if (!line.includes('message="stream error"')) continue;
+    const encoded = line.match(/error\.error=("(?:\\.|[^"\\])*")/);
+    if (encoded) { try { return JSON.parse(encoded[1]!); } catch { /* incomplete log line */ } }
+  }
+  return undefined;
+}
+
 function parseCodex(stdout: string): Parsed {
   let reply: string | undefined;
   let error: string | undefined;
@@ -73,7 +105,7 @@ function parseOpencode(stdout: string): Parsed {
     if (value.type === 'text' && typeof value.part?.text === 'string') reply += value.part.text;
     if (value.type === 'error') error = value.error?.data?.message ?? value.error?.message ?? value.message ?? 'error';
   }
-  return reply.trim() ? { reply } : { error };
+  return { ...(reply.trim() ? { reply } : {}), error };
 }
 
 /** dsh headless --json: session/status/thinking/text/tool events, then final; error without final on turn-outside failure.
@@ -138,8 +170,8 @@ function parsePi(stdout: string): Parsed {
 export const HELLO_ENGINES: Record<string, { command: string; argv: (model: string, effort: string, overlayPath?: string) => string[]; parse: (stdout: string) => Parsed }> = {
   claude: { command: 'claude', parse: parseResultObject, argv: (model, effort) => ['-p', PROMPT, '--model', model, '--effort', effort, '--output-format', 'json', '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--disable-slash-commands', '--system-prompt', SYSTEM, '--no-session-persistence'] },
   codex: { command: 'codex', parse: parseCodex, argv: (model, effort) => ['exec', '--json', '--ephemeral', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '--sandbox', 'read-only', '--model', model, '-c', `model_reasoning_effort="${effort}"`, PROMPT] },
-  grok: { command: 'grok', parse: parseResultObject, argv: (model, effort) => ['-p', PROMPT, '-m', model, '--reasoning-effort', effort, '--output-format', 'json', '--max-turns', '1', '--disable-web-search', '--no-subagents', '--system-prompt-override', SYSTEM] },
-  opencode: { command: 'opencode', parse: parseOpencode, argv: (model, effort) => ['run', '--pure', '--format', 'json', '-m', model, '--variant', effort, PROMPT] },
+  grok: { command: 'grok', parse: parseGrok, argv: (model, effort) => ['-p', PROMPT, '-m', model, '--reasoning-effort', effort, '--output-format', 'json', '--max-turns', '1', '--disable-web-search', '--no-subagents', '--system-prompt-override', SYSTEM] },
+  opencode: { command: 'opencode', parse: parseOpencode, argv: (model, effort) => ['run', '--pure', '--print-logs', '--log-level', 'ERROR', '--format', 'json', '-m', model, '--variant', effort, PROMPT] },
   pi: { command: 'pi', parse: parsePi, argv: (model, effort) => ['-p', '--mode', 'json', '--model', model, '--thinking', effort, '--no-tools', '--no-mcp', '--no-extensions', '--no-skills', '--no-context-files', '--no-prompt-templates', '--no-themes', '--no-session', '--system-prompt', SYSTEM, PROMPT] },
   // qodercli reports every model as the placeholder "qfmodel", so its vendor model is not shown.
   qodercli: { command: 'qodercli', parse: stdout => ({ ...parseResultObject(stdout), model: undefined }), argv: (model, effort) => ['-p', PROMPT, '-m', model, '--reasoning-effort', effort, '-o', 'json', '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--system-prompt', SYSTEM, '--no-session-persistence'] },
@@ -208,7 +240,7 @@ export function sayHi(route: Omit<HelloInput,'channel'> & { channel?:string; kin
   }
   return probeEngine();
   function probeEngine(): Promise<HelloResult> {
-    const scratch = join(deps.root, `hello-${randomBytes(4).toString('hex')}`);
+    const scratch = join(resolve(deps.root), `hello-${randomBytes(4).toString('hex')}`);
     let privateRun: ReturnType<typeof prepareChannelRun>|undefined;
     const cleanup = () => {if(privateRun)cleanupChannelRun(privateRun);rmSync(scratch, { recursive: true, force: true });};
     let child: HelloProcess;
@@ -224,6 +256,7 @@ export function sayHi(route: Omit<HelloInput,'channel'> & { channel?:string; kin
           return engine.argv(route.model, route.effort, overlayPath);
         })()
         : engine.argv(route.model, route.effort);
+      if (route.kind === 'opencode') argv.push('--dir', scratch);
       const runtime = privateRun = route.channelConfig ? prepareChannelRun({ ...route.channelConfig, model: route.model, stateDir: scratch }) : undefined;
       if (runtime) { argv.unshift(...runtime.argv); const ignore=argv.indexOf('--ignore-user-config'); if(ignore>=0)argv.splice(ignore,1); }
       child = (deps.spawn ?? spawnPrint)(engine.command, argv, scratch, runtime?.env);
@@ -247,12 +280,13 @@ export function sayHi(route: Omit<HelloInput,'channel'> & { channel?:string; kin
         clearTimeout(timer);
         deps.signal?.removeEventListener('abort', stop);
         cleanup();
-        if (timedOut) { resolve(done({ ok: false, error: `等待回复超时（${Math.round(timeoutMs / 1000)} 秒），已停止进程。` })); return; }
-        if (spawnError) { resolve(done({ ok: false, error: (spawnError as NodeJS.ErrnoException).code === 'ENOENT' ? `找不到命令 ${engine.command}，确认已安装并在 PATH 中。` : spawnError.message })); return; }
         const parsed = engine.parse(stdout);
-        if (code === 0 && parsed.reply?.trim() && !parsed.error) { resolve(done({ ok: true, reply: parsed.reply, model: parsed.model })); return; }
+        const nativeError = parsed.error || (route.kind === 'opencode' ? opencodeStreamError(stderr) : undefined);
+        if (timedOut) { resolve(done({ ok: false, error: `等待回复超时（${Math.round(timeoutMs / 1000)} 秒），已停止进程。${nativeError ? ` 原生错误：${nativeError}` : ''}` })); return; }
+        if (spawnError) { resolve(done({ ok: false, error: (spawnError as NodeJS.ErrnoException).code === 'ENOENT' ? `找不到命令 ${engine.command}，确认已安装并在 PATH 中。` : spawnError.message })); return; }
+        if (code === 0 && parsed.reply?.trim() && !nativeError) { resolve(done({ ok: true, reply: parsed.reply, model: parsed.model })); return; }
         const stderrLine = stderr.trim().split('\n').filter(Boolean).at(-1) ?? '';
-        resolve(done({ ok: false, model: parsed.model, error: parsed.error || stderrLine || `进程退出码 ${code ?? '未知'}，没有回复。` }));
+        resolve(done({ ok: false, model: parsed.model, error: nativeError || stderrLine || `进程退出码 ${code ?? '未知'}，没有回复。` }));
       };
       // Output can still be in flight when the process closes; wait for the stream to drain, briefly.
       let ended = false;

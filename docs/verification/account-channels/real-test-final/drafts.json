@@ -1,0 +1,132 @@
+{
+  "same": [
+    {
+      "inputs": [
+        {
+          "id": "_r_9f_-label",
+          "type": "text",
+          "value": "验收官方claude1025-未保存草稿"
+        },
+        {
+          "id": "_r_9f_-kind-hidden-input",
+          "type": "text",
+          "value": "subscription"
+        },
+        {
+          "id": "_r_9f_-engine-hidden-input",
+          "type": "text",
+          "value": "claude"
+        }
+      ],
+      "text": "编辑 验收官方claude1025\n名称\n*\n类型\n*\n官方订阅账号\n执行引擎\n*\nclaude · claude\n已有凭据归属于这个引擎；更换引擎请创建新渠道。\n官方账号使用独立配置。创建后会在此处启动原生登录并等待凭据验证；已有账号的引擎和类型不能更换。\n放弃此草稿\n暂存并关闭\n保存配置"
+    }
+  ],
+  "switch": [
+    {
+      "inputs": [],
+      "text": "已有未保存的账号草稿\n「验收官方claude1025」有未保存的输入。要打开「验收官方grok1025」，请先选择继续原草稿或放弃后切换。\n继续原草稿\n放弃原草稿并切换"
+    }
+  ],
+  "continued": [
+    {
+      "inputs": [
+        {
+          "id": "_r_9f_-label",
+          "type": "text",
+          "value": "验收官方claude1025-未保存草稿"
+        },
+        {
+          "id": "_r_9f_-kind-hidden-input",
+          "type": "text",
+          "value": "subscription"
+        },
+        {
+          "id": "_r_9f_-engine-hidden-input",
+          "type": "text",
+          "value": "claude"
+        }
+      ],
+      "text": "编辑 验收官方claude1025\n名称\n*\n类型\n*\n官方订阅账号\n执行引擎\n*\nclaude · claude\n已有凭据归属于这个引擎；更换引擎请创建新渠道。\n官方账号使用独立配置。创建后会在此处启动原生登录并等待凭据验证；已有账号的引擎和类型不能更换。\n放弃此草稿\n暂存并关闭\n保存配置"
+    }
+  ],
+  "discarded": [
+    {
+      "inputs": [
+        {
+          "id": "_r_bd_-label",
+          "type": "text",
+          "value": "验收官方grok1025"
+        },
+        {
+          "id": "_r_bd_-kind-hidden-input",
+          "type": "text",
+          "value": "subscription"
+        },
+        {
+          "id": "_r_bd_-engine-hidden-input",
+          "type": "text",
+          "value": "grok"
+        }
+      ],
+      "text": "编辑 验收官方grok1025\n名称\n*\n类型\n*\n官方订阅账号\n执行引擎\n*\ngrok · grok\n已有凭据归属于这个引擎；更换引擎请创建新渠道。\n官方账号使用独立配置。创建后会在此处启动原生登录并等待凭据验证；已有账号的引擎和类型不能更换。\n放弃此草稿\n暂存并关闭\n保存配置"
+    }
+  ],
+  "newToExisting": [
+    {
+      "inputs": [],
+      "text": "已有未保存的账号草稿\n「新增账号」有未保存的输入。要打开「验收官方grok1025」，请先选择继续原草稿或放弃后切换。\n继续原草稿\n放弃原草稿并切换"
+    }
+  ],
+  "cancelPreserved": true,
+  "newContinued": [
+    {
+      "inputs": [
+        {
+          "id": "_r_bv_-label",
+          "type": "text",
+          "value": "recheck-new-unsaved"
+        },
+        {
+          "id": "_r_bv_-kind-hidden-input",
+          "type": "text",
+          "value": "subscription"
+        },
+        {
+          "id": "_r_bv_-engine-hidden-input",
+          "type": "text",
+          "value": "claude"
+        }
+      ],
+      "text": "添加账号\n名称\n*\n类型\n*\n官方订阅账号\n执行引擎\n*\nclaude · claude\n官方账号使用独立配置。创建后会在此处启动原生登录并等待凭据验证；已有账号的引擎和类型不能更换。\n放弃此草稿\n暂存并关闭\n创建并登录"
+    }
+  ],
+  "existingToNew": [
+    {
+      "inputs": [],
+      "text": "已有未保存的账号草稿\n「验收官方claude1025」有未保存的输入。要打开「新增账号」，请先选择继续原草稿或放弃后切换。\n继续原草稿\n放弃原草稿并切换"
+    }
+  ],
+  "newBlank": [
+    {
+      "inputs": [
+        {
+          "id": "_r_e3_-label",
+          "type": "text",
+          "value": ""
+        },
+        {
+          "id": "_r_e3_-kind-hidden-input",
+          "type": "text",
+          "value": "subscription"
+        },
+        {
+          "id": "_r_e3_-engine-hidden-input",
+          "type": "text",
+          "value": "claude"
+        }
+      ],
+      "text": "添加账号\n名称\n*\n类型\n*\n官方订阅账号\n执行引擎\n*\nclaude · claude\n官方账号使用独立配置。创建后会在此处启动原生登录并等待凭据验证；已有账号的引擎和类型不能更换。\n放弃此草稿\n暂存并关闭\n创建并登录"
+    }
+  ],
+  "backendMetadataUnchanged": true
+}

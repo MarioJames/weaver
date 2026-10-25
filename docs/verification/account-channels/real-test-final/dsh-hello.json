@@ -1,0 +1,82 @@
+{
+  "uiClick": true,
+  "observations": [
+    {
+      "args": [
+        {
+          "channel": "channel_ca46ee07b37c4a0cacd86747",
+          "effort": "off",
+          "engine": "dsh",
+          "model": "deepseek-flash"
+        }
+      ],
+      "method": "sayHi",
+      "result": {
+        "id": "b6a490ed882ef64f",
+        "startedAt": "2026-10-25T05:42:15.196Z",
+        "status": "running"
+      },
+      "status": 200
+    },
+    {
+      "args": [
+        "b6a490ed882ef64f"
+      ],
+      "method": "sayHiResult",
+      "result": {
+        "id": "b6a490ed882ef64f",
+        "startedAt": "2026-10-25T05:42:15.196Z",
+        "status": "running"
+      },
+      "status": 200
+    },
+    {
+      "args": [
+        "b6a490ed882ef64f"
+      ],
+      "method": "sayHiResult",
+      "result": {
+        "id": "b6a490ed882ef64f",
+        "startedAt": "2026-10-25T05:42:15.196Z",
+        "status": "running"
+      },
+      "status": 200
+    },
+    {
+      "args": [
+        "b6a490ed882ef64f"
+      ],
+      "method": "sayHiResult",
+      "result": {
+        "id": "b6a490ed882ef64f",
+        "result": {
+          "checkedAt": "2026-10-25T05:42:19.296Z",
+          "durationMs": 4099,
+          "ok": true,
+          "reply": "hi"
+        },
+        "startedAt": "2026-10-25T05:42:15.196Z",
+        "status": "done"
+      },
+      "status": 200
+    }
+  ],
+  "hasCompleted": true,
+  "configAtCall": {
+    "hasApiKey": true,
+    "hasConfig": true,
+    "hasCredentials": false,
+    "quota": {
+      "engine": "dsh",
+      "source": "",
+      "status": "unsupported",
+      "checkedAt": null,
+      "observedAt": null,
+      "stale": true,
+      "windows": [],
+      "detail": "API 渠道没有官方订阅额度接口",
+      "retryAt": null,
+      "channel": "channel_ca46ee07b37c4a0cacd86747"
+    }
+  }
+}

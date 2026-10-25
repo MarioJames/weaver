@@ -1,0 +1,62 @@
+{
+  "secretCount": 6,
+  "metadataCount": 13,
+  "newMetadataAndSecretCountMatch": true,
+  "records": [
+    {
+      "engine": "codex",
+      "kind": "subscription",
+      "secretPresent": true,
+      "privateRootInsideB": true,
+      "rootExists": true,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "engine": "claude",
+      "kind": "subscription",
+      "secretPresent": true,
+      "privateRootInsideB": true,
+      "rootExists": true,
+      "hasApiKey": false,
+      "hasConfig": false,
+      "credentialsSourceEqual": true
+    },
+    {
+      "engine": "grok",
+      "kind": "subscription",
+      "secretPresent": true,
+      "privateRootInsideB": true,
+      "rootExists": true,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "engine": "qoder",
+      "kind": "subscription",
+      "secretPresent": true,
+      "privateRootInsideB": true,
+      "rootExists": true,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "engine": "opencode",
+      "kind": "subscription",
+      "secretPresent": true,
+      "privateRootInsideB": true,
+      "rootExists": true,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "engine": "dsh",
+      "kind": "api",
+      "secretPresent": true,
+      "privateRootInsideB": false,
+      "rootExists": false,
+      "hasApiKey": true,
+      "hasConfig": false
+    }
+  ]
+}

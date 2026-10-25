@@ -20,10 +20,14 @@ export interface RpcMethodSpec {
 
 export const RPC_METHODS = {
   refreshChannelQuota: { arity: 1, mutation: true, cli: 'channels.quota', timeoutMs: 180_000 },
+  startChannelLogin: { arity: 1, mutation: true, cli: 'channels.login.start' },
+  getChannelLogin: { arity: 1, mutation: false, retryable: true, cli: 'channels.login.get' },
+  submitChannelLoginCode: { arity: 1, mutation: true },
+  cancelChannelLogin: { arity: 1, mutation: true, cli: 'channels.login.cancel', timeoutMs: 60_000 },
   getChannels: { arity: 0, retryable: true, cli: 'channels.list', mutation: false },
   saveChannel: { arity: 1, mutation: true, cli: 'channels.save' },
   deleteChannel: { arity: 1, mutation: true, cli: 'channels.delete' },
-  importChannels: { arity: 1, mutation: true, cli: 'channels.import' },
+  importChannels: { arity: 1, mutation: true, cli: 'channels.import', timeoutMs: 180_000 },
   getImSettings: { arity: 0, retryable: true },
   saveImSettings: { arity: 1, mutation: true },
   reconnectIm: { arity: 0, mutation: true },
@@ -45,7 +49,6 @@ export const RPC_METHODS = {
   getEngineCleanup: { arity: 1, retryable: true },
   sayHi: { arity: 1 },
   sayHiResult: { arity: 1, retryable: true },
-  setEngineEnabled: { arity: 1, cli: 'engines.set-enabled', mutation: true },
   listTasks: { arity: 0, retryable: true },
   getTask: { arity: 1, retryable: true },
   createTask: { arity: 1 },
@@ -78,4 +81,26 @@ export function rpcForCommand(command: RpcCliCommand): RpcCliBinding {
   const binding = findRpcForCommand(command);
   if (!binding) throw new Error(`No RPC method for command ${command}`);
   return binding;
+}
+
+export class RpcError extends Error {
+  constructor(readonly code: string, message: string) {
+    super(message);
+    this.name = 'RpcError';
+  }
+}
+
+/** Browser and Unix method calls share one allowlist, the RPC contract table. There is no reflective dispatch. */
+export function parseRpcBody(value: unknown): { method: string; args: unknown[] } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new RpcError('INVALID_REQUEST', 'Request must be a JSON object');
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record);
+  if (keys.length !== 2 || !Object.hasOwn(record, 'method') || !Object.hasOwn(record, 'args')) {
+    throw new RpcError('INVALID_REQUEST', 'Request must contain only method and args');
+  }
+  const method = record.method;
+  const args = record.args;
+  if (typeof method !== 'string' || !Object.hasOwn(RPC_METHODS, method)) throw new RpcError('INVALID_REQUEST', 'Unknown method');
+  if (!Array.isArray(args) || args.length !== RPC_METHODS[method as RpcMethod].arity) throw new RpcError('INVALID_REQUEST', 'Invalid argument arity');
+  return { method, args };
 }

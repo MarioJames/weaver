@@ -1,0 +1,78 @@
+{
+  "exitCode": 0,
+  "startedAt": "2026-10-25T06:12:18.336348+00:00",
+  "completedAt": "2026-10-25T06:14:34.046692+00:00",
+  "digest": "0c424a5506a69109cfbac6c75ef71624caf8ade40751dd57c57e231ee5fc3be2",
+  "counts": {
+    "tests": 2184,
+    "pass": 2152,
+    "fail": 0,
+    "skipped": 32
+  },
+  "typecheckPassed": true,
+  "buildPassed": true,
+  "latestFinalCheck": {
+    "exitCode": 0,
+    "startedAt": "2026-10-25T06:17:57.762171+00:00",
+    "completedAt": "2026-10-25T06:18:45.546073+00:00",
+    "digest": "0c424a5506a69109cfbac6c75ef71624caf8ade40751dd57c57e231ee5fc3be2",
+    "counts": {
+      "tests": 2184,
+      "pass": 2152,
+      "fail": 0,
+      "skipped": 32
+    },
+    "typecheckPassed": true,
+    "buildPassed": true,
+    "log": "final-check-delivery-complete.log",
+    "testLifecycleSha256": "2961a88648fc87205df6b16cd4418f19240e4d457b3b55e4adcb70e38603ba1d",
+    "naturalExit": true,
+    "persistentClaudeHello": {
+      "target": "persistent4738",
+      "requestCount": 1,
+      "channel": "import_e6f3c04da52965f2b7c02668",
+      "model": "sonnet",
+      "effort": "medium",
+      "jobId": "229f75d999095d70",
+      "processSelectors": [
+        {
+          "claudePrivate": true,
+          "secureStoragePrivate": true,
+          "anthropicPrivate": true
+        }
+      ],
+      "status": "done",
+      "ok": true,
+      "replyIsHi": true,
+      "returnedModel": "claude-sonnet-5-5",
+      "durationMs": 6271,
+      "globalSourceFilesUnchanged": true
+    },
+    "environmentAudit": {
+      "at": "2026-10-25T06:10:05.682915+00:00",
+      "production": {
+        "dataDir": "/home/mocha/.local/share/weaver",
+        "port": 4737,
+        "device": 2050,
+        "inode": 1907011,
+        "integrity": "ok",
+        "http": 200,
+        "rootMode": "0o700",
+        "pidAlive": true,
+        "runningScriptHashes": [],
+        "binarySHA256": "2cbf137f8356101c242e4a4ba22aab0c879315ee69a201ac196dd8fda9aeb236",
+        "matchesPreviousBinary": true
+      },
+      "test": {
+        "dataDir": "/home/mocha/.local/share/weaver-real-test",
+        "port": 4738,
+        "device": 2050,
+        "inode": 1991412,
+        "integrity": "ok",
+        "http": 200,
+        "rootMode": "0o700"
+      },
+      "databaseDistinct": true
+    }
+  }
+}

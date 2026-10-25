@@ -1,0 +1,59 @@
+{
+  "at": "2026-10-25T05:14:36.938Z",
+  "engines": {
+    "claude": {
+      "enabled": true
+    },
+    "codex": {
+      "enabled": true
+    },
+    "grok": {
+      "enabled": true
+    },
+    "opencode": {
+      "enabled": true
+    },
+    "pi": {
+      "enabled": true
+    },
+    "qoder": {
+      "enabled": true
+    },
+    "dsh": {
+      "enabled": true
+    }
+  },
+  "pendingAccounts": [
+    {
+      "id": "channel_4ced3727a61348b390af7c6f",
+      "label": "验收官方claude1025",
+      "enabled": true,
+      "hasCredentials": false
+    },
+    {
+      "id": "channel_24fae3142b5c48f898448d0a",
+      "label": "验收官方grok1025",
+      "enabled": true,
+      "hasCredentials": false
+    },
+    {
+      "id": "channel_90504ac6dfee41019ebc3fc0",
+      "label": "验收官方opencode1025",
+      "enabled": true,
+      "hasCredentials": false
+    },
+    {
+      "id": "channel_40c15c208bf84e45911b2b95",
+      "label": "验收官方qoder1025",
+      "enabled": true,
+      "hasCredentials": false
+    },
+    {
+      "id": "channel_bce8566b32d34b089fb9191d",
+      "label": "验收官方codex1025",
+      "enabled": true,
+      "hasCredentials": false
+    }
+  ],
+  "apiQuotaStatus": "Backend returns unsupported with empty source; UI explicitly hides official subscription quota for API"
+}

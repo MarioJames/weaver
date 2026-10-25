@@ -1,0 +1,46 @@
+{
+  "at": "2026-10-25T05:39:50.659446+00:00",
+  "sourceDigest": "1c092161ceed7008012cdf22548f919e919033dc24d6df0601ed867be7117f88",
+  "sourceFiles": 291,
+  "sourceMismatches": [],
+  "command": "npm run check",
+  "exitCode": 0,
+  "tests": 2177,
+  "pass": 2145,
+  "skip": 32,
+  "fail": 0,
+  "typecheck": "passed",
+  "build": "passed",
+  "testServer": {
+    "pid": 1299907,
+    "url": "http://127.0.0.1:4738",
+    "port": 4738,
+    "dataDir": "/home/mocha/.local/share/weaver-real-test",
+    "version": "0.7.9",
+    "startedAt": "2026-10-25T05:29:26.659Z",
+    "runningWorkers": 0,
+    "managedBy": null
+  },
+  "databases": {
+    "weaver": {
+      "path": "/home/mocha/.local/share/weaver/weaver.db",
+      "device": 2050,
+      "inode": 1907011,
+      "mode": "0o600",
+      "integrity": "ok"
+    },
+    "weaver-real-test": {
+      "path": "/home/mocha/.local/share/weaver-real-test/weaver.db",
+      "device": 2050,
+      "inode": 1991412,
+      "mode": "0o600",
+      "integrity": "ok"
+    }
+  },
+  "productionPID": 1109320,
+  "productionBinarySHA256": "2cbf137f8356101c242e4a4ba22aab0c879315ee69a201ac196dd8fda9aeb236",
+  "scope": "dev-weaver-real-accounts.scope",
+  "dataRetention": "persistent prod/test unchanged; task-owned disposable fresh-import databases are separate and reclaimed by their worker",
+  "browserAcceptance": "running; engineering checks do not substitute UI/real engine validation",
+  "provenance": "Owner engineering and environment audit; not executed by this browser worker"
+}

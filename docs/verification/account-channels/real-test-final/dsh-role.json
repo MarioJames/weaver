@@ -1,0 +1,11 @@
+{
+  "role": "recheck_dsh_acd97205",
+  "configuration": {
+    "enabled": true,
+    "channel": "channel_ca46ee07b37c4a0cacd86747",
+    "model": "deepseek-flash",
+    "effort": "off",
+    "description": "One-time independent browser verification; remove after Hello"
+  },
+  "notInOwnerAllowlists": true
+}

@@ -26,7 +26,7 @@ export interface ImOwnerProfileOption {
   model: string;
   effort: string;
   selectable: boolean;
-  reason?: 'disabled' | 'channel_disabled' | 'engine_disabled' | 'not_launchable' | 'missing';
+  reason?: 'disabled' | 'channel_disabled' | 'not_launchable' | 'missing';
 }
 
 /** Live bridge status as the UI sees it. `message` is a fixed, safe string, never a vendor error. */

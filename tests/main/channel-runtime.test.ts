@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -39,7 +39,7 @@ test('two same-engine API processes consume distinct native files and never inhe
 
 test('subscription roots stay separate and missing credentials / malformed native JSON fail recoverably',()=>{
  const temp=fixture();try{
-  const roots=['a','b'].map(id=>{const dir=join(temp,id);mkdirSync(dir);writeFileSync(join(dir,'auth.json'),JSON.stringify({account:id}));return dir;});
+  const roots=['a','b'].map(id=>{const dir=join(temp,id);mkdirSync(dir);writeFileSync(join(dir,'auth.json'),JSON.stringify({tokens:{account_id:id,access_token:"fixture-access"}}));return dir;});
   for(const authDir of roots){const run=prepareChannelRun({channel:{engine:'codex',kind:'subscription',enabled:true,label:'official'},secret:{authDir},model:'m',stateDir:temp,env:{OPENAI_API_KEY:'bad'}});assert.equal(run.env.CODEX_HOME,authDir);assert.equal(run.env.OPENAI_API_KEY,undefined);}
   assert.throws(()=>prepareChannelRun({channel:{engine:'codex',kind:'subscription',enabled:true,label:'missing'},secret:{},model:'m',stateDir:temp}),/认证目录/);
   assert.throws(()=>prepareChannelRun({channel:{engine:'opencode',kind:'api',enabled:true,label:'broken'},secret:{config:'{'},model:'p/m',stateDir:temp}),/JSON/);
@@ -53,10 +53,10 @@ test('native import is idempotent, keeps renewed private credentials, rebinds pr
   const before=['auth.json','config.toml'].map(file=>readFileSync(join(source,file)));
   const policy=new PolicyStore(db);const secrets=new ChannelStore(db);const snapshot=policy.snapshot();snapshot.config.workers.codex_worker.model='provider_a/model';policy.save({revision:snapshot.revision,config:snapshot.config,blocks:[]});
   const importer=new NativeChannelImporter(policy,secrets,{root:join(temp,'managed'),env:{HOME:temp,FIXTURE_API_KEY:'fixture-import-key'}});
-  let result=await importer.import({revision:policy.snapshot().revision,engine:'codex',sourceDir:source});const ids=Object.keys(result.policy.config.channels).filter(id=>id.startsWith('import_'));assert.equal(ids.length,2);
+  let result=await importer.import({revision:policy.snapshot().revision,engine:'codex',sourceDir:source});const ids=Object.keys(result.policy.config.channels).filter(id=>id.startsWith('import_'));assert.equal(ids.length,2);assert.deepEqual(result.importResult,{added:2,existing:0,updated:0,notFound:[],failures:[]});
   const api=ids.find(id=>result.policy.config.channels[id]!.kind==='api')!;assert.equal(result.policy.config.workers.codex_worker.channel,api);
   const official=ids.find(id=>id!==api)!;const authDir=secrets.getSecret(official)!.authDir!;writeFileSync(join(authDir,'auth.json'),'{"renewed":"fixture-new-refresh"}');
-  const revision=result.policy.revision;result=await importer.import({revision,engine:'codex',sourceDir:source});assert.equal(result.policy.revision,revision);assert.equal(Object.keys(result.policy.config.channels).filter(id=>id.startsWith('import_')).length,2);assert.match(readFileSync(join(authDir,'auth.json'),'utf8'),/fixture-new-refresh/);assert.equal(secrets.getSecret(api)!.apiKey,'fixture-import-key');
+  const revision=result.policy.revision;result=await importer.import({revision,engine:'codex',sourceDir:source});assert.equal(result.policy.revision,revision);assert.equal(result.importResult.existing,2);assert.equal(result.importResult.added,0);assert.equal(Object.keys(result.policy.config.channels).filter(id=>id.startsWith('import_')).length,2);assert.match(readFileSync(join(authDir,'auth.json'),'utf8'),/fixture-new-refresh/);assert.equal(secrets.getSecret(api)!.apiKey,'fixture-import-key');
   assert.doesNotMatch(JSON.stringify(result),/fixture-import-key|fixture-refresh/);
   for(const [index,file] of ['auth.json','config.toml'].entries())assert.deepEqual(readFileSync(join(source,file)),before[index]);
  }finally{db.close();rmSync(temp,{recursive:true,force:true});}
@@ -104,7 +104,7 @@ test('Qoder imports only verified native opaque authentication files without rec
 
 test('quota observations, cooldown and persisted credentials remain independent for same-engine channels',async()=>{
  const temp=fixture();const db=new DatabaseSync(':memory:');const policy=new PolicyStore(db);void policy;
- const roots=['a','b'].map(id=>{const dir=join(temp,id);mkdirSync(dir);writeFileSync(join(dir,'auth.json'),'{}');return dir;});
+ const roots=['a','b'].map(id=>{const dir=join(temp,id);mkdirSync(dir);writeFileSync(join(dir,'auth.json'),JSON.stringify({tokens:{account_id:id,access_token:'fixture-access'}}));return dir;});
  let requests=0;const options={root:join(temp,'probes'),snapshotStore:dbQuotaStore(db),channels:()=>Object.fromEntries(roots.map((authDir,index)=>[['a','b'][index]!,{engineKind:'codex',channel:{engine:'codex',kind:'subscription' as const,enabled:true,label:authDir},secret:{authDir}}])),credentialResolver:async(_engine:any,env:NodeJS.ProcessEnv)=>({token:env.CODEX_HOME!.endsWith('/a')?'fixture-a':'fixture-b',fingerprint:env.CODEX_HOME!,account:env.CODEX_HOME!}),fetch:async(_url:any,init?:RequestInit)=>{requests++;const authorization=new Headers(init?.headers).get('authorization');return new Response(JSON.stringify({credits:{has_credits:false,unlimited:false,balance:'0'},rate_limit:{allowed:authorization?.includes('fixture-b'),limit_reached:authorization?.includes('fixture-a'),primary_window:{used_percent:authorization?.includes('fixture-a')?100:10,reset_at:Math.floor(Date.now()/1000)+3600,limit_window_seconds:18000}}}),{status:200,headers:{'content-type':'application/json'}});}};
  const prober=new QuotaProber(options);try{
   await prober.refresh({channel:'a'});let snapshot=await prober.refresh({channel:'b'});assert.equal(snapshot.records.find(record=>record.channel==='a')!.status,'exhausted');assert.equal(snapshot.records.find(record=>record.channel==='b')!.status,'available');assert.equal(requests,2);
@@ -122,7 +122,7 @@ test('Claude executes through stream-json with channel settings and retains real
 
 test('pre-spawn persistence failures reclaim per-run secret files and keep renewable subscription roots',()=>{
  const temp=fixture();try{
-  const authDir=join(temp,'auth');mkdirSync(authDir);writeFileSync(join(authDir,'auth.json'),'{"fixture":"renewable"}');let prepared:ReturnType<typeof prepareCliAgentInput>|undefined;
+  const authDir=join(temp,'auth');mkdirSync(authDir);writeFileSync(join(authDir,'auth.json'),'{"tokens":{"account_id":"fixture","access_token":"fixture-access"}}');let prepared:ReturnType<typeof prepareCliAgentInput>|undefined;
   assert.throws(()=>startCliAgent({engine:'codex',channel:'official',channelConfig:{channel:{engine:'codex',kind:'subscription',enabled:true,label:'official'},secret:{authDir,config:'model_reasoning_effort="low"'}},model:'m',effort:'low',workspace:temp,stateDir:join(temp,'run'),instruction:'fixture'},record=>{prepared=record;throw new Error('fixture-transaction-abort');}),/fixture-transaction-abort/);
   assert.equal(existsSync(prepared!.channelStateDir!),false);assert.equal(existsSync(prepared!.channelProfilePath!),false);assert.equal(existsSync(join(authDir,'auth.json')),true);
  }finally{rmSync(temp,{recursive:true,force:true});}
@@ -143,7 +143,7 @@ test('explicit re-import renews the same account into a new private root and pre
   const policy=new PolicyStore(db);const secrets=new ChannelStore(db);const importer=new NativeChannelImporter(policy,secrets,{root:join(temp,'managed'),env:{HOME:temp}});
   let result=await importer.import({revision:0,engine:'codex',sourceDir:source});const id=Object.keys(result.policy.config.channels).find(id=>id.startsWith('import_'))!;const originalRoot=secrets.getSecret(id)!.authDir!;const originalAuth=readFileSync(join(originalRoot,'auth.json'));const config=result.policy.config;config.channels[id]!.label='custom label';config.channels[id]!.enabled=false;policy.save({revision:result.policy.revision,config,blocks:[]});
   const rolesBefore=JSON.stringify(policy.snapshot().config.workers);writeFileSync(auth,JSON.stringify({tokens:{account_id:'fixture-account',refresh_token:'fixture-grant-two'}}));
-  result=await importer.import({revision:policy.snapshot().revision,engine:'codex',sourceDir:source,replaceExisting:true});const replacement=secrets.getSecret(id)!.authDir!;assert.notEqual(replacement,originalRoot);assert.match(readFileSync(join(replacement,'auth.json'),'utf8'),/fixture-grant-two/);assert.deepEqual(readFileSync(join(originalRoot,'auth.json')),originalAuth);assert.equal(result.policy.config.channels[id]!.label,'custom label');assert.equal(result.policy.config.channels[id]!.enabled,false);assert.equal(JSON.stringify(result.policy.config.workers),rolesBefore);
+  result=await importer.import({revision:policy.snapshot().revision,engine:'codex',sourceDir:source,replaceExisting:true});assert.deepEqual(result.importResult,{added:0,existing:0,updated:1,notFound:[],failures:[]});const replacement=secrets.getSecret(id)!.authDir!;assert.notEqual(replacement,originalRoot);assert.match(readFileSync(join(replacement,'auth.json'),'utf8'),/fixture-grant-two/);assert.deepEqual(readFileSync(join(originalRoot,'auth.json')),originalAuth);assert.equal(result.policy.config.channels[id]!.label,'custom label');assert.equal(result.policy.config.channels[id]!.enabled,false);assert.equal(JSON.stringify(result.policy.config.workers),rolesBefore);
  }finally{db.close();rmSync(temp,{recursive:true,force:true});}
 });
 
@@ -251,5 +251,108 @@ test('rollback recovery preserves subscription root and renewed grant, and refus
   const importer=new NativeChannelImporter(policy,secrets,{root:join(temp,'managed'),env:{HOME:temp}});const imported=await importer.import({revision:1,engine:'codex',sourceDir:source});const id=imported.policy.config.workers.codex_worker.channel;const managed=secrets.getSecret(id)!;const authFile=join(managed.authDir!,'auth.json');const renewed='{"tokens":{"refresh_token":"fixture-renewed-grant"}}';writeFileSync(authFile,renewed);const inode=statSync(authFile).ino;
   const rollback=policy.rollback(1);const restored=await importer.import({revision:rollback.revision,engine:'codex',sourceDir:source});assert.ok(restored.policy.config.channels[id]);assert.equal(restored.policy.config.workers.codex_worker.channel,id);assert.equal(restored.policy.blocks[0].channel,id);assert.equal(restored.policy.config.channels[id]!.quota_refresh,false);assert.deepEqual(secrets.getSecret(id),managed);assert.equal(readFileSync(authFile,'utf8'),renewed);assert.equal(statSync(authFile).ino,inode);assert.equal(readFileSync(join(source,'auth.json'),'utf8'),native);
   const revision=restored.policy.revision;secrets.deleteSecret(id);await assert.rejects(importer.import({revision,engine:'codex',sourceDir:source}),/目标账号根已存在/);assert.equal(policy.snapshot().revision,revision);assert.equal(secrets.getSecret(id),undefined);assert.equal(readFileSync(authFile,'utf8'),renewed);
+ }finally{db.close();rmSync(temp,{recursive:true,force:true});}
+});
+
+test('all-source import keeps valid accounts when an unrelated source is malformed, and empty sources never claim completion',async()=>{
+ const temp=fixture(),db=new DatabaseSync(':memory:');
+ try{
+  const policy=new PolicyStore(db),secrets=new ChannelStore(db);
+  mkdirSync(join(temp,'.codex'));writeFileSync(join(temp,'.codex','auth.json'),'{');
+  mkdirSync(join(temp,'.dsh'));writeFileSync(join(temp,'.dsh','.credentials.yaml'),'version: 1\nrefs:\n  DEEPSEEK_API_KEY: fixture-dsh-key\n');
+  const importer=new NativeChannelImporter(policy,secrets,{root:join(temp,'managed'),env:{HOME:temp}});
+  const result=await importer.import({revision:0});
+  assert.ok(Object.entries(result.policy.config.channels).some(([id,c])=>id.startsWith('import_')&&c.engine==='dsh'));
+  assert.match(result.configurations.default_codex.detail!,/codex.*来源/);
+  assert.deepEqual(result.importResult,{added:1,existing:0,updated:0,notFound:['claude','grok','qoder','opencode','pi'],failures:[{engine:'codex',message:result.configurations.default_codex.detail}]});
+  assert.doesNotMatch(JSON.stringify(result),/fixture-dsh-key/);assert.equal(readFileSync(join(temp,'.codex','auth.json'),'utf8'),'{');
+  const revision=policy.snapshot().revision;
+  await assert.rejects(importer.import({revision,engine:'codex',sourceDir:join(temp,'absent')}),/来源|可导入/);
+  assert.equal(policy.snapshot().revision,revision);
+ }finally{db.close();rmSync(temp,{recursive:true,force:true});}
+});
+
+test('a failed isolated OpenCode account verification does not roll back a valid unrelated API import',async()=>{
+ const temp=fixture(),db=new DatabaseSync(':memory:');
+ try{
+  const configRoot=join(temp,'.config','opencode'),dataRoot=join(temp,'data');mkdirSync(configRoot,{recursive:true});mkdirSync(dataRoot);
+  const sourceDb=new DatabaseSync(join(dataRoot,'opencode.db'));sourceDb.exec('CREATE TABLE fixture(id TEXT)');sourceDb.close();
+  mkdirSync(join(temp,'.dsh'));writeFileSync(join(temp,'.dsh','.credentials.yaml'),'version: 1\nrefs:\n  DEEPSEEK_API_KEY: fixture-dsh-key\n');
+  const policy=new PolicyStore(db),secrets=new ChannelStore(db);
+  const org={accountID:'fixture-account',orgID:'fixture-org',accountEmail:'fixture@example.invalid',accountUrl:'https://opencode.ai/console',orgName:'Fixture',active:true};
+  const accounts={list:async()=>({orgs:[org],consoleManagedProviders:['opencode-go'],switchableOrgCount:1,detail:''}),switchAccount:async()=>{throw new Error('native verification unavailable');},close:async()=>{}};
+  const importer=new NativeChannelImporter(policy,secrets,{root:join(temp,'managed'),env:{HOME:temp,OPENCODE_DB:join(dataRoot,'opencode.db')},accountsFactory:()=>accounts});
+  const result=await importer.import({revision:0});
+  assert.ok(Object.entries(result.policy.config.channels).some(([id,c])=>id.startsWith('import_')&&c.engine==='dsh'));
+  assert.equal(Object.values(result.policy.config.channels).filter(c=>c.engine==='opencode').length,1);
+  assert.match(result.configurations.default_opencode.detail!,/opencode.*复验/);
+  assert.equal(result.importResult.added,1);assert.equal(result.importResult.failures[0].engine,'opencode');
+  assert.doesNotMatch(JSON.stringify(result),/fixture-dsh-key|native verification unavailable/);
+ }finally{db.close();rmSync(temp,{recursive:true,force:true});}
+});
+
+
+test('Claude empty OAuth cannot add or replace; renewed managed auth survives bad source without revision changes',async()=>{
+ const temp=fixture();const db=new DatabaseSync(':memory:');try{
+  const source=join(temp,'.claude');mkdirSync(source);const file=join(source,'.credentials.json');
+  writeFileSync(join(source,'.claude.json'),JSON.stringify({oauthAccount:{accountUuid:'fixture-claude',organizationUuid:'fixture-org'}}));
+  const bad=JSON.stringify({claudeAiOauth:{accessToken:'',refreshToken:'',expiresAt:0}});writeFileSync(file,bad);
+  const policy=new PolicyStore(db),secrets=new ChannelStore(db);const managed=join(temp,'managed');
+  const importer=new NativeChannelImporter(policy,secrets,{root:managed,env:{HOME:temp}});
+  const before=policy.snapshot();await assert.rejects(importer.import({revision:0,engine:'claude'}),/未找到可用.*OAuth.*重新登录/);
+  assert.deepEqual(policy.snapshot(),before);assert.equal(db.prepare('SELECT count(*) AS n FROM channel_secrets').get()!.n,0);assert.equal(existsSync(managed),false);
+  writeFileSync(file,JSON.stringify({claudeAiOauth:{accessToken:'fixture-expired',refreshToken:'fixture-renewable',expiresAt:1}}));
+  const result=await importer.import({revision:0,engine:'claude',sourceDir:source});assert.equal(result.importResult.added,1);
+  const id=Object.keys(result.policy.config.channels).find(id=>id.startsWith('import_'))!;const secret=secrets.getSecret(id)!;
+  const privateFile=join(secret.authDir!,'.credentials.json');const renewed=JSON.stringify({claudeAiOauth:{accessToken:'fixture-newer',expiresAt:Date.now()+3600000}});writeFileSync(privateFile,renewed);
+  const cfg=policy.snapshot();cfg.config.channels[id].label='keep custom';policy.save({revision:cfg.revision,config:cfg.config,blocks:cfg.blocks});
+  const stable=policy.snapshot();writeFileSync(file,bad);
+  const existing=await importer.import({revision:stable.revision,engine:'claude'});assert.equal(existing.importResult.existing,1);assert.equal(existing.importResult.added,0);assert.deepEqual(policy.snapshot(),stable);
+  await assert.rejects(importer.import({revision:stable.revision,engine:'claude',replaceExisting:true}),/未找到可用.*OAuth/);
+  assert.deepEqual(policy.snapshot(),stable);assert.deepEqual(secrets.getSecret(id),secret);assert.equal(readFileSync(privateFile,'utf8'),renewed);assert.equal(readFileSync(file,'utf8'),bad);
+  writeFileSync(privateFile,bad);
+  await assert.rejects(importer.import({revision:stable.revision,engine:'claude'}),/托管.*独立登录.*更新/);assert.deepEqual(policy.snapshot(),stable);assert.deepEqual(secrets.getSecret(id),secret);
+ }finally{db.close();rmSync(temp,{recursive:true,force:true});}
+});
+
+test('all-source import reports empty Claude as a partial failure and commits five valid sources',async()=>{
+ const temp=fixture();const db=new DatabaseSync(':memory:');try{
+  mkdirSync(join(temp,'.claude'));writeFileSync(join(temp,'.claude','.credentials.json'),JSON.stringify({claudeAiOauth:{accessToken:'',refreshToken:'',expiresAt:0}}));writeFileSync(join(temp,'.claude','.claude.json'),JSON.stringify({oauthAccount:{accountUuid:'fixture-claude'}}));
+  mkdirSync(join(temp,'.dsh'));writeFileSync(join(temp,'.dsh','.credentials.yaml'),'refs:\n  DEEPSEEK_API_KEY: fixture-valid-key\n');
+  for(const engine of ['codex','grok']){mkdirSync(join(temp,`.${engine}`));writeFileSync(join(temp,`.${engine}`,'auth.json'),JSON.stringify({OPENAI_API_KEY:'fixture-api'}));}
+  mkdirSync(join(temp,'.qoder','.auth'),{recursive:true});writeFileSync(join(temp,'.qoder','.auth','user'),Buffer.from([0,255,2,128]));writeFileSync(join(temp,'.qoder','.auth','machine_id'),'fixture-machine');
+  mkdirSync(join(temp,'.config','opencode'),{recursive:true});writeFileSync(join(temp,'.config','opencode','opencode.json'),JSON.stringify({provider:{fixture:{options:{apiKey:'fixture-api'}}}}));
+  const policy=new PolicyStore(db),secrets=new ChannelStore(db);const importer=new NativeChannelImporter(policy,secrets,{root:join(temp,'managed'),env:{HOME:temp},identifyAccount:async()=> 'fixture-qoder'});
+  const result=await importer.import({revision:0});assert.equal(result.importResult.added,5);assert.equal(result.importResult.failures.length,1);assert.equal(result.importResult.failures[0].engine,'claude');assert.match(result.importResult.failures[0].message,/OAuth/);assert.ok(result.importResult.notFound.includes('pi'));
+  assert.deepEqual(Object.entries(result.policy.config.channels).filter(([id])=>id.startsWith('import_')).map(([,c])=>c.engine).sort(),['codex','dsh','grok','opencode','qoder']);assert.equal(db.prepare('SELECT count(*) AS n FROM channel_secrets').get()!.n,5);assert.deepEqual(result.importResult.notFound,['pi']);
+ }finally{db.close();rmSync(temp,{recursive:true,force:true});}
+});
+
+test('Claude readiness uses local renewable OAuth and pins secure storage and profile selectors for API and subscription',async()=>{
+ const {nativeCredentialsReady,nativeEnvironment}=await import('../../src/main/channels/native');const temp=fixture();try{
+  for(const [oauth,ready,strict] of [
+   [{accessToken:'',refreshToken:'',expiresAt:0},false,false],
+   [{accessToken:'fixture',expiresAt:1},false,false],
+   [{accessToken:'fixture',refreshToken:'renewable',expiresAt:1},true,false],
+   [{accessToken:'fixture',expiresAt:Date.now()+3600000},true,true],
+  ] as const){writeFileSync(join(temp,'.credentials.json'),JSON.stringify({claudeAiOauth:oauth}));assert.equal(nativeCredentialsReady('claude',{authDir:temp}),ready);assert.equal(nativeCredentialsReady('claude',{authDir:temp},true),strict);}
+  for(const override of ['/global','']){
+   const inherited={CLAUDE_CONFIG_DIR:override,CLAUDE_SECURESTORAGE_CONFIG_DIR:override,ANTHROPIC_CONFIG_DIR:override,ANTHROPIC_PROFILE:'global-profile',ANTHROPIC_API_KEY:'global-key',HOME:temp};
+   const env=nativeEnvironment('claude',temp,inherited);assert.equal(env.CLAUDE_CONFIG_DIR,temp);assert.equal(env.CLAUDE_SECURESTORAGE_CONFIG_DIR,temp);assert.equal(env.ANTHROPIC_CONFIG_DIR,join(temp,'anthropic'));assert.equal(env.ANTHROPIC_PROFILE,undefined);assert.equal(env.ANTHROPIC_API_KEY,undefined);assert.equal(env.HOME,temp);
+   for(const kind of ['api','subscription'] as const){const run=prepareChannelRun({channel:{engine:'claude',kind,enabled:true,label:kind},secret:kind==='api'?{apiKey:'fixture'}:{authDir:temp},model:'sonnet',stateDir:join(temp,'runs'),env:inherited});assert.equal(run.env.CLAUDE_SECURESTORAGE_CONFIG_DIR,run.env.CLAUDE_CONFIG_DIR);assert.equal(run.env.ANTHROPIC_CONFIG_DIR,join(run.env.CLAUDE_CONFIG_DIR!,'anthropic'));assert.equal(run.env.ANTHROPIC_PROFILE,undefined);cleanupChannelRun(run);}
+  }
+ }finally{rmSync(temp,{recursive:true,force:true});}
+});
+
+
+test('Claude secret write failures roll back metadata, roles, revision and newly created roots',async()=>{
+ const temp=fixture();const db=new DatabaseSync(':memory:');try{
+  const source=join(temp,'source'),managed=join(temp,'managed');mkdirSync(source);writeFileSync(join(source,'.claude.json'),JSON.stringify({oauthAccount:{accountUuid:'fixture-claude'}}));writeFileSync(join(source,'.credentials.json'),JSON.stringify({claudeAiOauth:{accessToken:'fixture-current',expiresAt:Date.now()+3600000}}));
+  const policy=new PolicyStore(db),secrets=new ChannelStore(db);const importer=new NativeChannelImporter(policy,secrets,{root:managed,env:{HOME:temp}});const before=policy.snapshot();
+  db.exec("CREATE TRIGGER reject_claude_insert BEFORE INSERT ON channel_secrets BEGIN SELECT RAISE(ABORT,'fixture secret failure'); END");
+  await assert.rejects(importer.import({revision:0,engine:'claude',sourceDir:source}),/fixture secret failure/);assert.deepEqual(policy.snapshot(),before);assert.deepEqual(readdirSync(managed),[]);assert.equal(db.prepare('SELECT count(*) AS n FROM channel_secrets').get()!.n,0);
+  db.exec('DROP TRIGGER reject_claude_insert');const imported=await importer.import({revision:0,engine:'claude',sourceDir:source});const id=Object.keys(imported.policy.config.channels).find(id=>id.startsWith('import_'))!;const secret=secrets.getSecret(id)!;const snapshot=policy.snapshot(),roots=readdirSync(managed);const original=readFileSync(join(secret.authDir!,'.credentials.json'));
+  writeFileSync(join(source,'.credentials.json'),JSON.stringify({claudeAiOauth:{accessToken:'fixture-replacement',expiresAt:Date.now()+3600000}}));db.exec("CREATE TRIGGER reject_claude_update BEFORE UPDATE ON channel_secrets BEGIN SELECT RAISE(ABORT,'fixture secret failure'); END");
+  await assert.rejects(importer.import({revision:snapshot.revision,engine:'claude',sourceDir:source,replaceExisting:true}),/fixture secret failure/);assert.deepEqual(policy.snapshot(),snapshot);assert.deepEqual(secrets.getSecret(id),secret);assert.deepEqual(readdirSync(managed),roots);assert.deepEqual(readFileSync(join(secret.authDir!,'.credentials.json')),original);
  }finally{db.close();rmSync(temp,{recursive:true,force:true});}
 });

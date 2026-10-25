@@ -18,7 +18,6 @@ export function coveringBlock(blocks: Block[], entity: Owner | Worker, workerId:
 /** workerId is the policy key of a worker; omit it for owners, which no worker-scoped block can reach. */
 export function availabilityOf(config: Config, blocks: Block[], entity: Owner | Worker, workerId?: string): Availability {
   if (!entity.enabled) return { status: "disabled" };
-  if (!config.engines[roleEngine(config, entity)]?.enabled) return { status: "engine_disabled" };
   if (!config.channels[entity.channel]?.enabled) return { status: 'channel_disabled', channel: entity.channel };
   const hit = coveringBlock(blocks, entity, workerId, config);
   if (hit) return { status: "blocked", engine: hit.engine, ...(hit.channel ? { channel: hit.channel } : {}), ...(hit.model ? { model: hit.model } : {}), ...(hit.worker ? { worker: hit.worker } : {}), reason: hit.reason, ...(hit.release_at ? { release_at: hit.release_at } : {}) };

@@ -1,3 +1,4 @@
+import { ENGINE_CATALOG } from '../../shared/engines';
 import { migrateChannelPolicy } from '../../shared/policy/channels';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -74,7 +75,7 @@ export class PolicyStore {
   if(saved.r===null){this.config=defaultConfig();this.blocks=[];this.revision=0;return;}
   const engines:Config['engines']={};
   for(const row of this.db.prepare('SELECT * FROM policy_engines ORDER BY position').all() as Record<string,unknown>[]){
-   const engine={enabled:Number(row.enabled)===1,kind:String(row.kind)} as Engine;
+   const engine={enabled:true,kind:String(row.kind)} as Engine;
    engines[String(row.id)]=engine;
   }
   const ownerWorkerRows=this.db.prepare('SELECT * FROM policy_owner_workers ORDER BY position').all() as Record<string,unknown>[];
@@ -132,7 +133,7 @@ export class PolicyStore {
   Object.entries(config.channels).forEach(([id,channel],index)=>insertChannel.run(id,index,JSON.stringify(channel)));
   this.db.exec('DELETE FROM policy_engines');
   const insertEngine=this.db.prepare('INSERT INTO policy_engines(id,position,enabled,kind,quota_refresh) VALUES (?,?,?,?,?)');
-  Object.entries(config.engines).forEach(([id,engine],index)=>insertEngine.run(id,index,bit(engine.enabled),engine.kind,null));
+  Object.entries(config.engines).forEach(([id,engine],index)=>insertEngine.run(id,index,1,engine.kind,null));
   this.db.exec('DELETE FROM policy_owner_workers');
   this.db.exec('DELETE FROM policy_owners');
   const insertOwner=this.db.prepare('INSERT INTO policy_owners(id,position,enabled,channel,model,effort,max_parallel) VALUES (?,?,?,?,?,?,?)');
@@ -167,13 +168,25 @@ export class PolicyStore {
  get connection():unknown{return this.db;}
  /** Runs the work, and every policy save inside it, in one transaction that commits or rolls back together with the other stores on this connection. */
  transaction<T>(work:()=>T):T {return transact(this.db,work);}
- private parse(config: unknown, blocks: unknown): {config:Config;blocks:Block[]} {
-  bounded({config,blocks}); const issues=validateConfig(config);
+ private parse(config: unknown, blocks: unknown, saving=false): {config:Config;blocks:Block[]} {
+  bounded({config,blocks});
+  // The schema-13 column remains for existing databases; engine switches no longer control execution.
+  const candidate=structuredClone(object(config));
+  const engines=object(candidate.engines);
+  for(const [id,raw] of Object.entries(engines)) {
+   if(raw && typeof raw==='object' && !Array.isArray(raw)) {
+    const engine=raw as Record<string,unknown>;
+    if(saving && engine.enabled===false) throw new Error(`Engines are always available; disable channel accounts or roles instead (${id})`);
+    if(typeof engine.enabled==='boolean') engine.enabled=true;
+   }
+  }
+  for(const entry of ENGINE_CATALOG) if(!Object.hasOwn(engines,entry.id)) engines[entry.id]={enabled:true,kind:entry.kind};
+  const issues=validateConfig(candidate);
   if(issues.length) throw new Error(issues.map(i=>`${i.path}: ${i.message}`).join('\n'));
-  const saved=config as Config;
+  const saved=candidate as unknown as Config;
   // Truthful reads: an older policy without max_command_minutes reports the default its runtime uses.
   const normalized:Config={...saved,herdr:{...defaultConfig().herdr,...saved.herdr}};
-  return {config:structuredClone(normalized),blocks:blocksOf(blocks,normalized)};
+  return {config:normalized,blocks:blocksOf(blocks,normalized)};
  }
  snapshot(): PolicySnapshot {
   const blocks=activeBlocks({version:1,blocks:this.blocks},this.now());
@@ -181,15 +194,10 @@ export class PolicyStore {
    owners:Object.fromEntries(Object.entries(this.config.owners).map(([id,e])=>[id,availabilityOf(this.config,blocks,e)])),
    workers:Object.fromEntries(Object.entries(this.config.workers).map(([id,e])=>[id,availabilityOf(this.config,blocks,e,id)])),execution:'disabled'});
  }
- save(value: unknown, options?: { allowEngineEnable?: boolean }): PolicySnapshot {
+ save(value: unknown, _options?: { allowEngineEnable?: boolean }): PolicySnapshot {
   const input=object(value); exact(input,['revision','config','blocks']);
   if(input.revision!==this.revision) throw new Error('Settings changed; reload before saving');
-  const parsed=this.parse(input.config,input.blocks);
-  if (!options?.allowEngineEnable) {
-   for (const [id, engine] of Object.entries(parsed.config.engines)) {
-    if (engine.enabled && this.config.engines[id]?.enabled !== true) throw new Error(`Engine ${id} cannot be enabled by policy save; use the probe toggle`);
-   }
-  }
+  const parsed=this.parse(input.config,input.blocks,true);
   this.commit(parsed.config,parsed.blocks,this.revision+1,'save');
   return this.snapshot();
  }
