@@ -1,0 +1,1015 @@
+{
+  "checkedAt": "2026-10-25T07:03:45.925114+00:00",
+  "commit": "ae45390a68ded37a59ebb83003759929dddc2bcc",
+  "version": "0.7.9",
+  "url": "http://127.0.0.1:4737/#/channels",
+  "server": {
+    "pid": 1442954,
+    "startedAt": "2026-10-25T06:58:09.196Z",
+    "port": 4737,
+    "dataDir": "/home/mocha/.local/share/weaver"
+  },
+  "binary": {
+    "oldSha256": "2cbf137f8356101c242e4a4ba22aab0c879315ee69a201ac196dd8fda9aeb236",
+    "preparedSha256": "3b980815c075d6f496f25711099d65676a881e35d5c7422337df7111c4a9e7be",
+    "installedSha256": "3b980815c075d6f496f25711099d65676a881e35d5c7422337df7111c4a9e7be",
+    "runningExeSha256": "3b980815c075d6f496f25711099d65676a881e35d5c7422337df7111c4a9e7be"
+  },
+  "backupPath": "/home/mocha/.local/share/weaver/backups/local-ae45390-20261025T065808.227219Z",
+  "assets": {
+    "index.html": {
+      "http": 200,
+      "sha256": "4e4a7c4645c74a5bdc69ed8a99994f0808c4e69ad635948d5a5827693046b915",
+      "matches_build": true
+    },
+    "assets/index-83mns99p.js": {
+      "http": 200,
+      "sha256": "07c1fff63489804c8e5902e6e9bcccfb99bcec05850d74c98d503c8cc2ba9553",
+      "matches_build": true
+    },
+    "assets/index-ClEh_ZSS.css": {
+      "http": 200,
+      "sha256": "fe2fffde3820c4c0ffc45c22855e4b9daa8a46cce4bdea17f2062682b5fb1675",
+      "matches_build": true
+    }
+  },
+  "preservation": {
+    "packages_old_rows_retained": true,
+    "policy_engines_old_rows_retained": true,
+    "policy_owners_old_rows_retained": true,
+    "policy_owner_workers_old_rows_retained": true,
+    "policy_workers_old_rows_retained": true,
+    "policy_channels_old_rows_retained": true,
+    "channel_secrets_old_rows_retained": true,
+    "policy_settings_old_rows_retained": true,
+    "historical_task_identity_bindings": true,
+    "old_owner_identity_roles": true,
+    "receipts_old_identities_retained": true,
+    "artifacts_old_identities_retained": true,
+    "task_events_old_identities_retained": true,
+    "private_im_settings_bytes_retained": true,
+    "schema13_integrity": true
+  },
+  "switchPreservation": {
+    "schema13_integrity": true,
+    "preserved_unmanaged_native_record_row_byte_equal": true,
+    "historical_task_identity_bindings": true,
+    "history_task_count": true,
+    "private_root_metadata": true,
+    "private_settings_bytes": true,
+    "packages_equal": true,
+    "policy_engines_equal": true,
+    "policy_owners_equal": true,
+    "policy_owner_workers_equal": true,
+    "policy_workers_equal": true,
+    "policy_channels_equal": true,
+    "channel_secrets_equal": true,
+    "policy_settings_equal": true,
+    "owners_identity_equal": true,
+    "kv_bindings_equal": true,
+    "schedules_config_equal": true,
+    "task_events_identities_retained": true,
+    "artifacts_identities_retained": true,
+    "receipts_identities_retained": true
+  },
+  "schema": 13,
+  "migration": "Existing schema 13 retained; no migration to 14 claimed",
+  "im": {
+    "enabled": true,
+    "appSecretConfigured": true,
+    "ownerBindingRetained": true,
+    "connection": "connected",
+    "agentState": "ready",
+    "busySessions": 0
+  },
+  "test4738": {
+    "pid": 1381285,
+    "startedAt": "2026-10-25T06:10:24.060Z",
+    "port": 4738,
+    "dbInode": 1991412,
+    "integrity": true,
+    "sameAsBaseline": true
+  },
+  "engines": {
+    "claude": true,
+    "codex": true,
+    "grok": true,
+    "opencode": true,
+    "pi": true,
+    "qoder": true,
+    "dsh": true
+  },
+  "accountCount": 13,
+  "accountReadiness": [
+    {
+      "accountOrdinal": 1,
+      "hasCredentials": false,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "accountOrdinal": 2,
+      "hasCredentials": false,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "accountOrdinal": 3,
+      "hasCredentials": false,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "accountOrdinal": 4,
+      "hasCredentials": false,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "accountOrdinal": 5,
+      "hasCredentials": false,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "accountOrdinal": 6,
+      "hasCredentials": false,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "accountOrdinal": 7,
+      "hasCredentials": false,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "accountOrdinal": 8,
+      "hasCredentials": true,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "accountOrdinal": 9,
+      "hasCredentials": false,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "accountOrdinal": 10,
+      "hasCredentials": true,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "accountOrdinal": 11,
+      "hasCredentials": true,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "accountOrdinal": 12,
+      "hasCredentials": true,
+      "hasApiKey": false,
+      "hasConfig": false
+    },
+    {
+      "accountOrdinal": 13,
+      "hasCredentials": false,
+      "hasApiKey": true,
+      "hasConfig": false
+    }
+  ],
+  "hasCredentialsTrue": 4,
+  "accountsUnchangedSinceColdBackup": true,
+  "status": "PASS (local deployment scope)",
+  "checks": {
+    "switchCompleted": true,
+    "binaryHashesMatch": true,
+    "rendererMatchesBuild": true,
+    "historyAndPrivateBindingsRetained": true,
+    "accountsUnchanged": true,
+    "sevenEnginesReadEnabled": true,
+    "imRecovered": true,
+    "test4738Preserved": true,
+    "noIndependentEngineNavigation": true,
+    "desktopWheelLastRow": true,
+    "desktopPageDownLastRow": true,
+    "mobileWheelLastRow": true,
+    "officialApiChoices": true,
+    "cancelBothViewports": true,
+    "desktopOfficialFooterVisible": true,
+    "desktopApiFooterVisible": true,
+    "mobileOfficialFooterVisible": true,
+    "mobileApiFooterVisible": true
+  },
+  "ui": {
+    "viewportDesktop": {
+      "width": 1366,
+      "height": 768
+    },
+    "viewportMobile": {
+      "width": 390,
+      "height": 844
+    },
+    "actions": [],
+    "desktopOfficial": {
+      "open": true,
+      "official": true,
+      "api": false,
+      "buttons": [
+        {
+          "text": "",
+          "top": 169,
+          "bottom": 201,
+          "left": 959,
+          "right": 991,
+          "visible": true
+        },
+        {
+          "text": "官方订阅账号",
+          "top": 333,
+          "bottom": 365,
+          "left": 379,
+          "right": 987,
+          "visible": true
+        },
+        {
+          "text": "claude · claude",
+          "top": 419,
+          "bottom": 451,
+          "left": 379,
+          "right": 987,
+          "visible": true
+        },
+        {
+          "text": "放弃此草稿",
+          "top": 511,
+          "bottom": 535,
+          "left": 379,
+          "right": 457.015625,
+          "visible": true
+        },
+        {
+          "text": "暂存并关闭",
+          "top": 563,
+          "bottom": 595,
+          "left": 788.96875,
+          "right": 883.984375,
+          "visible": true
+        },
+        {
+          "text": "创建并登录",
+          "top": 563,
+          "bottom": 595,
+          "left": 891.984375,
+          "right": 987,
+          "visible": true
+        }
+      ],
+      "inputs": [
+        {
+          "type": "text",
+          "empty": true
+        },
+        {
+          "type": "text",
+          "empty": false
+        },
+        {
+          "type": "text",
+          "empty": false
+        }
+      ]
+    },
+    "typeChoices": [
+      "官方订阅账号",
+      "API provider 渠道"
+    ],
+    "desktopApi": {
+      "open": true,
+      "official": false,
+      "api": true,
+      "buttons": [
+        {
+          "text": "",
+          "top": 24,
+          "bottom": 56,
+          "left": 959,
+          "right": 991,
+          "visible": true
+        },
+        {
+          "text": "API provider 渠道",
+          "top": 188,
+          "bottom": 220,
+          "left": 379,
+          "right": 987,
+          "visible": true
+        },
+        {
+          "text": "claude · claude",
+          "top": 274,
+          "bottom": 306,
+          "left": 379,
+          "right": 987,
+          "visible": true
+        },
+        {
+          "text": "Anthropic Messages",
+          "top": 532,
+          "bottom": 564,
+          "left": 379,
+          "right": 987,
+          "visible": true
+        },
+        {
+          "text": "",
+          "top": 626,
+          "bottom": 642,
+          "left": 958,
+          "right": 974,
+          "visible": true
+        },
+        {
+          "text": "选择配置文件",
+          "top": 993.53125,
+          "bottom": 1025.53125,
+          "left": 379,
+          "right": 507.015625,
+          "visible": false
+        },
+        {
+          "text": "放弃此草稿",
+          "top": 729.6875,
+          "bottom": 753.6875,
+          "left": 379,
+          "right": 457.015625,
+          "visible": true
+        },
+        {
+          "text": "暂存并关闭",
+          "top": 708,
+          "bottom": 740,
+          "left": 801.96875,
+          "right": 896.984375,
+          "visible": true
+        },
+        {
+          "text": "保存配置",
+          "top": 708,
+          "bottom": 740,
+          "left": 904.984375,
+          "right": 987,
+          "visible": true
+        }
+      ],
+      "inputs": [
+        {
+          "type": "text",
+          "empty": true
+        },
+        {
+          "type": "text",
+          "empty": false
+        },
+        {
+          "type": "text",
+          "empty": false
+        },
+        {
+          "type": "text",
+          "empty": true
+        },
+        {
+          "type": "url",
+          "empty": true
+        },
+        {
+          "type": "text",
+          "empty": false
+        },
+        {
+          "type": "password",
+          "empty": true
+        },
+        {
+          "type": "checkbox",
+          "empty": false
+        },
+        {
+          "type": "file",
+          "empty": true
+        }
+      ]
+    },
+    "desktopCanceled": true,
+    "navigation": [
+      {
+        "text": "任务",
+        "path": "/#/tasks"
+      },
+      {
+        "text": "定时任务",
+        "path": "/#/schedules"
+      },
+      {
+        "text": "账号与渠道",
+        "path": "/#/channels"
+      },
+      {
+        "text": "父 Agent",
+        "path": "/#/owners"
+      },
+      {
+        "text": "子 Agent",
+        "path": "/#/workers"
+      },
+      {
+        "text": "Bot",
+        "path": "/#/bots"
+      },
+      {
+        "text": "设置",
+        "path": "/#/settings"
+      }
+    ],
+    "addButton": {
+      "x": 1220.984375,
+      "y": 89,
+      "right": 1323,
+      "bottom": 121
+    },
+    "desktopBefore": {
+      "scrollTop": 0,
+      "scrollHeight": 2523,
+      "clientHeight": 694,
+      "rowCount": 13,
+      "lastRect": {
+        "top": 2451.171875,
+        "bottom": 2563.015625,
+        "height": 111.84375
+      },
+      "mainRect": {
+        "top": 65,
+        "bottom": 759
+      },
+      "lastFullyVisible": false,
+      "clip": [
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 327.390625,
+          "bottom": 2564.015625
+        },
+        {
+          "tag": "MAIN",
+          "overflow": "scroll",
+          "top": 65,
+          "bottom": 759
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 8,
+          "bottom": 760
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 768
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 768
+        },
+        {
+          "tag": "BODY",
+          "overflow": "auto",
+          "top": 0,
+          "bottom": 768
+        },
+        {
+          "tag": "HTML",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 768
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "desktopWheel": {
+      "scrollTop": 1829,
+      "scrollHeight": 2523,
+      "clientHeight": 694,
+      "rowCount": 13,
+      "lastRect": {
+        "top": 622.171875,
+        "bottom": 734.015625,
+        "height": 111.84375
+      },
+      "mainRect": {
+        "top": 65,
+        "bottom": 759
+      },
+      "lastFullyVisible": true,
+      "clip": [
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": -1501.609375,
+          "bottom": 735.015625
+        },
+        {
+          "tag": "MAIN",
+          "overflow": "scroll",
+          "top": 65,
+          "bottom": 759
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 8,
+          "bottom": 760
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 768
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 768
+        },
+        {
+          "tag": "BODY",
+          "overflow": "auto",
+          "top": 0,
+          "bottom": 768
+        },
+        {
+          "tag": "HTML",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 768
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "desktopPageDown": {
+      "scrollTop": 1829,
+      "scrollHeight": 2523,
+      "clientHeight": 694,
+      "rowCount": 13,
+      "lastRect": {
+        "top": 622.171875,
+        "bottom": 734.015625,
+        "height": 111.84375
+      },
+      "mainRect": {
+        "top": 65,
+        "bottom": 759
+      },
+      "lastFullyVisible": true,
+      "clip": [
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": -1501.609375,
+          "bottom": 735.015625
+        },
+        {
+          "tag": "MAIN",
+          "overflow": "scroll",
+          "top": 65,
+          "bottom": 759
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 8,
+          "bottom": 760
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 768
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 768
+        },
+        {
+          "tag": "BODY",
+          "overflow": "auto",
+          "top": 0,
+          "bottom": 768
+        },
+        {
+          "tag": "HTML",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 768
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "mobileBefore": {
+      "scrollTop": 0,
+      "scrollHeight": 5123,
+      "clientHeight": 788,
+      "rowCount": 13,
+      "lastRect": {
+        "top": 4896.9375,
+        "bottom": 5162.46875,
+        "height": 265.53125
+      },
+      "mainRect": {
+        "top": 56,
+        "bottom": 844
+      },
+      "lastFullyVisible": false,
+      "clip": [
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 392.78125,
+          "bottom": 5163.46875
+        },
+        {
+          "tag": "MAIN",
+          "overflow": "scroll",
+          "top": 56,
+          "bottom": 844
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 844
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 844
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 844
+        },
+        {
+          "tag": "BODY",
+          "overflow": "auto",
+          "top": 0,
+          "bottom": 844
+        },
+        {
+          "tag": "HTML",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 844
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "mobileWheel": {
+      "scrollTop": 4335,
+      "scrollHeight": 5123,
+      "clientHeight": 788,
+      "rowCount": 13,
+      "lastRect": {
+        "top": 561.9375,
+        "bottom": 827.46875,
+        "height": 265.53125
+      },
+      "mainRect": {
+        "top": 56,
+        "bottom": 844
+      },
+      "lastFullyVisible": true,
+      "clip": [
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": -3942.21875,
+          "bottom": 828.46875
+        },
+        {
+          "tag": "MAIN",
+          "overflow": "scroll",
+          "top": 56,
+          "bottom": 844
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 844
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 844
+        },
+        {
+          "tag": "DIV",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 844
+        },
+        {
+          "tag": "BODY",
+          "overflow": "auto",
+          "top": 0,
+          "bottom": 844
+        },
+        {
+          "tag": "HTML",
+          "overflow": "hidden",
+          "top": 0,
+          "bottom": 844
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "initialEvents": {
+      "rpcMethods": {
+        "command": 6,
+        "listTasks": 5,
+        "scanEngines": 2,
+        "getChannels": 2,
+        "capabilities": 2,
+        "getPolicy": 2
+      },
+      "networkFailures": {},
+      "httpErrors": {},
+      "consoleErrors": 0,
+      "pageErrors": 0
+    },
+    "mobileOfficial": {
+      "open": true,
+      "official": true,
+      "api": false,
+      "buttons": [
+        {
+          "text": "",
+          "top": 196,
+          "bottom": 228,
+          "left": 330,
+          "right": 362,
+          "visible": true
+        },
+        {
+          "text": "官方订阅账号",
+          "top": 360,
+          "bottom": 392,
+          "left": 32,
+          "right": 358,
+          "visible": true
+        },
+        {
+          "text": "claude · claude",
+          "top": 446,
+          "bottom": 478,
+          "left": 32,
+          "right": 358,
+          "visible": true
+        },
+        {
+          "text": "放弃此草稿",
+          "top": 560,
+          "bottom": 584,
+          "left": 32,
+          "right": 110.015625,
+          "visible": true
+        },
+        {
+          "text": "暂存并关闭",
+          "top": 612,
+          "bottom": 644,
+          "left": 159.96875,
+          "right": 254.984375,
+          "visible": true
+        },
+        {
+          "text": "创建并登录",
+          "top": 612,
+          "bottom": 644,
+          "left": 262.984375,
+          "right": 358,
+          "visible": true
+        }
+      ],
+      "passwordEmpty": true
+    },
+    "mobileApi": {
+      "open": true,
+      "official": false,
+      "api": true,
+      "buttons": [
+        {
+          "text": "",
+          "top": 25.15625,
+          "bottom": 57.15625,
+          "left": 330,
+          "right": 362,
+          "visible": true
+        },
+        {
+          "text": "API provider 渠道",
+          "top": 189.15625,
+          "bottom": 221.15625,
+          "left": 32,
+          "right": 358,
+          "visible": true
+        },
+        {
+          "text": "claude · claude",
+          "top": 275.15625,
+          "bottom": 307.15625,
+          "left": 32,
+          "right": 358,
+          "visible": true
+        },
+        {
+          "text": "Anthropic Messages",
+          "top": 533.15625,
+          "bottom": 565.15625,
+          "left": 32,
+          "right": 358,
+          "visible": true
+        },
+        {
+          "text": "",
+          "top": 627.15625,
+          "bottom": 643.15625,
+          "left": 329,
+          "right": 345,
+          "visible": true
+        },
+        {
+          "text": "选择配置文件",
+          "top": 1013.53125,
+          "bottom": 1045.53125,
+          "left": 32,
+          "right": 160.015625,
+          "visible": false
+        },
+        {
+          "text": "放弃此草稿",
+          "top": 730.84375,
+          "bottom": 754.84375,
+          "left": 32,
+          "right": 110.015625,
+          "visible": true
+        },
+        {
+          "text": "暂存并关闭",
+          "top": 782.84375,
+          "bottom": 814.84375,
+          "left": 172.96875,
+          "right": 267.984375,
+          "visible": true
+        },
+        {
+          "text": "保存配置",
+          "top": 782.84375,
+          "bottom": 814.84375,
+          "left": 275.984375,
+          "right": 358,
+          "visible": true
+        }
+      ],
+      "passwordEmpty": true
+    },
+    "mobileCanceled": true,
+    "desktopCancelBefore": {
+      "open": true,
+      "official": true,
+      "api": false,
+      "buttons": [
+        {
+          "text": "",
+          "top": 169,
+          "bottom": 201,
+          "left": 959,
+          "right": 991,
+          "visible": true
+        },
+        {
+          "text": "官方订阅账号",
+          "top": 333,
+          "bottom": 365,
+          "left": 379,
+          "right": 987,
+          "visible": true
+        },
+        {
+          "text": "claude · claude",
+          "top": 419,
+          "bottom": 451,
+          "left": 379,
+          "right": 987,
+          "visible": true
+        },
+        {
+          "text": "放弃此草稿",
+          "top": 511,
+          "bottom": 535,
+          "left": 379,
+          "right": 457.015625,
+          "visible": true
+        },
+        {
+          "text": "暂存并关闭",
+          "top": 563,
+          "bottom": 595,
+          "left": 788.96875,
+          "right": 883.984375,
+          "visible": true
+        },
+        {
+          "text": "创建并登录",
+          "top": 563,
+          "bottom": 595,
+          "left": 891.984375,
+          "right": 987,
+          "visible": true
+        }
+      ],
+      "passwordEmpty": true
+    },
+    "notes": [
+      "An initial discard click did not dismiss the dialog; native Close subsequently dismissed it on both viewports. No save, import or login was performed.",
+      "The mobile Add action was repeated after returning to the top with native wheel and explicitly restoring the 390x844 viewport."
+    ],
+    "events": {
+      "rpcMethods": {
+        "scanEngines": 2,
+        "getChannels": 2,
+        "command": 5,
+        "listTasks": 5,
+        "capabilities": 2,
+        "getPolicy": 2
+      },
+      "networkFailures": {},
+      "httpErrors": {},
+      "consoleErrors": 0,
+      "pageErrors": 0
+    }
+  },
+  "limitations": [
+    "本次未运行模型推理、Hello、额度刷新或发送 IM 消息；本地凭据状态不等于远端调用成功。",
+    "OpenCode Go 额度限制、Pi 无 key、五个新官方账号 OAuth 尚未全部验完。",
+    "本次未在生产 fresh 导入，也未登录、保存、替换、删除账号或解除 blocks。首次导入与 hi 的历史证据仅引用前次报告。",
+    "未重跑 npm check 或大测试矩阵；本次范围为已授权的本地部署验收。"
+  ],
+  "resources": {
+    "production4737": "retained; existing user service",
+    "test4738": "retained; existing dev-weaver-real-accounts.scope",
+    "persistentBackup": "retained; owner rollback resource",
+    "browserSession": "weaver-upgrade-ae45390",
+    "browserCleanup": "closed; task profile removed; no process using exact profile",
+    "profileRemoved": true,
+    "ownChromeProcessesRemaining": [],
+    "scratchCleanup": "Only result.json retained for owner handoff; helpers, PDF and print text removed",
+    "productionPidAtClosure": 1442954,
+    "testPidAtClosure": 1381285
+  },
+  "reportValidation": {
+    "file390": {
+      "protocol": "file:",
+      "width": 390,
+      "scrollWidth": 390,
+      "noHorizontalOverflow": true,
+      "coreVisible": true,
+      "brokenImages": 0,
+      "externalAssets": 0
+    },
+    "links": {
+      "localBroken": [],
+      "localChecked": 10,
+      "productionLinkPreviouslyVerifiedHttp200": true
+    },
+    "print": {
+      "generated": true,
+      "bytes": 858664,
+      "pageCount": 8,
+      "textExtractChecked": true,
+      "coreAndLimitationsPresent": true
+    }
+  }
+}
