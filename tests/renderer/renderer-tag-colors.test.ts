@@ -5,7 +5,7 @@ import { FREE_PROBE_BLOCK_BY, STALL_BLOCK_BY } from '../../src/shared/policy/blo
 import type { Block } from '../../src/shared/contracts/policy';
 import { TAG_COLORS, TONE_TAG_COLORS, statusTagColor, tagColor } from '../../src/renderer/format/tag-colors';
 import { workerStatusTag } from '../../src/renderer/features/roles/OwnerSchedule';
-import { roleNote } from '../../src/renderer/features/roles/RolesPage';
+import { roleNote } from '../../src/renderer/features/roles/roles-view';
 
 test('every semantic maps to one distinct Tag color preset, never a raw color value', () => {
   const colors = Object.values(TAG_COLORS);

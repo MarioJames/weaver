@@ -61,7 +61,7 @@ export function OwnerScheduleFields({ config, blocks, record, savedRecord, updat
   const ordered = ids.map(id => ({ id, weight: workerWeight(record, id) }));
   // A titled section rather than a Form.Field: the add button sits beside the title, and a label element would forward clicks on the title to it.
   return <section aria-label="子 Agent" className={styles.tight}>
-    <div className={styles.spread} style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
+    <div className={`${styles.spread} ${styles.alignStart}`}>
       <Form.Title title="子 Agent" desc="派发按权重分摊：空闲时先给权重高的，并发时按权重比例分配到各子 Agent；跳过停用或受限的子 Agent。权重为 0–10 的整数，默认 5；0 表示不派给它。" />
       <DropdownMenu placement="bottomRight" items={available.length ? available.map(id => ({ key: id, label: id, desc: [config.workers[id]?.channels.map(channel => config.channels[channel]?.label ?? channel).join('、'), config.workers[id]?.model].filter(Boolean).join(' · '), onClick: () => { const next = appendWorker(record.workers, available, id); if (next) update({ ...record, workers: next }); } })) : [{ key: 'none', label: '没有可添加的子 Agent', disabled: true }]}>
         <Button size="small" icon={Plus}>添加子 Agent</Button>
@@ -74,9 +74,9 @@ export function OwnerScheduleFields({ config, blocks, record, savedRecord, updat
         const status = workerStatusTag(config, blocks, id, weight);
         const locked = workerWeightLock(config, id, blocks) !== undefined;
         return <div key={id} data-locked={locked || undefined} className={`${scheduleStyles.listRow} ${scheduleStyles.row}`}>
-          <span className={`${styles.row} ${scheduleStyles.name}`} style={{ minInlineSize: 0 }}><Text className={styles.wrap} type={locked ? 'secondary' : undefined}>{id}</Text>{config.workers[id]?.free_channel && <FreeChannelTag />}{workerParallelText(config.workers[id]) && <Tag size="small" color={tagColor('neutral')} title="该子 Agent 同时运行的任务数上限，超出的任务排队">{workerParallelText(config.workers[id])}</Tag>}{status && <Tag size="small" color={status.color} title={status.hint}>{status.label}</Tag>}{status?.reason && <span className={scheduleStyles.reason} title={status.reason}>{status.reason}</span>}</span>
+          <span className={`${styles.row} ${scheduleStyles.name}`}><Text className={styles.wrap} type={locked ? 'secondary' : undefined}>{id}</Text>{config.workers[id]?.free_channel && <FreeChannelTag />}{workerParallelText(config.workers[id]) && <Tag size="small" color={tagColor('neutral')} title="该子 Agent 同时运行的任务数上限，超出的任务排队">{workerParallelText(config.workers[id])}</Tag>}{status && <Tag size="small" color={status.color} title={status.hint}>{status.label}</Tag>}{status?.reason && <span className={scheduleStyles.reason} title={status.reason}>{status.reason}</span>}</span>
           <span className={scheduleStyles.controls}>
-            <NamedInputNumber aria-label={`${id} 的权重`} size="small" disabled={locked} min={0} max={WEIGHT_MAX} step={1} precision={0} value={weight} style={{ inlineSize: 72 }} onChange={value => update(withWorkerWeight(record, id, typeof value === 'number' ? value : DEFAULT_WEIGHT))} />
+            <NamedInputNumber aria-label={`${id} 的权重`} size="small" disabled={locked} min={0} max={WEIGHT_MAX} step={1} precision={0} value={weight} className={scheduleStyles.weightInput} onChange={value => update(withWorkerWeight(record, id, typeof value === 'number' ? value : DEFAULT_WEIGHT))} />
             <span role="group" aria-label={`${id} 权重预设`} className={scheduleStyles.presets} data-locked={locked || undefined}>{PRESETS.map(preset => <Button key={preset.value} size="small" type="text" disabled={locked} aria-pressed={weight === preset.value} aria-label={`${id} ${preset.label}`} onClick={() => update(withWorkerWeight(record, id, preset.value))}>{preset.label}</Button>)}</span>
             <ActionIcon size="small" icon={X} aria-label={`移除 ${id}`} onClick={() => update(withoutListedWorker(record, id))} />
           </span>

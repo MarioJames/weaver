@@ -9,7 +9,7 @@ import { defaultConfig } from '../../src/main/policy/routing';
 import { type Block } from '../../src/shared/contracts/policy';
 import { workerStatusTag } from '../../src/renderer/features/roles/OwnerSchedule';
 import { removeBlock } from '../../src/renderer/policy/worker-resume';
-import { roleNote } from '../../src/renderer/features/roles/RolesPage';
+import { roleNote } from '../../src/renderer/features/roles/roles-view';
 import { blockOf } from '../../src/renderer/features/probes/probe-view';
 import { VENDOR_BLOCK_BY } from '../../src/shared/policy/blocks';
 

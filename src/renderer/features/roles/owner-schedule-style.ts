@@ -56,7 +56,13 @@ export const scheduleStyles = createStaticStyles(({ css, cssVar }) => ({
     font-size: ${cssVar.fontSizeSM};
   `,
   name: css`
+    min-inline-size: 0;
+
     @media (max-width: 600px) { grid-column: 1 / -1; }
+  `,
+  /** The weight input keeps its fixed column width. */
+  weightInput: css`
+    inline-size: 72px;
   `,
   controls: css`
     display: contents;

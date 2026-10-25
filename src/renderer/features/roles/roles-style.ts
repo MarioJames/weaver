@@ -35,7 +35,7 @@ export const rolesStyles = createStaticStyles(({ css, cssVar, responsive }) => (
   sortItem: css`
     min-inline-size: 0;
   `,
-  /** The independent drag handle. Touch drags move the row instead of scrolling the page. */
+  /** The independent drag handle. Touch drags move the row instead of scrolling the page. The DragHandle also carries touch-action inline: static-render tests can only see inline styles, never classes. */
   roleGrip: css`
     flex: none;
     margin-block-start: 2px;
@@ -76,6 +76,18 @@ export const rolesStyles = createStaticStyles(({ css, cssVar, responsive }) => (
     @media (max-width: 720px) {
       grid-template-columns: minmax(0, 1fr);
     }
+  `,
+  /** The model/effort pair top-aligns when one side grows a hint line. */
+  pairStart: css`
+    align-items: start;
+  `,
+  /** The parallel-cap input keeps its compact inline size beside its switch. */
+  parallelInput: css`
+    inline-size: 88px;
+  `,
+  /** The paused-dispatch notice sits off the fields below it. */
+  blockNotice: css`
+    margin-block-end: 12px;
   `,
   /** A list entry: its enable switch, then a button that selects it. No outer frame. */
   roleItem: css`
@@ -167,7 +179,8 @@ export const rolesStyles = createStaticStyles(({ css, cssVar, responsive }) => (
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   `,
-  warn: css`
-    color: ${cssVar.colorWarningText};
+  /** The reply header's route and timestamp stay on one line. */
+  replyTime: css`
+    white-space: nowrap;
   `,
 }));

@@ -198,7 +198,7 @@ test('renaming or removing a worker keeps weight keys saveable', () => {
 });
 
 test('a role list item only notes states its enable switch does not already show', async () => {
-  const { roleNote } = await import('../../src/renderer/features/roles/RolesPage');
+  const { roleNote } = await import('../../src/renderer/features/roles/roles-view');
   assert.equal(roleNote({ status: 'available' }, false), undefined);
   assert.equal(roleNote({ status: 'disabled' }, false), undefined);
   assert.deepEqual(roleNote({ status: 'channel_disabled', channel: 'default_claude' }, false), { text: '渠道未启用' });

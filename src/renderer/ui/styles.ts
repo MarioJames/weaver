@@ -56,6 +56,9 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     font-size: 12px;
     color: ${cssVar.colorErrorText};
   `,
+  warn: css`
+    color: ${cssVar.colorWarningText};
+  `,
   /** A form section set off from the fields above it. */
   divided: css`
     padding-block-start: 12px;
@@ -75,5 +78,14 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
       margin-inline-end: 4px;
       vertical-align: -0.15em;
     }
+  `,
+  /** Flex rows that must stay on one line; compose after row/spread so it wins the cascade. */
+  nowrap: css`
+    flex-wrap: nowrap;
+  `,
+  /** A spread row whose two sides top-align, e.g. a section title beside its action. */
+  alignStart: css`
+    flex-wrap: nowrap;
+    align-items: flex-start;
   `,
 }));

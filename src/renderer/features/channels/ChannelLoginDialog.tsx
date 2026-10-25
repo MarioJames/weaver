@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, InputPassword, Modal, Text } from '@lobehub/ui/base-ui';
 import type { ChannelLogin, ChannelLoginRef } from '../../../shared/contracts/channels';
 import { styles } from '../../ui/styles';
+import { resourceStyles } from '../../ui/resource-style';
 import { channelStyles } from './channels-style';
 
 const active = (job: ChannelLogin) => ['starting', 'authorizing', 'verifying'].includes(job.status);
@@ -98,8 +99,8 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
   }, [job]);
 
   const reference = job ? { channel, id: job.id } : savedRef(channel);
-  return <Modal open title={`登录 ${label}`} width={640} draggable={false} className={channelStyles.modal}
-    classNames={{ body: channelStyles.modalBody, footer: channelStyles.modalFooter }} onCancel={onClose}
+  return <Modal open title={`登录 ${label}`} width={640} draggable={false} className={resourceStyles.modal}
+    classNames={{ body: resourceStyles.modalBody, footer: resourceStyles.modalFooter }} onCancel={onClose}
     footer={<>
       {running && <Button danger disabled={pending} loading={pending} onClick={() => reference && void run('cancel', reference)}>取消此次登录</Button>}
       {reference && <Button disabled={pending} onClick={() => { setPollRound(value => value + 1); void run('read', reference); }}>重新读取状态</Button>}
