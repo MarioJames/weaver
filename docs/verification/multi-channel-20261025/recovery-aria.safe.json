@@ -1,0 +1,17 @@
+{
+  "lifecycle": {
+    "effectiveLaunch": {
+      "browserLaunched": true,
+      "engine": "chrome",
+      "launchHash": 16751286643085047603
+    },
+    "launched": false,
+    "relaunchedBrowser": false,
+    "restartedBackground": false,
+    "restoreStatus": "not_configured",
+    "reused": true,
+    "saveStatus": "not_attempted"
+  },
+  "origin": "http://127.0.0.1:4739/#/workers",
+  "result": "{\"width\":390,\"account\":[{\"invalid\":null,\"describedby\":null,\"errorNodeExists\":false,\"rect\":{\"x\":33,\"y\":1053.09375,\"width\":314,\"height\":32,\"top\":1053.09375,\"right\":347,\"bottom\":1085.09375,\"left\":33}}],\"alerts\":[]}"
+}

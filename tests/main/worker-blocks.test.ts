@@ -49,7 +49,7 @@ function setup() {
   const raw = (command: string, args: Record<string, unknown> = {}) => handler.handle({ apiVersion: 'weaver.v1', commandId: randomUUID(), command, args });
   const call = (command: string, args: Record<string, unknown> = {}): any => { const response = raw(command, args); assert.equal(response.ok, true, JSON.stringify(response)); return response.data; };
   const create = (): Task => store.get(call('tasks.create', { title: 'Worker block', instruction: 'Inspect the fixture', ownerProfileId: 'claude_owner', workspace: dir }).id);
-  const route = (worker: string, engine: string): TaskDispatch => ({ owner: 'claude_owner', worker, engine, model: 'fixture', effort: 'high', execution: 'real', adapter: 'codex', engineKind: 'codex', maxParallel: 10, workspace: dir });
+  const route = (worker: string, engine: string): TaskDispatch => ({ owner: 'claude_owner', worker, channel: config.workers[worker]?.channels[0], engine, model: 'fixture', effort: 'high', execution: 'real', adapter: 'codex', engineKind: 'codex', maxParallel: 10, workspace: dir });
   /** A finished attempt that ended on the given failure. */
   const failed = (worker: string, engine: string, failure: TaskFailure): Task => {
     const task = create(); task.dispatch = route(worker, engine); task.status = 'failed'; task.failure = failure; store.put(task); return store.get(task.id);
@@ -203,7 +203,7 @@ test('a queued task frozen to a worker-blocked worker is rerouted to its sibling
     const moved = f.store.get(first.id);
     assert.equal(moved.dispatch?.worker, 'codexb_worker');
     assert.equal(moved.dispatch?.engine, 'codex', 'the same engine is still used');
-    assert.ok(moved.events.some(item => /Vendor limit rerouted queued worker to codex \(codexb_worker\)/.test(item.message)));
+    assert.ok(moved.events.some(item => /Vendor limit rerouted queued channel default_codex → default_codex \(codex, codexb_worker\)/.test(item.message)));
     // Whole-engine block: the engine is excluded, so the free opencode worker is chosen.
     const second = queued('codexb_worker', 'codex');
     const next = f.policy.snapshot();
@@ -230,32 +230,31 @@ test('a vendor reroute keeps the retry chain out and never returns to a failed w
     const moved = f.store.get(task.id);
     assert.equal(moved.dispatch?.worker, 'opencode_worker', 'codexb_worker is in the retry chain and stays excluded');
     assert.equal(moved.dispatch?.engine, 'opencode');
-    assert.ok(moved.events.some(item => /Vendor limit rerouted queued worker to opencode \(opencode_worker\)/.test(item.message)));
+    assert.ok(moved.events.some(item => /Vendor limit rerouted queued channel default_codex → default_opencode \(opencode, opencode_worker\)/.test(item.message)));
   } finally { await f.close(); }
 });
 
-test('after a rate-limit failure tasks retry still chooses another worker on the same engine; other failures exclude only that worker', async () => {
+test('an account failure excludes the shared account across workers; other failures exclude only their worker', async () => {
   const f = setup();
   try {
     const limited = f.failed('codex_worker', 'codex', rate());
     const retry = f.call('tasks.retry', { taskId: limited.id });
-    assert.equal(retry.dispatch.worker, 'codexb_worker');
-    assert.equal(retry.dispatch.engine, 'codex');
-    assert.deepEqual(retry.excludedWorkers, ['codex_worker']);
-    assert.equal(retry.excludedEngines, undefined, 'the rate-limited engine is not excluded');
-    assert.ok(f.blocks().some(block => block.worker === 'codex_worker'), 'the retry already saw the worker block');
-    // The chain walks on: the second worker is now blocked too, so only the other engine is left.
+    assert.equal(retry.dispatch.worker, 'opencode_worker', 'the codex sibling uses the same failed account');
+    assert.equal(retry.dispatch.channel, 'default_opencode');
+    assert.equal(retry.excludedWorkers, undefined, 'account failure does not blacklist the worker pool');
+    assert.ok(f.blocks().some(block => block.worker === 'codex_worker' && block.channel === 'default_codex'));
     const second = f.store.get(retry.id);
     second.status = 'failed'; second.failure = rate(); f.store.put(second);
-    const again = f.call('tasks.retry', { taskId: second.id });
-    assert.equal(again.dispatch.engine, 'opencode', 'both codex workers are blocked, so only the other engine is left');
-    assert.deepEqual(new Set(again.excludedWorkers), new Set(['codex_worker', 'codexb_worker']));
-    // Any other failure excludes only the worker that ran it.
-    const other = f.failed('codexb_worker', 'codex', { kind: 'other', message: 'boom' });
-    const third = f.call('tasks.retry', { taskId: other.id });
-    assert.equal(third.dispatch.engine, 'opencode');
-    assert.deepEqual(third.excludedWorkers, ['codexb_worker']);
+    assert.equal(f.raw('tasks.retry', { taskId: second.id }).ok, false, 'all historical failed accounts remain excluded');
   } finally { await f.close(); }
+  const g = setup();
+  try {
+    const other = g.failed('codex_worker', 'codex', { kind: 'other', message: 'boom' });
+    const retry = g.call('tasks.retry', { taskId: other.id });
+    assert.equal(retry.dispatch.worker, 'codexb_worker');
+    assert.equal(retry.dispatch.channel, 'default_codex', 'non-account failure can reuse the account on another worker');
+    assert.deepEqual(retry.excludedWorkers, ['codex_worker']);
+  } finally { await g.close(); }
 });
 
 test('engines unblock clears the engine block and its worker-level blocks and leaves other engines alone', async () => {

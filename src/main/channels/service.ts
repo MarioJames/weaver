@@ -1,3 +1,4 @@
+import { roleChannels } from '../../shared/policy/channels';
 import { mkdirSync, chmodSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseDshConfig, type ChannelBinding } from './runtime';
@@ -69,7 +70,7 @@ export class ChannelService {
  delete(input: DeleteChannelInput): ChannelsSnapshot {
   exact(object(input),['revision','id']);const snapshot=this.policy.snapshot();
   if(!Object.hasOwn(snapshot.config.channels,input.id))throw new Error('Unknown channel');
-  if([...Object.values(snapshot.config.owners),...Object.values(snapshot.config.workers)].some(role=>role.channel===input.id))throw new Error('Channel is referenced by a role');
+  if([...Object.values(snapshot.config.owners),...Object.values(snapshot.config.workers)].some(role=>roleChannels(role).includes(input.id)))throw new Error('Channel is referenced by a role');
   delete snapshot.config.channels[input.id];
   this.policy.transaction(()=>{this.policy.save({revision:input.revision,config:snapshot.config,blocks:snapshot.blocks.filter(b=>b.channel!==input.id)});this.secrets.deleteSecret(input.id);});return this.get();
  }

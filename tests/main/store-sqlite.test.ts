@@ -1,5 +1,5 @@
 import { policySchema12 } from '../helpers/policy-schema12';
-import { migrateChannelPolicy } from '../../src/shared/policy/channels';
+import { normalizeHistoricalPolicy } from '../../src/shared/policy/channels';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
@@ -165,13 +165,15 @@ test('upgrading a version 7 database drops the role proxy columns and strips pro
    for(const table of ['policy_owners','policy_workers'])assert.equal((upgraded.prepare(`PRAGMA table_info(${table})`).all() as {name:string}[]).some(column=>column.name==='proxy'),false,`${table}.proxy is gone`);
    assert.equal(Number(upgraded.prepare('SELECT count(*) n FROM policy_owners').get()!.n),Object.keys(expected.owners).length,'role rows survive');
    const bodies=new Map((upgraded.prepare('SELECT revision,body FROM policy_revisions').all() as {revision:number;body:string}[]).map(row=>[row.revision,row.body]));
-   for(const [revision,body] of originals){const value=JSON.parse(body);const next=migrateChannelPolicy(value.config,value.blocks);assert.deepEqual(JSON.parse(bodies.get(revision)!),{...value,...next},`round ${round}: revision ${revision} is back to its pre-proxy snapshot, every other field intact`);}
+   for(const [revision,body] of originals){const value=JSON.parse(body);const next=normalizeHistoricalPolicy(value.config,value.blocks);assert.deepEqual(JSON.parse(bodies.get(revision)!),{...value,...next},`round ${round}: revision ${revision} is back to its pre-proxy snapshot, every other field intact`);}
    assert.equal(bodies.get(93),broken);assert.equal(bodies.get(90),empty);assert.equal(bodies.get(91),bare);
    assert.deepEqual(JSON.parse(bodies.get(92)!),{version:1,revision:92,config:{owners:{a:'text',b:{keep:1}},workers:[]},blocks:[]});
    upgraded.close();
   }
   const store=new PolicyStore(path);
   assert.deepEqual(store.snapshot().config,expected,'live config reads without the proxy columns');
+  const before=store.snapshot();const history=store.history();
+  for(const revision of [90,91,92,93]){assert.throws(()=>store.rollback(revision));assert.deepEqual(store.snapshot(),before);assert.deepEqual(store.history(),history);}
   const rolled=store.rollback(Math.min(...originals.keys()));
   assert.equal(rolled.config.owners[ownerId]!.max_parallel,3,'the oldest snapshot is restored');
   assert.equal('proxy' in rolled.config.owners[ownerId]!,false);assert.equal('proxy' in rolled.config.workers[workerId]!,false);

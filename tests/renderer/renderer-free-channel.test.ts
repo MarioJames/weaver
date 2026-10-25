@@ -83,7 +83,7 @@ test('a sub agent without the flag gets no free-channel badge in the list', () =
 function pausedPolicy() {
   const config = defaultConfig();
   const profile = config.workers.qoder_worker!;
-  const block: Block = { engine: defaultConfig().channels[profile.channel]!.engine, model: profile.model, reason: '额度耗尽：免费额度已用完', since: '2026-10-19T00:00:00Z', by: FREE_PROBE_BLOCK_BY };
+  const block: Block = { engine: defaultConfig().channels[profile.channels[0]!]!.engine, model: profile.model, reason: '额度耗尽：免费额度已用完', since: '2026-10-19T00:00:00Z', by: FREE_PROBE_BLOCK_BY };
   const snapshot = { revision: 1, config, blocks: [block], activeBlocks: [block], owners: {}, workers: { qoder_worker: { status: 'blocked', reason: '免费额度已用完' } }, execution: 'disabled' } as unknown as PolicyDraft['snapshot'];
   return { config, snapshot };
 }

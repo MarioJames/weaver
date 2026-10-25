@@ -1,3 +1,4 @@
+import { roleChannels } from '../../shared/policy/channels';
 import { qoderModelFiles,qoderApiModelDifference,qoderModelManifest,QODER_BYOK_MANIFEST } from './qoder';
 import { remapImportedBlocks } from './import-blocks';
 import { findEngineExecutable,runCapture } from '../engines/probe';
@@ -84,7 +85,7 @@ export class NativeChannelImporter {
   const notFound=new Set<string>();
   const counts={added:0,existing:0,updated:0};
   const initialIds=new Set(Object.keys(snapshot.config.channels));
-  const originalRoles=new Map([...Object.values(snapshot.config.owners),...Object.values(snapshot.config.workers)].map(role=>[role,role.channel]));
+  const originalRoles=new Map([...Object.values(snapshot.config.owners),...Object.values(snapshot.config.workers)].map(role=>[role,[...roleChannels(role)]]));
   const temporary: string[]=[];
   const createdTargets:string[]=[];let committed=false;
   try {
@@ -241,12 +242,16 @@ export class NativeChannelImporter {
     if(candidate.channel.kind==='subscription'){const previous=snapshot.config.channels[`default_${candidate.channel.engine}`];if(previous?.quota_refresh!==undefined)candidate.channel.quota_refresh=previous.quota_refresh;}
     snapshot.config.channels[id]??=candidate.channel;
     for(const role of [...Object.values(snapshot.config.owners),...Object.values(snapshot.config.workers)]) {
-     const current=snapshot.config.channels[role.channel];if(current?.engine!==candidate.channel.engine||!candidate.channel.enabled)continue;
+     // Only an untouched legacy singleton is eligible for automatic source selection.
+     // An explicit worker pool is user-owned, even when it contains a default account.
+     const original=originalRoles.get(role)!;if(original.length!==1||!original[0]!.startsWith('default_'))continue;
+     const currentId=roleChannels(role)[0]!;
+     const current=snapshot.config.channels[currentId];if(current?.engine!==candidate.channel.engine||!candidate.channel.enabled)continue;
      const provider=role.model.includes('/')?role.model.split('/')[0]:undefined;
-     const original=originalRoles.get(role);const legacy=original?.startsWith('default_');if(!legacy)continue;
-     if(candidate.models){if(candidate.models.includes(role.model))role.channel=id;continue;}
-     if(provider){if(candidate.modelProvider===provider&&(candidate.selected||role.channel===original))role.channel=id;}
-     else if(legacy&&(candidate.selected||!candidate.modelProvider&&candidate.channel.kind==='subscription'&&role.channel===original))role.channel=id;
+     const rebind=()=>{if('channels' in role)role.channels=[...new Set(role.channels.map(channel=>channel===currentId?id:channel))];else role.channel=id;};
+     if(candidate.models){if(candidate.models.includes(role.model))rebind();continue;}
+     if(provider){if(candidate.modelProvider===provider&&(candidate.selected||currentId===original[0]))rebind();}
+     else if(candidate.selected||!candidate.modelProvider&&candidate.channel.kind==='subscription'&&currentId===original[0])rebind();
     }
     pendingSecrets.set(id,secret);counts[initialIds.has(id)?input.replaceExisting?'updated':'existing':'added']++;accepted.push(candidate);
     }catch(error){
@@ -261,7 +266,7 @@ export class NativeChannelImporter {
   } finally {for(const stage of staged)rmSync(stage,{recursive:true,force:true});}
   const subscriptions=new Map<string,Set<string>>();
   for(const candidate of candidates){if(candidate.channel.kind!=='subscription'||!candidate.channel.enabled)continue;const id=`import_${hash(candidate.identity)}`;const set=subscriptions.get(candidate.channel.engine)??new Set<string>();set.add(id);subscriptions.set(candidate.channel.engine,set);}
-  const roleChanges=[...originalRoles].map(([role,before])=>({before,after:role.channel}));
+  const roleChanges=[...originalRoles].flatMap(([role,before])=>before.length===1&&roleChannels(role).length===1?[{before:before[0]!,after:roleChannels(role)[0]!}]:[]);
   snapshot.blocks=remapImportedBlocks(snapshot.config,snapshot.blocks,roleChanges,subscriptions);
   if(pendingSecrets.size)this.policy.transaction(()=>{
    this.policy.save({revision:input.revision,config:snapshot.config,blocks:snapshot.blocks});

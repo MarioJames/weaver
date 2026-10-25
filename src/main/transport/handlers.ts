@@ -92,7 +92,7 @@ function policyHandlers(): Handlers<'getPolicy' | 'policyHistory' | 'policyRollb
       // The route shown is the route a dispatch would take now, so the server supplies the live load.
       const input = args[0] && typeof args[0] === 'object' && !Array.isArray(args[0]) ? args[0] as Record<string, unknown> : {};
       const live = active.policy.snapshot();
-      return previewRoute(live.config, live.blocks, Date.now(), { ...input, workerLoad: workerLoad(active.store.listHeads()) });
+      return previewRoute(live.config, live.blocks, Date.now(), { ...input, workerLoad: workerLoad(active.store.listHeads()) }, active.policy.routingContext());
     },
   };
 }

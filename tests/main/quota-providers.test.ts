@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { QuotaProber } from '../../src/main/quota';
 import { QuotaFailure, QuotaRenewalPending, readNativeCredential } from '../../src/main/quota/credentials';
+import { normalizeConsoleStatus, normalizeUsage } from '../../src/main/quota/providers';
 import type { QuotaEngine } from '../../src/shared/contracts/quota';
 
 const start = Date.parse('2026-10-18T12:00:00Z');
@@ -118,7 +119,7 @@ test('API keys, expired native sessions, ambiguous Grok accounts and symlink cre
   assert.equal(calls, 0);
 });
 
-test('scoped model pools do not claim an exhausted account and paid allowances prevent false blocks', async t => {
+test('scoped model pools remain isolated while paid allowances cannot bypass account caps', async t => {
   const f = fixture(t);
   for (const engine of ['codex', 'claude', 'grok'] as const) f.credential(engine);
   const bodies = {
@@ -129,14 +130,14 @@ test('scoped model pools do not claim an exhausted account and paid allowances p
   const prober = new QuotaProber({ env: f.env, now: () => new Date(start), fetch: async url => json(String(url).includes('chatgpt.com') ? bodies.codex : String(url).includes('anthropic.com') ? bodies.claude : bodies.grok) });
   t.after(() => prober.close());
   const result = await prober.refresh({});
-  assert.equal(result.records[0].status, 'available');
+  assert.equal(result.records[0].status, 'exhausted');
   assert.equal(result.records[1].status, 'unknown');
-  assert.equal(result.records[2].status, 'unknown');
+  assert.equal(result.records[2].status, 'exhausted');
   assert.equal(result.records[0].windows[1].scope, 'model');
   assert.equal(result.records[1].windows[0].scope, 'model');
 });
 
-test('explicit account exhaustion requires known unavailable extras; missing numbers never become zero', async t => {
+test('explicit account exhaustion blocks regardless of extras; missing numbers never become zero', async t => {
   const f = fixture(t);
   for (const engine of ['codex', 'claude', 'grok'] as const) f.credential(engine);
   let missing = false;
@@ -296,12 +297,12 @@ test('native directory overrides stay local and malformed or non-official sessio
   assert.equal(result.records[3].status, 'unsupported', 'OpenCode without a Go login stays local');
 });
 
-test('independent Codex model allowance prevents a whole-engine exhaustion claim', async t => {
+test('independent Codex model allowance cannot bypass an account hard cap', async t => {
   const f = fixture(t); f.credential('codex');
   const prober = new QuotaProber({ env: f.env, now: () => new Date(start), fetch: async () => json(codexBody(100, { additional_rate_limits: [{ metered_feature: 'spark', rate_limit: { allowed: true, primary_window: { used_percent: 10, reset_at: Date.parse(reset) / 1000 } } }] })) });
   t.after(() => prober.close());
   const record = (await prober.refresh({ engine: 'codex' })).records[0];
-  assert.equal(record.status, 'unknown');
+  assert.equal(record.status, 'exhausted');
   assert.equal(record.windows[0].usedPercent, 100);
   assert.equal(record.windows[1].scope, 'model');
 });
@@ -344,7 +345,7 @@ test('Codex rejects mixed ambiguous modes and expired access JWTs without contac
   assert.equal(calls, 0);
 });
 
-test('explicit extra allowance and server permission recover availability while global spend limits win', async t => {
+test('extra allowance and server permission cannot bypass caps; global restrictions remain independent', async t => {
   const f = fixture(t); f.credential('codex'); f.credential('claude');
   let now = start; let blocked = false;
   const prober = new QuotaProber({ env: f.env, now: () => new Date(now), fetch: async url => String(url).includes('chatgpt.com')
@@ -352,11 +353,12 @@ test('explicit extra allowance and server permission recover availability while 
     : json({ five_hour: { utilization: 100, resets_at: reset }, extra_usage: { is_enabled: true, monthly_limit: 100, used_credits: 1 } }) });
   t.after(() => prober.close());
   let records = (await prober.refresh({})).records;
-  assert.equal(records[0].status, 'available'); assert.equal(records[1].status, 'available');
-  assert.match(records[1].detail, /额外额度/);
+  assert.equal(records[0].status, 'exhausted'); assert.equal(records[1].status, 'exhausted');
+  assert.equal(records[0].statusBasis, undefined);
   blocked = true; now += 60001;
   records = (await prober.refresh({ engine: 'codex' })).records;
   assert.equal(records[0].status, 'exhausted'); assert.equal(records[0].stale, false);
+  assert.equal(records[0].statusBasis, 'account_restriction');
 });
 
 test('an expired short window does not stale a currently exhausted weekly account pool', async t => {
@@ -406,7 +408,9 @@ test('Claude explicit model and surface scopes cannot become account quota or fa
   limits = [{ kind: 'session', percent: null, scope: { model: {} } }]; now += 60001;
   record = (await prober.refresh({ engine: 'claude' })).records[1];
   assert.equal(record.status, 'unknown');
-  assert.equal(record.windows.length, 0, 'an authoritative incomplete record must not become legacy available quota');
+  assert.equal(record.windows.length, 1, 'an authoritative incomplete model record must not become legacy available quota');
+  assert.equal(record.windows[0].scope, 'model');
+  assert.equal(record.windows[0].usedPercent, null);
 });
 
 test('fresh independent account restriction survives included-window resets while TTL and failures still apply', async t => {
@@ -634,7 +638,6 @@ test('OpenCode maps rate limits to an exhausted plan window and malformed shapes
     { usage: { weekly: goSlot('ok', 25, reset), monthly: goSlot('ok', 29, reset) } },
     goUsage(goSlot('paused', 10, reset)),
     goUsage(goSlot('ok', -1, reset)),
-    goUsage(goSlot('ok', 101, reset)),
     goUsage(goSlot('ok', NaN, reset)),
     goUsage(goSlot('ok', 10, 'not-a-date')),
     { usage: null },
@@ -698,4 +701,110 @@ test('OpenCode credential reading separates accounts by provider id and never wr
   f.credential('opencode', { opencode: { type: 'api', key: 'secret-plain' } });
   const second = await readNativeCredential('opencode', f.env, start);
   assert.notEqual(second.account, first.account, 'different provider ids hash to different accounts');
+});
+
+test('Claude five-hour, weekly and configured monthly caps are independent AND constraints', () => {
+  for (const full of [null, 'five', 'week', 'month'] as const) {
+    for (const percent of [100, 105]) {
+      const result = normalizeUsage('claude', {
+        five_hour: { utilization: full === 'five' ? percent : 10, resets_at: reset },
+        seven_day: { utilization: full === 'week' ? percent : 20, resets_at: reset },
+        extra_usage: { is_enabled: true, monthly_limit: 2000, used_credits: full === 'month' ? percent * 20 : 600, utilization: full === 'month' ? percent : 30 },
+      }, start);
+      assert.equal(result.status, full === null ? 'available' : 'exhausted', `${full}: ${percent}`);
+      assert.equal(result.windows.length, 3);
+      const monthly = result.windows.find(w => w.id === 'claude:extra_usage:monthly')!;
+      assert.equal(monthly.scope, 'account');
+      assert.equal(monthly.unit, 'credits');
+      assert.equal(monthly.total, 2000);
+    }
+  }
+});
+
+test('Claude monthly configured amounts block even without utilization, but disabled or unconfigured extras add no cap', () => {
+  for (const used of [2000, 2100]) {
+    const result = normalizeUsage('claude', { five_hour: { utilization: 10 }, extra_usage: { is_enabled: true, monthly_limit: 2000, used_credits: used } }, start);
+    assert.equal(result.status, 'exhausted');
+  }
+  for (const extra_usage of [undefined, { is_enabled: false, monthly_limit: 2000, used_credits: 2000, utilization: 100 }, { monthly_limit: 2000, used_credits: 2000 }, { is_enabled: true, monthly_limit: null, utilization: 100 }, { is_enabled: true, monthly_limit: 0, used_credits: 0 }, { is_enabled: true, balance: 0 }]) {
+    const result = normalizeUsage('claude', { five_hour: { utilization: 0 }, extra_usage }, start);
+    assert.equal(result.status, 'available');
+    assert.equal(result.windows.length, 1);
+  }
+  assert.equal(normalizeUsage('claude', { five_hour: { utilization: 0 }, extra_usage: { is_enabled: true, monthly_limit: 2000 } }, start).status, 'unknown');
+});
+
+test('Codex permission, credits and model allowances cannot release either account window', () => {
+  for (const full of ['primary_window', 'secondary_window']) {
+    const result = normalizeUsage('codex', {
+      rate_limit: { allowed: true, primary_window: { used_percent: 10 }, secondary_window: { used_percent: 20 }, [full]: { used_percent: 100 } },
+      credits: { has_credits: true, unlimited: true, balance: '100' },
+      additional_rate_limits: [{ normal_model_slug: 'other', rate_limit: { allowed: true, primary_window: { used_percent: 0 } } }],
+    }, start);
+    assert.equal(result.status, 'exhausted');
+  }
+  assert.equal(normalizeUsage('codex', { rate_limit: { allowed: true, primary_window: { used_percent: null } } }, start).status, 'unknown');
+  assert.equal(normalizeUsage('codex', { rate_limit: { primary_window: { used_percent: 0 } }, additional_rate_limits: [{ normal_model_slug: 'other', rate_limit: { primary_window: { used_percent: 100 } } }] }, start).status, 'available');
+});
+
+test('Grok current account monthly amounts are one cap; billing balances and product stats do not override it', () => {
+  for (const used of [100, 105]) {
+    const result = normalizeUsage('grok', { config: { monthlyLimit: { val: 100 }, used: { val: used }, currentPeriod: { type: 'USAGE_PERIOD_TYPE_MONTHLY', start: '2026-10-01T00:00:00Z', end: reset }, prepaidBalance: { val: 50 }, onDemandCap: { val: 100 }, onDemandUsed: { val: 0 } } }, start);
+    assert.equal(result.status, 'exhausted');
+    assert.equal(result.windows.length, 1);
+    assert.notEqual(result.windows[0].unit, 'usd');
+  }
+  assert.equal(normalizeUsage('grok', { config: { creditUsagePercent: 10, productUsage: [{ product: 'other', usagePercent: 100 }], prepaidBalance: { val: 0 } } }, start).status, 'available');
+});
+
+test('OpenCode each provided cap blocks at and above 100 and an expired window cannot establish availability', () => {
+  for (const key of ['rolling', 'weekly', 'monthly']) {
+    for (const percent of [100, 105]) {
+      const body = goUsage();
+      body.usage[key as keyof typeof body.usage] = goSlot('ok', percent, reset);
+      assert.equal(normalizeUsage('opencode', body, start).status, 'exhausted');
+    }
+  }
+  assert.equal(normalizeUsage('opencode', goUsage(), Date.parse(reset)).status, 'unknown');
+});
+
+test('an expired or incomplete provided account window cannot be masked by another available window', () => {
+  for (const percent of [0, 100, null]) {
+    const result = normalizeUsage('claude', { five_hour: { utilization: percent, resets_at: new Date(start - 1).toISOString() }, seven_day: { utilization: 10, resets_at: reset } }, start);
+    assert.equal(result.status, 'unknown');
+  }
+  assert.equal(normalizeUsage('claude', { limits: [{ kind: 'session', percent: null }, { kind: 'weekly_all', percent: 10 }] }, start).status, 'unknown');
+});
+
+test('Grok finite current account used/total remain authoritative when utilization is missing or contradictory', () => {
+  for (const creditUsagePercent of [undefined, null, 10, NaN]) {
+    const result = normalizeUsage('grok', { config: { creditUsagePercent, monthlyLimit: { val: 100 }, used: { val: 100 } } }, start);
+    assert.equal(result.status, 'exhausted');
+  }
+});
+
+test('OpenCode known exhausted windows still block when another window is incomplete', () => {
+  assert.equal(normalizeUsage('opencode', { usage: { weekly: goSlot('ok', 100, reset) } }, start).status, 'exhausted');
+});
+
+test('Console five-hour, weekly and monthly caps each block despite useBalance', () => {
+  for (const key of ['fiveHour', 'week', 'month']) {
+    for (const used of ['100', '105']) {
+      const meters = Object.fromEntries(['fiveHour', 'week', 'month'].map(name => [name, { usedMicroCents: name === key ? used : '10', limitMicroCents: '100', resetsAt: reset }]));
+      assert.equal(normalizeConsoleStatus({ access: { meters }, useBalance: true }).status, 'exhausted');
+    }
+  }
+});
+
+test('a Console rolling window with usage but no reset is incomplete, never fabricated as zero', () => {
+  const result = normalizeConsoleStatus({ access: { meters: {
+    fiveHour: { usedMicroCents: '100', limitMicroCents: '100' },
+    week: { usedMicroCents: '10', limitMicroCents: '100', resetsAt: reset },
+    month: { usedMicroCents: '10', limitMicroCents: '100', resetsAt: reset },
+  } } });
+  assert.equal(result.status, 'unknown');
+});
+
+test('Console known exhausted cap takes precedence over incomplete sibling windows', () => {
+  assert.equal(normalizeConsoleStatus({ access: { meters: { month: { usedMicroCents: '100', limitMicroCents: '100', resetsAt: reset } } } }).status, 'exhausted');
 });

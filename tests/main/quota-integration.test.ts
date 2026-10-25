@@ -304,34 +304,110 @@ test('expired manual conflict reaches HTTP and CLI without overwriting the manua
   } finally { await runtime?.close(); await f.close(); }
 });
 
-test('live exhausted windows survive an older reset, then explicit Codex permission and Claude allowance clear old quota blocks', async () => {
+test('live exhausted windows survive an older reset and allowance until official windows recover, clearing only their own quota blocks', async () => {
   const f = await fixture();
   let runtime: WeaverRuntime | undefined;
   let clock = Date.now();
   const expiredReset = Math.floor((clock - 60_000) / 1000);
   const futureReset = Math.floor((clock + 3_600_000) / 1000);
+  const futureResetIso = new Date(futureReset * 1000).toISOString();
   let allowance = false;
+  let recovered = false;
+  const requests = { codex: 0, claude: 0 };
   try {
     const env = await nativeFixture(f.dir);
     await mkdir(join(env.HOME, '.claude'));
     await writeFile(join(env.HOME, '.claude', '.credentials.json'), JSON.stringify({ claudeAiOauth: { accessToken: 'fixture-claude', expiresAt: Date.parse('2100-01-01') } }));
     const quotaProber = channelProber(f.dir,{ env, now: () => new Date(clock), fetch: async url => {
-      if (String(url).includes('anthropic.com')) return Response.json({ five_hour: { utilization: 100, resets_at: reset }, extra_usage: allowance ? { is_enabled: true, monthly_limit: 100, used_credits: 1 } : { is_enabled: false } });
-      return Response.json({ rate_limit: { allowed: allowance, limit_reached: !allowance, primary_window: { used_percent: 100, reset_at: expiredReset, limit_window_seconds: 3600 }, secondary_window: { used_percent: 100, reset_at: futureReset, limit_window_seconds: 604800 } }, credits: { has_credits: false, unlimited: false, balance: '0' } });
+      if (String(url).includes('anthropic.com')) {
+        requests.claude++;
+        return Response.json({
+          five_hour: { utilization: recovered ? 25 : 100, resets_at: recovered ? futureResetIso : new Date(expiredReset * 1000).toISOString() },
+          seven_day: { utilization: recovered ? 50 : 100, resets_at: futureResetIso },
+          extra_usage: allowance ? { is_enabled: true, monthly_limit: 100, used_credits: 1 } : { is_enabled: false },
+        });
+      }
+      requests.codex++;
+      return Response.json({
+        rate_limit: { allowed: allowance, limit_reached: !allowance,
+          primary_window: { used_percent: recovered ? 25 : 100, reset_at: recovered ? futureReset : expiredReset, limit_window_seconds: 18000 },
+          secondary_window: { used_percent: recovered ? 50 : 100, reset_at: futureReset, limit_window_seconds: 604800 } },
+        credits: { has_credits: allowance, unlimited: false, balance: allowance ? '99' : '0' },
+      });
     } });
     runtime = await startRuntime({ dataDir: f.dir, port: 0, open: false, quotaProber });
+    const accounts = (records: EngineQuotaRecord[]) => records.filter(item => item.engine === 'codex' || item.engine === 'claude');
+    const assertPublished = async (result: any) => {
+      const read = await rpc(runtime!, 'getQuota', []);
+      assert.equal(read.status, 200);
+      assert.deepEqual(accounts(read.json.result.records), accounts(result.records), 'HTTP reads publish the latest observations');
+      const policy = await rpc(runtime!, 'getPolicy', []);
+      assert.equal(policy.status, 200);
+      assert.deepEqual(policy.json.result.blocks, result.snapshot.blocks);
+      const persisted = new PolicyStore(join(f.dir, 'weaver.db')).snapshot();
+      assert.deepEqual(persisted.blocks, result.snapshot.blocks, 'the database retains the exact block set');
+      assert.equal(persisted.revision, result.snapshot.revision);
+    };
+
+    // An elapsed short-window reset cannot erase a still-full weekly window.
     const exhausted = await refreshAccounts(runtime);
     assert.equal(exhausted.status, 200);
-    assert.equal(exhausted.json.result.snapshot.blocks.length, 2);
-    assert.equal(exhausted.json.result.records.find((item: EngineQuotaRecord) => item.engine === 'codex').stale, false);
-    assert.equal(exhausted.json.result.snapshot.blocks.find((block: { engine: string }) => block.engine === 'codex').release_at, new Date(futureReset * 1000).toISOString());
+    assert.deepEqual(requests, { codex: 1, claude: 1 });
+    assert.deepEqual(accounts(exhausted.json.result.records).map(item => item.status), ['exhausted', 'exhausted']);
+    for (const item of accounts(exhausted.json.result.records)) {
+      assert.equal(item.stale, false);
+      assert.ok(item.windows.some(window => window.usedPercent === 100 && window.resetsAt === futureResetIso));
+    }
+    const quotaBlocks = exhausted.json.result.snapshot.blocks;
+    assert.equal(quotaBlocks.length, 2);
+    assert.deepEqual(quotaBlocks.map((block: { by: string }) => block.by).sort(), ['weaver-quota:claude', 'weaver-quota:codex']);
+    assert.equal(quotaBlocks.find((block: { engine: string }) => block.engine === 'codex').release_at, futureResetIso);
+    await assertPublished(exhausted.json.result);
+
+    const retained = [
+      { engine: 'codex', channel: 'default_codex', model: 'manual-fixture', reason: 'manual retained', since, by: 'operator' },
+      { engine: 'grok', channel: 'default_grok', reason: 'other engine quota retained', since, by: 'weaver-quota:grok' },
+      { engine: 'codex', channel: 'default_codex', model: 'vendor-fixture', reason: 'vendor restriction retained', since, by: 'vendor-fixture' },
+    ];
+    const current = (await rpc(runtime, 'getPolicy', [])).json.result;
+    const saved = await rpc(runtime, 'savePolicy', [{ revision: current.revision, config: current.config, blocks: [...quotaBlocks, ...retained] }]);
+    assert.equal(saved.status, 200);
+
+    // Allowance and credits change, but the official windows remain at 100%.
     allowance = true;
     clock += 60_001;
-    const restored = await refreshAccounts(runtime);
+    const allowed = await refreshAccounts(runtime);
+    assert.equal(allowed.status, 200);
+    assert.deepEqual(requests, { codex: 2, claude: 2 }, 'both providers are probed again after pacing');
+    assert.deepEqual(accounts(allowed.json.result.records).map(item => item.status), ['exhausted', 'exhausted']);
+    assert.ok(accounts(allowed.json.result.records).every(item => !item.stale && item.checkedAt === new Date(clock).toISOString()));
+    assert.equal(allowed.json.result.policyChanged, false);
+    assert.equal(allowed.json.result.snapshot.revision, saved.json.result.revision);
+    assert.deepEqual(allowed.json.result.snapshot.blocks, [...quotaBlocks, ...retained]);
+    await assertPublished(allowed.json.result);
+
+    // Recovery requires new official readings below 100%, with valid future resets.
+    recovered = true;
+    clock += 60_001;
+    const codexRestored = await rpc(runtime, 'refreshQuota', [{ channel: 'default_codex' }]);
+    assert.equal(codexRestored.status, 200);
+    assert.deepEqual(requests, { codex: 3, claude: 2 });
+    assert.deepEqual(codexRestored.json.result.snapshot.blocks, [...quotaBlocks.filter((block: { engine: string }) => block.engine === 'claude'), ...retained], 'Codex recovery preserves the Claude quota block');
+    await assertPublished(codexRestored.json.result);
+    const restored = await rpc(runtime, 'refreshQuota', [{ channel: 'default_claude' }]);
     assert.equal(restored.status, 200);
-    assert.deepEqual(restored.json.result.records.filter((item: EngineQuotaRecord) => item.engine === 'codex' || item.engine === 'claude').map((item: EngineQuotaRecord) => item.status), ['available', 'available']);
+    assert.deepEqual(requests, { codex: 3, claude: 3 });
+    assert.deepEqual(accounts(restored.json.result.records).map(item => item.status), ['available', 'available']);
+    for (const item of accounts(restored.json.result.records)) {
+      assert.equal(item.stale, false);
+      assert.equal(item.checkedAt, new Date(clock).toISOString());
+      const included = item.windows.filter(window => window.unit === 'percent');
+      assert.ok(included.length >= 2);
+      assert.ok(included.every(window => window.usedPercent !== null && window.usedPercent < 100 && window.resetsAt !== null && Date.parse(window.resetsAt) > clock));
+    }
     assert.equal(restored.json.result.policyChanged, true);
-    assert.deepEqual(restored.json.result.snapshot.blocks, []);
+    assert.deepEqual(restored.json.result.snapshot.blocks, retained, 'only each recovered provider’s own channel quota block is removed');
+    await assertPublished(restored.json.result);
   } finally { await runtime?.close(); await f.close(); }
 });
 

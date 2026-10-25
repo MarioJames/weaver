@@ -7,7 +7,7 @@ import type { PolicyDraft } from './usePolicyDraft';
 import { styles } from '../ui/styles';
 
 /** Page header for pages that edit the saved policy: one save path, one place for its outcome. */
-export function PolicyHeader({ title, description, policy, extra }: { title: string; description: ReactNode; policy: PolicyDraft; extra?: ReactNode }) {
+export function PolicyHeader({ title, description, policy, extra, saveBlockReason }: { title: string; description: ReactNode; policy: PolicyDraft; extra?: ReactNode; saveBlockReason?: string }) {
   const state = policy.loading && !policy.config ? '正在读取配置…' : policy.dirty ? '有未保存的修改' : policy.snapshot ? '已保存' : '';
   useNotifyError(policy.loadError, '配置读取失败');
   useNotifyError(policy.saveError ? [policy.saveError, ...policy.issues.map(issue => `${issue.path}：${issue.message}`)].join('\n') : '', '保存失败');
@@ -17,7 +17,7 @@ export function PolicyHeader({ title, description, policy, extra }: { title: str
       {extra}
       <Text type={policy.dirty ? 'warning' : 'secondary'} role="status" aria-live="polite" style={{ inlineSize: 126, flexShrink: 0 }}>{state}</Text>
       <Button disabled={!policy.dirty || policy.busy || policy.loading} onClick={() => void policy.load(true)}>放弃修改</Button>
-      <Button type="primary" icon={Save} loading={policy.busy} disabled={!policy.config || !policy.dirty} onClick={() => void policy.save()}>保存</Button>
+      <Button type="primary" icon={Save} loading={policy.busy} disabled={!policy.config || !policy.dirty || !!saveBlockReason} title={saveBlockReason || undefined} onClick={() => { if (!saveBlockReason) void policy.save(); }}>保存</Button>
     </div>} />
   </>;
 }

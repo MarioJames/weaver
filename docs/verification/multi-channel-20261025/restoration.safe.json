@@ -1,0 +1,32 @@
+{
+  "checkedAt": "2026-10-25T11:48:42.970396+00:00",
+  "baselineRevision": 23,
+  "finalRevision": 31,
+  "baselineConfigExactlyRestored": true,
+  "configSha256": "7124bdeb2336de7892dec25fa28002ee00b535cba18dc5a79b6f073032be1e72",
+  "liveBlocksPreserved": true,
+  "quotaExactlyPreservedAcrossRestore": true,
+  "tasksExactlyPreservedAcrossRestore": true,
+  "quotaSameAsPackageStart": true,
+  "tasksSameAsPackageStart": true,
+  "accountConfigurationsUntouched": true,
+  "fixturesAbsent": true,
+  "labelsRestored": true,
+  "channelCount": 9,
+  "workerCount": 7,
+  "ownerCount": 3,
+  "sourceFilesChangedDuringAcceptance": [],
+  "service": {
+    "pid": 1724773,
+    "url": "http://127.0.0.1:4739",
+    "port": 4739,
+    "dataDir": "/tmp/wm-4d4zht7u/multi-real-prep/data",
+    "version": "0.7.9",
+    "startedAt": "2026-10-25T11:08:28.187Z",
+    "runningWorkers": 0,
+    "managedBy": null
+  },
+  "serviceRetained": true,
+  "inferenceCalls": 0,
+  "quotaRefreshCalls": 0
+}

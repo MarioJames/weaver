@@ -1,8 +1,8 @@
-import { migrateChannelPolicy } from '../shared/policy/channels';
+import { migrateChannelPolicy, normalizeHistoricalPolicy } from '../shared/policy/channels';
 import type { DatabaseSync } from 'node:sqlite';
 
 /** Every schema change lands here as one ordered step; PRAGMA user_version tracks what ran. */
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 /** A step is plain SQL, or a function for data work SQL alone cannot express (here: rewriting JSON snapshots). */
 type Step = (string | ((db: DatabaseSync) => void))[];
@@ -131,6 +131,11 @@ const STEPS: Step[] = [
     `ALTER TABLE policy_blocks ADD COLUMN channel TEXT`,
     migrateChannels,
   ],
+  // 14: generated column rename; JSON conversion and history normalization run in the same transaction.
+  [
+    `ALTER TABLE policy_workers RENAME COLUMN channel TO channels`,
+    migrateWorkerChannels,
+  ],
 ];
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -214,5 +219,27 @@ function migrateChannels(db: DatabaseSync): void {
   if(!isRecord(body)||!isRecord(body.config)||!isRecord(body.config.engines)||!isRecord(body.config.owners)||!isRecord(body.config.workers)||!Array.isArray(body.blocks))continue;
   const next=migrateChannelPolicy(body.config,body.blocks??[]);body.config=next.config;body.blocks=next.blocks;
   update.run(JSON.stringify(body),row.revision);
+ }
+}
+
+function migrateWorkerChannels(db: DatabaseSync): void {
+ const updateWorker = db.prepare('UPDATE policy_workers SET channels=? WHERE id=?');
+ for (const row of db.prepare('SELECT id,channels FROM policy_workers').all() as {id:string;channels:unknown}[]) {
+  if (typeof row.channels !== 'string' || !row.channels.length || !db.prepare('SELECT id FROM policy_channels WHERE id=?').get(row.channels)) throw new Error(`Invalid historical worker channel: ${row.id}`);
+  updateWorker.run(JSON.stringify([row.channels]),row.id);
+ }
+ const update = db.prepare('UPDATE policy_revisions SET body=? WHERE revision=?');
+ for (const row of db.prepare('SELECT revision,body FROM policy_revisions').all() as {revision:number;body:string}[]) {
+  let body: string;
+  try {
+   const snapshot: unknown = JSON.parse(row.body);
+   if (!isRecord(snapshot) || snapshot.version !== 1 || snapshot.revision !== row.revision || !isRecord(snapshot.config) || !Array.isArray(snapshot.blocks)) continue;
+   const normalized = normalizeHistoricalPolicy(snapshot.config,snapshot.blocks);
+   body = JSON.stringify({...snapshot,...normalized});
+  } catch {
+   // Retain unconvertible history verbatim; rollback still validates before using it.
+   continue;
+  }
+  update.run(body,row.revision);
  }
 }

@@ -1,0 +1,270 @@
+[
+  {
+    "label": "production",
+    "beforeVersion": 13,
+    "afterVersion": 14,
+    "integrity": "ok",
+    "tables": [
+      {
+        "table": "artifacts",
+        "rows": 907,
+        "equal": true
+      },
+      {
+        "table": "channel_secrets",
+        "rows": 6,
+        "equal": true
+      },
+      {
+        "table": "free_probe_history",
+        "rows": 50,
+        "equal": true
+      },
+      {
+        "table": "free_probe_workers",
+        "rows": 3,
+        "equal": true
+      },
+      {
+        "table": "janitor_sweeps",
+        "rows": 25,
+        "equal": true
+      },
+      {
+        "table": "kv",
+        "rows": 118,
+        "equal": true
+      },
+      {
+        "table": "owners",
+        "rows": 207,
+        "equal": true
+      },
+      {
+        "table": "packages",
+        "rows": 1270,
+        "equal": true
+      },
+      {
+        "table": "policy_blocks",
+        "rows": 3,
+        "equal": true
+      },
+      {
+        "table": "policy_channels",
+        "rows": 6,
+        "equal": true
+      },
+      {
+        "table": "policy_engines",
+        "rows": 7,
+        "equal": true
+      },
+      {
+        "table": "policy_owner_workers",
+        "rows": 8,
+        "equal": true
+      },
+      {
+        "table": "policy_owners",
+        "rows": 2,
+        "equal": true
+      },
+      {
+        "table": "policy_revisions",
+        "rows": 369,
+        "equal": true
+      },
+      {
+        "table": "policy_settings",
+        "rows": 5,
+        "equal": true
+      },
+      {
+        "table": "policy_workers",
+        "rows": 5,
+        "equal": true
+      },
+      {
+        "table": "quota_records",
+        "rows": 24,
+        "equal": true
+      },
+      {
+        "table": "quota_state",
+        "rows": 18,
+        "equal": true
+      },
+      {
+        "table": "receipts",
+        "rows": 6575,
+        "equal": true
+      },
+      {
+        "table": "sqlite_sequence",
+        "rows": 2,
+        "equal": true
+      },
+      {
+        "table": "stall_history",
+        "rows": 0,
+        "equal": true
+      },
+      {
+        "table": "stall_penalties",
+        "rows": 0,
+        "equal": true
+      },
+      {
+        "table": "task_events",
+        "rows": 105871,
+        "equal": true
+      },
+      {
+        "table": "tasks",
+        "rows": 1293,
+        "equal": true
+      },
+      {
+        "table": "vendor_worker_limits",
+        "rows": 2,
+        "equal": true
+      }
+    ],
+    "allEqual": true
+  },
+  {
+    "label": "persistent_test",
+    "beforeVersion": 13,
+    "afterVersion": 14,
+    "integrity": "ok",
+    "tables": [
+      {
+        "table": "artifacts",
+        "rows": 1,
+        "equal": true
+      },
+      {
+        "table": "channel_secrets",
+        "rows": 11,
+        "equal": true
+      },
+      {
+        "table": "free_probe_history",
+        "rows": 0,
+        "equal": true
+      },
+      {
+        "table": "free_probe_workers",
+        "rows": 0,
+        "equal": true
+      },
+      {
+        "table": "janitor_sweeps",
+        "rows": 35,
+        "equal": true
+      },
+      {
+        "table": "kv",
+        "rows": 33,
+        "equal": true
+      },
+      {
+        "table": "owners",
+        "rows": 1,
+        "equal": true
+      },
+      {
+        "table": "packages",
+        "rows": 1,
+        "equal": true
+      },
+      {
+        "table": "policy_blocks",
+        "rows": 1,
+        "equal": true
+      },
+      {
+        "table": "policy_channels",
+        "rows": 18,
+        "equal": true
+      },
+      {
+        "table": "policy_engines",
+        "rows": 7,
+        "equal": true
+      },
+      {
+        "table": "policy_owner_workers",
+        "rows": 10,
+        "equal": true
+      },
+      {
+        "table": "policy_owners",
+        "rows": 2,
+        "equal": true
+      },
+      {
+        "table": "policy_revisions",
+        "rows": 79,
+        "equal": true
+      },
+      {
+        "table": "policy_settings",
+        "rows": 6,
+        "equal": true
+      },
+      {
+        "table": "policy_workers",
+        "rows": 7,
+        "equal": true
+      },
+      {
+        "table": "quota_records",
+        "rows": 12,
+        "equal": true
+      },
+      {
+        "table": "quota_state",
+        "rows": 9,
+        "equal": true
+      },
+      {
+        "table": "receipts",
+        "rows": 6,
+        "equal": true
+      },
+      {
+        "table": "sqlite_sequence",
+        "rows": 1,
+        "equal": true
+      },
+      {
+        "table": "stall_history",
+        "rows": 0,
+        "equal": true
+      },
+      {
+        "table": "stall_penalties",
+        "rows": 0,
+        "equal": true
+      },
+      {
+        "table": "task_events",
+        "rows": 13,
+        "equal": true
+      },
+      {
+        "table": "tasks",
+        "rows": 1,
+        "equal": true
+      },
+      {
+        "table": "vendor_worker_limits",
+        "rows": 0,
+        "equal": true
+      }
+    ],
+    "allEqual": true
+  }
+]

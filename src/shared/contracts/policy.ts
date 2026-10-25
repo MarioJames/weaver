@@ -8,7 +8,7 @@ export interface FreeChannelProbeSettings { enabled: boolean; interval_minutes: 
 /** Periodic cleanup of stale Weaver-owned temp directories. Missing means enabled with a 24 hour TTL every 6 hours. */
 export interface JanitorSettings { enabled: boolean; ttl_hours: number; interval_hours: number }
 export interface Owner { enabled: boolean; channel: string; model: string; effort: string; workers: string[]; max_parallel: number; worker_weights?: Record<string, number> }
-export interface Worker { free_channel?: boolean; enabled: boolean; channel: string; model: string; effort: string; description?: string; /** Cap on tasks this worker runs at once across every owner; missing means no cap. */ max_parallel?: number }
+export interface Worker { free_channel?: boolean; enabled: boolean; channels: string[]; model: string; effort: string; description?: string; /** Cap on tasks this worker runs at once across every owner; missing means no cap. */ max_parallel?: number }
 export interface Herdr { max_wait_minutes: number; /** Missing on older policies: treated as 30 (MAX_COMMAND_MINUTES_DEFAULT). */ max_command_minutes?: number }
 /** Rendering preferences; missing means follow the browser. */
 export interface Display { timezone?: string }

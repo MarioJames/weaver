@@ -473,3 +473,25 @@ test('import mutation waits beyond 15 seconds, returns its result once, and time
   gate.calls.find(call=>call.body.method==='getPolicy')?.resolve(jsonResponse({result:{revision:2}}));await flush();
  }finally{gate.restore();cleanup();}
 });
+
+test('saving a worker pool posts every member and keeps the parent account singular', async () => {
+  installOrigin();
+  const gate = installFetch();
+  try {
+    const { defaultConfig } = await import('../../src/main/policy/routing');
+    const config = defaultConfig();
+    config.channels.second = { ...config.channels.default_codex };
+    config.channels.third = { ...config.channels.default_codex, enabled: false };
+    config.workers.codex_worker.channels = ['default_codex', 'second', 'third'];
+    const client = createBrowserClient();
+    const pending = client.savePolicy({ revision: 3, config, blocks: [] });
+    assert.equal(gate.calls.length, 1);
+    assert.deepEqual(gate.calls[0].body, { method: 'savePolicy', args: [{ revision: 3, config, blocks: [] }] });
+    const sent = gate.calls[0].body.args[0] as { config: typeof config };
+    assert.deepEqual(sent.config.workers.codex_worker.channels, ['default_codex', 'second', 'third']);
+    assert.equal(sent.config.owners.codex_owner.channel, 'default_codex');
+    gate.calls[0].resolve(jsonResponse({ result: { revision: 4, config, blocks: [] } }));
+    const saved = await pending;
+    assert.deepEqual(saved.config.workers.codex_worker.channels, ['default_codex', 'second', 'third']);
+  } finally { gate.restore(); cleanup(); }
+});

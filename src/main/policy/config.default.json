@@ -89,21 +89,27 @@
       "model": "sonnet",
       "effort": "high",
       "description": "Default Claude Code worker (Sonnet).",
-      "channel": "default_claude"
+      "channels": [
+        "default_claude"
+      ]
     },
     "codex_worker": {
       "enabled": true,
       "model": "gpt-6.1-sol",
       "effort": "high",
       "description": "Default Codex worker (gpt-6.1-sol).",
-      "channel": "default_codex"
+      "channels": [
+        "default_codex"
+      ]
     },
     "grok_worker": {
       "enabled": false,
       "model": "grok-4.7",
       "effort": "high",
       "description": "Example Grok worker (grok-4.7).",
-      "channel": "default_grok"
+      "channels": [
+        "default_grok"
+      ]
     },
     "qoder_worker": {
       "enabled": false,
@@ -111,7 +117,9 @@
       "effort": "xhigh",
       "description": "Free worker (Qwen3.8-Flash via qodercli).",
       "free_channel": true,
-      "channel": "default_qoder"
+      "channels": [
+        "default_qoder"
+      ]
     },
     "opencode_worker": {
       "enabled": false,
@@ -119,21 +127,27 @@
       "effort": "max",
       "description": "Free worker (glm-5.3-flash-free via opencode). Its TUI uses the variant remembered in ~/.local/state/opencode/model.json, which must match effort.",
       "free_channel": true,
-      "channel": "default_opencode"
+      "channels": [
+        "default_opencode"
+      ]
     },
     "pi_worker": {
       "enabled": false,
       "model": "glm-5.3-flash",
       "effort": "high",
       "description": "Disabled Pi worker template (glm-5.3-flash). Configure its account and enable this worker before dispatch.",
-      "channel": "default_pi"
+      "channels": [
+        "default_pi"
+      ]
     },
     "dsh_worker": {
       "enabled": false,
       "model": "deepseek-flash",
       "effort": "high",
       "description": "DeepSeek Harness worker (deepseek-flash via dsh headless). Uses the DeepSeek API key saved in dsh settings or DEEPSEEK_API_KEY.",
-      "channel": "default_dsh"
+      "channels": [
+        "default_dsh"
+      ]
     }
   },
   "herdr": {
@@ -143,49 +157,49 @@
   "channels": {
     "default_claude": {
       "engine": "claude",
-      "label": "claude 官方订阅",
+      "label": "claude \u5b98\u65b9\u8ba2\u9605",
       "enabled": true,
       "kind": "subscription",
       "quota_refresh": true
     },
     "default_codex": {
       "engine": "codex",
-      "label": "codex 官方订阅",
+      "label": "codex \u5b98\u65b9\u8ba2\u9605",
       "enabled": true,
       "kind": "subscription",
       "quota_refresh": true
     },
     "default_grok": {
       "engine": "grok",
-      "label": "grok 官方订阅",
+      "label": "grok \u5b98\u65b9\u8ba2\u9605",
       "enabled": true,
       "kind": "subscription",
       "quota_refresh": true
     },
     "default_opencode": {
       "engine": "opencode",
-      "label": "opencode 官方订阅",
+      "label": "opencode \u5b98\u65b9\u8ba2\u9605",
       "enabled": true,
       "kind": "subscription",
       "quota_refresh": false
     },
     "default_pi": {
       "engine": "pi",
-      "label": "pi API（待导入）",
+      "label": "pi API\uff08\u5f85\u5bfc\u5165\uff09",
       "enabled": true,
       "kind": "api",
       "quota_refresh": false
     },
     "default_qoder": {
       "engine": "qoder",
-      "label": "qoder 官方订阅",
+      "label": "qoder \u5b98\u65b9\u8ba2\u9605",
       "enabled": true,
       "kind": "subscription",
       "quota_refresh": false
     },
     "default_dsh": {
       "engine": "dsh",
-      "label": "dsh API（待导入）",
+      "label": "dsh API\uff08\u5f85\u5bfc\u5165\uff09",
       "enabled": true,
       "kind": "api",
       "quota_refresh": false

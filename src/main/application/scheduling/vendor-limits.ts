@@ -1,3 +1,4 @@
+import { dbQuotaStore } from '../../storage/quota-snapshot';
 import { roleEngine } from '../../../shared/policy/channels';
 import type { Block } from '../../../shared/contracts/policy';
 import { VENDOR_BLOCK_BY, isEngineBlock, isScopeBlock } from '../../../shared/policy/blocks';
@@ -15,11 +16,24 @@ export class VendorLimits {
   private readonly blocks: PolicyBlockService;
   private readonly ladder: VendorLadderStore;
 
-  constructor(private readonly manager: TaskManager, policy: PolicyStore) {
+  constructor(private readonly manager: TaskManager, private readonly policy: PolicyStore) {
     this.blocks = new PolicyBlockService(() => policy);
     this.ladder = dbVendorLadder(manager.store.db);
     // Historical failures must not recreate a block after an explicit unblock or restart.
-    for (const task of manager.store.listHeads()) if (task.failure) { this.vendorBlockedAttempts.add(task.run?.id ?? task.id); }
+    for (const task of manager.store.listHeads()) if (task.failure) {
+      this.vendorBlockedAttempts.add(task.run?.id ?? task.id);
+      const channel = task.run?.channel ?? task.dispatch?.channel;
+      if (task.failure.kind === 'auth' && channel) {
+        const engineId = task.run?.engine ?? task.dispatch?.engine;
+        const engine = task.run?.evidence?.engine ?? task.dispatch?.engineKind
+          ?? (engineId ? policy.snapshot().config.engines[engineId]?.kind : undefined);
+        const record = dbQuotaStore(manager.store.db).channelRecords!()
+          .find(record => record.channel === channel && record.engine === engine);
+        if (record && (!record.observedAt || Date.parse(record.observedAt) <= Date.parse(task.run?.endedAt ?? task.updatedAt))) {
+          policy.invalidateChannelQuota(channel);
+        }
+      }
+    }
   }
 
   /**
@@ -32,13 +46,13 @@ export class VendorLimits {
       const engine = task.dispatch?.engine;
       const key = task.run?.id ?? task.id;
       if (!engine || !failure || !['rate_limit', 'quota', 'auth'].includes(failure.kind) || this.vendorBlockedAttempts.has(key)) continue;
-      if (failure.kind === 'auth') continue;
+      if (failure.kind === 'auth') { const channel=task.run?.channel??task.dispatch?.channel;if(channel)this.policy.invalidateChannelQuota(channel);this.vendorBlockedAttempts.add(key);continue; }
       // The ladder step and the block it earns are one commit: a save that fails leaves the ladder where it was, so the retry steps it once.
       this.blocks.atomic(() => this.blocks.update(snapshot => {
         const now = Date.now();
         const dispatched = task.dispatch?.worker;
         const worker = dispatched && Object.hasOwn(snapshot.config.workers, dispatched) && roleEngine(snapshot.config,snapshot.config.workers[dispatched]!) === engine ? dispatched : undefined;
-        const channel=task.dispatch?.channel;
+        const channel=task.run?.channel??task.dispatch?.channel;
         const existing = snapshot.blocks.find(block => isScopeBlock(block, engine, worker) && block.channel===channel);
         if (existing && existing.by !== VENDOR_BLOCK_BY) return undefined;
         // Another source already keeps the whole engine out of routing; a worker block would only stack on it.

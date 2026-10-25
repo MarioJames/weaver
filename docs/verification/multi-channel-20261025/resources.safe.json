@@ -1,0 +1,22 @@
+{
+  "checkedAt": "2026-10-25T11:51:46.469003+00:00",
+  "session": "wm-field-92adede5",
+  "mode": "task",
+  "chromeBinary": "/opt/google/chrome/chrome",
+  "chromeRootPidBeforeClose": 1813655,
+  "daemonPidBeforeClose": 1813631,
+  "browserClosed": true,
+  "profileRemoved": true,
+  "profilePath": "/tmp/wm-4d4zht7u/field-browser/browser-profile",
+  "remainingPreviouslyOwnedProcesses": [],
+  "profileMatchingLiveChromePids": [],
+  "checkedWithoutReopeningBrowser": true,
+  "ownedAgentBrowserDaemonReleased": true,
+  "serviceScope": "dev-weaver-multi-1025.scope",
+  "servicePid": 1724773,
+  "servicePort": 4739,
+  "serviceRetained": true,
+  "serviceHttpStatus": 200,
+  "onlyOwnedProfileRemoved": true,
+  "intermediatesRetainedForParentCleanup": true
+}

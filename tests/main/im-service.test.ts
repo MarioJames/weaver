@@ -81,7 +81,7 @@ test('独立Bot参数不依赖owner/worker；无关profile变化保留session，
  const {f,service,live,config}=await setup(t,async input=>{inputs.push(input);return {send:async()=> 'ok',close:async()=>{closes++;}};});
  live.config.owners={};live.config.workers={};await service.reconcile();f.handlers.message(message('direct1'));await tick();
  assert.equal(inputs.length,1);assert.equal(inputs[0]!.model,'gpt-test');assert.equal(inputs[0]!.effort,'medium');assert.equal(inputs[0]!.engineKind,'codex');
- live.config.owners=policy().config.owners;live.config.owners.main!.model='unrelated';live.config.workers.other={enabled:true,channel:"default_codex",model:'unrelated',effort:'high'};await service.reconcile();f.handlers.message(message('direct2'));await tick();assert.equal(inputs.length,1);assert.equal(closes,0);
+ live.config.owners=policy().config.owners;live.config.owners.main!.model='unrelated';live.config.workers.other={enabled:true,channels:["default_codex"],model:'unrelated',effort:'high'};await service.reconcile();f.handlers.message(message('direct2'));await tick();assert.equal(inputs.length,1);assert.equal(closes,0);
  const old=f.handlers;await service.save({expectedRevision:1,config:{...config,model:'gpt-next',effort:'high'}});await tick();assert.equal(closes,1);old.message(message('fenced'));f.handlers.message(message('direct3'));await tick();assert.equal(inputs.length,2);assert.equal(inputs[1]!.model,'gpt-next');assert.equal(inputs[1]!.effort,'high');assert.notEqual(inputs[0]!.instructions,inputs[1]!.instructions);
 });
 test('独立chat尊重engine/model真实block，忽略单worker block；非法参数拒绝且不保存',async t=>{

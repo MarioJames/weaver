@@ -10,7 +10,7 @@ export const subscriptionAllowed = (kind: string): boolean => ENGINE_CATALOG.som
 export function channelUsers(config: Config, channel: string): string[] {
   return [
     ...Object.entries(config.owners).filter(([, role]) => role.channel === channel).map(([id]) => `父 Agent ${id}`),
-    ...Object.entries(config.workers).filter(([, role]) => role.channel === channel).map(([id]) => `子 Agent ${id}`),
+    ...Object.entries(config.workers).filter(([, role]) => role.channels.includes(channel)).map(([id]) => `子 Agent ${id}`),
   ];
 }
 

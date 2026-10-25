@@ -1,0 +1,86 @@
+[
+  {
+    "requestId": "1738853.979",
+    "status": 200,
+    "timestamp": 1792927089107,
+    "method": "listEngineModels",
+    "args": [
+      {
+        "engine": "opencode",
+        "channel": "import_83eeeaa0433b1ae33e5e1a92"
+      }
+    ],
+    "responseKeys": [
+      "engine",
+      "fetchedAt",
+      "models",
+      "status",
+      "source"
+    ],
+    "error": null,
+    "modelCount": 36
+  },
+  {
+    "requestId": "1738853.1009",
+    "status": 200,
+    "timestamp": 1792927114325,
+    "method": "listEngineModels",
+    "args": [
+      {
+        "engine": "opencode",
+        "channel": "import_c9d3db081852ed7a86a554bc"
+      }
+    ],
+    "responseKeys": [
+      "engine",
+      "fetchedAt",
+      "models",
+      "status",
+      "source"
+    ],
+    "error": null,
+    "modelCount": 32
+  },
+  {
+    "requestId": "1738853.1059",
+    "status": 200,
+    "timestamp": 1792927157007,
+    "method": "listEngineModels",
+    "args": [
+      {
+        "engine": "opencode",
+        "channel": "import_83eeeaa0433b1ae33e5e1a92"
+      }
+    ],
+    "responseKeys": [
+      "engine",
+      "fetchedAt",
+      "models",
+      "status",
+      "source"
+    ],
+    "error": null,
+    "modelCount": 36
+  },
+  {
+    "requestId": "1738853.1065",
+    "status": 200,
+    "timestamp": 1792927162807,
+    "method": "listEngineModels",
+    "args": [
+      {
+        "engine": "opencode",
+        "channel": "import_c9d3db081852ed7a86a554bc"
+      }
+    ],
+    "responseKeys": [
+      "engine",
+      "fetchedAt",
+      "models",
+      "status",
+      "source"
+    ],
+    "error": null,
+    "modelCount": 32
+  }
+]

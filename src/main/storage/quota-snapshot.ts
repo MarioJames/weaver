@@ -12,12 +12,27 @@ export interface QuotaPersistence {
 }
 
 /** Where the prober persists its snapshot: a DatabaseSync-backed adapter in product, nothing in tests. */
-export interface QuotaSnapshotStore { load(): QuotaPersistence | undefined; save(snapshot: QuotaPersistence): void; scope?(id: string): QuotaSnapshotStore }
+export interface QuotaSnapshotStore { load(): QuotaPersistence | undefined; save(snapshot: QuotaPersistence): void; invalidateChannel?(id:string): void; channelRecords?(): EngineQuotaRecord[]; scope?(id: string): QuotaSnapshotStore }
 
 /** The weaver.db quota tables: one observation row per engine plus the prober's own pacing keys. */
 export function dbQuotaStore(db: DatabaseSync, namespace = ''): QuotaSnapshotStore {
   const prefix = namespace ? `channel:${namespace}:` : '';
   return {
+    invalidateChannel: id => {
+      const start=`channel:${id}:`;
+      for(const row of db.prepare('SELECT engine,body FROM quota_records').all() as {engine:string;body:string}[]) {
+        if(!row.engine.startsWith(start))continue;
+        const record=JSON.parse(row.body) as EngineQuotaRecord;
+        db.prepare('UPDATE quota_records SET body=? WHERE engine=?').run(JSON.stringify({...record,status:'error',stale:true,detail:'账号认证失败，请刷新认证后重新获取额度'}),row.engine);
+      }
+    },
+    channelRecords: () => (db.prepare('SELECT engine,body FROM quota_records').all() as {engine:string;body:string}[]).flatMap(row=>{
+      if(!row.engine.startsWith('channel:'))return [];
+      const split=row.engine.lastIndexOf(':');
+      const channel=row.engine.slice('channel:'.length,split);
+      const record=JSON.parse(row.body) as EngineQuotaRecord;
+      return [{channel,engine:record.engine,source:record.source,status:record.status,checkedAt:record.checkedAt,observedAt:record.observedAt,stale:record.stale,windows:record.windows,detail:'',retryAt:record.retryAt,...(record.statusBasis?{statusBasis:record.statusBasis}:{})}];
+    }),
     scope: id => dbQuotaStore(db, id),
     load(): QuotaPersistence | undefined {
       const records: QuotaPersistence['records'] = {};

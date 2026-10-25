@@ -1,0 +1,17 @@
+{
+  "revisionBefore": 19,
+  "revisionAfter": 19,
+  "third": "channel_35461a16cf764cf3b1660cbb",
+  "result": {
+    "error": {
+      "code": "INVALID_REQUEST",
+      "message": "Channel is referenced by a role"
+    }
+  },
+  "referenceCounts": {
+    "A": 2,
+    "B": 2,
+    "third": 1
+  },
+  "referencingRolesDisabled": true
+}

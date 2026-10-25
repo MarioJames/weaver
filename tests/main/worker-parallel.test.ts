@@ -59,6 +59,7 @@ test('an empty database gets the column, an older database keeps its rows and up
   policySchema12(old);
   old.exec('ALTER TABLE policy_workers DROP COLUMN max_parallel; PRAGMA user_version=9');
   assert.ok(!columns(old).includes('max_parallel'));
+  old.prepare('INSERT INTO policy_engines(id,position,enabled,kind) VALUES (?,?,?,?)').run('claude',0,1,'claude');
   old.prepare('INSERT INTO policy_workers(id,position,enabled,engine,model,effort) VALUES (?,?,?,?,?,?)').run('legacy_worker', 0, 1, 'claude', 'sonnet', 'high');
   migrate(old);
   assert.ok(columns(old).includes('max_parallel'));

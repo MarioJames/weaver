@@ -1,0 +1,32 @@
+{
+  "directFileOpen": true,
+  "desktopViewport": [
+    1440,
+    1000
+  ],
+  "desktopBodyWidth": 1440,
+  "narrowViewport": [
+    390,
+    844
+  ],
+  "narrowBodyWidth": 390,
+  "relativeLinkCount": 59,
+  "missingOrEscapingLinks": [],
+  "directRelativePngOpen": {
+    "file": "dual-reloaded-desktop.png",
+    "width": 1440,
+    "height": 1000,
+    "complete": true
+  },
+  "externalResources": [],
+  "caseCount": 21,
+  "printGeneratedByRealChrome": true,
+  "printPages": 10,
+  "printPaper": "letter (agent-browser PDF default overrides CSS A4 preference)",
+  "printContainsFailureAndUnverified": true,
+  "printMissingCaseTitles": [],
+  "printFirstAndLastPagesVisuallyInspected": true,
+  "note": "Final cleanup paragraph is filled after Chrome close from same static template.",
+  "desktopAndNarrowScreenshotsVisuallyInspected": true,
+  "printReadable": true
+}

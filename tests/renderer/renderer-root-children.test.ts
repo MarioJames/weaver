@@ -125,7 +125,7 @@ test('a disabled worker, disabled account or manual pause locks its weight; a te
   assert.equal(workerWeightLock(config, 'claude_worker'), undefined);
   // The account is off while the worker itself is still on.
   const draft = structuredClone(config);
-  draft.channels[draft.workers.claude_worker.channel].enabled = false;
+  draft.channels[draft.workers.claude_worker.channels[0]!].enabled = false;
   assert.equal(workerWeightLock(draft, 'claude_worker')?.label, '渠道已停用');
   assert.equal(workerStatusTag(draft, [], 'claude_worker', 5)?.label, '渠道已停用');
   assert.equal(workerStatusTag(config, blocks, 'qoder_worker', 3)?.label, '已限制');

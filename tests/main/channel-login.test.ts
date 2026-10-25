@@ -194,7 +194,8 @@ test('private login initialization refuses deleted and API identities without cr
   assert.deepEqual(service.initializeLogin('default_codex').secret,before);
   // Metadata deletion cannot resurrect a private secret or adopt a retained directory.
   const snapshot=policy.snapshot();delete snapshot.config.channels.default_codex;
-  for(const role of [...Object.values(snapshot.config.owners),...Object.values(snapshot.config.workers)])if(role.channel==='default_codex')role.channel='api';
+  for(const role of Object.values(snapshot.config.owners))if(role.channel==='default_codex')role.channel='api';
+  for(const role of Object.values(snapshot.config.workers))role.channels=role.channels.map(id=>id==='default_codex'?'api':id);
   policy.save({revision:snapshot.revision,config:snapshot.config,blocks:[]});
   assert.throws(()=>service.initializeLogin('default_codex'));assert.deepEqual(secrets.getSecret('default_codex'),before);
  }finally{db.close();rmSync(f.root,{recursive:true,force:true});}

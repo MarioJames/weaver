@@ -8,7 +8,15 @@ import { fail } from '../commands/errors';
 import { terminal, type TaskRecords } from '../tasks/records';
 import type { Dispatcher } from './dispatch';
 
- /** Workers of every earlier attempt in this task's retry chain that failed, cancelled or is still cancelling: a retry never returns to one. */
+/** Account failures exclude only the actual account, across the entire retry chain. */
+const accountFailure = (task:Task):boolean => !!task.dispatch?.channel && task.status==='failed' && ['quota','auth','rate_limit'].includes(task.failure?.kind??'');
+export function chainChannels(store:TaskManager['store'],task:Task,includeCurrent=false):string[] {
+ const channels=new Set<string>();const seen=new Set<string>();let current:Task|undefined=task;
+ if(!includeCurrent){try{current=task.retryOf?store.get(task.retryOf):undefined;}catch{current=undefined;}}
+ while(current&&!seen.has(current.id)){seen.add(current.id);if(accountFailure(current))channels.add(current.run?.channel??current.dispatch!.channel!);try{current=current.retryOf?store.get(current.retryOf):undefined;}catch{break;}}
+ return [...channels];
+}
+/** Non-account failures and cancellations exclude their Worker for the rest of the retry chain. */
 export function chainWorkers(store:TaskManager['store'],task:Task):string[] {
   const workers:string[]=[];const seen=new Set<string>([task.id]);let id=task.retryOf;
   while(id&&!seen.has(id)){
@@ -16,7 +24,7 @@ export function chainWorkers(store:TaskManager['store'],task:Task):string[] {
    let previous:Task;
    try{previous=store.get(id);}catch{break;}
    const worker=previous.dispatch?.worker;
-   if(worker&&(previous.status==='failed'||previous.status==='cancelled'||previous.status==='cancelling')&&!workers.includes(worker))workers.push(worker);
+   if(worker&&!accountFailure(previous)&&(previous.status==='failed'||previous.status==='cancelled'||previous.status==='cancelling')&&!workers.includes(worker))workers.push(worker);
    id=previous.retryOf;
   }
   return workers;
@@ -32,7 +40,7 @@ export class Retries {
   const excluded=chainWorkers(this.manager.store,original);
   const worker=original.dispatch?.worker;
   const abandoned=(cancel&&!terminal(original))||original.status==='failed'||original.status==='cancelled';
-  if(worker&&abandoned&&!excluded.includes(worker))excluded.push(worker);
+  if(worker&&abandoned&&!accountFailure(original)&&!excluded.includes(worker))excluded.push(worker);
   return excluded;
  }
  /** The goal as its owner first wrote it. Walking to the chain root is what keeps one continuation note per
@@ -125,7 +133,7 @@ export class Retries {
   const excludedWorkers=this.retryWorkers(original,cancel);
   const logical=original.ownerId?this.records.owner(original.ownerId):undefined;
   const owner=logical?.profileId??Object.keys(this.policy.snapshot().config.owners)[0];
-  const route=this.dispatch.routeOf(owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(original.ownerId,owner)),[],undefined,excludedWorkers);
+  const route=this.dispatch.routeOf(owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(original.ownerId,owner)),[],undefined,excludedWorkers,chainChannels(this.manager.store,original,true));
   // An explicit mock attempt stays a mock; a real one never falls back to a fixture because it failed.
   const provider=original.dispatch?.execution==='mock'?'mock-jsonl':undefined;
   const decision=this.dispatch.decideExecution(route.engine,provider,original,this.policy.snapshot().config.owners[route.owner]?.channel,route.channel);

@@ -1,3 +1,4 @@
+import { nativeCredentialsReady } from './channels/native';
 import { ChannelLogins } from './channels/login';
 import { ChannelStore } from './channels/store';
 import { ChannelService } from './channels/service';
@@ -315,7 +316,12 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
       },
       taskStatus: () => formatStoreStatus(store!),
     });
+    policy.setRoutingContextProvider(config=>({now:Date.now(),quotas:dbQuotaStore(store!.db).channelRecords!(),credentialsReady:id=>{
+      const channel=config.channels[id];if(!channel?.enabled)return false;
+      try{return nativeCredentialsReady(config.engines[channel.engine]?.kind??'',channelStore.getSecret(id)??{});}catch{return false;}
+    }}));
     quotaProber = options.quotaProber ?? new QuotaProber({ channels:bindings,root:join(dataDir,'agent-state','quota'),env: options.channels?.env,snapshotStore: dbQuotaStore(store.db) });
+    policy.setChannelQuotaInvalidator(id=>quotaProber?.invalidateChannel(id));
     // Ladders and probe answers live in the same weaver.db, so a restart keeps its penalties and history.
     stall = new StallMonitor({
       tasks: () => store!.list(),

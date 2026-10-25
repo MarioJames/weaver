@@ -630,7 +630,7 @@ test('no enabled worker on the penalized engine fails the probe without calling 
   try {
     await h.advance(11);
     assert.equal(p.calls.length, 0, 'there is no route to greet with');
-    assert.equal(h.engine().level, 2, 'and that counts as a failed recovery check');
+    assert.equal(h.engine().level, 1, 'missing diagnostic route cannot justify a new engine penalty');
     assert.equal(h.stallBlocks().length, 1);
     const failed = h.engine().history.at(-1)!;
     assert.equal(failed.probe?.ok, false);

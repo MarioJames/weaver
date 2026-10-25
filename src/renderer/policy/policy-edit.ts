@@ -1,4 +1,5 @@
 import { DEFAULT_WEIGHT, WEIGHT_MAX } from '../../shared/policy/weights';
+import { EFFORTS } from '../../shared/policy/settings';
 import { type Config, type Owner, type Worker } from '../../shared/contracts/policy';
 import type { PolicyDraft } from './usePolicyDraft';
 
@@ -141,7 +142,7 @@ export function blankOwner(config: Config): Owner {
 }
 
 export function blankWorker(config: Config): Worker {
-  return { enabled: false, channel: Object.keys(config.channels).find(id => config.channels[id]!.enabled && config.engines[config.channels[id]!.engine]?.enabled) ?? Object.keys(config.channels)[0] ?? '', model: '', effort: 'high', description: '' };
+  return { enabled: false, channels: [Object.keys(config.channels).find(id => config.channels[id]!.enabled && config.engines[config.channels[id]!.engine]?.enabled) ?? Object.keys(config.channels)[0] ?? ''].filter(Boolean), model: '', effort: 'high', description: '' };
 }
 
 /** Worker concurrency cap: off (or no longer limited) removes the key, on stores an integer 1–100; an empty or out-of-range input lands inside that range. */
@@ -212,4 +213,36 @@ export function isFieldError(error: unknown): boolean {
   const code = typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
   const raw = typeof error === 'object' && error !== null && 'message' in error ? String((error as { message: unknown }).message) : String(error);
   return code === 'VALIDATION' || /^(?:[A-Z][A-Z_0-9]+:\s*)?\$\./.test(raw.replace(/^Error: /, ''));
+}
+
+/** Accounts on the same engine share model/effort. An empty selection keeps the draft; binding it to an engine starts a fresh model. */
+export function withWorkerChannels(config: Config, worker: Worker, channels: string[]): Worker {
+  const previousEngine = config.channels[worker.channels[0] ?? '']?.engine;
+  const engine = config.channels[channels[0] ?? '']?.engine;
+  if (!engine || engine === previousEngine) return { ...worker, channels };
+  const supported = EFFORTS[config.engines[engine]?.kind ?? ''];
+  return { ...worker, channels, model: '', effort: supported?.includes(worker.effort) === false ? supported[0]! : worker.effort };
+}
+
+/** Multi-account pools only share one official quota-bearing policy engine. */
+export function workerChannelsError(config: Config, worker: Worker): string {
+  if (!worker.channels.length) return '请至少选择一个账号或渠道';
+  if (worker.channels.length === 1) return '';
+  if (worker.free_channel) return '免费渠道仅支持单个账号；请先取消免费渠道或只保留一个成员。';
+  const channels = worker.channels.map(id => config.channels[id]);
+  if (channels.some(channel => !channel || channel.kind !== 'subscription')) return '多账号仅支持官方订阅账号，API 渠道不能加入账号池。';
+  const engine = channels[0]!.engine;
+  if (channels.some(channel => channel!.engine !== engine)) return '账号池成员必须使用同一个执行引擎 ID。';
+  const kind = config.engines[engine]?.kind;
+  if (kind === 'opencode') return worker.model.startsWith('opencode-go/') ? '' : 'OpenCode 多账号仅支持 opencode-go/模型；请先填写该模型。';
+  return ['codex', 'claude', 'grok'].includes(kind ?? '') ? '' : '该引擎没有受支持的官方额度接口，仅支持单个账号。';
+}
+
+/** Saving submits every draft role, including workers outside the current editor. */
+export function workerChannelsSaveBlockReason(config: Config): string {
+  for (const [id, worker] of Object.entries(config.workers)) {
+    const error = workerChannelsError(config, worker);
+    if (error) return `子 Agent ${id}：${error}`;
+  }
+  return '';
 }

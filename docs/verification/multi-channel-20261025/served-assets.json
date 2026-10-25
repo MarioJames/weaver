@@ -1,0 +1,25 @@
+{
+  "productionAssets": [
+    {
+      "path": "/",
+      "status": 200,
+      "sha256": "fb3cfc9575c23f6fbe94a21a86fa793afcb18878e04a53d4803aaad2aad7c50f",
+      "matchesBuiltAssets": true
+    },
+    {
+      "path": "/assets/index-C44ijjuB.js",
+      "status": 200,
+      "sha256": "e430c1ca46ad88222a909101176c9e5f7f61214f57217e0d87f0824ddc66a4cc",
+      "matchesBuiltAssets": true
+    },
+    {
+      "path": "/assets/index-ClEh_ZSS.css",
+      "status": 200,
+      "sha256": "fe2fffde3820c4c0ffc45c22855e4b9daa8a46cce4bdea17f2062682b5fb1675",
+      "matchesBuiltAssets": true
+    }
+  ],
+  "persistentTestSchema": 14,
+  "persistentTestIntegrity": "ok",
+  "http4738": 200
+}

@@ -39,3 +39,8 @@ export async function startHello(key: string, input: HelloInput, route: string, 
     finish({ ok: false, error: error instanceof Error ? error.message : String(error), durationMs: 0, checkedAt: new Date().toISOString() });
   }
 }
+
+/** Diagnostic identity includes every mutable route field, separate from the role's policy. */
+export function helloRouteKey(role: string, route: Pick<HelloInput, 'channel' | 'model' | 'effort'>): string {
+  return JSON.stringify([role, route.channel, route.model.trim(), route.effort.trim()]);
+}

@@ -1,0 +1,110 @@
+{
+  "at": "2026-10-25T11:45:06.246536+00:00",
+  "revision": 26,
+  "configSha256": "3cce92240c5d54d3995bfb78a934d9d1eacd3c6de3bd26115ffe68665441e659",
+  "worker": {
+    "enabled": false,
+    "channels": [
+      "import_83eeeaa0433b1ae33e5e1a92",
+      "import_c9d3db081852ed7a86a554bc"
+    ],
+    "model": "opencode-go/glm-5.3-flash",
+    "effort": "high",
+    "description": ""
+  },
+  "savePolicyRequests": [
+    {
+      "id": "1813838.298",
+      "status": 200
+    }
+  ],
+  "dom": {
+    "bodyWidth": 390,
+    "viewport": 390,
+    "main": [
+      {
+        "top": 403,
+        "height": 1880,
+        "client": 788
+      }
+    ],
+    "invalid": [
+      {
+        "id": "_r_j_-channel",
+        "desc": "_r_j_-channel-error",
+        "rect": {
+          "x": 33,
+          "y": 650.09375,
+          "width": 314,
+          "height": 32,
+          "top": 650.09375,
+          "right": 347,
+          "bottom": 682.09375,
+          "left": 33
+        },
+        "errors": [
+          {
+            "id": "_r_j_-channel-error",
+            "exists": true,
+            "text": "请至少选择一个账号或渠道",
+            "rect": {
+              "x": 33,
+              "y": 686.09375,
+              "width": 314,
+              "height": 18.84375,
+              "top": 686.09375,
+              "right": 347,
+              "bottom": 704.9375,
+              "left": 33
+            },
+            "display": "block"
+          }
+        ]
+      },
+      {
+        "id": "_r_j_-channel-hidden-input",
+        "desc": "_r_j_-channel-error",
+        "rect": {
+          "x": -1,
+          "y": -1,
+          "width": 1,
+          "height": 1,
+          "top": -1,
+          "right": 0,
+          "bottom": 0,
+          "left": -1
+        },
+        "errors": [
+          {
+            "id": "_r_j_-channel-error",
+            "exists": true,
+            "text": "请至少选择一个账号或渠道",
+            "rect": {
+              "x": 33,
+              "y": 686.09375,
+              "width": 314,
+              "height": 18.84375,
+              "top": 686.09375,
+              "right": 347,
+              "bottom": 704.9375,
+              "left": 33
+            },
+            "display": "block"
+          }
+        ]
+      }
+    ],
+    "alerts": [
+      "请至少选择一个账号或渠道"
+    ],
+    "notifications": [],
+    "save": [
+      {
+        "disabled": true,
+        "title": "子 Agent wm_field_92adede5：请至少选择一个账号或渠道",
+        "text": "保存",
+        "outer": "<button type=\"button\" class=\"acss-3qhimw\" title=\"子 Agent wm_field_92adede5：请至少选择一个账号或渠道\" aria-disabled=\"true\" disabled=\"\"><span aria-hidden=\"true\" class=\"acss-73apt5\"><span class=\"acss-1v9fevl\"></span></span><span class=\"acss-14cw40i\"><span class=\"anticon\" role=\"img\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"transparent\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-save\" aria-hidden=\"true\"><path d=\"M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z\"></path><path d=\"M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7\"></path><path d=\"M7 3v4a1 1 0 0"
+      }
+    ]
+  }
+}

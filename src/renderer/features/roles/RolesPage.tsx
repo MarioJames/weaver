@@ -1,3 +1,5 @@
+import { activeBlocks, channelAvailabilityOf } from '../../../shared/policy/availability';
+import { roleChannels } from '../../../shared/policy/channels';
 import { dateText } from '../quota/quota-view';
 import { blockOf, blockText, pauseOfBlock } from '../probes/probe-view';
 import { useFreeProbe } from '../probes/useFreeProbe';
@@ -11,11 +13,12 @@ import { Empty, SortableList } from '@lobehub/ui';
 import { Surface } from '@lobehub/ui/dashboard';
 import { Alert, Button, Checkbox, Input, Modal, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
 import type { HelloResult } from '../../../shared/engines';
-import { startHello, useHelloRun } from '../engines/hello-runs';
+import { helloRouteKey, startHello, useHelloRun } from '../engines/hello-runs';
+import { Field } from '@base-ui/react/field';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
 import { EFFORTS } from '../../../shared/policy/settings';
 import { type Availability, type Block, type Owner, type Worker } from '../../../shared/contracts/policy';
-import { blankOwner, blankWorker, deleteRole, fieldErrorText, renameRole, reorderRoles, roleDeleteImpact, roleIdError, syncRoleEditor, withWorkerParallel, workerParallelText, type RoleSection } from '../../policy/policy-edit';
+import { blankOwner, blankWorker, deleteRole, fieldErrorText, renameRole, reorderRoles, roleDeleteImpact, roleIdError, syncRoleEditor, withWorkerChannels, withWorkerParallel, workerParallelText, workerChannelsError, workerChannelsSaveBlockReason, type RoleSection } from '../../policy/policy-edit';
 import { OwnerScheduleFields } from './OwnerSchedule';
 import { ModelPicker } from '../engines/ModelPicker';
 import { engineBlockText, removeBlock, resumeAction, resumeWorker } from '../../policy/worker-resume';
@@ -67,6 +70,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   const [deleteError, setDeleteError] = useState('');
   const [toggling, setToggling] = useState('');
   const [resuming, setResuming] = useState('');
+  const [diagnostics, setDiagnostics] = useState<Record<string, string>>({});
   const form = useForm();
   const fieldId = useId();
   const freeProbe = useFreeProbe(policy.snapshot?.revision);
@@ -79,10 +83,16 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
     setAskDelete(false);
   }, [section, current]);
   const name = NAMES[section];
-  const header = <PolicyHeader title={name} description={DESCRIPTIONS[section]} policy={policy} extra={config && <Button icon={Plus} disabled={policy.busy} onClick={add}>新建{name}</Button>} />;
+  const header = <PolicyHeader title={name} description={DESCRIPTIONS[section]} policy={policy} saveBlockReason={config ? workerChannelsSaveBlockReason(config) : undefined} extra={config && <Button icon={Plus} disabled={policy.busy} onClick={add}>新建{name}</Button>} />;
   if (!config) return <>{header}{policy.loading && <Skeleton.Text animated rows={6} />}</>;
   const record = current ? config[section][current] : undefined;
-  const kind = record ? config.engines[config.channels[record.channel]?.engine ?? '']?.kind : undefined;
+  const members = record ? roleChannels(record) : [];
+  const diagnosticKey = `${section}:${current}`;
+  const diagnostic = members.length === 1 ? members[0]! : members.includes(diagnostics[diagnosticKey] ?? '') ? diagnostics[diagnosticKey]! : '';
+  const diagnosticEngine = config.channels[diagnostic]?.engine ?? '';
+  const kind = config.engines[diagnosticEngine]?.kind;
+  const poolError = record && 'channels' in record ? workerChannelsError(config, record) : '';
+  const channelNames = (role: Owner | Worker) => roleChannels(role).map(id => `${config.channels[id]?.label ?? id}${config.channels[id]?.enabled ? '' : '（渠道停用）'}`).join('、') || '未选账号';
   const efforts = kind ? EFFORTS[kind] : undefined;
   function add() {
     if (!config) return;
@@ -158,7 +168,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           onChange={items => { if (canSort) policy.setConfig(current => current ? reorderRoles(current, section, items.map(item => item.id)) : current); }}
           renderItem={({ id }) => {
             const item = config[section][id]!;
-            const channelOn = config.channels[item.channel]?.enabled === true;
+            const channelOn = roleChannels(item).some(channel => config.channels[channel]?.enabled === true);
             const saved = policy.snapshot?.config[section][id];
             const cap = section === 'workers' ? workerParallelText(item as Worker) : undefined;
             const hit = policy.snapshot && saved ? blockOf(policy.snapshot.blocks, saved, Date.now(), section === 'workers' ? id : undefined, policy.snapshot.config) : undefined;
@@ -175,7 +185,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
                     {section === 'workers' && 'free_channel' in item && item.free_channel === true && <FreeChannelTag />}
                   </span>
                   <span className={rolesStyles.roleNote}>
-                    <span className={`${styles.wrap} ${styles.meta}`}>{config.channels[item.channel]?.label ?? item.channel} · {item.model || '未填模型'}</span>
+                    <span className={`${styles.wrap} ${styles.meta}`}>{channelNames(item)} · {item.model || '未填模型'}</span>
                     {cap && <Tag size="small" color={tagColor('neutral')}>{cap}</Tag>}
                   </span>
                   {note && (note.tag
@@ -190,7 +200,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
             const item = config[section][id];
             return <div className={rolesStyles.roleOverlay}>
               <strong className={styles.wrap}>{id}</strong>
-              <span className={`${styles.wrap} ${styles.meta}`}>{item ? `${config.channels[item.channel]?.label ?? item.channel} · ${item.model || '未填模型'}` : ''}</span>
+              <span className={`${styles.wrap} ${styles.meta}`}>{item ? `${channelNames(item)} · ${item.model || '未填模型'}` : ''}</span>
             </div>;
           }}
         />}
@@ -206,14 +216,36 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           <Form.Field label="配置 ID" required desc="改名后按 Enter 或离开输入框，引用处一起更新。">
             <Input id={`${fieldId}-id`} aria-label="配置 ID" aria-invalid={!!idError} value={pendingId} placeholder={section === 'workers' ? '例如：research' : '例如：codex'} onChange={event => setPendingId(event.target.value)} onBlur={acceptId} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); acceptId(); } }} />
           </Form.Field>
-            <Form.Field label="账号或渠道" required extra={config.channels[record.channel] ? `执行引擎：${config.channels[record.channel]!.engine}` : '渠道不存在，请重新选择；可在账号与渠道页添加。'}><NamedSelect id={`${fieldId}-channel`} aria-label="账号或渠道" value={record.channel || undefined} options={Object.entries(config.channels).map(([id, channel]) => ({ value: id, label: `${channel.label} · ${channel.engine}${channel.enabled ? '' : '（渠道停用）'}` }))} onChange={value => { if (typeof value !== 'string') return; const channel = config.channels[value]!; const supported = EFFORTS[config.engines[channel.engine]?.kind ?? '']; update({ ...record, channel: value, model: value === record.channel ? record.model : '', effort: supported?.includes(record.effort) === false ? supported[0]! : record.effort, enabled: channel.enabled ? record.enabled : false }); }} /></Form.Field>
+            <Field.Root invalid={!!poolError}>
+              <Form.Field label="账号或渠道" required extra={<>{poolError && <Field.Error id={`${fieldId}-channel-error`} match render={<Text type="danger" role="alert" />}>{poolError}</Field.Error>}{section === 'workers' ? '每次派发从有可用额度的账号中随机选择；没有新鲜可用额度时不派发。多账号仅支持同一引擎 ID 的官方订阅池：Codex、Claude、Grok，或 OpenCode 的 opencode-go/模型。API、免费渠道及无额度接口的引擎只支持单账号。' : '选择父 Agent 使用的一个账号。'}</>}>
+                <NamedSelect id={`${fieldId}-channel`} aria-label="账号或渠道" mode={section === 'workers' ? 'multiple' : undefined} value={record && 'channels' in record ? record.channels : (record as Owner).channel || undefined} options={Object.entries(config.channels).map(([id, channel]) => ({ value: id, label: `${channel.label} · ${channel.engine}${channel.enabled ? '' : '（渠道停用）'}` }))} onChange={value => {
+                  if ('channels' in record) {
+                    const channels = Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
+                    const next = withWorkerChannels(config, record, channels);
+                    const error = workerChannelsError(config, next);
+                    if (error && channels.some(id => !record.channels.includes(id))) { notifyError(error, '无法添加账号'); return; }
+                    update(next);
+                  } else if (typeof value === 'string') {
+                    const channel = config.channels[value]!;
+                    const supported = EFFORTS[config.engines[channel.engine]?.kind ?? ''];
+                    update({ ...record, channel: value, model: value === record.channel ? record.model : '', effort: supported?.includes(record.effort) === false ? supported[0]! : record.effort, enabled: channel.enabled ? record.enabled : false });
+                  }
+                }} />
+              </Form.Field>
+            </Field.Root>
           </div>
+          {section === 'workers' && <div className={styles.tight} aria-label="成员账号状态">{members.map(channel => {
+            const saved = policy.snapshot?.config.workers[current];
+            const state = saved?.channels.includes(channel) && policy.snapshot ? channelAvailabilityOf(policy.snapshot.config, activeBlocks({ version: 1, blocks: policy.snapshot.blocks }, Date.now()), { ...saved, channel }, current) : undefined;
+            return <Text key={channel} type="secondary" className={styles.meta}>{config.channels[channel]?.label ?? channel} · {state?.status === 'available' ? '未被策略限制；派发仍需新鲜可用额度' : availabilityText(state)}</Text>;
+          })}</div>}
+          {members.length > 1 && <Form.Field label="用于查看模型和连通测试的账号" extra="此选择仅用于当前诊断，不保存策略，也不指定派发账号。模型目录仅属于所选账号。"><NamedSelect id={`${fieldId}-diagnostic`} aria-label="用于查看模型和连通测试的账号" value={diagnostic || undefined} placeholder="选择一个成员账号" options={members.map(id => ({ value: id, label: config.channels[id]?.label ?? id }))} onChange={value => { if (typeof value === 'string' && members.includes(value)) setDiagnostics(previous => ({ ...previous, [diagnosticKey]: value })); }} /></Form.Field>}
           <div className={rolesStyles.pair} style={{ alignItems: 'start' }}>
-            <Form.Field label="模型" required><ModelPicker kind={kind} channel={record.channel} engine={config.channels[record.channel]?.engine ?? ''} id={`${fieldId}-model`} value={record.model} onChange={model => update({ ...record, model })} /></Form.Field>
+            <Form.Field label="模型" required><ModelPicker key={`${diagnosticKey}:${diagnostic}:${diagnosticEngine}`} kind={kind} channel={diagnostic || undefined} engine={diagnosticEngine} id={`${fieldId}-model`} value={record.model} onChange={model => update({ ...record, model })} /></Form.Field>
             <Form.Field label="推理强度" required><EffortPicker id={`${fieldId}-effort`} efforts={efforts} value={record.effort} onChange={effort => update({ ...record, effort })} /></Form.Field>
           </div>
-          {section === 'owners' && <HelloCheck id={`owners:${current}`} record={record} engine={config.channels[record.channel]?.engine ?? ''} />}
-          {section === 'workers' ? <WorkerFields key={current} id={current} record={record as Worker} engine={config.channels[record.channel]?.engine ?? ''} probe={freeProbe} update={next => update(next)} /> : <OwnerFields key={current} savedRecord={policy.snapshot?.config.owners[current]} config={config} blocks={policy.blocks} record={record as Owner} update={next => update(next)} />}
+          <HelloCheck id={diagnosticKey} record={{ channel: diagnostic, model: record.model, effort: record.effort }} engine={diagnosticEngine} channelLabel={config.channels[diagnostic]?.label} />
+          {section === 'workers' ? <WorkerFields key={current} id={current} record={record as Worker} probe={freeProbe} update={next => update(next)} /> : <OwnerFields key={current} savedRecord={policy.snapshot?.config.owners[current]} config={config} blocks={policy.blocks} record={record as Owner} update={next => update(next)} />}
           {impact && <Modal open={askDelete} title={impact.title} okText={deleteError ? '重试删除' : '删除'} cancelText="取消" confirmLoading={deleting} okButtonProps={{ danger: true, disabled: deleting || policy.busy }} cancelButtonProps={{ disabled: deleting }} closable={!deleting} maskClosable={!deleting} keyboard={!deleting} onCancel={() => { if (!deletingRef.current) setAskDelete(false); }} onOk={() => void confirmDelete()}>
             <Text>{policy.snapshot?.config[section][current] ? impact.detail : '这条角色尚未保存，确认后只从本地草稿移除，并清理引用。取消不改草稿。'}</Text>
             {deleteError && <div role="alert"><Text type="danger">删除失败：{deleteError}</Text></div>}
@@ -234,14 +266,13 @@ function EffortPicker({ efforts, id, value, onChange }: { efforts?: string[]; id
   </div>;
 }
 
-function WorkerFields({ id, record, engine, probe, update }: { id: string; record: Worker; engine: string; probe: ReturnType<typeof useFreeProbe>; update: (next: Worker) => void }) {
+function WorkerFields({ id, record, probe, update }: { id: string; record: Worker; probe: ReturnType<typeof useFreeProbe>; update: (next: Worker) => void }) {
   const fieldId = useId();
   return <>
-    <Form.Field label="免费渠道" desc="仅跳过原生账户额度暂停；手动暂停、供应商限流仍生效。调度权重由父 Agent 分别设置。"><Checkbox checked={record.free_channel === true} onChange={checked => update({ ...record, free_channel: checked === true })}>此子 Agent 使用免费渠道</Checkbox></Form.Field>
+    <Form.Field label="免费渠道" desc="免费模型仅跳过不适用的套餐窗口；适用的额度上限、手动暂停和供应商限制仍生效。调度权重由父 Agent 分别设置。"><Checkbox disabled={record.channels.length > 1 && !record.free_channel} checked={record.free_channel === true} onChange={checked => update({ ...record, free_channel: checked === true })}>此子 Agent 使用免费渠道</Checkbox></Form.Field>
     <Form.Field label="用途说明"><Input id={`${fieldId}-description`} aria-label="用途说明" value={record.description ?? ''} placeholder="例如：负责前端界面与浏览器验收" onChange={event => update({ ...record, description: event.target.value })} /></Form.Field>
-    {record.free_channel === true && <FreeProbePanel worker={id} probe={probe} />}
+    {record.free_channel === true && record.channels.length === 1 && <FreeProbePanel worker={id} probe={probe} />}
     <WorkerParallelField record={record} update={update} />
-    <HelloCheck id={id} record={record} engine={engine} />
   </>;
 }
 
@@ -266,8 +297,9 @@ export function WorkerBlockNotice({ block, now = Date.now(), busy, disabled, onR
 }
 
 /** Sends one real "say hi" through the route as currently filled in, saved or not. The run outlives this form. */
-export function HelloCheck({ id, record, engine }: { id: string; record: Pick<Worker, 'channel' | 'model' | 'effort'>; engine: string }) {
-  const run = useHelloRun(id);
+export function HelloCheck({ id, record, engine, channelLabel }: { id: string; record: Pick<Owner, 'channel' | 'model' | 'effort'>; engine: string; channelLabel?: string }) {
+  const runKey = helloRouteKey(id, record);
+  const run = useHelloRun(runKey);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!run?.running) return;
@@ -280,9 +312,9 @@ export function HelloCheck({ id, record, engine }: { id: string; record: Pick<Wo
     <div className={styles.spread} style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
       <div className={styles.tight}>
         <Text strong>可用性</Text>
-        <Text type="secondary" className={styles.meta}>用当前填写的渠道、模型和推理强度发送一条简短问候，检查能否正常回复。不调用工具，不保存会话，会消耗少量额度。</Text>
+        <Text type="secondary" className={styles.meta}>用当前填写的渠道、模型和推理强度发送一条简短问候，检查能否正常回复。不调用工具，不保存会话，会消耗少量额度。连通成功不代表额度可用。</Text>
       </div>
-      <Button icon={Zap} loading={run?.running} disabled={!ready} onClick={() => void startHello(id, { channel: record.channel, engine, model: record.model.trim(), effort: record.effort.trim() }, `${record.channel} · ${record.model.trim()} · ${record.effort.trim()}`)}>连通测试</Button>
+      <Button icon={Zap} loading={run?.running} disabled={!ready} onClick={() => void startHello(runKey, { channel: record.channel, engine, model: record.model.trim(), effort: record.effort.trim() }, `${channelLabel ?? record.channel} · ${record.model.trim()} · ${record.effort.trim()}`)}>连通测试</Button>
     </div>
     {run?.running && <Text type="secondary" className={styles.meta} role="status">正在等待 {run.route.split(' · ')[0]} 回复… {elapsed} 秒</Text>}
     {run?.result && !run.running && <ReplyCard result={{ ...run.result, route: run.route }} />}
@@ -297,7 +329,7 @@ function ReplyCard({ result }: { result: HelloResult & { route: string } }) {
   return <article role="status" aria-label="连通测试结果" className={rolesStyles.replyCard} data-ok={result.ok ? 'true' : 'false'}>
     <header className={styles.spread} style={{ flexWrap: 'nowrap' }}>
       <span className={styles.row} style={{ flexWrap: 'nowrap', minInlineSize: 0 }}>
-        <Tag size="small" color={result.ok ? tagColor('success') : tagColor('error')}>{result.ok ? '可用' : '不可用'}</Tag>
+        <Tag size="small" color={result.ok ? tagColor('success') : tagColor('error')}>{result.ok ? '连通成功' : '连通失败'}</Tag>
         <Text strong className={styles.wrap}>{result.route}</Text>
       </span>
       <Text type="secondary" className={`${styles.meta} ${styles.numbers}`} style={{ whiteSpace: 'nowrap' }}>{seconds && `${seconds} · `}<TimeText value={result.checkedAt} /></Text>

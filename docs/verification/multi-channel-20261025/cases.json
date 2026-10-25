@@ -1,0 +1,144 @@
+{
+  "scope": "Focused browser retest; historical cases remain historical",
+  "current": [
+    {
+      "id": "inline-aria",
+      "status": "pass",
+      "title": "空账号内联反馈与可访问关联",
+      "actual": "清空真实A/B后立即出现「请至少选择一个账号或渠道」。可见combobox aria-invalid=true，aria-describedby指向存在、display:block且在视口内的错误节点；没有全局技术重复通知。",
+      "evidence": [
+        "empty-desktop.png",
+        "empty-desktop.safe.json"
+      ],
+      "version": "accepted frontend fix / current browser retest"
+    },
+    {
+      "id": "prevent-save",
+      "status": "pass",
+      "title": "无效保存被禁用，跨角色仍可定位",
+      "actual": "revision26/config哈希和savePolicy计数均不变（仅之前1次成功保存）。切换codex_worker后Save仍disabled，title准确给出「子 Agent wm_field_92adede5：请至少选择一个账号或渠道」。切换默认模板出现的凭据通知另行分类。",
+      "evidence": [
+        "before-empty.safe.json",
+        "empty-desktop.safe.json",
+        "hidden-empty.safe.json",
+        "hidden-empty.png"
+      ],
+      "version": "accepted frontend fix / current browser retest"
+    },
+    {
+      "id": "recovery",
+      "status": "pass",
+      "title": "恢复有效账号、保存与reload",
+      "actual": "恢复A后错误节点被移除，aria-invalid及describedby均清除，Save可用。空池重选账号会清空模型；最初未补模型的保存被本地校验拒绝，补回opencode-go/glm-5.3-flash后revision27成功保存；reload确认单成员A和模型正确。随后恢复双成员，revision28。",
+      "evidence": [
+        "recovered-before-save.safe.json",
+        "recovered-saved.safe.json",
+        "recovered-reload.safe.json",
+        "recovered-reload.png",
+        "recovery-aria.safe.json",
+        "recovered-narrow.png"
+      ],
+      "version": "accepted frontend fix / current browser retest"
+    },
+    {
+      "id": "diagnostic",
+      "status": "pass",
+      "title": "真实双成员与A/B诊断请求隔离",
+      "actual": "新建本包Worker，初次双成员保存revision26并reload保持A/B。恢复双成员后选择诊断A/B，各请求channel准确对应import_83eeeaa0433b1ae33e5e1a92/import_c9d3db081852ed7a86a554bc，HTTP200目录分别36/32项；诊断前后revision28/config哈希不变。未点击Hello。本次没有重跑延迟故障，旧包的异步隔离证据另保留。",
+      "evidence": [
+        "dual-reloaded.png",
+        "dual-diagnostic-before.safe.json",
+        "dual-diagnostic-after.safe.json",
+        "diagnostic-a.png",
+        "diagnostic-b.png",
+        "health.safe.json"
+      ],
+      "version": "accepted frontend fix / current browser retest"
+    },
+    {
+      "id": "owner-single",
+      "status": "pass",
+      "title": "Owner保持单选",
+      "actual": "通过RPC创建本包专属Owner，浏览器从A切换B后重新展开，仅B选中，listbox未设置aria-multiselectable=true；该草稿已放弃，未保存账号变更。",
+      "evidence": [
+        "owner-single.png",
+        "owner-single.safe.json"
+      ],
+      "version": "accepted frontend fix / current browser retest"
+    },
+    {
+      "id": "delete",
+      "status": "pass",
+      "title": "已保存角色立即删除及草稿隔离",
+      "actual": "删除本包wm_field_delete_92adede5，确认后revision29→30立即生效，未点顶部Save；本包Owner列表和权重清除该角色。wm_field_92adede5未保存说明WM_FIELD_UNSAVED_92ADEDE5仍在界面，后端description仍为空。",
+      "evidence": [
+        "delete-confirm.png",
+        "deleted-draft-kept.png",
+        "delete.safe.json"
+      ],
+      "version": "accepted frontend fix / current browser retest"
+    },
+    {
+      "id": "responsive",
+      "status": "pass",
+      "title": "1440×1000与390×844可见及可滚动",
+      "actual": "桌面错误节点位于y286..305，末项同屏可达；窄屏原生聚焦main后PageDown/PageUp到达账号错误（y686..705）及末尾并发开关（bottom791.55）。末尾scrollTop1092=1880−788；body宽度分别1440/390，无横向溢出。恢复后错误节点彻底移除，截图无错误占位。未用JS强设滚动或注入DOM。",
+      "evidence": [
+        "empty-desktop.png",
+        "empty-narrow-field.png",
+        "empty-narrow-field.safe.json",
+        "empty-narrow-bottom.png",
+        "empty-narrow-bottom.safe.json",
+        "recovered-narrow.png",
+        "recovered-narrow-final.safe.json"
+      ],
+      "version": "accepted frontend fix / current browser retest"
+    },
+    {
+      "id": "health-restore",
+      "status": "pass",
+      "title": "运行健康、配置恢复和资源边界",
+      "actual": "console error/warn=0，page errors=[]，bh artifact_errors=[]。11次HTTP400均为default_claude/default_codex的未认证目录请求；真实A/B请求HTTP200。一次目录请求与reload重叠未记录响应，不计成功；后续目录响应已核实。基线config精确恢复revision23→31；仅本包两个Worker及一个Owner清除，真实标签恢复，quota/blocks/task及账号认证配置不变，4739原服务保留。",
+      "evidence": [
+        "health.safe.json",
+        "baseline.safe.json",
+        "restoration.safe.json",
+        "version.safe.json",
+        "resources.safe.json"
+      ],
+      "version": "accepted frontend fix / current browser retest"
+    },
+    {
+      "id": "hello",
+      "status": "unverified",
+      "title": "真实Hello / 推理",
+      "actual": "按包约束未调用Hello、推理或刷新quota；本包仅验证按钮状态与目录请求。交接约束说明另已有real dispatch passed，不作为本轮Hello通过证据。",
+      "evidence": [
+        "health.safe.json",
+        "previous/REPORT.html#case-hello-limits"
+      ],
+      "version": "accepted frontend fix / current browser retest"
+    },
+    {
+      "id": "wheel-dark",
+      "status": "unverified",
+      "title": "Wheel输入与暗色外观",
+      "actual": "本轮未重跑Wheel或暗色切换。旧包记录Wheel落点工具限制，实际滚动本轮以原生键盘复验；旧包未取得暗色截图，本报告不提升为通过。",
+      "evidence": [
+        "previous/REPORT.html#case-wheel-tool",
+        "previous/REPORT.html#case-dark-mode"
+      ],
+      "version": "accepted frontend fix / current browser retest"
+    }
+  ],
+  "previous": {
+    "report": "previous/REPORT.html",
+    "cases": "previous/cases.json",
+    "unchangedOriginalResults": true,
+    "counts": {
+      "pass": 17,
+      "fail": 1,
+      "unverified": 3
+    }
+  }
+}

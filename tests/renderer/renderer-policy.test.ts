@@ -10,6 +10,7 @@ test('confirmed saved deletion commits only removal and reference cleanup, prese
   saved.owners.claude_owner = withWorkerWeight(saved.owners.claude_owner, 'opencode_worker', 7);
   let draft = structuredClone(saved);
   draft.workers.claude_worker!.model = 'unsaved-model';
+  draft.workers.claude_worker!.channels = ['default_claude', 'second_claude', 'third_claude'];
   draft.owners.claude_owner.max_parallel = 42;
   let update: PolicyUpdate | undefined;
   let finish!: () => void;
@@ -32,6 +33,7 @@ test('confirmed saved deletion commits only removal and reference cleanup, prese
   draft = update({ config: draft, blocks: [] }).config;
   assert.equal(draft.workers.opencode_worker, undefined);
   assert.equal(draft.workers.claude_worker!.model, 'unsaved-model');
+  assert.deepEqual(draft.workers.claude_worker!.channels, ['default_claude', 'second_claude', 'third_claude']);
   assert.equal(draft.owners.claude_owner.max_parallel, 42);
   assert.equal(draft.owners.claude_owner.worker_weights, undefined);
   finish();
@@ -204,4 +206,64 @@ test('a role list item only notes states its enable switch does not already show
   assert.match(roleNote({ status: 'blocked', reason: '额度耗尽' }, false)!.text, /额度耗尽/);
   assert.deepEqual(roleNote(undefined, true), { text: '尚未保存', warning: true });
   assert.deepEqual(roleNote({ status: 'available' }, true), { text: '有未保存的修改', warning: true });
+});
+
+test('official pools retain all members through role edits and policy validation, with clear unsupported pool errors', async () => {
+  const { workerChannelsError } = await import('../../src/renderer/policy/policy-edit');
+  const config = defaultConfig();
+  config.channels.second = { ...config.channels.default_codex, enabled: false };
+  config.channels.third = { ...config.channels.default_codex };
+  config.workers.codex_worker = { ...config.workers.codex_worker, channels: ['default_codex', 'second', 'third'] };
+  const renamed = renameRole(config, 'workers', 'codex_worker', 'pool');
+  const ordered = reorderRoles(renamed, 'workers', ['pool']);
+  assert.deepEqual(ordered.workers.pool.channels, ['default_codex', 'second', 'third']);
+  assert.deepEqual(validateConfig(ordered), []);
+  assert.equal(workerChannelsError(ordered, ordered.workers.pool), '');
+  assert.match(workerChannelsError(ordered, { ...ordered.workers.pool, free_channel: true }), /免费渠道/);
+  ordered.channels.second.kind = 'api';
+  assert.match(workerChannelsError(ordered, ordered.workers.pool), /API/);
+  ordered.channels.second = { ...ordered.channels.default_claude };
+  assert.match(workerChannelsError(ordered, ordered.workers.pool), /同一个执行引擎 ID/);
+  assert.equal(typeof ordered.owners.codex_owner.channel, 'string');
+});
+
+test('the real role form renders every selected member while the parent keeps a single account', async () => {
+  const React = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { ConfigProvider, ThemeProvider } = await import('@lobehub/ui');
+  const { motion } = await import('motion/react');
+  const { RolesPage } = await import('../../src/renderer/features/roles/RolesPage');
+  const config = defaultConfig();
+  config.channels.second = { ...config.channels.default_codex, label: 'Second account', enabled: false };
+  config.channels.third = { ...config.channels.default_codex, label: 'Third account' };
+  config.workers = { pool: { ...config.workers.codex_worker, channels: ['default_codex', 'second', 'third'] } };
+  config.owners = { parent: { ...config.owners.codex_owner, workers: ['pool'] } };
+  const policy = { config, blocks: [], snapshot: { config, blocks: [], revision: 1, workers: {}, owners: {} }, issues: [], dirty: true } as unknown as PolicyDraft;
+  const render = (section: 'workers' | 'owners') => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: React.createElement(RolesPage, { section, policy }) }) }));
+  const worker = render('workers');
+  assert.match(worker, /Second account/);
+  assert.match(worker, /Third account/);
+  assert.match(worker, /用于查看模型和连通测试的账号/);
+  assert.match(worker, /选择一个成员账号/);
+  const parent = render('owners');
+  assert.doesNotMatch(parent, /用于查看模型和连通测试的账号/);
+  assert.match(parent, /选择父 Agent 使用的一个账号/);
+  assert.deepEqual(config.workers.pool.channels, ['default_codex', 'second', 'third']);
+
+  config.workers.pool.channels = [];
+  const empty = render('workers');
+  assert.match(empty, /aria-invalid="true"/);
+  assert.match(empty, /id="[^"]+-channel-error"[^>]*role="alert"|role="alert"[^>]*id="[^"]+-channel-error"/);
+  assert.match(empty, /请至少选择一个账号或渠道/);
+  assert.match(empty, /title="子 Agent pool：请至少选择一个账号或渠道"/);
+  const saveButton = (html: string) => [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]).find(button => button.endsWith('保存</button>'));
+  assert.match(saveButton(empty) ?? '', / disabled/);
+  assert.match(render('owners'), /title="子 Agent pool：请至少选择一个账号或渠道"/, 'a hidden empty worker still blocks saving from the parent editor');
+
+  config.workers.pool.channels = ['default_codex'];
+  const restored = render('workers');
+  assert.doesNotMatch(restored, /aria-invalid="true"|id="[^"]+-channel-error"|子 Agent pool：请至少选择一个账号或渠道/);
+  const save = saveButton(restored);
+  assert.ok(save);
+  assert.doesNotMatch(save, /disabled/);
 });

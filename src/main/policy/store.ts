@@ -1,5 +1,7 @@
+import { dbQuotaStore } from '../storage/quota-snapshot';
+import { channelRoutingReason, workerChannelCandidates, type ChannelRoutingContext } from './worker-channel-routing';
 import { ENGINE_CATALOG } from '../../shared/engines';
-import { migrateChannelPolicy } from '../../shared/policy/channels';
+import { normalizeHistoricalPolicy, roleEngine } from '../../shared/policy/channels';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -55,6 +57,12 @@ export class PolicyStore {
  private config:Config=defaultConfig();
  private blocks: Block[]=[];
  private revision=0;
+ private quotaInvalidator?: (channel:string) => void;
+ setChannelQuotaInvalidator(invalidate:(channel:string)=>void):void { this.quotaInvalidator=invalidate; }
+ invalidateChannelQuota(channel:string):void { dbQuotaStore(this.db).invalidateChannel!(channel);this.quotaInvalidator?.(channel); }
+ private contextProvider?: (config: Config) => ChannelRoutingContext;
+ setRoutingContextProvider(provider: (config: Config) => ChannelRoutingContext): void { this.contextProvider=provider; }
+ routingContext(): ChannelRoutingContext | undefined { return this.contextProvider?.(this.config); }
  readonly path: string;
  constructor(source: string|DatabaseSync, private now: ()=>number=Date.now) {
   if(typeof source==='string'){
@@ -92,7 +100,7 @@ export class PolicyStore {
   const workers:Config['workers']={};
   for(const row of this.db.prepare('SELECT * FROM policy_workers ORDER BY position').all() as Record<string,unknown>[]){
    const id=String(row.id);
-   const worker={enabled:Number(row.enabled)===1,channel:String(row.channel),model:String(row.model),effort:String(row.effort)} as Worker;
+   const worker={enabled:Number(row.enabled)===1,channels:JSON.parse(String(row.channels)),model:String(row.model),effort:String(row.effort)} as Worker;
    if(row.description!==null&&row.description!==undefined)worker.description=String(row.description);
    if(row.free_channel!==null&&row.free_channel!==undefined)worker.free_channel=Number(row.free_channel)===1;
    if(row.max_parallel!==null&&row.max_parallel!==undefined)worker.max_parallel=Number(row.max_parallel);
@@ -143,8 +151,8 @@ export class PolicyStore {
    owner.workers.forEach((workerId,position)=>insertLink.run(id,workerId,position,owner.worker_weights&&Object.hasOwn(owner.worker_weights,workerId)?owner.worker_weights[workerId]!:null));
   });
   this.db.exec('DELETE FROM policy_workers');
-  const insertWorker=this.db.prepare('INSERT INTO policy_workers(id,position,enabled,channel,model,effort,description,free_channel,max_parallel) VALUES (?,?,?,?,?,?,?,?,?)');
-  Object.entries(config.workers).forEach(([id,worker],index)=>insertWorker.run(id,index,bit(worker.enabled),worker.channel,worker.model,worker.effort,optionalText(worker.description),worker.free_channel===undefined?null:bit(worker.free_channel),worker.max_parallel===undefined?null:worker.max_parallel));
+  const insertWorker=this.db.prepare('INSERT INTO policy_workers(id,position,enabled,channels,model,effort,description,free_channel,max_parallel) VALUES (?,?,?,?,?,?,?,?,?)');
+  Object.entries(config.workers).forEach(([id,worker],index)=>insertWorker.run(id,index,bit(worker.enabled),JSON.stringify(worker.channels),worker.model,worker.effort,optionalText(worker.description),worker.free_channel===undefined?null:bit(worker.free_channel),worker.max_parallel===undefined?null:worker.max_parallel));
   this.db.exec('DELETE FROM policy_settings');
   const insertSetting=this.db.prepare('INSERT INTO policy_settings(key,body) VALUES (?,?)');
   insertSetting.run('herdr',JSON.stringify(config.herdr));
@@ -190,9 +198,15 @@ export class PolicyStore {
  }
  snapshot(): PolicySnapshot {
   const blocks=activeBlocks({version:1,blocks:this.blocks},this.now());
+  const context=this.routingContext();
   return structuredClone({revision:this.revision,config:this.config,blocks:this.blocks,activeBlocks:blocks,
    owners:Object.fromEntries(Object.entries(this.config.owners).map(([id,e])=>[id,availabilityOf(this.config,blocks,e)])),
-   workers:Object.fromEntries(Object.entries(this.config.workers).map(([id,e])=>[id,availabilityOf(this.config,blocks,e,id)])),execution:'disabled'});
+   workers:Object.fromEntries(Object.entries(this.config.workers).map(([id,worker])=>{
+    const candidates=workerChannelCandidates(this.config,blocks,id,context);
+    const eligible=candidates.some(candidate=>candidate.eligible);
+    const base=availabilityOf(this.config,blocks,worker,id);
+    return [id,eligible?{status:'available'}:base.status!=='available'?base:{status:'blocked',engine:roleEngine(this.config,worker),worker:id,reason:[...new Set(candidates.map(candidate=>channelRoutingReason(candidate.reason)))].join('；')||'暂无可用账号'}];
+   })),execution:'disabled'});
  }
  save(value: unknown, _options?: { allowEngineEnable?: boolean }): PolicySnapshot {
   const input=object(value); exact(input,['revision','config','blocks']);
@@ -213,7 +227,7 @@ export class PolicyStore {
   if(!row) throw new Error(`Policy revision ${revision} not found`);
   const data=object(JSON.parse(row.body)); exact(data,['version','revision','config','blocks']);
   if(data.version!==1) throw new Error('Unsupported policy snapshot');
-  const upgraded=migrateChannelPolicy(dropRetiredFields(data.config) as Record<string,any>,data.blocks as any[]);
+  const upgraded=normalizeHistoricalPolicy(dropRetiredFields(data.config) as Record<string,any>,data.blocks as any[]);
   const parsed=this.parse(upgraded.config,upgraded.blocks);
   this.commit(parsed.config,parsed.blocks,this.revision+1,`rollback:${revision}`);
   return this.snapshot();

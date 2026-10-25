@@ -16,7 +16,7 @@ import { previewOn } from '../helpers/policy-preview';
 const now=Date.parse('2026-10-18T12:00:00Z');
 const preview=(store:PolicyStore,value:unknown)=>previewOn(store,value,now);
 const all=()=>{const c=defaultConfig(); for(const e of Object.values(c.engines)) e.enabled=true; for(const w of Object.values(c.workers)) w.enabled=true; return c;};
-const route=(c:Config,blocks:Block[]=[])=>resolveDispatch(c,blocks,{owner:'claude_owner'});
+const route=(c:Config,blocks:Block[]=[])=>resolveDispatch(c,blocks,{owner:'claude_owner'},{now,quotas:[]});
 test('migrated defaults validate, clone, and default review stays true',()=>{
  const c=defaultConfig(); assert.deepEqual(validateConfig(c),[]); c.workers.claude_worker.model='changed'; assert.notEqual(defaultConfig().workers.claude_worker.model,'changed');
  assert.equal(chatgptReviewEnabled({}),true); assert.equal(chatgptReviewEnabled({chatgpt_review:false}),false);
@@ -177,7 +177,7 @@ test('excluded workers are skipped by ID and a sibling on the same engine can ta
  assert.equal(moved.worker,'qoder_worker');
  assert.deepEqual(moved.skipped![0],{worker:'claude_worker',reason:'excluded for this dispatch'});
  const same=structuredClone(c);
- same.workers.claude_alt_worker={enabled:true,channel:'default_claude',model:'sonnet',effort:'high'};
+ same.workers.claude_alt_worker={enabled:true,channels:['default_claude'],model:'sonnet',effort:'high'};
  same.owners.claude_owner.workers=['claude_worker','claude_alt_worker'];
  same.owners.claude_owner.worker_weights={claude_worker:10,claude_alt_worker:8};
  const sibling=resolveDispatch(same,[],{owner:'claude_owner',excludeWorkers:['claude_worker']});
@@ -393,6 +393,7 @@ test('pre-channel JSON history restores through the same catalog normalization w
   const current=store.save({revision:0,config:defaultConfig(),blocks:[]});
   const legacy:Record<string,any>=structuredClone(current.config);
   for(const engine of Object.values(legacy.engines) as any[])engine.enabled=false;
+  for(const worker of Object.values(legacy.workers) as any[]) {worker.channel=worker.channels[0];delete worker.channels;}
   for(const role of [...Object.values(legacy.owners),...Object.values(legacy.workers)] as any[]) {
    role.engine=legacy.channels[role.channel].engine;delete role.channel;
   }

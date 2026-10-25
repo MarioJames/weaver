@@ -49,7 +49,7 @@ async function harness(options: HarnessOptions = {}) {
   config.workers.qoder_worker.enabled = true;
   config.workers.opencode_worker.enabled = true;
   // A paid worker shares the qoder engine and must never be touched by free-channel writes.
-  config.workers.qoder_paid_worker = { channel: "default_qoder", model: 'paid-model', effort: 'auto', enabled: true };
+  config.workers.qoder_paid_worker = { channels:["default_qoder"], model: 'paid-model', effort: 'auto', enabled: true };
   const policy = new PolicyStore(join(dir,'weaver.db'), () => now);
   const base = policy.snapshot();
   policy.save({ revision: base.revision, config, blocks: base.blocks }, { allowEngineEnable: true });

@@ -1,0 +1,174 @@
+{
+  "checkedAt": "2026-10-25T12:21:45.461352+00:00",
+  "check": {
+    "command": "TMPDIR=/tmp/wm-4d4zht7u npm run check",
+    "cwd": "isolated CoW workspace",
+    "exitCode": 0,
+    "tests": 2263,
+    "pass": 2231,
+    "skipped": 32,
+    "fail": 0,
+    "typecheck": "passed",
+    "build": "passed",
+    "logSha256": "4f533163dd5cc2c7284c3f55bdf75ab0cc202e4e24b2d18a685feeb4e1536488"
+  },
+  "independentReview": {
+    "realTaskCompletedAccepted": true,
+    "exactMarker": "WEAVER_REAL_OK",
+    "frozenRunChannelMatches": true,
+    "candidateShaMatches": true,
+    "productSubsetUnchanged": true,
+    "historyBoth25TablesMatched": true
+  },
+  "knownLimitations": [
+    "真实调用只测OpenCode Go；通用runner因七个默认账号未配置返回incomplete，所请求多账号派发通过。",
+    "已记录的账号A准备期间源目录字节变化无法归因；逻辑认证行保持，后续调用全部用私有副本。",
+    "没有为随机抽样增加真实计费调用；两侧随机可达与等概率实现由定向测试覆盖。",
+    "多账号仅使用5分钟内官方观测。生产当前自动刷新间隔5分钟，未改用户设置；默认15分钟或关闭自动刷新时，观测过期后需等待下一次刷新或手工刷新。"
+  ],
+  "browser": {
+    "initial": {
+      "passed": 17,
+      "failed": 1,
+      "unverified": 3,
+      "review": "rejected",
+      "failure": "账号必选反馈仅全局通知"
+    },
+    "correction": {
+      "status": "passed",
+      "checksPassed": 8,
+      "notRepeated": [
+        "Hello推理",
+        "鼠标Wheel输入",
+        "暗色外观"
+      ],
+      "initialFailurePreserved": "previous/REPORT.html",
+      "configRestoreIndependentlyMatched": true,
+      "chromeAndProfileReleased": true
+    }
+  },
+  "deployment": {
+    "checkedAt": "2026-10-25T11:58:36.292518+00:00",
+    "status": "verified-after-readonly-owner-check",
+    "candidateSha256": "a9d2ac4b1c66f7e72454f989bda032249c3f22e8aa64a4123df78e3c4a541969",
+    "pid": 1832765,
+    "http4737": 200,
+    "schema": 14,
+    "integrity": "ok",
+    "foreignKeys": "ok",
+    "backup": "/home/mocha/.local/share/weaver/backups/schema13-to14-20261025T115557Z-62f79cffa90c4199802fac54b9b16667",
+    "protectedTablesUnchanged": true,
+    "workerArraysExact": true,
+    "historyExactNormalized": true,
+    "privateConfigUnchanged": true,
+    "externalNativeRowUnchanged": true,
+    "globalLaunchBlockers": [],
+    "systemdAutomaticRestarts": 0,
+    "automaticApplyResult": "failed PermissionError during post-start verification; original deployment.safe.json retained",
+    "applyCalls": 1,
+    "followupServiceMutations": 0,
+    "verificationMode": "read-only functions and existing history normalizer",
+    "privateConfigUnchangedNote": "此布尔值指schema14启动后的比对；随后对旧IM v4执行了已授权的v5显式账号选择迁移，secret及其它值保持，详见im-legacy-migration.json。"
+  },
+  "cleanup": {
+    "temporaryScope": "dev-weaver-multi-1025.scope stopped",
+    "temporaryPort4739Released": true,
+    "chromeProfilesAndDaemonsReleased": true,
+    "privateOpenCodeHelpersRemaining": 0,
+    "cowWorkspace": "weaver-multi-1025-01 removed after export/integration",
+    "cowBaseline": "weaver-multi-1025-01 removed",
+    "gitSeedWorktreeRemoved": true,
+    "temporaryRootRemoved": true,
+    "priorOwnedAuditRootRemoved": true,
+    "pointerFilesRemoved": [
+      "/tmp/weaver-grok-quota-current",
+      "/tmp/weaver-multi-account-current"
+    ],
+    "retained": {
+      "production": "4737 weaver.service",
+      "persistentTest": "4738 dev-weaver-real-accounts.scope",
+      "productionData": "/home/mocha/.local/share/weaver",
+      "persistentTestData": "/home/mocha/.local/share/weaver-real-test",
+      "coldBackups": "保留；包含旧binary、schema13冷备、故障时schema14副本和IM v4原文件，0700/0600"
+    },
+    "sourceAndReports": "已整合到正式仓库并保留安全证据；不清理用户原有未提交文件"
+  },
+  "weaver": {
+    "ownerId": "e0118de8-888e-41ee-88ed-81bc92da4b43",
+    "ownerName": "Codex · weaver · 17:12",
+    "worker": "codex_sol_med",
+    "engine": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "medium"
+  },
+  "featurePatchSha256": "7e2ad089b46fceebb8854655b8ca7e1eef8556b6c4a4c340a9d333e20fb3bf81",
+  "candidateSha256": "a9d2ac4b1c66f7e72454f989bda032249c3f22e8aa64a4123df78e3c4a541969",
+  "skillFeedback": {
+    "skill": "lobe-design",
+    "route": "C-02 表单与输入",
+    "files": [
+      "/home/mocha/.agents/skills/lobe-design/SKILL.md",
+      "/home/mocha/.agents/skills/lobe-design/references/components.md"
+    ],
+    "quickValidate": "passed",
+    "linksChecked": 38,
+    "scope": "仅两处文档；版本限定UI5.64.4/BaseUI1.8.0，不复制项目业务规则"
+  },
+  "mainIntegration": {
+    "changedFilesExactlyMatchTestedView": true,
+    "productContentSha256": "67bf1641198b63c4ef85f247569b51bb87b48b65367f0b338dc1ce8264b7d8c3",
+    "matchesCompiledProduct": true,
+    "typecheck": "passed",
+    "sourceCommitBeforeFeature": "5159df2"
+  },
+  "persistentTest": {
+    "backup": "/home/mocha/.local/share/weaver-real-test/backups/before-feature-apply-20261025T115946Z/weaver.db",
+    "beforeSchema": 13,
+    "sourceApplied": true,
+    "watcher": 1123112,
+    "watcherResumed": true,
+    "afterSchema": 14,
+    "integrity": "ok",
+    "http4738": 200,
+    "protectedTables": {
+      "channel_secrets": true,
+      "policy_channels": true,
+      "policy_engines": true,
+      "policy_owners": true,
+      "policy_owner_workers": true,
+      "policy_settings": true,
+      "policy_blocks": true,
+      "tasks": true,
+      "workersExactArrayConversion": true
+    },
+    "historyExactNormalized": true
+  },
+  "imPostUpgrade": {
+    "status": "connected/ready",
+    "versionBefore": 4,
+    "versionAfter": 5,
+    "revisionBefore": 12,
+    "revisionAfter": 13,
+    "targetChannel": "import_12c10a0745e6e2a1a214b91e",
+    "onlyEngineToExplicitChannelSelectionChanged": true,
+    "secretAndEveryOtherConfigValueIndependentlyComparedEqual": true,
+    "backup": "/home/mocha/.local/share/weaver/backups/schema13-to14-20261025T115557Z-62f79cffa90c4199802fac54b9b16667/im-settings.v4.before-migration.json",
+    "sourceChanges": 0,
+    "saveCalls": 1,
+    "extraServiceRestarts": 0,
+    "userMessagesSent": 0
+  },
+  "finalServiceChecks": {
+    "production": {
+      "http": 200,
+      "schema": 14,
+      "integrity": "ok"
+    },
+    "persistentTest": {
+      "http": 200,
+      "schema": 14,
+      "integrity": "ok"
+    },
+    "temporaryPort4739": "released"
+  }
+}

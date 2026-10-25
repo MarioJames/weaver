@@ -1,0 +1,369 @@
+{
+  "consoleErrorWarn": [],
+  "pageErrors": [],
+  "methodCounts": {
+    "null": 883,
+    "command": 307,
+    "listTasks": 28,
+    "capabilities": 5,
+    "getPolicy": 8,
+    "listEngineModels": 24,
+    "workerProbeStatus": 22,
+    "validatePolicy": 6,
+    "savePolicy": 4
+  },
+  "requests": [
+    {
+      "requestId": "1813838.248",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "expected unauthenticated default fixture"
+    },
+    {
+      "requestId": "1813838.253",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "expected unauthenticated default fixture"
+    },
+    {
+      "requestId": "1813838.258",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "expected unauthenticated default fixture"
+    },
+    {
+      "requestId": "1813838.263",
+      "status": 200,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "import_83eeeaa0433b1ae33e5e1a92"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "successful real model catalog"
+    },
+    {
+      "requestId": "1813838.470",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "expected unauthenticated default fixture"
+    },
+    {
+      "requestId": "1813838.490",
+      "status": 200,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "import_c9d3db081852ed7a86a554bc"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "successful real model catalog"
+    },
+    {
+      "requestId": "1813838.503",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "codex",
+          "channel": "default_codex"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "expected unauthenticated default fixture"
+    },
+    {
+      "requestId": "1813838.545",
+      "status": null,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "import_83eeeaa0433b1ae33e5e1a92"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "navigation-overlap: no response recorded; not counted as success"
+    },
+    {
+      "requestId": "1813838.714",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "expected unauthenticated default fixture"
+    },
+    {
+      "requestId": "1813838.747",
+      "status": 200,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "import_83eeeaa0433b1ae33e5e1a92"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "successful real model catalog"
+    },
+    {
+      "requestId": "1813838.748",
+      "status": 200,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "import_83eeeaa0433b1ae33e5e1a92"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "successful real model catalog"
+    },
+    {
+      "requestId": "1813838.936",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "expected unauthenticated default fixture"
+    },
+    {
+      "requestId": "1813838.938",
+      "status": 200,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "import_83eeeaa0433b1ae33e5e1a92"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "successful real model catalog"
+    },
+    {
+      "requestId": "1813838.961",
+      "status": 200,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "import_83eeeaa0433b1ae33e5e1a92"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "successful real model catalog"
+    },
+    {
+      "requestId": "1813838.967",
+      "status": 200,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "import_c9d3db081852ed7a86a554bc"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "successful real model catalog"
+    },
+    {
+      "requestId": "1813838.969",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": null,
+      "modelCount": null,
+      "classification": "expected unauthenticated default fixture"
+    },
+    {
+      "requestId": "1813838.1160",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "modelCount": null,
+      "classification": "expected unauthenticated default fixture"
+    },
+    {
+      "requestId": "1813838.1162",
+      "status": 200,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "import_83eeeaa0433b1ae33e5e1a92"
+        }
+      ],
+      "error": null,
+      "modelCount": 36,
+      "classification": "successful real model catalog"
+    },
+    {
+      "requestId": "1813838.1173",
+      "status": 200,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "import_c9d3db081852ed7a86a554bc"
+        }
+      ],
+      "error": null,
+      "modelCount": 32,
+      "classification": "successful real model catalog"
+    },
+    {
+      "requestId": "1813838.1175",
+      "status": 200,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "import_83eeeaa0433b1ae33e5e1a92"
+        }
+      ],
+      "error": null,
+      "modelCount": 36,
+      "classification": "successful real model catalog"
+    },
+    {
+      "requestId": "1813838.1176",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "modelCount": null,
+      "classification": "expected unauthenticated default fixture"
+    },
+    {
+      "requestId": "1813838.1191",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "modelCount": null,
+      "classification": "expected unauthenticated default fixture"
+    },
+    {
+      "requestId": "1813838.1295",
+      "status": 200,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "import_c9d3db081852ed7a86a554bc"
+        }
+      ],
+      "error": null,
+      "modelCount": 32,
+      "classification": "successful real model catalog"
+    },
+    {
+      "requestId": "1813838.1297",
+      "status": 200,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "import_83eeeaa0433b1ae33e5e1a92"
+        }
+      ],
+      "error": null,
+      "modelCount": 36,
+      "classification": "successful real model catalog"
+    }
+  ],
+  "diagnosticPolicyUnchanged": true,
+  "helloCalls": 0,
+  "quotaRefreshCalls": 0,
+  "syntheticFaultsThisPackage": 0,
+  "artifact_errors": [],
+  "toolCorrections": "Initial stale refs caused an invalid ID attempt and an incompatible member attempt; corrected using current snapshots. Empty-to-account transition clears model; a save with blank model was rejected locally, then valid model restored and save/reload verified. These expected UI validation notices are separate from empty-channel validation.",
+  "responseBodyRetentionNote": "Older request details no longer expose responseBody in agent-browser. HTTP status and exact method/channel are retained for every listed request; later default fixture responses explicitly show INVALID_REQUEST credential-not-ready, and later real A/B responses retain modelCount36/32. Missing bodies are not fabricated."
+}

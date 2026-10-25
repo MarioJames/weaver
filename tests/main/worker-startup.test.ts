@@ -103,7 +103,7 @@ test('vendor blocks use policy and reroute queued work to another enabled engine
  try{
  const task=h.store.get(h.id);task.dispatch!.engine='codex';task.dispatch!.engineKind='codex';h.store.put(task);
  const queued=manager.create({title:'queued',instruction:'fake',workspace:h.dir,owner:{name:'o',transport:'herdr-visible',session:'s',pane:'p'}});
- queued.scheduled=true;queued.dispatch={owner:'claude_owner',worker:'codex_worker',engine:'codex',engineKind:'codex',model:'gpt-6.1-sol',effort:'high',execution:'real',adapter:'codex',maxParallel:2,workspace:h.dir};h.store.put(queued);
+ queued.scheduled=true;queued.dispatch={owner:'claude_owner',worker:'codex_worker',channel:'default_codex',engine:'codex',engineKind:'codex',model:'gpt-6.1-sol',effort:'high',execution:'real',adapter:'codex',maxParallel:2,workspace:h.dir};h.store.put(queued);
  h.child.emit('vendor-error','Rate limit exceeded',classifyVendorError('codex','Rate limit exceeded'));
  handler.pump();await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));
  const block=policy.snapshot().blocks.find(b=>b.engine==='codex');assert.equal(block?.by,'weaver-vendor-limit');assert.match(block?.reason??'',/Rate limit/);assert.ok(block?.release_at);

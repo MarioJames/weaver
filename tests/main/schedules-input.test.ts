@@ -48,7 +48,7 @@ test('executor role selects the matching policy section, including a shared owne
     assert.throws(() => input(agent({ ...goal, executor: { role: 'worker', profileId: 'codex_owner' } }), f.policy), /available worker profile/);
 
     save(f.policy, snapshot => {
-      snapshot.config.workers.codex_owner = { enabled: true, channel: "default_claude", model: 'sonnet', effort: 'high' };
+      snapshot.config.workers.codex_owner = { enabled: true, channels:["default_claude"], model: 'sonnet', effort: 'high' };
     });
     const sameIdOwner = { ...goal, executor: { role: 'owner', profileId: 'codex_owner' } };
     const sameIdWorker = { ...goal, executor: { role: 'worker', profileId: 'codex_owner' } };

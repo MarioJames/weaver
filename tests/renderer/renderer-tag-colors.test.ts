@@ -54,7 +54,7 @@ function schedule() {
 }
 const blockFor = (worker: 'qoder_worker' | 'opencode_worker', by: string): Block => {
   const profile = schedule().workers[worker];
-  return { engine: defaultConfig().channels[profile.channel]!.engine, model: profile.model, reason: by === FREE_PROBE_BLOCK_BY ? '额度耗尽：免费额度已用完' : '探测失败：超时', since: '2026-10-19T00:00:00Z', by };
+  return { engine: defaultConfig().channels[profile.channels[0]!]!.engine, model: profile.model, reason: by === FREE_PROBE_BLOCK_BY ? '额度耗尽：免费额度已用完' : '探测失败：超时', since: '2026-10-19T00:00:00Z', by };
 };
 
 test('schedule status tags take their colors from the semantic scheme, not ad-hoc strings', () => {

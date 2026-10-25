@@ -1,0 +1,21 @@
+{
+  "baselineRevision": 11,
+  "configSha256": "7124bdeb2336de7892dec25fa28002ee00b535cba18dc5a79b6f073032be1e72",
+  "blocksSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "channelCount": 9,
+  "workerCount": 7,
+  "ownerCount": 3,
+  "blockCount": 0,
+  "runningWorkers": 0,
+  "predecessorStatus": "completed",
+  "info": {
+    "pid": 1724773,
+    "url": "http://127.0.0.1:4739",
+    "port": 4739,
+    "dataDir": "/tmp/wm-4d4zht7u/multi-real-prep/data",
+    "version": "0.7.9",
+    "startedAt": "2026-10-25T11:08:28.187Z",
+    "runningWorkers": 0,
+    "managedBy": null
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "status": "failed",
+  "candidate": {
+    "path": "/tmp/wm-4d4zht7u/standalone-final/release/weaver-linux-x64",
+    "sha256": "a9d2ac4b1c66f7e72454f989bda032249c3f22e8aa64a4123df78e3c4a541969",
+    "bytes": 114853856,
+    "version": "weaver 0.7.9"
+  },
+  "oldPID": "1442954",
+  "backup": "/home/mocha/.local/share/weaver/backups/schema13-to14-20261025T115557Z-62f79cffa90c4199802fac54b9b16667",
+  "autoRollback": false,
+  "stopped": true,
+  "error": "PermissionError",
+  "requiresOwnerRecovery": true
+}

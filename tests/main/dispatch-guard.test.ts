@@ -289,7 +289,7 @@ test('requested and observed provider facts survive completion and reload, bound
 function queuedReal(f:ReturnType<typeof setup>) {
  const created=f.raw('tasks.create',{title:'Frozen',instruction:'fixture',owner,workspace:f.dir});
  const task=f.store.get(created.data.id);task.scheduled=true;
- task.dispatch={owner:'codex_owner',worker:'codex_worker',engine:'codex',engineKind:'codex',model:'gpt-6.1-sol',effort:'high',execution:'real',maxParallel:1,maxWaitMinutes:15,adapter:'codex',workspace:realpathSync(f.dir)};
+ task.dispatch={owner:'codex_owner',worker:'codex_worker',channel:'default_codex',engine:'codex',engineKind:'codex',model:'gpt-6.1-sol',effort:'high',execution:'real',maxParallel:1,maxWaitMinutes:15,adapter:'codex',workspace:realpathSync(f.dir)};
  f.store.put(task);return task;
 }
 
@@ -329,7 +329,7 @@ test('pump never makes an attempted worker runnable again after PID persistence 
  const policy=new PolicyStore(join(dir,'weaver.db'));const handler=new CommandHandler(manager,policy);
  try{
   const task=manager.create({title:'Persistence failure',instruction:'fixture',owner});
-  task.scheduled=true;task.dispatch={owner:'codex_owner',worker:'codex_worker',engine:'codex',model:'gpt-6.1-sol',effort:'high',execution:'mock',adapter:'mock-jsonl',maxParallel:1,maxWaitMinutes:15};store.put(task);
+  task.scheduled=true;task.dispatch={owner:'codex_owner',worker:'codex_worker',channel:'default_codex',engine:'codex',model:'gpt-6.1-sol',effort:'high',execution:'mock',adapter:'mock-jsonl',maxParallel:1,maxWaitMinutes:15};store.put(task);
   const put=store.put.bind(store);let failOnce=true;
   store.put=current=>{if(current.run?.pid!==undefined&&failOnce){failOnce=false;throw new Error('PID persistence failed');}put(current);};
   handler.pump();await new Promise<void>(resolve=>setImmediate(resolve));assert.equal(starts,1);assert.equal(store.get(task.id).status,'failed');assert.equal(store.get(task.id).scheduled,false);
@@ -372,7 +372,7 @@ function attempt(f:ReturnType<typeof setup>,engine:'claude'|'codex',status:'fail
 /** Claude owns this owner, so only a second engine gives dispatch somewhere to move. */
 function addCodexWorker(f:ReturnType<typeof setup>):void {
  const s=f.policy.snapshot();
- s.config.workers.codex_alt_worker={enabled:true,channel:"default_codex",model:'gpt-6.1-sol',effort:'high',description:'Second codex worker for retry routing.'};
+ s.config.workers.codex_alt_worker={enabled:true,channels:["default_codex"],model:'gpt-6.1-sol',effort:'high',description:'Second codex worker for retry routing.'};
  s.config.owners.claude_owner.workers=[...s.config.owners.claude_owner.workers,'codex_alt_worker'];
  f.policy.save({revision:s.revision,config:s.config,blocks:[]});
 }
@@ -477,7 +477,7 @@ test('editing the same channel secret makes a new child use the current CLI bind
     let snapshot=f.policy.snapshot();
     snapshot.config.channels.claude_api={engine:'claude',kind:'api',enabled:true,label:'Fixture API'};
     snapshot.config.owners.claude_owner.channel='claude_api';
-    snapshot.config.workers.claude_worker.channel='claude_api';
+    snapshot.config.workers.claude_worker.channels=['claude_api'];
     f.policy.save({revision:snapshot.revision,config:snapshot.config,blocks:snapshot.blocks});
     secrets.putSecret('claude_api',{apiKey:'old-fixture-key'});
     const first=f.raw('tasks.create',{title:'Inherited child',instruction:'fixture',workspace:f.dir,ownerProfileId:'claude_owner'});

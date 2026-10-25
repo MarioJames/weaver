@@ -8,7 +8,7 @@ import { redactContext } from '../../redact-context';
 import { assertFrozenWorkspace, workspaceIdentity } from '../../workspace';
 import { terminal, type TaskRecords } from '../tasks/records';
 import type { Dispatcher } from './dispatch';
-import { chainWorkers } from './retry';
+import { chainWorkers, chainChannels } from './retry';
 import { workerLoad } from './dispatch';
 
 /** Admits queued work as capacity and policy allow: the one place that starts scheduled tasks. */
@@ -44,26 +44,30 @@ export class Coordinator {
    let phase:NonNullable<Task['queueReason']>['code']='policy_blocked';
    try{
     const frozen=task.dispatch;
+    if(!frozen.channel){this.queueBlocked(task,'frozen_route_changed','Frozen dispatch has no channel; cancel and create a new attempt.');continue;}
     // A whole-engine vendor block sends the task to another engine; a worker-level one only takes that worker out.
     const vendorBlocks=this.policy.snapshot().blocks.filter(block=>block.engine===frozen.engine&&(block.channel===undefined||block.channel===frozen.channel)&&block.by===VENDOR_BLOCK_BY&&(!block.release_at||Date.parse(block.release_at)>Date.now()));
     const engineBlocked=vendorBlocks.some(block=>block.worker===undefined&&block.channel===undefined);
     const channelBlocked=vendorBlocks.some(block=>block.worker===undefined&&block.channel===frozen.channel&&frozen.channel!==undefined);
     const workerBlocked=!engineBlocked&&!channelBlocked&&vendorBlocks.some(block=>block.worker===frozen.worker);
-    if(engineBlocked||channelBlocked||workerBlocked){
+    if((engineBlocked||channelBlocked||workerBlocked)&&!task.run){
       if(frozen.execution==='real'){phase='workspace_changed';assertFrozenWorkspace(frozen);phase='policy_blocked';}
       const excludedWorkers=chainWorkers(this.manager.store,task);
-      if(workerBlocked&&!excludedWorkers.includes(frozen.worker))excludedWorkers.push(frozen.worker);
-      const reroute=this.dispatch.routeOf(frozen.owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner)),engineBlocked?[frozen.engine]:[],undefined,excludedWorkers,channelBlocked&&frozen.channel?[frozen.channel]:[]);
+      const accountBlocked=channelBlocked||vendorBlocks.some(block=>block.worker===frozen.worker&&block.channel===frozen.channel);
+      if(workerBlocked&&!accountBlocked&&!excludedWorkers.includes(frozen.worker))excludedWorkers.push(frozen.worker);
+      const excludedChannels=chainChannels(this.manager.store,task);
+      if(accountBlocked&&!excludedChannels.includes(frozen.channel))excludedChannels.push(frozen.channel);
+      const reroute=this.dispatch.routeOf(frozen.owner,slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner)),engineBlocked?[frozen.engine]:[],undefined,excludedWorkers,excludedChannels);
       const decision=this.dispatch.decideExecution(reroute.engine,undefined,{...task,workspace:frozen.workspace??task.workspace},this.policy.snapshot().config.owners[reroute.owner]?.channel,reroute.channel);
       task.dispatch={...frozen,worker:reroute.worker,channel:reroute.channel,channelLabel:this.policy.snapshot().config.channels[reroute.channel]?.label,engine:reroute.engine,model:reroute.model,effort:reroute.effort,execution:decision.execution,adapter:decision.adapter,engineKind:decision.engineKind,maxParallel:reroute.maxParallel,...(decision.workspace?{workspace:decision.workspace,workspaceIdentity:workspaceIdentity(decision.workspace)}:{})};
-      event(task,'lifecycle',`Vendor limit rerouted queued worker to ${reroute.engine} (${reroute.worker})`);this.records.put(task);this.pump();continue;
+      event(task,'lifecycle',`Vendor limit rerouted queued channel ${frozen.channel} → ${reroute.channel} (${reroute.engine}, ${reroute.worker})`);this.records.put(task);this.pump();continue;
     }
 
     const running=slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,frozen.owner));
     const live=this.policy.snapshot();
-    const route=previewRoute(live.config,live.blocks,Date.now(),{owner:frozen.owner,worker:frozen.worker,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads())});
+    const route=previewRoute(live.config,live.blocks,Date.now(),{owner:frozen.owner,worker:frozen.worker,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads())},this.policy.routingContext(),frozen.channel);
     const kind=live.config.engines[route.engine]?.kind;
-    if(route.worker!==frozen.worker||route.engine!==frozen.engine||route.model!==frozen.model||route.effort!==frozen.effort||(frozen.engineKind!==undefined&&kind!==frozen.engineKind)){
+    if(route.channel!==frozen.channel||route.worker!==frozen.worker||route.engine!==frozen.engine||route.model!==frozen.model||route.effort!==frozen.effort||(frozen.engineKind!==undefined&&kind!==frozen.engineKind)){
      this.queueBlocked(task,'frozen_route_changed','Current worker engine, kind, model or effort no longer matches the frozen dispatch; restore the route or cancel and create a new task.');continue;
     }
     if(!route.capacityAvailable){this.queueBlocked(task,'waiting_for_capacity',this.dispatch.queueWaitText(task.ownerId,route));continue;}

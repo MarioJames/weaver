@@ -1,0 +1,16 @@
+{
+  "kind": "precise-synthetic-transport-failure",
+  "method": "listEngineModels",
+  "channel": "import_83eeeaa0433b1ae33e5e1a92",
+  "faultStartedAtEpochMs": 1792927201470,
+  "switchedToBObservedAtEpochMs": 1792927207105,
+  "faultRejectedAtEpochMs": 1792927209478,
+  "BVerifiedAtEpochMs": 1792927215656,
+  "BModelCount": 32,
+  "syntheticErrorVisibleOnB": false,
+  "BRefreshEnabled": true,
+  "policyRevisionBeforeAndAfter": 18,
+  "configExactlyUnchanged": true,
+  "successfulResponsesFabricated": false,
+  "note": "Values summarized from actual browser eval evidence; previous initial A failure was not used to prove stale response isolation."
+}

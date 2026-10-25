@@ -81,7 +81,7 @@ export function engineReadiness(probe: EngineProbeRecord, config: Config): Engin
     ownerConfigured: Object.values(config.owners).some(owner => roleEngine(config, owner) === probe.id),
     workerConfigured: Object.values(config.workers).some(worker => roleEngine(config, worker) === probe.id),
     adapterStatus,
-    realExecution: probe.status === 'installed' && adapterStatus === 'real' && Object.values(config.workers).some(worker => worker.enabled && config.channels[worker.channel]?.enabled && roleEngine(config, worker) === probe.id),
+    realExecution: probe.status === 'installed' && adapterStatus === 'real' && Object.values(config.workers).some(worker => worker.enabled && worker.channels.some(id => config.channels[id]?.enabled) && roleEngine(config, worker) === probe.id),
     probe,
   };
 }

@@ -60,6 +60,7 @@ export class QuotaProber {
   private readonly timeoutMs: number;
   private readonly snapshotStore?: QuotaSnapshotStore;
   private closed = false;
+  private invalidationRevision = 0;
 
   constructor(private readonly options: QuotaProberOptions = {}) {
     this.env = options.env ?? process.env;
@@ -89,6 +90,25 @@ export class QuotaProber {
       lastAccounts: Object.fromEntries(this.lastAccounts) as QuotaPersistence['lastAccounts'],
       nextRequests: Object.fromEntries(this.nextRequests) as QuotaPersistence['nextRequests'],
     });
+  }
+
+  /** Invalidate the account's observation and abort old HTTP work before it can restore a positive. */
+  invalidateChannel(id:string):void {
+    const cached=this.channelProbers.get(id);
+    if(cached)cached.prober.invalidate();
+    const binding=this.options.channels?.()[id];
+    if(!binding)return;
+    const engine=(binding.engineKind??binding.channel.engine) as QuotaEngine;
+    const record={...initial(engine),channel:id,status:'error' as const,stale:true,detail:'账号认证失败，请刷新认证后重新获取额度'};
+    this.channelFailures.set(id,record);
+    const scoped=this.snapshotStore?.scope?.(id);const saved=scoped?.load();
+    if(saved){saved.records[engine]=record;scoped?.save(saved);}
+  }
+  private invalidate():void {
+    this.invalidationRevision++;
+    for(const controller of this.controllers)controller.abort();
+    for(const engine of ENGINES){const previous=this.records.get(engine)!;this.records.set(engine,{...previous,status:'error',stale:true});}
+    this.persist();
   }
 
   get(): QuotaSnapshot {
@@ -155,6 +175,7 @@ export class QuotaProber {
   }
 
   private async execute(engine: QuotaEngine): Promise<void> {
+    const revision=this.invalidationRevision;
     const controller = new AbortController();
     this.controllers.add(controller);
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -165,9 +186,9 @@ export class QuotaProber {
     const started = this.clock().getTime();
     try {
       const result = await Promise.race([this.probe(engine, controller.signal, (value, probedKind) => { fingerprint = value; kind = probedKind; }), interrupted]);
-      if (result && !this.closed) { this.records.set(engine, result); this.persist(); }
+      if (result && !this.closed && revision===this.invalidationRevision) { this.records.set(engine, result); this.persist(); }
     } catch (error) {
-      if (this.closed) return;
+      if (this.closed || revision!==this.invalidationRevision) return;
       const failure = error instanceof QuotaFailure ? error : new QuotaFailure('error', '额度接口请求失败');
       const previous = this.records.get(engine)!;
       if (failure.retryAt !== null) this.nextRequests.set(engine, Math.max(this.nextRequests.get(engine) ?? 0, failure.retryAt));

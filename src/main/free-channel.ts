@@ -41,16 +41,16 @@ export function modeBlockBy(mode: NonNullable<WorkerProbe['mode']>): string {
 /** Only free_channel workers on enabled engines: probing shares the account a dispatch would take. */
 export function freeProbeEligible(config: Config, id: string): boolean {
   const worker = config.workers[id];
-  if (!worker || worker.free_channel !== true || !worker.enabled) return false;
-  return config.channels[worker.channel]?.enabled === true && config.engines[roleEngine(config, worker)]?.enabled === true;
+  if (!worker || worker.free_channel !== true || !worker.enabled || worker.channels.length !== 1) return false;
+  return config.channels[worker.channels[0]!]?.enabled === true && config.engines[roleEngine(config, worker)]?.enabled === true;
 }
 
 /** The saved route of one free_channel worker. */
 function probeRouteOf(config: Config, worker: string): ProbeRoute | undefined {
   const profile = config.workers[worker];
   const engine = profile ? config.engines[roleEngine(config, profile)] : undefined;
-  if (!profile || !engine) return undefined;
-  return { channel:profile.channel, engine: roleEngine(config, profile), kind: engine.kind, worker, model: profile.model, effort: profile.effort };
+  if (!profile || !engine || profile.channels.length !== 1) return undefined;
+  return { channel:profile.channels[0]!, engine: roleEngine(config, profile), kind: engine.kind, worker, model: profile.model, effort: profile.effort };
 }
 
 export interface FreeProbeInput { worker?: string }

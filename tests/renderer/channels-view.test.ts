@@ -30,7 +30,7 @@ test('channel update rebases a role draft without losing an unrelated channel ed
 
 test('channel references name all users and API-only tools reject subscription creation', () => {
   const config = defaultConfig();
-  const users = channelUsers(config, config.workers.codex_worker.channel);
+  const users = channelUsers(config, config.workers.codex_worker.channels[0]!);
   assert.ok(users.includes('子 Agent codex_worker'));
   assert.ok(users.includes('父 Agent codex_owner'));
   assert.equal(subscriptionAllowed('pi'), false);
@@ -56,7 +56,7 @@ test('new roles select an enabled channel on an enabled tool instead of the firs
   config.engines.codex.enabled = true;
   config.channels.work_account = { engine: 'codex', label: '工作账号', kind: 'subscription', enabled: true };
   assert.equal(blankOwner(config).channel, 'work_account');
-  assert.equal(blankWorker(config).channel, 'work_account');
+  assert.deepEqual(blankWorker(config).channels, ['work_account']);
 });
 
 
@@ -106,4 +106,19 @@ test('import receipts distinguish added, existing, updated, empty sources and pa
   assert.match(text, /修正来源.*重试/);
   assert.match(channelImportNotice({ added: 0, existing: 0, updated: 0, notFound: ['claude'], failures: [] }), /未发现可导入项/);
   assert.doesNotMatch(channelImportNotice({ ...result, failures: [] }), /部分引擎导入失败/);
+});
+
+test('disabled roles and every pool member remain channel references and survive draft rebase', () => {
+  const base = defaultConfig();
+  const draft = structuredClone(base);
+  draft.channels.second = { ...draft.channels.default_codex, label: '第二账号', enabled: false };
+  draft.channels.third = { ...draft.channels.default_codex, label: '第三账号' };
+  draft.workers.codex_worker = { ...draft.workers.codex_worker, enabled: false, channels: ['default_codex', 'second', 'third'] };
+  assert.ok(channelUsers(draft, 'second').includes('子 Agent codex_worker'));
+  assert.ok(channelUsers(draft, 'third').includes('子 Agent codex_worker'));
+  const next = structuredClone(base);
+  next.channels.default_codex.label = '已更新';
+  const merged = mergeChannelPolicy(draft, base, next);
+  assert.deepEqual(merged.workers.codex_worker.channels, ['default_codex', 'second', 'third']);
+  assert.equal(merged.channels.second.enabled, false);
 });

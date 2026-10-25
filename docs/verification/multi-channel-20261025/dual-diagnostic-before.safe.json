@@ -1,0 +1,51 @@
+{
+  "at": "2026-10-25T11:46:00.997055+00:00",
+  "revision": 28,
+  "configSha256": "3cce92240c5d54d3995bfb78a934d9d1eacd3c6de3bd26115ffe68665441e659",
+  "worker": {
+    "enabled": false,
+    "channels": [
+      "import_83eeeaa0433b1ae33e5e1a92",
+      "import_c9d3db081852ed7a86a554bc"
+    ],
+    "model": "opencode-go/glm-5.3-flash",
+    "effort": "high",
+    "description": ""
+  },
+  "savePolicyRequests": [
+    {
+      "id": "1813838.298",
+      "status": 200
+    },
+    {
+      "id": "1813838.761",
+      "status": 200
+    },
+    {
+      "id": "1813838.953",
+      "status": 200
+    }
+  ],
+  "dom": {
+    "bodyWidth": 1440,
+    "viewport": 1440,
+    "main": [
+      {
+        "top": 0,
+        "height": 978,
+        "client": 926
+      }
+    ],
+    "invalid": [],
+    "alerts": [],
+    "notifications": [],
+    "save": [
+      {
+        "disabled": true,
+        "title": "",
+        "text": "保存",
+        "outer": "<button type=\"button\" class=\"acss-3qhimw\" aria-disabled=\"true\" style=\"transform: none;\" disabled=\"\"><span aria-hidden=\"true\" class=\"acss-73apt5\"><span class=\"acss-1v9fevl\"></span></span><span class=\"acss-14cw40i\"><span class=\"anticon\" role=\"img\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"transparent\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-save\" aria-hidden=\"true\"><path d=\"M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z\"></path><path d=\"M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7\"></path><path d=\"M7 3v4a1 1 0 0 0 1 1h7\"></path></svg"
+      }
+    ]
+  }
+}

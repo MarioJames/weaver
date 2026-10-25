@@ -153,10 +153,22 @@ test('account and role switches control weight availability while legacy engine 
   config.engines.grok.enabled = false;
   assert.equal(workerWeightLock(config, 'grok_worker', [], NOW), undefined);
   assert.equal(workerWeightLock(config, 'grok_worker', [GROK_402], NOW)?.paused, true);
-  const channel = config.workers.grok_worker.channel;
+  const channel = config.workers.grok_worker.channels[0]!;
   config.channels[channel].enabled = false;
   assert.equal(workerWeightLock(config, 'grok_worker', [GROK_402], NOW)?.label, '渠道已停用');
   config.channels[channel].enabled = true;
   config.workers.grok_worker.enabled = false;
   assert.equal(workerWeightLock(config, 'grok_worker', [GROK_402], NOW)?.label, '子 Agent 已停用');
+});
+
+test('one restricted or disabled pool member does not pause the worker or lock its weight', () => {
+  const config = defaultConfig();
+  config.channels.second_grok = { ...config.channels.default_grok, enabled: true };
+  config.workers.grok_worker = { ...config.workers.grok_worker, enabled: true, channels: ['default_grok', 'second_grok'] };
+  const blocks: Block[] = [{ engine: 'grok', channel: 'default_grok', by: 'manual', reason: 'only first account', since: '2026-10-25T00:00:00Z' }];
+  assert.equal(workerWeightLock(config, 'grok_worker', blocks), undefined);
+  config.channels.default_grok.enabled = false;
+  assert.equal(workerWeightLock(config, 'grok_worker', blocks), undefined);
+  config.channels.second_grok.enabled = false;
+  assert.equal(workerWeightLock(config, 'grok_worker', blocks)?.label, '渠道已停用');
 });

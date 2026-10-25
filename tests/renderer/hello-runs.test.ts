@@ -26,3 +26,35 @@ test('a say hi run is kept per worker, polls until done, and ignores a second st
   assert.equal((seen as any).route, 'codex · m · low');
   delete (globalThis as any).window;
 });
+
+test('diagnostic results stay with role, account, model and effort when an old account finishes last', async () => {
+  const store = await import('../../src/renderer/features/engines/hello-runs');
+  const React = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const route = { channel: 'a', engine: 'codex', model: 'm', effort: 'high' };
+  const a = store.helloRouteKey('workers:pool', route);
+  const bRoute = { ...route, channel: 'b' };
+  const b = store.helloRouteKey('workers:pool', bRoute);
+  let finishA!: (job: unknown) => void;
+  const previous = (globalThis as any).window;
+  (globalThis as any).window = { weaver: { sayHi: async (input: typeof route) => input.channel === 'a' ? new Promise(resolve => { finishA = resolve; }) : { status: 'done', result: { ok: true, reply: 'B' } } } };
+  const read = (key: string) => {
+    let seen: ReturnType<typeof store.useHelloRun>;
+    function Probe() { seen = store.useHelloRun(key); return null; }
+    renderToStaticMarkup(React.createElement(Probe));
+    return seen!;
+  };
+  try {
+    const pending = store.startHello(a, route, '账号 A');
+    await store.startHello(b, bRoute, '账号 B');
+    assert.equal(read(b)?.result?.reply, 'B');
+    assert.equal(read(a)?.running, true);
+    for (const [role, change] of [['workers:other', {}], ['owners:pool', {}], ['workers:pool', { model: 'other' }], ['workers:pool', { effort: 'low' }]] as const) {
+      assert.equal(read(store.helloRouteKey(role, { ...route, ...change })), undefined);
+    }
+    finishA({ status: 'done', result: { ok: true, reply: 'A' } });
+    await pending;
+    assert.equal(read(a)?.result?.reply, 'A');
+    assert.equal(read(b)?.result?.reply, 'B');
+  } finally { (globalThis as any).window = previous; }
+});

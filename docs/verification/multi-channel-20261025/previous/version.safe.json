@@ -1,0 +1,13 @@
+{
+  "head": "4f9efefa835150c13a781c03995bc93dc1f3c5fc",
+  "dirty": true,
+  "sha256": {
+    "src/renderer/features/roles/RolesPage.tsx": "9a2d5c723a49ca57eadece33ea3754046d84dd6d1d0ccc1a20fe718d11212460",
+    "src/renderer/features/roles/roles-style.ts": "cd31046425e2c41f79af93ec8c3401be22a1025fe6adb28ba899b14bad155601",
+    "src/renderer/policy/policy-edit.ts": "ac3a3b80a8cd56a2ccdd3b18e4b6d1d470f5a5831f4e22bbae488bc5b39e1e5f",
+    "src/renderer/features/channels/channels-view.ts": "c4fbd13da9aed61033617200d328e6b2d07fb3278a5599afd4bee74a8aed20a3",
+    "src/main/policy/store.ts": "d7fc80b1d8631f850d0f65475dda553d151dd235ae0968b21f57c39f3facb208",
+    "src/main/transport/handlers.ts": "dbf8ace6fa9289a76838be7e0ab9b0b59476d6b5150f101bfa6beb1f7db3923a"
+  },
+  "observedAt": "2026-10-25T11:15:14.585129+00:00"
+}

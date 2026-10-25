@@ -1,0 +1,111 @@
+{
+  "taskId": "76a5c7e0-c108-4ce7-b054-07b825065af7",
+  "checkedAt": "2026-10-25T12:12:01.569053+00:00",
+  "conclusion": "confirmed_invalid_legacy_channel_resolution",
+  "rootCause": {
+    "storedSettingsVersion": 4,
+    "storedEngine": "dsh",
+    "storedRevision": 12,
+    "effectiveChannel": "default_dsh",
+    "effectiveChannelExists": false,
+    "fallbackShortCircuitsOnMissingDefault": true,
+    "availableImportedDshChannel": "import_12c10a0745e6e2a1a214b91e",
+    "importedCandidateCount": 1,
+    "candidateHasApiKey": true,
+    "candidateAuthenticationVerified": false,
+    "safeFailureCode": "IM_CONFIG_UNAVAILABLE",
+    "failureLayer": "route validation before Lark channel construction and parent bootstrap"
+  },
+  "sourceEvidence": [
+    {
+      "path": "src/main/im/settings.ts",
+      "line": 256,
+      "meaning": "legacy engine -> default channel, then legacy resolver"
+    },
+    {
+      "path": "src/main/im/service.ts",
+      "line": 90,
+      "meaning": "missing original default returns fallback before imported candidate search"
+    },
+    {
+      "path": "src/main/im/service.ts",
+      "line": 330,
+      "meaning": "missing selected channel cannot resolve engine"
+    },
+    {
+      "path": "src/main/im/service.ts",
+      "line": 371,
+      "meaning": "route rejection marks agent and connection error, returns before channel factory"
+    }
+  ],
+  "runtime": {
+    "pid": 1832765,
+    "binarySha256": "a9d2ac4b1c66f7e72454f989bda032249c3f22e8aa64a4123df78e3c4a541969",
+    "workingDirectory": "/home/mocha",
+    "systemdWorkingDirectory": "!/home/mocha",
+    "active": true,
+    "restarts": 0,
+    "finalConnection": "error",
+    "finalAgentState": "error",
+    "imHostRecords": 0
+  },
+  "removedCowDependency": {
+    "configuredRootsAllExist": true,
+    "configuredRootsReferenceDeletedCow": false,
+    "processCwdReferencesDeletedCow": false,
+    "selectedProcessPathEnvironmentReferencesDeletedCow": false,
+    "binaryContainsExactRemovedCowPath": false,
+    "conclusion": "no causal evidence; observed route failure is independent of removed CoW"
+  },
+  "coldBackup": {
+    "readMode": "immutable SQLite metadata reads, WAL confirmed zero bytes; no old executable run",
+    "schema": 13,
+    "defaultDshExists": false,
+    "sameImportedDshCandidateExists": true
+  },
+  "timeline": {
+    "serviceActiveSince": "2026-10-25T11:55:58Z",
+    "firstPackageObservation": "2026-10-25T12:08:56.251193Z",
+    "exactFailureTimeAvailable": false,
+    "errorStackAvailable": false,
+    "note": "journal has startup URL/janitor output but no IM failure code/stack; startup route failure is inferred from code and retained metadata, not a logged event"
+  },
+  "verification": {
+    "pureSourceMethodReplay": {
+      "ok": true,
+      "checks": 3,
+      "selectedChannel": "default_dsh",
+      "selectedChannelExists": false,
+      "channelBindingsRead": 0,
+      "routeFailureCode": "IM_CONFIG_UNAVAILABLE",
+      "appImported": false,
+      "storesConstructed": false,
+      "networkCalls": 0,
+      "processLaunches": 0
+    },
+    "httpGetImSettingsCalls": 2,
+    "serverInfoSkipped": "runtime dispatch calls IM reconcile for serverInfo, so avoided under no-mutation contract",
+    "fullTestsRun": false,
+    "liveInferenceRun": false,
+    "liveLarkConnectionTestRun": false
+  },
+  "mutations": {
+    "repo": false,
+    "service": false,
+    "configuration": false,
+    "credentials": false,
+    "blocks": false,
+    "tasks": false,
+    "accountLogin": false,
+    "reconnect": false,
+    "commit": false,
+    "push": false,
+    "delegation": false,
+    "writes": "only task artifacts under designated temporary directory"
+  },
+  "remainingRisks": [
+    "Fixing route does not prove live Lark network, credentials or dsh identity will succeed; those boundaries were intentionally not exercised.",
+    "Exact first failure timestamp and original runtime stack are unavailable; fixed safe logging suppresses cause.",
+    "Existing repository changes belong to prior work and were left untouched."
+  ]
+}

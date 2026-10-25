@@ -1,0 +1,267 @@
+{
+  "taskId": "1f727359-dca8-4941-96fc-4ba2965cfdd1",
+  "requestedAcceptance": "passed",
+  "appUrl": "http://127.0.0.1:4739",
+  "dataDir": "/tmp/wm-4d4zht7u/multi-real-prep/data",
+  "prerequisite": {
+    "taskId": "923eafac-9555-4e60-ab8e-abef72898074",
+    "status": "completed",
+    "readOnlyCheck": true,
+    "existingOwnerContextUsed": true
+  },
+  "sourceChange": {
+    "file": "scripts/test-real-engines.mjs",
+    "line": 214,
+    "change": "Worker.channels.includes(frozen.channel), with exact model/effort checks; existing Owner.channel handling retained",
+    "preexistingSavedRoleDiscoveryChangePreserved": true,
+    "routeRegression": {
+      "oldAssertionReproducedRejection": true,
+      "twoMembersAccepted": true,
+      "outsideChannelRejected": true,
+      "modelMismatchRejected": true,
+      "effortMismatchRejected": true,
+      "unownedWorkerRejected": true,
+      "disabledWorkerRejected": true,
+      "ownerRemainsScalar": true
+    },
+    "syntaxChecksPassed": true
+  },
+  "quota": [
+    {
+      "channel": "import_83eeeaa0433b1ae33e5e1a92",
+      "status": "exhausted",
+      "observedAt": "2026-10-25T11:10:51.762Z",
+      "freshAtDispatch": true,
+      "eligible": false,
+      "windows": [
+        {
+          "id": "opencode:rolling",
+          "label": "OpenCode Go · 5 小时额度",
+          "scope": "account",
+          "model": null,
+          "usedPercent": 0,
+          "remainingPercent": 100,
+          "resetsAt": null,
+          "durationMinutes": 300,
+          "used": null,
+          "total": null,
+          "remaining": null,
+          "unit": "percent"
+        },
+        {
+          "id": "opencode:weekly",
+          "label": "OpenCode Go · 每周额度",
+          "scope": "account",
+          "model": null,
+          "usedPercent": 100,
+          "remainingPercent": 0,
+          "resetsAt": "2026-10-26T00:00:00.000Z",
+          "durationMinutes": 10080,
+          "used": null,
+          "total": null,
+          "remaining": null,
+          "unit": "percent"
+        },
+        {
+          "id": "opencode:monthly",
+          "label": "OpenCode Go · 每月额度",
+          "scope": "account",
+          "model": null,
+          "usedPercent": 50,
+          "remainingPercent": 50,
+          "resetsAt": "2026-11-21T12:46:26.000Z",
+          "durationMinutes": null,
+          "used": null,
+          "total": null,
+          "remaining": null,
+          "unit": "percent"
+        }
+      ]
+    },
+    {
+      "channel": "import_c9d3db081852ed7a86a554bc",
+      "status": "available",
+      "observedAt": "2026-10-25T11:10:52.076Z",
+      "freshAtDispatch": true,
+      "eligible": true,
+      "windows": [
+        {
+          "id": "opencode:rolling",
+          "label": "OpenCode Go · 5 小时额度",
+          "scope": "account",
+          "model": null,
+          "usedPercent": 0,
+          "remainingPercent": 100,
+          "resetsAt": null,
+          "durationMinutes": 300,
+          "used": null,
+          "total": null,
+          "remaining": null,
+          "unit": "percent"
+        },
+        {
+          "id": "opencode:weekly",
+          "label": "OpenCode Go · 每周额度",
+          "scope": "account",
+          "model": null,
+          "usedPercent": 0,
+          "remainingPercent": 100,
+          "resetsAt": "2026-10-26T00:00:00.000Z",
+          "durationMinutes": 10080,
+          "used": null,
+          "total": null,
+          "remaining": null,
+          "unit": "percent"
+        },
+        {
+          "id": "opencode:monthly",
+          "label": "OpenCode Go · 每月额度",
+          "scope": "account",
+          "model": null,
+          "usedPercent": 0,
+          "remainingPercent": 100,
+          "resetsAt": "2026-11-25T09:59:29.000Z",
+          "durationMinutes": null,
+          "used": null,
+          "total": null,
+          "remaining": null,
+          "unit": "percent"
+        }
+      ]
+    }
+  ],
+  "accountCandidates": [
+    {
+      "channel": "import_83eeeaa0433b1ae33e5e1a92",
+      "eligible": false,
+      "reason": "QUOTA_WEEK_EXHAUSTED"
+    },
+    {
+      "channel": "import_c9d3db081852ed7a86a554bc",
+      "eligible": true,
+      "reason": "ELIGIBLE",
+      "observedAt": "2026-10-25T11:10:52.076Z"
+    }
+  ],
+  "realTaskCount": 1,
+  "helloCalls": 0,
+  "dispatch": {
+    "status": "passed",
+    "profile": "wm_real_owner_1f727359",
+    "preview": {
+      "worker": "wm_real_worker_1f727359",
+      "channel": "import_c9d3db081852ed7a86a554bc",
+      "engine": "opencode",
+      "model": "opencode-go/glm-5.3-flash",
+      "effort": "high"
+    },
+    "ownerId": "260f6525-9803-42d1-a6c9-beba77e35c47",
+    "taskId": "44555af3-943b-4252-9b6a-ed4af00876b9",
+    "frozen": {
+      "owner": "wm_real_owner_1f727359",
+      "worker": "wm_real_worker_1f727359",
+      "channel": "import_c9d3db081852ed7a86a554bc",
+      "engine": "opencode",
+      "model": "opencode-go/glm-5.3-flash",
+      "effort": "high",
+      "execution": "real"
+    },
+    "bindingProcess": {
+      "pid": 1742145,
+      "privateRoot": "/tmp/wm-4d4zht7u/multi-real-prep/data/channels/import_c9d3db081852ed7a86a554bc",
+      "OPENCODE_DB": "/tmp/wm-4d4zht7u/multi-real-prep/data/channels/import_c9d3db081852ed7a86a554bc/opencode.db",
+      "XDG_CONFIG_HOME": "/tmp/wm-4d4zht7u/multi-real-prep/data/channels/import_c9d3db081852ed7a86a554bc/config",
+      "XDG_DATA_HOME": "/tmp/wm-4d4zht7u/multi-real-prep/data/channels/import_c9d3db081852ed7a86a554bc/data",
+      "XDG_STATE_HOME": "/tmp/wm-4d4zht7u/multi-real-prep/data/channels/import_c9d3db081852ed7a86a554bc/state",
+      "XDG_CACHE_HOME": "/tmp/wm-4d4zht7u/multi-real-prep/data/channels/import_c9d3db081852ed7a86a554bc/cache",
+      "allXdgPrivate": true
+    },
+    "actual": {
+      "status": "completed",
+      "channel": "import_c9d3db081852ed7a86a554bc",
+      "engine": "opencode",
+      "model": "opencode-go/glm-5.3-flash",
+      "effort": "high",
+      "execution": "real",
+      "terminal": "success",
+      "independentBindingObserved": true
+    },
+    "manifestDigest": "ac5e5521df52853ebc2492261d132c2a83536b8f57ed9cfdce0fa84ba6ead454"
+  },
+  "result": {
+    "manifestDigest": "ac5e5521df52853ebc2492261d132c2a83536b8f57ed9cfdce0fa84ba6ead454",
+    "exitCode": 0,
+    "exactMarker": true
+  },
+  "terminal": {
+    "taskId": "44555af3-943b-4252-9b6a-ed4af00876b9",
+    "status": "completed",
+    "reviewState": "accepted",
+    "runId": "e51be42e-4be7-4eb4-b677-01402129761a",
+    "finalizedAt": "2026-10-25T11:13:00.603Z"
+  },
+  "restoration": {
+    "restoredConfigExact": true,
+    "testOwnerAbsent": true,
+    "testWorkerAbsent": true,
+    "blocksPreserved": true,
+    "revision": 11,
+    "blocks": []
+  },
+  "cleanup": {
+    "noPrivateNativeHelpersRemain": true,
+    "helperScopeInventoryEmpty": true,
+    "cleanupSignalsSent": 0
+  },
+  "quotaIsolation": {
+    "onlyTwoPrivateQuotaNamespaces": true,
+    "quotaRecordsAndStateReadOnlyChecked": true,
+    "productionQuotaRefreshes": 0
+  },
+  "retainedService": {
+    "pid": 1724773,
+    "url": "http://127.0.0.1:4739",
+    "port": 4739,
+    "dataDir": "/tmp/wm-4d4zht7u/multi-real-prep/data",
+    "version": "0.7.9",
+    "startedAt": "2026-10-25T11:08:28.187Z",
+    "runningWorkers": 0,
+    "managedBy": null
+  },
+  "httpStatus": 200,
+  "runnerOverall": {
+    "status": "incomplete",
+    "exitCode": 2,
+    "requestedDispatch": "passed",
+    "unrelatedUnconfiguredChannels": [
+      "default_claude",
+      "default_codex",
+      "default_grok",
+      "default_opencode",
+      "default_pi",
+      "default_qoder",
+      "default_dsh"
+    ]
+  },
+  "limitations": [
+    "Generic runner remains incomplete (exit 2) because seven unrelated default channels are unconfigured; requested two-account dispatch passed.",
+    "Provider-defined effort high was sent exactly and invocation succeeded; model listing exposes model IDs, not a separate supported-variants catalog.",
+    "Quota values are authentic observations at recorded timestamps, not a post-inference balance refresh.",
+    "Earlier preparation source-1 byte immutability limitation remains outside this package; production DB immutability was not asserted.",
+    "No additional positive/positive random sampling calls or browser acceptance performed."
+  ],
+  "artifacts": [
+    "REPORT.md",
+    "handoff.md",
+    "result.safe.json",
+    "execution.safe.json",
+    "final-check.safe.json",
+    "quota.safe.json",
+    "route-check.safe.json",
+    "baselineconfig.safe.json",
+    "runner.stdout.safe.json",
+    "runner.stderr.safe.log",
+    "pre-dispatch-driver-failure.safe.json"
+  ],
+  "finishedAt": "2026-10-25T11:13:57.363Z"
+}

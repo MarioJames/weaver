@@ -1,0 +1,15 @@
+{
+  "head": "4f9efefa835150c13a781c03995bc93dc1f3c5fc",
+  "sha256": {
+    "src/renderer/features/roles/RolesPage.tsx": "a6ed9a9adeb88557cca81db8b7aafe6b354b9b14cb53daa46d28c8d697a40fc4",
+    "src/renderer/policy/PolicyHeader.tsx": "d2c72051ff5ac0b27c6f0409e036c5c30ca53a747a0d72beaf484f6f60a7f7a7",
+    "src/renderer/policy/policy-edit.ts": "4083001b055aef044db6336c71172ecd9db719e97913d67c327db4557f9f0009",
+    "src/renderer/features/roles/roles-style.ts": "cd31046425e2c41f79af93ec8c3401be22a1025fe6adb28ba899b14bad155601",
+    "src/main/policy/store.ts": "d7fc80b1d8631f850d0f65475dda553d151dd235ae0968b21f57c39f3facb208"
+  },
+  "through": "Browser UI + existing RPC on borrowed 4739; no product/test edits",
+  "observedAt": "2026-10-25T11:43:18.213378+00:00",
+  "fixTask": "f643953c-0fe0-41f5-a5b9-b96b443a342c",
+  "fixStatus": "completed",
+  "fixReview": "accepted"
+}

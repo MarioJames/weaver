@@ -1,0 +1,219 @@
+{
+  "started_at": "2026-10-25T11:06:42.239Z",
+  "target_version": 14,
+  "read_only_sources": true,
+  "online_backup_api": true,
+  "source_store_initialization": false,
+  "services_started": 0,
+  "source_writes": 0,
+  "secret_values_or_hashes_exported": 0,
+  "results": [
+    {
+      "label": "production",
+      "started_at": "2026-10-25T11:06:42.239Z",
+      "source_version": 13,
+      "source_integrity_ok": true,
+      "expected_source_version": true,
+      "backup_version": 13,
+      "backup_integrity_ok": true,
+      "table_count": 25,
+      "row_count": 116776,
+      "table_row_counts": {
+        "artifacts": 907,
+        "channel_secrets": 6,
+        "free_probe_history": 50,
+        "free_probe_workers": 3,
+        "janitor_sweeps": 25,
+        "kv": 118,
+        "owners": 207,
+        "packages": 1270,
+        "policy_blocks": 3,
+        "policy_channels": 6,
+        "policy_engines": 7,
+        "policy_owner_workers": 8,
+        "policy_owners": 2,
+        "policy_revisions": 369,
+        "policy_settings": 5,
+        "policy_workers": 5,
+        "quota_records": 24,
+        "quota_state": 18,
+        "receipts": 6575,
+        "sqlite_sequence": 2,
+        "stall_history": 0,
+        "stall_penalties": 0,
+        "task_events": 105871,
+        "tasks": 1293,
+        "vendor_worker_limits": 2
+      },
+      "live_workers": 5,
+      "history_normalized": 369,
+      "history_preserved_verbatim": 0,
+      "history_legacy_normalized": 0,
+      "normalizer_pure": true,
+      "history_worker_other_fields_equal": true,
+      "current_history_nonworker_semantics_equal": true,
+      "migration_performed": true,
+      "migrated_version": 14,
+      "integrity_after_migration_ok": true,
+      "all_tables_expected_fields_equal": true,
+      "non_target_tables_all_fields_equal": true,
+      "live_workers_exact_conversion": true,
+      "history_exact_expected_and_metadata_equal": true,
+      "schema_only_expected_rename": true,
+      "repeat_rounds": [
+        {
+          "round": 1,
+          "version": 14,
+          "all_rows_and_schema_stable": true,
+          "integrity_ok": true
+        },
+        {
+          "round": 2,
+          "version": 14,
+          "all_rows_and_schema_stable": true,
+          "integrity_ok": true
+        }
+      ],
+      "passed": true,
+      "finished_at": "2026-10-25T11:06:48.324Z",
+      "revalidation_repeat_rounds": [
+        {
+          "round": 1,
+          "version": 14,
+          "all_rows_and_schema_stable": true,
+          "integrity_ok": true
+        },
+        {
+          "round": 2,
+          "version": 14,
+          "all_rows_and_schema_stable": true,
+          "integrity_ok": true
+        }
+      ],
+      "revalidated_at": "2026-10-25T11:07:34.014Z"
+    },
+    {
+      "label": "persistent_test",
+      "started_at": "2026-10-25T11:06:48.324Z",
+      "source_version": 13,
+      "source_integrity_ok": true,
+      "expected_source_version": true,
+      "backup_version": 13,
+      "backup_integrity_ok": true,
+      "table_count": 25,
+      "row_count": 254,
+      "table_row_counts": {
+        "artifacts": 1,
+        "channel_secrets": 11,
+        "free_probe_history": 0,
+        "free_probe_workers": 0,
+        "janitor_sweeps": 35,
+        "kv": 33,
+        "owners": 1,
+        "packages": 1,
+        "policy_blocks": 1,
+        "policy_channels": 18,
+        "policy_engines": 7,
+        "policy_owner_workers": 10,
+        "policy_owners": 2,
+        "policy_revisions": 79,
+        "policy_settings": 6,
+        "policy_workers": 7,
+        "quota_records": 12,
+        "quota_state": 9,
+        "receipts": 6,
+        "sqlite_sequence": 1,
+        "stall_history": 0,
+        "stall_penalties": 0,
+        "task_events": 13,
+        "tasks": 1,
+        "vendor_worker_limits": 0
+      },
+      "live_workers": 7,
+      "history_normalized": 79,
+      "history_preserved_verbatim": 0,
+      "history_legacy_normalized": 0,
+      "normalizer_pure": true,
+      "history_worker_other_fields_equal": true,
+      "current_history_nonworker_semantics_equal": true,
+      "migration_performed": true,
+      "migrated_version": 14,
+      "integrity_after_migration_ok": true,
+      "all_tables_expected_fields_equal": true,
+      "non_target_tables_all_fields_equal": true,
+      "live_workers_exact_conversion": true,
+      "history_exact_expected_and_metadata_equal": true,
+      "schema_only_expected_rename": true,
+      "repeat_rounds": [
+        {
+          "round": 1,
+          "version": 14,
+          "all_rows_and_schema_stable": true,
+          "integrity_ok": true
+        },
+        {
+          "round": 2,
+          "version": 14,
+          "all_rows_and_schema_stable": true,
+          "integrity_ok": true
+        }
+      ],
+      "passed": true,
+      "finished_at": "2026-10-25T11:06:48.350Z",
+      "revalidation_repeat_rounds": [
+        {
+          "round": 1,
+          "version": 14,
+          "all_rows_and_schema_stable": true,
+          "integrity_ok": true
+        },
+        {
+          "round": 2,
+          "version": 14,
+          "all_rows_and_schema_stable": true,
+          "integrity_ok": true
+        }
+      ],
+      "revalidated_at": "2026-10-25T11:07:34.030Z"
+    },
+    {
+      "label": "empty",
+      "started_at": "2026-10-25T11:06:48.350Z",
+      "initial_version": 0,
+      "migrated_version": 14,
+      "table_count": 25,
+      "row_count": 0,
+      "integrity_ok": true,
+      "repeat_rounds": [
+        {
+          "round": 1,
+          "version": 14,
+          "all_rows_and_schema_stable": true,
+          "integrity_ok": true
+        },
+        {
+          "round": 2,
+          "version": 14,
+          "all_rows_and_schema_stable": true,
+          "integrity_ok": true
+        }
+      ],
+      "passed": true,
+      "finished_at": "2026-10-25T11:06:48.355Z"
+    }
+  ],
+  "finished_at": "2026-10-25T11:07:34.030Z",
+  "all_passed": true,
+  "retained_database_count": 5,
+  "database_permissions_0600": true,
+  "initial_comparison_passed": false,
+  "initial_comparison_included_object_prototypes": true,
+  "corrected_comparison_checks_sqlite_field_values": true,
+  "unconvertible_real_history_present": false,
+  "unconvertible_history_preservation_exercised": false,
+  "product_source_or_test_files_written": 0,
+  "commits": 0,
+  "pushes": 0,
+  "delegations": 0,
+  "all_artifacts_permissions_0600": true
+}

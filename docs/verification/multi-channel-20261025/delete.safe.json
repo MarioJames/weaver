@@ -1,0 +1,40 @@
+{
+  "beforeRevision": 29,
+  "afterRevision": 30,
+  "deletedWorkerAbsent": true,
+  "parentList": [
+    "wm_field_92adede5"
+  ],
+  "parentWeights": {
+    "wm_field_92adede5": 5
+  },
+  "otherDraftBackendValue": "",
+  "browser": {
+    "lifecycle": {
+      "effectiveLaunch": {
+        "browserLaunched": true,
+        "engine": "chrome",
+        "launchHash": 16751286643085047603
+      },
+      "launched": false,
+      "relaunchedBrowser": false,
+      "restartedBackground": false,
+      "restoreStatus": "not_configured",
+      "reused": true,
+      "saveStatus": "not_attempted"
+    },
+    "origin": "http://127.0.0.1:4739/#/workers",
+    "result": {
+      "account": [
+        {
+          "invalid": null,
+          "describedby": null,
+          "errorNodeExists": false
+        }
+      ]
+    }
+  },
+  "topSaveNotClickedForDelete": true,
+  "otherDraftBrowserValue": "WM_FIELD_UNSAVED_92ADEDE5",
+  "draftPreserved": true
+}

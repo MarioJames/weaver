@@ -1,0 +1,22 @@
+{
+  "backup": "/home/mocha/.local/share/weaver-real-test/backups/before-feature-apply-20261025T115946Z/weaver.db",
+  "beforeSchema": 13,
+  "sourceApplied": true,
+  "watcher": 1123112,
+  "watcherResumed": true,
+  "afterSchema": 14,
+  "integrity": "ok",
+  "http4738": 200,
+  "protectedTables": {
+    "channel_secrets": true,
+    "policy_channels": true,
+    "policy_engines": true,
+    "policy_owners": true,
+    "policy_owner_workers": true,
+    "policy_settings": true,
+    "policy_blocks": true,
+    "tasks": true,
+    "workersExactArrayConversion": true
+  },
+  "historyExactNormalized": true
+}

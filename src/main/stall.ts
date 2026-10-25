@@ -1,3 +1,4 @@
+import { workerChannelCandidates, type ChannelRoutingContext } from './policy/worker-channel-routing';
 import { roleEngine } from '../shared/policy/channels';
 import type { Config, Block } from '../shared/contracts/policy';
 import type { ProbeOutcome, RunningCommand, StallStatus, TaskHealth } from '../shared/contracts/monitoring';
@@ -39,7 +40,7 @@ export interface ProbeRoute { channel: string; engine: string; kind: string; wor
 export type RecoveryProbe = (route: ProbeRoute, signal: AbortSignal) => Promise<ProbeOutcome>;
 
 /** The main-process policy writer, narrowed to what a penalty needs. */
-export type StallPolicy = BlockPolicy;
+export type StallPolicy = BlockPolicy & {routingContext?:()=>ChannelRoutingContext|undefined};
 
 export const emptyPenalty = (): EnginePenalty => ({ level: 0, lastTriggerAt: null, needsAttention: false, blockedUntil: null, nextProbeAt: null, probeSuccesses: 0, head: '' });
 
@@ -135,12 +136,16 @@ export function nextPenalty(state: StallState, engine: string, now: number, stal
 }
 
 /** The probe reuses one enabled worker's configured route, so it proves the same account path a dispatch would take. */
-function probeRoute(config: Config, engine: string): ProbeRoute | null {
+function probeRoute(config: Config, engine: string, context?: ChannelRoutingContext): ProbeRoute | null {
   const target = config.engines[engine];
   if (!target?.enabled) return null;
-  const worker = Object.entries(config.workers).find(([, item]) => item.enabled && roleEngine(config,item) === engine);
-  if (!worker) return null;
-  return { channel:worker[1].channel, engine, kind: target.kind, worker: worker[0], model: worker[1].model, effort: worker[1].effort };
+  for(const [worker,item] of Object.entries(config.workers)) {
+    if(!item.enabled||roleEngine(config,item)!==engine)continue;
+    const available=workerChannelCandidates(config,[],worker,context).find(candidate=>candidate.eligible);
+    const channel=available?.channel??item.channels.find(id=>config.channels[id]?.enabled&&(!context?.credentialsReady||context.credentialsReady(id)));
+    if(channel)return {channel,engine,kind:target.kind,worker,model:item.model,effort:item.effort};
+  }
+  return null;
 }
 
 /** Is the worker burning CPU in its newest observed interval? Null when nothing was observed to compare. */
@@ -476,7 +481,9 @@ export class StallMonitor {
   private async probeEngine(policy: StallPolicy, engine: string, now: number, probe: RecoveryProbe, held: Set<string>, fence: number): Promise<void> {
     const penalty = this.state.engines[engine]!;
     const ours = (blocks: Block[]) => blocks.find(block => isStallEngineBlock(block, engine));
-    const route = probeRoute(policy.snapshot().config, engine);
+    const snapshot=policy.snapshot();
+    const route = probeRoute(snapshot.config, engine,policy.routingContext?.());
+    const diagnosticOnly=!route || (snapshot.config.workers[route.worker]!.channels.length>1 && !workerChannelCandidates(snapshot.config,snapshot.activeBlocks.filter(block=>!isStallEngineBlock(block,engine)),route.worker,policy.routingContext?.()).some(candidate=>candidate.channel===route.channel&&candidate.eligible));
     /** Which penalty this probe is answering: a replacement block is not ours to act on. */
     const tested = ours(activeBlocks({ version: 1, blocks: policy.snapshot().blocks }, now))?.since;
     const { value: outcome } = await this.lifecycle.abortable<ProbeOutcome>(
@@ -498,7 +505,8 @@ export class StallMonitor {
         ...(route ? { model: route.model, effort: route.effort } : {}),
       });
       if (!outcome.ok) {
-        this.escalate(engine, live, now);
+        if(diagnosticOnly)live.nextProbeAt=now+PROBE_MS;
+        else this.escalate(engine, live, now);
         return false;
       }
       if (live.level >= STALL_LADDER.length) {

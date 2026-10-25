@@ -158,7 +158,7 @@ async function main() {
       await assertTarget(server);
       if (!channel.enabled || !policy.config.engines[channel.engine]?.enabled) { hello.status = 'unavailable'; hello.code = 'POLICY_DISABLED'; continue; }
       const roles = [...Object.entries(policy.config.workers), ...Object.entries(policy.config.owners)];
-      const saved = roles.find(([, role]) => role.channel === id && role.model && role.effort);
+      const saved = roles.find(([, role]) => (Array.isArray(role.channels) ? role.channels.includes(id) : role.channel === id) && role.model && role.effort);
       const selection = values.channel === id && values.model
         ? { model: values.model, effort: values.effort, source: 'explicit_arguments' }
         : saved ? { model: saved[1].model, effort: saved[1].effort, source: 'saved_role', role: saved[0] } : null;
@@ -211,7 +211,7 @@ async function main() {
           report.dispatch.frozen = Object.fromEntries(['owner', 'worker', 'channel', 'engine', 'model', 'effort', 'execution'].map(k => [k, frozen[k]]));
           if (frozen.owner !== profile || !policy.config.channels[frozen.channel] || policy.config.channels[frozen.channel].engine !== frozen.engine) fail('FROZEN_ROUTE_INVALID');
           const workerRole = policy.config.workers[frozen.worker];
-          if (!workerRole?.enabled || !policy.config.owners[profile].workers.includes(frozen.worker) || ['channel', 'model', 'effort'].some(k => workerRole[k] !== frozen[k])) fail('FROZEN_ROLE_MISMATCH');
+          if (!workerRole?.enabled || !policy.config.owners[profile].workers.includes(frozen.worker) || !workerRole.channels.includes(frozen.channel) || ['model', 'effort'].some(k => workerRole[k] !== frozen[k])) fail('FROZEN_ROLE_MISMATCH');
           const deadline = Date.now() + timeoutMs;
           let current;
           do {

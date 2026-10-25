@@ -15,7 +15,7 @@ import { absoluteExistingWorkspace, isRealEngineKind, workspaceIdentity } from '
 import { fail } from '../commands/errors';
 import { acceptCommandResult } from '../commands/gateway';
 import { publicTask, type TaskRecords } from '../tasks/records';
-import { chainWorkers } from './retry';
+import { chainWorkers, chainChannels } from './retry';
 
 /** Tasks holding a worker across every owner: the load that weighted dispatch balances. */
 export function workerLoad(tasks: Task[]): Record<string, number> {
@@ -56,7 +56,7 @@ export class Dispatcher {
   if(provider==='mock-jsonl'||this.manager.adapterId==='mock-jsonl') return {execution:'mock',adapter:'mock-jsonl',maxWaitMinutes:minutes};
   // A worker on the owner's own engine runs inside the owner with its built-in subagent tool; Weaver launches nothing.
   const root=task.parentTaskId?this.manager.store.get(task.parentTaskId):undefined;
-  if(ownerChannel!==undefined&&channel===ownerChannel&&root?.run?.channel===channel&&root.run.policyRevision===this.policy.snapshot().revision) return {execution:'native',adapter:'native',maxWaitMinutes:minutes,...(task.workspace?{workspace:task.workspace}:{})};
+  if(ownerChannel!==undefined&&channel===ownerChannel&&root?.run?.channel===channel&&root.run.policyRevision===this.policy.snapshot().revision&&(root.run.engine===undefined||root.run.engine===engine)) return {execution:'native',adapter:'native',maxWaitMinutes:minutes,...(task.workspace?{workspace:task.workspace}:{})};
   const kind=this.policy.snapshot().config.engines[engine]?.kind??'';
   if(!isRealEngineKind(kind))fail('CAPABILITY_UNAVAILABLE',`Engine ${engine} (${kind||'unknown kind'}) cannot be launched. No mock provider was substituted.`);
   if(!this.manager.canLaunchReal)fail('CAPABILITY_UNAVAILABLE',`Real launcher for ${kind} is not loaded. No mock provider was substituted.`);
@@ -66,7 +66,7 @@ export class Dispatcher {
  routeOf(owner:string,running:number,excludedEngines:string[],worker?:unknown,excludedWorkers:string[]=[],excludedChannels:string[]=[]):RoutePreview {
   try {
    const live=this.policy.snapshot();
-   return previewRoute(live.config,live.blocks,Date.now(),{owner,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads()),...(worker!==undefined?{worker}:{}),...(excludedChannels.length?{excludeChannels:excludedChannels}:{}),...(excludedEngines.length?{excludeEngines:excludedEngines}:{}),...(excludedWorkers.length?{excludeWorkers:excludedWorkers}:{})});
+   return previewRoute(live.config,live.blocks,Date.now(),{owner,runningCount:running,workerLoad:workerLoad(this.manager.store.listHeads()),...(worker!==undefined?{worker}:{}),...(excludedChannels.length?{excludeChannels:excludedChannels}:{}),...(excludedEngines.length?{excludeEngines:excludedEngines}:{}),...(excludedWorkers.length?{excludeWorkers:excludedWorkers}:{})},this.policy.routingContext());
   } catch(error) {
    const message=error instanceof Error?error.message:String(error);
    if(message.startsWith('NO_ALTERNATIVE_ENGINE'))fail('NO_ALTERNATIVE_ENGINE',message);
@@ -129,7 +129,7 @@ export class Dispatcher {
    const excludedWorkers=chainWorkers(this.manager.store,task);
    for(const worker of forcedWorkers)if(!excludedWorkers.includes(worker))excludedWorkers.push(worker);
    const running=slotGroupCount(this.manager.store.listHeads(),slotGroupFor(task.ownerId,owner));
-   const route=this.routeOf(owner,running,[],a.worker,excludedWorkers);
+   const route=this.routeOf(owner,running,[],a.worker,excludedWorkers,chainChannels(this.manager.store,task));
    const decision=this.decideExecution(route.engine,a.provider,task,this.policy.snapshot().config.owners[route.owner]?.channel,route.channel);
    const pendingPackage:WorkPackage=task.packageId?this.manager.store.getPackage(task.packageId!)!:{id:randomUUID(),taskId:task.id,revision:1,instruction:task.instruction,scope:[decision.workspace??task.workspace??'Explicit mock fixture'],acceptanceCriteria:task.acceptanceCriteria?.length?task.acceptanceCriteria:[decision.execution==='mock'?'Mock output returned for owner review':'Provider result returned for owner review'],createdAt:new Date().toISOString()};
    if(!pendingPackage||pendingPackage.taskId!==task.id)fail('INVALID_REQUEST','Frozen work package is missing');

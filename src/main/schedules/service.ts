@@ -174,13 +174,14 @@ export class ScheduleService {
      }else fail('INVALID_REQUEST','Agent schedule has no executor');
     }else{
      const snapshot=this.options.policy.snapshot();
-     const profile=resolveScheduleProfile(snapshot,executor.role as 'owner'|'worker',executor.profileId);
+     const profile=resolveScheduleProfile(snapshot,executor.role as 'owner'|'worker',executor.profileId,this.options.policy.routingContext());
      const kind=classifyScheduleAgent(executor.role as 'owner'|'worker',profile.kind);
      if(kind==='legacy-root'){
       const dataDir=this.dataDir();
       const {path:effective}=resolveEffectiveWorkspace(d.workspace,dataDir,d.id);
       const task=this.options.createTask({title:d.name,goal:d.agent!.goal,ownerProfileId:executor.profileId,workspace:effective}) as {id:string};run.taskId=task.id;
      }
+     run.channel=profile.channel;
      // Direct kinds persist the precise unit in the launch hook before any external effect.
     }
    }else if(!d.builtin)run.process={unit:`weaver-schedule-${run.id}`};
@@ -242,7 +243,7 @@ export class ScheduleService {
    effective=resolved.path;unspecified=resolved.unspecified;
   }catch(error){this.finish(run,'failed',{error:redactContext(error instanceof Error?error.message:String(error),2000)});return;}
   let profile:ReturnType<typeof resolveScheduleProfile>;
-  try{profile=resolveScheduleProfile(this.options.policy.snapshot(),executor.role,executor.profileId);}
+  try{profile=resolveScheduleProfile(this.options.policy.snapshot(),executor.role,executor.profileId,this.options.policy.routingContext(),run.channel);}
   catch(error){this.finish(run,'failed',{error:redactContext(error instanceof Error?error.message:String(error),2000)});return;}
   let kind:ReturnType<typeof classifyScheduleAgent>;
   try{kind=classifyScheduleAgent(executor.role,profile.kind);}

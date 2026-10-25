@@ -1,0 +1,157 @@
+{
+  "taskId": "957f7555-f04a-4d34-b5d2-d7c441d57139",
+  "startedAt": "2026-10-25T12:19:33.388Z",
+  "saveCalls": 1,
+  "checks": {
+    "diagnosisAccepted": true,
+    "diagnosisMatches": true,
+    "diagnosisReportRead": true,
+    "legacyShape": true,
+    "coldFingerprintMatches": true,
+    "privateSourceMode": true,
+    "privateBackupDirectory": true,
+    "nativeRecordExists": true,
+    "uniqueIdentity": true,
+    "candidateEnabled": true,
+    "candidateSecretExists": true,
+    "candidateHasApiKey": true,
+    "candidateMetadataValid": true,
+    "candidateOptionalConfigValid": true,
+    "noBusySessions": true,
+    "noActiveSessions": true,
+    "revisionMatches": true,
+    "legacyEffectiveChannel": true,
+    "noDefaultDsh": true,
+    "publicSecretPresent": true,
+    "publicConfigMatchesDisk": true,
+    "workspaceRootsExist": true,
+    "runtimeBinaryMatches": true,
+    "schema14Before": true,
+    "integrityBefore": true,
+    "httpBefore": true,
+    "backupVerified": true,
+    "noConcurrentModification": true,
+    "diagnosisStillAccepted": true,
+    "v5ExplicitChannel": true,
+    "revisionIncrementedOnce": true,
+    "selectedEngineDsh": true,
+    "secretPreserved": true,
+    "allOtherImConfigSemanticsPreserved": true,
+    "preservedFields": {
+      "enabled": true,
+      "appId": true,
+      "appSecret": true,
+      "allowedOpenIds": true,
+      "model": true,
+      "effort": true,
+      "workspaces": true,
+      "idleTimeoutMinutes": true,
+      "ownerProfileId": true
+    },
+    "policyTablesUnchanged": true,
+    "policyFileUnchanged": true,
+    "externalNativeFullRowUnchanged": true,
+    "schema14After": true,
+    "integrityAfter": true,
+    "privateV5Mode": true,
+    "httpAfter": true,
+    "coldReadExplicitChannel": true,
+    "connectedReady": true,
+    "noUserMessageObserved": true,
+    "servicePidAndRestartsPreserved": true
+  },
+  "polls": [
+    {
+      "elapsedMs": 61,
+      "connection": "connecting",
+      "agentState": "starting",
+      "activeSessions": 0,
+      "busySessions": 0
+    },
+    {
+      "elapsedMs": 5066,
+      "connection": "connected",
+      "agentState": "starting",
+      "activeSessions": 0,
+      "busySessions": 0
+    },
+    {
+      "elapsedMs": 10075,
+      "connection": "connected",
+      "agentState": "ready",
+      "activeSessions": 0,
+      "busySessions": 0
+    }
+  ],
+  "artifacts": {
+    "persistentBackup": "/home/mocha/.local/share/weaver/backups/schema13-to14-20261025T115557Z-62f79cffa90c4199802fac54b9b16667/im-settings.v4.before-migration.json",
+    "coldReadCopy": "/tmp/wm-4d4zht7u/im-legacy-migration/cold-read/im-settings.json"
+  },
+  "diagnosticTask": {
+    "status": "completed",
+    "reviewState": "accepted"
+  },
+  "before": {
+    "version": 4,
+    "revision": 12,
+    "status": {
+      "connection": "error",
+      "agentState": "error",
+      "activeSessions": 0,
+      "busySessions": 0,
+      "message": "IM 操作失败，请检查配置或重新连接。",
+      "agentMessage": "IM 操作失败，请检查配置或重新连接。"
+    },
+    "http": {
+      "p4737": 200,
+      "p4738": 200
+    }
+  },
+  "candidateMetadata": {
+    "hasApiKey": true,
+    "hasOptionalNativePatch": false
+  },
+  "rpc": {
+    "ok": true
+  },
+  "after": {
+    "version": 5,
+    "revision": 13,
+    "status": {
+      "connection": "connected",
+      "agentState": "ready",
+      "activeSessions": 0,
+      "busySessions": 0
+    },
+    "http": {
+      "p4737": 200,
+      "p4738": 200
+    }
+  },
+  "finalCode": "CONNECTED_READY",
+  "outcome": "migrated_and_ready",
+  "finishedAt": "2026-10-25T12:19:44.008Z",
+  "actions": {
+    "saveImSettingsCalls": 1,
+    "reconnectCalls": 0,
+    "serviceRestarts": 0,
+    "userMessageSends": 0,
+    "extraInferenceRequests": 0,
+    "loginLogoutHelloCalls": 0,
+    "sourceEdits": 0,
+    "delegation": 0,
+    "commits": 0,
+    "pushes": 0
+  },
+  "runtimeAfter": {
+    "pid": 1832765,
+    "active": true,
+    "running": true,
+    "restarts": 0
+  },
+  "preflightNote": "An initial preflight stopped with zero saves because the helper incorrectly required an optional native patch. Source runtime.ts dsh branch confirms the patch is optional; the required API key and channel provider metadata were present. The helper was corrected before the sole authorized save.",
+  "limitations": [
+    "Account configuration comparison covered policy_channels and channel_secrets complete rows; native subscription credential directories were not recursively inspected.",
+    "No user messaging test or extra inference/authentication probe was performed. Connected/ready reflects normal service initialization after the authorized save."
+  ]
+}

@@ -1,3 +1,4 @@
+import { policySchema12 } from '../helpers/policy-schema12';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -20,7 +21,7 @@ import type { Task } from '../../src/shared/contracts/tasks';
 // Step 11 only deletes rows (no table changes), so a fully migrated database whose user_version is put back to 10 and
 // which is then filled with the shapes an older build wrote is exactly the historical database the step upgrades.
 
-function defaultConfig(): any { const c: any=currentConfig(); for(const channel of Object.values(c.channels) as any[]) if(channel.quota_refresh!==undefined)c.engines[channel.engine].quota_refresh=channel.quota_refresh; for(const r of [...Object.values(c.owners),...Object.values(c.workers)] as any[]) {r.engine=c.channels[r.channel].engine;delete r.channel;} delete c.channels;return c; }
+function defaultConfig(): any { const c: any=currentConfig(); for(const channel of Object.values(c.channels) as any[]) if(channel.quota_refresh!==undefined)c.engines[channel.engine].quota_refresh=channel.quota_refresh; for(const w of Object.values(c.workers) as any[]) {w.channel=w.channels[0];delete w.channels;} for(const r of [...Object.values(c.owners),...Object.values(c.workers)] as any[]) {r.engine=c.channels[r.channel].engine;delete r.channel;} delete c.channels;return c; }
 
 const version = (db: DatabaseSync) => Number((db.prepare('PRAGMA user_version').get() as { user_version: number | string }).user_version);
 const rows = (db: DatabaseSync, sql: string) => (db.prepare(sql).all() as Record<string, unknown>[]).map(row => ({ ...row }));
@@ -28,7 +29,7 @@ const rows = (db: DatabaseSync, sql: string) => (db.prepare(sql).all() as Record
 function legacyDatabase(): DatabaseSync {
   const db = new DatabaseSync(':memory:');
   migrate(db);
-  db.exec(`UPDATE policy_owners SET channel=(SELECT json_extract(body, '$.engine') FROM policy_channels WHERE id=channel) WHERE channel IN (SELECT id FROM policy_channels); UPDATE policy_workers SET channel=(SELECT json_extract(body, '$.engine') FROM policy_channels WHERE id=channel) WHERE channel IN (SELECT id FROM policy_channels); DROP TABLE policy_channels; DROP TABLE channel_secrets; ALTER TABLE policy_owners RENAME COLUMN channel TO engine; ALTER TABLE policy_workers RENAME COLUMN channel TO engine; ALTER TABLE policy_blocks DROP COLUMN channel`);
+  policySchema12(db);
   db.exec('PRAGMA user_version=10');
   return db;
 }
@@ -142,7 +143,7 @@ test('running the upgrade again changes nothing, including after the version is 
   const once = dump();
   migrate(db);
   assert.equal(dump(), once, 'a current database runs nothing');
-  db.exec(`UPDATE policy_owners SET channel=(SELECT json_extract(body, '$.engine') FROM policy_channels WHERE id=channel) WHERE channel IN (SELECT id FROM policy_channels); UPDATE policy_workers SET channel=(SELECT json_extract(body, '$.engine') FROM policy_channels WHERE id=channel) WHERE channel IN (SELECT id FROM policy_channels); DROP TABLE policy_channels; DROP TABLE channel_secrets; ALTER TABLE policy_owners RENAME COLUMN channel TO engine; ALTER TABLE policy_workers RENAME COLUMN channel TO engine; ALTER TABLE policy_blocks DROP COLUMN channel`);
+  policySchema12(db);
   db.exec('PRAGMA user_version=10');
   migrate(db);
   assert.equal(version(db), SCHEMA_VERSION);

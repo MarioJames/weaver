@@ -1,0 +1,468 @@
+{
+  "taskId": "6e5b48ff-4073-4728-ab70-7db57aff3580",
+  "startedAt": "2026-10-25T11:42:40.451046+00:00",
+  "workspace": "/home/mocha/.local/share/cow-workspace/workspaces/weaver-multi-1025-01/merged",
+  "checks": [
+    {
+      "name": "hashBefore",
+      "exitCode": 0,
+      "log": "/tmp/wm-4d4zht7u/standalone-final/hashBefore.private.log"
+    },
+    {
+      "name": "build",
+      "exitCode": 0,
+      "log": "/tmp/wm-4d4zht7u/standalone-final/build.private.log"
+    },
+    {
+      "name": "hashAfterBuild",
+      "exitCode": 0,
+      "log": "/tmp/wm-4d4zht7u/standalone-final/hashAfterBuild.private.log"
+    },
+    {
+      "name": "typecheck",
+      "exitCode": 0,
+      "log": "/tmp/wm-4d4zht7u/standalone-final/typecheck.private.log"
+    },
+    {
+      "name": "hashBeforeCompile",
+      "exitCode": 0,
+      "log": "/tmp/wm-4d4zht7u/standalone-final/hashBeforeCompile.private.log"
+    },
+    {
+      "name": "compile",
+      "exitCode": 0,
+      "log": "/tmp/wm-4d4zht7u/standalone-final/compile.private.log"
+    },
+    {
+      "name": "hashAfterCompile",
+      "exitCode": 0,
+      "log": "/tmp/wm-4d4zht7u/standalone-final/hashAfterCompile.private.log"
+    },
+    {
+      "name": "version",
+      "exitCode": 0,
+      "log": "/tmp/wm-4d4zht7u/standalone-final/version.private.log"
+    },
+    {
+      "name": "sqlite-self-test",
+      "exitCode": 0,
+      "log": "/tmp/wm-4d4zht7u/standalone-final/sqlite-self-test.private.log"
+    },
+    {
+      "name": "sqlite-repeat-migrate",
+      "exitCode": 0,
+      "log": "/tmp/wm-4d4zht7u/standalone-final/sqlite-repeat-migrate.private.log"
+    },
+    {
+      "name": "hashAfter",
+      "exitCode": 0,
+      "log": "/tmp/wm-4d4zht7u/standalone-final/hashAfter.private.log"
+    }
+  ],
+  "status": "passed",
+  "limitations": [
+    "Full npm run check and browser acceptance belong to owner; not run here.",
+    "Repeated migrations use the verified source migrate() under Node/tsx on the same candidate-created DB; binary self-test itself is run once on a fresh DB.",
+    "Build emits dependency use-client/directive warnings; build exits 0.",
+    "No production/4738/4739 service or DB mutations, engine calls, installs, staging, commits or pushes; only read-only dependency task status/health queried.",
+    "Candidate only; no upgrade or deployment performed."
+  ],
+  "dependency": {
+    "id": "f643953c-0fe0-41f5-a5b9-b96b443a342c",
+    "status": "completed",
+    "reviewState": "accepted"
+  },
+  "feedbackSource": {
+    "path": "src/renderer/features/roles/RolesPage.tsx",
+    "sha256": "a6ed9a9adeb88557cca81db8b7aafe6b354b9b14cb53daa46d28c8d697a40fc4",
+    "poolErrorLines": [
+      {
+        "line": 94,
+        "text": "const poolError = record && 'channels' in record ? workerChannelsError(config, record) : '';"
+      },
+      {
+        "line": 217,
+        "text": "<Input id={`${fieldId}-id`} aria-label=\"\u914d\u7f6e ID\" aria-invalid={!!idError} value={pendingId} placeholder={section === 'workers' ? '\u4f8b\u5982\uff1aresearch' : '\u4f8b\u5982\uff1acodex'} onChange={event => setPendingId(event.target.value)} onBlur={acceptId} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); acceptId(); } }} />"
+      },
+      {
+        "line": 219,
+        "text": "<Field.Root invalid={!!poolError}>"
+      },
+      {
+        "line": 220,
+        "text": "<Form.Field label=\"\u8d26\u53f7\u6216\u6e20\u9053\" required extra={<>{poolError && <Field.Error id={`${fieldId}-channel-error`} match render={<Text type=\"danger\" role=\"alert\" />}>{poolError}</Field.Error>}{section === 'workers' ? '\u6bcf\u6b21\u6d3e\u53d1\u4ece\u6709\u53ef\u7528\u989d\u5ea6\u7684\u8d26\u53f7\u4e2d\u968f\u673a\u9009\u62e9\uff1b\u6ca1\u6709\u65b0\u9c9c\u53ef\u7528\u989d\u5ea6\u65f6\u4e0d\u6d3e\u53d1\u3002\u591a\u8d26\u53f7\u4ec5\u652f\u6301\u540c\u4e00\u5f15\u64ce ID \u7684\u5b98\u65b9\u8ba2\u9605\u6c60\uff1aCodex\u3001Claude\u3001Grok\uff0c\u6216 OpenCode \u7684 opencode-go/\u6a21\u578b\u3002API\u3001\u514d\u8d39\u6e20\u9053\u53ca\u65e0\u989d\u5ea6\u63a5\u53e3\u7684\u5f15\u64ce\u53ea\u652f\u6301\u5355\u8d26\u53f7\u3002' : '\u9009\u62e9\u7236 Agent \u4f7f\u7528\u7684\u4e00\u4e2a\u8d26\u53f7\u3002'}</>}>"
+      }
+    ]
+  },
+  "hashes": {
+    "hashBefore": {
+      "at": "2026-10-25T11:42:41.076Z",
+      "head": "4f9efefa835150c13a781c03995bc93dc1f3c5fc",
+      "productGitDiffSha256": "8c12a4d4879d533d9926610be2ad67ef4823785514c5f1b0d9d39bc208f36c45",
+      "productContentSha256": "67bf1641198b63c4ef85f247569b51bb87b48b65367f0b338dc1ce8264b7d8c3",
+      "trackedContentSha256": "6ad709280f6617fcccd87c79d3677cac9003a4aa48509edfd2bda9a17cf2864b"
+    },
+    "hashAfterBuild": {
+      "at": "2026-10-25T11:42:52.750Z",
+      "head": "4f9efefa835150c13a781c03995bc93dc1f3c5fc",
+      "productGitDiffSha256": "8c12a4d4879d533d9926610be2ad67ef4823785514c5f1b0d9d39bc208f36c45",
+      "productContentSha256": "67bf1641198b63c4ef85f247569b51bb87b48b65367f0b338dc1ce8264b7d8c3",
+      "trackedContentSha256": "6ad709280f6617fcccd87c79d3677cac9003a4aa48509edfd2bda9a17cf2864b"
+    },
+    "hashBeforeCompile": {
+      "at": "2026-10-25T11:42:54.502Z",
+      "head": "4f9efefa835150c13a781c03995bc93dc1f3c5fc",
+      "productGitDiffSha256": "8c12a4d4879d533d9926610be2ad67ef4823785514c5f1b0d9d39bc208f36c45",
+      "productContentSha256": "67bf1641198b63c4ef85f247569b51bb87b48b65367f0b338dc1ce8264b7d8c3",
+      "trackedContentSha256": "6ad709280f6617fcccd87c79d3677cac9003a4aa48509edfd2bda9a17cf2864b"
+    },
+    "hashAfterCompile": {
+      "at": "2026-10-25T11:42:55.741Z",
+      "head": "4f9efefa835150c13a781c03995bc93dc1f3c5fc",
+      "productGitDiffSha256": "8c12a4d4879d533d9926610be2ad67ef4823785514c5f1b0d9d39bc208f36c45",
+      "productContentSha256": "67bf1641198b63c4ef85f247569b51bb87b48b65367f0b338dc1ce8264b7d8c3",
+      "trackedContentSha256": "6ad709280f6617fcccd87c79d3677cac9003a4aa48509edfd2bda9a17cf2864b"
+    },
+    "hashAfter": {
+      "at": "2026-10-25T11:42:56.442Z",
+      "head": "4f9efefa835150c13a781c03995bc93dc1f3c5fc",
+      "productGitDiffSha256": "8c12a4d4879d533d9926610be2ad67ef4823785514c5f1b0d9d39bc208f36c45",
+      "productContentSha256": "67bf1641198b63c4ef85f247569b51bb87b48b65367f0b338dc1ce8264b7d8c3",
+      "trackedContentSha256": "6ad709280f6617fcccd87c79d3677cac9003a4aa48509edfd2bda9a17cf2864b"
+    }
+  },
+  "compileEnvironment": {
+    "WEAVER_STANDALONE_WORK": "/tmp/wm-4d4zht7u/standalone-final/work",
+    "WEAVER_STANDALONE_OUT": "/tmp/wm-4d4zht7u/standalone-final/release"
+  },
+  "candidate": {
+    "path": "/tmp/wm-4d4zht7u/standalone-final/release/weaver-linux-x64",
+    "sha256": "a9d2ac4b1c66f7e72454f989bda032249c3f22e8aa64a4123df78e3c4a541969",
+    "bytes": 114853856,
+    "version": "weaver 0.7.9"
+  },
+  "sqlite": {
+    "ok": true,
+    "database": "/tmp/wm-4d4zht7u/standalone-final/selftest-new.sqlite",
+    "sameConnection": true,
+    "resets": 0,
+    "before": {
+      "schema": 14,
+      "integrity": [
+        {
+          "integrity_check": "ok"
+        }
+      ],
+      "tasks": 1,
+      "history": [
+        {
+          "revision": 1,
+          "source": "save"
+        },
+        {
+          "revision": 2,
+          "source": "rollback:1"
+        }
+      ],
+      "workers": [
+        {
+          "id": "claude_worker",
+          "channels": [
+            "default_claude"
+          ]
+        },
+        {
+          "id": "codex_worker",
+          "channels": [
+            "default_codex"
+          ]
+        },
+        {
+          "id": "dsh_worker",
+          "channels": [
+            "default_dsh"
+          ]
+        },
+        {
+          "id": "grok_worker",
+          "channels": [
+            "default_grok"
+          ]
+        },
+        {
+          "id": "opencode_worker",
+          "channels": [
+            "default_opencode"
+          ]
+        },
+        {
+          "id": "pi_worker",
+          "channels": [
+            "default_pi"
+          ]
+        },
+        {
+          "id": "qoder_worker",
+          "channels": [
+            "default_qoder"
+          ]
+        }
+      ],
+      "digest": "9cd6edc31c854302ef86fbfb9a322eec343df1b04569b731c22051c82c663ec3"
+    },
+    "repetitions": [
+      {
+        "schema": 14,
+        "integrity": [
+          {
+            "integrity_check": "ok"
+          }
+        ],
+        "tasks": 1,
+        "history": [
+          {
+            "revision": 1,
+            "source": "save"
+          },
+          {
+            "revision": 2,
+            "source": "rollback:1"
+          }
+        ],
+        "workers": [
+          {
+            "id": "claude_worker",
+            "channels": [
+              "default_claude"
+            ]
+          },
+          {
+            "id": "codex_worker",
+            "channels": [
+              "default_codex"
+            ]
+          },
+          {
+            "id": "dsh_worker",
+            "channels": [
+              "default_dsh"
+            ]
+          },
+          {
+            "id": "grok_worker",
+            "channels": [
+              "default_grok"
+            ]
+          },
+          {
+            "id": "opencode_worker",
+            "channels": [
+              "default_opencode"
+            ]
+          },
+          {
+            "id": "pi_worker",
+            "channels": [
+              "default_pi"
+            ]
+          },
+          {
+            "id": "qoder_worker",
+            "channels": [
+              "default_qoder"
+            ]
+          }
+        ],
+        "digest": "9cd6edc31c854302ef86fbfb9a322eec343df1b04569b731c22051c82c663ec3"
+      },
+      {
+        "schema": 14,
+        "integrity": [
+          {
+            "integrity_check": "ok"
+          }
+        ],
+        "tasks": 1,
+        "history": [
+          {
+            "revision": 1,
+            "source": "save"
+          },
+          {
+            "revision": 2,
+            "source": "rollback:1"
+          }
+        ],
+        "workers": [
+          {
+            "id": "claude_worker",
+            "channels": [
+              "default_claude"
+            ]
+          },
+          {
+            "id": "codex_worker",
+            "channels": [
+              "default_codex"
+            ]
+          },
+          {
+            "id": "dsh_worker",
+            "channels": [
+              "default_dsh"
+            ]
+          },
+          {
+            "id": "grok_worker",
+            "channels": [
+              "default_grok"
+            ]
+          },
+          {
+            "id": "opencode_worker",
+            "channels": [
+              "default_opencode"
+            ]
+          },
+          {
+            "id": "pi_worker",
+            "channels": [
+              "default_pi"
+            ]
+          },
+          {
+            "id": "qoder_worker",
+            "channels": [
+              "default_qoder"
+            ]
+          }
+        ],
+        "digest": "9cd6edc31c854302ef86fbfb9a322eec343df1b04569b731c22051c82c663ec3"
+      },
+      {
+        "schema": 14,
+        "integrity": [
+          {
+            "integrity_check": "ok"
+          }
+        ],
+        "tasks": 1,
+        "history": [
+          {
+            "revision": 1,
+            "source": "save"
+          },
+          {
+            "revision": 2,
+            "source": "rollback:1"
+          }
+        ],
+        "workers": [
+          {
+            "id": "claude_worker",
+            "channels": [
+              "default_claude"
+            ]
+          },
+          {
+            "id": "codex_worker",
+            "channels": [
+              "default_codex"
+            ]
+          },
+          {
+            "id": "dsh_worker",
+            "channels": [
+              "default_dsh"
+            ]
+          },
+          {
+            "id": "grok_worker",
+            "channels": [
+              "default_grok"
+            ]
+          },
+          {
+            "id": "opencode_worker",
+            "channels": [
+              "default_opencode"
+            ]
+          },
+          {
+            "id": "pi_worker",
+            "channels": [
+              "default_pi"
+            ]
+          },
+          {
+            "id": "qoder_worker",
+            "channels": [
+              "default_qoder"
+            ]
+          }
+        ],
+        "digest": "9cd6edc31c854302ef86fbfb9a322eec343df1b04569b731c22051c82c663ec3"
+      }
+    ]
+  },
+  "finishedAt": "2026-10-25T11:42:56.454318+00:00",
+  "productHashDefinition": {
+    "paths": [
+      "src",
+      "scripts/build-main.mjs",
+      "scripts/build-standalone.mjs",
+      "scripts/mock-worker.mjs",
+      "package.json",
+      "package-lock.json",
+      "vite.config.ts",
+      "tsconfig.json",
+      "skills"
+    ],
+    "diffCommand": [
+      "git",
+      "diff",
+      "HEAD",
+      "--binary",
+      "--no-ext-diff",
+      "--",
+      "src",
+      "scripts/build-main.mjs",
+      "scripts/build-standalone.mjs",
+      "scripts/mock-worker.mjs",
+      "package.json",
+      "package-lock.json",
+      "vite.config.ts",
+      "tsconfig.json",
+      "skills"
+    ],
+    "contentMethod": "SHA256(JSON.stringify(sorted [{path,sha256(actual working-tree bytes)}] from git ls-files -z)); includes intent-to-add files",
+    "includedAddedFiles": [
+      "src/main/policy/worker-channel-routing.ts",
+      "src/shared/quota-windows.ts"
+    ],
+    "sourcePatch": "/tmp/wm-4d4zht7u/standalone-final/product-source.private.patch"
+  },
+  "commands": {
+    "build": [
+      "npm",
+      "run",
+      "build"
+    ],
+    "typecheck": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "compile": [
+      "node",
+      "scripts/build-standalone.mjs"
+    ],
+    "target": "host-only linux-x64"
+  },
+  "tools": {
+    "node": "v24.21.0",
+    "npm": "12.0.2",
+    "bun": "1.4.3"
+  },
+  "writeBoundary": "Package helpers, logs, reports, candidate and fresh DB only under /tmp/wm-4d4zht7u/standalone-final; default npm build also updates generated ignored dist output in workspace as required. No product source or tests edited."
+}

@@ -1,0 +1,43 @@
+{
+  "checkedAt": "2026-10-25T11:53:12.188574+00:00",
+  "desktop": {
+    "viewport": [
+      1440,
+      1000
+    ],
+    "bodyWidth": 1440,
+    "visuallyReviewed": true
+  },
+  "narrow": {
+    "viewport": [
+      390,
+      844
+    ],
+    "bodyWidth": 390,
+    "visuallyReviewed": true
+  },
+  "reportImagesLoaded": 4,
+  "relativePngOpenedInChrome": {
+    "path": "empty-narrow-field.png",
+    "naturalWidth": 390
+  },
+  "print": {
+    "producer": "Chrome156 Skia/PDF",
+    "pages": 8,
+    "actualPaper": "Letter (Chrome CLI output)",
+    "firstAndLastPagesVisuallyReviewed": true,
+    "coreTextPreserved": true
+  },
+  "browserMode": "Direct file:// on owned Chrome before closure",
+  "screenshots": [
+    "report-desktop.png",
+    "report-narrow.png",
+    "report-print-first.png"
+  ],
+  "relativeLinksChecked": 125,
+  "brokenLinks": [],
+  "historicalFilesCopiedUnchanged": 45,
+  "currentCaseTitlesInPrint": 10,
+  "sensitiveTextScanFindings": [],
+  "allAttachmentsContained": true
+}

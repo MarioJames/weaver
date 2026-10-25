@@ -1,3 +1,4 @@
+import { policySchema12 } from '../helpers/policy-schema12';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
@@ -31,7 +32,7 @@ test('channel metadata, native secrets and revisions are separate; empty inputs 
   assert.throws(()=>service.save({revision:3,id:'constructor',channel:api}),/Invalid channel/);
   assert.throws(()=>service.save({revision:3,id:'unknown',channel:api}),/Unknown channel/);
   for(const change of [{...api,engine:'grok'},{...api,kind:'subscription' as const}]){assert.throws(()=>service.save({revision:3,id,channel:change,apiKey:'wrong'}),/cannot be changed/);assert.deepEqual(secrets.getSecret(id),{apiKey:'test-private-key'});}
-  const cfg=policy.snapshot().config;cfg.workers.codex_worker.channel=id;
+  const cfg=policy.snapshot().config;cfg.workers.codex_worker.channels=[id];
   policy.save({revision:3,config:cfg,blocks:[]});
   assert.throws(()=>service.delete({revision:4,id}),/referenced/);
   assert.deepEqual(secrets.getSecret(id),{apiKey:'test-private-key'});
@@ -51,7 +52,7 @@ test('policy and secret changes roll back together after a SQLite failure',()=>{
 });
 
 test('same-engine channels isolate limits and retries, while global failures reach both',()=>{
- const c=defaultConfig();c.channels.api=api;c.workers.api={...c.workers.codex_worker,channel:'api'};
+ const c=defaultConfig();c.channels.api=api;c.workers.api={...c.workers.codex_worker,channels:['api']};
  c.owners.claude_owner.workers=['codex_worker','api'];
  const block={engine:'codex',channel:'default_codex',reason:'quota',since:'2026-01-01T00:00:00Z'};
  assert.equal(resolveDispatch(c,[block],{owner:'claude_owner'}).channel,'api');
@@ -65,7 +66,7 @@ test('same-engine channels isolate limits and retries, while global failures rea
 /** Rebuild the actual v12 table shape, then seed historical rows and JSON snapshots. */
 function historical12(db:DatabaseSync){
  migrate(db);
- db.exec('DROP TABLE policy_channels; DROP TABLE channel_secrets; ALTER TABLE policy_owners RENAME COLUMN channel TO engine; ALTER TABLE policy_workers RENAME COLUMN channel TO engine; ALTER TABLE policy_blocks DROP COLUMN channel; PRAGMA user_version=12');
+ policySchema12(db);db.exec('PRAGMA user_version=12');
  const config:any={version:1,engines:{my_codex:{enabled:true,kind:'codex'},pi:{enabled:false,kind:'pi'}},owners:{owner:{enabled:true,engine:'my_codex',model:'gpt',effort:'high',workers:['worker'],max_parallel:3,worker_weights:{worker:8}}},workers:{worker:{enabled:true,engine:'my_codex',model:'gpt-original',effort:'high',max_parallel:2},pi_worker:{enabled:false,engine:'pi',model:'provider/model-original',effort:'high'}},herdr:{max_wait_minutes:15}};
  const blocks=[{engine:'my_codex',reason:'quota',by:'weaver-quota:codex',since:'2026-01-01T00:00:00Z'},{engine:'my_codex',worker:'worker',reason:'manual limit',since:'2026-01-02T00:00:00Z'}];
  db.prepare('INSERT INTO policy_engines VALUES (?,?,?,?,?)').run('my_codex',0,1,'codex',null);db.prepare('INSERT INTO policy_engines VALUES (?,?,?,?,?)').run('pi',1,0,'pi',null);
@@ -97,7 +98,7 @@ test('empty install and schema12 history upgrade preserve roles, weights, blocks
 
 test('vendor aggregate channel pause never applies to a later API account',async()=>{
  const {escalateEngineBlock,withoutWorkerBlocks,ENGINE_ALL_BLOCKED_REASON}=await import('../../src/main/policy/routing');
- const c=defaultConfig();c.channels.api=api;c.workers.api={...c.workers.codex_worker,channel:'api'};
+ const c=defaultConfig();c.channels.api=api;c.workers.api={...c.workers.codex_worker,channels:['api']};
  const workerBlock={engine:'codex',channel:'default_codex',worker:'codex_worker',reason:'limit',since:'2026-01-01T00:00:00Z',by:'weaver-vendor-limit'};
  const blocks=escalateEngineBlock(c,[workerBlock],'codex',Date.parse('2026-01-01T00:00:00Z'));
  assert.equal(blocks.length,2);assert.equal(blocks[1].channel,'default_codex');assert.equal(blocks[1].reason,ENGINE_ALL_BLOCKED_REASON);

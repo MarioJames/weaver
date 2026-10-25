@@ -1,0 +1,305 @@
+{
+  "taskId": "4fa92dd2-f0c6-46ef-873e-6e5f16885c04",
+  "outcome": "partial: core business passed; field feedback deviation remains",
+  "appUrl": "http://127.0.0.1:4739",
+  "head": "4f9efefa835150c13a781c03995bc93dc1f3c5fc",
+  "dirtyWorktree": true,
+  "counts": {
+    "pass": 17,
+    "unverified": 3,
+    "fail": 1
+  },
+  "cases": [
+    {
+      "id": "prereq-fixture",
+      "status": "pass",
+      "title": "未认证模板错误",
+      "actual": "默认claude账号的listEngineModels请求返回HTTP400 INVALID_REQUEST，提示认证目录缺失/凭据未就绪；页面仍可操作，errors数组为空。属于预期fixture错误，不代表真实账号失败。",
+      "evidence": [
+        "pre-worker-narrow-bottom.png"
+      ],
+      "at": "2026-10-25T11:14:33.226488+00:00"
+    },
+    {
+      "id": "dual-persistence",
+      "status": "pass",
+      "title": "真实双账号保存与重载",
+      "actual": "浏览器新建wm_browser_multi，选择真实A/B并填写opencode-go/glm-5.3-flash，保存成功revision16；GET策略精确保留两个channels，reload后角色列表和多选控件仍显示A/B。未选诊断账号时模型刷新/连通测试禁用。",
+      "evidence": [
+        "dual-reloaded-desktop.png"
+      ],
+      "at": "2026-10-25T11:16:52.564232+00:00"
+    },
+    {
+      "id": "remove-middle",
+      "status": "pass",
+      "title": "三项移除中间成员",
+      "actual": "浏览器把未认证placeholder C加入[A,B]后取消B并保存；GET策略精确为[A,C]，第三项保留。C不是第三真实账号。",
+      "evidence": [
+        "remove-middle.png"
+      ],
+      "at": "2026-10-25T11:17:10.326705+00:00"
+    },
+    {
+      "id": "empty-validation",
+      "status": "pass",
+      "title": "清空与校验",
+      "actual": "清空全部成员后页面可用、连通测试禁用；点击保存显示保存失败与精确字段路径$.workers.wm_browser_multi.channels：must have at least 1 item(s)。后端revision保持17且仍保留两个已保存成员；没有伪成功。字段错误通过通知显示，非字段下方内联。",
+      "evidence": [
+        "empty-validation.png"
+      ],
+      "at": "2026-10-25T11:17:42.607026+00:00"
+    },
+    {
+      "id": "incompatible",
+      "status": "pass",
+      "title": "混引擎与API拒绝",
+      "actual": "在[A,C]上尝试添加codex订阅和同OpenCode API，均显示无法添加账号；每次读取aria-selected仍只有A/C，草稿未被更改。多成员免费渠道复选框禁用。",
+      "evidence": [
+        "mixed-engine-rejected.png",
+        "mixed-api-rejected.png"
+      ],
+      "at": "2026-10-25T11:17:52.220532+00:00"
+    },
+    {
+      "id": "diagnostic-isolation",
+      "status": "pass",
+      "title": "诊断账号请求与异步隔离",
+      "actual": "A真实目录36项/B32项，网络listEngineModels分别携带正确channel。精准拦截一次A模型目录请求并延迟8秒合成传输错误；A pending时不显示旧B目录且刷新禁用；切回B后目录为32项、刷新可用，旧A错误不污染B。诊断切换前后revision18和config完全一致。",
+      "evidence": [
+        "network-diagnostics.safe.json",
+        "diagnostic-a-synthetic-pending.png",
+        "diagnostic-b-after-old-failure.png"
+      ],
+      "at": "2026-10-25T11:19:31.527341+00:00"
+    },
+    {
+      "id": "hello-limits",
+      "status": "unverified",
+      "title": "连通测试真实调用",
+      "actual": "按授权未点击真实连通测试、未发起额外推理。浏览器已验证未选诊断账号时按钮禁用、选A/B后按钮可用；network中sayHi=0。实现只读路由审查显示按钮使用当前diagnostic channel/model/effort及其route key。真实Hello结果/运行中切换不在本包重复验证。",
+      "evidence": [
+        "network-diagnostics.safe.json",
+        "dual-reloaded-desktop.png"
+      ],
+      "at": "2026-10-25T11:19:31.542372+00:00"
+    },
+    {
+      "id": "reference-protection",
+      "status": "pass",
+      "title": "所有成员与停用角色引用保护",
+      "actual": "账号页A/B分别列出两个角色引用，第三占位项列出停用角色wm_browser_delete。点第三项删除，弹窗说明仍被角色引用并禁用删除；正常deleteChannel API也拒绝Channel is referenced by a role，revision19不变。B作为第二成员、C作为第三成员的引用均计入。",
+      "evidence": [
+        "channel-third-referenced.png",
+        "channel-guard.safe.json"
+      ],
+      "at": "2026-10-25T11:20:51.027408+00:00"
+    },
+    {
+      "id": "channels-scroll",
+      "status": "pass",
+      "title": "账号渠道桌面窄屏滚动",
+      "actual": "1440×1000：main从Home top0通过两次PageDown到top1173=max，最后账号及编辑/删除按钮在视口。390×844：六次PageDown到top3620=max，最后账号bottom826.97<844，主体scrollWidth390；长标签换行可读。mouse wheel落点(0,0)工具限制另列，未据此宣称轮滚通过。",
+      "evidence": [
+        "channels-desktop-bottom.png",
+        "channels-narrow-bottom.png",
+        "channels-narrow-long-label.png"
+      ],
+      "at": "2026-10-25T11:21:47.205670+00:00"
+    },
+    {
+      "id": "role-scroll",
+      "status": "pass",
+      "title": "角色所有成员展示与滚动",
+      "actual": "停用角色wm_browser_delete包含真实A/B和未认证C，列表摘要及编辑器显示所有成员。桌面PageDown到main top117=max，最后并发开关bottom931.2<1000。390×844以PageDown到top1512=max，最后开关bottom792<844，body宽390；多成员长标签未造成主体横向溢出。",
+      "evidence": [
+        "roles-three-desktop.png",
+        "roles-desktop-bottom.png",
+        "roles-narrow-three.png",
+        "roles-narrow-bottom.png"
+      ],
+      "at": "2026-10-25T11:22:12.744467+00:00"
+    },
+    {
+      "id": "role-delete",
+      "status": "pass",
+      "title": "已保存角色立即删除与草稿隔离",
+      "actual": "取消删除后revision19不变。编辑另一个角色用途说明为WM_BROWSER_UNSAVED_DESCRIPTION；删除wm_browser_delete时精确拦截一次revision19保存请求并合成8秒传输错误，pending删除/取消均禁用，提交内容不含该草稿；失败弹窗保留且提供重试。重试后未点顶部Save，后端revision20立即移除角色并清理claude_owner列表和权重；另一个角色草稿仍显示，后端description仍为空。",
+      "evidence": [
+        "role-delete-confirm.png",
+        "role-delete-synthetic-pending.png",
+        "role-delete-retry.png",
+        "role-deleted-draft-kept.png",
+        "role-delete-backend.safe.json"
+      ],
+      "at": "2026-10-25T11:23:45.589952+00:00"
+    },
+    {
+      "id": "channel-delete",
+      "status": "pass",
+      "title": "移除最后引用后删除临时账号",
+      "actual": "wm_browser_delete立即删除后，第三占位账号删除弹窗由禁用变为可用；浏览器确认删除，后端revision21已移除该精确临时channel。未删除真实账号或现有模板。",
+      "evidence": [
+        "channel-unreferenced-delete.png"
+      ],
+      "at": "2026-10-25T11:24:06.583686+00:00"
+    },
+    {
+      "id": "free-rejected",
+      "status": "pass",
+      "title": "免费池不可新增成员",
+      "actual": "现有free_channel=true的OpenCode免费模板尝试添加真实B，显示免费渠道仅支持单个账号，aria-selected仍仅default_opencode；未点击探测或连通测试。",
+      "evidence": [
+        "free-pool-rejected.png"
+      ],
+      "at": "2026-10-25T11:24:41.010106+00:00"
+    },
+    {
+      "id": "engine-change",
+      "status": "pass",
+      "title": "单账号引擎与模型强度联动",
+      "actual": "通过[B]→[B,A]→[A]同OpenCode账号替换，opencode-go/glm-5.3-flash与max保留。另从单个OpenCode B填写wm_custom_effort，清空B再选择Codex后模型清空，强度规范为low，连通测试禁用。全程草稿，未保存这些转换。",
+      "evidence": [
+        "same-engine-model-kept.png",
+        "different-engine-clears.png"
+      ],
+      "at": "2026-10-25T11:25:49.235533+00:00"
+    },
+    {
+      "id": "owner-im-single",
+      "status": "pass",
+      "title": "Owner与IM保持单选",
+      "actual": "Owner和IM账号控件先选真实A再选B，重新展开列表均仅B被选中，listbox没有aria-multiselectable=true。Owner/IM均未保存；IM凭据字段为空、开关未启用。",
+      "evidence": [
+        "owner-single.png",
+        "im-single.png"
+      ],
+      "at": "2026-10-25T11:26:31.158899+00:00"
+    },
+    {
+      "id": "pool-recovery",
+      "status": "pass",
+      "title": "空池恢复",
+      "actual": "清空多账号池后未崩溃；放弃修改恢复保存的[A,C]，后续又恢复为[A,B]并继续诊断、编辑和删除相关角色。",
+      "evidence": [
+        "empty-validation.png",
+        "dual-reloaded-desktop.png"
+      ],
+      "at": "2026-10-25T11:26:31.172651+00:00"
+    },
+    {
+      "id": "field-feedback",
+      "status": "fail",
+      "title": "字段错误只在全局通知",
+      "actual": "复现：选择wm_browser_multi→取消全部账号→保存。保存被正确拒绝，但账号字段没有内联错误、aria-invalid或aria-describedby；main内role=alert为0，错误仅在右下全局通知显示$.workers.wm_browser_multi.channels: must have at least 1 item(s)。违反feature-acceptance表单项承载字段错误规则。建议在账号字段显示中文必选提示并关联错误。未修改源码。定位RolesPage.tsx账号Form.Field和PolicyHeader.tsx通知处理。",
+      "evidence": [
+        "field-error-not-inline.png"
+      ],
+      "at": "2026-10-25T11:28:07.879612+00:00"
+    },
+    {
+      "id": "wheel-tool",
+      "status": "unverified",
+      "title": "Wheel输入路径",
+      "actual": "本机agent-browser mouse move后mouse wheel事件落在(0,0)的HEADER，未命中内容。该轮滚路径不作为产品通过/失败证据；实际可达性以main聚焦后的原生Home/PageDown/PageUp验证，并单独报告。",
+      "evidence": [],
+      "at": "2026-10-25T11:30:55.955134+00:00"
+    },
+    {
+      "id": "dark-mode",
+      "status": "unverified",
+      "title": "暗色外观",
+      "actual": "模拟prefers-color-scheme:dark后应用仍渲染light，设置页未见主题控件。本包没有通过DOM或样式注入伪造暗色；暗色截图未取得，仅验收实际提供的浅色界面。",
+      "evidence": [],
+      "at": "2026-10-25T11:30:55.970156+00:00"
+    },
+    {
+      "id": "restoration",
+      "status": "pass",
+      "title": "基线与精确fixture恢复",
+      "actual": "已通过正常deleteChannel删除两项临时账号，通过savePolicy在保留当前blocks下精确恢复baseline config（11→23）；两真实label恢复，临时角色/账号从配置和账号配置列表消失，保留真实quota/任务结果。9账号、7worker、3owner，IM revision0/disabled，runningWorkers0；借用服务PID1724773/4739保留。",
+      "evidence": [
+        "baseline.safe.json",
+        "restoration.safe.json"
+      ],
+      "at": "2026-10-25T11:30:55.986613+00:00"
+    },
+    {
+      "id": "runtime-health",
+      "status": "pass",
+      "title": "Console与网络健康",
+      "actual": "实际采集console没有error/warn，page errors为空；12个HTTP400均为default_claude/default_codex/default_opencode未认证模板的模型目录，准确返回凭据未就绪。真实A/B目录HTTP200。合成模型/删除传输失败均明确标记并由UI处理；bh artifact_errors为空。没有sayHi请求或额外quota刷新。",
+      "evidence": [
+        "health.safe.json",
+        "network-diagnostics.safe.json"
+      ],
+      "at": "2026-10-25T11:31:36.099945+00:00"
+    }
+  ],
+  "noProductSourceOrTestsEdited": true,
+  "noCommitStagePush": true,
+  "noDelegation": true,
+  "restoration": {
+    "restoredAt": "2026-10-25T11:29:48.924020+00:00",
+    "baselineRevision": 11,
+    "finalRevision": 23,
+    "baselineConfigExactlyRestored": true,
+    "configSha256": "7124bdeb2336de7892dec25fa28002ee00b535cba18dc5a79b6f073032be1e72",
+    "liveBlocksPreserved": true,
+    "blockCount": 0,
+    "blocksSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "temporaryChannelsAbsentFromConfigAndConfigurations": true,
+    "temporaryWorkersAbsent": true,
+    "realLabelsRestored": true,
+    "channelCount": 9,
+    "workerCount": 7,
+    "ownerCount": 3,
+    "runningWorkers": 0,
+    "imRevision": 0,
+    "imEnabled": false,
+    "taskResultContainer": "array",
+    "taskCount": 1,
+    "quotaTopKeys": [
+      "records",
+      "schedule"
+    ],
+    "service": {
+      "pid": 1724773,
+      "url": "http://127.0.0.1:4739",
+      "port": 4739,
+      "dataDir": "/tmp/wm-4d4zht7u/multi-real-prep/data",
+      "version": "0.7.9",
+      "startedAt": "2026-10-25T11:08:28.187Z",
+      "runningWorkers": 0,
+      "managedBy": null
+    },
+    "serviceRetained": true,
+    "credentialContentsRead": false,
+    "quotaRefreshesThisPackage": 0,
+    "inferenceCallsThisPackage": 0
+  },
+  "resources": {
+    "checkedAt": "2026-10-25T11:36:32.051745+00:00",
+    "session": "wm-multi-browser-4fa92dd2",
+    "mode": "task",
+    "chromeBinary": "/opt/google/chrome/chrome",
+    "chromeRootPidBeforeClose": 1738065,
+    "agentBrowserDaemonPidBeforeClose": 1738023,
+    "browserClosed": true,
+    "profileRemoved": true,
+    "profilePath": "/tmp/wm-4d4zht7u/multi-browser/browser-profile",
+    "remainingPreviouslyOwnedProcesses": [],
+    "profileMatchingLiveChromePids": [],
+    "checkedWithoutReopeningBrowser": true,
+    "sourceFilesChangedDuringAcceptance": [],
+    "serviceScope": "dev-weaver-multi-1025.scope",
+    "servicePort": 4739,
+    "servicePid": 1724773,
+    "serviceRetained": true,
+    "serviceHttpStatus": 200,
+    "onlyOwnedProfileRemoved": true,
+    "intermediatesRetainedForParentCleanup": true,
+    "ownedAgentBrowserDaemonReleased": true,
+    "daemonCleanup": "Exact session-owned daemon PID1738023 SIGTERM after Chrome close; matched saved start ticks and executable"
+  }
+}

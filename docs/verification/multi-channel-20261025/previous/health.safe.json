@@ -1,0 +1,271 @@
+{
+  "requestCountSinceNetworkClear": 1077,
+  "methodCountsSinceNetworkClear": {
+    "listEngineModels": 27,
+    "command": 762,
+    "listTasks": 54,
+    "getPolicy": 29,
+    "workerProbeStatus": 26,
+    "null": 167,
+    "capabilities": 1,
+    "scanEngines": 2,
+    "getChannels": 2,
+    "savePolicy": 1,
+    "deleteChannel": 1,
+    "getImSettings": 3,
+    "getQuota": 1,
+    "validatePolicy": 1
+  },
+  "httpErrorsSinceNetworkClear": [
+    {
+      "requestId": "1738853.1321",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "classification": "expected-uncredentialed-fixture"
+    },
+    {
+      "requestId": "1738853.1413",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "classification": "expected-uncredentialed-fixture"
+    },
+    {
+      "requestId": "1738853.1537",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "classification": "expected-uncredentialed-fixture"
+    },
+    {
+      "requestId": "1738853.1589",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "classification": "expected-uncredentialed-fixture"
+    },
+    {
+      "requestId": "1738853.1605",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "opencode",
+          "channel": "default_opencode"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "classification": "expected-uncredentialed-fixture"
+    },
+    {
+      "requestId": "1738853.1652",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "codex",
+          "channel": "default_codex"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "classification": "expected-uncredentialed-fixture"
+    },
+    {
+      "requestId": "1738853.1695",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "codex",
+          "channel": "default_codex"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "classification": "expected-uncredentialed-fixture"
+    },
+    {
+      "requestId": "1738853.1709",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "classification": "expected-uncredentialed-fixture"
+    },
+    {
+      "requestId": "1738853.1731",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "classification": "expected-uncredentialed-fixture"
+    },
+    {
+      "requestId": "1738853.1823",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "classification": "expected-uncredentialed-fixture"
+    },
+    {
+      "requestId": "1738853.1846",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "classification": "expected-uncredentialed-fixture"
+    },
+    {
+      "requestId": "1738853.2004",
+      "status": 400,
+      "method": "listEngineModels",
+      "args": [
+        {
+          "engine": "claude",
+          "channel": "default_claude"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "官方账号认证目录缺失、凭据未就绪或已过期，请在账号页新建独立账号登录后重试"
+      },
+      "classification": "expected-uncredentialed-fixture"
+    }
+  ],
+  "consoleMessages": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+    }
+  ],
+  "pageErrors": [],
+  "bhArtifactErrors": [],
+  "intentionalFaults": [
+    "two exact A model-directory transport failures; second switched to B before reject",
+    "one exact revision19 wm_browser_delete save transport failure; retry was real"
+  ],
+  "noHelloRequests": true,
+  "note": "Initial pre-clear credential error separately documented. No quota or successful responses synthesized."
+}
