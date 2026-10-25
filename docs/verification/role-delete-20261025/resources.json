@@ -1,0 +1,17 @@
+{
+  "browserClosed": true,
+  "profileRemoved": true,
+  "chromeProcessesUsingProfile": [],
+  "ownTemporarySubdirectoryRemoved": true,
+  "parentRootRetained": true,
+  "parentAndSiblingResourcesTouched": false,
+  "borrowedServiceRetained": 4738,
+  "borrowedServiceFinalHttpStatus": 200,
+  "productionAccessed": false,
+  "sourceHashesUnchangedDuringAcceptance": true,
+  "reportDesktopAnd390pxOverflow": false,
+  "reportImagesLoaded": true,
+  "reportRelativeLinksExist": true,
+  "screenshotsAreDirectModalClips": true,
+  "safeTextArtifactsNoEmailPatterns": true
+}

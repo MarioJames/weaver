@@ -125,7 +125,7 @@ test('an expired token waiting for native renewal shows kept windows or the no-d
   // Mirrors what the engines page renders: the status tag, the detail line only when no window survived, and recovery advice only for non-unknown states.
   const pageText = (value: EngineQuotaRecord) => [
     quotaStatusText(value, quotaRecordStale(value, NOW)),
-    value.windows.length || value.status === 'unknown' ? '' : value.detail,
+    value.windows.length ? '' : value.detail,
     value.status === 'unknown' ? '' : quotaRecoveryText(value),
   ].filter(Boolean).join(' ');
   const kept = record({ status: 'exhausted', stale: true, observedAt: time(-600_000), windows: [window({ usedPercent: 100, resetsAt: time(3_600_000) })], detail: wait });
@@ -133,8 +133,11 @@ test('an expired token waiting for native renewal shows kept windows or the no-d
   assert.match(pageText(kept), /上次观测：账户额度耗尽/);
   assert.doesNotMatch(pageText(kept), /登录/);
   const none = record({ status: 'unknown', stale: true, checkedAt: null, observedAt: null, windows: [], detail: wait });
-  assert.equal(pageText(none), '额度未知');
+  assert.equal(pageText(none), `额度未知 ${wait}`);
   assert.doesNotMatch(pageText(none), /登录/);
+  const noData = record({ status: 'unknown', observedAt: null, windows: [], detail: '供应商未返回可用额度数据' });
+  assert.equal(pageText(noData), '额度未知 供应商未返回可用额度数据');
+  assert.doesNotMatch(pageText(none), /0%|耗尽/);
   const logout = record({ status: 'unauthenticated', stale: true, windows: [], detail: '原生登录已过期，请在对应工具中重新登录' });
   assert.match(pageText(logout), /登录状态不可用.*请在原生 CLI 中确认登录/);
 });

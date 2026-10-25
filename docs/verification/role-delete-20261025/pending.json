@@ -1,0 +1,32 @@
+{
+  "synthetic": true,
+  "ui": {
+    "buttons": [
+      {
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "disabled": true,
+        "text": "取消"
+      },
+      {
+        "disabled": true,
+        "text": "删除"
+      }
+    ],
+    "calls": 1,
+    "dialogPresent": true
+  },
+  "escapeAttempt": {
+    "calls": 1,
+    "modalRetained": true
+  },
+  "backend": {
+    "revision": 74,
+    "workerPresent": true,
+    "parentListReference": true,
+    "parentWeightReference": true
+  },
+  "singleAttemptSaveCalls": 1
+}

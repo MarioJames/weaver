@@ -1,0 +1,23 @@
+{
+  "result": "PASS",
+  "appUrl": "http://127.0.0.1:4738",
+  "dateUtc": "2026-10-25T10:22:55.360521+00:00",
+  "roleDeletionCommits": 5,
+  "roleDeletionSuccesses": 5,
+  "channelDeletionCommits": 3,
+  "channelDeletionSuccesses": 3,
+  "fixtureSetupCommits": 5,
+  "syntheticSaveRejections": 5,
+  "topPolicySaveClicks": 0,
+  "baselineConfigAndBlocksRestoredExactly": true,
+  "renameAmbiguityGuardEncountered": false,
+  "sourceModifiedByWorker": false,
+  "transportRestoredThenPageReloaded": true,
+  "unitTestsUsedAsBrowserEvidence": false,
+  "initialExploratoryEvidence": "Initial timing-sensitive modal/notification capture discarded; three later stable complete cycles passed. Final JSON and cropped Chrome screenshots represent the last complete cycle.",
+  "remainingRisks": [
+    "Synthetic rejection validates UI recovery; no real network outage or backend save failure induced.",
+    "Old draft rename ambiguity guard was not exercised."
+  ],
+  "serviceRetained": "Borrowed 4738 retained, production 4737 not accessed"
+}

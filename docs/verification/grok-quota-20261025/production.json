@@ -1,0 +1,60 @@
+{
+  "url": "http://127.0.0.1:4737/#/channels",
+  "kind": "real service state; no quota refresh mutation",
+  "reloadVerified": true,
+  "quota": {
+    "channel": "import_e9a31f0093aaaacc595255e0",
+    "checkedAt": "2026-10-25T09:54:05.743Z",
+    "detail": "已读取账户额度；这不保证模型可以运行",
+    "engine": "grok",
+    "observedAt": "2026-10-25T09:54:05.743Z",
+    "retryAt": null,
+    "source": "grok_cli_billing",
+    "stale": false,
+    "status": "available",
+    "windows": [
+      {
+        "durationMinutes": 10080,
+        "id": "grok:account",
+        "label": "7 天额度",
+        "model": null,
+        "remaining": null,
+        "remainingPercent": 83,
+        "resetsAt": "2026-10-29T09:58:14.387Z",
+        "scope": "account",
+        "total": null,
+        "unit": "percent",
+        "used": null,
+        "usedPercent": 17
+      },
+      {
+        "durationMinutes": 10080,
+        "id": "grok:product:GrokBuild",
+        "label": "产品用量 · GrokBuild",
+        "model": null,
+        "remaining": null,
+        "remainingPercent": 83,
+        "resetsAt": "2026-10-29T09:58:14.387Z",
+        "scope": "unknown",
+        "total": null,
+        "unit": "percent",
+        "used": null,
+        "usedPercent": 17
+      }
+    ]
+  },
+  "cardText": "Grok Supergrok 印度\n官方订阅\ngrok\n子 Agent grok_worker\n原生登录凭据已配置\n使用引擎原生配置\n观测到可用额度\n7 天额度\n已用 17%\n10-29 17:58 重置\n产品用量 · GrokBuild\n已用 17%\n10-29 17:58 重置\n17:54 观测\nGrok Supergrok 印度 自动刷新额度\n自动刷新\n启用 Grok Supergrok 印度\n编辑\n删除",
+  "health": {
+    "consoleErrors": 0,
+    "consoleWarnings": 0,
+    "pageErrors": 0,
+    "requests": 111,
+    "httpErrors": 0,
+    "failedRequests": 0,
+    "pendingRequests": 0,
+    "scope": "observed task browser session; may include earlier origin requests"
+  },
+  "bundle": [
+    "http://127.0.0.1:4737/assets/index-83mns99p.js"
+  ]
+}

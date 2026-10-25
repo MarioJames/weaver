@@ -1,0 +1,68 @@
+{
+  "failedRequests": [
+    {
+      "requestId": "1629337.464",
+      "rpcMethod": "listEngineModels",
+      "status": 400,
+      "ownDisabledFixture": true,
+      "classification": "expected disabled-channel model-list boundary"
+    },
+    {
+      "requestId": "1629337.710",
+      "rpcMethod": "listEngineModels",
+      "status": 400,
+      "ownDisabledFixture": true,
+      "classification": "expected disabled-channel model-list boundary"
+    },
+    {
+      "requestId": "1629337.964",
+      "rpcMethod": "listEngineModels",
+      "status": 400,
+      "ownDisabledFixture": true,
+      "classification": "expected disabled-channel model-list boundary"
+    },
+    {
+      "requestId": "1629337.967",
+      "rpcMethod": "listEngineModels",
+      "status": 400,
+      "ownDisabledFixture": true,
+      "classification": "expected disabled-channel model-list boundary"
+    },
+    {
+      "requestId": "1629337.1421",
+      "rpcMethod": "listEngineModels",
+      "status": 400,
+      "ownDisabledFixture": true,
+      "classification": "expected disabled-channel model-list boundary"
+    },
+    {
+      "requestId": "1629337.1424",
+      "rpcMethod": "listEngineModels",
+      "status": 400,
+      "ownDisabledFixture": true,
+      "classification": "expected disabled-channel model-list boundary"
+    },
+    {
+      "requestId": "1629337.1856",
+      "rpcMethod": "listEngineModels",
+      "status": 400,
+      "ownDisabledFixture": true,
+      "classification": "expected disabled-channel model-list boundary"
+    },
+    {
+      "requestId": "1629337.1859",
+      "rpcMethod": "listEngineModels",
+      "status": 400,
+      "ownDisabledFixture": true,
+      "classification": "expected disabled-channel model-list boundary"
+    }
+  ],
+  "consoleErrors": 0,
+  "consoleWarnings": 0,
+  "uncaughtJsErrors": 0,
+  "syntheticRejectedPromises": 5,
+  "browserHttpFailures": 8,
+  "nonBrowserSetupHttp403MissingOrigin": 1,
+  "expectedBrowserBoundaryHttpFailures": 8,
+  "unexpectedBrowserHttpFailures": 0
+}

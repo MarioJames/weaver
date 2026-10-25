@@ -452,7 +452,7 @@ test('an expired access token the native CLI can renew keeps the last reading wi
   assert.doesNotMatch(JSON.stringify(pending), /never-use|expired-|secret/);
 });
 
-test('a renewal wait without any earlier reading stays the ordinary no-data state', async t => {
+test('a renewal wait without any earlier reading stays unknown with a safe reason', async t => {
   const f = fixture(t);
   for (const engine of ['codex', 'claude', 'grok'] as const) f.credential(engine, expiredCredential(engine, true));
   let calls = 0;
@@ -461,6 +461,10 @@ test('a renewal wait without any earlier reading stays the ordinary no-data stat
   const records = (await prober.refresh({})).records;
   assert.equal(calls, 0);
   assert.deepEqual(records.map(r => [r.status, r.stale, r.windows.length, r.observedAt]), [['unknown', true, 0, null], ['unknown', true, 0, null], ['unknown', true, 0, null], ['unsupported', true, 0, null]]);
+  for (const record of records.filter(r => r.engine !== 'opencode')) {
+    assert.match(record.detail, /令牌已到期.*等待原生 CLI 续期/, 'unknown quota must explain why no observation is available');
+  }
+  assert.doesNotMatch(JSON.stringify(records), /never-use|expired-|secret|refresh_token/);
   assert.ok(records.every(r => !/登录|重新登录|确认/.test(r.detail)));
 });
 

@@ -1,0 +1,36 @@
+{
+  "recordedAtUTC": "2026-10-25T10:34:06.917693+00:00",
+  "scope": "Grok quota explanation, immediate persistent role deletion, independent model-test temporary path; 8 source/test files; multi-account work is isolated elsewhere and excluded.",
+  "command": "TMPDIR=<short task-owned canonical root> npm run check",
+  "exitCode": 0,
+  "typecheck": "passed",
+  "tests": {
+    "tests": 2188,
+    "pass": 2156,
+    "fail": 0,
+    "skipped": 32
+  },
+  "build": "passed",
+  "sourceSha256": {
+    "src/main/quota/index.ts": "134ed688d628ef1f642e2f72fb57e55557779db5e6cacc1a885f2fb34356c7ca",
+    "src/renderer/features/engines/QuotaSummary.tsx": "9ed32eba5f7fef2472ab9b12d900f9015aa9342d1318638fb669025f3567a595",
+    "tests/main/engine-models.test.ts": "b33e95e4de1a0b5363c0fc34487d51488a1cc28a9c63d5dbc4992e7e23228dfb",
+    "tests/main/quota-providers.test.ts": "3e9f2c03f1b8aa8c29b8e560462ae58015f274dd588cf4ed5473c1a9dab9e678",
+    "tests/renderer/quota-renderer.test.ts": "c0c39306cb7bcada007e6ffc472d30c9abfbd8296291814db9a0c3338b674f3b",
+    "src/renderer/features/roles/RolesPage.tsx": "89d15fe13c309ef9d9c6aea185048a0e5d1557125a88ba63d70e5d649a1585dc",
+    "src/renderer/policy/policy-edit.ts": "8c46f7a894f8e8065ad1b91ad6864c852ef6567f49c4ca339d57d6e2998086a2",
+    "tests/renderer/renderer-policy.test.ts": "d4f00ad79cca36baad7c594db4b1f5d88b710e8393b3aa79958bfc88a4e24213"
+  },
+  "browser": {
+    "productionRealGrok": "available; observed used17%,remaining83%; no inference or service restart",
+    "renewalHint": "actual React component with explicitly synthetic browser-only waiting state, desktop/narrow; production hint source not yet upgraded",
+    "roleDeletion": "real test-db UI persisted deletion without top Save; cancel/pending/failure-retry/draft preservation/channel-reference cleanup verified",
+    "fixtures": "test config and blocks restored to original hashes; browser/profile released"
+  },
+  "priorFailedAudits": "owner-verification.json retains actual long-path and /proc-alias failures and the shared-root deletion incident; this successful canonical-path check does not overwrite those records.",
+  "deployment": "No production binary restart for these hints/deletion changes in this commit. Existing 4737 and 4738 services retained.",
+  "limitations": [
+    "Application ThemeProvider is fixed light; dark appearance is outside this change.",
+    "32 existing tests skipped; real vendor multi-account scheduler is not part of this source revision."
+  ]
+}

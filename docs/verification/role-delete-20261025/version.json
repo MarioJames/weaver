@@ -1,0 +1,9 @@
+{
+  "head": "4f9efefa835150c13a781c03995bc93dc1f3c5fc",
+  "workingTree": {
+    "src/renderer/features/roles/RolesPage.tsx": "89d15fe13c309ef9d9c6aea185048a0e5d1557125a88ba63d70e5d649a1585dc",
+    "src/renderer/policy/policy-edit.ts": "8c46f7a894f8e8065ad1b91ad6864c852ef6567f49c4ca339d57d6e2998086a2",
+    "tests/renderer/renderer-policy.test.ts": "d4f00ad79cca36baad7c594db4b1f5d88b710e8393b3aa79958bfc88a4e24213"
+  },
+  "unitTestsRunByWorker": false
+}

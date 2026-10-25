@@ -1,7 +1,93 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { defaultConfig, validateConfig } from '../../src/main/policy/routing';
-import { appendWorker, removeRole, renameRole, reorderRoles, roleDeleteImpact, roleIdError, syncRoleEditor, withWorkerWeight, withoutListedWorker, workerWeight } from '../../src/renderer/policy/policy-edit';
+import { appendWorker, deleteRole, removeRole, renameRole, reorderRoles, roleDeleteImpact, roleIdError, syncRoleEditor, withWorkerWeight, withoutListedWorker, workerWeight } from '../../src/renderer/policy/policy-edit';
+import type { PolicyDraft, PolicyUpdate } from '../../src/renderer/policy/usePolicyDraft';
+
+test('confirmed saved deletion commits only removal and reference cleanup, preserving unrelated draft edits', async () => {
+  const saved = defaultConfig();
+  saved.workers.opencode_worker!.enabled = false;
+  saved.owners.claude_owner = withWorkerWeight(saved.owners.claude_owner, 'opencode_worker', 7);
+  let draft = structuredClone(saved);
+  draft.workers.claude_worker!.model = 'unsaved-model';
+  draft.owners.claude_owner.max_parallel = 42;
+  let update: PolicyUpdate | undefined;
+  let finish!: () => void;
+  const pending = new Promise<void>(resolve => { finish = resolve; });
+  let done = false;
+  const deletion = deleteRole({ config: draft, snapshot: { config: saved } as PolicyDraft['snapshot'],
+    setConfig: () => assert.fail('saved deletion must use commit'),
+    commit: async change => { update = change; await pending; },
+  }, 'workers', 'opencode_worker').then(() => { done = true; });
+  assert.ok(update, 'confirmation immediately requests persistence');
+  assert.ok(draft.workers.opencode_worker, 'pending save keeps the role visible');
+  assert.equal(done, false);
+  const next = update({ config: structuredClone(saved), blocks: [] }).config;
+  const expected = structuredClone(saved);
+  delete expected.workers.opencode_worker;
+  expected.owners.claude_owner.workers = expected.owners.claude_owner.workers.filter(id => id !== 'opencode_worker');
+  expected.owners.codex_owner.workers = expected.owners.codex_owner.workers.filter(id => id !== 'opencode_worker');
+  delete expected.owners.claude_owner.worker_weights;
+  assert.deepEqual(next, expected, 'no other draft edits enter the saved policy');
+  draft = update({ config: draft, blocks: [] }).config;
+  assert.equal(draft.workers.opencode_worker, undefined);
+  assert.equal(draft.workers.claude_worker!.model, 'unsaved-model');
+  assert.equal(draft.owners.claude_owner.max_parallel, 42);
+  assert.equal(draft.owners.claude_owner.worker_weights, undefined);
+  finish();
+  await deletion;
+});
+
+test('failed saved deletion leaves the draft intact and can be retried', async () => {
+  const config = defaultConfig();
+  const before = structuredClone(config);
+  let calls = 0;
+  const policy = { config, snapshot: { config } as PolicyDraft['snapshot'], setConfig: () => assert.fail('must not change draft before success'),
+    commit: async () => { if (++calls === 1) throw new Error('save failed'); },
+  };
+  await assert.rejects(deleteRole(policy, 'owners', 'claude_owner'), /save failed/);
+  assert.deepEqual(config, before);
+  await deleteRole(policy, 'owners', 'claude_owner');
+  assert.equal(calls, 2);
+});
+
+test('saved parent deletion preserves workers and blocks and never submits other parent edits', async () => {
+  const saved = defaultConfig();
+  const draft = structuredClone(saved);
+  draft.owners.codex_owner.model = 'unsaved-model';
+  let committed = false;
+  await deleteRole({ config: draft, snapshot: { config: saved } as PolicyDraft['snapshot'],
+    setConfig: () => assert.fail('must commit saved parent deletion'),
+    commit: async update => {
+      committed = true;
+      const blocks = [{ engine: 'claude', reason: 'pause', since: '2026-10-25T00:00:00Z', by: 'manual' as const }];
+      const next = update({ config: saved, blocks });
+      assert.equal(next.config.owners.claude_owner, undefined);
+      assert.deepEqual(next.config.owners.codex_owner, saved.owners.codex_owner);
+      assert.deepEqual(next.config.workers, saved.workers);
+      assert.equal(next.blocks, blocks);
+      assert.equal(update({ config: draft, blocks }).config.owners.codex_owner.model, 'unsaved-model');
+    },
+  }, 'owners', 'claude_owner');
+  assert.equal(committed, true);
+});
+
+test('new unsaved role deletion is local; unsaved renames including reused saved IDs cannot delete saved roles', async () => {
+  const saved = defaultConfig();
+  let config = structuredClone(saved);
+  config.workers.new = { ...config.workers.claude_worker! };
+  const policy = () => ({ config, snapshot: { config: saved } as PolicyDraft['snapshot'],
+    setConfig: (next: Parameters<PolicyDraft['setConfig']>[0]) => { config = (typeof next === 'function' ? next(config) : next)!; },
+    commit: async () => assert.fail('must not write saved policy'),
+  });
+  await deleteRole(policy(), 'workers', 'new');
+  assert.deepEqual(config, saved);
+  config = renameRole(config, 'workers', 'claude_worker', 'renamed');
+  await assert.rejects(deleteRole(policy(), 'workers', 'renamed'), /改名/);
+  config = renameRole(config, 'workers', 'codex_worker', 'claude_worker');
+  await assert.rejects(deleteRole(policy(), 'workers', 'claude_worker'), /改名/);
+  assert.ok(config.workers.claude_worker);
+});
 
 
 test('role id editor follows the visible record', () => {
@@ -14,6 +100,7 @@ test('deleting a worker names the owners that reference it', () => {
   const impact = roleDeleteImpact(defaultConfig(), 'workers', 'claude_worker');
   assert.match(impact.title, /claude_worker/);
   assert.match(impact.detail, /claude_owner/);
+  assert.match(impact.detail, /立即保存删除/);
   assert.match(roleDeleteImpact(defaultConfig(), 'owners', 'codex_owner').detail, /取消不改草稿/);
 });
 

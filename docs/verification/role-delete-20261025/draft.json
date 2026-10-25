@@ -1,0 +1,12 @@
+{
+  "draftWorker": "codex_sol_med",
+  "retainedDraft": "UNSAVED role-delete b38e0cf3d6",
+  "backendDescriptionUnchanged": true,
+  "backend": {
+    "revision": 75,
+    "workerPresent": false,
+    "parentListReference": false,
+    "parentWeightReference": false
+  },
+  "topSaveClicked": false
+}

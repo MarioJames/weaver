@@ -1,0 +1,47 @@
+{
+  "dateUTC": "2026-10-25T09:59:28.197829+00:00",
+  "conclusion": "partial: production and synthetic boundary pass; actual dark theme not covered",
+  "repositoryHEAD": "4f9efefa835150c13a781c03995bc93dc1f3c5fc",
+  "development": "existing Vite working tree; six tracked diff files observed, no source edits by this task",
+  "productionVersion": "served asset index-83mns99p.js; process commit not independently established",
+  "deployment": "per frozen handoff, production has not deployed the two source hint changes; production was not restarted",
+  "checks": {
+    "productionRealQuotaAndReload": "pass",
+    "pendingReasonAndNoFalseNumericOrLoginState": "pass on exact target card",
+    "desktopLight": "pass",
+    "narrow390": "pass",
+    "darkTheme": "not verified: prefers-color-scheme dark is true but rendered page remains light",
+    "consoleNetwork": "pass: zero observed JS/console/HTTP errors"
+  },
+  "notCovered": [
+    "live provider pending response",
+    "backend native CLI renewal path in this browser task",
+    "true dark rendered appearance",
+    "production deployment of two hint changes"
+  ],
+  "cleanup": {
+    "projectionRestored": true,
+    "pageReloaded": true,
+    "browserClosed": true,
+    "profileRemoved": true,
+    "existingServices": "retained 4737 and 4738; no prepare/cleanup/restart",
+    "noChromeUsingTaskProfile": true,
+    "existingServiceHTTPStatus": {
+      "4737": 200,
+      "4738": 200
+    },
+    "taskTempRemoved": true
+  },
+  "reportValidation": {
+    "openedInBrowser": true,
+    "attachmentsExist": true,
+    "imagesLoaded": 4,
+    "narrowWidth": 390,
+    "narrowDocumentWidth": 390,
+    "desktopWidth": 1440,
+    "desktopDocumentWidth": 1440,
+    "printPDFPages": 3,
+    "printFirstPageVisuallyReviewed": true,
+    "safeJSONScan": "pass"
+  }
+}

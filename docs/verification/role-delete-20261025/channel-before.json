@@ -1,0 +1,5 @@
+{
+  "noRoleReferenceWarning": true,
+  "modalText": "删除渠道删除这条渠道及其托管配置，不修改来源 CLI 目录。此操作不能撤销。取消删除",
+  "channelPresent": true
+}

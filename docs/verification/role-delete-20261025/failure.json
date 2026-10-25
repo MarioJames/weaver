@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "ui": {
+    "calls": 1,
+    "failureVisible": true,
+    "modalRetained": true,
+    "retryVisible": true
+  },
+  "backend": {
+    "revision": 74,
+    "workerPresent": true,
+    "parentListReference": true,
+    "parentWeightReference": true
+  }
+}

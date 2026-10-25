@@ -182,7 +182,7 @@ export class QuotaProber {
           ...(observation?.statusBasis ? { statusBasis: observation.statusBasis } : {}),
           checkedAt: new Date(started).toISOString(),
           observedAt: sameAccount ? previous.observedAt : null,
-          windows: sameAccount ? previous.windows : [], stale: true, detail: observation?.detail ?? '', retryAt: cooldown,
+          windows: sameAccount ? previous.windows : [], stale: true, detail: observation?.detail ?? failure.message, retryAt: cooldown,
         });
         this.persist();
         return;

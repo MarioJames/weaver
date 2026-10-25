@@ -15,7 +15,7 @@ import { startHello, useHelloRun } from '../engines/hello-runs';
 import { Form, useForm } from '@lobehub/ui/base-ui/form';
 import { EFFORTS } from '../../../shared/policy/settings';
 import { type Availability, type Block, type Owner, type Worker } from '../../../shared/contracts/policy';
-import { blankOwner, blankWorker, removeRole, renameRole, reorderRoles, roleDeleteImpact, roleIdError, syncRoleEditor, withWorkerParallel, workerParallelText, type RoleSection } from '../../policy/policy-edit';
+import { blankOwner, blankWorker, deleteRole, fieldErrorText, renameRole, reorderRoles, roleDeleteImpact, roleIdError, syncRoleEditor, withWorkerParallel, workerParallelText, type RoleSection } from '../../policy/policy-edit';
 import { OwnerScheduleFields } from './OwnerSchedule';
 import { ModelPicker } from '../engines/ModelPicker';
 import { engineBlockText, removeBlock, resumeAction, resumeWorker } from '../../policy/worker-resume';
@@ -62,6 +62,9 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   const [pendingId, setPendingId] = useState('');
   const [idError, setIdError] = useState('');
   const [askDelete, setAskDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deletingRef = useRef(false);
+  const [deleteError, setDeleteError] = useState('');
   const [toggling, setToggling] = useState('');
   const [resuming, setResuming] = useState('');
   const form = useForm();
@@ -83,13 +86,15 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
   const efforts = kind ? EFFORTS[kind] : undefined;
   function add() {
     if (!config) return;
-    const id = uniqueId(section, config);
+    const id = uniqueId(section, config, policy.snapshot?.config);
     policy.setConfig({ ...config, [section]: { ...config[section], [id]: section === 'owners' ? blankOwner(config) : blankWorker(config) } });
     setSelected(id); setPendingId(id); scrollToEditor();
   }
   function update(next: Owner | Worker) { if (!current) return; policy.setConfig({ ...config!, [section]: { ...config![section], [current]: next } }); }
   function acceptId() {
-    const error = roleIdError(section, pendingId, config!, current);
+    const error = pendingId !== current && Object.hasOwn(policy.snapshot?.config[section] ?? {}, pendingId)
+      ? '这个 ID 仍属于已保存的角色。请先保存或放弃已有改名，再使用这个 ID。'
+      : roleIdError(section, pendingId, config!, current);
     setIdError(error);
     if (error) notifyError(error, '配置 ID 有误');
     if (error || !current || pendingId === current) return;
@@ -103,6 +108,23 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
     try { await policy.commit(doc => ({ ...doc, config: { ...doc.config, [section]: { ...doc.config[section], [id]: { ...doc.config[section][id]!, enabled } } } })); }
     catch (error) { notifyError(error, '保存失败'); }
     finally { setToggling(''); }
+  }
+  async function confirmDelete() {
+    if (deletingRef.current || policy.busy || !current) return;
+    deletingRef.current = true;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await deleteRole(policy, section, current);
+      setAskDelete(false);
+      setSelected('');
+      setPendingId('');
+    } catch (error) {
+      setDeleteError(fieldErrorText(error));
+    } finally {
+      deletingRef.current = false;
+      setDeleting(false);
+    }
   }
   /**
    * 「恢复派发」 for one worker: the shown ban decides the call (see resumeAction). The worker's own ban is lifted by the server
@@ -119,7 +141,8 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
       }
     } finally { setResuming(''); }
   }
-  const impact = current ? roleDeleteImpact(config, section, current) : undefined;
+  const impactConfig = policy.snapshot?.config[section][current] ? policy.snapshot.config : config;
+  const impact = current ? roleDeleteImpact(impactConfig, section, current) : undefined;
   const savedWorker = section === 'workers' && current ? policy.snapshot?.config.workers[current] : undefined;
   const pausedBy = savedWorker && current && policy.snapshot ? blockOf(policy.snapshot.blocks, savedWorker, Date.now(), current, policy.snapshot.config) : undefined;
   const canSort = ids.length > 1 && !policy.busy && !toggling && !resuming;
@@ -177,7 +200,7 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           {pausedBy && current && <WorkerBlockNotice block={pausedBy} busy={resuming === current} disabled={policy.busy || (!!resuming && resuming !== current)} onResume={() => void resume(current, pausedBy)} />}
           <div className={styles.spread}>
             <Text strong>{name} 配置</Text>
-            <Button danger size="small" icon={Trash2} disabled={policy.busy} onClick={() => setAskDelete(true)}>删除</Button>
+            <Button danger size="small" icon={Trash2} disabled={policy.busy || deleting} onClick={() => { setDeleteError(''); setAskDelete(true); }}>删除</Button>
           </div>
           <div className={rolesStyles.pair}>
           <Form.Field label="配置 ID" required desc="改名后按 Enter 或离开输入框，引用处一起更新。">
@@ -191,8 +214,9 @@ export function RolesPage({ section, policy }: { section: RoleSection; policy: P
           </div>
           {section === 'owners' && <HelloCheck id={`owners:${current}`} record={record} engine={config.channels[record.channel]?.engine ?? ''} />}
           {section === 'workers' ? <WorkerFields key={current} id={current} record={record as Worker} engine={config.channels[record.channel]?.engine ?? ''} probe={freeProbe} update={next => update(next)} /> : <OwnerFields key={current} savedRecord={policy.snapshot?.config.owners[current]} config={config} blocks={policy.blocks} record={record as Owner} update={next => update(next)} />}
-          {impact && <Modal open={askDelete} title={impact.title} okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onCancel={() => setAskDelete(false)} onOk={() => { policy.setConfig(removeRole(config, section, current)); setSelected(''); setPendingId(''); setAskDelete(false); }}>
-            <Text>{impact.detail}</Text>
+          {impact && <Modal open={askDelete} title={impact.title} okText={deleteError ? '重试删除' : '删除'} cancelText="取消" confirmLoading={deleting} okButtonProps={{ danger: true, disabled: deleting || policy.busy }} cancelButtonProps={{ disabled: deleting }} closable={!deleting} maskClosable={!deleting} keyboard={!deleting} onCancel={() => { if (!deletingRef.current) setAskDelete(false); }} onOk={() => void confirmDelete()}>
+            <Text>{policy.snapshot?.config[section][current] ? impact.detail : '这条角色尚未保存，确认后只从本地草稿移除，并清理引用。取消不改草稿。'}</Text>
+            {deleteError && <div role="alert"><Text type="danger">删除失败：{deleteError}</Text></div>}
           </Modal>}
         </Form>}
       </Surface></div>
@@ -290,9 +314,9 @@ function OwnerFields({ config, blocks, record, savedRecord, update }: { config: 
   </>;
 }
 
-function uniqueId(section: RoleSection, config: NonNullable<PolicyDraft['config']>): string {
+function uniqueId(section: RoleSection, config: NonNullable<PolicyDraft['config']>, saved?: NonNullable<PolicyDraft['config']>): string {
   let id = 'new';
   let index = 2;
-  while (Object.hasOwn(config[section], id) || roleIdError(section, id, config)) { id = `new${index}`; index += 1; }
+  while (Object.hasOwn(config[section], id) || Object.hasOwn(saved?.[section] ?? {}, id) || roleIdError(section, id, config)) { id = `new${index}`; index += 1; }
   return id;
 }

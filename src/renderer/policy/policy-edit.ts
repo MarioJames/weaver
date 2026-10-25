@@ -1,5 +1,6 @@
 import { DEFAULT_WEIGHT, WEIGHT_MAX } from '../../shared/policy/weights';
 import { type Config, type Owner, type Worker } from '../../shared/contracts/policy';
+import type { PolicyDraft } from './usePolicyDraft';
 
 export { DEFAULT_WEIGHT, WEIGHT_MAX };
 
@@ -114,6 +115,20 @@ export function removeRole(config: Config, section: RoleSection, id: string): Co
   return { ...config, owners };
 }
 
+/** Commit only the saved removal, then let commit rebase that removal onto the existing draft. */
+export async function deleteRole(policy: Pick<PolicyDraft, 'config' | 'snapshot' | 'setConfig' | 'commit'>, section: RoleSection, id: string): Promise<void> {
+  if (!policy.config || !policy.snapshot) throw new Error('配置尚未读取');
+  // Keys alone cannot identify a saved role after a draft rename (including reuse of an old ID).
+  if (Object.keys(policy.snapshot.config[section]).some(savedId => !Object.hasOwn(policy.config![section], savedId))) {
+    throw new Error('当前列表有未保存的 ID 改名。请先保存或放弃改名，再删除角色。');
+  }
+  if (!Object.hasOwn(policy.snapshot.config[section], id)) {
+    policy.setConfig(current => current ? removeRole(current, section, id) : current);
+    return;
+  }
+  await policy.commit(doc => ({ ...doc, config: removeRole(doc.config, section, id) }));
+}
+
 /** Ignore a stale add after the owner or the candidate list changes. */
 export function appendWorker(workers: readonly string[], available: readonly string[], add: string | undefined): string[] | undefined {
   if (!add || !available.includes(add) || workers.includes(add)) return undefined;
@@ -155,10 +170,10 @@ export function roleDeleteImpact(config: Config, section: RoleSection, id: strin
     const owners = Object.entries(config.owners).filter(([, owner]) => owner.workers.includes(id)).map(([ownerId]) => ownerId);
     return {
       title: `删除子 Agent ${id}`,
-      detail: owners.length ? `保存后会从这些父 Agent 的子 Agent 列表中移除：${owners.join('、')}。取消不改草稿。` : '没有父 Agent 引用这条子 Agent。取消不改草稿。',
+      detail: `确认后立即保存删除，并清理父 Agent 的列表及权重引用。${owners.length ? `引用它的父 Agent：${owners.join('、')}。` : '没有父 Agent 列表引用这条子 Agent。'}其他未保存修改保留，取消不改草稿。`,
     };
   }
-  return { title: `删除父 Agent ${id}`, detail: '只从草稿移除这条父 Agent，子 Agent 配置保留。取消不改草稿。' };
+  return { title: `删除父 Agent ${id}`, detail: '确认后立即保存删除这条父 Agent，子 Agent 配置及其他未保存修改保留。取消不改草稿。' };
 }
 
 /** A whole-number minutes field: empty, fractional or out-of-range input is refused with one sentence, and nothing is saved. */

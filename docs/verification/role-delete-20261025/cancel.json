@@ -1,0 +1,16 @@
+{
+  "before": {
+    "revision": 74,
+    "workerPresent": true,
+    "parentListReference": true,
+    "parentWeightReference": true
+  },
+  "after": {
+    "revision": 74,
+    "workerPresent": true,
+    "parentListReference": true,
+    "parentWeightReference": true
+  },
+  "unchanged": true,
+  "dialogClosed": true
+}

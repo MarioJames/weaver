@@ -1,0 +1,14 @@
+{
+  "configIdentical": true,
+  "blocksIdentical": true,
+  "changedExistingRecords": [],
+  "fixtureWorkerAbsent": true,
+  "fixtureChannelAbsent": true,
+  "allOwnListReferencesAbsent": true,
+  "allOwnWeightReferencesAbsent": true,
+  "initialRevision": 63,
+  "finalRevision": 76,
+  "finalConfigHash": "a81cb6d2e5f578965a6bb2cb4d77f9ad2cb3e335c5b91895bf52aaecd579965f",
+  "baselineConfigHash": "a81cb6d2e5f578965a6bb2cb4d77f9ad2cb3e335c5b91895bf52aaecd579965f",
+  "apiCleanupWrites": 0
+}

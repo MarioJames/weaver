@@ -19,7 +19,7 @@ export function QuotaSummary({ engine, record, now, busy, policyBusy, feedback, 
     </div>
     {!record ? <Skeleton.Text rows={1} /> : <>
       {quotaVisibleWindows(record).map(window => <QuotaWindowRow key={window.id} window={window} />)}
-      {!record.windows.length && record.status !== 'unknown' && <Text type="secondary" className={styles.meta}>{record.detail}</Text>}
+      {!record.windows.length && <Text type="secondary" className={styles.meta}>{record.detail}</Text>}
       {(recovery ?? quotaRecoveryText(record)) && record.status !== 'unknown' && <Text type="secondary" className={styles.meta}>{recovery ?? quotaRecoveryText(record)}</Text>}
       <Text type="secondary" className={styles.meta}>{record.observedAt ? <>{stale ? '已过期 · ' : ''}<TimeText value={record.observedAt} now={now} /> 观测</> : record.checkedAt ? <><TimeText value={record.checkedAt} now={now} /> 检查</> : '尚未刷新'}</Text>
     </>}

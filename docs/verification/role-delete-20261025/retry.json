@@ -1,0 +1,14 @@
+{
+  "backend": {
+    "revision": 75,
+    "workerPresent": false,
+    "parentListReference": false,
+    "parentWeightReference": false
+  },
+  "ui": {
+    "calls": 2,
+    "modalClosed": true,
+    "realCalls": 1
+  },
+  "topSaveClicked": false
+}

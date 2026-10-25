@@ -1,0 +1,313 @@
+{
+  "taskId": "f6011bd9-78bc-42b2-9c9c-d017dd4fdf20",
+  "recordedAt": "2026-10-25T10:07:26.985497+00:00",
+  "conclusion": "partial: quota-specific tests, typecheck, build and read-only production observations pass; fresh full npm run check did not pass under the assigned temporary-root constraints.",
+  "scope": "Final verification and evidence correction only; no business source edits, production mutation, model listing, quota refresh, service restart, delegation, commit or push by this worker.",
+  "priorEvidenceCorrection": {
+    "incident": "Previous browser worker deleted shared temporary root /tmp/weaver-grok-quota-iglb0tme, including parent/sibling resources; unarchived original check and recovery logs were lost.",
+    "priorFullCheck": {
+      "provenance": "owner-witnessed result supplied in frozen package; original raw log is unavailable; not independently re-established as passing by this worker",
+      "exitCode": 0,
+      "tests": 2184,
+      "pass": 2152,
+      "skipped": 32,
+      "fail": 0
+    },
+    "priorProductionRecovery": {
+      "provenance": "owner independently verified before this worker; original recovery log lost; not repeated",
+      "observedAt": "2026-10-25T09:54:05.743Z",
+      "status": "available",
+      "usedPercent": 17,
+      "remainingPercent": 83,
+      "nativeModelsExecutions": 1,
+      "inference": false,
+      "serviceRestart": false
+    },
+    "thisRecord": "New actual validation results below; do not substitute the prior witnessed pass for this rerun."
+  },
+  "sourceVerification": {
+    "fiveTaskDiffFiles": [
+      "src/main/quota/index.ts",
+      "src/renderer/features/engines/QuotaSummary.tsx",
+      "tests/main/engine-models.test.ts",
+      "tests/main/quota-providers.test.ts",
+      "tests/renderer/quota-renderer.test.ts"
+    ],
+    "sha256Before": {
+      "src/main/quota/index.ts": "134ed688d628ef1f642e2f72fb57e55557779db5e6cacc1a885f2fb34356c7ca",
+      "src/renderer/features/engines/QuotaSummary.tsx": "9ed32eba5f7fef2472ab9b12d900f9015aa9342d1318638fb669025f3567a595",
+      "tests/main/engine-models.test.ts": "b33e95e4de1a0b5363c0fc34487d51488a1cc28a9c63d5dbc4992e7e23228dfb",
+      "tests/main/quota-providers.test.ts": "3e9f2c03f1b8aa8c29b8e560462ae58015f274dd588cf4ed5473c1a9dab9e678",
+      "tests/renderer/quota-renderer.test.ts": "c0c39306cb7bcada007e6ffc472d30c9abfbd8296291814db9a0c3338b674f3b"
+    },
+    "sha256After": {
+      "src/main/quota/index.ts": "134ed688d628ef1f642e2f72fb57e55557779db5e6cacc1a885f2fb34356c7ca",
+      "src/renderer/features/engines/QuotaSummary.tsx": "9ed32eba5f7fef2472ab9b12d900f9015aa9342d1318638fb669025f3567a595",
+      "tests/main/engine-models.test.ts": "b33e95e4de1a0b5363c0fc34487d51488a1cc28a9c63d5dbc4992e7e23228dfb",
+      "tests/main/quota-providers.test.ts": "3e9f2c03f1b8aa8c29b8e560462ae58015f274dd588cf4ed5473c1a9dab9e678",
+      "tests/renderer/quota-renderer.test.ts": "c0c39306cb7bcada007e6ffc472d30c9abfbd8296291814db9a0c3338b674f3b"
+    },
+    "unchangedDuringWorker": true,
+    "otherPreexistingWorkspaceChanges": "Observed unrelated .gitignore changes and untracked items; not modified or attributed to this task."
+  },
+  "freshFullChecks": [
+    {
+      "startedAt": "2026-10-25T10:02:04.732659+00:00",
+      "command": "npm run check",
+      "cwd": "/home/mocha/opensource/weaver",
+      "TMPDIR": "/tmp/weaver-grok-quota-review-5fjv6xlk/audit-worker/tmp",
+      "sourceSha256Before": {
+        "src/main/quota/index.ts": "134ed688d628ef1f642e2f72fb57e55557779db5e6cacc1a885f2fb34356c7ca",
+        "src/renderer/features/engines/QuotaSummary.tsx": "9ed32eba5f7fef2472ab9b12d900f9015aa9342d1318638fb669025f3567a595",
+        "tests/main/engine-models.test.ts": "b33e95e4de1a0b5363c0fc34487d51488a1cc28a9c63d5dbc4992e7e23228dfb",
+        "tests/main/quota-providers.test.ts": "3e9f2c03f1b8aa8c29b8e560462ae58015f274dd588cf4ed5473c1a9dab9e678",
+        "tests/renderer/quota-renderer.test.ts": "c0c39306cb7bcada007e6ffc472d30c9abfbd8296291814db9a0c3338b674f3b"
+      },
+      "exitCode": 1,
+      "finishedAt": "2026-10-25T10:07:26.010969+00:00",
+      "sourceSha256After": {
+        "src/main/quota/index.ts": "134ed688d628ef1f642e2f72fb57e55557779db5e6cacc1a885f2fb34356c7ca",
+        "src/renderer/features/engines/QuotaSummary.tsx": "9ed32eba5f7fef2472ab9b12d900f9015aa9342d1318638fb669025f3567a595",
+        "tests/main/engine-models.test.ts": "b33e95e4de1a0b5363c0fc34487d51488a1cc28a9c63d5dbc4992e7e23228dfb",
+        "tests/main/quota-providers.test.ts": "3e9f2c03f1b8aa8c29b8e560462ae58015f274dd588cf4ed5473c1a9dab9e678",
+        "tests/renderer/quota-renderer.test.ts": "c0c39306cb7bcada007e6ffc472d30c9abfbd8296291814db9a0c3338b674f3b"
+      },
+      "log": "/tmp/weaver-grok-quota-review-5fjv6xlk/audit-worker/check.log",
+      "logSha256": "4a78402d706c1fa5b6afa17fb480f968276c3435972e13bae5b892512e4450d7",
+      "testStatistics": {
+        "tests": 2184,
+        "suites": 2,
+        "pass": 2063,
+        "fail": 89,
+        "cancelled": 0,
+        "skipped": 32,
+        "todo": 0,
+        "duration_ms": 319674.126883
+      },
+      "typecheck": "passed before tests (npm check uses &&)",
+      "build": "not reached because tests failed",
+      "failureEvidence": {
+        "endpointPathTooLongCount": 72,
+        "socketPathTooLongCount": 8,
+        "note": "Direct long TMPDIR run; see retained raw failure log for all failures. No source edits made to bypass path limits."
+      }
+    },
+    {
+      "startedAt": "2026-10-25T10:03:49.619031+00:00",
+      "command": "npm run check",
+      "cwd": "/home/mocha/opensource/weaver",
+      "TMPDIR": "/proc/1603188/fd/3",
+      "physicalTMPDIR": "/tmp/weaver-grok-quota-review-5fjv6xlk/audit-worker/short-tmp",
+      "pathReason": "Short proc fd path to worker-owned directory avoids Unix socket length limit; directory fd remains open in wrapper for complete run. No files created outside worker scope.",
+      "sourceSha256Before": {
+        "src/main/quota/index.ts": "134ed688d628ef1f642e2f72fb57e55557779db5e6cacc1a885f2fb34356c7ca",
+        "src/renderer/features/engines/QuotaSummary.tsx": "9ed32eba5f7fef2472ab9b12d900f9015aa9342d1318638fb669025f3567a595",
+        "tests/main/engine-models.test.ts": "b33e95e4de1a0b5363c0fc34487d51488a1cc28a9c63d5dbc4992e7e23228dfb",
+        "tests/main/quota-providers.test.ts": "3e9f2c03f1b8aa8c29b8e560462ae58015f274dd588cf4ed5473c1a9dab9e678",
+        "tests/renderer/quota-renderer.test.ts": "c0c39306cb7bcada007e6ffc472d30c9abfbd8296291814db9a0c3338b674f3b"
+      },
+      "exitCode": 1,
+      "finishedAt": "2026-10-25T10:04:37.831739+00:00",
+      "sourceSha256After": {
+        "src/main/quota/index.ts": "134ed688d628ef1f642e2f72fb57e55557779db5e6cacc1a885f2fb34356c7ca",
+        "src/renderer/features/engines/QuotaSummary.tsx": "9ed32eba5f7fef2472ab9b12d900f9015aa9342d1318638fb669025f3567a595",
+        "tests/main/engine-models.test.ts": "b33e95e4de1a0b5363c0fc34487d51488a1cc28a9c63d5dbc4992e7e23228dfb",
+        "tests/main/quota-providers.test.ts": "3e9f2c03f1b8aa8c29b8e560462ae58015f274dd588cf4ed5473c1a9dab9e678",
+        "tests/renderer/quota-renderer.test.ts": "c0c39306cb7bcada007e6ffc472d30c9abfbd8296291814db9a0c3338b674f3b"
+      },
+      "log": "/tmp/weaver-grok-quota-review-5fjv6xlk/audit-worker/check-short.log",
+      "logSha256": "a88a9056133dc9640fe2428d8bfa251c8b41653c09998aa7ad930775a19c295d",
+      "testStatistics": {
+        "tests": 2184,
+        "suites": 2,
+        "pass": 2122,
+        "fail": 30,
+        "cancelled": 0,
+        "skipped": 32,
+        "todo": 0,
+        "duration_ms": 46545.113182
+      },
+      "typecheck": "passed before tests (npm check uses &&)",
+      "build": "not reached because tests failed",
+      "failureEvidence": {
+        "note": "Short /proc directory-fd alias avoids many socket limits but introduces canonical-path versus alias assertions; other assertions also fail. This run is diagnostic only and is not a passing acceptance run."
+      }
+    }
+  ],
+  "targetedQuotaAndModelTests": {
+    "command": [
+      "node",
+      "--import",
+      "tsx",
+      "--test",
+      "tests/main/quota-providers.test.ts",
+      "tests/renderer/quota-renderer.test.ts",
+      "tests/main/engine-models.test.ts"
+    ],
+    "startedAt": "2026-10-25T10:05:03.656381+00:00",
+    "TMPDIR": "/tmp/weaver-grok-quota-review-5fjv6xlk/audit-worker/tmp",
+    "exitCode": 0,
+    "finishedAt": "2026-10-25T10:05:05.500618+00:00",
+    "log": "/tmp/weaver-grok-quota-review-5fjv6xlk/audit-worker/targeted-quota.log",
+    "logSha256": "4e5d5d5705bdf26eeb28b2603aa23f39a0f2b6966c58b9fe635a7a281a71e270",
+    "testStatistics": {
+      "tests": 59,
+      "suites": 0,
+      "pass": 59,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 1816.65524
+    }
+  },
+  "independentBuild": {
+    "command": [
+      "npm",
+      "run",
+      "build"
+    ],
+    "startedAt": "2026-10-25T10:05:05.500764+00:00",
+    "TMPDIR": "/tmp/weaver-grok-quota-review-5fjv6xlk/audit-worker/tmp",
+    "exitCode": 0,
+    "finishedAt": "2026-10-25T10:05:08.771158+00:00",
+    "log": "/tmp/weaver-grok-quota-review-5fjv6xlk/audit-worker/build.log",
+    "logSha256": "f4738b6d9514eab15d048a5de1c24816752c7f59c285511dfe1b9f13463289b1",
+    "testStatistics": {},
+    "typecheck": "passed: npm run build includes tsc --noEmit",
+    "warnings": "Nonfatal bundle-size and dependency module-level directive warnings present; see raw build log."
+  },
+  "productionReadOnlyObservation": {
+    "observedAt": "2026-10-25T10:02:33.834853+00:00",
+    "readOnlyMethod": "getChannels (channels.list)",
+    "transport": "http://127.0.0.1:4737/api/rpc",
+    "policyRevision": 403,
+    "grokChannels": [
+      {
+        "id": "import_e9a31f0093aaaacc595255e0",
+        "engine": "grok",
+        "enabled": true,
+        "kind": "subscription",
+        "hasApiKey": false,
+        "hasConfig": false,
+        "hasCredentials": true,
+        "quota": {
+          "channel": "import_e9a31f0093aaaacc595255e0",
+          "engine": "grok",
+          "status": "available",
+          "source": "grok_cli_billing",
+          "checkedAt": "2026-10-25T09:58:52.844Z",
+          "observedAt": "2026-10-25T09:58:52.844Z",
+          "stale": false,
+          "retryAt": null,
+          "windows": [
+            {
+              "id": "grok:account",
+              "scope": "account",
+              "model": null,
+              "usedPercent": 17,
+              "remainingPercent": 83,
+              "resetsAt": "2026-10-29T09:58:14.387Z",
+              "durationMinutes": 10080,
+              "used": null,
+              "total": null,
+              "remaining": null,
+              "unit": "percent"
+            },
+            {
+              "id": "grok:product:GrokBuild",
+              "scope": "unknown",
+              "model": null,
+              "usedPercent": 17,
+              "remainingPercent": 83,
+              "resetsAt": "2026-10-29T09:58:14.387Z",
+              "durationMinutes": 10080,
+              "used": null,
+              "total": null,
+              "remaining": null,
+              "unit": "percent"
+            }
+          ]
+        }
+      }
+    ],
+    "policyBlocks": [],
+    "activePolicyBlocks": [],
+    "services": [
+      {
+        "port": 4737,
+        "httpStatus": 200,
+        "listening": true,
+        "pid": 1442954
+      },
+      {
+        "port": 4738,
+        "httpStatus": 200,
+        "listening": true,
+        "pid": 1552860
+      }
+    ],
+    "redaction": "Allowlisted technical fields only; no channel/account labels, email, raw configuration, credential contents or block reason text saved."
+  },
+  "productionObservationDifference": "Current read-only cached quota checkedAt/observedAt is 2026-10-25T09:58:52.844Z, distinct from the prior owner-witnessed 09:54:05.743Z reading. No quota refresh or native models command was run by this worker; cause of the newer cached timestamp was not investigated.",
+  "servicesAtCompletion": [
+    {
+      "port": 4737,
+      "httpStatus": 200,
+      "listening": true,
+      "pid": 1442954
+    },
+    {
+      "port": 4738,
+      "httpStatus": 200,
+      "listening": true,
+      "pid": 1552860
+    }
+  ],
+  "servicesRetained": true,
+  "browserEvidence": {
+    "originalArtifactsUnchanged": true,
+    "originalArtifactSha256": {
+      "pending.json": "1291323e3da6b0d503e680a55a032a403b03d57c86a8e4039fe3b62cb930fb5e",
+      "summary.json": "af75aae19f3f3da8a513700564e02464cfa733b2b79ec7077b21cad01eaa16a5",
+      "production.json": "5b88aaf12db7a9e7c86bab6b7806eeb8752571c456ad23cec7744d4b70d3cad4",
+      "pending-dark-preference.png": "bff14267238ca6adfdc517265d42f3466f634361ad87e712808ab71eef269a6b",
+      "pending-light-preference.png": "bff14267238ca6adfdc517265d42f3466f634361ad87e712808ab71eef269a6b",
+      "REPORT.html": "07e867bea26c3aa833f4e9a4ad69cc679e4ed3845502db9b56c7259b8f750870",
+      "production-light.png": "fc0b6a9ece0c77b17122481107974dd1e3b9589104b83a49775382c4d9a3eb4f",
+      "pending-narrow.png": "4c8fe682981df710798e1ccf95a6dcb869a88504165fddad424f83cf7c5d789e"
+    },
+    "originalConclusionPreserved": true,
+    "functionalAcceptance": "Existing browser evidence retained; no browser acceptance rerun by this audit worker.",
+    "themeCorrection": "src/renderer/main.tsx fixes ThemeProvider themeMode=\"light\". Actual dark appearance is outside this frozen scope; the prior report dark-theme limitation does not add a dark-theme requirement.",
+    "deploymentLimitation": "Local build is validation only; production deployment of the hint changes was not performed or established."
+  },
+  "acceptanceCriteria": {
+    "freshFullCheckPass": false,
+    "safeReadOnlyProductionAndServices": true,
+    "honestLostLogCorrectionAndRetainedWorkerLogs": true
+  },
+  "resources": {
+    "ownedTemporaryRoot": "/tmp/weaver-grok-quota-review-5fjv6xlk/audit-worker",
+    "physicalTemporaryRoots": [
+      "/tmp/weaver-grok-quota-review-5fjv6xlk/audit-worker/tmp",
+      "/tmp/weaver-grok-quota-review-5fjv6xlk/audit-worker/short-tmp"
+    ],
+    "shortAlias": "Transient /proc/<wrapper-pid>/fd/<directory-fd> resolved only to audit-worker/short-tmp while wrapper ran; wrapper has exited.",
+    "retainedLogNames": [
+      "check.log",
+      "check-short.log",
+      "targeted-quota.log",
+      "build.log"
+    ],
+    "logsRetained": true,
+    "deletedResources": [],
+    "parentAndSiblingResources": "Not deleted or cleaned by this worker; parent owner retains final cleanup authority.",
+    "cleanupAuthority": "Only this audit-worker child directory is worker-owned; no cleanup performed."
+  },
+  "unresolvedRisks": [
+    "Fresh full-check acceptance remains unmet. Long assigned canonical temporary paths exceed Unix socket limits; a short proc alias also fails path-sensitive assertions. Resolving the complete suite requires an owner-authorized suitable short canonical test root or separate test infrastructure changes outside this work package.",
+    "Prior raw check/recovery logs cannot be reconstructed; only supplied owner-witnessed results are recorded.",
+    "Do not infer production deployment or a new real native renewal validation from the local build or read-only cached quota observation."
+  ]
+}

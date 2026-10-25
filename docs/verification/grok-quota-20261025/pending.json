@@ -1,0 +1,108 @@
+{
+  "kind": "synthetic browser-only frontend boundary; NOT live provider response",
+  "exactChannel": "import_e9a31f0093aaaacc595255e0",
+  "url": "http://127.0.0.1:4738/#/channels",
+  "projection": {
+    "status": "unknown",
+    "stale": true,
+    "windows": [],
+    "observedAt": null,
+    "detail": "原生访问令牌已到期，等待原生 CLI 续期后再读取"
+  },
+  "metadataPreserved": true,
+  "trigger": "clicked 重新读取, not quota refresh/login",
+  "states": [
+    {
+      "bodyBackground": "rgb(249, 249, 250)",
+      "calls": 2,
+      "cardRect": {
+        "left": 274,
+        "right": 1396,
+        "width": 1122
+      },
+      "darkPreference": false,
+      "documentWidth": 1440,
+      "progressbars": 0,
+      "reasonRect": {
+        "height": 18.84375,
+        "left": 948.84375,
+        "right": 1231.96875,
+        "width": 283.125
+      },
+      "text": "grok 官方订阅 8a856887\n官方订阅\ngrok\n子 Agent grok_worker\n原生登录凭据已配置\n使用引擎原生配置\n额度未知\n原生访问令牌已到期，等待原生 CLI 续期后再读取\n05:57 检查\ngrok 官方订阅 8a856887 自动刷新额度\n自动刷新\n启用 grok 官方订阅 8a856887\n编辑\n删除",
+      "viewport": {
+        "height": 1000,
+        "width": 1440
+      },
+      "modeRequested": "light",
+      "noHorizontalDocumentOverflow": true,
+      "screenshot": "pending-light-preference.png"
+    },
+    {
+      "bodyBackground": "rgb(249, 249, 250)",
+      "calls": 2,
+      "cardRect": {
+        "left": 274,
+        "right": 1396,
+        "width": 1122
+      },
+      "darkPreference": true,
+      "documentWidth": 1440,
+      "progressbars": 0,
+      "reasonRect": {
+        "height": 18.84375,
+        "left": 948.84375,
+        "right": 1231.96875,
+        "width": 283.125
+      },
+      "text": "grok 官方订阅 8a856887\n官方订阅\ngrok\n子 Agent grok_worker\n原生登录凭据已配置\n使用引擎原生配置\n额度未知\n原生访问令牌已到期，等待原生 CLI 续期后再读取\n05:57 检查\ngrok 官方订阅 8a856887 自动刷新额度\n自动刷新\n启用 grok 官方订阅 8a856887\n编辑\n删除",
+      "viewport": {
+        "height": 1000,
+        "width": 1440
+      },
+      "modeRequested": "dark",
+      "noHorizontalDocumentOverflow": true,
+      "screenshot": "pending-dark-preference.png"
+    },
+    {
+      "bodyBackground": "rgb(249, 249, 250)",
+      "calls": 2,
+      "cardRect": {
+        "left": 17,
+        "right": 363,
+        "width": 346
+      },
+      "darkPreference": false,
+      "documentWidth": 390,
+      "progressbars": 0,
+      "reasonRect": {
+        "height": 18.84375,
+        "left": 33,
+        "right": 347,
+        "width": 314
+      },
+      "text": "grok 官方订阅 8a856887\n官方订阅\ngrok\n子 Agent grok_worker\n原生登录凭据已配置\n使用引擎原生配置\n额度未知\n原生访问令牌已到期，等待原生 CLI 续期后再读取\n05:57 检查\ngrok 官方订阅 8a856887 自动刷新额度\n自动刷新\n启用 grok 官方订阅 8a856887\n编辑\n删除",
+      "viewport": {
+        "height": 844,
+        "width": 390
+      },
+      "modeRequested": "light",
+      "noHorizontalDocumentOverflow": true,
+      "screenshot": "pending-narrow.png"
+    }
+  ],
+  "health": {
+    "consoleErrors": 0,
+    "consoleWarnings": 0,
+    "pageErrors": 0,
+    "requests": 227,
+    "httpErrors": 0,
+    "failedRequests": 0,
+    "pendingRequests": 0,
+    "scope": "observed task browser session; may include earlier origin requests"
+  },
+  "bundle": [
+    "http://127.0.0.1:4738/@vite/client",
+    "http://127.0.0.1:4738/main.tsx"
+  ]
+}

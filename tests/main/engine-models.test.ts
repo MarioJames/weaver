@@ -259,7 +259,7 @@ test('account cache invalidation prevents an old inflight model result from repo
 
 
 test('Codex account model listing uses its private root without runtime-only profile flags',async()=>{
- const root=mkdtempSync('/tmp/weaver-accounts-correction-0m5vxumu/backend-correction/models-');
+ const root=mkdtempSync(join(tmpdir(),'wm-codex-models-'));
  try{
   writeFileSync(join(root,'auth.json'),JSON.stringify({tokens:{account_id:'fixture',access_token:'fixture'}}));
   const lister=new EngineModelLister({root:join(root,'scratch'),channel:()=>({channel:{engine:'codex',kind:'subscription',enabled:true,label:'fixture'},secret:{authDir:root}}),find:async()=>'/fixture/codex',run:async(_exe,args,_timeout,_max,env)=>{
