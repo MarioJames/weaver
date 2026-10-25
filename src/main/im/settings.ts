@@ -143,7 +143,7 @@ export class ImSettingsStore {
   readonly path: string;
   private cached: StoredImSettings | null = null;
 
-  constructor(private readonly dataDir: string) {
+  constructor(private readonly dataDir: string, private readonly legacyChannel?: (engine: string, model: string) => string) {
     this.path = join(dataDir, 'im-settings.json');
     try { mkdirSync(dataDir, { recursive: true, mode: 0o700 }); }
     catch { throw new ImSettingsError('IM_SETTINGS_IO', 'IM settings storage is unavailable'); }
@@ -235,8 +235,8 @@ export class ImSettingsStore {
     const file = exactObject(parsed, FILE_KEYS, 'IM settings file', 'IM_SETTINGS_CORRUPT');
     if (file.version !== VERSION && file.version !== 2 && file.version !== 3 && file.version !== 4) throw new ImSettingsError('IM_SETTINGS_CORRUPT', 'IM settings storage is corrupt');
     if (typeof file.revision !== 'number' || !Number.isInteger(file.revision) || file.revision < 0) throw new ImSettingsError('IM_SETTINGS_CORRUPT', 'IM settings storage is corrupt');
-    // v2/v3 are normalized in memory only: reading never changes bytes or revision. The next successful
-    // CAS save atomically writes v4 and increments once, preserving all private config fields.
+    // Legacy settings are normalized in memory only. The next successful CAS save writes v5 and
+    // increments once, preserving all private config fields.
     // v2 accepts only the original v2 key set (singular workspace, no ownerProfileId);
     // v3 accepts only the original v3 key set (no ownerProfileId). Either key present
     // where it did not exist is IM_SETTINGS_CORRUPT, never a tolerant default.
@@ -258,7 +258,13 @@ export class ImSettingsStore {
       if(typeof engine!=='string')throw new ImSettingsError('IM_SETTINGS_CORRUPT','IM settings engine is malformed');
       config={...rest,channel:engine ? `default_${engine}` : ''};
     }
-    this.cached = { revision: file.revision, config: parseStoredConfig(config, 'IM_SETTINGS_CORRUPT') };
+    const normalized = parseStoredConfig(config, 'IM_SETTINGS_CORRUPT');
+    // Resolve only validated legacy engine selections, after native channel import. v5 channel IDs
+    // are explicit identity choices and must never be repaired by selecting another account.
+    if (file.version !== VERSION && normalized.channel && this.legacyChannel) {
+      normalized.channel = this.legacyChannel(normalized.channel.slice('default_'.length), normalized.model);
+    }
+    this.cached = { revision: file.revision, config: normalized };
     return this.cached;
   }
 

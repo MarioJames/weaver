@@ -79,7 +79,37 @@ export class ImService {
   private closed = false;
   private notices = 0;
   private status: ImStatus = { connection: 'disabled', agentState: 'disabled', activeSessions: 0, busySessions: 0 };
-  constructor(private readonly options: ImServiceOptions) { this.settings = new ImSettingsStore(options.dataDir); this.inbox = new ImInbox(options.dataDir); this.now = options.now ?? Date.now; }
+  constructor(private readonly options: ImServiceOptions) { this.settings = new ImSettingsStore(options.dataDir, (engine, model) => this.legacyChannel(engine, model)); this.inbox = new ImInbox(options.dataDir); this.now = options.now ?? Date.now; }
+  private legacyChannel(engineId: string, model: string): string {
+    const fallback = `default_${engineId}`;
+    if (!this.options.channelConfig) return fallback;
+    const { engines, channels } = this.options.policy().config;
+    const engine = engines[engineId];
+    const original = channels[fallback];
+    if (!engine?.enabled || !isImEngineKind(engine.kind) || !original?.enabled || original.engine !== engineId) return fallback;
+    const configured = (id: string): boolean => {
+      const { secret } = this.options.channelConfig!(id);
+      return Boolean(secret.apiKey || secret.config || secret.authDir);
+    };
+    try {
+      // Even incomplete user configuration on the default channel is an identity choice.
+      if (configured(fallback)) return fallback;
+      const provider = model.includes('/') ? model.split('/')[0] : undefined;
+      const providerOf = (value: string | undefined) => engine.kind === 'dsh' && value === 'deepseek-official' ? 'deepseek' : value;
+      const candidates = Object.entries(channels).filter(([id, channel]) =>
+        id.startsWith('import_') && channel.engine === engineId && channel.kind === original.kind &&
+        (provider ? providerOf(channel.provider) === providerOf(provider) : channel.kind === 'subscription' || engine.kind === 'dsh' && providerOf(channel.provider) === 'deepseek'));
+      // Count identities before availability/credential checks: disabling an account must not
+      // silently move its traffic to another one. Ambiguity requires an explicit channel choice.
+      if (candidates.length !== 1) return '';
+      const [id, channel] = candidates[0]!;
+      if (!channel.enabled) return '';
+      const { secret } = this.options.channelConfig(id);
+      const usable = channel.kind === 'subscription' ? Boolean(secret.authDir)
+        : engine.kind === 'dsh' || engine.kind === 'pi' ? Boolean(secret.apiKey) : configured(id);
+      return usable ? id : '';
+    } catch { return ''; }
+  }
   snapshot(): ImSettingsSnapshot {
     let saved;
     try { saved = this.settings.current(); } catch (error) { throw new ImServiceError(this.safeCode(error)); }

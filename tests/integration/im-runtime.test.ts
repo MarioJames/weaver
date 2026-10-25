@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, stat, readFile, realpath } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, stat, readFile, realpath, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startRuntime } from '../../src/main/runtime';
@@ -8,6 +8,41 @@ import { TaskStore } from '../../src/main/store';
 import { PolicyStore } from '../../src/main/policy/store';
 import { ImBootstrapBudgetError } from '../../src/main/im/bootstrap';
 import { quotaSettings, freeChannelProbeSettings } from '../../src/shared/policy/settings';
+
+test('getImSettings exposes the usable imported legacy dsh channel and the parent receives its binding', async t => {
+ const dir = await mkdtemp(join(tmpdir(), 'r-'));
+ t.after(async () => { await rm(dir, { recursive: true, force: true }); });
+ isolatedPolicy(dir);
+ const store = new TaskStore(join(dir, 'weaver.db'));
+ try {
+  const policy = new PolicyStore(store.db); const saved = policy.snapshot();
+  saved.config.engines.dsh = { enabled: true, kind: 'dsh' };
+  saved.config.channels.default_dsh = { engine: 'dsh', enabled: true, kind: 'api', label: 'pending' };
+  policy.save({ revision: saved.revision, config: saved.config, blocks: [] }, { allowEngineEnable: true });
+ } finally { store.close(); }
+ const home = join(dir, 'fake-home'); await mkdir(join(home, '.dsh'), { recursive: true });
+ await writeFile(join(home, '.dsh', '.credentials.yaml'), 'refs:\n  DEEPSEEK_API_KEY: FAKE_HTTP_KEY\n');
+ const path = join(dir, 'im-settings.json');
+ const bytes = JSON.stringify({ version: 4, revision: 23, config: { enabled: true, appId: 'cli_fake', appSecret: 'FAKE_HTTP_SECRET', allowedOpenIds: ['ou_fake'], engine: 'dsh', model: 'deepseek/deepseek-chat', effort: 'high', workspaces: [dir], idleTimeoutMinutes: 30, ownerProfileId: '' } });
+ await writeFile(path, bytes);
+ const inputs: import('../../src/main/im/parent-agent').ParentAgentInput[] = [];
+ const runtime = await startRuntime({ dataDir: dir, channels: { env: { HOME: home, PATH: '' } }, im: {
+  parentFactory: async input => { inputs.push(input); return { send: async () => '', close: async () => {} }; },
+  channelFactory: () => ({ connect: async () => {}, close: async () => {}, state: () => 'connected', send: async () => {}, stream: async () => '', updateCard: async () => {}, retireCard: async () => {} }),
+ } });
+ try {
+  const response = await fetch(`${runtime.url}/api/rpc`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: runtime.url }, body: JSON.stringify({ method: 'getImSettings', args: [] }) });
+  const body = await response.json() as any;
+  assert.equal(response.status, 200); assert.equal(body.result.revision, 23);
+  assert.match(body.result.config.channel, /^import_/);
+  assert.equal(body.result.status.agentState, 'ready');
+  assert.equal(inputs.length, 1); assert.equal(inputs[0]!.channel, body.result.config.channel);
+  assert.equal(inputs[0]!.channelConfig?.secret.apiKey, 'FAKE_HTTP_KEY');
+  assert.equal(JSON.stringify(body).includes('FAKE_HTTP_KEY'), false);
+  assert.equal(JSON.stringify(body).includes('FAKE_HTTP_SECRET'), false);
+  assert.equal(await readFile(path, 'utf8'), bytes);
+ } finally { await runtime.close(); }
+});
 
 function isolatedPolicy(dir: string): void {
  const store = new TaskStore(join(dir, 'weaver.db'));

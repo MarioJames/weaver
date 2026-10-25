@@ -1,0 +1,480 @@
+{
+  "verifiedAt": "2026-10-25T03:51:22.563757+00:00",
+  "version": "0.7.9",
+  "binarySha256": "2cbf137f8356101c242e4a4ba22aab0c879315ee69a201ac196dd8fda9aeb236",
+  "service": {
+    "status": "running",
+    "pid": 1109320,
+    "url": "http://127.0.0.1:4737",
+    "port": 4737,
+    "dataDir": "/home/mocha/.local/share/weaver",
+    "version": "0.7.9",
+    "startedAt": "2026-10-25T03:49:33.055Z",
+    "runningWorkers": 0,
+    "managedBy": "systemd",
+    "service": {
+      "installed": true,
+      "manager": "systemd",
+      "path": "/home/mocha/.config/systemd/user/weaver.service"
+    }
+  },
+  "schema": 13,
+  "integrity": "ok",
+  "backup": "/home/mocha/.local/share/weaver/backups/local-accounts-20261025T032147Z-4cc021b",
+  "unchangedTables": {
+    "artifacts": {
+      "count": 849,
+      "sha256": "33c7ff37a41f72333da295b4cf75d3be246fec6d2505bc5ce40f515c2af1da47"
+    },
+    "free_probe_history": {
+      "count": 50,
+      "sha256": "6663c00d2dfff7ab6589893d8f0c3258d2d0a8066fb3a32c59a9e1707dc0b226"
+    },
+    "free_probe_workers": {
+      "count": 3,
+      "sha256": "9f0a36b188f982a9ddc67fd5a18bc8a154a09893d768e8de738523eae6355f27"
+    },
+    "janitor_sweeps": {
+      "count": 20,
+      "sha256": "7b68a6bd74adf2fb4b65bf1f04b3fce3d5b80970daa67d0762d010f4e472fa4b"
+    },
+    "owners": {
+      "count": 206,
+      "sha256": "ff8799073e947b4488c28c1bc236b10e87cc96acb1870ffac9066cb06ef8d1e8"
+    },
+    "packages": {
+      "count": 1209,
+      "sha256": "0f5b4f5bab8631d66867dc2cfe6a87d1334634a80e94beab9db648b719daf54c"
+    },
+    "policy_engines": {
+      "count": 7,
+      "sha256": "b8088d1a364b7eb55102f70a3d411ef9cff7c738c2e96bb9cbeb56b611170a39"
+    },
+    "policy_owner_workers": {
+      "count": 10,
+      "sha256": "cf14145ae8bf3fb8b013e4ffe9d390bfc937b855937e1fd8e888b0130a6c0028"
+    },
+    "policy_settings": {
+      "count": 5,
+      "sha256": "58831cda96cf3ba0a99050a34526889cc14c497c34bb03f54c4d9627e74293c1"
+    },
+    "quota_records": {
+      "count": 4,
+      "sha256": "88eed3f9101efe16a39d5eb22fb5bd76a0cde3e7f16a8c8956790fe1497d53b2"
+    },
+    "quota_state": {
+      "count": 3,
+      "sha256": "647cb37a98ce6b591739421f95f6951462490d52d709285b5d7cce76970fa088"
+    },
+    "receipts": {
+      "count": 6264,
+      "sha256": "a4d31d20d07f9e50651d32dab306fd739c5bf8ddf589d811b1cd32f7b15489e9"
+    },
+    "stall_history": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "stall_penalties": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "task_events": {
+      "count": 101686,
+      "sha256": "0abbfe4a0200a32be3681fba8c4c01d48dfbd10d2f75a654b820bdb75598d8eb"
+    },
+    "tasks": {
+      "count": 1232,
+      "sha256": "6c8da0c2e56207826303aca4a45646c2fe6fe30e2fdab8a8f69817fc10f8ac82"
+    },
+    "vendor_worker_limits": {
+      "count": 2,
+      "sha256": "5d5683969a9438f2674275f0cb4837f3dc91522c4f008813176ffeb47e2bd7f7"
+    }
+  },
+  "nativeSourcesUnchanged": false,
+  "nativeSourceHashes": {
+    ".codex/auth.json": "09d346c6bbeee8f23aa469f4f82707254f0779e18cf8f9a2bf14503c447479f6",
+    ".codex/config.toml": "aa861036a58bb0df3592d75443083a18a71ea0a39706b0092a9a25c3fca24b9a",
+    ".claude/.credentials.json": "5bcec7526c209b1abf71ca1cb776568e5824654132db8348f160590b60d8a298",
+    ".claude/settings.json": "89de8be07db66cc561a0354b03eb861e6ca8bd969513fa4d76bfe1a4589251a8",
+    ".grok/auth.json": "33ae5a4982bacbabbbee79e63e6b65656978df92873430a1a5bc67a12a8ae9ad",
+    ".grok/config.toml": "2d56cb734ef6f33becc2b1433da2e2bc742ba80c3ce54482b95e43c80144145e",
+    ".qoder/settings.json": "c662886fdf6ba9c379ccbe5d11842666ead829ac929485d6aae5e54b70b67272",
+    ".qoder/.auth/user": "c42267d0bc2acdaa3331942fb1327e892a7f64938f78f152667a84860f060ff6",
+    ".qoder/.auth/machine_id": "11734b7417e5337d0432c7ff60384112bd74cc2b198188222afab5514385631e",
+    ".pi/agent/models.json": "f6a60ffe718b445a923e5d870ff3b23ced2a8e42ef7322a0494c48c788e66e10",
+    ".pi/agent/auth.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    ".dsh/.credentials.yaml": "8044e0e9e7cb1fe3dbce530967ee4035fcf8e8f3b52dc885bdc16817d33a3f01",
+    ".config/opencode/opencode.jsonc": "4e901f9e457c8d52ab31f9fb4ea637a8c9104ebdbf23fe8b3600f35ad46d4a61",
+    ".qoder/.models/default": "655842a2e54892c346eaf3250951f77a1c254ec7ca7bf8a0a3ff76fc04884636",
+    ".qoder/.models/21ec4e27-00df-4d65-baac-71a279c0cbad/catalog-v7": "30dc66749834cb4249a8d535a5523be40d3ac222fa2e1d8b64359ac9b3d47249",
+    ".qoder/.models/21ec4e27-00df-4d65-baac-71a279c0cbad/catalog-v6": "5a69da24c9b13d4c19571396af0340a9960a9fefc656a3e42213f0746abcd146"
+  },
+  "nativeOpenCodeTablesUnchanged": true,
+  "legacyFilesUnchanged": {
+    "im-settings.json": true,
+    "im-inbox.json": true,
+    "policy.v1.json": true,
+    "tasks.v1.json": true
+  },
+  "migration": {
+    "schema": {
+      "user_version": 13
+    },
+    "historyRowsBefore": 333,
+    "historyRowsAfter": 334,
+    "historyMigratedPreserved": true,
+    "owners": [
+      {
+        "id": "claude_owner",
+        "engine": "claude",
+        "channel": "import_e6f3c04da52965f2b7c02668",
+        "propertiesPreserved": true,
+        "enginePreserved": true,
+        "credentialBound": true
+      },
+      {
+        "id": "codex_owner",
+        "engine": "codex",
+        "channel": "import_d56e030df4fb20d796d92a22",
+        "propertiesPreserved": true,
+        "enginePreserved": true,
+        "credentialBound": true
+      }
+    ],
+    "workers": [
+      {
+        "id": "opencode_muse",
+        "engine": "opencode",
+        "channel": "import_ee32f57491d779f9ce7f0f0f",
+        "propertiesPreserved": true,
+        "enginePreserved": true,
+        "credentialBound": true
+      },
+      {
+        "id": "opencode_deepseek",
+        "engine": "opencode",
+        "channel": "import_ee32f57491d779f9ce7f0f0f",
+        "propertiesPreserved": true,
+        "enginePreserved": true,
+        "credentialBound": true
+      },
+      {
+        "id": "codex_luna_max",
+        "engine": "codex",
+        "channel": "import_d56e030df4fb20d796d92a22",
+        "propertiesPreserved": true,
+        "enginePreserved": true,
+        "credentialBound": true
+      },
+      {
+        "id": "codex_sol_med",
+        "engine": "codex",
+        "channel": "import_d56e030df4fb20d796d92a22",
+        "propertiesPreserved": true,
+        "enginePreserved": true,
+        "credentialBound": true
+      },
+      {
+        "id": "claude_sonnet_med",
+        "engine": "claude",
+        "channel": "import_e6f3c04da52965f2b7c02668",
+        "propertiesPreserved": true,
+        "enginePreserved": true,
+        "credentialBound": true
+      },
+      {
+        "id": "grok_worker",
+        "engine": "grok",
+        "channel": "import_e9a31f0093aaaacc595255e0",
+        "propertiesPreserved": true,
+        "enginePreserved": true,
+        "credentialBound": true
+      },
+      {
+        "id": "qoder_worker",
+        "engine": "qoder",
+        "channel": "import_46c108d104db423c8ebfde2c",
+        "propertiesPreserved": true,
+        "enginePreserved": true,
+        "credentialBound": true
+      }
+    ],
+    "blocksBefore": 4,
+    "blocksAfter": 4,
+    "blocksSemanticsPreserved": true,
+    "im": {
+      "fileVersion": 4,
+      "enabled": true,
+      "appSecretConfigured": true,
+      "allowedOpenIds": 1,
+      "workspaces": 4,
+      "legacyEngine": "dsh",
+      "channel": "import_12c10a0745e6e2a1a214b91e",
+      "privateAndBusinessConfigPreserved": true,
+      "channelHasCredentials": true,
+      "normalization": "v4字节不变，读时选择唯一同engine/provider/kind且有凭据的导入渠道"
+    },
+    "nativeImportMarker": {
+      "body": "true"
+    }
+  },
+  "channels": [
+    {
+      "id": "default_claude",
+      "engine": "claude",
+      "kind": "subscription",
+      "enabled": true,
+      "quota_refresh": null,
+      "hasCredentials": false,
+      "hasApiKey": false
+    },
+    {
+      "id": "default_codex",
+      "engine": "codex",
+      "kind": "subscription",
+      "enabled": true,
+      "quota_refresh": null,
+      "hasCredentials": false,
+      "hasApiKey": false
+    },
+    {
+      "id": "default_grok",
+      "engine": "grok",
+      "kind": "subscription",
+      "enabled": true,
+      "quota_refresh": null,
+      "hasCredentials": false,
+      "hasApiKey": false
+    },
+    {
+      "id": "default_opencode",
+      "engine": "opencode",
+      "kind": "subscription",
+      "enabled": true,
+      "quota_refresh": null,
+      "hasCredentials": false,
+      "hasApiKey": false
+    },
+    {
+      "id": "default_pi",
+      "engine": "pi",
+      "kind": "api",
+      "enabled": true,
+      "quota_refresh": null,
+      "hasCredentials": false,
+      "hasApiKey": false
+    },
+    {
+      "id": "default_qoder",
+      "engine": "qoder",
+      "kind": "subscription",
+      "enabled": true,
+      "quota_refresh": null,
+      "hasCredentials": false,
+      "hasApiKey": false
+    },
+    {
+      "id": "default_dsh",
+      "engine": "dsh",
+      "kind": "api",
+      "enabled": true,
+      "quota_refresh": null,
+      "hasCredentials": false,
+      "hasApiKey": false
+    },
+    {
+      "id": "import_d56e030df4fb20d796d92a22",
+      "engine": "codex",
+      "kind": "subscription",
+      "enabled": true,
+      "quota_refresh": null,
+      "hasCredentials": true,
+      "hasApiKey": false
+    },
+    {
+      "id": "import_e6f3c04da52965f2b7c02668",
+      "engine": "claude",
+      "kind": "subscription",
+      "enabled": true,
+      "quota_refresh": null,
+      "hasCredentials": true,
+      "hasApiKey": false
+    },
+    {
+      "id": "import_e9a31f0093aaaacc595255e0",
+      "engine": "grok",
+      "kind": "subscription",
+      "enabled": true,
+      "quota_refresh": null,
+      "hasCredentials": true,
+      "hasApiKey": false
+    },
+    {
+      "id": "import_46c108d104db423c8ebfde2c",
+      "engine": "qoder",
+      "kind": "subscription",
+      "enabled": true,
+      "quota_refresh": null,
+      "hasCredentials": true,
+      "hasApiKey": false
+    },
+    {
+      "id": "import_ee32f57491d779f9ce7f0f0f",
+      "engine": "opencode",
+      "kind": "subscription",
+      "enabled": true,
+      "quota_refresh": null,
+      "hasCredentials": true,
+      "hasApiKey": false
+    },
+    {
+      "id": "import_12c10a0745e6e2a1a214b91e",
+      "engine": "dsh",
+      "kind": "api",
+      "enabled": true,
+      "quota_refresh": null,
+      "hasCredentials": false,
+      "hasApiKey": true
+    }
+  ],
+  "pages": [
+    {
+      "page": "channels",
+      "target": "http://127.0.0.1:4737/#/channels",
+      "artifact_errors": [],
+      "networkErrors": 0,
+      "consoleMessages": 0
+    },
+    {
+      "page": "owners",
+      "target": "http://127.0.0.1:4737/#/owners",
+      "artifact_errors": [],
+      "networkErrors": 0,
+      "consoleMessages": 0
+    },
+    {
+      "page": "engines",
+      "target": "http://127.0.0.1:4737/#/engines",
+      "artifact_errors": [],
+      "networkErrors": 0,
+      "consoleMessages": 0
+    }
+  ],
+  "skillUpdate": "未执行：全局技能无.weaver-skill.json所有权标记，按约束保留",
+  "billingValidation": "本worker未运行Hello、收费推理试跑或主动额度探针；正式纠偏由另一个Codex CLI worker实际执行，计费归属仍未验证",
+  "resourceState": "真实weaver.service PID1109320/4737及业务数据、必要私有配置、持久回滚backup保留；任务Chrome已关闭、profile已删除、一次性构建/数据库副本/原始浏览器证据已回收。父Agent调度文件保留供统一收尾。",
+  "knownIssue": "首次升级发现legacy IM绑定占位渠道，已通过正式源码纠偏并重建部署。最终getImSettings为真实dsh import渠道，connected/ready；旧v4文件hash不变。",
+  "baseCommit": "4cc021b2c54535c0f09d42bab8b525e1ccd2dc3f",
+  "sourceFilesSha256": {
+    "src/main/im/settings.ts": "8a8e2b63a003e10d7e6bc35eee130e7fd93a9d172801282fd83c2ba1dff52125",
+    "src/main/im/service.ts": "05a871b3ca010c59310f40a95a1ee178637d387b1853a4d018ffa156b5d6f2ff"
+  },
+  "historicalRowsFinal": {
+    "tasks": {
+      "originalCount": 1232,
+      "currentCount": 1233,
+      "originalRowsUnchanged": true,
+      "changedOriginalRows": 0
+    },
+    "task_events": {
+      "originalCount": 101686,
+      "currentCount": 101775,
+      "originalRowsUnchanged": true,
+      "changedOriginalRows": 0
+    },
+    "artifacts": {
+      "originalCount": 849,
+      "currentCount": 850,
+      "originalRowsUnchanged": true,
+      "changedOriginalRows": 0
+    },
+    "packages": {
+      "originalCount": 1209,
+      "currentCount": 1210,
+      "originalRowsUnchanged": true,
+      "changedOriginalRows": 0
+    },
+    "b643b582-8e2b-410b-a65d-15fdfe8b6a0e": "running",
+    "b1818507-257a-4afd-989e-9fb1f02c1ff3": "running"
+  },
+  "secondRestartChangedTables": [
+    "janitor_sweeps",
+    "kv"
+  ],
+  "imFinal": {
+    "allowedOpenIdsCount": 1,
+    "appSecretConfigured": true,
+    "channel": "import_12c10a0745e6e2a1a214b91e",
+    "enabled": true,
+    "status": {
+      "activeSessions": 0,
+      "agentState": "ready",
+      "busySessions": 0,
+      "connection": "connected"
+    },
+    "workspacesCount": 4
+  },
+  "botUi": {
+    "hasConnected": true,
+    "hasDshImportedChannel": true,
+    "hasError": false,
+    "hasReady": true,
+    "origin": "http://127.0.0.1:4737/#/bots"
+  },
+  "testVerification": {
+    "red": {
+      "command": "HOME=<scratch>/home TMPDIR=<scratch>/tmp node --import tsx --test tests/integration/im-channel-migration.test.ts",
+      "exitCode": 1,
+      "observed": "Expected imported channel; actual default_deep. Failed before source implementation."
+    },
+    "relatedTests": 106,
+    "relatedPassed": 106,
+    "typecheck": true,
+    "rootCheck": {
+      "tests": [
+        "2155"
+      ],
+      "pass": [
+        "2123"
+      ],
+      "fail": [
+        "0"
+      ],
+      "skipped": [
+        "32"
+      ],
+      "duration_ms": [
+        "129999.484251"
+      ],
+      "sourceUnchanged": true,
+      "exitCode": 0
+    },
+    "acceptanceScan": {
+      "exitCode": 2,
+      "reason": "既有.worktrees目录导致扫描覆盖不完整；4个本次修复文件零命中"
+    }
+  },
+  "acceptance": {
+    "upgradeMigration": "passed",
+    "overallProduct": "not_passed",
+    "uncoveredUserReportedIssues": [
+      "账号渠道内容无法滚动",
+      "本地数据导入失败",
+      "新官方账号独立配置登录/认证写入/按配置调度流程未覆盖"
+    ],
+    "newRequirements": [
+      "移除引擎页",
+      "所有引擎默认启用，通过账号控制",
+      "添加账号区分官方与API，官方独立配置登录"
+    ]
+  },
+  "reportChecks": {
+    "localLinksExist": true,
+    "allImagesLoaded": true,
+    "mobileViewport": 390,
+    "horizontalOverflow": false,
+    "visualReview": "390px窄屏截图已实际查看；打印CSS无折叠必需内容，无外部资源",
+    "noRawEmailsInTextArtifacts": true
+  }
+}
