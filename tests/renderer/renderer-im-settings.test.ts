@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { defaultConfig } from '../../src/main/policy/routing';
 import type { ImConfig, ImSettingsSnapshot, ImStatus } from '../../src/shared/contracts/im';
@@ -17,6 +17,7 @@ import type { EngineModelList, EngineModelListInput } from '../../src/shared/eng
 import { AgentStatus, ImSettingsView, type ImSettingsViewProps } from '../../src/renderer/features/bots/ImSettings';
 import { BotsPage } from '../../src/renderer/features/bots/BotsPage';
 import { botStyles } from '../../src/renderer/features/bots/bot-style';
+import { styleClass } from './style-helpers';
 
 /** The real configured baseline the fixtures branch from, e.g. read at revision 5. */
 const APP_ID = 'cli_a1b2c3d4e5f6a7b8';
@@ -46,7 +47,7 @@ function activeEdit(over: Partial<ImDraft> = {}, base = configOf(), revision = 5
 }
 
 function markup(node: React.ReactNode) {
-  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) }));
+  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) }));
 }
 
 test('a page without an active draft adopts a later snapshot whole: revision, config and status move together', () => {
@@ -609,10 +610,10 @@ test('each Feishu setting is one two-column row: name label plus description on 
   assert.ok(appId.indexOf('App ID 需要 cli_ 开头') > appId.indexOf('data-bot-control'), 'the field error sits under the control');
   const controlClasses = [...section.matchAll(/<div data-bot-control="" class="([^"]+)">/g)].map(match => match[1]);
   assert.equal(new Set(controlClasses).size, 1, 'all control columns share the same width track');
-  assert.equal(controlClasses[0], botStyles.controlCell);
+  assert.equal(controlClasses[0], styleClass(botStyles.controlCell));
   const rowClasses = [...section.matchAll(/<div data-bot-row="[^"]*" class="([^"]+)">/g)].map(match => match[1]);
   assert.equal(new Set(rowClasses).size, 1, 'all rows share the same two-column grid');
-  assert.equal(rowClasses[0], botStyles.row);
+  assert.equal(rowClasses[0], styleClass(botStyles.row));
 });
 
 test('the new channel layout keeps the conflict, workspace empty/limit, save feedback and loading/error states', () => {

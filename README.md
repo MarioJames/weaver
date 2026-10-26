@@ -32,7 +32,7 @@ Releases are built by `.github/workflows/release.yml` on a `v*` tag that matches
 
 ## Build from source
 
-Requires Node.js 22.13+ (`engines` in `package.json`). No system toolchain is installed.
+Requires Node.js 22.22+ (`engines` in `package.json`). No system toolchain is installed.
 
 ```sh
 npm ci

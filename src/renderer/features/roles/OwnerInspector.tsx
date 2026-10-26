@@ -1,7 +1,8 @@
 import { dateText } from '../quota/quota-view';
 import { isTransientError, useNotifyError } from '../../api/notify';
 import { useEffect, useRef, useState } from 'react';
-import { Button, Modal, Tag, Text, Tooltip } from '@lobehub/ui/base-ui';
+import * as stylex from '@stylexjs/stylex';
+import { Button, Modal, Tag, Text, Tooltip } from '@lobehub/ui';
 import type { Config } from '../../../shared/contracts/policy';
 import type { Task } from '../../../shared/contracts/tasks';
 import { command } from '../../api/commands';
@@ -101,22 +102,22 @@ export function OwnerInspector({ task, busy, action, owners, now = Date.now() }:
     } finally { setSending(false); locked.current = false; }
   }
 
-  return <section aria-label="父 Agent 接续" className={styles.stack}>
-    <div className={styles.row}>
-      <span className={styles.lead}>
+  return <section aria-label="父 Agent 接续" {...stylex.props(styles.stack)}>
+    <div {...stylex.props(styles.row)}>
+      <span {...stylex.props(styles.lead)}>
         <EngineIcon kind={kind} size={16} />
-        <Text className={styles.owner}>{owner}</Text>
+        <Text {...stylex.props(styles.owner)}>{owner}</Text>
         {blocked ? <Tag size="small" color={tagColor('inProgress')}>{task.executionRole === 'owner' ? '父 Agent' : '子 Agent'} 执行中，暂不可接续</Tag>
           : due ? <Tag size="small" color={tagColor('warning')}>{`已空闲 ${idleMinutes} 分钟，建议接续`}</Tag>
             : <Tag size="small" color={tagColor('success')}>可接续</Tag>}
       </span>
-      <span className={styles.action}>
+      <span {...stylex.props(styles.action)}>
         {blockedReason
           ? <Tooltip title={blockedReason}><span><Button type="primary" disabled>接续给…</Button></span></Tooltip>
           : <Button type="primary" disabled={busy || sending} onClick={() => { setOpen(true); setFailure(''); setProfile(currentProfile(task, profiles)); }}>接续给…</Button>}
       </span>
     </div>
-    {task.ownerHost && <Text className={styles.host}>{`已在 Herdr 启动 ${task.ownerHost.agentName} · ${dateText(task.ownerHost.launchedAt)}`}</Text>}
+    {task.ownerHost && <Text {...stylex.props(styles.host)}>{`已在 Herdr 启动 ${task.ownerHost.agentName} · ${dateText(task.ownerHost.launchedAt)}`}</Text>}
     {started && <Text type="success" role="status">{started}</Text>}
     <Modal open={open} title="接续给新的父 Agent" okText="启动新的父 Agent" cancelText="取消"
       confirmLoading={sending} okButtonProps={{ disabled: !profile || sending }} maskClosable={!sending} keyboard={!sending}
@@ -130,7 +131,7 @@ export function OwnerInspector({ task, busy, action, owners, now = Date.now() }:
 /** Every enabled profile as a dialog option, marked with its engine. */
 export const ownerOptions = (profiles: OwnerProfile[]) => profiles.map(item => ({
   value: item.id,
-  label: <span className={styles.option}><EngineIcon kind={item.kind} />{item.id}</span>,
+  label: <span {...stylex.props(styles.option)}><EngineIcon kind={item.kind} />{item.id}</span>,
 }));
 
 /** The dialog body, kept apart from its portal so it renders and reads on its own. */
@@ -143,8 +144,8 @@ export function ContinuationDialog({ profiles, value, sending, failure, onChange
   onRetry: () => void;
 }) {
   useNotifyError(failure, '操作失败', {label:'重试启动',run:onRetry});
-  return <div className={styles.dialog}>
-    <NamedSelect aria-label="接手父 Agent" className={styles.pick} placeholder="选择接手父 Agent" disabled={sending} value={value}
+  return <div {...stylex.props(styles.dialog)}>
+    <NamedSelect aria-label="接手父 Agent" {...stylex.props(styles.pick)} placeholder="选择接手父 Agent" disabled={sending} value={value}
       options={ownerOptions(profiles)}
       onChange={next => onChange(typeof next === 'string' ? next : undefined)} />
     <Text type="secondary">Weaver 会生成接续说明，并在 Herdr 中启动新的父 Agent 接手这个任务。</Text>

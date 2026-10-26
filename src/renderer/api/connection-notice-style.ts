@@ -1,10 +1,11 @@
-import { createStaticStyles } from 'antd-style';
+import * as stylex from '@stylexjs/stylex';
+import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
 
-export const connectionStyles = createStaticStyles(({ css, cssVar }) => ({
-  content: css`
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: ${cssVar.colorText};
-  `,
-}));
+export const connectionStyles = stylex.create({
+  content: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    color: cssVar.colorText,
+  },
+});

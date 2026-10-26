@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
 import { TaskBoard } from '../../src/renderer/features/tasks/TaskBoard';
 import { afterZone, boardRows, pinnedRows, workspaceGroups } from '../../src/renderer/features/tasks/task-columns';
 import { emptySelection } from '../../src/renderer/features/tasks/task-filters';
 import { taskStyles as styles } from '../../src/renderer/features/tasks/task-style';
+import { styleClass } from './style-helpers';
 import { ENDED_EXPANDED_KEY, TASK_PINS_KEY, readTaskPins, writeTaskPins } from '../../src/renderer/features/tasks/task-persistence';
 import { NEW_TASK_WINDOW_MS, isNewTask, isPinned, nextNewExpiry, nextPinTime, pruneStalePins, splitPinned, togglePin } from '../../src/renderer/features/tasks/task-pins';
 import type { TaskPins } from '../../src/renderer/features/tasks/task-pins';
@@ -40,7 +41,7 @@ function storage<T>(values: Record<string, string>, run: () => T): T {
   return swapStorage({ getItem: (key: string) => values[key] ?? null, setItem: (key: string, value: string) => { values[key] = value; } }, run);
 }
 function markup(node: React.ReactNode) {
-  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) }));
+  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) }));
 }
 function board(tasks: Task[], pins: TaskPins | string = {}, at: number = NOW) {
   return storage({ [ENDED_EXPANDED_KEY]: 'true', [TASK_PINS_KEY]: typeof pins === 'string' ? pins : JSON.stringify(pins) },
@@ -153,7 +154,7 @@ test('2 分钟内的卡片在标题行最前显示「新」标签，并自动进
   const fresh = make('fresh', { createdAt: ago(60_000), updatedAt: ago(60_000) });
   const html = board([fresh]);
   const card = cardButton(html, fresh.title);
-  const title = card.slice(card.indexOf(`class="${styles.cardTitle}"`), card.indexOf(`class="${styles.cardStatus}"`));
+  const title = card.slice(card.indexOf(`class="${styleClass(styles.cardTitle)}"`), card.indexOf(`class="${styleClass(styles.cardStatus)}"`));
   assert.match(title, />新</);
   assert.ok(title.indexOf('>新<') < title.indexOf('<strong'), '「新」标签在标题行最前');
   const running = columnSlice(html, 'running');

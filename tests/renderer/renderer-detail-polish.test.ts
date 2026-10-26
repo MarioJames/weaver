@@ -2,20 +2,22 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
-import { toast, type ToastOptions } from '@lobehub/ui/base-ui';
+import { toast, type ToastOptions } from '@lobehub/ui';
 import { ArtifactsPanel } from '../../src/renderer/features/tasks/ArtifactsPanel';
 import { displayLog } from '../../src/renderer/features/tasks/log-view';
 import { compactTime, fullTime } from '../../src/renderer/format/timezone';
 import { notifyError } from '../../src/renderer/api/notify';
 import { readFileSync } from 'node:fs';
 import { transformSync } from 'esbuild';
+import { styles as detailStyles } from '../../src/renderer/features/tasks/task-detail-style';
+import { styleCss } from './style-helpers';
 const app = readFileSync(new URL('../../src/renderer/app/App.tsx', import.meta.url), 'utf8');
 const routeSource = app.slice(app.indexOf('function pageFromHash'), app.indexOf('/** The hash'));
 const pagesSource = app.slice(app.indexOf('const PAGES ='), app.indexOf('type Page ='));
 const pageFromHash = new Function(transformSync(pagesSource + routeSource.replace('export ', ''), { loader: 'ts' }).code + '; return pageFromHash;')() as () => string;
-const markup = (node: React.ReactNode) => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { enableCustomFonts: false, children: node }) }));
+const markup = (node: React.ReactNode) => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { children: node }) }));
 test('completed and interrupted artifact empty states explain the actual status', () => {
   const completed = markup(React.createElement(ArtifactsPanel, { artifacts: [], status: 'completed' }));
   assert.match(completed, /没有产物/);
@@ -61,18 +63,16 @@ test('direct and copied legacy URLs resolve to the same page', () => {
 });
 
 test('the detail header stacks the action row below the title when narrow, wide layout unchanged', () => {
-  const source = readFileSync(new URL('../../src/renderer/features/tasks/task-detail-style.ts', import.meta.url), 'utf8');
-  const block = (key: string) => source.slice(source.indexOf(`${key}: css\``), source.indexOf(`${key}: css\``) + source.slice(source.indexOf(`${key}: css\``)).indexOf('`,') + 1);
-  const header = block('header');
+  const url = new URL('../../src/renderer/features/tasks/task-detail-style.ts', import.meta.url);
+  const header = styleCss(url, detailStyles.header);
   // The header is its own inline-size container; wide keeps the actions beside the heading (wrap only as a fallback).
-  assert.match(header, /container-type: inline-size/);
-  assert.match(header, /flex-wrap: wrap/);
+  assert.match(header, /container-type:inline-size/);
+  assert.match(header, /flex-wrap:wrap/);
   assert.doesNotMatch(header, /@container/);
-  const heading = block('heading');
-  assert.match(heading, /@container \(max-width: 480px\)\s*\{\s*flex-basis: 100%;/);
-  const actions = block('actions');
-  assert.match(actions, /@container \(max-width: 480px\)\s*\{\s*flex-direction: row;/);
-  assert.match(actions, /flex-wrap: wrap/);
+  assert.match(styleCss(url, detailStyles.heading), /@container \(max-width: 480px\)\{[^}]*flex-basis:100%/);
+  const actions = styleCss(url, detailStyles.actions);
+  assert.match(actions, /@container \(max-width: 480px\)\{[^}]*flex-direction:row/);
+  assert.match(actions, /flex-wrap:wrap/);
 });
 
 test('accepted detail omits retry and counts constraints with acceptance criteria', async () => {

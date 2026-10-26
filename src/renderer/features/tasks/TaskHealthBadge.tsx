@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Tag, Text } from '@lobehub/ui/base-ui';
+import * as stylex from '@stylexjs/stylex';
+import { Tag, Text } from '@lobehub/ui';
 import type { TaskHealth, TaskHealthState } from '../../../shared/contracts/monitoring';
 import { command } from '../../api/commands';
 import type { TagSemantic } from '../../format/tag-colors';
@@ -39,9 +40,9 @@ export function commandElapsedText(ms: number): string {
 /** The monitor's reading, rendered without a second interpretation of silence or CPU. */
 export function TaskHealthView({ health }: { health: TaskHealth }) {
   const command = health.runningCommand;
-  return <div className={styles.row} aria-label="任务健康" style={{ gap: 8, flexWrap: 'wrap' }}>
+  return <div {...stylex.props(styles.row)} aria-label="任务健康">
     <Tag color={tagColor(HEALTH_TONES[health.state])}>{HEALTH_LABELS[health.state]}</Tag>
-    {command && <Text type="secondary" fontSize={12} className={styles.wrap}>
+    {command && <Text type="secondary" fontSize={12} className={stylex.props(styles.wrap).className}>
       命令：{command.summary} · 已运行 {commandElapsedText(command.elapsedMs)}
     </Text>}
     {health.reason === 'command_timeout' && <Text type="warning" fontSize={12}>超过单条命令最长运行时间，请父 Agent 判断是否取消或重试；Weaver 不会自动停止命令。</Text>}

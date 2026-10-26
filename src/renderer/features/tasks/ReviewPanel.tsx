@@ -1,6 +1,7 @@
 import { useNotifyError } from '../../api/notify';
 import { useEffect, useRef, useState } from 'react';
-import { Button, Descriptions, Modal, Tag, Text, TextArea } from '@lobehub/ui/base-ui';
+import * as stylex from '@stylexjs/stylex';
+import { Button, Descriptions, Modal, Tag, Text, TextArea } from '@lobehub/ui';
 import type { Task } from '../../../shared/contracts/tasks';
 import { command } from '../../api/commands';
 import { DISPLAY_LABELS, DISPLAY_TONES, type DisplayStatus } from '../../format/status-colors';
@@ -36,12 +37,12 @@ export function ReviewView({ task, manifest, busy, ownerKind, open, comment, onO
       { key: 'by', label: '决定者', children: <AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerLabel(task)} /> },
       ...(decision ? [{ key: 'at', label: '决定时间', children: <TimeText value={decision.at} /> }] : []),
     ] : []),
-    ...(task.reviewComment ? [{ key: 'comment', label: '验收说明', span: 2, children: <Text className={styles.wrap}>{task.reviewComment}</Text> }] : []),
+    ...(task.reviewComment ? [{ key: 'comment', label: '验收说明', span: 2, children: <Text className={stylex.props(styles.wrap).className}>{task.reviewComment}</Text> }] : []),
   ];
   return <>
     {manifest && <Descriptions colon={false} column={2} items={items} />}
-    <div className={styles.row}><Button disabled={busy} onClick={onOpen}>手动验收</Button></div>
-    <Modal open={open} title="手动验收" onCancel={() => { if (!busy) onClose(); }} footer={<div className={detailStyles.modalFooter}>
+    <div {...stylex.props(styles.row)}><Button disabled={busy} onClick={onOpen}>手动验收</Button></div>
+    <Modal open={open} title="手动验收" onCancel={() => { if (!busy) onClose(); }} footer={<div {...stylex.props(detailStyles.modalFooter)}>
       {manifest?.delivery !== 'acknowledged' && <Button disabled={busy || !ready || !manifest} onClick={() => onSubmit('results.ack', {})}>确认收到</Button>}
       <Button disabled={busy || !ready || !manifest || manifest.acceptance === 'rejected'} onClick={() => onSubmit('reviews.submit', { decision: 'rejected', ...note })}>要求修改</Button>
       <Button type="primary" disabled={busy || !ready || !manifest || manifest.acceptance === 'accepted'} onClick={() => onSubmit('reviews.submit', { decision: 'accepted', ...note })}>验收通过</Button>
@@ -95,7 +96,7 @@ export function ReviewPanel({ task, busy, action, ownerKind, open: controlledOpe
       setAttempt(value => value + 1);
     } finally { locked.current = false; if (active.current) setSubmitting(false); }
   }
-  return <section aria-label="交付验收" className={styles.stack}>
+  return <section aria-label="交付验收" {...stylex.props(styles.stack)}>
     {!open && loading && <LoadingNote />}
     <ReviewView task={task} manifest={manifest?.taskId === task.id ? manifest : undefined} busy={busy || submitting} ready={!loading && loadedVersion === version && !error} loading={loading} ownerKind={ownerKind} open={open} comment={comment} onOpen={() => setOpen(true)} onClose={() => setOpen(false)} onComment={setComment} onSubmit={(name, extra) => void submit(name, extra)} />
   </section>;

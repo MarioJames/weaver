@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, InputPassword, Modal, Text } from '@lobehub/ui/base-ui';
+import * as stylex from '@stylexjs/stylex';
+import { Alert, Button, InputPassword, Modal, Text } from '@lobehub/ui';
 import type { ChannelLogin, ChannelLoginRef } from '../../../shared/contracts/channels';
 import { styles } from '../../ui/styles';
 import { resourceStyles } from '../../ui/resource-style';
@@ -99,8 +100,8 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
   }, [job]);
 
   const reference = job ? { channel, id: job.id } : savedRef(channel);
-  return <Modal open title={`登录 ${label}`} width={640} draggable={false} className={resourceStyles.modal}
-    classNames={{ body: resourceStyles.modalBody, footer: resourceStyles.modalFooter }} onCancel={onClose}
+  return <Modal open title={`登录 ${label}`} width={640} draggable={false} className={stylex.props(resourceStyles.modal).className}
+    classNames={{ body: stylex.props(resourceStyles.modalBody).className, footer: stylex.props(resourceStyles.modalFooter).className }} onCancel={onClose}
     footer={<>
       {running && <Button danger disabled={pending} loading={pending} onClick={() => reference && void run('cancel', reference)}>取消此次登录</Button>}
       {reference && <Button disabled={pending} onClick={() => { setPollRound(value => value + 1); void run('read', reference); }}>重新读取状态</Button>}
@@ -108,12 +109,12 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
       {job?.status === 'succeeded' && <Button disabled={pending} onClick={() => void onSucceeded().catch(error => setFailure(error instanceof Error ? error.message : String(error)))}>刷新账号凭据状态</Button>}
       <Button onClick={onClose}>关闭</Button>
     </>}>
-    <div className={styles.stack} data-channels-scroll="">
+    <div {...stylex.props(styles.stack)} data-channels-scroll="">
       <Text role="status">{job ? statusText[job.status] : pending ? '正在读取或启动登录' : '尚未确认登录状态'}</Text>
       <Text type="secondary">请在官方页面完成授权。关闭此窗口后，可从该账号的登录按钮找回状态；关闭不会取消登录。只有独立配置中的凭据通过验证后，账号才可用于执行。</Text>
-      {running && job.verificationUrl && <a className={channelStyles.loginLink} href={job.verificationUrl} target="_blank" rel="noopener noreferrer">打开官方授权页面：{job.verificationUrl}</a>}
+      {running && job.verificationUrl && <a className={stylex.props(channelStyles.loginLink).className} href={job.verificationUrl} target="_blank" rel="noopener noreferrer">打开官方授权页面：{job.verificationUrl}</a>}
       {running && job.userCode && <Text>设备验证码：<code>{job.userCode}</code></Text>}
-      {running && job.acceptsCode && <div className={styles.stack}>
+      {running && job.acceptsCode && <div {...stylex.props(styles.stack)}>
         <label htmlFor={`authorization-code-${channel}`}>官方返回授权码</label>
         <InputPassword id={`authorization-code-${channel}`} autoComplete="off" value={authorizationCode} disabled={pending} maxLength={4096} placeholder="粘贴官方页面返回的完整 code#state" onChange={event => setAuthorizationCode(event.target.value)} />
         <Button disabled={pending || !authorizationCode} loading={pending} onClick={() => reference && void run('code', reference)}>提交官方返回授权码</Button>

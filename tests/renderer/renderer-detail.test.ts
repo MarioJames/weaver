@@ -2,14 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
 import { PENDING_TASK_TITLE } from '../../src/shared/validation';
 import { TaskDetail } from '../../src/renderer/features/tasks/TaskDetail';
 
 function markup(node: React.ReactNode) {
-  const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;
+  const props = { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) } as React.ComponentProps<typeof ConfigProvider>;
   return renderToStaticMarkup(React.createElement(ConfigProvider, props));
 }
 
@@ -23,9 +23,9 @@ const header = (html: string) => html.slice(0, html.indexOf('aria-label="任务�
 
 test('the header status tag is solid, colored by status and spins only while running', () => {
   const running = header(render(task));
-  assert.match(running, /<span[^>]*background:var\(--ant-color-info\)[^>]*>[\s\S]*?lucide-loader[\s\S]*?执行中<\/span>/);
+  assert.match(running, /<span[^>]*background:var\(--lobe-color-info\)[^>]*>[\s\S]*?lucide-loader[\s\S]*?执行中<\/span>/);
   const done = header(render({ ...task, status: 'completed', reviewState: 'accepted' }));
-  assert.match(done, /background:var\(--ant-color-success\)[^>]*>已通过<\/span>/);
+  assert.match(done, /background:var\(--lobe-color-success\)[^>]*>已通过<\/span>/);
   assert.doesNotMatch(done, /lucide-loader/);
 });
 

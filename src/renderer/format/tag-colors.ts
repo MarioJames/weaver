@@ -3,7 +3,7 @@ import type { StatusTone } from './status-colors';
 /**
  * The one place that decides what a Tag color means. Every `<Tag color=…>` in the renderer
  * takes its value from here, so the same idea is the same color on every page and two
- * different ideas never share a color. Values are `@lobehub/ui/base-ui` Tag color presets
+ * different ideas never share a color. Values are `@lobehub/ui` Tag color presets
  * (preset colors and the system colors success/warning/error/processing; see the Tag utils).
  *
  * Identity (purple/geekblue) and billing channel (cyan) are deliberately disjoint from the

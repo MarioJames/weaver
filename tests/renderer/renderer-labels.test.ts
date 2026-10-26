@@ -2,15 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { defaultConfig } from '../../src/main/policy/routing';
 import { RolesPage } from '../../src/renderer/features/roles/RolesPage';
+import { rolesStyles } from '../../src/renderer/features/roles/roles-style';
 import { TaskComposer } from '../../src/renderer/features/tasks/TaskComposer';
 import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';
+import { styleClass, styleCss } from './style-helpers';
 
 function markup(node: React.ReactNode) {
-  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { enableCustomFonts: false }, node) }));
+  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, null, node) }));
 }
 
 function nativeFieldLinks(html: string, names: string[], instances = 1) {
@@ -69,7 +71,8 @@ test('a sortable role list has one dedicated drag handle per row and none while 
   const html = markup(React.createElement(RolesPage, { section: 'workers', policy: { config } as PolicyDraft }));
   assert.equal((html.match(/aria-label="拖动排序 /g) ?? []).length, 2);
   for (const id of ['opencode_worker', 'claude_worker']) assert.match(html, new RegExp(`aria-label="拖动排序 ${id}"`));
-  assert.match(html, /touch-action:\s*none/);
+  assert.ok(html.includes(styleClass(rolesStyles.roleGrip)));
+  assert.match(styleCss(new URL('../../src/renderer/features/roles/roles-style.ts', import.meta.url), rolesStyles.roleGrip), /touch-action:none/);
   const busy = markup(React.createElement(RolesPage, { section: 'workers', policy: { config, busy: true } as PolicyDraft }));
   assert.doesNotMatch(busy, /aria-label="拖动排序 /);
 });

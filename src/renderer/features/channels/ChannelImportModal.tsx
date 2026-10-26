@@ -1,6 +1,7 @@
 import { useId } from 'react';
-import { Alert, Button, Checkbox, Input, Modal, Text } from '@lobehub/ui/base-ui';
-import { Form, useForm } from '@lobehub/ui/base-ui/form';
+import * as stylex from '@stylexjs/stylex';
+import { Alert, Button, Checkbox, Input, Modal, Text } from '@lobehub/ui';
+import { Form, useForm } from '@lobehub/ui/form';
 import type { ImportChannelsResult } from '../../../shared/contracts/channels';
 import { NamedSelect } from '../../ui/NamedControls';
 import { styles } from '../../ui/styles';
@@ -9,7 +10,7 @@ import { channelImportNotice } from './channels-view';
 
 /** The import dialog. Its fields and the result live on the page so the notice outlives the modal; this component only shapes them. */
 export function ChannelImportModal({ open, busy, revision, engineOptions, importResult, sourceDir, importEngine, replaceExisting, failure, onSource, onEngine, onReplace, onCancel, onImport, onReload }: { open: boolean; busy: string; revision: number | undefined; engineOptions: { value: string; label: string }[]; importResult: ImportChannelsResult['importResult'] | undefined; sourceDir: string; importEngine: string; replaceExisting: boolean; failure: string; onSource: (value: string) => void; onEngine: (value: string) => void; onReplace: (value: boolean) => void; onCancel: () => void; onImport: () => void; onReload: () => void }) {
-  return <Modal className={resourceStyles.modal} classNames={{ body: resourceStyles.modalBody, footer: resourceStyles.modalFooter }} draggable={false} open={open} title="导入原生账号与 API 配置" okText="导入" cancelText="取消" confirmLoading={busy === 'import'} okButtonProps={{ disabled: !!busy || revision === undefined || (!!sourceDir.trim() && importEngine === 'all') }} maskClosable={!busy} keyboard={!busy} onCancel={onCancel} onOk={onImport}>
+  return <Modal className={stylex.props(resourceStyles.modal).className} classNames={{ body: stylex.props(resourceStyles.modalBody).className, footer: stylex.props(resourceStyles.modalFooter).className }} draggable={false} open={open} title="导入原生账号与 API 配置" okText="导入" cancelText="取消" confirmLoading={busy === 'import'} okButtonProps={{ disabled: !!busy || revision === undefined || (!!sourceDir.trim() && importEngine === 'all') }} maskClosable={!busy} keyboard={!busy} onCancel={onCancel} onOk={onImport}>
     {importResult && <Alert type={importResult.failures.length ? 'warning' : 'info'} title="本次导入结果" description={channelImportNotice(importResult)} />}
     <ImportForm engine={importEngine} engines={engineOptions} sourceDir={sourceDir} replaceExisting={replaceExisting} onReplace={onReplace} onEngine={onEngine} onSource={onSource} busy={!!busy} failure={failure} onReload={onReload} />
   </Modal>;
@@ -17,7 +18,7 @@ export function ChannelImportModal({ open, busy, revision, engineOptions, import
 
 function ImportForm({ engine, engines, sourceDir, replaceExisting, onReplace, onEngine, onSource, busy, failure, onReload }: { engine: string; engines: { value: string; label: string }[]; sourceDir: string; replaceExisting: boolean; onReplace: (value: boolean) => void; onEngine: (value: string) => void; onSource: (value: string) => void; busy: boolean; failure: string; onReload: () => void }) {
   const form = useForm(); const id = useId();
-  return <Form form={form} layout="vertical" className={styles.stack} data-channels-scroll="">
+  return <Form form={form} layout="vertical" className={stylex.props(styles.stack).className} data-channels-scroll="">
     <Form.Field label="导入引擎"><NamedSelect id={`${id}-engine`} aria-label="执行引擎" value={engine} disabled={busy} options={[{ value: 'all', label: '所有已有引擎配置' }, ...engines]} onChange={value => onEngine(String(value))} /></Form.Field>
     <Form.Field label="来源配置目录" extra="Weaver 所在机器的原生 CLI 配置根；指定目录时请先选择对应引擎。留空使用默认位置。只复制必要配置与认证，不修改来源。"><Input id={`${id}-source`} value={sourceDir} disabled={busy} onChange={event => onSource(event.target.value)} placeholder="可选，例如 /home/user/.codex" /></Form.Field>
     <Checkbox checked={replaceExisting} disabled={busy} onChange={checked => onReplace(checked === true)}>更新已导入的配置与认证</Checkbox>

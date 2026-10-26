@@ -1,20 +1,21 @@
+import './app/style.css';
+import '@lobehub/ui/theme.css';
+import '@lobehub/ui/style.css';
+import '@lobehub/ui/global.css';
+
 import { createRoot } from 'react-dom/client';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
-import { slate } from '@lobehub/ui/color';
+import { ConfigProvider, setLobeTheme } from '@lobehub/ui';
 import { zhCn } from '@lobehub/ui/i18n';
 import { motion } from 'motion/react';
 import { App } from './app/App';
 import { installBrowserClient } from './api/client';
-import './app/style.css';
 
 // Light only. Cool slate neutrals with a geekblue accent; the canvas sits one step below the white cards.
-const surface = { colorBgLayout: slate.light[1], colorBgContainer: slate.light[0], colorBgElevated: slate.light[0] };
+setLobeTheme({ appearance: 'light', neutralColor: 'slate', primaryColor: 'geekblue' });
 
 function Root() {
-  return <ConfigProvider locale="zh-CN" motion={motion} resources={zhCn}>
-    <ThemeProvider themeMode="light" enableCustomFonts={false} customTheme={{ neutralColor: 'slate', primaryColor: 'geekblue' }} customToken={() => surface} style={{ height: '100%' }}>
-      <App />
-    </ThemeProvider>
+  return <ConfigProvider locale="zh-CN" motion={motion} resources={zhCn} enableCustomFonts={false}>
+    <App />
   </ConfigProvider>;
 }
 

@@ -1,6 +1,7 @@
 import { useId } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { Field } from '@base-ui/react/field';
-import { AutoComplete, InputNumber, Select, Switch, type AutoCompleteProps, type InputNumberProps, type SelectProps, type SwitchProps } from '@lobehub/ui/base-ui';
+import { AutoComplete, InputNumber, Select, Switch, type AutoCompleteProps, type InputNumberProps, type SelectProps, type SwitchProps } from '@lobehub/ui';
 import { styles } from './styles';
 
 type Named = { 'aria-label': string };
@@ -12,13 +13,13 @@ type Named = { 'aria-label': string };
 export function NamedInputNumber({ 'aria-label': label, id: suppliedId, ...props }: InputNumberProps & Named) {
   const generatedId = useId();
   const id = suppliedId ?? generatedId;
-  return <>{!suppliedId && <label className={styles.srOnly} htmlFor={id}>{label}</label>}<InputNumber {...props} id={id} /></>;
+  return <>{!suppliedId && <label {...stylex.props(styles.srOnly)} htmlFor={id}>{label}</label>}<InputNumber {...props} id={id} /></>;
 }
 
 export function NamedSwitch({ 'aria-label': label, id: suppliedId, ...props }: SwitchProps & Named) {
   const generatedId = useId();
   const id = suppliedId ?? generatedId;
-  return <>{!suppliedId && <label className={styles.srOnly} htmlFor={id}>{label}</label>}<Switch {...props} id={id} /></>;
+  return <>{!suppliedId && <label {...stylex.props(styles.srOnly)} htmlFor={id}>{label}</label>}<Switch {...props} id={id} /></>;
 }
 
 export function NamedSelect({ 'aria-label': label, id: suppliedId, ...props }: SelectProps & Named) {
@@ -28,14 +29,14 @@ export function NamedSelect({ 'aria-label': label, id: suppliedId, ...props }: S
     // Tags uses a non-labelable div trigger plus an input with no input-props
     // slot. Base UI's field context names the trigger; the native wrapping
     // label names the editable input without querying or mutating library DOM.
-    return <Field.Root><Field.Label nativeLabel={false} render={<span />} className={styles.srOnly}>{label}</Field.Label><label><span className={styles.srOnly}>{label}</span><Select {...props} id={id} /></label></Field.Root>;
+    return <Field.Root><Field.Label nativeLabel={false} render={<span />} className={stylex.props(styles.srOnly).className}>{label}</Field.Label><label><span {...stylex.props(styles.srOnly)}>{label}</span><Select {...props} id={id} /></label></Field.Root>;
   }
-  return <>{!suppliedId && <label className={styles.srOnly} htmlFor={id}>{label}</label>}<Select {...props} id={id} /></>;
+  return <>{!suppliedId && <label {...stylex.props(styles.srOnly)} htmlFor={id}>{label}</label>}<Select {...props} id={id} /></>;
 }
 
 /** A text field with a suggestion list. The id reaches the native input, so the native label names it. */
 export function NamedAutoComplete({ 'aria-label': label, id: suppliedId, ...props }: AutoCompleteProps & Named) {
   const generatedId = useId();
   const id = suppliedId ?? generatedId;
-  return <>{!suppliedId && <label className={styles.srOnly} htmlFor={id}>{label}</label>}<AutoComplete {...props} id={id} /></>;
+  return <>{!suppliedId && <label {...stylex.props(styles.srOnly)} htmlFor={id}>{label}</label>}<AutoComplete {...props} id={id} /></>;
 }

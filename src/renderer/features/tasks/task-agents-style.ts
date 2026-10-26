@@ -1,44 +1,47 @@
-import { createStaticStyles } from 'antd-style';
+import * as stylex from '@stylexjs/stylex';
+import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
 
-export const styles = createStaticStyles(({ css, cssVar }) => ({
-  section: css`
-    display: flex;
-    flex-direction: column;
-    gap: ${cssVar.marginSM};
-    min-inline-size: 0;
-    overflow-wrap: anywhere;
-  `,
+export const styles = stylex.create({
+  section: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cssVar.marginSM,
+    minInlineSize: 0,
+    overflowWrap: 'anywhere',
+  },
   /** An inline-block label in a table cell sits on the text baseline and makes its row taller than the others. */
-  value: css`
-    display: flex;
-    min-inline-size: 0;
-  `,
-  children: css`
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  `,
-  child: css`
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: ${cssVar.marginXS};
-    padding-block: ${cssVar.paddingSM};
-    border-block-end: 1px solid ${cssVar.colorBorderSecondary};
-  `,
-  link: css`
-    min-inline-size: 0;
-    max-inline-size: 100%;
-    height: auto;
-    white-space: normal;
-    text-align: start;
-    overflow-wrap: anywhere;
-  `,
-  meta: css`
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: ${cssVar.marginXS};
-  `,
-}));
+  value: {
+    display: 'flex',
+    minInlineSize: 0,
+  },
+  children: {
+    listStyle: 'none',
+    margin: 0,
+    padding: 0,
+  },
+  child: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: cssVar.marginXS,
+    paddingBlock: cssVar.paddingSM,
+    borderBlockEndWidth: 1,
+    borderBlockEndStyle: 'solid',
+    borderBlockEndColor: cssVar.colorBorderSecondary,
+  },
+  link: {
+    minInlineSize: 0,
+    maxInlineSize: '100%',
+    height: 'auto',
+    whiteSpace: 'normal',
+    textAlign: 'start',
+    overflowWrap: 'anywhere',
+  },
+  meta: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: cssVar.marginXS,
+  },
+});

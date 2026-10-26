@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { ModelListSession, type ModelListSink } from '../../src/renderer/features/engines/engine-models';
 import type { EngineModelList, EngineModelListInput } from '../../src/shared/engines';
@@ -113,7 +113,7 @@ test('a rejected old-engine fetch cannot overwrite the new engine list', async (
 });
 
 function markup(node: React.ReactNode) {
-  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { enableCustomFonts: false }, node) }));
+  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, null, node) }));
 }
 
 test('the picker no longer tells the user to open the field to fetch models, and keeps the refresh button', () => {

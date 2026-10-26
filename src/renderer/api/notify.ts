@@ -1,5 +1,5 @@
 import { createElement, useEffect, useRef } from 'react';
-import { toast, type ToastInstance } from '@lobehub/ui/base-ui';
+import { toast, type ToastInstance } from '@lobehub/ui';
 import { ConnectionNotice } from './ConnectionNotice';
 import { Reconnector, isTransientError } from './reconnect';
 export { isTransientError } from './reconnect';

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { Virtualizer } from 'virtua';
 import { taskStyles } from './task-style';
 
@@ -51,9 +52,9 @@ export function VirtualLane<T>({ rows, rowKey, rowKind, pinned = [], children }:
   }, []);
   const keep = [...new Set([...pinned, focused - 1, focused, focused + 1])].filter(index => index >= 0 && index < rows.length);
   const server = typeof window === 'undefined';
-  return <div ref={anchor} className={taskStyles.lane}>
+  return <div ref={anchor} {...stylex.props(taskStyles.lane)}>
     {(ready || server) && <Virtualizer data={rows} scrollRef={scroller} startMargin={margin} keepMounted={keep} ssrCount={server ? SSR_ROWS : undefined} bufferSize={BUFFER_PX}>
-      {(row, index) => <div key={rowKey(row)} className={taskStyles.laneRow} data-row={rowKind(row)} onFocus={() => setFocused(index)}>{children(row, index)}</div>}
+      {(row, index) => <div key={rowKey(row)} {...stylex.props(taskStyles.laneRow)} data-row={rowKind(row)} onFocus={() => setFocused(index)}>{children(row, index)}</div>}
     </Virtualizer>}
   </div>;
 }

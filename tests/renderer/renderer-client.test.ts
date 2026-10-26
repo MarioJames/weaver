@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { toast } from '@lobehub/ui/base-ui';
+import { toast } from '@lobehub/ui';
 import type { CommandRequest } from '../../src/shared/contracts/commands';
 import { command } from '../../src/renderer/api/commands';
 import { RPC_DEADLINE_MS, createBrowserClient, installBrowserClient } from '../../src/renderer/api/client';

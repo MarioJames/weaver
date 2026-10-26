@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
-import { toast } from '@lobehub/ui/base-ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
+import { toast } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { defaultConfig } from '../../src/main/policy/routing';
 import type { Task } from '../../src/shared/contracts/tasks';
@@ -23,7 +23,7 @@ const NY = 'America/New_York';
 const at = (value: string) => Date.parse(value);
 afterEach(() => setProjectTimeZone(undefined));
 
-const markup = (node: React.ReactNode) => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { enableCustomFonts: false, children: node }) }));
+const markup = (node: React.ReactNode) => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { children: node }) }));
 
 test('compact time: HH:mm on the zone\'s own today, MM-DD HH:mm on another day, across a year boundary and in two zones', () => {
   // 2027-01-01 03:00Z is New Year's Day in Shanghai (11:00) and still New Year's Eve in New York (22:00).

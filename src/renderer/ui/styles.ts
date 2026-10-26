@@ -1,91 +1,93 @@
-import { createStaticStyles } from 'antd-style';
+import * as stylex from '@stylexjs/stylex';
+import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
 
 /** Layout and text helpers shared across pages; anything one feature owns lives in that feature's style file. */
-export const styles = createStaticStyles(({ css, cssVar }) => ({
-  srOnly: css`
-    position: absolute;
-    overflow: hidden;
-    clip-path: inset(50%);
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    border: 0;
-    white-space: nowrap;
-  `,
-  stack: css`
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-inline-size: 0;
-  `,
-  tight: css`
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-inline-size: 0;
-  `,
-  row: css`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    min-inline-size: 0;
-  `,
-  spread: css`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    justify-content: space-between;
-    min-inline-size: 0;
-  `,
-  numbers: css`
-    font-variant-numeric: tabular-nums;
-  `,
-  wrap: css`
-    overflow-wrap: anywhere;
-    min-inline-size: 0;
-  `,
-  meta: css`
-    font-size: 12px;
-    color: ${cssVar.colorTextSecondary};
-  `,
-  error: css`
-    margin: 0;
-    font-size: 12px;
-    color: ${cssVar.colorErrorText};
-  `,
-  warn: css`
-    color: ${cssVar.colorWarningText};
-  `,
+export const styles = stylex.create({
+  srOnly: {
+    position: 'absolute',
+    overflow: 'hidden',
+    clipPath: 'inset(50%)',
+    width: 1,
+    height: 1,
+    margin: -1,
+    padding: 0,
+    borderWidth: 0,
+    whiteSpace: 'nowrap',
+  },
+  stack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    minInlineSize: 0,
+  },
+  tight: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    minInlineSize: 0,
+  },
+  row: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+    minInlineSize: 0,
+  },
+  spread: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minInlineSize: 0,
+  },
+  numbers: {
+    fontVariantNumeric: 'tabular-nums',
+  },
+  wrap: {
+    overflowWrap: 'anywhere',
+    minInlineSize: 0,
+  },
+  meta: {
+    fontSize: 12,
+    color: cssVar.colorTextSecondary,
+  },
+  error: {
+    margin: 0,
+    fontSize: 12,
+    color: cssVar.colorErrorText,
+  },
+  warn: {
+    color: cssVar.colorWarningText,
+  },
   /** A form section set off from the fields above it. */
-  divided: css`
-    padding-block-start: 12px;
-    border-block-start: 1px solid ${cssVar.colorBorderSecondary};
-  `,
+  divided: {
+    paddingBlockStart: 12,
+    borderBlockStartWidth: 1,
+    borderBlockStartStyle: 'solid',
+    borderBlockStartColor: cssVar.colorBorderSecondary,
+  },
   /** Keep the brand mark with a single-line, ellipsized name. */
-  agentLabel: css`
-    display: inline-block;
-    max-inline-size: 100%;
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-
-    & > svg {
-      flex: none;
-      margin-inline-end: 4px;
-      vertical-align: -0.15em;
-    }
-  `,
+  agentLabel: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    maxInlineSize: '100%',
+    minInlineSize: 0,
+  },
+  agentName: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    minInlineSize: 0,
+  },
   /** Flex rows that must stay on one line; compose after row/spread so it wins the cascade. */
-  nowrap: css`
-    flex-wrap: nowrap;
-  `,
+  nowrap: {
+    flexWrap: 'nowrap',
+  },
   /** A spread row whose two sides top-align, e.g. a section title beside its action. */
-  alignStart: css`
-    flex-wrap: nowrap;
-    align-items: flex-start;
-  `,
-}));
+  alignStart: {
+    flexWrap: 'nowrap',
+    alignItems: 'flex-start',
+  },
+});

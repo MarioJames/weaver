@@ -1,7 +1,7 @@
 import { Children, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Empty, Icon } from '@lobehub/ui';
-import { Button, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
+import * as stylex from '@stylexjs/stylex';
+import { Button, Empty, Icon, Skeleton, Tag, Text } from '@lobehub/ui';
 import { ChevronDown, ChevronRight, ChevronUp, Clock, Folder, Loader2, Pin, PinOff, X } from 'lucide-react';
 import type { Task } from '../../../shared/contracts/tasks';
 import { displayLog } from './log-view';
@@ -34,7 +34,7 @@ function cardStatus(task: Task): { label: string; color?: string; spin: boolean 
 
 /** One time inside the footer sentence: compact text, the full timestamp on hover. */
 function CardTime({ value, now }: { value: string; now: number }) {
-  return <TimeText className={taskStyles.cardTime} value={value} now={now} />;
+  return <TimeText className={stylex.props(taskStyles.cardTime).className} value={value} now={now} />;
 }
 
 const spinner = <Icon icon={Loader2} spin size="small" />;
@@ -43,11 +43,11 @@ const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : us
 
 /** One checkable chip: label, optional brand/dot, and how many tasks in scope carry it. */
 export function FacetChip({ checked, label, count, icon, tone, title, ariaLabel, onClick }: { checked: boolean; label: string; count?: number; icon?: ReactNode; tone?: string; title?: string; ariaLabel?: string; onClick: () => void }) {
-  return <button type="button" className={taskStyles.facetChip} aria-pressed={checked} aria-label={ariaLabel} title={title} onClick={onClick}>
-    {tone && <span className={taskStyles.facetDot} data-tone={tone} aria-hidden="true" />}
+  return <button type="button" {...stylex.props(taskStyles.facetChip)} aria-pressed={checked} aria-label={ariaLabel} title={title} onClick={onClick}>
+    {tone && <span {...stylex.props(taskStyles.facetDot)} data-tone={tone} aria-hidden="true" />}
     {icon}
-    <span className={taskStyles.facetChipLabel}>{label}</span>
-    {count !== undefined && <span className={`${taskStyles.facetChipCount} ${styles.numbers}`}>{count}</span>}
+    <span {...stylex.props(taskStyles.facetChipLabel)}>{label}</span>
+    {count !== undefined && <span {...stylex.props(taskStyles.facetChipCount, styles.numbers)}>{count}</span>}
   </button>;
 }
 
@@ -85,16 +85,16 @@ function FacetRow({ label, size, leading, children }: { label: string; size: num
     Array.from(list.children).forEach(child => observer.observe(child));
     return () => observer.disconnect();
   }, [size, children]);
-  return <div className={taskStyles.facetRow}>
-    <span className={taskStyles.facetLabel}>{label}</span>
-    <div ref={row} className={taskStyles.facetValues}>
+  return <div {...stylex.props(taskStyles.facetRow)}>
+    <span {...stylex.props(taskStyles.facetLabel)}>{label}</span>
+    <div ref={row} {...stylex.props(taskStyles.facetValues)}>
       {leading}
-      <div ref={chips} className={taskStyles.facetChips} data-expanded={expanded}>
-        {size ? Children.toArray(children).map((child, index) => <span key={index} className={taskStyles.facetItem}
+      <div ref={chips} {...stylex.props(taskStyles.facetChips)} data-expanded={expanded}>
+        {size ? Children.toArray(children).map((child, index) => <span key={index} {...stylex.props(taskStyles.facetItem)}
           data-hidden={!expanded && index >= visibleCount} aria-hidden={!expanded && index >= visibleCount} inert={!expanded && index >= visibleCount}>{child}</span>) :
-          leading ? null : <span className={taskStyles.facetEmpty}>暂无</span>}
+          leading ? null : <span {...stylex.props(taskStyles.facetEmpty)}>暂无</span>}
       </div>
-      <button type="button" className={`${taskStyles.facetChip} ${taskStyles.facetMore}`} data-visible={overflow}
+      <button type="button" {...stylex.props(taskStyles.facetChip, taskStyles.facetMore)} data-visible={overflow}
         aria-hidden={!overflow} inert={!overflow} aria-expanded={expanded} aria-label={`${label} ${expanded ? '收起' : '更多'}`}
         onClick={() => setExpanded(!expanded)}>
         {expanded ? '收起' : '更多'}<Icon icon={expanded ? ChevronUp : ChevronDown} size="small" />
@@ -117,13 +117,13 @@ function optionIcon(dimension: FilterDimension, option: FilterOption, ownerKind?
 export function TaskFacets({ board, all = board, selection, collapsed, now, ownerKind, onChange, onCollapse }: { board: Task[]; all?: Task[]; selection: TaskSelection; collapsed: boolean; now: number; ownerKind?: (ownerId?: string) => string | undefined; onChange: (selection: TaskSelection) => void; onCollapse: (collapsed: boolean) => void }) {
   const options = Object.fromEntries(FILTER_DIMENSIONS.map(dimension => [dimension, facetOptions(board, dimension, selection, now, all)])) as Record<FilterDimension, FilterOption[]>;
   const entries = selectedEntries(selection, options);
-  if (collapsed) return <div className={taskStyles.facets} role="group" aria-label="任务筛选">
-    <div className={taskStyles.facetSelected}>
-      <span className={taskStyles.facetSummary}>{filterSummary(selection, options)}</span>
+  if (collapsed) return <div {...stylex.props(taskStyles.facets)} role="group" aria-label="任务筛选">
+    <div {...stylex.props(taskStyles.facetSelected)}>
+      <span {...stylex.props(taskStyles.facetSummary)}>{filterSummary(selection, options)}</span>
       <Button size="small" type="text" icon={ChevronDown} aria-expanded={false} onClick={() => onCollapse(false)}>展开筛选</Button>
     </div>
   </div>;
-  return <div className={taskStyles.facets} role="group" aria-label="任务筛选">
+  return <div {...stylex.props(taskStyles.facets)} role="group" aria-label="任务筛选">
     <FacetRow label="时间" size={TIME_RANGES.length}>
       {TIME_RANGES.map(range => <FacetChip key={range.value} checked={selection.time === range.value} label={range.label}
         count={applyTaskFilters(board, { ...selection, time: range.value as TaskTimeRange }, undefined, now, all).length}
@@ -145,14 +145,14 @@ export function TaskFacets({ board, all = board, selection, collapsed, now, owne
       })}
       </FacetRow>;
     })}
-    <div className={taskStyles.facetSelected}>
-      <div className={taskStyles.facetSelectedDetails} data-active={hasFilters(selection)} aria-hidden={!hasFilters(selection)} inert={!hasFilters(selection)}>
+    <div {...stylex.props(taskStyles.facetSelected)}>
+      <div {...stylex.props(taskStyles.facetSelectedDetails)} data-active={hasFilters(selection)} aria-hidden={!hasFilters(selection)} inert={!hasFilters(selection)}>
         <span>已选：</span>
-        <span className={taskStyles.facetSelectedList}>
-          {selection.time !== 'today' && <button type="button" className={taskStyles.facetChip} aria-label={`移除 ${TIME_RANGES.find(range => range.value === selection.time)?.label}`} onClick={() => onChange({ ...selection, time: 'today' })}>
+        <span {...stylex.props(taskStyles.facetSelectedList)}>
+          {selection.time !== 'today' && <button type="button" {...stylex.props(taskStyles.facetChip)} aria-label={`移除 ${TIME_RANGES.find(range => range.value === selection.time)?.label}`} onClick={() => onChange({ ...selection, time: 'today' })}>
             时间：{TIME_RANGES.find(range => range.value === selection.time)?.label}<Icon icon={X} size="small" />
           </button>}
-          {entries.map(entry => <button key={`${entry.dimension}:${entry.value}`} type="button" className={taskStyles.facetChip} aria-label={`移除 ${entry.label}`}
+          {entries.map(entry => <button key={`${entry.dimension}:${entry.value}`} type="button" {...stylex.props(taskStyles.facetChip)} aria-label={`移除 ${entry.label}`}
             onClick={() => onChange({ ...selection, [entry.dimension]: selection[entry.dimension].filter(value => value !== entry.value) })}>
             {entry.label}<Icon icon={X} size="small" />
           </button>)}
@@ -190,7 +190,7 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, freeC
     setPins(next);
     writeTaskPins(next);
   };
-  if (loading && !tasks.length) return <div role="status" className={styles.stack}><Skeleton animated /><Text type="secondary">正在加载本地任务…</Text></div>;
+  if (loading && !tasks.length) return <div role="status" {...stylex.props(styles.stack)}><Skeleton animated /><Text type="secondary">正在加载本地任务…</Text></div>;
   if (!tasks.length) return <Empty title="还没有任务" description="从右上角新建第一个任务。" />;
   const selection = resolveSelection(filters ?? stored, tasks, boardNow);
   const board = nonArchived(tasks, boardNow);
@@ -230,48 +230,48 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, freeC
     const activity = task.ownerHost ? `Herdr · ${task.ownerHost.agentName}` : displayLog(latest?.message ?? '等待首次调度');
     const fresh = isNewTask(task, boardNow);
     const pinnedNow = isPinned(pins, task.id);
-    return <div className={taskStyles.cardShell}>
-      <button type="button" className={taskStyles.taskCard} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
-        <span className={taskStyles.cardTitle}>
-          {fresh && <Tag className={taskStyles.cardTag} size="small" color={tagColor('fresh')}>新</Tag>}
-          {task.parentTaskId && <Tag className={taskStyles.cardTag} size="small" color={tagColor('childRole')}>子任务</Tag>}
-          {task.dispatch?.worker && <Tag className={taskStyles.cardTag} title={task.dispatch.worker} size="small" color={tagColor('neutral')} icon={<EngineIcon kind={dispatchKind(task)} />}><span className={taskStyles.cardTagText}>{task.dispatch.worker}</span></Tag>}
-          {task.dispatch?.worker && freeChannel?.(task.dispatch.worker) && <FreeChannelTag className={taskStyles.cardTag} title={`子 Agent ${task.dispatch.worker} 使用免费渠道`} />}
-          <strong className={taskStyles.cardTitleText}>{taskTitle(task)}</strong>
+    return <div {...stylex.props(taskStyles.cardShell)}>
+      <button type="button" {...stylex.props(taskStyles.taskCard)} aria-current={selected === task.id ? 'true' : undefined} onClick={() => onSelect(task.id)}>
+        <span {...stylex.props(taskStyles.cardTitle)}>
+          {fresh && <Tag className={stylex.props(taskStyles.cardTag).className} size="small" color={tagColor('fresh')}>新</Tag>}
+          {task.parentTaskId && <Tag className={stylex.props(taskStyles.cardTag).className} size="small" color={tagColor('childRole')}>子任务</Tag>}
+          {task.dispatch?.worker && <Tag className={stylex.props(taskStyles.cardTag).className} title={task.dispatch.worker} size="small" color={tagColor('neutral')} icon={<EngineIcon kind={dispatchKind(task)} />}><span {...stylex.props(taskStyles.cardTagText)}>{task.dispatch.worker}</span></Tag>}
+          {task.dispatch?.worker && freeChannel?.(task.dispatch.worker) && <FreeChannelTag className={stylex.props(taskStyles.cardTag).className} title={`子 Agent ${task.dispatch.worker} 使用免费渠道`} />}
+          <strong {...stylex.props(taskStyles.cardTitleText)}>{taskTitle(task)}</strong>
         </span>
-        <span className={taskStyles.cardStatus}>
-          <Tag size="small" color={tag.color} icon={tag.spin ? spinner : displayStatus(task) === 'scheduled' ? <Icon icon={Clock} size="small" /> : undefined}>{tag.label}</Tag>
-          {tag.spin && <Text type="secondary" className={taskStyles.cardActivity} title={activity}>{activity}</Text>}
+        <span {...stylex.props(taskStyles.cardStatus)}>
+          <Tag className={stylex.props(taskStyles.cardStatusTag).className} size="small" color={tag.color} icon={tag.spin ? spinner : displayStatus(task) === 'scheduled' ? <Icon icon={Clock} size="small" /> : undefined}>{tag.label}</Tag>
+          {tag.spin && <Text type="secondary" className={stylex.props(taskStyles.cardActivity).className} title={activity}>{activity}</Text>}
         </span>
-        {wait && <span className={taskStyles.cardWait} data-overdue={wait.overdue} data-wait={wait.acknowledged ? 'acknowledged' : 'pending'} title={wait.title}>{wait.text}</span>}
-        <span className={taskStyles.cardMeta}>
-          <span className={taskStyles.cardWho}>由 <AgentFacts compact task={task} owner={owner} ownerKind={ownerKind} /> <span className={taskStyles.cardTail}>于 <CardTime value={footer.at} now={boardNow} /> {footer.verb}{footer.tail && <span className={taskStyles.cardSep} aria-hidden="true"> ·</span>}</span></span>
-          {footer.tail && <>{' '}<span className={taskStyles.cardTail}>{footer.tail.label} <CardTime value={footer.tail.at} now={boardNow} /></span></>}
+        {wait && <span {...stylex.props(taskStyles.cardWait)} data-overdue={wait.overdue} data-wait={wait.acknowledged ? 'acknowledged' : 'pending'} title={wait.title}>{wait.text}</span>}
+        <span {...stylex.props(taskStyles.cardMeta)}>
+          <span {...stylex.props(taskStyles.cardWho)}>由 <AgentFacts compact task={task} owner={owner} ownerKind={ownerKind} /> <span {...stylex.props(taskStyles.cardTail)}>于 <CardTime value={footer.at} now={boardNow} /> {footer.verb}{footer.tail && <span {...stylex.props(taskStyles.cardSep)} aria-hidden="true"> ·</span>}</span></span>
+          {footer.tail && <>{' '}<span {...stylex.props(taskStyles.cardTail)}>{footer.tail.label} <CardTime value={footer.tail.at} now={boardNow} /></span></>}
         </span>
       </button>
       {/* A sibling of the card button, never nested inside it; the click stays a pin toggle and never selects the card. */}
-      <button type="button" className={taskStyles.pinButton} data-pinned={pinnedNow} aria-pressed={pinnedNow} aria-label={pinnedNow ? '取消置顶' : '置顶'} onClick={() => onTogglePin(task.id)}>
+      <button type="button" {...stylex.props(taskStyles.pinButton)} data-pinned={pinnedNow} aria-pressed={pinnedNow} aria-label={pinnedNow ? '取消置顶' : '置顶'} onClick={() => onTogglePin(task.id)}>
         {/* Pinned reads as 「已钉住」 (filled Pin); the slashed PinOff only appears while the button is hovered or focused, to say the click unpins. */}
-        <span data-icon="pin" className={taskStyles.pinGlyph}><Icon icon={Pin} size="small" /></span>
-        {pinnedNow && <span data-icon="unpin" className={taskStyles.pinGlyph}><Icon icon={PinOff} size="small" /></span>}
+        <span data-icon="pin" {...stylex.props(taskStyles.pinGlyph, taskStyles.pinGlyphPin)}><Icon icon={Pin} size="small" fill={pinnedNow ? 'currentColor' : undefined} /></span>
+        {pinnedNow && <span data-icon="unpin" {...stylex.props(taskStyles.pinGlyph, taskStyles.pinGlyphUnpin)}><Icon icon={PinOff} size="small" /></span>}
       </button>
     </div>;
   };
-  return <section aria-label="任务看板" className={taskStyles.board}>
+  return <section aria-label="任务看板" {...stylex.props(taskStyles.board)}>
     <TaskFacets board={board} all={tasks} selection={selection} collapsed={collapsed} now={boardNow} ownerKind={ownerKind} onChange={update} onCollapse={collapse} />
     {!visible.length && <>
-      {childlessRoots.map(root => <div key={root.id} className={styles.row} role="status">
+      {childlessRoots.map(root => <div key={root.id} {...stylex.props(styles.row)} role="status">
         <Text type="secondary">{emptyRootNotice(root)}</Text>
         <Button size="small" onClick={() => onSelect(root.id)}>查看父任务</Button>
       </div>)}
-      <Empty title="没有匹配的任务" description={olderOpenWork ? '今天没有任务，还有更早的未结束任务。' : undefined} action={<div className={styles.row}>
+      <Empty title="没有匹配的任务" description={olderOpenWork ? '今天没有任务，还有更早的未结束任务。' : undefined} action={<div {...stylex.props(styles.row)}>
       <Button size="small" onClick={() => update(emptySelection())}>清除筛选</Button>
       {olderOpenWork && <Button size="small" onClick={() => update({ ...selection, time: 'all' })}>查看全部</Button>}
     </div>} />
     </>}
     {visible.length > 0 && <>
-    <Text type="secondary" className={taskStyles.boardScrollHint}>左右滚动查看其他状态列</Text>
-    <div className={taskStyles.columns} aria-label="任务状态列" role="region" tabIndex={0} aria-busy={loading}>
+    <Text type="secondary" className={stylex.props(taskStyles.boardScrollHint).className}>左右滚动查看其他状态列</Text>
+    <div {...stylex.props(taskStyles.columns)} aria-label="任务状态列" role="region" tabIndex={0} aria-busy={loading}>
       {TASK_COLUMNS.map((column, index) => {
         const items = columns[index];
         /** 置顶区 leads the column: manual pins and still-new tasks grouped by workspace, the plain groups follow without them. */
@@ -284,30 +284,30 @@ export function TaskBoard({ tasks, selected, loading, onSelect, ownerKind, freeC
         const shown = !foldable || ended || !items.length;
         const count = <>
           <strong>{column.label}</strong>
-          <span className={`${styles.numbers} ${taskStyles.columnCount}`}>{items.length}</span>
+          <span {...stylex.props(taskStyles.columnCount, styles.numbers)}>{items.length}</span>
         </>;
-        return <div key={column.key} id={shown && foldable ? ENDED_BODY_ID : undefined} className={taskStyles.column} data-status-column={column.key} data-collapsed={!shown}>
-          <header className={taskStyles.columnHead}>
-            {foldable && items.length > 0 ? <button type="button" className={taskStyles.fold} aria-expanded={shown} aria-controls={shown ? ENDED_BODY_ID : undefined} onClick={toggleEnded}>
+        return <div key={column.key} id={shown && foldable ? ENDED_BODY_ID : undefined} {...stylex.props(taskStyles.column)} data-status-column={column.key} data-collapsed={!shown}>
+          <header {...stylex.props(taskStyles.columnHead)}>
+            {foldable && items.length > 0 ? <button type="button" {...stylex.props(taskStyles.fold)} aria-expanded={shown} aria-controls={shown ? ENDED_BODY_ID : undefined} onClick={toggleEnded}>
               <Icon icon={shown ? ChevronDown : ChevronRight} size="small" />
               {count}
             </button> : count}
           </header>
           {shown && <>
             {items.length > 0 && <VirtualLane rows={rows} rowKey={row => row.key} rowKind={row => row.kind} pinned={rows.flatMap((row, at) => row.kind === 'card' && row.task.id === selected ? [at] : [])}>
-              {row => row.kind === 'zoneHeading' ? <div className={taskStyles.pinnedHeading}>
+              {row => row.kind === 'zoneHeading' ? <div {...stylex.props(taskStyles.pinnedHeading)}>
                 <Icon icon={Pin} size="small" />
                 <span>置顶 · {row.count}</span>
               </div> : row.kind === 'heading' ? <>
-                {row.afterZone && <div role="separator" className={taskStyles.pinnedEnd} />}
-                <h3 className={taskStyles.workspaceHeading} title={row.title}>
-                  <Icon icon={Folder} size="small" />
-                  <span className={taskStyles.workspaceName}>{row.label}</span>
-                  <span className={styles.numbers}>{row.count}</span>
+                {row.afterZone && <div role="separator" {...stylex.props(taskStyles.pinnedEnd)} />}
+                <h3 {...stylex.props(taskStyles.workspaceHeading)} title={row.title}>
+                  <Icon icon={Folder} size="small" className={stylex.props(taskStyles.workspaceIcon).className} />
+                  <span {...stylex.props(taskStyles.workspaceName)}>{row.label}</span>
+                  <span {...stylex.props(styles.numbers)}>{row.count}</span>
                 </h3>
               </> : card(row.task)}
             </VirtualLane>}
-            {!items.length && <Text type="secondary" className={styles.meta}>暂无任务</Text>}
+            {!items.length && <Text type="secondary" className={stylex.props(styles.meta).className}>暂无任务</Text>}
             {split.rest.length > 20 && <Button size="small" type="text" aria-expanded={expanded} onClick={() => setExpandedLanes(current => expanded ? current.filter(key => key !== column.key) : [...current, column.key])}>
               {expanded ? '收起' : `查看全部 ${split.rest.length}`}
             </Button>}

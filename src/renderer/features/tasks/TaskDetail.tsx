@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Empty, Icon } from '@lobehub/ui';
-import { Alert, Button, Modal, Tabs, Tag, Text } from '@lobehub/ui/base-ui';
+import * as stylex from '@stylexjs/stylex';
+import { Alert, Button, Empty, Icon, Modal, Tabs, Tag, Text } from '@lobehub/ui';
 import { Loader2 } from 'lucide-react';
 import { useNotifyError } from '../../api/notify';
 import { TaskAgents } from './TaskAgents';
@@ -57,17 +57,17 @@ export function TaskDetail({ task, busy, onStart, onEdit, onCancel, action, onRe
   const artifacts = task.summary ? task.artifacts.filter(artifact => artifact.content.trim() !== summary) : task.artifacts;
   const cancelNotice = task ? rootCancelNotice(task, tasks) : undefined;
   const queueNotice = task.scheduled || (task.status === 'queued' && task.queueReason);
-  return <section ref={panel} tabIndex={-1} aria-label="任务详情" className={styles.stack}>
-    <div className={detailStyles.header}>
-      <div className={detailStyles.heading}>
-        <Text className={styles.wrap} style={{ fontSize: 18, fontWeight: 600 }}>{taskTitle(task)}</Text>
-        <div className={styles.row}>
-          <Tag className={detailStyles.statusTag} variant="solid" color={statusTagColor(DISPLAY_TONES[status])} icon={timelineActive(task.status) ? <Icon icon={Loader2} spin size="small" /> : undefined}>{DISPLAY_LABELS[status]}</Tag>
+  return <section ref={panel} tabIndex={-1} aria-label="任务详情" {...stylex.props(styles.stack)}>
+    <div {...stylex.props(detailStyles.header)}>
+      <div {...stylex.props(detailStyles.heading)}>
+        <Text className={stylex.props(styles.wrap, detailStyles.title).className}>{taskTitle(task)}</Text>
+        <div {...stylex.props(styles.row)}>
+          <Tag className={stylex.props(detailStyles.statusTag).className} variant="solid" color={statusTagColor(DISPLAY_TONES[status])} icon={timelineActive(task.status) ? <Icon icon={Loader2} spin size="small" /> : undefined}>{DISPLAY_LABELS[status]}</Tag>
           <TaskHealthBadge taskId={task.id} active={task.status === 'running'} />
         </div>
         {needsWorkspace && <Text type="secondary">先编辑补充目标项目目录，才能开始执行。</Text>}
       </div>
-      <div className={detailStyles.actions}>
+      <div {...stylex.props(detailStyles.actions)}>
         {task.status === 'completed' && (!task.reviewState || task.reviewState === 'pending') && <Button type="primary" disabled={busy} onClick={() => { setTab('review'); setReviewOpen(true); }}>手动验收</Button>}
         {draft && onEdit && <Button disabled={busy} onClick={() => onEdit(task.id)}>编辑</Button>}
         {canStart && <Button type="primary" disabled={busy || needsWorkspace} onClick={() => onStart(task.id)}>{retryLaunch ? '重试启动父 Agent' : '开始执行'}</Button>}
@@ -76,23 +76,23 @@ export function TaskDetail({ task, busy, onStart, onEdit, onCancel, action, onRe
       </div>
     </div>
     {cancelNotice && <Modal open={askCancel} title={cancelNotice.title} width={600} okText="确认取消" cancelText="返回" okButtonProps={{ danger: true }} onCancel={() => setAskCancel(false)} onOk={() => { setAskCancel(false); onCancel(task.id); }}>
-      <div className={styles.stack}><Text>{cancelNotice.description}</Text><Text type="secondary">{cancelNotice.detail}</Text></div>
+      <div {...stylex.props(styles.stack)}><Text>{cancelNotice.description}</Text><Text type="secondary">{cancelNotice.detail}</Text></div>
     </Modal>}
-    <div role="group" aria-label="任务记录" className={detailStyles.tabs}>
-      <Tabs activeKey={tab} onChange={setTab} variant="square" size="small" classNames={{ list: detailStyles.tabList, panel: detailStyles.panel }} items={[
-        { key: 'overview', label: '概览', children: <div className={detailStyles.overview}>
+    <div role="group" aria-label="任务记录" {...stylex.props(detailStyles.tabs)}>
+      <Tabs activeKey={tab} onChange={setTab} variant="square" size="small" classNames={{ list: stylex.props(detailStyles.tabList).className, tab: stylex.props(detailStyles.tab).className, panel: stylex.props(detailStyles.panel).className }} items={[
+        { key: 'overview', label: '概览', children: <div {...stylex.props(detailStyles.overview)}>
           {queueNotice ? <Alert type="info" title="调度请求已排队" description={task.queueReason ? `${queueLabels[task.queueReason.code]}：${redactLog(task.queueReason.message)}` : '等待调度检查。'} />
-            : task.status === 'cancelled' ? <Alert type="secondary" title="执行已取消" description={redactLog(failure?.message ?? latest?.message ?? '查看时间线。')} /> : showActivity ? <Text type="secondary" className={detailStyles.activity}>{activity}</Text> : undefined}
+            : task.status === 'cancelled' ? <Alert type="secondary" title="执行已取消" description={redactLog(failure?.message ?? latest?.message ?? '查看时间线。')} /> : showActivity ? <Text type="secondary" className={stylex.props(detailStyles.activity).className}>{activity}</Text> : undefined}
           {task.summary && <TaskTextBlock key={`${task.id}:summary`} title="执行结果" content={task.summary} markdown clamp={6} />}
           <AgentFacts task={task} ownerKind={ownerKind} />
           <TaskAgents task={task} tasks={tasks} onSelect={onSelect} ownerKind={ownerKind} freeChannel={freeChannel} />
-          {task.retryOf && <Text type="secondary" className={styles.wrap}>重试来源：{task.retryOf}</Text>}
+          {task.retryOf && <Text type="secondary" className={stylex.props(styles.wrap).className}>重试来源：{task.retryOf}</Text>}
         </div> },
         { key: 'prompt', label: 'Prompt', children: <TaskTextBlock key={`${task.id}:prompt`} title="Prompt" content={task.instruction} /> },
-        { key: 'requirements', label: '要求' + ((task.acceptanceCriteria?.length ?? 0) + (task.constraints?.length ?? 0) ? ` ${(task.acceptanceCriteria?.length ?? 0) + (task.constraints?.length ?? 0)}` : ''), children: <div className={detailStyles.overview}>
-          {task.constraints?.length ? <div className={styles.stack}><Text style={{ fontWeight: 600 }}>执行约束</Text><ul className={detailStyles.list}>{task.constraints.map((constraint, index) => <li key={index}>{constraint}</li>)}</ul></div> : undefined}
-          <div className={styles.stack}><Text style={{ fontWeight: 600 }}>验收标准</Text>
-            {task.acceptanceCriteria?.length ? <ol className={detailStyles.list}>{task.acceptanceCriteria.map((criterion, index) => <li key={index}>{criterion}</li>)}</ol> : <Text type="secondary">等待父 Agent 生成并填充验收标准。</Text>}
+        { key: 'requirements', label: '要求' + ((task.acceptanceCriteria?.length ?? 0) + (task.constraints?.length ?? 0) ? ` ${(task.acceptanceCriteria?.length ?? 0) + (task.constraints?.length ?? 0)}` : ''), children: <div {...stylex.props(detailStyles.overview)}>
+          {task.constraints?.length ? <div {...stylex.props(styles.stack)}><Text strong>执行约束</Text><ul {...stylex.props(detailStyles.list)}>{task.constraints.map((constraint, index) => <li key={index}>{constraint}</li>)}</ul></div> : undefined}
+          <div {...stylex.props(styles.stack)}><Text strong>验收标准</Text>
+            {task.acceptanceCriteria?.length ? <ol {...stylex.props(detailStyles.list)}>{task.acceptanceCriteria.map((criterion, index) => <li key={index}>{criterion}</li>)}</ol> : <Text type="secondary">等待父 Agent 生成并填充验收标准。</Text>}
           </div>
         </div> },
         { key: 'events', label: '时间线 ' + task.events.length, children: <EventsPanel events={task.events} taskId={task.id} active={timelineActive(task.status)} failure={task.failure} /> },

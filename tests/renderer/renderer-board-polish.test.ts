@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
 import { TaskBoard, TaskFacets } from '../../src/renderer/features/tasks/TaskBoard';
@@ -14,7 +14,7 @@ import { ENDED_EXPANDED_KEY } from '../../src/renderer/features/tasks/task-persi
 
 const now = new Date(2026, 9, 19, 14, 25).getTime();
 const task: Task = { id: 'one', title: 'POLISH_TITLE', status: 'running', owner: { name: 'Parent', transport: 'herdr-visible', session: '', pane: '' }, instruction: '', workspace: '/projects/enterprise', progress: 0, createdAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString(), events: [], artifacts: [] };
-const markup = (node: React.ReactNode) => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { enableCustomFonts: false, children: node }) }));
+const markup = (node: React.ReactNode) => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { children: node }) }));
 function board(tasks: Task[], filters = emptySelection()) {
   const prior = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (key: string) => key === ENDED_EXPANDED_KEY ? 'true' : null } });

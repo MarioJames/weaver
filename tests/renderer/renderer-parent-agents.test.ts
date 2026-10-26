@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
 import { TaskBoard } from '../../src/renderer/features/tasks/TaskBoard';
@@ -45,7 +45,7 @@ function storage<T>(values: Record<string, string>, run: () => T): T {
   }
 }
 function markup(node: React.ReactNode) {
-  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) }));
+  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) }));
 }
 function board(selection: Partial<typeof everything> = {}, list: Task[] = tasks) {
   return storage({ [ENDED_EXPANDED_KEY]: 'true' }, () => markup(React.createElement(TaskBoard, { tasks: list, filters: { ...everything, ...selection }, now, loading: false, onSelect: () => {} })));

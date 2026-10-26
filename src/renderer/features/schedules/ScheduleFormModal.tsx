@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Input, Modal, Segmented, TextArea, Text } from '@lobehub/ui/base-ui';
-import { Form, useForm } from '@lobehub/ui/base-ui/form';
+import * as stylex from '@stylexjs/stylex';
+import { Alert, Button, Input, Modal, Segmented, TextArea, Text } from '@lobehub/ui';
+import { Form, useForm } from '@lobehub/ui/form';
 import type { PolicySnapshot } from '../../../shared/contracts/policy';
 import type { ScheduleDefinition, ScheduleInput } from '../../../shared/contracts/schedules';
 import { notifyError } from '../../api/notify';
@@ -159,7 +160,7 @@ export function ScheduleFormModal({ open, definition, active, busy, pendingNotic
     ? '正在读取…'
     : policyError ? '读取失败，重试后选择' : (baseExecutorOptions.length ? '选择执行 Agent' : '没有可用的执行 Agent 配置');
   const fieldError = (key: keyof ReturnType<typeof draftErrors>) => errors[key]
-    ? <p role="alert" className={styles.error}>{errors[key]}</p> : undefined;
+    ? <p role="alert" className={stylex.props(styles.error).className}>{errors[key]}</p> : undefined;
   const executorInline = (() => {
     if (builtin || runningOnly || draft.kind !== 'agent') return undefined;
     if (policyLoading || (!policy && !policyError)) return { tone: 'status' as const, text: '正在读取执行 Agent 配置，已选内容和草稿会保留。' };
@@ -173,8 +174,8 @@ export function ScheduleFormModal({ open, definition, active, busy, pendingNotic
   const executorExtra = (<>
     {fieldError('executor')}
     {executorInline && (executorInline.tone === 'error'
-      ? <p role="alert" className={styles.error}>{executorInline.text}</p>
-      : <p role="status" className={styles.meta}>{executorInline.text}</p>)}
+      ? <p role="alert" className={stylex.props(styles.error).className}>{executorInline.text}</p>
+      : <p role="status" className={stylex.props(styles.meta).className}>{executorInline.text}</p>)}
     {(policyError || (policy && baseExecutorOptions.length === 0 && !builtin && !runningOnly && draft.kind === 'agent')) && (
       <div><Button size="small" disabled={policyLoading} loading={policyLoading} onClick={reloadPolicy}>重试读取</Button></div>
     )}
@@ -214,7 +215,7 @@ export function ScheduleFormModal({ open, definition, active, busy, pendingNotic
           </>} />}
         {builtin && <Alert type="info" title={`内置任务：${BUILTIN_HINT}`} description="名称、类型、脚本内容和删除都不在这里修改；这里的启停和间隔与「设置」页的额度开关同源。" />}
         {runningOnly && <Alert type="warning" title="这个任务正在运行" description="执行内容在本次运行结束前不能修改，只能在此切换启用状态。" />}
-        <div className={schedulesStyles.formBody}>
+        <div {...stylex.props(schedulesStyles.formBody)}>
           {/* fieldError rides in `extra`, not as a second child: Field computes the visible
               label's htmlFor from a single direct element child's id, and an array—even with
               an undefined slot—enumerates as list children for it. */}
@@ -234,12 +235,12 @@ export function ScheduleFormModal({ open, definition, active, busy, pendingNotic
             // MinutesInput follows the same no-min/no-max pattern).
             ? builtin
               ? <Form.Field label="刷新间隔（分钟）" required desc={BUILTIN_INTERVAL_DESC} extra={fieldError('interval')}>
-                  <NamedInputNumber id={`${fieldId}-interval`} aria-label="刷新间隔（分钟）" disabled={lockedField('intervalSeconds') || blocked} step={5} format={{ useGrouping: false }} value={minutesOf()} placeholder="15" style={{ inlineSize: 200 }} onChange={value => update({ intervalSeconds: value === undefined || value === null ? undefined : value * 60 })} />
+                  <NamedInputNumber id={`${fieldId}-interval`} aria-label="刷新间隔（分钟）" disabled={lockedField('intervalSeconds') || blocked} step={5} format={{ useGrouping: false }} value={minutesOf()} placeholder="15" className={stylex.props(schedulesStyles.intervalInput).className} onChange={value => update({ intervalSeconds: value === undefined || value === null ? undefined : value * 60 })} />
                 </Form.Field>
               : <Form.Field label="间隔秒数" required extra={fieldError('interval')}>
-                  <NamedInputNumber id={`${fieldId}-interval`} aria-label="间隔秒数" disabled={lockedField('intervalSeconds') || blocked} step={1} format={{ useGrouping: false }} value={draft.intervalSeconds} placeholder="900" style={{ inlineSize: 200 }} onChange={value => update({ intervalSeconds: value ?? undefined })} />
+                  <NamedInputNumber id={`${fieldId}-interval`} aria-label="间隔秒数" disabled={lockedField('intervalSeconds') || blocked} step={1} format={{ useGrouping: false }} value={draft.intervalSeconds} placeholder="900" className={stylex.props(schedulesStyles.intervalInput).className} onChange={value => update({ intervalSeconds: value ?? undefined })} />
                 </Form.Field>
-            : <div className={schedulesStyles.pair}>
+            : <div {...stylex.props(schedulesStyles.pair)}>
                 <Form.Field label="cron 表达式" required extra={fieldError('cron')}>
                   <Input id={`${fieldId}-cron`} aria-label="cron 表达式" disabled={lockedField('cron') || blocked} value={draft.cron} placeholder="*/15 * * * *" onChange={event => update({ cron: event.target.value })} />
                 </Form.Field>
@@ -255,7 +256,7 @@ export function ScheduleFormModal({ open, definition, active, busy, pendingNotic
               <TextArea id={`${fieldId}-command`} aria-label="命令" disabled={lockedField('command') || blocked} rows={3} maxLength={16000} value={draft.command} placeholder="例如：rsync -a /srv/data/ /backup/data/" onChange={event => update({ command: event.target.value })} />
             </Form.Field>
             <Form.Field label="超时秒数" required desc={TIMEOUT_DESC} extra={fieldError('timeout')}>
-              <NamedInputNumber id={`${fieldId}-timeout`} aria-label="超时秒数" disabled={lockedField('timeoutSeconds') || blocked} step={1} format={{ useGrouping: false }} value={draft.timeoutSeconds} placeholder="3600" style={{ inlineSize: 200 }} onChange={value => update({ timeoutSeconds: value ?? undefined })} />
+              <NamedInputNumber id={`${fieldId}-timeout`} aria-label="超时秒数" disabled={lockedField('timeoutSeconds') || blocked} step={1} format={{ useGrouping: false }} value={draft.timeoutSeconds} placeholder="3600" className={stylex.props(schedulesStyles.intervalInput).className} onChange={value => update({ timeoutSeconds: value ?? undefined })} />
             </Form.Field>
           </>}
           {draft.kind === 'agent' && !builtin && <>
@@ -277,7 +278,7 @@ export function ScheduleFormModal({ open, definition, active, busy, pendingNotic
           </Form.Field>
           {!editing && <Text type="secondary">保存后按时间规则触发；停用的任务不会自动运行，但仍可在这里手动执行。</Text>}
         </div>
-        <div className={schedulesStyles.footer}>
+        <div {...stylex.props(schedulesStyles.footer)}>
           <Button htmlType="button" disabled={blocked} onClick={requestClose}>取消</Button>
           <Button htmlType="submit" type="primary" disabled={!valid || blocked} loading={submitting}>{builtin ? '保存内置任务' : editing ? '保存修改' : '创建'}</Button>
         </div>

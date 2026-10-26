@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, Folder, FolderOpen, X } from 'lucide-react';
-import { Button, Modal, Text } from '@lobehub/ui/base-ui';
-import { Icon } from '@lobehub/ui';
+import * as stylex from '@stylexjs/stylex';
+import { Button, Icon, Modal, Text } from '@lobehub/ui';
 import { command } from '../../api/commands';
 import { notifyError } from '../../api/notify';
 import { composerStyles } from './task-composer-style';
@@ -63,36 +63,36 @@ export function WorkspacePicker({ value, disabled, allowClear = false, recent = 
     finally { if (current()) setChecking(''); }
   }
   return <>
-    <div className={composerStyles.directoryRow}>
-      <Button id={id} ref={directoryButtonRef} block className={composerStyles.directoryButton} title={value || undefined} disabled={disabled} aria-label={label} icon={value ? FolderOpen : Folder} onClick={() => { if (!selection.current.disabled) { setListing(undefined); setError(''); setLoading(true); setPath(value || undefined); setOpen(true); } }}>{value || placeholder}</Button>
-      {allowClear && !!value && <Button htmlType="button" className={composerStyles.directoryClear} disabled={disabled} title="清除目标项目目录" aria-label="清除目标项目目录" icon={X} onClick={() => { if (!selection.current.disabled) { clearWorkspace(onChange); focusDirectoryPicker(directoryButtonRef.current); } }} />}
+    <div {...stylex.props(composerStyles.directoryRow)}>
+      <Button id={id} ref={directoryButtonRef} block {...stylex.props(composerStyles.directoryButton)} title={value || undefined} disabled={disabled} aria-label={label} icon={value ? FolderOpen : Folder} onClick={() => { if (!selection.current.disabled) { setListing(undefined); setError(''); setLoading(true); setPath(value || undefined); setOpen(true); } }}><span {...stylex.props(composerStyles.directoryLabel)}>{value || placeholder}</span></Button>
+      {allowClear && !!value && <Button htmlType="button" {...stylex.props(composerStyles.directoryClear)} disabled={disabled} title="清除目标项目目录" aria-label="清除目标项目目录" icon={X} onClick={() => { if (!selection.current.disabled) { clearWorkspace(onChange); focusDirectoryPicker(directoryButtonRef.current); } }} />}
     </div>
     <Modal open={open} title={label} width={560} onCancel={closePicker} footer={<Button type="primary" disabled={loading || !!checking || !!error || !listing || disabled} onClick={() => { if (listing && !selection.current.disabled && selection.current.open) { onChange(listing.path); closePicker(); } }}>{confirmLabel}</Button>}>
-      <div className={composerStyles.directoryBrowser}>
-        {recent.length > 0 && <section aria-label="已有工作区" className={composerStyles.directorySection}>
+      <div {...stylex.props(composerStyles.directoryBrowser)}>
+        {recent.length > 0 && <section aria-label="已有工作区" {...stylex.props(composerStyles.directorySection)}>
           <Text strong>已有工作区</Text>
-          <div className={composerStyles.recentList}>
-            {recent.map(item => <Button key={item} block type="text" loading={checking === item} disabled={disabled || !!checking} title={item} aria-label={`使用工作区 ${item}`} className={composerStyles.recentItem} onClick={() => void pickRecent(item)}>
+          <div {...stylex.props(composerStyles.recentList)}>
+            {recent.map(item => <Button key={item} block type="text" loading={checking === item} disabled={disabled || !!checking} title={item} aria-label={`使用工作区 ${item}`} {...stylex.props(composerStyles.recentItem)} onClick={() => void pickRecent(item)}>
               <Icon icon={Folder} size="small" />
-              <span className={composerStyles.recentName}>{baseName(item)}</span>
-              <span className={composerStyles.recentPath}>{item}</span>
+              <span {...stylex.props(composerStyles.recentName)}>{baseName(item)}</span>
+              <span {...stylex.props(composerStyles.recentPath)}>{item}</span>
             </Button>)}
           </div>
         </section>}
-        <section aria-label="浏览目录" className={composerStyles.directorySection}>
+        <section aria-label="浏览目录" {...stylex.props(composerStyles.directorySection)}>
           <Text strong>浏览其他目录</Text>
-          <Text className={composerStyles.directoryPath}>{listing?.path || path || '项目目录'}</Text>
-          <div className={composerStyles.directoryActions}>
+          <Text {...stylex.props(composerStyles.directoryPath)}>{listing?.path || path || '项目目录'}</Text>
+          <div {...stylex.props(composerStyles.directoryActions)}>
             <Button disabled={disabled || !!checking || loading || (!listing?.parent && !error)} onClick={() => setPath(listing?.parent ?? undefined)}>上一级</Button>
             <Button disabled={disabled || !!checking || loading} onClick={() => { setPath(undefined); setAttempt(value => value + 1); }}>起始目录</Button>
           </div>
           {error && <div role="alert"><Text type="danger">目录读取失败，可重试或返回起始目录。</Text><Button disabled={disabled || loading} onClick={retry}>重试</Button></div>}
           {loading && <Text role="status" type="secondary">正在读取目录…</Text>}
-          {listing && <div className={composerStyles.directoryList}>
-            {listing.directories.length ? listing.directories.map(directory => <Button key={directory.path} block type="text" disabled={disabled || !!checking} onClick={() => setPath(directory.path)}>
+          {listing && <div {...stylex.props(composerStyles.directoryList)}>
+            {listing.directories.length ? listing.directories.map(directory => <Button key={directory.path} block type="text" disabled={disabled || !!checking} {...stylex.props(composerStyles.directoryEntry)} onClick={() => setPath(directory.path)}>
               <Icon icon={Folder} size="small" />
-              <span className={composerStyles.recentName}>{directory.name}</span>
-              <Icon icon={ChevronRight} size="small" className={composerStyles.directoryEnter} />
+              <span {...stylex.props(composerStyles.recentName)}>{directory.name}</span>
+              <Icon icon={ChevronRight} size="small" className={stylex.props(composerStyles.directoryEnter).className} />
             </Button>) : <Text type="secondary">此目录没有可浏览的子目录，可直接选择当前目录。</Text>}
           </div>}
         </section>

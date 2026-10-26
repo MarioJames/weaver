@@ -1,186 +1,189 @@
-import { createStaticStyles } from 'antd-style';
+import * as stylex from '@stylexjs/stylex';
+import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
 
 /** Parent / sub agent pages: master-detail split, list entries and the model reply card. */
-export const rolesStyles = createStaticStyles(({ css, cssVar, responsive }) => ({
+export const rolesStyles = stylex.create({
   /** List on the left, the selected record on the right. Collapses to one column on narrow screens. */
-  split: css`
-    display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
-    gap: 16px;
-    align-items: start;
-    min-inline-size: 0;
-
-    ${responsive.laptop} {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  `,
+  split: {
+    display: 'grid',
+    gridTemplateColumns: '280px minmax(0, 1fr)',
+    gap: 16,
+    alignItems: 'start',
+    minInlineSize: 0,
+    '@media (max-width: 991.98px)': {
+      gridTemplateColumns: 'minmax(0, 1fr)',
+    },
+  },
   /** The list stays in view while a long record scrolls the workspace. */
-  listPane: css`
-    position: sticky;
-    inset-block-start: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-inline-size: 0;
-
-    ${responsive.laptop} {
-      position: static;
-    }
-  `,
+  listPane: {
+    position: 'sticky',
+    insetBlockStart: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    minInlineSize: 0,
+    '@media (max-width: 991.98px)': {
+      position: 'static',
+    },
+  },
   /** The sortable list keeps the pane's own spacing instead of the browser's list margin. */
-  sortList: css`
-    margin-block: 0;
-  `,
+  sortList: {
+    marginBlock: 0,
+  },
   /** A sortable list row: the drag handle, then the record. */
-  sortItem: css`
-    min-inline-size: 0;
-  `,
-  /** The independent drag handle. Touch drags move the row instead of scrolling the page. The DragHandle also carries touch-action inline: static-render tests can only see inline styles, never classes. */
-  roleGrip: css`
-    flex: none;
-    margin-block-start: 2px;
-    color: ${cssVar.colorTextTertiary};
-    touch-action: none;
-  `,
+  sortItem: {
+    minInlineSize: 0,
+  },
+  /** The independent drag handle. Touch drags move the row instead of scrolling the page. */
+  roleGrip: {
+    flex: 'none',
+    marginBlockStart: 2,
+    color: cssVar.colorTextTertiary,
+    touchAction: 'none',
+  },
   /** The same grip while another action holds the page: it keeps the row width but cannot start a drag. */
-  roleGripOff: css`
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    inline-size: 44px;
-    block-size: 44px;
-    margin-block-start: 2px;
-    color: ${cssVar.colorTextQuaternary};
-  `,
+  roleGripOff: {
+    display: 'inline-flex',
+    flex: 'none',
+    alignItems: 'center',
+    justifyContent: 'center',
+    inlineSize: 44,
+    blockSize: 44,
+    marginBlockStart: 2,
+    color: cssVar.colorTextQuaternary,
+  },
   /** The drag preview shows the record's identity only, never copies its switches or buttons. */
-  roleOverlay: css`
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    box-sizing: border-box;
-    inline-size: 100%;
-    padding: 8px 10px;
-    border: 1px solid ${cssVar.colorBorderSecondary};
-    border-radius: ${cssVar.borderRadius};
-    background: ${cssVar.colorBgElevated};
-    box-shadow: ${cssVar.boxShadowSecondary};
-  `,
+  roleOverlay: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+    boxSizing: 'border-box',
+    inlineSize: '100%',
+    paddingBlock: 8,
+    paddingInline: 10,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: cssVar.colorBorderSecondary,
+    borderRadius: cssVar.borderRadius,
+    backgroundColor: cssVar.colorBgElevated,
+    boxShadow: cssVar.boxShadowSecondary,
+  },
   /** Two fields side by side; one column when the form is narrow. */
-  pair: css`
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    min-inline-size: 0;
-
-    @media (max-width: 720px) {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  `,
+  pair: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: 12,
+    minInlineSize: 0,
+    '@media (max-width: 720px)': {
+      gridTemplateColumns: 'minmax(0, 1fr)',
+    },
+  },
   /** The model/effort pair top-aligns when one side grows a hint line. */
-  pairStart: css`
-    align-items: start;
-  `,
+  pairStart: {
+    alignItems: 'start',
+  },
   /** The parallel-cap input keeps its compact inline size beside its switch. */
-  parallelInput: css`
-    inline-size: 88px;
-  `,
+  parallelInput: {
+    inlineSize: 88,
+  },
   /** The paused-dispatch notice sits off the fields below it. */
-  blockNotice: css`
-    margin-block-end: 12px;
-  `,
+  blockNotice: {
+    marginBlockEnd: 12,
+  },
   /** A list entry: its enable switch, then a button that selects it. No outer frame. */
-  roleItem: css`
-    display: grid;
-    flex: 1;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 4px 10px;
-    align-items: start;
-    padding: 8px 10px;
-    border-radius: ${cssVar.borderRadius};
-
-    &:hover {
-      background: ${cssVar.colorFillTertiary};
-    }
-
-    &[aria-current='true'] {
-      background: ${cssVar.colorFillSecondary};
-    }
-
-    & > [role='switch'] {
-      margin-block-start: 2px;
-    }
-  `,
-  roleButton: css`
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-inline-size: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    text-align: start;
-    cursor: pointer;
-
-    &:focus-visible {
-      outline: 2px solid ${cssVar.colorPrimaryBorder};
-      outline-offset: 2px;
-      border-radius: ${cssVar.borderRadiusSM};
-    }
-  `,
+  roleItem: {
+    display: 'grid',
+    flex: 1,
+    gridTemplateColumns: 'auto minmax(0, 1fr)',
+    gap: '4px 10px',
+    alignItems: 'start',
+    paddingBlock: 8,
+    paddingInline: 10,
+    borderRadius: cssVar.borderRadius,
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': cssVar.colorFillTertiary,
+    },
+    '[aria-current="true"]': {
+      backgroundColor: cssVar.colorFillSecondary,
+    },
+  },
+  /** The enable switch sits on the first text line, not above it. */
+  roleSwitch: {
+    marginBlockStart: 2,
+  },
+  roleButton: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+    minInlineSize: 0,
+    padding: 0,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    color: 'inherit',
+    font: 'inherit',
+    textAlign: 'start',
+    cursor: 'pointer',
+    ':focus-visible': {
+      outlineWidth: 2,
+      outlineStyle: 'solid',
+      outlineColor: cssVar.colorPrimaryBorder,
+      outlineOffset: 2,
+      borderRadius: cssVar.borderRadiusSM,
+    },
+  },
   /** The list entry's title row: the id, then the free-channel badge; the badge wraps to its own line before anything overflows. */
-  roleTitle: css`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px 6px;
-    align-items: center;
-    min-inline-size: 0;
-  `,
+  roleTitle: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '2px 6px',
+    alignItems: 'center',
+    minInlineSize: 0,
+  },
   /** The list entry's text button for resuming a paused worker: its own row under the note, never beside the switch or the tags. */
-  roleResume: css`
-    grid-column: 2;
-    justify-self: start;
-    margin-inline-start: -8px;
-  `,
+  roleResume: {
+    gridColumn: 2,
+    justifySelf: 'start',
+    marginInlineStart: -8,
+  },
   /** A list entry's pause: its kind as a tag, then the reason; the reason moves under the tag when the pane is narrow. */
-  roleNote: css`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px 6px;
-    align-items: center;
-    min-inline-size: 0;
-  `,
+  roleNote: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '2px 6px',
+    alignItems: 'center',
+    minInlineSize: 0,
+  },
   /** A model reply shown as a message card. */
-  replyCard: css`
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px 14px;
-    border: 1px solid ${cssVar.colorBorderSecondary};
-    border-radius: ${cssVar.borderRadiusLG};
-    background: ${cssVar.colorFillQuaternary};
-
-    &[data-ok='true'] {
-      border-color: ${cssVar.colorSuccessBorder};
-      background: ${cssVar.colorSuccessBg};
-    }
-
-    &[data-ok='false'] {
-      border-color: ${cssVar.colorErrorBorder};
-      background: ${cssVar.colorErrorBg};
-    }
-  `,
-  replyText: css`
-    margin: 0;
-    font-size: 15px;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  `,
+  replyCard: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    paddingBlock: 12,
+    paddingInline: 14,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: cssVar.colorBorderSecondary,
+    borderRadius: cssVar.borderRadiusLG,
+    backgroundColor: cssVar.colorFillQuaternary,
+    '[data-ok="true"]': {
+      borderColor: cssVar.colorSuccessBorder,
+      backgroundColor: cssVar.colorSuccessBg,
+    },
+    '[data-ok="false"]': {
+      borderColor: cssVar.colorErrorBorder,
+      backgroundColor: cssVar.colorErrorBg,
+    },
+  },
+  replyText: {
+    margin: 0,
+    fontSize: 15,
+    lineHeight: 1.6,
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'anywhere',
+  },
   /** The reply header's route and timestamp stay on one line. */
-  replyTime: css`
-    white-space: nowrap;
-  `,
-}));
+  replyTime: {
+    whiteSpace: 'nowrap',
+  },
+});

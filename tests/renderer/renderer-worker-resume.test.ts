@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
-import { toast, type ToastOptions } from '@lobehub/ui/base-ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
+import { toast, type ToastOptions } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { defaultConfig } from '../../src/main/policy/routing';
 import type { Block, PolicySnapshot } from '../../src/shared/contracts/policy';
@@ -20,7 +20,7 @@ const NOW = Date.now();
 const SINCE = '2026-10-19T00:00:00Z';
 const block = (patch: Partial<Block>): Block => ({ engine: 'grok', reason: '原因', since: SINCE, ...patch });
 const body = (html: string) => html.replace(/<style[\s\S]*?<\/style>/g, '');
-const markup = (node: React.ReactNode) => body(renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'light', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>)));
+const markup = (node: React.ReactNode) => body(renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'light', children: node }) } as React.ComponentProps<typeof ConfigProvider>)));
 
 function grokConfig() {
   const config = defaultConfig();

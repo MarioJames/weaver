@@ -1,22 +1,23 @@
 import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { createStaticStyles } from 'antd-style';
-import { ActionIcon, Text, Tooltip } from '@lobehub/ui/base-ui';
+import * as stylex from '@stylexjs/stylex';
+import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
+import { ActionIcon, Text, Tooltip } from '@lobehub/ui';
 import type { EngineModelList } from '../../../shared/engines';
 import { matchModel, missingModelWarning, modelListView, modelSelectOptions, useEngineModels } from './engine-models';
 import { NamedAutoComplete } from '../../ui/NamedControls';
 import { styles } from '../../ui/styles';
 
-const pickerStyles = createStaticStyles(({ css, cssVar }) => ({
+const pickerStyles = stylex.create({
   /** The list floats over the card below the field: solid, so the card text never shows through it. */
-  popup: css`background: ${cssVar.colorBgElevated}; box-shadow: ${cssVar.boxShadowSecondary};`,
-  warn: css`font-size: 12px; color: ${cssVar.colorWarningText};`,
-}));
+  popup: { backgroundColor: cssVar.colorBgElevated, boxShadow: cssVar.boxShadowSecondary },
+  warn: { fontSize: 12, color: cssVar.colorWarningText },
+});
 
 /** Under the field: the saved model is not among the models the engine reports now. Warns only; the value stays editable and savable. */
 export function ModelListWarning({ engine, value, list }: { engine: string; value: string; list: EngineModelList | undefined }) {
   const text = missingModelWarning(engine, value, list);
-  return text ? <Text className={pickerStyles.warn} role="status">{text}</Text> : null;
+  return text ? <Text className={stylex.props(pickerStyles.warn).className} role="status">{text}</Text> : null;
 }
 
 /**
@@ -35,8 +36,8 @@ export function ModelPicker({ engine, channel, kind, value, onChange, id, placeh
       : view.kind === 'ready' ? `${view.count} 个模型 · 来源：${view.source}。也可以直接填写。`
         : view.text;
   const empty = view.kind === 'loading' ? '正在获取模型列表…' : view.kind === 'ready' ? '没有匹配的模型，可直接填写' : undefined;
-  return <div className={styles.tight}>
-    <NamedAutoComplete id={id} aria-label={label} value={value} placeholder={placeholder} options={options} emptyText={empty} classNames={{ popup: pickerStyles.popup }}
+  return <div {...stylex.props(styles.tight)}>
+    <NamedAutoComplete id={id} aria-label={label} value={value} placeholder={placeholder} options={options} emptyText={empty} classNames={{ popup: stylex.props(pickerStyles.popup).className }}
       /* An engine with no list has nothing to suggest: an empty strip would only cover the explanation printed under the field. */
       open={open && (options.length > 0 || Boolean(empty))}
       filter={(item, query) => matchModel(options, query, item as { value: string; label?: unknown })}
@@ -45,7 +46,7 @@ export function ModelPicker({ engine, channel, kind, value, onChange, id, placeh
       suffix={view.kind !== 'manual' && <Tooltip title="重新获取模型列表">
         <ActionIcon size="small" icon={RefreshCw} aria-label={`刷新 ${engine} 模型列表`} loading={models.loading} disabled={!engine || models.loading} onClick={() => void models.load(true)} />
       </Tooltip>} />
-    <Text type="secondary" className={styles.meta} role="status">{text}</Text>
+    <Text type="secondary" className={stylex.props(styles.meta).className} role="status">{text}</Text>
     <ModelListWarning engine={kind ?? engine} value={value} list={models.list} />
   </div>;
 }

@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
 import { taskStyles as styles } from '../../src/renderer/features/tasks/task-style';
+import { styleClass } from './style-helpers';
 import { TaskBoard } from '../../src/renderer/features/tasks/TaskBoard';
 import { columnize } from '../../src/renderer/features/tasks/task-columns';
 import { REVIEW_OVERDUE_HINT, REVIEW_WAIT_WARN_MINUTES, RECEIPT_ACK_MESSAGE, formatWait, reviewWait } from '../../src/renderer/features/tasks/task-wait';
@@ -69,7 +70,7 @@ function board(tasks: Task[]) {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (key: string) => key === ENDED_EXPANDED_KEY ? 'true' : null, setItem: () => {} } });
   try {
-    return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'light', enableCustomFonts: false, children: React.createElement(TaskBoard, { tasks, filters: { ...emptySelection(), time: 'all' }, now, loading: false, onSelect: () => {} }) }) }));
+    return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'light', children: React.createElement(TaskBoard, { tasks, filters: { ...emptySelection(), time: 'all' }, now, loading: false, onSelect: () => {} }) }) }));
   } finally { if (previous) Object.defineProperty(globalThis, 'localStorage', previous); else Reflect.deleteProperty(globalThis, 'localStorage'); }
 }
 
@@ -83,13 +84,13 @@ test('the board shows the wait line on review cards only, warning-marked once ov
   const cards = [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]).filter(card => /CARD_/.test(card));
   const byTitle = (title: string) => cards.find(card => card.includes(title))!;
   const pending = byTitle('CARD_PENDING');
-  assert.match(pending, new RegExp(`<span class="${styles.cardWait}" data-overdue="false" data-wait="pending">待父 Agent 确认收到 · 已等 10 分钟</span>`));
+  assert.match(pending, new RegExp(`<span class="${styleClass(styles.cardWait)}" data-overdue="false" data-wait="pending">待父 Agent 确认收到 · 已等 10 分钟</span>`));
   assert.doesNotMatch(pending, /请检查其运行状态/);
   const acked = byTitle('CARD_ACKED');
-  assert.match(acked, new RegExp(`class="${styles.cardWait}" data-overdue="true" data-wait="acknowledged" title="父 Agent 尚未提交验收，请检查其运行状态">已确认收到 · 待验收结论 · 已等 2 小时 5 分钟</span>`));
+  assert.match(acked, new RegExp(`class="${styleClass(styles.cardWait)}" data-overdue="true" data-wait="acknowledged" title="父 Agent 尚未提交验收，请检查其运行状态">已确认收到 · 待验收结论 · 已等 2 小时 5 分钟</span>`));
   // The line sits between the status tag and the footer sentence, and no other card has one.
-  assert.ok(acked.indexOf(styles.cardStatus) < acked.indexOf(styles.cardWait) && acked.indexOf(styles.cardWait) < acked.indexOf(styles.cardMeta));
-  assert.doesNotMatch(byTitle('CARD_DONE') + byTitle('CARD_RUNNING'), new RegExp(styles.cardWait));
+  assert.ok(acked.indexOf(styleClass(styles.cardStatus)) < acked.indexOf(styleClass(styles.cardWait)) && acked.indexOf(styleClass(styles.cardWait)) < acked.indexOf(styleClass(styles.cardMeta)));
+  assert.doesNotMatch(byTitle('CARD_DONE') + byTitle('CARD_RUNNING'), new RegExp(styleClass(styles.cardWait)));
 });
 
 test('the review lane keeps its updatedAt ordering: the wait line does not reorder cards', () => {

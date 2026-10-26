@@ -1,0 +1,327 @@
+{
+  "date": "2026-10-26",
+  "ui": "@lobehub/ui 6.9.0",
+  "stylex": "0.19.1",
+  "nodeMinimum": "22.22.0",
+  "result": "passed",
+  "checks": {
+    "rendererTests": {
+      "passed": 557,
+      "failed": 0
+    },
+    "cliTests": {
+      "passed": 6,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "build": "passed",
+    "compiledCliWeb": "passed",
+    "antdDependencyGraph": "empty",
+    "diffCheck": "passed"
+  },
+  "browser": {
+    "tool": "browser-harness + agent-browser, task-owned Google Chrome",
+    "devUrl": "http://127.0.0.1:40533",
+    "productionUrl": "http://127.0.0.1:40965",
+    "coldBoot": "fresh Vite cache; actual browser request order; no manual pretransforms",
+    "routes": [
+      {
+        "heading": "任务",
+        "width": 390,
+        "scroll": 390,
+        "overlay": 0,
+        "styles": 7,
+        "page": "tasks",
+        "mode": "dev"
+      },
+      {
+        "heading": "定时任务",
+        "width": 390,
+        "scroll": 390,
+        "overlay": 0,
+        "styles": 7,
+        "page": "schedules",
+        "mode": "dev"
+      },
+      {
+        "heading": "账号与渠道",
+        "width": 390,
+        "scroll": 390,
+        "overlay": 0,
+        "styles": 7,
+        "page": "channels",
+        "mode": "dev"
+      },
+      {
+        "heading": "父 Agent",
+        "width": 390,
+        "scroll": 390,
+        "overlay": 0,
+        "styles": 7,
+        "page": "owners",
+        "mode": "dev"
+      },
+      {
+        "heading": "子 Agent",
+        "width": 390,
+        "scroll": 390,
+        "overlay": 0,
+        "styles": 7,
+        "page": "workers",
+        "mode": "dev"
+      },
+      {
+        "heading": "Bot",
+        "width": 390,
+        "scroll": 390,
+        "overlay": 0,
+        "styles": 7,
+        "page": "bots",
+        "mode": "dev"
+      },
+      {
+        "heading": "设置",
+        "width": 390,
+        "scroll": 390,
+        "overlay": 0,
+        "styles": 7,
+        "page": "settings",
+        "mode": "dev"
+      },
+      {
+        "heading": "任务",
+        "width": 1024,
+        "scroll": 1024,
+        "overlay": 0,
+        "styles": 7,
+        "page": "tasks",
+        "mode": "dev"
+      },
+      {
+        "heading": "定时任务",
+        "width": 1024,
+        "scroll": 1024,
+        "overlay": 0,
+        "styles": 7,
+        "page": "schedules",
+        "mode": "dev"
+      },
+      {
+        "heading": "账号与渠道",
+        "width": 1024,
+        "scroll": 1024,
+        "overlay": 0,
+        "styles": 7,
+        "page": "channels",
+        "mode": "dev"
+      },
+      {
+        "heading": "父 Agent",
+        "width": 1024,
+        "scroll": 1024,
+        "overlay": 0,
+        "styles": 7,
+        "page": "owners",
+        "mode": "dev"
+      },
+      {
+        "heading": "子 Agent",
+        "width": 1024,
+        "scroll": 1024,
+        "overlay": 0,
+        "styles": 7,
+        "page": "workers",
+        "mode": "dev"
+      },
+      {
+        "heading": "Bot",
+        "width": 1024,
+        "scroll": 1024,
+        "overlay": 0,
+        "styles": 7,
+        "page": "bots",
+        "mode": "dev"
+      },
+      {
+        "heading": "设置",
+        "width": 1024,
+        "scroll": 1024,
+        "overlay": 0,
+        "styles": 7,
+        "page": "settings",
+        "mode": "dev"
+      },
+      {
+        "heading": "任务",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 7,
+        "page": "tasks",
+        "mode": "dev"
+      },
+      {
+        "heading": "定时任务",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 7,
+        "page": "schedules",
+        "mode": "dev"
+      },
+      {
+        "heading": "账号与渠道",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 7,
+        "page": "channels",
+        "mode": "dev"
+      },
+      {
+        "heading": "父 Agent",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 7,
+        "page": "owners",
+        "mode": "dev"
+      },
+      {
+        "heading": "子 Agent",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 7,
+        "page": "workers",
+        "mode": "dev"
+      },
+      {
+        "heading": "Bot",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 7,
+        "page": "bots",
+        "mode": "dev"
+      },
+      {
+        "heading": "设置",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 7,
+        "page": "settings",
+        "mode": "dev"
+      },
+      {
+        "heading": "任务",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 2,
+        "page": "tasks",
+        "mode": "production"
+      },
+      {
+        "heading": "定时任务",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 2,
+        "page": "schedules",
+        "mode": "production"
+      },
+      {
+        "heading": "账号与渠道",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 2,
+        "page": "channels",
+        "mode": "production"
+      },
+      {
+        "heading": "父 Agent",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 2,
+        "page": "owners",
+        "mode": "production"
+      },
+      {
+        "heading": "子 Agent",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 2,
+        "page": "workers",
+        "mode": "production"
+      },
+      {
+        "heading": "Bot",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 2,
+        "page": "bots",
+        "mode": "production"
+      },
+      {
+        "heading": "设置",
+        "width": 1440,
+        "scroll": 1440,
+        "overlay": 0,
+        "styles": 2,
+        "page": "settings",
+        "mode": "production"
+      }
+    ],
+    "flows": [
+      "Task draft save and restart persistence",
+      "Completed-task details: rendered Markdown, copy, requirements and timeline tabs",
+      "Task pin action",
+      "Schedule interval/cron switching; invalid cron disables submit; valid disabled schedule save and history drawer",
+      "Channel type selector and API form; discard draft",
+      "Owner numeric setting save",
+      "Worker concurrency switch and draft retention",
+      "Bot draft fields and workspace picker without external connection",
+      "Timezone search and save; restart persistence",
+      "Mobile navigation and task dialog; Escape restores trigger focus"
+    ],
+    "artifactErrors": [],
+    "productionConsoleErrors": [],
+    "productionPageErrors": [],
+    "expectedNetworkErrors": {
+      "method": "listEngineModels",
+      "status": 400,
+      "reason": "Isolated fixture has no official account credentials; error toast and manual input remain usable"
+    }
+  },
+  "limits": [
+    "External model execution, real account login, quota calls and Bot connections were not invoked.",
+    "Vite dev log recorded two transient ResizeObserver loop notifications while opening/resizing panels; no persistent loop or production page/console error observed.",
+    "Build emits upstream use-client directive warnings.",
+    "Feature-acceptance textual scan is incomplete because pre-existing untracked .worktrees contains nested directories; 51 deep-relative-import candidates were reviewed against successful TypeScript/build/runtime checks. It is not reported as a passed gate."
+  ],
+  "resources": {
+    "services": "All task-owned dev, preview and production units stopped",
+    "browser": "Task Chrome closed and profile removed",
+    "data": "Only isolated disposable fixtures under the task temporary root reclaimed; existing project and shared Weaver data retained",
+    "workspace": "Pre-existing .gitignore, channels-view.ts, roles-view.ts and original untracked files excluded from commit"
+  },
+  "screenshots": [
+    "tasks-desktop.png",
+    "tasks-mobile.png",
+    "task-dialog-mobile.png",
+    "production-detail.png"
+  ],
+  "commands": [
+    "node --import tsx --import ./scripts/register-stylex.mjs --test tests/renderer/*.test.ts",
+    "node --import tsx --import ./scripts/register-stylex.mjs --test tests/cli/cli-entrypoint.test.ts tests/integration/standalone.test.ts",
+    "npm run build",
+    "npm ls antd antd-style --all",
+    "git diff --check"
+  ]
+}

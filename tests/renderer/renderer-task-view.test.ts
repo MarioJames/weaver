@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Config } from '../../src/shared/contracts/policy';
 import type { Task } from '../../src/shared/contracts/tasks';
@@ -20,7 +20,7 @@ import { TaskTextBlock } from '../../src/renderer/features/tasks/TaskTextBlock';
 import { OwnerInspector } from '../../src/renderer/features/roles/OwnerInspector';
 
 function markup(node: React.ReactNode) {
-  const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;
+  const props = { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) } as React.ComponentProps<typeof ConfigProvider>;
   return renderToStaticMarkup(React.createElement(ConfigProvider, props));
 }
 
@@ -77,7 +77,7 @@ test('engine icons map every known kind and fall back to a neutral bot for unkno
 
 test('agent labels pair the brand icon with the name in one inline row', () => {
   const labeled = markup(React.createElement(AgentLabel, { kind: 'qodercli', name: 'qoder_worker' }));
-  assert.match(labeled, /<span[^>]*><svg[^>]*><title>Qoder<\/title>[\s\S]*?<\/svg>qoder_worker<\/span>/);
+  assert.match(labeled, /<span[^>]*><svg[^>]*><title>Qoder<\/title>[\s\S]*?<\/svg><span[^>]*>qoder_worker<\/span><\/span>/);
 });
 
 test('owner attribution prefers the frozen dispatch over the placeholder owner name', () => {
@@ -393,8 +393,8 @@ test('detail is one column: status tag, facts block and route line, no progress 
   assert.doesNotMatch(html, /已创建 ·/);
   assert.doesNotMatch(html, /最近活动/);
   /** The agents and the directory are the facts block; what is left of the meta line is the route and the clock. */
-  assert.match(html, /<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?claude_owner<\/span><\/dd>/);
-  assert.match(html, /<dt[^>]*>子 Agent<\/dt><dd[^>]*>[\s\S]*?claude_worker<\/span><\/dd>/);
+  assert.match(html, /<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?claude_owner[\s\S]*?<\/dd>/);
+  assert.match(html, /<dt[^>]*>子 Agent<\/dt><dd[^>]*>[\s\S]*?claude_worker[\s\S]*?<\/dd>/);
   assert.match(html, /<dt[^>]*>工作目录<\/dt><dd[^>]*>[\s\S]*?\/home\/mocha\/opensource\/weaver[\s\S]*?<\/dd>/);
   assert.match(html, /<dt[^>]*>模型<\/dt>/);
   assert.match(html, /<dt[^>]*>更新时间<\/dt>/);

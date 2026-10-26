@@ -1,88 +1,102 @@
-import { createStaticStyles } from 'antd-style';
+import * as stylex from '@stylexjs/stylex';
+import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
 
-export const scheduleStyles = createStaticStyles(({ css, cssVar }) => ({
+export const scheduleStyles = stylex.create({
   /** Rows of a short editable list: one fixed height, hairline separators, no outer frame. */
-  listRows: css`
-    display: flex;
-    flex-direction: column;
-    min-inline-size: 0;
-
-    &:empty {
-      display: none;
-    }
-  `,
-  listRow: css`
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    justify-content: space-between;
-    min-block-size: 40px;
-    padding-block: 4px;
-
-    & + & {
-      border-block-start: 1px solid ${cssVar.colorBorderSecondary};
-    }
-
-    /* A locked row (disabled, or paused until the user resumes it) is greyed; its status tag keeps its color. */
-    &[data-locked] {
-      color: ${cssVar.colorTextTertiary};
-    }
-  `,
-  list: css`
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 72px max-content 24px;
-    column-gap: ${cssVar.marginXS};
-  `,
-  columns: css`
-    display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: subgrid;
-  `,
-  row: css`
-    display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: subgrid;
-    align-items: center;
-    gap: ${cssVar.marginXS};
-  `,
+  list: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) 72px max-content 24px',
+    columnGap: cssVar.marginXS,
+    minInlineSize: 0,
+  },
+  /** The heading shares the rows' tracks so its weight label lines up with the input column. */
+  columns: {
+    display: 'grid',
+    gridColumn: '1 / -1',
+    gridTemplateColumns: 'subgrid',
+  },
+  row: {
+    display: 'grid',
+    gridColumn: '1 / -1',
+    gridTemplateColumns: 'subgrid',
+    alignItems: 'center',
+    gap: cssVar.marginXS,
+    minBlockSize: 40,
+    paddingBlock: 4,
+    '[data-locked]': {
+      color: cssVar.colorTextTertiary,
+    },
+  },
+  /** Hairline between rows, without a selector that reaches beyond this row. */
+  rowDivider: {
+    borderBlockStartWidth: 1,
+    borderBlockStartStyle: 'solid',
+    borderBlockStartColor: cssVar.colorBorderSecondary,
+  },
   /** The pause reason beside its tag: one line, the rest in the tooltip. */
-  reason: css`
-    flex: 1 1 0;
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: ${cssVar.colorTextSecondary};
-    font-size: ${cssVar.fontSizeSM};
-  `,
-  name: css`
-    min-inline-size: 0;
-
-    @media (max-width: 600px) { grid-column: 1 / -1; }
-  `,
+  reason: {
+    flex: '1 1 0',
+    minInlineSize: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    color: cssVar.colorTextSecondary,
+    fontSize: cssVar.fontSizeSM,
+  },
+  name: {
+    gridColumn: 1,
+    minInlineSize: 0,
+    '@media (max-width: 600px)': {
+      gridColumn: '1 / -1',
+    },
+  },
   /** The weight input keeps its fixed column width. */
-  weightInput: css`
-    inline-size: 72px;
-  `,
-  controls: css`
-    display: contents;
-    > :first-child { grid-column: 2; }
-  `,
-  presets: css`
-    display: inline-flex;
-    flex-wrap: nowrap;
-    border: 1px solid ${cssVar.colorBorder};
-    border-radius: ${cssVar.borderRadius};
-    overflow: hidden;
-    button { border-radius: 0; font: inherit; }
-    button[aria-pressed="true"] { background: ${cssVar.colorFillSecondary}; color: ${cssVar.colorText}; }
-    button + button { border-inline-start: 1px solid ${cssVar.colorBorder}; }
-    &[data-locked] { border-color: ${cssVar.colorBorderSecondary}; }
-    &[data-locked] button + button { border-inline-start-color: ${cssVar.colorBorderSecondary}; }
-  `,
-  heading: css`
-    grid-column: 2;
-    font-size: ${cssVar.fontSizeSM};
-    color: ${cssVar.colorTextSecondary};
-  `,
-}));
+  weightInput: {
+    gridColumn: 2,
+    inlineSize: 72,
+  },
+  controls: {
+    display: 'contents',
+  },
+  presets: {
+    display: 'inline-flex',
+    flexWrap: 'nowrap',
+    gridColumn: 3,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: cssVar.colorBorder,
+    borderRadius: cssVar.borderRadius,
+    overflow: 'hidden',
+  },
+  presetsLocked: {
+    borderColor: cssVar.colorBorderSecondary,
+  },
+  presetButton: {
+    borderWidth: 0,
+    borderRadius: 0,
+    font: 'inherit',
+  },
+  presetDivider: {
+    borderInlineStartWidth: 1,
+    borderInlineStartStyle: 'solid',
+    borderInlineStartColor: cssVar.colorBorder,
+  },
+  presetDividerLocked: {
+    borderInlineStartColor: cssVar.colorBorderSecondary,
+  },
+  presetActive: {
+    backgroundColor: {
+      default: cssVar.colorFillSecondary,
+      ':hover': cssVar.colorFillSecondary,
+    },
+    color: cssVar.colorText,
+  },
+  rowAction: {
+    gridColumn: 4,
+  },
+  heading: {
+    gridColumn: 2,
+    fontSize: cssVar.fontSizeSM,
+    color: cssVar.colorTextSecondary,
+  },
+});

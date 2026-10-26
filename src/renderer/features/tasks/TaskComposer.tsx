@@ -2,8 +2,9 @@ import { notifyError } from '../../api/notify';
 import { WorkspacePicker } from './WorkspacePicker';
 import { NamedSelect } from '../../ui/NamedControls';
 import { useEffect, useId, useState, type Dispatch, type SetStateAction } from 'react';
-import { Button, Text, TextArea } from '@lobehub/ui/base-ui';
-import { Form, useForm } from '@lobehub/ui/base-ui/form';
+import * as stylex from '@stylexjs/stylex';
+import { Button, Text, TextArea } from '@lobehub/ui';
+import { Form, useForm } from '@lobehub/ui/form';
 import type { PolicySnapshot } from '../../../shared/contracts/policy';
 import { styles } from '../../ui/styles';
 import { composerStyles } from './task-composer-style';
@@ -65,22 +66,21 @@ export function TaskComposer({ disabled, draft, mode = 'create', recentWorkspace
     try { return await onCreate(composerInput(draft), start); } finally { setPressed(undefined); }
   };
   const form = useForm({ onSubmit: () => submit(true) });
-  return <Form form={form} layout="vertical" className={composerStyles.form}>
-    <div className={composerStyles.scroll}><fieldset disabled={disabled} className={composerStyles.body}>
-      <Form.Field label="目标与约束" required><TextArea id={`${fieldId}-goal`} aria-label="目标与约束" required maxLength={16000} rows={4} value={goal} placeholder="例如：只改指定目录里的文档" onChange={event => onDraft(current => ({ ...current, goal: event.target.value }))} /></Form.Field>
-      <Form.Field label="验收标准" desc="可留空：父 Agent 接手后会根据目标生成并填入。每行一条。">
-        <TextArea id={`${fieldId}-criteria`} aria-label="验收标准" rows={3} maxLength={30000} value={criteria} placeholder="例如：README 的安装步骤逐条核对过&#10;不修改任何文件" onChange={event => onDraft(current => ({ ...current, criteria: event.target.value }))} />
-        {criteriaProblem && <p role="alert" className={styles.error}>{criteriaProblem}</p>}
+  return <Form form={form} layout="vertical" className={stylex.props(composerStyles.form).className}>
+    <div {...stylex.props(composerStyles.scroll)}><fieldset disabled={disabled} {...stylex.props(composerStyles.body)}>
+      <Form.Field label="目标与约束" required><TextArea id={`${fieldId}-goal`} className={stylex.props(composerStyles.fieldControl).className} aria-label="目标与约束" required maxLength={16000} rows={4} value={goal} placeholder="例如：只改指定目录里的文档" onChange={event => onDraft(current => ({ ...current, goal: event.target.value }))} /></Form.Field>
+      <Form.Field label="验收标准" desc="可留空：父 Agent 接手后会根据目标生成并填入。每行一条。" extra={criteriaProblem ? <p role="alert" {...stylex.props(styles.error)}>{criteriaProblem}</p> : undefined}>
+        <TextArea id={`${fieldId}-criteria`} className={stylex.props(composerStyles.fieldControl).className} aria-label="验收标准" rows={3} maxLength={30000} value={criteria} placeholder="例如：README 的安装步骤逐条核对过&#10;不修改任何文件" onChange={event => onDraft(current => ({ ...current, criteria: event.target.value }))} />
       </Form.Field>
       <Form.Field label="目标项目目录" desc={`选择已有工作区，或浏览 Weaver 服务所在机器上的其他文件夹。${editing ? '开始执行前必须填写。' : '存为草稿时可留空，开始执行前必须填写。'}`}>
         <WorkspacePicker value={workspace} disabled={disabled} allowClear recent={recentWorkspaces} onChange={workspace => onDraft(current => ({ ...current, workspace }))} />
       </Form.Field>
-      <Form.Field label="父 Agent 配置" required><NamedSelect id={`${fieldId}-profile`} aria-label="父 Agent 配置" value={profile || undefined} placeholder={policy ? '选择可用父 Agent' : '正在读取…'} options={policy ? Object.keys(policy.config.owners).map(id => ({ value: id, label: `${id}${policy.owners[id]?.status === 'available' ? '' : ' · 不可用'}`, disabled: policy.owners[id]?.status !== 'available' })) : []} onChange={value => { if (typeof value === 'string') onDraft(current => ({ ...current, profile: value })); }} /></Form.Field>
+      <Form.Field label="父 Agent 配置" required><NamedSelect id={`${fieldId}-profile`} className={stylex.props(composerStyles.fieldControl).className} aria-label="父 Agent 配置" value={profile || undefined} placeholder={policy ? '选择可用父 Agent' : '正在读取…'} options={policy ? Object.keys(policy.config.owners).map(id => ({ value: id, label: `${id}${policy.owners[id]?.status === 'available' ? '' : ' · 不可用'}`, disabled: policy.owners[id]?.status !== 'available' })) : []} onChange={value => { if (typeof value === 'string') onDraft(current => ({ ...current, profile: value })); }} /></Form.Field>
       <Text type="secondary">{editing
         ? '「保存并开始」会在保存后立即在 Herdr 中启动父 Agent，由它生成任务标题和验收标准，拆分子任务并派发给子 Agent；「保存」只更新草稿，稍后仍可再编辑，并在详情中开始。'
         : '「创建并开始」会立即在 Herdr 中启动父 Agent，由它生成任务标题和验收标准，拆分子任务并派发给子 Agent；「存为草稿」只保存目标与约束，之后可在任务详情中编辑，补齐目标项目目录后再点「开始执行」。'}</Text>
     </fieldset></div>
-    <div className={composerStyles.footer}>
+    <div {...stylex.props(composerStyles.footer)}>
       <Button htmlType="button" disabled={disabled || !canDraft} loading={disabled && pressed === 'draft'} onClick={() => void submit(false)}>{editing ? '保存' : '存为草稿'}</Button>
       <Button htmlType="submit" type="primary" disabled={disabled || !canStart} loading={disabled && pressed === 'start'}>{editing ? '保存并开始' : '创建并开始'}</Button>
     </div>

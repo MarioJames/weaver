@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { History, Pencil, Play, Plus, RefreshCw, Search, Square, Trash2 } from 'lucide-react';
-import { Empty } from '@lobehub/ui';
+import { ActionIcon, Alert, Button, Empty, Input, Modal, Skeleton, Tag, Text } from '@lobehub/ui';
 import { PageHeader } from '@lobehub/ui/dashboard';
-import { ActionIcon, Alert, Button, Input, Modal, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
 import { command } from '../../api/commands';
 import { notifyError, notifyInfo } from '../../api/notify';
 import { NamedSelect, NamedSwitch } from '../../ui/NamedControls';
@@ -84,30 +84,30 @@ function ScheduleRow({ schedule, now, busy, onToggle, onRun, onStop, onEdit, onH
   const builtin = isBuiltinQuota(schedule);
   const lastRun = schedule.lastRun;
   const executor = schedule.kind === 'agent' ? executorOfDefinition(schedule) : undefined;
-  return <div className={schedulesStyles.row}>
-    <div className={schedulesStyles.rowHead}>
+  return <div {...stylex.props(schedulesStyles.row)}>
+    <div {...stylex.props(schedulesStyles.rowHead)}>
       <NamedSwitch size="small" aria-label={`启用 ${schedule.name}`} checked={schedule.enabled} disabled={busy} onChange={checked => onToggle(schedule, checked)} />
-      <Text strong className={schedulesStyles.name}>{schedule.name}</Text>
+      <Text strong className={stylex.props(schedulesStyles.name).className}>{schedule.name}</Text>
     </div>
-    <div className={schedulesStyles.tags}>
+    <div {...stylex.props(schedulesStyles.tags)}>
       <Tag size="small" color={tagColor(builtin ? 'neutral' : 'childRole')}>{KIND_LABELS[schedule.kind]}</Tag>
       {builtin && <Tag size="small" title={BUILTIN_HINT}>{BUILTIN_LABEL}</Tag>}
       {!schedule.enabled && <Tag size="small">已停用</Tag>}
       {isRunning(schedule) && <Tag size="small" color={statusTagColor('processing')}>运行中</Tag>}
     </div>
-    <div className={schedulesStyles.meta}>
-      <span className={schedulesStyles.metaItem}><span>规则</span><span>{timingText(schedule.timing)}</span></span>
-      {executor && <span className={schedulesStyles.metaItem}><span>执行</span><span>{executorText(executor)}</span></span>}
-      {schedule.timing.mode === 'cron' && <span className={schedulesStyles.metaItem}><span>时区</span><span>{schedule.timing.timezone}</span></span>}
-      {schedule.workspace && <span className={schedulesStyles.metaItem}><span>目录</span><span className={styles.wrap}>{schedule.workspace}</span></span>}
-      <span className={schedulesStyles.metaItem}><span>下次</span><TimeText value={schedule.nextRunAt} now={now} /></span>
-      <span className={schedulesStyles.metaItem}><span>上次</span><TimeText value={schedule.lastRunAt} now={now} /></span>
-      {lastRun && <span className={schedulesStyles.metaItem}>
-        <span>结果</span>
+    <div {...stylex.props(schedulesStyles.meta)}>
+      <span {...stylex.props(schedulesStyles.metaItem)}><span {...stylex.props(schedulesStyles.metaLabel)}>规则</span><span {...stylex.props(schedulesStyles.metaValue)}>{timingText(schedule.timing)}</span></span>
+      {executor && <span {...stylex.props(schedulesStyles.metaItem)}><span {...stylex.props(schedulesStyles.metaLabel)}>执行</span><span {...stylex.props(schedulesStyles.metaValue)}>{executorText(executor)}</span></span>}
+      {schedule.timing.mode === 'cron' && <span {...stylex.props(schedulesStyles.metaItem)}><span {...stylex.props(schedulesStyles.metaLabel)}>时区</span><span {...stylex.props(schedulesStyles.metaValue)}>{schedule.timing.timezone}</span></span>}
+      {schedule.workspace && <span {...stylex.props(schedulesStyles.metaItem)}><span {...stylex.props(schedulesStyles.metaLabel)}>目录</span><span {...stylex.props(schedulesStyles.metaValue, styles.wrap)}>{schedule.workspace}</span></span>}
+      <span {...stylex.props(schedulesStyles.metaItem)}><span {...stylex.props(schedulesStyles.metaLabel)}>下次</span><TimeText value={schedule.nextRunAt} now={now} /></span>
+      <span {...stylex.props(schedulesStyles.metaItem)}><span {...stylex.props(schedulesStyles.metaLabel)}>上次</span><TimeText value={schedule.lastRunAt} now={now} /></span>
+      {lastRun && <span {...stylex.props(schedulesStyles.metaItem)}>
+        <span {...stylex.props(schedulesStyles.metaLabel)}>结果</span>
         <Tag size="small" color={statusTagColor(RUN_TONES[lastRun.status])}>{RUN_LABELS[lastRun.status]}</Tag>
       </span>}
     </div>
-    <div className={schedulesStyles.actions}>
+    <div {...stylex.props(schedulesStyles.actions)}>
       <Button size="small" type="text" icon={Play} disabled={busy || isRunning(schedule)} aria-label={`立即运行 ${schedule.name}`} onClick={() => onRun(schedule)}>运行</Button>
       {!builtin && isRunning(schedule) && <Button size="small" type="text" icon={Square} disabled={busy} aria-label={`停止 ${schedule.name} 的活跃运行`} onClick={() => onStop(schedule)}>停止</Button>}
       <Button size="small" type="text" icon={History} aria-label={`查看 ${schedule.name} 的运行历史`} onClick={() => onHistory(schedule)}>历史</Button>
@@ -196,13 +196,13 @@ export function SchedulesPage({ onOpenTask, onPolicyChanged }: {
   };
   const listBody = (): ReactNode => {
     if (loading && !schedules) return <div role="status" aria-label="正在加载定时任务"><Skeleton.Text animated rows={6} /></div>;
-    if (error && !schedules) return <div className={styles.stack}>
+    if (error && !schedules) return <div {...stylex.props(styles.stack)}>
       <Alert type="error" title="定时任务读取失败" description={error} />
       <div><Button icon={RefreshCw} onClick={retry}>重试</Button></div>
     </div>;
     if (!schedules?.length) return <Empty title="还没有定时任务" description="创建脚本或 Agent 定时任务，让 Weaver 按时间规则自动执行。" action={<Button icon={Plus} onClick={() => setCreating(true)}>新建定时任务</Button>} />;
     if (!rows.length) return <Empty title="没有匹配的定时任务" description="换个名称关键字或类型再试。" action={<Button onClick={() => { setSearch(''); setKind('all'); }}>清除筛选</Button>} />;
-    return <div className={schedulesStyles.list}>
+    return <div {...stylex.props(schedulesStyles.list)}>
       {rows.map(item => <ScheduleRow key={item.id} schedule={item} now={now} busy={paused}
         onToggle={toggle} onRun={runNow} onStop={stopRun} onEdit={setEditing} onHistory={setHistoryOf} onDelete={setDeleting} />)}
     </div>;
@@ -211,13 +211,13 @@ export function SchedulesPage({ onOpenTask, onPolicyChanged }: {
     <PageHeader title="定时任务" description="按时间规则自动执行脚本命令，或让所选执行 Agent 定时处理目标；运行结果保留在各自的历史里。" action={
       <Button ref={newButtonRef} type="primary" icon={Plus} disabled={paused} onClick={() => setCreating(true)}>新建定时任务</Button>
     } />
-    <div className={schedulesStyles.page}>
-      <div className={schedulesStyles.toolbar}>
-        <Input className={schedulesStyles.search} allowClear aria-label="搜索定时任务" prefix={<Search size={14} />} placeholder="按名称、命令或目标搜索" value={search} onChange={event => setSearch(event.target.value)} />
-        <NamedSelect className={schedulesStyles.kindFilter} aria-label="按类型筛选" value={kind} options={KIND_FILTER_OPTIONS} onChange={value => { if (typeof value === 'string') setKind(value as KindFilter); }} />
-        <ActionIcon className={schedulesStyles.refresh} icon={RefreshCw} aria-label="刷新定时任务" disabled={paused} onClick={() => void refresh()} />
+    <div {...stylex.props(schedulesStyles.page)}>
+      <div {...stylex.props(schedulesStyles.toolbar)}>
+        <Input className={stylex.props(schedulesStyles.search).className} allowClear aria-label="搜索定时任务" prefix={<Search size={14} />} placeholder="按名称、命令或目标搜索" value={search} onChange={event => setSearch(event.target.value)} />
+        <NamedSelect className={stylex.props(schedulesStyles.kindFilter).className} aria-label="按类型筛选" value={kind} options={KIND_FILTER_OPTIONS} onChange={value => { if (typeof value === 'string') setKind(value as KindFilter); }} />
+        <ActionIcon className={stylex.props(schedulesStyles.refresh).className} icon={RefreshCw} aria-label="刷新定时任务" disabled={paused} onClick={() => void refresh()} />
       </div>
-      {stale && <p role="status" className={`${styles.meta} ${schedulesStyles.staleNote}`}>后台刷新失败，显示的是上次结果：{problem}。可再点刷新重试。</p>}
+      {stale && <p role="status" {...stylex.props(styles.meta, schedulesStyles.staleNote)}>后台刷新失败，显示的是上次结果：{problem}。可再点刷新重试。</p>}
       {pendingForPage && <PendingNotice notice={pendingForPage} />}
       {listBody()}
     </div>

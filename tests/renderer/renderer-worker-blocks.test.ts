@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { availabilityOf, coveringBlock } from '../../src/shared/policy/availability';
 import { defaultConfig } from '../../src/main/policy/routing';
@@ -16,7 +16,7 @@ import { VENDOR_BLOCK_BY } from '../../src/shared/policy/blocks';
 const FUTURE = '2999-01-01T00:00:00.000Z';
 const NOW = Date.now();
 function markup(node: React.ReactNode) {
-  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) }));
+  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) }));
 }
 
 function twins() {

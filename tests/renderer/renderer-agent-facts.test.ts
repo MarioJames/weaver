@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Config } from '../../src/shared/contracts/policy';
 import type { Task } from '../../src/shared/contracts/tasks';
@@ -12,7 +12,7 @@ import { AgentLabel, EngineIcon } from '../../src/renderer/ui/EngineIcon';
 import { TaskDetail } from '../../src/renderer/features/tasks/TaskDetail';
 
 function markup(node: React.ReactNode) {
-  const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;
+  const props = { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) } as React.ComponentProps<typeof ConfigProvider>;
   return renderToStaticMarkup(React.createElement(ConfigProvider, props));
 }
 
@@ -65,13 +65,13 @@ test('an unknown or missing engine kind still gets the neutral bot mark', () => 
 
 test('the brand icon is the first item of one inline row with the name', () => {
   const labeled = markup(React.createElement(AgentLabel, { kind: 'claude', name: 'claude_owner' }));
-  assert.match(labeled, /<span class="[^"]+"><svg[^>]*>[\s\S]*?<\/svg>claude_owner<\/span>/);
+  assert.match(labeled, /<span class="[^"]+"><svg[^>]*>[\s\S]*?<\/svg><span[^>]*>claude_owner<\/span><\/span>/);
 });
 
 test('facts name the owner, the worker and the workspace as one key value block', () => {
   const html = markup(React.createElement(AgentFacts, { task: claude, ownerKind }));
-  assert.match(html, /<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?claude_owner<\/span><\/dd>/);
-  assert.match(html, /<dt[^>]*>子 Agent<\/dt><dd[^>]*>[\s\S]*?claude_worker<\/span><\/dd>/);
+  assert.match(html, /<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?claude_owner[\s\S]*?<\/dd>/);
+  assert.match(html, /<dt[^>]*>子 Agent<\/dt><dd[^>]*>[\s\S]*?claude_worker[\s\S]*?<\/dd>/);
   assert.match(html, /<dt[^>]*>模型<\/dt><dd[^>]*>[\s\S]*?claude \/ sonnet · high[\s\S]*?<\/dd>/);
   assert.match(html, /<dt[^>]*>更新时间<\/dt><dd[^>]*><time[^>]*dateTime="2026-10-18T01:00:00Z"/);
   assert.match(html, /<dt[^>]*>工作目录<\/dt><dd[^>]*>[\s\S]*?\/home\/mocha\/opensource\/weaver[\s\S]*?<\/dd>/);

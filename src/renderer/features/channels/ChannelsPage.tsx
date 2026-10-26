@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { LogIn, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { PageHeader } from '@lobehub/ui/dashboard';
 import { Empty } from '@lobehub/ui';
-import { Alert, Button, Modal, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
+import * as stylex from '@stylexjs/stylex';
+import { Alert, Button, Modal, Skeleton, Tag, Text } from '@lobehub/ui';
 import type { Channel, ChannelsSnapshot, ImportChannelsResult } from '../../../shared/contracts/channels';
 import type { EngineProbeRecord } from '../../../shared/engines';
 import { QUOTA_KINDS } from '../../../shared/policy/settings';
@@ -85,9 +86,9 @@ export function ChannelsPage({ policy }: { policy: PolicyDraft }) {
     const engine = engineOptions.find(option => subscriptionAllowed(config?.engines[option.value]?.kind ?? ''))?.value ?? engineOptions[0]?.value ?? '';
     openEditor({ channel: { label: '', engine, kind: subscriptionAllowed(config?.engines[engine]?.kind ?? '') ? 'subscription' : 'api', enabled: true } });
   };
-  return <section className={resourceStyles.page} aria-label="账号与渠道内容">
+  return <section {...stylex.props(resourceStyles.page)} aria-label="账号与渠道内容">
     <PageHeader title="账号与渠道" description="选择官方订阅账号或 API 渠道，再分配给父、子 Agent。每个渠道使用独立配置。" action={<Button type="primary" icon={Plus} disabled={!engineOptions.length || !!busy || policy.busy} onClick={newChannel}>添加账号</Button>} />
-    <div className={resourceStyles.toolbar}>
+    <div {...stylex.props(resourceStyles.toolbar)}>
       <NamedSelect aria-label="渠道类型筛选" value={filter} options={[{ value: 'all', label: '全部类型' }, { value: 'subscription', label: '官方订阅' }, { value: 'api', label: 'API' }]} onChange={value => setFilter(String(value))} />
       <NamedSelect aria-label="渠道引擎筛选" value={engineFilter} options={[{ value: 'all', label: '全部引擎' }, ...engineOptions]} onChange={value => setEngineFilter(String(value))} />
       <Button icon={Upload} disabled={!!busy || policy.busy} onClick={() => { readGeneration.current++; setLoading(false); setFailure(''); setReplaceExisting(false); setImporting(true); }}>导入已有账号或渠道</Button>
@@ -101,7 +102,7 @@ export function ChannelsPage({ policy }: { policy: PolicyDraft }) {
     {loading && !snapshot ? <Skeleton.Text animated rows={5} /> : !snapshot && failure ? <Text type="secondary">尚未读取账号状态，请重新读取后重试。</Text> : !rows.length ? <Empty
       title={Object.keys(config?.channels ?? {}).length ? '没有匹配的渠道' : '添加第一个账号或渠道'}
       description="添加官方订阅可直接登录独立账号；API 渠道填写连接配置。Qoder API 请通过原生 /model 配置 BYOK 后导入。"
-      action={<Button icon={Plus} disabled={!engineOptions.length || !!busy} onClick={newChannel}>添加账号</Button>} /> : <div className={resourceStyles.list}>
+      action={<Button icon={Plus} disabled={!engineOptions.length || !!busy} onClick={newChannel}>添加账号</Button>} /> : <div {...stylex.props(resourceStyles.list)}>
       {rows.map(([id, channel]) => {
         const state = snapshot?.configurations[id];
         const users = config ? channelUsers(config, id) : [];
@@ -109,27 +110,27 @@ export function ChannelsPage({ policy }: { policy: PolicyDraft }) {
         const probe = probes.find(item => item.id === channel.engine);
         const record = channelQuota(id, channel, state);
         const canQueryQuota = channel.kind === 'subscription' && (QUOTA_KINDS as readonly string[]).includes(engine?.kind ?? '');
-        return <article key={id} aria-label={channel.label} className={channelStyles.row}>
-          <div className={styles.tight}>
-            <Text strong className={styles.wrap}>{channel.label}</Text>
-            <span className={styles.row}><Tag size="small" color={tagColor('neutral')}>{channel.kind === 'subscription' ? '官方订阅' : 'API'}</Tag><Text type="secondary">{channel.engine}</Text></span>
-            {probe?.status === 'missing' && <Text type="warning" className={styles.meta}>未在此机器找到 CLI，请安装对应引擎后重新打开此页面。</Text>}
-            {probe?.status === 'probe_failed' && <Text type="warning" className={styles.meta}>CLI 安装探测失败，请检查本机命令后重试。</Text>}
-            <Text type="secondary" className={`${styles.meta} ${styles.wrap}`}>{users.length ? users.join('、') : '尚未分配给 Agent'}</Text>
+        return <article key={id} aria-label={channel.label} {...stylex.props(channelStyles.row)}>
+          <div {...stylex.props(styles.tight)}>
+            <Text strong className={stylex.props(styles.wrap).className}>{channel.label}</Text>
+            <span {...stylex.props(styles.row)}><Tag size="small" color={tagColor('neutral')}>{channel.kind === 'subscription' ? '官方订阅' : 'API'}</Tag><Text type="secondary">{channel.engine}</Text></span>
+            {probe?.status === 'missing' && <Text type="warning" className={stylex.props(styles.meta).className}>未在此机器找到 CLI，请安装对应引擎后重新打开此页面。</Text>}
+            {probe?.status === 'probe_failed' && <Text type="warning" className={stylex.props(styles.meta).className}>CLI 安装探测失败，请检查本机命令后重试。</Text>}
+            <Text type="secondary" className={stylex.props(styles.meta, styles.wrap).className}>{users.length ? users.join('、') : '尚未分配给 Agent'}</Text>
           </div>
-          <div className={styles.tight}>
+          <div {...stylex.props(styles.tight)}>
             <Text>{channel.kind === 'subscription' ? state?.hasCredentials ? '原生登录凭据已配置' : '等待官方账号登录' : state?.hasApiKey ? 'API 密钥已配置' : state?.hasCredentials ? '原生认证已配置' : state?.hasConfig ? '原生配置已提供' : '尚未配置连接'}</Text>
-            {channel.kind === 'api' && <Text type="secondary" className={`${styles.meta} ${styles.wrap}`}>{[channel.provider, channel.baseUrl, channel.protocol].filter(Boolean).join(' · ') || '编辑渠道以配置 provider 与 endpoint'}</Text>}
-            <Text type="secondary" className={styles.meta}>{state?.hasConfig ? '已有原生配置覆写 · 不回显秘密内容' : '使用引擎原生配置'}</Text>
-            {state?.detail && <Text type="warning" className={`${styles.meta} ${styles.wrap}`}>{state.detail}</Text>}
-            {channel.kind === 'subscription' && !state?.hasCredentials && <Text type="secondary" className={styles.meta}>点击「登录官方账号」完成此账号的独立认证，再分配给 Agent。</Text>}
+            {channel.kind === 'api' && <Text type="secondary" className={stylex.props(styles.meta, styles.wrap).className}>{[channel.provider, channel.baseUrl, channel.protocol].filter(Boolean).join(' · ') || '编辑渠道以配置 provider 与 endpoint'}</Text>}
+            <Text type="secondary" className={stylex.props(styles.meta).className}>{state?.hasConfig ? '已有原生配置覆写 · 不回显秘密内容' : '使用引擎原生配置'}</Text>
+            {state?.detail && <Text type="warning" className={stylex.props(styles.meta, styles.wrap).className}>{state.detail}</Text>}
+            {channel.kind === 'subscription' && !state?.hasCredentials && <Text type="secondary" className={stylex.props(styles.meta).className}>点击「登录官方账号」完成此账号的独立认证，再分配给 Agent。</Text>}
           </div>
-          <div className={styles.tight}>
+          <div {...stylex.props(styles.tight)}>
             {record ? <QuotaSummary engine={record.engine} record={record} now={Date.now()} busy={busy === `quota:${id}` ? record.engine : null} policyBusy={!!busy || policy.busy} onRefresh={() => void mutate(`quota:${id}`, () => window.weaver.refreshChannelQuota({ channel: id }), '已刷新所选账号额度。')} recovery={record.status === 'unauthenticated' ? '请检查此账号的登录状态；需要更换身份时新建账号。' : undefined} refreshLabel={`刷新 ${channel.label} 额度`} />
               : <><Text type="secondary">{channel.kind === 'api' ? 'API 渠道不显示官方订阅额度' : !canQueryQuota ? '该引擎没有官方只读额度接口' : '尚无该账号的额度观测'}</Text>{canQueryQuota && <Button size="small" disabled={!!busy || policy.busy} loading={busy === `quota:${id}`} onClick={() => void mutate(`quota:${id}`, () => window.weaver.refreshChannelQuota({ channel: id }), '已刷新所选账号额度。')}>刷新账号额度</Button>}</>}
-            {canQueryQuota && <span className={resourceStyles.rowActions}><NamedSwitch size="small" aria-label={`${channel.label} 自动刷新额度`} checked={channel.quota_refresh !== false} disabled={!!busy || policy.busy} onChange={checked => revision !== undefined && void mutate(id, () => window.weaver.saveChannel({ revision, id, channel: { ...channel, quota_refresh: checked } }), '已更新额度刷新设置。')} /><Text type="secondary" className={styles.meta}>自动刷新</Text></span>}
+            {canQueryQuota && <span {...stylex.props(resourceStyles.rowActions)}><NamedSwitch size="small" aria-label={`${channel.label} 自动刷新额度`} checked={channel.quota_refresh !== false} disabled={!!busy || policy.busy} onChange={checked => revision !== undefined && void mutate(id, () => window.weaver.saveChannel({ revision, id, channel: { ...channel, quota_refresh: checked } }), '已更新额度刷新设置。')} /><Text type="secondary" className={stylex.props(styles.meta).className}>自动刷新</Text></span>}
           </div>
-          <div className={resourceStyles.rowActions}>
+          <div {...stylex.props(resourceStyles.rowActions)}>
             <NamedSwitch size="small" aria-label={`启用 ${channel.label}`} checked={channel.enabled} loading={busy === id} disabled={!!busy || policy.busy} onChange={enabled => revision !== undefined && void mutate(id, () => window.weaver.saveChannel({ revision, id, channel: { ...channel, enabled } }), enabled ? '渠道已启用；实际执行仍需可用凭据与引擎。' : '渠道已停用。')} />
             {channel.kind === 'subscription' && !state?.hasCredentials && subscriptionAllowed(engine?.kind ?? '') && <Button size="small" type="text" icon={LogIn} disabled={!!busy} onClick={() => setLoginChannel(id)}>登录官方账号</Button>}
             <Button size="small" type="text" icon={Pencil} disabled={!!busy} onClick={() => openEditor({ id, channel: { ...channel } })}>编辑</Button>
@@ -151,9 +152,9 @@ export function ChannelsPage({ policy }: { policy: PolicyDraft }) {
     }, '账号配置已保存。', () => { setEditor(undefined); setEditorOpen(false); })} />}
     <ChannelImportModal open={importing} busy={busy} revision={revision} engineOptions={engineOptions} importResult={importResult} sourceDir={sourceDir} importEngine={importEngine} replaceExisting={replaceExisting} failure={failure} onSource={setSourceDir} onEngine={setImportEngine} onReplace={setReplaceExisting} onCancel={() => { if (!busy) setImporting(false); }} onImport={() => revision !== undefined && void mutate('import', () => { setImportResult(undefined); return window.weaver.importChannels(channelImportInput(revision, importEngine, sourceDir, replaceExisting)); }, next => { setImportResult(next.importResult); return ''; }, next => { if (!next.importResult.failures.length && next.importResult.added + next.importResult.existing + next.importResult.updated > 0) setImporting(false); })} onReload={() => void load()} />
     {loginChannel && config?.channels[loginChannel] && <ChannelLoginDialog key={`login:${loginChannel}`} channel={loginChannel} label={config.channels[loginChannel].label} onClose={() => setLoginChannel(undefined)} onSucceeded={async () => { if (!await load()) throw new Error('未能重新读取账号凭据状态，请重试。'); }} />}
-    <Modal className={resourceStyles.modal} classNames={{ body: resourceStyles.modalBody, footer: resourceStyles.modalFooter }} draggable={false} open={!!deleting} title="删除渠道" okText="删除" cancelText="取消" okButtonProps={{ danger: true, disabled: !!busy || !deleting || !!(config && channelUsers(config, deleting).length) }} confirmLoading={busy === 'delete'} onCancel={() => { if (!busy) setDeleting(undefined); }} onOk={() => revision !== undefined && deleting && void mutate('delete', () => window.weaver.deleteChannel({ revision, id: deleting }), '渠道已删除。', () => setDeleting(undefined))}>
+    <Modal className={stylex.props(resourceStyles.modal).className} classNames={{ body: stylex.props(resourceStyles.modalBody).className, footer: stylex.props(resourceStyles.modalFooter).className }} draggable={false} open={!!deleting} title="删除渠道" okText="删除" cancelText="取消" okButtonProps={{ danger: true, disabled: !!busy || !deleting || !!(config && channelUsers(config, deleting).length) }} confirmLoading={busy === 'delete'} onCancel={() => { if (!busy) setDeleting(undefined); }} onOk={() => revision !== undefined && deleting && void mutate('delete', () => window.weaver.deleteChannel({ revision, id: deleting }), '渠道已删除。', () => setDeleting(undefined))}>
       <Text>{deleting && config && channelUsers(config, deleting).length ? `以下角色仍引用该渠道，请先在角色配置中更换：${channelUsers(config, deleting).join('、')}` : '删除这条渠道及其托管配置，不修改来源 CLI 目录。此操作不能撤销。'}</Text>
-      {failure && <Text type="danger" role="alert" className={styles.wrap}>{failure}</Text>}
+      {failure && <Text type="danger" role="alert" className={stylex.props(styles.wrap).className}>{failure}</Text>}
     </Modal>
   </section>;
 }

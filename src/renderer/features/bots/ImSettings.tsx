@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Button, Input, InputPassword, Spin, Tag, Text, TextArea, Tooltip } from '@lobehub/ui/base-ui';
+import * as stylex from '@stylexjs/stylex';
+import { Button, Icon, Input, InputPassword, Spin, Tag, Text, TextArea, Tooltip } from '@lobehub/ui';
 import { Check } from 'lucide-react';
-import { Icon } from '@lobehub/ui';
 import { notifyError } from '../../api/notify';
 import { TimeText } from '../../ui/TimeText';
 import { NamedSelect, NamedSwitch } from '../../ui/NamedControls';
@@ -111,8 +111,8 @@ export function ImSettingsView({
   return <BotChannel channel="feishu" title="飞书 IM" desc={CHANNEL_DESC}>
     {!saved || !values
       ? loading
-        ? <div className={botStyles.loading}><Spin size="small" aria-label="正在读取飞书 IM 设置" /><Text fontSize={12}>正在读取飞书 IM 设置…</Text></div>
-        : <div className={botStyles.loading}><Text fontSize={12} role="alert">{loadError}</Text><Button size="small" onClick={onRetryLoad}>重试</Button></div>
+        ? <div {...stylex.props(botStyles.loading)}><Spin size="small" aria-label="正在读取飞书 IM 设置" /><Text fontSize={12}>正在读取飞书 IM 设置…</Text></div>
+        : <div {...stylex.props(botStyles.loading)}><Text fontSize={12} role="alert">{loadError}</Text><Button size="small" onClick={onRetryLoad}>重试</Button></div>
       : <>
           {conflict && edit && <BotSetting label="配置在别处被修改" htmlFor={`${id}-conflict`} desc={conflictNote(edit, saved)} role="alert">
             <Button id={`${id}-conflict`} size="small" loading={forceReading} disabled={saving || loading} onClick={onReloadLatest}>放弃修改并载入最新</Button>
@@ -128,45 +128,45 @@ export function ImSettingsView({
             <NamedSwitch id={`${id}-enabled`} aria-label="启用飞书 IM" checked={values.enabled} disabled={lockFields} onChange={checked => onUpdate({ enabled: checked })} />
           </BotSetting>
           <BotSetting label="App ID" htmlFor={`${id}-appid`} desc="飞书开放平台企业自建应用的 App ID：cli_ 开头加 16 位十六进制字符。" error={fieldErrors.appId}>
-            <Input id={`${id}-appid`} aria-label="App ID" value={values.appId} placeholder="例如：cli_a1b2c3d4e5f6a7b8" style={{ inlineSize: '100%', maxInlineSize: 320 }} disabled={lockFields} onChange={event => onUpdate({ appId: event.target.value })} />
+            <Input id={`${id}-appid`} aria-label="App ID" value={values.appId} placeholder="例如：cli_a1b2c3d4e5f6a7b8" className={stylex.props(botStyles.fullControl).className} disabled={lockFields} onChange={event => onUpdate({ appId: event.target.value })} />
           </BotSetting>
           <BotSetting label="App Secret" htmlFor={`${id}-secret`} desc={configuredSecret ? '已保存一份 Secret，不再回显；留空保存保持不变，粘贴新值即覆盖。「清除已保存」在保存时删除它。' : '粘贴开放平台的应用 Secret，只在保存时提交，之后不再回显。'} error={fieldErrors.secret}>
-            <InputPassword id={`${id}-secret`} aria-label="App Secret" value={values.secret} placeholder={configuredSecret ? '已保存；粘贴新的 Secret 可覆盖' : '粘贴应用 Secret'} style={{ inlineSize: '100%', maxInlineSize: 320 }} disabled={lockFields} visibilityToggle onChange={event => onUpdate({ secret: event.target.value })} />
+            <InputPassword id={`${id}-secret`} aria-label="App Secret" value={values.secret} placeholder={configuredSecret ? '已保存；粘贴新的 Secret 可覆盖' : '粘贴应用 Secret'} className={stylex.props(botStyles.fullControl).className} disabled={lockFields} visibilityToggle onChange={event => onUpdate({ secret: event.target.value })} />
             {configuredSecret && (values.clearSecret
               ? <Button size="small" disabled={lockFields} onClick={() => onUpdate({ clearSecret: false })}>撤销清除</Button>
               : <Tooltip title="随下次「保存修改」删除已存的 Secret：保存后手机链路立即失效，直到粘贴新的 Secret。"><span><Button size="small" disabled={lockFields} onClick={() => onUpdate({ clearSecret: true })}>清除已保存</Button></span></Tooltip>)}
           </BotSetting>
           <BotSetting label="open_id 白名单" htmlFor={`${id}-openids`} desc="只接受这些飞书用户发来的单聊文本消息，每行一个。open_id 的获取方式见接入文档，不做自动绑定。" error={fieldErrors.openIds}>
-            <TextArea id={`${id}-openids`} aria-label="open_id 白名单，每行一个" value={values.openIdsText} placeholder={'ou_xxxxxxxxxxxxxxxx\n（每行一个）'} autoSize={{ minRows: 2, maxRows: 6 }} disabled={lockFields} style={{ inlineSize: '100%', maxInlineSize: 360 }} onChange={event => onUpdate({ openIdsText: event.target.value })} />
+            <TextArea id={`${id}-openids`} aria-label="open_id 白名单，每行一个" value={values.openIdsText} placeholder={'ou_xxxxxxxxxxxxxxxx\n（每行一个）'} autoSize={{ minRows: 2, maxRows: 6 }} disabled={lockFields} className={stylex.props(botStyles.wideControl).className} onChange={event => onUpdate({ openIdsText: event.target.value })} />
           </BotSetting>
           <BotSetting label="账号或渠道" htmlFor={`${id}-channel`} desc="选择已启用渠道及其引擎；这里只控制 Bot 聊天，不依赖父 Agent 或 worker 配置。" error={fieldErrors.channel || (values.channel && !channelUsable ? '已保存的渠道已失效、未启用或暂不支持，请重新选择。' : '')}>
-            <NamedSelect id={`${id}-channel`} aria-label="账号或渠道" value={values.channel || undefined} options={channelOptions} style={{ inlineSize: '100%', maxInlineSize: 320 }} popupMatchSelectWidth={false} disabled={lockFields} placeholder="选择已启用的渠道" onChange={engine => { if (typeof engine === 'string') onChannelChange(engine); }} />
+            <NamedSelect id={`${id}-channel`} aria-label="账号或渠道" value={values.channel || undefined} options={channelOptions} className={stylex.props(botStyles.fullControl).className} popupMatchSelectWidth={false} disabled={lockFields} placeholder="选择已启用的渠道" onChange={engine => { if (typeof engine === 'string') onChannelChange(engine); }} />
           </BotSetting>
           <BotSetting label="模型" htmlFor={`${id}-model`} desc="从引擎提供的模型中选择，也可手动填写；切换渠道后需重新明确模型。" error={fieldErrors.model}>
-            <fieldset disabled={lockFields} inert={lockFields} style={{ border: 0, padding: 0, margin: 0, minInlineSize: 0, inlineSize: '100%', maxInlineSize: 360 }}>
+            <fieldset disabled={lockFields} inert={lockFields} className={stylex.props(botStyles.fieldset).className}>
               <ModelPicker kind={engineKind} channel={channelUsable ? values.channel : undefined} id={`${id}-model`} label="模型" engine={channelUsable ? discoveryEngine : ''} value={values.model} placeholder="例如：gpt-6.1-sol 或 claude-opus-5-5" onChange={model => { if (!lockFields) onUpdate({ model }); }} />
             </fieldset>
           </BotSetting>
           <BotSetting label="思考力度" htmlFor={`${id}-effort`} desc={efforts ? 'Bot 独立使用的思考力度；保存后随模型一起生效。' : openCodeVariant ? 'OpenCode 的 variant 由模型定义，可直接填写；保存后随模型一起生效。' : '先选择一个支持飞书对话的渠道。'} error={fieldErrors.effort}>
             {efforts
-              ? <NamedSelect id={`${id}-effort`} aria-label="思考力度" value={values.effort || undefined} options={effortOptions} style={{ inlineSize: '100%', maxInlineSize: 320 }} disabled={lockFields || !channelUsable} placeholder="先选择渠道" onChange={effort => { if (typeof effort === 'string') onUpdate({ effort }); }} />
-              : <div className={botStyles.controlStack}>
-                  <Input id={`${id}-effort`} aria-label="思考力度" value={values.effort} placeholder={openCodeVariant ? '例如：high 或该模型接受的 variant' : '先选择渠道'} style={{ inlineSize: '100%', maxInlineSize: 320 }} disabled={lockFields || !channelUsable} onChange={event => onUpdate({ effort: event.target.value })} />
-                  {openCodeVariant && channelUsable && <Text type="secondary" fontSize={12} className={botStyles.wrap}>填写该模型接受的 variant。</Text>}
+              ? <NamedSelect id={`${id}-effort`} aria-label="思考力度" value={values.effort || undefined} options={effortOptions} className={stylex.props(botStyles.fullControl).className} disabled={lockFields || !channelUsable} placeholder="先选择渠道" onChange={effort => { if (typeof effort === 'string') onUpdate({ effort }); }} />
+              : <div {...stylex.props(botStyles.controlStack)}>
+                  <Input id={`${id}-effort`} aria-label="思考力度" value={values.effort} placeholder={openCodeVariant ? '例如：high 或该模型接受的 variant' : '先选择渠道'} className={stylex.props(botStyles.fullControl).className} disabled={lockFields || !channelUsable} onChange={event => onUpdate({ effort: event.target.value })} />
+                  {openCodeVariant && channelUsable && <Text type="secondary" fontSize={12} className={stylex.props(botStyles.wrap).className}>填写该模型接受的 variant。</Text>}
                 </div>}
           </BotSetting>
           <BotSetting label="调度主引擎" htmlFor={`${id}-owner`} desc="Bot 派发实际任务时使用的父 Agent：「自动（按策略）」由 Master 按策略选择可用的父 Agent；固定后 Master 只用该父 Agent，不回退。只影响任务派发，不影响 Bot 聊天渠道。" error={fieldErrors.ownerProfileId || ownerLiveError}>
             {/* 自动在草稿里是 ''，lobe Select 会把 '' 归一为空显示：这里经哨兵（见 ownerSelectDisplay）
                 让触发框直接显示「自动（按策略）」，回调里再映射回 ''（见 ownerSelectValue）。 */}
-            <NamedSelect id={`${id}-owner`} aria-label="调度主引擎" value={ownerSelectDisplay(values.ownerProfileId)} options={ownerOptions} style={{ inlineSize: '100%', maxInlineSize: 320 }} popupMatchSelectWidth={false} disabled={lockFields} onChange={owner => onUpdate({ ownerProfileId: ownerSelectValue(owner) })} />
+            <NamedSelect id={`${id}-owner`} aria-label="调度主引擎" value={ownerSelectDisplay(values.ownerProfileId)} options={ownerOptions} className={stylex.props(botStyles.fullControl).className} popupMatchSelectWidth={false} disabled={lockFields} onChange={owner => onUpdate({ ownerProfileId: ownerSelectValue(owner) })} />
           </BotSetting>
           <BotSetting label="工作空间" htmlFor={`${id}-workspaces`} desc={`Bot 可访问列表中的全部目录，并按任务目标在相应目录创建主 Agent 和任务。最多 ${IM_WORKSPACE_LIMIT} 个，选择 Weaver 所在机器上已存在的项目目录；保存后生效。`} error={fieldErrors.workspaces}>
-            <div className={botStyles.workspaces}>
+            <div {...stylex.props(botStyles.workspaces)}>
               {values.workspaces.length
-                ? <ul aria-label="已配置工作空间" className={botStyles.list}>
-                    {values.workspaces.map((path, index) => <li key={`${index}-${path}`} className={botStyles.directory}>
-                      <Text fontSize={12}>{path}</Text>
-                      <Button size="small" disabled={lockFields} aria-label={`移除工作空间 ${path}`} onClick={() => onRemoveWorkspace(index)}>移除</Button>
+                ? <ul aria-label="已配置工作空间" {...stylex.props(botStyles.list)}>
+                    {values.workspaces.map((path, index) => <li key={`${index}-${path}`} {...stylex.props(botStyles.directory)}>
+                      <Text fontSize={12} className={stylex.props(botStyles.directoryPath).className}>{path}</Text>
+                      <Button size="small" className={stylex.props(botStyles.directoryAction).className} disabled={lockFields} aria-label={`移除工作空间 ${path}`} onClick={() => onRemoveWorkspace(index)}>移除</Button>
                     </li>)}
                   </ul>
                 : <Text type="secondary" fontSize={12}>尚未添加工作空间。浏览本机目录后添加，启用 Bot 前至少配置一个。</Text>}

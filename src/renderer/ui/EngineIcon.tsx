@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import { Bot } from 'lucide-react';
+import * as stylex from '@stylexjs/stylex';
 import { ClaudeCode, Codex, DeepSeek, Grok, OpenCode, Pi, Qoder } from '@lobehub/icons';
 import { styles } from './styles';
 
@@ -25,5 +26,5 @@ export function EngineIcon({ kind, size = 14 }: { kind?: string; size?: number }
 
 /** Name with its brand icon in one centered inline row; callers keep the audible text. */
 export function AgentLabel({ kind, name }: { kind?: string; name: string }) {
-  return <span className={styles.agentLabel}><EngineIcon kind={kind} />{name}</span>;
+  return <span {...stylex.props(styles.agentLabel)}><EngineIcon kind={kind} /><span {...stylex.props(styles.agentName)}>{name}</span></span>;
 }

@@ -11,6 +11,7 @@ await build({
   format: 'esm',
   target: 'node22',
   banner: { js: `import { createRequire as __weaverCreateRequire } from 'node:module'; import { fileURLToPath as __weaverFileURLToPath } from 'node:url'; const require = __weaverCreateRequire(import.meta.url); const __dirname = __weaverFileURLToPath(new URL('.', import.meta.url));` },
+  alias: { 'jsonc-parser': 'jsonc-parser/lib/esm/main.js' },
   external: ['vite'],
 
 });

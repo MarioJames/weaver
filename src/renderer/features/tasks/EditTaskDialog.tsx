@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal } from '@lobehub/ui/base-ui';
+import { Modal } from '@lobehub/ui';
 import type { Task } from '../../../shared/contracts/tasks';
 import { TaskComposer, type CreateTaskDraft } from './TaskComposer';
 import { draftEdit } from './task-create';

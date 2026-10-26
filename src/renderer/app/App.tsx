@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Bot, CalendarClock, KeyRound, ListTodo, MessageSquare, Settings2, UserRound } from 'lucide-react';
-import { ConsoleBrand, ConsoleNav, ConsoleShell } from '@lobehub/ui/dashboard';
-import { ToastHost } from '@lobehub/ui/base-ui';
+import * as stylex from '@stylexjs/stylex';
+import { ToastHost } from '@lobehub/ui';
+import { ConsoleBrand, ConsoleNav, ConsoleShell, useConsoleShell } from '@lobehub/ui/dashboard';
 import weaverIcon from '../assets/weaver-icon.png';
 import weaverLockup from '../assets/weaver-lockup.svg';
 import { useWorkbench } from '../features/tasks/useWorkbench';
@@ -51,6 +52,14 @@ function usePage(): [Page, (next: Page) => void] {
   return [page, next => { window.location.hash = `/${next}`; }];
 }
 
+/** The rail keeps only the mark; the full lockup needs the expanded navigation width. */
+function BrandLogo() {
+  const { collapsed } = useConsoleShell();
+  return collapsed
+    ? <img {...stylex.props(shellStyles.mark)} src={weaverIcon} width={24} height={24} alt="" aria-hidden="true" draggable={false} />
+    : <img {...stylex.props(shellStyles.brandLockup)} src={weaverLockup} width={128} height={27} alt="" aria-hidden="true" draggable={false} />;
+}
+
 export function App() {
   useEffect(() => {
     // Focus each newly opened panel once; keyboard navigation within it remains unrestricted.
@@ -77,12 +86,9 @@ export function App() {
   const workerFreeChannel = freeChannelLookup(policy.config);
   // The saved policy decides the time zone for the whole page; a draft elsewhere never moves it.
   return <TimeZoneProvider zone={displayTimeZone(policy.snapshot?.config)}><ConsoleShell
-    className={shellStyles.shell}
+    {...stylex.props(shellStyles.shell)}
     storageKey="weaver-nav"
-    brand={<ConsoleBrand label="Weaver 任务" logo={<>
-      <img className={shellStyles.brandLockup} src={weaverLockup} width={128} height={27} alt="" aria-hidden="true" draggable={false} />
-      <img className={shellStyles.mark} src={weaverIcon} width={24} height={24} alt="" aria-hidden="true" draggable={false} />
-    </>} href="/#/tasks" />}
+    brand={<ConsoleBrand label="Weaver 任务" logo={<BrandLogo />} href="/#/tasks" />}
     navigation={<ConsoleNav label="主导航" items={NAVIGATION} pathname={`/#/${page}`} onNavigate={href => open(href.replace(/^\/#\//, '') as Page)} />}
     openNavigationLabel="打开导航" closeNavigationLabel="关闭导航" collapseLabel="收起导航" expandLabel="展开导航" skipToContentLabel="跳到内容"
   >

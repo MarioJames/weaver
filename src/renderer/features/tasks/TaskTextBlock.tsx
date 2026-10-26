@@ -1,9 +1,10 @@
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { CopyButton, Markdown } from '@lobehub/ui';
-import { Button, Text } from '@lobehub/ui/base-ui';
+import { Button, Text } from '@lobehub/ui';
 import { styles } from './task-detail-style';
 
-export function TaskTextBlock({ title, content, description, clamp, markdown, className }: { title: string; content: string; description?: string; clamp?: number; markdown?: boolean; className?: string }) {
+export function TaskTextBlock({ title, content, description, clamp, markdown, flat = false }: { title: string; content: string; description?: string; clamp?: number; markdown?: boolean; flat?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const [overflowing, setOverflowing] = useState(!!clamp && (content.split('\n').length > clamp || content.length > clamp * 100));
   const textRef = useRef<HTMLElement>(null);
@@ -22,15 +23,15 @@ export function TaskTextBlock({ title, content, description, clamp, markdown, cl
     observer.observe(element);
     return () => observer.disconnect();
   }, [clamp, content, expanded, markdown]);
-  return <section className={`${styles.textBlock} ${className ?? ''}`} aria-label={title}>
-    <div className={styles.textHeader}>
-      <div className={styles.textHeading}>
-        <Text style={{ fontWeight: 600 }}>{title}</Text>
-        {description && <Text type="secondary" className={styles.description}>{description}</Text>}
+  return <section {...stylex.props(styles.textBlock, flat && styles.textBlockFlat)} aria-label={title}>
+    <div {...stylex.props(styles.textHeader, flat && styles.textHeaderFlat)}>
+      <div {...stylex.props(styles.textHeading)}>
+        <Text strong>{title}</Text>
+        {description && <Text type="secondary" className={stylex.props(styles.description).className}>{description}</Text>}
       </div>
       <CopyButton content={content} size="small" aria-label={`复制${title}`} title={`复制${title}`} />
     </div>
-    {markdown ? <div ref={element => { textRef.current = element; }} id={contentId} className={`${styles.markdown}${clamp && !expanded ? ` ${styles.markdownClamped}` : ''}`} style={clamp ? { '--summary-lines': clamp } as CSSProperties : undefined}><Markdown>{content}</Markdown></div> : <pre ref={element => { textRef.current = element; }} id={contentId} className={`${styles.textContent}${clamp && !expanded ? ` ${styles.clamped}` : ''}`} style={clamp ? { WebkitLineClamp: clamp } : undefined}>{content}</pre>}
-    {clamp && overflowing && <div className={styles.textFooter}><Button size="small" type="text" aria-expanded={expanded} aria-controls={contentId} aria-label={`${expanded ? '收起' : '展开'}${title}`} onClick={() => setExpanded(value => !value)}>{expanded ? '收起' : '展开'}</Button></div>}
+    {markdown ? <div ref={element => { textRef.current = element; }} id={contentId} {...stylex.props(styles.markdown, flat && styles.markdownFlat, clamp !== undefined && !expanded && styles.markdownClamped, clamp !== undefined && styles.summaryLines(clamp))}><Markdown fontSize={14} headerMultiple={0} lineHeight={1.7}>{content}</Markdown></div> : <pre ref={element => { textRef.current = element; }} id={contentId} {...stylex.props(styles.textContent, clamp !== undefined && !expanded && styles.clamped, clamp !== undefined && !expanded && styles.clampLines(clamp))}>{content}</pre>}
+    {clamp && overflowing && <div {...stylex.props(styles.textFooter, flat && styles.textFooterFlat)}><Button size="small" type="text" aria-expanded={expanded} aria-controls={contentId} aria-label={`${expanded ? '收起' : '展开'}${title}`} onClick={() => setExpanded(value => !value)}>{expanded ? '收起' : '展开'}</Button></div>}
   </section>;
 }

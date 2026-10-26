@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
 import { taskStyles as styles } from '../../src/renderer/features/tasks/task-style';
+import { styleClass } from './style-helpers';
 import { TaskBoard, TaskFacets } from '../../src/renderer/features/tasks/TaskBoard';
 import { ArchiveList, archiveColumns } from '../../src/renderer/features/tasks/ArchiveDrawer';
 import { archivedTasks } from '../../src/renderer/features/tasks/task-archive';
@@ -40,7 +41,7 @@ function storage<T>(values: Record<string, string>, run: () => T): T {
   }
 }
 function markup(node: React.ReactNode) {
-  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) }));
+  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) }));
 }
 /** The pressed chip buttons of a render, as text-bearing markup. */
 const pressed = (html: string) => [...html.matchAll(/<button\b[^>]*aria-pressed="true"[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]);
@@ -158,8 +159,8 @@ test('the 已选 row is always present so selecting does not move the board', ()
   assert.match(none, /已选：/);
   assert.match(some, /已选：/);
   assert.equal(none.indexOf('data-status-column="queued"') > 0, true);
-  assert.match(some, new RegExp(`class="${styles.facetSelected}[^"]*"`));
-  assert.match(none, new RegExp(`class="${styles.facetSelected}[^"]*"`));
+  assert.match(some, new RegExp(`class="${styleClass(styles.facetSelected)}[^"]*"`));
+  assert.match(none, new RegExp(`class="${styleClass(styles.facetSelected)}[^"]*"`));
 });
 
 test('collapsed block is one summary line and keeps the board', () => {
@@ -191,7 +192,7 @@ test('archive: one row of selects, no search box, shared status tags, 全部 tim
   assert.doesNotMatch(html, /搜索|<input[^>]*placeholder/);
   for (const label of ['按时间筛选归档任务', '按状态筛选归档任务', '按父 Agent 筛选归档任务', '按子 Agent 筛选归档任务']) assert.match(html, new RegExp(label));
   assert.doesNotMatch(html, /按父 Agent筛选|按子 Agent筛选/);
-  assert.equal((html.match(new RegExp(`class="${styles.archiveFilters}`, 'g')) ?? []).length, 1);
+  assert.equal((html.match(new RegExp(`class="${styleClass(styles.archiveFilters)}`, 'g')) ?? []).length, 1);
   const outcome = archiveColumns().find(column => column.key === 'outcome')!;
   const cell = (task: Task) => markup(React.createElement(React.Fragment, null, outcome.render?.(task.title, task, 0) as React.ReactNode));
   assert.match(cell(old[0]), /失败/);
@@ -201,14 +202,12 @@ test('archive: one row of selects, no search box, shared status tags, 全部 tim
 
 test('the card title uses one text flow with the sub agent tag before the title', () => {
   const html = board(sel({}));
-  const block = html.match(new RegExp(`<span class="${styles.cardTitle}[^"]*">([\\s\\S]*?)</strong></span>`))?.[1];
+  const block = html.match(new RegExp(`<span class="${styleClass(styles.cardTitle)}[^"]*">([\\s\\S]*?)</strong></span>`))?.[1];
   assert.ok(block, 'card title block');
   assert.match(block, /<strong[^>]*>T_/);
   assert.match(block, /w\d/);
   assert.match(block, /w\d[\s\S]*<strong[^>]*>T_/);
   assert.equal((block.match(/<strong/g) ?? []).length, 1);
-  const source = styles.cardTitle;
-  assert.ok(source.length > 0);
 });
 
 test('tasks without a workspace answer for one 未指定工作目录 option that filters them', () => {

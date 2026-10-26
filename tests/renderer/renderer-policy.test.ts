@@ -230,7 +230,7 @@ test('official pools retain all members through role edits and policy validation
 test('the real role form renders every selected member while the parent keeps a single account', async () => {
   const React = await import('react');
   const { renderToStaticMarkup } = await import('react-dom/server');
-  const { ConfigProvider, ThemeProvider } = await import('@lobehub/ui');
+  const { ConfigProvider, ThemeScope } = await import('@lobehub/ui');
   const { motion } = await import('motion/react');
   const { RolesPage } = await import('../../src/renderer/features/roles/RolesPage');
   const config = defaultConfig();
@@ -239,7 +239,7 @@ test('the real role form renders every selected member while the parent keeps a 
   config.workers = { pool: { ...config.workers.codex_worker, channels: ['default_codex', 'second', 'third'] } };
   config.owners = { parent: { ...config.owners.codex_owner, workers: ['pool'] } };
   const policy = { config, blocks: [], snapshot: { config, blocks: [], revision: 1, workers: {}, owners: {} }, issues: [], dirty: true } as unknown as PolicyDraft;
-  const render = (section: 'workers' | 'owners') => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: React.createElement(RolesPage, { section, policy }) }) }));
+  const render = (section: 'workers' | 'owners') => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: React.createElement(RolesPage, { section, policy }) }) }));
   const worker = render('workers');
   assert.match(worker, /Second account/);
   assert.match(worker, /Third account/);

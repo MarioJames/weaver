@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { defaultConfig } from '../../src/main/policy/routing';
 import type { Block, Config, PolicySnapshot } from '../../src/shared/contracts/policy';
@@ -12,14 +12,14 @@ import { RolesPage } from '../../src/renderer/features/roles/RolesPage';
 import { WorkerBlockNotice, WorkerParallelField } from '../../src/renderer/features/roles/RoleEditor';
 import { OwnerScheduleFields } from '../../src/renderer/features/roles/OwnerSchedule';
 import { tagColor } from '../../src/renderer/format/tag-colors';
-import { Form, useForm } from '@lobehub/ui/base-ui/form';
+import { Form, useForm } from '@lobehub/ui/form';
 import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';
 
 const FUTURE = '2999-01-01T00:00:00.000Z';
 const NOW = Date.now();
 const body = (html: string) => html.replace(/<style[\s\S]*?<\/style>/g, '');
 function markup(node: React.ReactNode) {
-  const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'light', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;
+  const props = { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'light', children: node }) } as React.ComponentProps<typeof ConfigProvider>;
   return body(renderToStaticMarkup(React.createElement(ConfigProvider, props)));
 }
 /** Form.Field only renders inside a Form. */

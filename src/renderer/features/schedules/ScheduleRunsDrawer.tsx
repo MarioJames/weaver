@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { ChevronDown, ChevronUp, ExternalLink, Square } from 'lucide-react';
-import { Empty } from '@lobehub/ui';
-import { Alert, Drawer, Button, Skeleton, Tag, Text } from '@lobehub/ui/base-ui';
+import { Alert, Button, Drawer, Empty, Skeleton, Tag, Text } from '@lobehub/ui';
 import { command } from '../../api/commands';
 import { TimeText } from '../../ui/TimeText';
 import { TaskTextBlock } from '../tasks/TaskTextBlock';
@@ -42,19 +42,19 @@ function RunSection({ run, expanded, detail, detailLoading, detailError, active,
 }) {
   const hasOutput = !!run.output || !!run.error || !!run.truncated;
   const shown = expanded && detail ? detail : run;
-  return <section className={schedulesStyles.run} aria-label={`${RUN_LABELS[run.status]}的运行`}>
-    <div className={schedulesStyles.runHead}>
+  return <section {...stylex.props(schedulesStyles.run)} aria-label={`${RUN_LABELS[run.status]}的运行`}>
+    <div {...stylex.props(schedulesStyles.runHead)}>
       <Tag size="small" color={statusTagColor(RUN_TONES[run.status])}>{RUN_LABELS[run.status]}</Tag>
       <Text type="secondary">{runHeadline(run)}</Text>
-      <span className={schedulesStyles.meta}>
+      <span {...stylex.props(schedulesStyles.meta)}>
         <TimeText value={run.startedAt} />
         {run.finishedAt && <> → <TimeText value={run.finishedAt} /></>}
       </span>
       {run.exitCode !== undefined && run.exitCode !== null && <Text type="secondary">退出码 {run.exitCode}</Text>}
       {(expanded ? detail?.truncated : run.truncated) && <Tag size="small">{expanded ? '输出已截断' : `摘录前 ${SUMMARY_CHARS} 字`}</Tag>}
     </div>
-    {run.taskId && <div className={schedulesStyles.runHead}>
-      <Text type="secondary" className={styles.numbers}>任务 {run.taskId}</Text>
+    {run.taskId && <div {...stylex.props(schedulesStyles.runHead)}>
+      <Text type="secondary" className={stylex.props(styles.numbers).className}>任务 {run.taskId}</Text>
       {onViewTask
         ? <Button size="small" type="text" icon={ExternalLink} aria-label={`在任务页查看 ${run.taskId}`} onClick={() => onViewTask(run.taskId!)}>在任务页查看</Button>
         : <Text type="secondary">任务页入口未接入。</Text>}
@@ -62,24 +62,24 @@ function RunSection({ run, expanded, detail, detailLoading, detailError, active,
     {expanded && (detailLoading
       ? <div role="status" aria-label="正在读取本次运行完整输出"><Skeleton animated /></div>
       : detailError
-        ? <div className={styles.row}>
+        ? <div {...stylex.props(styles.row)}>
           <Text type="danger">完整输出读取失败：{detailError}</Text>
           <Button size="small" type="text" onClick={onRetryDetail}>重试</Button>
         </div>
         : detail && <TaskTextBlock title="输出" content={detail.output} clamp={20} />)}
     {!expanded && hasOutput && <>
       <TaskTextBlock title="输出" description={`列表只展示摘要（前 ${SUMMARY_CHARS} 字）；展开本条读取完整输出。`} content={run.output} clamp={8} />
-      <div className={schedulesStyles.runHead}>
+      <div {...stylex.props(schedulesStyles.runHead)}>
         <Button size="small" type="text" icon={ChevronDown} aria-expanded={false} aria-label="查看完整输出" onClick={onToggle}>查看完整输出</Button>
       </div>
     </>}
     {expanded
-      ? <div className={schedulesStyles.runHead}>
+      ? <div {...stylex.props(schedulesStyles.runHead)}>
         <Button size="small" type="text" icon={ChevronUp} aria-expanded aria-label="收起完整输出" onClick={onToggle}>收起，回到摘要</Button>
       </div>
       : undefined}
     {shown.error && <TaskTextBlock title="错误" content={shown.error} />}
-    {active && <div className={schedulesStyles.rowHead}>
+    {active && <div {...stylex.props(schedulesStyles.rowHead)}>
       <Button size="small" icon={Square} loading={cancelBusy} disabled={cancelBusy} aria-label={`停止这次运行（${runHeadline(run)}）`} onClick={() => onCancelRun(run.id)}>停止本次运行</Button>
     </div>}
   </section>;
@@ -133,17 +133,17 @@ export function ScheduleRunsDrawer({ schedule, open, onClose, cancelBusy, onCanc
       action={<><Button size="small" loading={pendingNotice.checking} onClick={pendingNotice.onVerify}>核对结果</Button><Button size="small" disabled={pendingNotice.checking} onClick={pendingNotice.onResend}>重试同一请求</Button></>} />}
     {schedule.builtin && schedule.activeRunId && <Text type="secondary">停止会等待当前额度请求完成，再结束本次刷新；后续目标不再请求。</Text>}
     {loading && <div role="status" aria-label="正在加载运行历史"><Skeleton animated /></div>}
-    {!loading && error && !runs && <div className={styles.stack}>
+    {!loading && error && !runs && <div {...stylex.props(styles.stack)}>
       <Text type="danger">运行历史读取失败：{error}</Text>
       <Button size="small" onClick={retry}>重试</Button>
     </div>}
     {!loading && runs && <>
-      {problem && <div className={styles.row}>
+      {problem && <div {...stylex.props(styles.row)}>
         <Text type="secondary" role="status">这次读取没有完成：{problem}。已显示的记录保留，可再试读取。</Text>
         <Button size="small" type="text" onClick={retry}>重新读取</Button>
       </div>}
       {runs.length
-        ? <div className={schedulesStyles.runs}>
+        ? <div {...stylex.props(schedulesStyles.runs)}>
           {runs.map(run => <RunSection key={run.id} run={run}
             expanded={expandId === run.id}
             detail={expandId === run.id ? detail : undefined}

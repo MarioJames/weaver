@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
-import { toast, type ToastOptions } from '@lobehub/ui/base-ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
+import { toast, type ToastOptions } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
 import { PENDING_TASK_TITLE } from '../../src/shared/validation';
@@ -19,7 +19,7 @@ import { applyTaskFilters, emptySelection, filterOptions } from '../../src/rende
 import { isDraft, ownerProfileOf, taskTitle } from '../../src/renderer/features/tasks/task-view';
 
 function markup(node: React.ReactNode) {
-  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) }));
+  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) }));
 }
 const owner = { name: 'Task owner', transport: 'herdr-visible' as const, session: 's', pane: 'p' };
 const NOW = Date.parse('2026-10-19T12:00:00Z');

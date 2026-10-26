@@ -1,9 +1,9 @@
 import { useId } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { Plus, Play, Trash2 } from 'lucide-react';
-import { Empty } from '@lobehub/ui';
-import { Alert, Button, Checkbox, Input, Modal, Text } from '@lobehub/ui/base-ui';
+import { Alert, Button, Checkbox, Empty, Input, Modal, Text } from '@lobehub/ui';
 import { Field } from '@base-ui/react/field';
-import { Form, useForm } from '@lobehub/ui/base-ui/form';
+import { Form, useForm } from '@lobehub/ui/form';
 import { activeBlocks, channelAvailabilityOf } from '../../../shared/policy/availability';
 import { roleChannels } from '../../../shared/policy/channels';
 import { EFFORTS } from '../../../shared/policy/settings';
@@ -48,14 +48,14 @@ export function RoleEditor({ section, policy, current, editor, freeProbe, onAdd 
   const savedWorker = section === 'workers' ? policy.snapshot?.config.workers[current] : undefined;
   const pausedBy = savedWorker && policy.snapshot ? blockOf(policy.snapshot.blocks, savedWorker, Date.now(), current, policy.snapshot.config) : undefined;
   const referringOwners = section === 'workers' ? ownerUsersOf(config, current) : undefined;
-  return <Form form={form} layout="vertical" className={styles.stack}>
+  return <Form form={form} layout="vertical" {...stylex.props(styles.stack)}>
     {pausedBy && <WorkerBlockNotice block={pausedBy} busy={editor.resuming === current} disabled={policy.busy || (!!editor.resuming && editor.resuming !== current)} onResume={() => void editor.resume(current, pausedBy)} />}
-    <div className={styles.spread}>
+    <div {...stylex.props(styles.spread)}>
       <Text strong>{name} 配置</Text>
       <Button danger size="small" icon={Trash2} disabled={policy.busy || editor.deleting} onClick={() => { editor.setDeleteError(''); editor.setAskDelete(true); }}>删除</Button>
     </div>
-    {referringOwners && <Text type="secondary" className={styles.meta}>被父 Agent 引用：{referringOwners.join('、') || '暂无'}</Text>}
-    <div className={rolesStyles.pair}>
+    {referringOwners && <Text type="secondary" {...stylex.props(styles.meta)}>被父 Agent 引用：{referringOwners.join('、') || '暂无'}</Text>}
+    <div {...stylex.props(rolesStyles.pair)}>
       <Form.Field label="配置 ID" required desc="改名后按 Enter 或离开输入框，引用处一起更新。">
         <Input id={`${fieldId}-id`} aria-label="配置 ID" aria-invalid={!!editor.idError} value={editor.pendingId} placeholder={section === 'workers' ? '例如：research' : '例如：codex'} onChange={event => editor.setPendingId(event.target.value)} onBlur={editor.acceptId} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); editor.acceptId(); } }} />
       </Form.Field>
@@ -77,13 +77,13 @@ export function RoleEditor({ section, policy, current, editor, freeProbe, onAdd 
         </Form.Field>
       </Field.Root>
     </div>
-    {section === 'workers' && <div className={styles.tight} aria-label="成员账号状态">{members.map(channel => {
+    {section === 'workers' && <div {...stylex.props(styles.tight)} aria-label="成员账号状态">{members.map(channel => {
       const saved = policy.snapshot?.config.workers[current];
       const state = saved?.channels.includes(channel) && policy.snapshot ? channelAvailabilityOf(policy.snapshot.config, activeBlocks({ version: 1, blocks: policy.snapshot.blocks }, Date.now()), { ...saved, channel }, current) : undefined;
-      return <Text key={channel} type="secondary" className={styles.meta}>{config.channels[channel]?.label ?? channel} · {state?.status === 'available' ? '未被策略限制；派发仍需新鲜可用额度' : availabilityText(state)}</Text>;
+      return <Text key={channel} type="secondary" {...stylex.props(styles.meta)}>{config.channels[channel]?.label ?? channel} · {state?.status === 'available' ? '未被策略限制；派发仍需新鲜可用额度' : availabilityText(state)}</Text>;
     })}</div>}
     {members.length > 1 && <Form.Field label="用于查看模型和连通测试的账号" extra="此选择仅用于当前诊断，不保存策略，也不指定派发账号。模型目录仅属于所选账号。"><NamedSelect id={`${fieldId}-diagnostic`} aria-label="用于查看模型和连通测试的账号" value={diagnostic || undefined} placeholder="选择一个成员账号" options={members.map(id => ({ value: id, label: config.channels[id]?.label ?? id }))} onChange={value => { if (typeof value === 'string' && members.includes(value)) editor.setDiagnostics(previous => ({ ...previous, [diagnosticKey]: value })); }} /></Form.Field>}
-    <div className={`${rolesStyles.pair} ${rolesStyles.pairStart}`}>
+    <div {...stylex.props(rolesStyles.pair, rolesStyles.pairStart)}>
       <Form.Field label="模型" required><ModelPicker key={`${diagnosticKey}:${diagnostic}:${diagnosticEngine}`} kind={kind} channel={diagnostic || undefined} engine={diagnosticEngine} id={`${fieldId}-model`} value={record.model} onChange={model => update({ ...record, model })} /></Form.Field>
       <Form.Field label="推理强度" required><EffortPicker id={`${fieldId}-effort`} efforts={efforts} value={record.effort} onChange={effort => update({ ...record, effort })} /></Form.Field>
     </div>
@@ -98,11 +98,11 @@ export function RoleEditor({ section, policy, current, editor, freeProbe, onAdd 
 
 /** The effort control with its hint below the input, mirroring the model field's hint placement so paired columns keep their inputs top aligned. */
 function EffortPicker({ efforts, id, value, onChange }: { efforts?: string[]; id: string; value: string; onChange: (effort: string) => void }) {
-  return <div className={styles.tight}>
+  return <div {...stylex.props(styles.tight)}>
     {efforts?.length
       ? <NamedSelect id={id} aria-label="推理强度" value={value} options={efforts.map(option => ({ value: option, label: option }))} onChange={option => { if (typeof option === 'string') onChange(option); }} />
       : <Input id={id} aria-label="推理强度" value={value} placeholder="例如：max" onChange={event => onChange(event.target.value)} />}
-    {!efforts?.length && <Text type="secondary" className={styles.meta}>填写该模型接受的 variant。</Text>}
+    {!efforts?.length && <Text type="secondary" {...stylex.props(styles.meta)}>填写该模型接受的 variant。</Text>}
   </div>;
 }
 
@@ -120,10 +120,10 @@ function WorkerFields({ id, record, probe, update }: { id: string; record: Worke
 export function WorkerParallelField({ record, update }: { record: Worker; update: (next: Worker) => void }) {
   const on = record.max_parallel !== undefined;
   return <Form.Field label="并发上限" desc="同一时间最多运行几个任务，超出的任务排队等待；用于避免供应商限流。">
-    <div className={`${styles.row} ${styles.nowrap}`}>
+    <div {...stylex.props(styles.row, styles.nowrap)}>
       <NamedSwitch size="small" aria-label="限制同时运行的任务数" checked={on} onChange={checked => update(withWorkerParallel(record, checked, record.max_parallel))} />
       <Text>限制同时运行的任务数</Text>
-      {on && <NamedInputNumber aria-label="并发上限" size="small" min={1} max={100} step={1} precision={0} value={record.max_parallel} className={rolesStyles.parallelInput} onChange={value => update(withWorkerParallel(record, true, typeof value === 'number' ? value : undefined))} />}
+      {on && <NamedInputNumber aria-label="并发上限" size="small" min={1} max={100} step={1} precision={0} value={record.max_parallel} {...stylex.props(rolesStyles.parallelInput)} onChange={value => update(withWorkerParallel(record, true, typeof value === 'number' ? value : undefined))} />}
     </div>
   </Form.Field>;
 }
@@ -133,7 +133,7 @@ export function WorkerBlockNotice({ block, now = Date.now(), busy, disabled, onR
   const text = engineBlockText(block, now);
   const scope = block.channel ? `（作用于渠道 ${block.channel}）` : block.worker ? '' : block.model ? `（作用于引擎 ${block.engine} 的模型 ${block.model}）` : `（作用于整个引擎 ${block.engine}，恢复后该引擎的所有子 Agent 都会恢复）`;
   return <Alert type="warning" title={`已暂停派发 · ${text.category}`} description={`${text.reason}；${text.release}${scope}`}
-    className={rolesStyles.blockNotice} action={<Button size="small" icon={Play} aria-label="恢复派发" loading={busy} disabled={disabled} onClick={onResume}>恢复派发</Button>} />;
+    {...stylex.props(rolesStyles.blockNotice)} action={<Button size="small" icon={Play} aria-label="恢复派发" loading={busy} disabled={disabled} onClick={onResume}>恢复派发</Button>} />;
 }
 
 function OwnerFields({ config, blocks, record, savedRecord, update }: { config: NonNullable<PolicyDraft['config']>; blocks: PolicyDraft['blocks']; record: Owner; savedRecord?: Owner; update: (next: Owner) => void }) {

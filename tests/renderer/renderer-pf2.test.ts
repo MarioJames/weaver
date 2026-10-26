@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { EventsPanel } from '../../src/renderer/features/tasks/EventsPanel';
 
-const markup = (node: React.ReactNode) => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { enableCustomFonts: false, children: node }) }));
+const markup = (node: React.ReactNode) => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { children: node }) }));
 
 test('a result node puts its time in the labeled card and renders report markdown', () => {
   const html = markup(React.createElement(EventsPanel, { taskId: 'fixture', events: [{ id: 'result', kind: 'result', at: '2026-10-19T12:00:00Z', message: '# 验证报告\n\n**通过**' }] }));

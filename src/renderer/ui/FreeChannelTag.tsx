@@ -1,4 +1,4 @@
-import { Tag } from '@lobehub/ui/base-ui';
+import { Tag } from '@lobehub/ui';
 import { TAG_COLORS } from '../format/tag-colors';
 
 /**

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal } from '@lobehub/ui/base-ui';
+import { Modal } from '@lobehub/ui';
 import { TaskComposer, type CreateTaskDraft, type TaskDraftFields } from './TaskComposer';
 
 const emptyDraft: TaskDraftFields = { goal: '', workspace: '', profile: '', criteria: '' };

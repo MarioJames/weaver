@@ -2,7 +2,7 @@ import { notifyError } from '../../api/notify';
 import { useEffect, useRef, useState } from 'react';
 import { Archive, Plus } from 'lucide-react';
 import { PageHeader } from '@lobehub/ui/dashboard';
-import { Button, Drawer, Skeleton } from '@lobehub/ui/base-ui';
+import { Button, Drawer, Skeleton } from '@lobehub/ui';
 import { command } from '../../api/commands';
 import type { OwnerInstance } from '../../../shared/contracts/owners';
 import type { Task } from '../../../shared/contracts/tasks';

@@ -1,134 +1,144 @@
-import { createStaticStyles } from 'antd-style';
+import * as stylex from '@stylexjs/stylex';
+import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
 
-export const composerStyles = createStaticStyles(({ css, cssVar }) => ({
-  form: css`
-    display: flex;
-    flex-direction: column;
-    gap: ${cssVar.marginSM};
-    inline-size: 100%;
-    min-inline-size: 0;
-    max-block-size: calc(100dvh - 160px);
-    overflow: hidden;
-    button, input, textarea { font: inherit; }
-    input, textarea { inline-size: 100%; }
-  `,
-  scroll: css`
-    flex: 1 1 auto;
-    min-block-size: 0;
-    overflow-y: auto;
-    padding-block-end: ${cssVar.paddingSM};
-  `,
+export const composerStyles = stylex.create({
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cssVar.marginSM,
+    inlineSize: '100%',
+    minInlineSize: 0,
+    maxBlockSize: 'calc(100dvh - 160px)',
+    overflow: 'hidden',
+  },
+  fieldControl: {
+    inlineSize: '100%',
+    fontFamily: 'inherit',
+    fontSize: 'inherit',
+    fontWeight: 'inherit',
+    lineHeight: 'inherit',
+  },
+  scroll: {
+    flex: '1 1 auto',
+    minBlockSize: 0,
+    overflowY: 'auto',
+    paddingBlockEnd: cssVar.paddingSM,
+  },
   /** Form.Field already pads itself between fields; the fieldset adds nothing on top. */
-  body: css`
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    min-inline-size: 0;
-    min-block-size: 0;
-    padding: 0 ${cssVar.paddingXXS} 0 0;
-    margin: 0;
-    border: 0;
-    > * { inline-size: 100%; min-inline-size: 0; }
-  `,
+  body: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 0,
+    minInlineSize: 0,
+    minBlockSize: 0,
+    paddingBlock: 0,
+    paddingInline: `${cssVar.paddingXXS} 0`,
+    margin: 0,
+    borderWidth: 0,
+  },
   /** The chosen path plus, when allowed, a clear entry beside it: the directory button takes the remaining width. */
-  directoryRow: css`
-    display: flex;
-    align-items: center;
-    gap: ${cssVar.marginXXS};
-    min-inline-size: 0;
-
-    > :first-child { flex: 1 1 auto; min-inline-size: 0; }
-  `,
+  directoryRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: cssVar.marginXXS,
+    minInlineSize: 0,
+  },
   /** The chosen path reads like the inputs around it: from the start edge, one line, the rest ellipsized. */
-  directoryButton: css`
-    justify-content: flex-start;
-    text-align: start;
-
-    > span {
-      min-inline-size: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  `,
+  directoryButton: {
+    flex: '1 1 auto',
+    minInlineSize: 0,
+    justifyContent: 'flex-start',
+    textAlign: 'start',
+  },
+  directoryLabel: {
+    minInlineSize: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
   /** The clear entry is an icon-only square: as tall as the directory button and exactly as wide. */
-  directoryClear: css`
-    flex: none;
-    aspect-ratio: 1;
-    padding-inline: 0;
-    padding-block: 0;
-  `,
-  directoryBrowser: css`
-    display: flex;
-    flex-direction: column;
-    gap: ${cssVar.marginMD};
-    min-inline-size: 0;
-    max-block-size: calc(100dvh - 220px);
-    overflow-y: auto;
-  `,
-  directorySection: css`
-    display: flex;
-    flex-direction: column;
-    gap: ${cssVar.marginXS};
-    min-inline-size: 0;
-  `,
+  directoryClear: {
+    flex: 'none',
+    aspectRatio: '1',
+    paddingInline: 0,
+    paddingBlock: 0,
+  },
+  directoryBrowser: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cssVar.marginMD,
+    minInlineSize: 0,
+    maxBlockSize: 'calc(100dvh - 220px)',
+    overflowY: 'auto',
+  },
+  directorySection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cssVar.marginXS,
+    minInlineSize: 0,
+  },
   /** Earlier workspaces: the name first, the full path after it and ellipsized. */
-  recentList: css`
-    display: flex;
-    flex-direction: column;
-    gap: ${cssVar.marginXXS};
-  `,
-  recentItem: css`
-    justify-content: flex-start;
-    min-block-size: 32px;
-    flex-shrink: 0;
-
-    > span:not(:first-child) { min-inline-size: 0; }
-  `,
-  recentName: css`
-    flex: none;
-    max-inline-size: 45%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: ${cssVar.colorText};
-  `,
-  recentPath: css`
-    flex: 1 1 auto;
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: ${cssVar.colorTextTertiary};
-    font-size: ${cssVar.fontSizeSM};
-    text-align: start;
-  `,
-  directoryEnter: css`
-    margin-inline-start: auto;
-    color: ${cssVar.colorTextQuaternary};
-  `,
-  directoryPath: css`
-    overflow-wrap: anywhere;
-  `,
-  directoryActions: css`
-    display: flex;
-    gap: ${cssVar.marginSM};
-  `,
-  directoryList: css`
-    display: flex;
-    flex-direction: column;
-    gap: ${cssVar.marginXXS};
-    button { justify-content: flex-start; min-block-size: 32px; flex-shrink: 0; }
-  `,
-  footer: css`
-    position: relative;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: ${cssVar.marginXS};
-    flex-shrink: 0;
-    padding-block: ${cssVar.paddingSM} ${cssVar.paddingXXS};
-    border-block-start: 1px solid ${cssVar.colorBorderSecondary};
-    background: ${cssVar.colorBgElevated};
-  `,
-}));
+  recentList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cssVar.marginXXS,
+  },
+  recentItem: {
+    justifyContent: 'flex-start',
+    minBlockSize: 32,
+    flexShrink: 0,
+  },
+  recentName: {
+    flex: 'none',
+    minInlineSize: 0,
+    maxInlineSize: '45%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    color: cssVar.colorText,
+  },
+  recentPath: {
+    flex: '1 1 auto',
+    minInlineSize: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    color: cssVar.colorTextTertiary,
+    fontSize: cssVar.fontSizeSM,
+    textAlign: 'start',
+  },
+  directoryEnter: {
+    marginInlineStart: 'auto',
+    color: cssVar.colorTextQuaternary,
+  },
+  directoryPath: {
+    overflowWrap: 'anywhere',
+  },
+  directoryActions: {
+    display: 'flex',
+    gap: cssVar.marginSM,
+  },
+  directoryList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cssVar.marginXXS,
+  },
+  directoryEntry: {
+    justifyContent: 'flex-start',
+    minBlockSize: 32,
+    flexShrink: 0,
+  },
+  footer: {
+    position: 'relative',
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: cssVar.marginXS,
+    flexShrink: 0,
+    paddingBlock: `${cssVar.paddingSM} ${cssVar.paddingXXS}`,
+    borderBlockStartWidth: 1,
+    borderBlockStartStyle: 'solid',
+    borderBlockStartColor: cssVar.colorBorderSecondary,
+    backgroundColor: cssVar.colorBgElevated,
+  },
+});

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { defaultConfig } from '../../src/main/policy/routing';
 import { SettingsPage } from '../../src/renderer/features/settings/SettingsPage';
@@ -11,7 +11,7 @@ import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';
 import type { TaskHealth } from '../../src/shared/contracts/monitoring';
 
 function markup(node: React.ReactNode) {
-  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) }));
+  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) }));
 }
 function settings(patch: (config: ReturnType<typeof defaultConfig>) => void = () => {}) {
   const config = defaultConfig();

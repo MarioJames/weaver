@@ -1,8 +1,9 @@
 import { useNotifyError } from '../../api/notify';
 import { TimeZoneSelect } from './TimeZoneSelect';
 import { useEffect, useId, useState } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { PageHeader } from '@lobehub/ui/dashboard';
-import { Skeleton } from '@lobehub/ui/base-ui';
+import { Skeleton } from '@lobehub/ui';
 import type { QuotaSchedule } from '../../../shared/contracts/quota';
 import { FREE_CHANNEL_INTERVAL_RANGE, MAX_COMMAND_MINUTES_RANGE, QUOTA_INTERVAL_RANGE, chatgptReviewEnabled, freeChannelProbeSettings, maxCommandMinutes, quotaSettings } from '../../../shared/policy/settings';
 import { useFreeProbe } from '../probes/useFreeProbe';
@@ -46,7 +47,7 @@ export function SettingsPage({ policy }: { policy: PolicyDraft }) {
   const scheduleText = !quota.auto_refresh ? '已关闭，只在账号与渠道页手动刷新。' : schedule?.nextRunAt ? `下次 ${dateText(schedule.nextRunAt)}${schedule.lastRunAt ? ` · 上次 ${dateText(schedule.lastRunAt)}` : ''}` : '按下方间隔自动查询订阅额度，不会调用模型。';
   return <>
     {header}
-    <div className={settingsStyles.surface}>
+    <div {...stylex.props(settingsStyles.surface)}>
       <Group title="显示" desc="网页里所有时间的显示方式。">
         <Setting label="项目时区" htmlFor={`${id}-timezone`} desc={`任务看板、详情、时间线和各页面的时间都按此时区显示，「今天」从该时区当天 00:00 起算。未设置时跟随浏览器。`} state={saver.states.timezone}>
           <TimeZoneSelect id={`${id}-timezone`} value={displayTimeZone(saved)} disabled={saver.states.timezone?.status === 'saving'} onChange={next => void saver.save('timezone', config => ({ display: displayWithTimeZone(config, next) }))} />

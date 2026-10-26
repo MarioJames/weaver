@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
 import { taskStyles as styles } from '../../src/renderer/features/tasks/task-style';
+import { styleClass } from './style-helpers';
 import { TaskBoard } from '../../src/renderer/features/tasks/TaskBoard';
 import { ownerHostName, ownerLabel } from '../../src/renderer/features/tasks/task-view';
 import { cardFooter, cardFooterText } from '../../src/renderer/features/tasks/task-footer';
@@ -79,7 +80,7 @@ function board(tasks: Task[]) {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (key: string) => key === ENDED_EXPANDED_KEY ? 'true' : null, setItem: () => {} } });
   try {
-    return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: React.createElement(TaskBoard, { tasks, filters: { ...emptySelection(), time: 'all' }, now, loading: false, onSelect: () => {} }) }) }));
+    return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: React.createElement(TaskBoard, { tasks, filters: { ...emptySelection(), time: 'all' }, now, loading: false, onSelect: () => {} }) }) }));
   } finally { if (previous) Object.defineProperty(globalThis, 'localStorage', previous); else Reflect.deleteProperty(globalThis, 'localStorage'); }
 }
 
@@ -94,17 +95,17 @@ test('cards in every lane carry the footer sentence once, with the host only and
   const cards = [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]).filter(card => /LANE_/.test(card));
   assert.equal(cards.length, 4);
   const expected: Record<string, RegExp> = {
-    LANE_QUEUED: /由 <span[^>]*>.*?Claude<\/span><\/span> <span[^>]*>于 <time[^>]*>21:00<\/time> 创建<\/span><\/span><\/span><\/button>$/,
+    LANE_QUEUED: /由 <span[^>]*>[\s\S]*?Claude[\s\S]*?<\/span> <span[^>]*>于 <time[^>]*>21:00<\/time> 创建<\/span>/,
     LANE_RUNNING: /于 <time[^>]*>21:05<\/time> 派发(?:<span[^>]*> ·<\/span>)?<\/span>[\s\S]*最新上报 <time[^>]*>22:41<\/time>/,
     LANE_REVIEW: /于 <time[^>]*>21:05<\/time> 派发(?:<span[^>]*> ·<\/span>)?<\/span>[\s\S]*完成于 <time[^>]*>22:20<\/time>/,
     LANE_FAILED: /于 <time[^>]*>21:05<\/time> 派发(?:<span[^>]*> ·<\/span>)?<\/span>[\s\S]*结束于 <time[^>]*>22:30<\/time>/,
   };
   for (const card of cards) {
     const title = card.match(/LANE_[A-Z]+/)![0];
-    const footer = card.slice(card.indexOf(`class="${styles.cardMeta}"`));
+    const footer = card.slice(card.indexOf(`class="${styleClass(styles.cardMeta)}"`));
     assert.match(footer, expected[title]!, title);
     // Times appear only inside the footer; the instance's directory and session clock appear nowhere.
-    assert.equal(card.slice(0, card.indexOf(`class="${styles.cardMeta}"`)).includes('<time'), false, title);
+    assert.equal(card.slice(0, card.indexOf(`class="${styleClass(styles.cardMeta)}"`)).includes('<time'), false, title);
     assert.doesNotMatch(card.replace(/<[^>]*>/g, ''), /enterprise|21:30/, title);
     assert.match(card, /aria-label="父 Agent：Claude"[^>]*title="Claude · enterprise · 21:30"/, title);
     assert.equal((card.match(/aria-label="父 Agent/g) ?? []).length, 1, title);

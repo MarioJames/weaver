@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
 import { filterTasks, isActive, reviewLabel, reviewStatus } from '../../src/renderer/features/tasks/task-view';
@@ -13,12 +13,12 @@ import { TaskTextBlock } from '../../src/renderer/features/tasks/TaskTextBlock';
 import { workspacePathError } from '../../src/renderer/features/tasks/TaskComposer';
 import { ArtifactsPanel } from '../../src/renderer/features/tasks/ArtifactsPanel';
 import { NamedInputNumber, NamedSelect, NamedSwitch } from '../../src/renderer/ui/NamedControls';
-import { Form, useForm } from '@lobehub/ui/base-ui/form';
+import { Form, useForm } from '@lobehub/ui/form';
 import { defaultConfig } from '../../src/main/policy/routing';
 import { type Block } from '../../src/shared/contracts/policy';
 import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';
 function markup(node: React.ReactNode) {
-  const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;
+  const props = { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) } as React.ComponentProps<typeof ConfigProvider>;
   return renderToStaticMarkup(React.createElement(ConfigProvider, props));
 }
 const task:Task={id:'t',title:'中文任务',instruction:'Do work',owner:{name:'Owner',transport:'herdr-visible',session:'main',pane:'1'},status:'completed',progress:100,createdAt:'2026-10-18T00:00:00Z',updatedAt:'2026-10-18T00:00:00Z',events:[],artifacts:[]};
@@ -37,7 +37,7 @@ test('every task lands in exactly one kanban column by where it is in its lifecy
 });
 test('board lays tasks out in columns with counts',()=>{const html=markup(React.createElement(TaskBoard,{tasks:[task,{...task,id:'q',title:'排队任务',status:'queued' as const}],now:Date.parse('2026-10-18T02:00:00Z'),loading:false,onSelect:()=>{}}));assert.match(html,/待执行/);assert.match(html,/待验收/);assert.match(html,/排队任务/);assert.match(html,/中文任务/);});
 test('board has distinct loading and empty states',()=>{const props={tasks:[],onSelect:()=>{}};assert.match(markup(React.createElement(TaskBoard,{...props,loading:true})),/正在加载/);assert.match(markup(React.createElement(TaskBoard,{...props,loading:false})),/还没有任务/);});
-test('task view separates execution and review with prompt in its own tab',()=>{const html=markup(React.createElement(TaskDetail,{task:{...task,instruction:'<script>bad()</script>'},busy:false,onStart:()=>{},onCancel:()=>{},action:async()=>true}));assert.match(html,/待验收/);assert.match(html,/role="tab"[^>]*>Prompt/);assert.doesNotMatch(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>bad\(\)<\/script>/);assert.doesNotMatch(html,/开始 mock 执行/);assert.doesNotMatch(html,/真实 provider 未连接/);assert.doesNotMatch(html,/本地 mock/);assert.match(html,/<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?>Owner<\/span><\/dd>/);assert.match(html,/更新时间/);assert.doesNotMatch(html,/执行进度/);assert.doesNotMatch(html,/role="progressbar"/);assert.match(html,/role="tablist"/);assert.match(html,/role="tabpanel"/);assert.match(html,/aria-selected="true"/);});
+test('task view separates execution and review with prompt in its own tab',()=>{const html=markup(React.createElement(TaskDetail,{task:{...task,instruction:'<script>bad()</script>'},busy:false,onStart:()=>{},onCancel:()=>{},action:async()=>true}));assert.match(html,/待验收/);assert.match(html,/role="tab"[^>]*>Prompt/);assert.doesNotMatch(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>bad\(\)<\/script>/);assert.doesNotMatch(html,/开始 mock 执行/);assert.doesNotMatch(html,/真实 provider 未连接/);assert.doesNotMatch(html,/本地 mock/);assert.match(html,/<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?>Owner<\/span>[\s\S]*?<\/dd>/);assert.match(html,/更新时间/);assert.doesNotMatch(html,/执行进度/);assert.doesNotMatch(html,/role="progressbar"/);assert.match(html,/role="tablist"/);assert.match(html,/role="tabpanel"/);assert.match(html,/aria-selected="true"/);});
 test('task workspace must be an absolute directory',()=>{assert.equal(workspacePathError(''), '选择目标项目目录。');assert.match(workspacePathError('.'),/绝对路径/);assert.match(workspacePathError('docs'),/绝对路径/);assert.equal(workspacePathError('/home/user/project'),'');});
 test('artifact preview renders hostile markup as text only',()=>{const html=markup(React.createElement(ArtifactsPanel,{artifacts:[{id:'a',name:'test.html',mediaType:'text/plain',createdAt:task.createdAt,content:'<img src=x onerror=alert(1)>'}]}));assert.match(html,/&lt;img/);assert.doesNotMatch(html,/<img/);});
 test('cancelling task disables repeat cancellation',()=>{const html=markup(React.createElement(TaskDetail,{task:{...task,status:'cancelling'},busy:false,onStart:()=>{},onCancel:()=>{},action:async()=>true}));assert.match(html,/<button[^>]*disabled=""[^>]*>[\s\S]*正在停止/);});

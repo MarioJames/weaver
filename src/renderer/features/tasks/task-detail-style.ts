@@ -1,145 +1,174 @@
-import { createStaticStyles } from 'antd-style';
+import * as stylex from '@stylexjs/stylex';
+import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
 
-export const styles = createStaticStyles(({ css, cssVar }) => ({
+export const styles = stylex.create({
   /** Wide: the action column sits beside the heading; narrow (drawer ≤ 480px): the buttons wrap to a row below the title instead of squeezing it. */
-  header: css`
-    container-type: inline-size;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: ${cssVar.marginSM};
-  `,
-  heading: css`
-    display: flex;
-    flex-direction: column;
-    gap: ${cssVar.marginXS};
-    min-inline-size: 0;
-    flex: 1;
-
-    @container (max-width: 480px) {
-      flex-basis: 100%;
-    }
-  `,
-  actions: css`
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    align-items: flex-end;
-    gap: ${cssVar.marginXS};
-    button { font: inherit; }
-
-    @container (max-width: 480px) {
-      flex-direction: row;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: flex-start;
-    }
-  `,
-  markdown: css`
-    min-inline-size: 0;
-    padding: ${cssVar.padding};
-    line-height: 1.7;
-    overflow-wrap: anywhere;
-    &&& h1, &&& h2, &&& h3 {
-      font-size: ${cssVar.fontSize};
-      font-weight: 600;
-      line-height: 1.7;
-    }
-  `,
-  markdownClamped: css`
-    max-block-size: calc(var(--summary-lines) * 1.7em + 2 * ${cssVar.padding});
-    overflow: hidden;
-  `,
-  tabs: css`
-    min-inline-size: 0;
-    inline-size: 100%;
-  `,
-  tabList: css`
-    overflow-x: auto;
-    max-inline-size: 100%;
-    flex-wrap: nowrap;
-    button { flex-shrink: 0; font: inherit; }
-    &[data-overflow='end'] { mask-image: linear-gradient(to right, ${cssVar.colorText} calc(100% - 24px), transparent); }
-    &[data-overflow='start'] { mask-image: linear-gradient(to right, transparent, ${cssVar.colorText} 24px); }
-    &[data-overflow='both'] { mask-image: linear-gradient(to right, transparent, ${cssVar.colorText} 24px, ${cssVar.colorText} calc(100% - 24px), transparent); }
-  `,
-  panel: css`
-    min-inline-size: 0;
-    padding-block-start: ${cssVar.paddingLG};
-  `,
-  overview: css`
-    display: flex;
-    flex-direction: column;
-    gap: ${cssVar.marginLG};
-    min-inline-size: 0;
-  `,
-  list: css`
-    margin: 0;
-    padding-inline-start: ${cssVar.paddingLG};
-    overflow-wrap: anywhere;
-    line-height: 1.7;
-  `,
-  textBlock: css`
-    overflow: hidden;
-    min-inline-size: 0;
-    border: 1px solid ${cssVar.colorBorderSecondary};
-    border-radius: ${cssVar.borderRadiusLG};
-    background: ${cssVar.colorFillQuaternary};
-  `,
-  textHeader: css`
-    display: flex;
-    gap: ${cssVar.marginSM};
-    align-items: center;
-    justify-content: space-between;
-    padding: ${cssVar.paddingSM} ${cssVar.padding};
-    border-block-end: 1px solid ${cssVar.colorBorderSecondary};
-  `,
-  textHeading: css`
-    display: flex;
-    flex-direction: column;
-    gap: ${cssVar.marginXXS};
-    min-inline-size: 0;
-    overflow-wrap: anywhere;
-  `,
-  description: css`
-    font-size: ${cssVar.fontSizeSM};
-  `,
-  activity: css`
-    display: block;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    min-inline-size: 0;
-  `,
-  clamped: css`
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  `,
-  textFooter: css`
-    padding: ${cssVar.paddingXXS} ${cssVar.paddingSM};
-    border-block-start: 1px solid ${cssVar.colorBorderSecondary};
-  `,
-  textContent: css`
-    margin: 0;
-    padding: ${cssVar.padding};
-    color: ${cssVar.colorText};
-    font-family: ${cssVar.fontFamilyCode};
-    font-size: ${cssVar.fontSizeSM};
-    line-height: 1.7;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    tab-size: 2;
-  `,
-  modalFooter: css`
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${cssVar.marginXS};
-    justify-content: flex-end;
-  `,
+  header: {
+    containerType: 'inline-size',
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: cssVar.marginSM,
+  },
+  heading: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cssVar.marginXS,
+    minInlineSize: 0,
+    flex: 1,
+    '@container (max-width: 480px)': {
+      flexBasis: '100%',
+    },
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 600,
+  },
+  actions: {
+    display: 'flex',
+    flexDirection: 'column',
+    flexShrink: 0,
+    alignItems: 'flex-end',
+    gap: cssVar.marginXS,
+    '@container (max-width: 480px)': {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+    },
+  },
+  markdown: {
+    minInlineSize: 0,
+    padding: cssVar.padding,
+    lineHeight: 1.7,
+    overflowWrap: 'anywhere',
+  },
+  markdownClamped: {
+    maxBlockSize: `calc(var(--summary-lines) * 1.7em + 2 * ${cssVar.padding})`,
+    overflow: 'hidden',
+  },
+  summaryLines: (lines: number) => ({
+    '--summary-lines': lines,
+  }),
+  tabs: {
+    minInlineSize: 0,
+    inlineSize: '100%',
+  },
+  tabList: {
+    overflowX: 'auto',
+    maxInlineSize: '100%',
+    flexWrap: 'nowrap',
+    '[data-overflow="end"]': { maskImage: `linear-gradient(to right, ${cssVar.colorText} calc(100% - 24px), transparent)` },
+    '[data-overflow="start"]': { maskImage: `linear-gradient(to right, transparent, ${cssVar.colorText} 24px)` },
+    '[data-overflow="both"]': { maskImage: `linear-gradient(to right, transparent, ${cssVar.colorText} 24px, ${cssVar.colorText} calc(100% - 24px), transparent)` },
+  },
+  tab: {
+    flexShrink: 0,
+  },
+  panel: {
+    minInlineSize: 0,
+    paddingBlockStart: cssVar.paddingLG,
+  },
+  overview: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cssVar.marginLG,
+    minInlineSize: 0,
+  },
+  list: {
+    margin: 0,
+    paddingInlineStart: cssVar.paddingLG,
+    overflowWrap: 'anywhere',
+    lineHeight: 1.7,
+  },
+  textBlock: {
+    overflow: 'hidden',
+    minInlineSize: 0,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: cssVar.colorBorderSecondary,
+    borderRadius: cssVar.borderRadiusLG,
+    backgroundColor: cssVar.colorFillQuaternary,
+  },
+  textBlockFlat: {
+    borderWidth: 0,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+  },
+  textHeader: {
+    display: 'flex',
+    gap: cssVar.marginSM,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBlock: cssVar.paddingSM,
+    paddingInline: cssVar.padding,
+    borderBlockEndWidth: 1,
+    borderBlockEndStyle: 'solid',
+    borderBlockEndColor: cssVar.colorBorderSecondary,
+  },
+  textHeaderFlat: {
+    paddingBlockStart: 0,
+    paddingInline: 0,
+    borderBlockEndWidth: 0,
+  },
+  textHeading: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cssVar.marginXXS,
+    minInlineSize: 0,
+    overflowWrap: 'anywhere',
+  },
+  description: {
+    fontSize: cssVar.fontSizeSM,
+  },
+  activity: {
+    display: 'block',
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
+    textOverflow: 'ellipsis',
+    minInlineSize: 0,
+  },
+  clamped: {
+    display: '-webkit-box',
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+  },
+  clampLines: (lines: number) => ({
+    WebkitLineClamp: lines,
+  }),
+  textFooter: {
+    paddingBlock: cssVar.paddingXXS,
+    paddingInline: cssVar.paddingSM,
+    borderBlockStartWidth: 1,
+    borderBlockStartStyle: 'solid',
+    borderBlockStartColor: cssVar.colorBorderSecondary,
+  },
+  textFooterFlat: {
+    paddingInline: 0,
+  },
+  textContent: {
+    margin: 0,
+    padding: cssVar.padding,
+    color: cssVar.colorText,
+    fontFamily: cssVar.fontFamilyCode,
+    fontSize: cssVar.fontSizeSM,
+    lineHeight: 1.7,
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'anywhere',
+    tabSize: 2,
+  },
+  markdownFlat: {
+    paddingInline: 0,
+  },
+  modalFooter: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: cssVar.marginXS,
+    justifyContent: 'flex-end',
+  },
   /** The header status tag keeps its spinner and label on one line. */
-  statusTag: css`
-    margin: 0;
-  `,
-}));
+  statusTag: {
+    margin: 0,
+  },
+});

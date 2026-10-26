@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { defaultConfig } from '../../src/main/policy/routing';
 import { FREE_PROBE_BLOCK_BY } from '../../src/shared/policy/blocks';
@@ -18,7 +18,7 @@ import { ENDED_EXPANDED_KEY } from '../../src/renderer/features/tasks/task-persi
 import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';
 
 function markup(node: React.ReactNode) {
-  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) }));
+  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) }));
 }
 function withStorage<T>(run: () => T): T {
   const values: Record<string, string> = { [ENDED_EXPANDED_KEY]: 'true' };
@@ -64,7 +64,7 @@ test('the sub agent list shows the cyan free-channel tag exactly on the free wor
   for (const id of ['qoder_worker', 'opencode_worker']) {
     const row = rowOf(id);
     assert.match(row, /免费渠道/);
-    assert.match(row, /--ant-cyan/, 'the badge uses the freeChannel color, not the plain default');
+    assert.match(row, /--lobe-cyan/, 'the badge uses the freeChannel color, not the plain default');
     assert.ok(row.indexOf('免费渠道') < row.indexOf(' · '), 'the badge sits in the title row before the engine · model line');
   }
   assert.doesNotMatch(rowOf('claude_worker'), /免费渠道/);
@@ -76,7 +76,7 @@ test('a sub agent without the flag gets no free-channel badge in the list', () =
   delete config.workers.opencode_worker!.free_channel;
   const html = workerList(config);
   assert.doesNotMatch(html, /免费渠道/);
-  assert.doesNotMatch(html, /--ant-cyan/);
+  assert.doesNotMatch(html, /--lobe-cyan/);
 });
 
 /** A saved policy whose qoder_worker is paused by the free probe, so the list item carries a pause note. */
@@ -122,7 +122,7 @@ test('board cards show the same free-channel badge for dispatches to free worker
   const card = (html: string) => [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].find(match => match[0].includes('FREE_CARD'))![0];
   const free = card(board(base, freeChannelLookup(defaultConfig())));
   assert.match(free, /免费渠道/);
-  assert.match(free, /--ant-cyan/);
+  assert.match(free, /--lobe-cyan/);
   assert.doesNotMatch(card(board({ ...base, dispatch: { ...base.dispatch!, worker: 'claude_worker', engine: 'claude', engineKind: 'claude' } }, freeChannelLookup(defaultConfig()))), /免费渠道/);
   assert.doesNotMatch(card(board(base)), /免费渠道/, 'no policy, no badge');
   // An undispatched task and the 父 Agent role tag never carry it.
@@ -142,7 +142,7 @@ test('the root task child list marks children dispatched to free workers', () =>
   const html = withStorage(() => markup(React.createElement(TaskAgents, { task: root, tasks, onSelect: () => {}, freeChannel: freeChannelLookup(defaultConfig()) })));
   assert.equal((html.match(/免费渠道</g) ?? []).length, 1);
   const freeRow = html.slice(html.indexOf('子任务 free'), html.indexOf('子任务 paid'));
-  assert.match(freeRow, /--ant-cyan/);
+  assert.match(freeRow, /--lobe-cyan/);
   assert.doesNotMatch(html, /任务 nodispatch[\s\S]*免费渠道/);
   const paid = withStorage(() => markup(React.createElement(TaskAgents, { task: root, tasks: [root, tasks[2]], onSelect: () => {}, freeChannel: freeChannelLookup(defaultConfig()) })));
   assert.doesNotMatch(paid, /免费渠道/);

@@ -1,176 +1,199 @@
-import { createStaticStyles } from 'antd-style';
+import * as stylex from '@stylexjs/stylex';
+import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
+import { media } from '@lobehub/ui/stylex/media.stylex';
 
 /** The schedules management page: toolbar, compact responsive rows, run history and form layout. */
-export const schedulesStyles = createStaticStyles(({ css, cssVar, responsive }) => ({
+export const schedulesStyles = stylex.create({
   /* Page body under PageHeader: filters above, cards below, one vertical stack like the tasks board. */
-  page: css`
-    display: flex;
-    flex-direction: column;
-    gap: ${cssVar.marginSM};
-    min-inline-size: 0;
-    max-inline-size: 100%;
-  `,
+  page: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cssVar.marginSM,
+    minInlineSize: 0,
+    maxInlineSize: '100%',
+  },
   /* Desktop: search + type + refresh stay on one line; narrow screens wrap compactly without horizontal overflow. */
-  toolbar: css`
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 8px;
-    align-items: center;
-    min-inline-size: 0;
-    max-inline-size: 100%;
-
-    ${responsive.mobile} {
-      flex-wrap: wrap;
-    }
-  `,
-  search: css`
-    flex: 1 1 200px;
-    min-inline-size: 0;
-    max-inline-size: 420px;
-
-    ${responsive.mobile} {
-      flex-basis: 100%;
-      max-inline-size: none;
-    }
-  `,
-  kindFilter: css`
-    flex: none;
-    inline-size: 132px;
-    min-inline-size: 0;
-  `,
-  refresh: css`
-    flex: none;
-  `,
+  toolbar: {
+    display: 'flex',
+    flexWrap: {
+      default: 'nowrap',
+      [media.mobile]: 'wrap',
+    },
+    gap: 8,
+    alignItems: 'center',
+    minInlineSize: 0,
+    maxInlineSize: '100%',
+  },
+  search: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: {
+      default: 200,
+      [media.mobile]: '100%',
+    },
+    minInlineSize: 0,
+    maxInlineSize: {
+      default: 420,
+      [media.mobile]: 'none',
+    },
+  },
+  kindFilter: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 'auto',
+    inlineSize: 132,
+    minInlineSize: 0,
+  },
+  refresh: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 'auto',
+  },
   /* Responsive card grid: multiple columns in a 1280 content area, one column at 390 with no horizontal scroll. */
-  list: css`
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
-    align-items: start;
-    gap: 12px;
-    min-inline-size: 0;
-    max-inline-size: 100%;
-  `,
+  list: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))',
+    alignItems: 'start',
+    gap: 12,
+    minInlineSize: 0,
+    maxInlineSize: '100%',
+  },
   /* One schedule card: identity + status zones above, actions in their own footer zone below. */
-  row: css`
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-inline-size: 0;
-    max-inline-size: 100%;
-    padding: 12px;
-    border: 1px solid ${cssVar.colorBorderSecondary};
-    border-radius: ${cssVar.borderRadiusLG};
-    background: ${cssVar.colorBgContainer};
-  `,
-  rowHead: css`
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    min-inline-size: 0;
-    max-inline-size: 100%;
-  `,
-  name: css`
-    flex: 1 1 auto;
-    font-weight: 600;
-    overflow-wrap: anywhere;
-    min-inline-size: 0;
-  `,
+  row: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    minInlineSize: 0,
+    maxInlineSize: '100%',
+    padding: 12,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: cssVar.colorBorderSecondary,
+    borderRadius: cssVar.borderRadiusLG,
+    backgroundColor: cssVar.colorBgContainer,
+  },
+  rowHead: {
+    display: 'flex',
+    gap: 8,
+    alignItems: 'center',
+    minInlineSize: 0,
+    maxInlineSize: '100%',
+  },
+  name: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 'auto',
+    fontWeight: cssVar.fontWeightStrong,
+    overflowWrap: 'anywhere',
+    minInlineSize: 0,
+  },
   /* Status + kind tags sit in their own scannable row so long names never squeeze them. */
-  tags: css`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    align-items: center;
-    min-inline-size: 0;
-    max-inline-size: 100%;
-  `,
+  tags: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 4,
+    alignItems: 'center',
+    minInlineSize: 0,
+    maxInlineSize: '100%',
+  },
   /** Actions live in the card footer, separated from identity/status and wrapping without squeezing. */
-  actions: css`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px;
-    align-items: center;
-    min-inline-size: 0;
-    max-inline-size: 100%;
-    margin-block-start: auto;
-    padding-block-start: 8px;
-    border-block-start: 1px solid ${cssVar.colorBorderSecondary};
-  `,
-  meta: css`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 14px;
-    font-size: ${cssVar.fontSizeSM};
-    color: ${cssVar.colorTextSecondary};
-    font-variant-numeric: tabular-nums;
-    min-inline-size: 0;
-    max-inline-size: 100%;
-  `,
-  metaItem: css`
-    display: inline-flex;
-    gap: 4px;
-    align-items: baseline;
-    min-inline-size: 0;
-    max-inline-size: 100%;
-
-    & > span:first-child {
-      flex: none;
-    }
-
-    & > span:last-child {
-      overflow-wrap: anywhere;
-      min-inline-size: 0;
-    }
-  `,
-  staleNote: css`
-    margin: 0;
-  `,
+  actions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 2,
+    alignItems: 'center',
+    minInlineSize: 0,
+    maxInlineSize: '100%',
+    marginBlockStart: 'auto',
+    paddingBlockStart: 8,
+    borderBlockStartWidth: 1,
+    borderBlockStartStyle: 'solid',
+    borderBlockStartColor: cssVar.colorBorderSecondary,
+  },
+  meta: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    rowGap: 4,
+    columnGap: 14,
+    fontSize: cssVar.fontSizeSM,
+    color: cssVar.colorTextSecondary,
+    fontVariantNumeric: 'tabular-nums',
+    minInlineSize: 0,
+    maxInlineSize: '100%',
+  },
+  metaItem: {
+    display: 'inline-flex',
+    gap: 4,
+    alignItems: 'baseline',
+    minInlineSize: 0,
+    maxInlineSize: '100%',
+  },
+  metaLabel: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 'auto',
+  },
+  metaValue: {
+    overflowWrap: 'anywhere',
+    minInlineSize: 0,
+  },
+  staleNote: {
+    margin: 0,
+  },
   /** The history drawer keeps runs scannable: one bordered block per run, output below. */
-  runs: css`
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-inline-size: 0;
-  `,
-  run: css`
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px 12px;
-    border: 1px solid ${cssVar.colorBorderSecondary};
-    border-radius: ${cssVar.borderRadius};
-    min-inline-size: 0;
-  `,
-  runHead: css`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 12px;
-    align-items: center;
-    min-inline-size: 0;
-  `,
+  runs: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    minInlineSize: 0,
+  },
+  run: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    paddingBlock: 10,
+    paddingInline: 12,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: cssVar.colorBorderSecondary,
+    borderRadius: cssVar.borderRadius,
+    minInlineSize: 0,
+  },
+  runHead: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    rowGap: 4,
+    columnGap: 12,
+    alignItems: 'center',
+    minInlineSize: 0,
+  },
   /** The form stacks its two-column pairs and drops to one column while narrow. */
-  formBody: css`
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-inline-size: 0;
-    padding-block-end: 8px;
-  `,
-  pair: css`
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 12px;
-    min-inline-size: 0;
-
-    ${responsive.mobile} {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  `,
-  footer: css`
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-    padding-block-start: 12px;
-    border-block-start: 1px solid ${cssVar.colorBorderSecondary};
-  `,
-}));
+  formBody: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    minInlineSize: 0,
+    paddingBlockEnd: 8,
+  },
+  pair: {
+    display: 'grid',
+    gridTemplateColumns: {
+      default: 'repeat(2, minmax(0, 1fr))',
+      [media.mobile]: 'minmax(0, 1fr)',
+    },
+    columnGap: 12,
+    minInlineSize: 0,
+  },
+  intervalInput: {
+    inlineSize: 200,
+  },
+  footer: {
+    display: 'flex',
+    gap: 8,
+    justifyContent: 'flex-end',
+    paddingBlockStart: 12,
+    borderBlockStartWidth: 1,
+    borderBlockStartStyle: 'solid',
+    borderBlockStartColor: cssVar.colorBorderSecondary,
+  },
+});

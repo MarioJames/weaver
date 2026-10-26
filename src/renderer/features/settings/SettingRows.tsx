@@ -1,8 +1,8 @@
 import { notifyError } from '../../api/notify';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import { Check } from 'lucide-react';
-import { Icon } from '@lobehub/ui';
-import { Spin, Text } from '@lobehub/ui/base-ui';
+import { Icon, Spin, Text } from '@lobehub/ui';
 import type { Config } from '../../../shared/contracts/policy';
 import { fieldErrorText, isFieldError, minutesError, type DisplaySettings, type SettingsPatch } from '../../policy/policy-edit';
 import type { PolicyDraft } from '../../policy/usePolicyDraft';
@@ -39,22 +39,22 @@ export function useSaver(policy: PolicyDraft) {
 function Outcome({ state }: { state?: SaveState }) {
   if (!state) return null;
   if (state.status === 'saving') return <Spin size="small" aria-label="正在保存" />;
-  if (state.status === 'saved') return <Text type="success" fontSize={12} role="status" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}><Icon icon={Check} size="small" /> 已保存</Text>;
+  if (state.status === 'saved') return <Text type="success" fontSize={12} role="status" className={stylex.props(settingsStyles.outcome).className}><Icon icon={Check} size="small" /> 已保存</Text>;
   return null;
 }
 
 /** A bad value or a refused save is said right under the control it belongs to; a floating notice is for the request failing, not for the input being wrong. */
 export function Setting({ label, desc, htmlFor, state, error, children }: { label: string; desc: ReactNode; htmlFor: string; state?: SaveState; error?: string; children: ReactNode }) {
   const message = error || (state?.status === 'error' ? state.message : '');
-  return <div className={settingsStyles.row}>
-    <div className={`${settingsStyles.fieldCell} ${styles.tight}`}>
+  return <div {...stylex.props(settingsStyles.row)}>
+    <div className={stylex.props(settingsStyles.fieldCell, styles.tight).className}>
       <label htmlFor={htmlFor}><Text strong>{label}</Text></label>
       <Text fontSize={12}>{desc}</Text>
     </div>
-    <div className={settingsStyles.controlCell}>
-      <div className={settingsStyles.controlStack}>
-        <div className={settingsStyles.controlRow}><Outcome state={state} />{children}</div>
-        {message && <p id={`${htmlFor}-error`} role="alert" className={styles.error}>{message}</p>}
+    <div {...stylex.props(settingsStyles.controlCell)}>
+      <div {...stylex.props(settingsStyles.controlStack)}>
+        <div {...stylex.props(settingsStyles.controlRow)}><Outcome state={state} />{children}</div>
+        {message && <p id={`${htmlFor}-error`} role="alert" className={stylex.props(styles.error).className}>{message}</p>}
       </div>
     </div>
   </div>;
@@ -62,12 +62,12 @@ export function Setting({ label, desc, htmlFor, state, error, children }: { labe
 
 /** One group: its title and explanation in the left column, its settings in the field and control columns. */
 export function Group({ title, desc, children }: { title: string; desc?: ReactNode; children: ReactNode }) {
-  return <section aria-label={title} className={settingsStyles.group}>
-    <div className={`${settingsStyles.groupCell} ${styles.tight}`}>
+  return <section aria-label={title} {...stylex.props(settingsStyles.group)}>
+    <div className={stylex.props(settingsStyles.groupCell, styles.tight).className}>
       <Text strong>{title}</Text>
       {desc && <Text fontSize={12}>{desc}</Text>}
     </div>
-    <div className={settingsStyles.rows}>{children}</div>
+    <div {...stylex.props(settingsStyles.rows)}>{children}</div>
   </section>;
 }
 
@@ -88,6 +88,6 @@ export function MinutesInput({ id, label, value, min, max, step, disabled, onCom
   }
   // No min/max on the control: it would silently clamp on blur and save a value the user did not type.
   // Minutes are plain integers: no thousands separator ("1,440" reads like a decimal in some locales).
-  return <NamedInputNumber id={id} aria-label={label} step={step} format={{ useGrouping: false }} value={draft} placeholder={`例如：${value ?? min}`} disabled={disabled} style={{ inlineSize: 120 }}
+  return <NamedInputNumber id={id} aria-label={label} step={step} format={{ useGrouping: false }} value={draft} placeholder={`例如：${value ?? min}`} disabled={disabled} className={stylex.props(settingsStyles.minutesInput).className}
     onChange={next => { const visible = typeof next === 'number' ? next : null; setDraft(visible); if (onDraftChange) onDraftChange(visible); if (!minutesError(visible, min, max)) onError(''); }} onBlur={commit} onPressEnter={commit} />;
 }

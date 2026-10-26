@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
 import { taskStyles as styles } from '../../src/renderer/features/tasks/task-style';
+import { styleClass } from './style-helpers';
 import { TaskBoard } from '../../src/renderer/features/tasks/TaskBoard';
 import { applyTaskFilters, emptySelection, filterOptions } from '../../src/renderer/features/tasks/task-filters';
 import { readTaskFilters, writeTaskFilters, TASK_FILTERS_KEY, ENDED_EXPANDED_KEY } from '../../src/renderer/features/tasks/task-persistence';
@@ -27,7 +28,7 @@ function storage<T>(values: Record<string, string>, run: () => T): T {
   }
 }
 function markup(node: React.ReactNode) {
-  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) }));
+  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) }));
 }
 function board(tasks: Task[]) {
   return storage({ [ENDED_EXPANDED_KEY]: 'true' }, () => markup(React.createElement(TaskBoard, { tasks, filters: { ...emptySelection(), time: 'all' }, now, loading: false, onSelect: () => {} })));
@@ -41,10 +42,10 @@ function card(task: Task) {
 
 test('card title shares its text flow with the sub agent, followed by exactly two information rows', () => {
   const html = card(base);
-  const title = html.slice(html.indexOf(`class="${styles.cardTitle}"`), html.indexOf(`class="${styles.cardStatus}"`));
+  const title = html.slice(html.indexOf(`class="${styleClass(styles.cardTitle)}"`), html.indexOf(`class="${styleClass(styles.cardStatus)}"`));
   assert.match(title, /<title>Claude Code<\/title>[\s\S]*WORKER[\s\S]*<strong[^>]*>CARD_ONE<\/strong>/);
   assert.equal((html.match(/>WORKER</g) ?? []).length, 1);
-  const meta = html.slice(html.indexOf(`class="${styles.cardMeta}"`));
+  const meta = html.slice(html.indexOf(`class="${styleClass(styles.cardMeta)}"`));
   assert.match(meta, /^[^>]*><span[^>]*>由 <span[^>]*aria-label="父 Agent：Parent"[\s\S]*Parent[\s\S]*于 <time[^>]*>[0-9]{2}:[0-9]{2}<\/time> 创建/);
   assert.doesNotMatch(html, /<dl|<dt|目录|\/projects|\/frozen/);
   assert.doesNotMatch(card({ ...base, dispatch: undefined }), /WORKER|<title>Claude Code/);
@@ -53,7 +54,7 @@ test('card title shares its text flow with the sub agent, followed by exactly tw
 test('running and cancelling cards show only status and latest redacted activity in the first row', () => {
   for (const task of [base, { ...base, status: 'cancelling' as const }]) {
     const html = card({ ...task, events: [{ ...base.events[0], message: 'OLD_MESSAGE' }, ...base.events] });
-    const row = html.slice(html.indexOf(`class="${styles.cardStatus}"`), html.indexOf(`class="${styles.cardMeta}"`));
+    const row = html.slice(html.indexOf(`class="${styleClass(styles.cardStatus)}"`), html.indexOf(`class="${styleClass(styles.cardMeta)}"`));
     assert.match(row, /ACTIVITY/);
     assert.match(row, /title="ACTIVITY[^"<>]*"/);
     assert.doesNotMatch(row, /secret-value|OLD_MESSAGE|<time|WORKER|Parent/);
@@ -66,11 +67,11 @@ test('running and cancelling cards show only status and latest redacted activity
 test('inactive execution cards keep the first row status alone and the second row time plus parent', () => {
   for (const [status, label] of [['completed', '待验收'], ['failed', '失败'], ['cancelled', '已取消'], ['queued', '待执行']] as const) {
     const html = card({ ...base, status });
-    const row = html.slice(html.indexOf(`class="${styles.cardStatus}"`), html.indexOf(`class="${styles.cardMeta}"`));
+    const row = html.slice(html.indexOf(`class="${styleClass(styles.cardStatus)}"`), html.indexOf(`class="${styleClass(styles.cardMeta)}"`));
     assert.match(row, new RegExp(label));
     assert.doesNotMatch(row, /<time|WORKER|Parent/);
     assert.doesNotMatch(html, /ACTIVITY|secret-value|等待首次调度|lucide-loader-2/);
-    const meta = html.slice(html.indexOf(`class="${styles.cardMeta}"`));
+    const meta = html.slice(html.indexOf(`class="${styleClass(styles.cardMeta)}"`));
     assert.match(meta, /由 <span[^>]*aria-label="父 Agent：Parent"[\s\S]*于 <time[^>]*title="[^"]+"[^>]*>[0-9]{2}:[0-9]{2}<\/time> 创建/);
     assert.equal(/完成于|结束于/.test(meta), status === 'completed' || status === 'failed' || status === 'cancelled');
     assert.doesNotMatch(meta, /最新上报/);

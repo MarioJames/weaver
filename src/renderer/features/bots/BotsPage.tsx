@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { Tabs } from '@lobehub/ui/base-ui';
+import * as stylex from '@stylexjs/stylex';
+import { Tabs } from '@lobehub/ui';
 import { PageHeader } from '@lobehub/ui/dashboard';
 import type { PolicyDraft } from '../../policy/usePolicyDraft';
 import { ImSettings } from './ImSettings';
@@ -28,7 +29,10 @@ export function BotsPage({ policy }: { policy: PolicyDraft }) {
       onChange={setChannel}
       variant="square"
       size="small"
-      classNames={{ list: botStyles.tabList, panel: `${botStyles.surface} ${botStyles.tabPanel}` }}
+      classNames={{
+        list: stylex.props(botStyles.tabList).className,
+        panel: stylex.props(botStyles.surface, botStyles.tabPanel).className,
+      }}
       items={CHANNELS.map(item => ({ key: item.key, label: item.label, children: item.render(policy) }))}
     />
   </>;

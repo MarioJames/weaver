@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { TaskEvent } from '../../src/shared/contracts/tasks';
 import { condenseEvents, eventBadge, filterCondensed, isTimelineNoise, normalizeToolName, relativeTime, timelineActive } from '../../src/renderer/features/tasks/log-view';
 import { styles as eventStyles } from '../../src/renderer/features/tasks/events-style';
+import { styleClass } from './style-helpers';
 import { EventsPanel } from '../../src/renderer/features/tasks/EventsPanel';
 
 function event(id: string, kind: TaskEvent['kind'], message: string, seconds = 0): TaskEvent {
@@ -14,7 +15,7 @@ function event(id: string, kind: TaskEvent['kind'], message: string, seconds = 0
 }
 
 function markup(node: React.ReactNode) {
-  const props = { motion, children: React.createElement(ThemeProvider, { themeMode: 'dark', enableCustomFonts: false, children: node }) } as React.ComponentProps<typeof ConfigProvider>;
+  const props = { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) } as React.ComponentProps<typeof ConfigProvider>;
   return renderToStaticMarkup(React.createElement(ConfigProvider, props));
 }
 
@@ -233,16 +234,15 @@ test('statuses are solid tags and the outcome is an outlined tag', () => {
   const status = html.match(/<span[^>]*>执行中<\/span>/)?.[0] ?? '';
   const outcome = html.match(/<span[^>]*>已取消<\/span>/)?.[0] ?? '';
   assert.ok(status && outcome);
-  assert.match(status, /background:var\(--ant-color-info\)/);
-  assert.doesNotMatch(outcome, /background:var\(--ant-color-(?:info|text)/);
+  assert.match(status, /background:var\(--lobe-color-info\)/);
+  assert.doesNotMatch(outcome, /background:var\(--lobe-color-(?:info|text)/);
   assert.notEqual(status.replace(/>.*/, ''), outcome.replace(/>.*/, ''));
 });
 
 test('the result event is a success card with copy and folds when long', () => {
   const long = Array.from({ length: 12 }, (_, index) => `line ${index}`).join('\n');
   const html = markup(React.createElement(EventsPanel, { events: [event('1', 'result', long)], taskId: 't' }));
-  assert.ok(html.includes(eventStyles.cardSuccess));
-  assert.match(String(eventStyles.cardSuccess), /acss/);
+  assert.ok(html.includes(styleClass(eventStyles.cardSuccess)));
   assert.match(html, /aria-label="复制执行结果"/);
   assert.match(html, /aria-label="展开执行结果"/);
   const short = markup(React.createElement(EventsPanel, { events: [event('1', 'result', 'done')], taskId: 't' }));
@@ -252,7 +252,7 @@ test('the result event is a success card with copy and folds when long', () => {
 test('a failed task shows an error card with message, stderr tail and vendor error', () => {
   const failure = { kind: 'rate_limit' as const, message: 'Provider rate limited', stderrTail: 'stderr line 9', vendorError: 'AI_APICallError 429' };
   const html = markup(React.createElement(EventsPanel, { events: [event('1', 'error', 'Worker failed')], taskId: 't', failure }));
-  assert.ok(html.includes(eventStyles.cardError));
+  assert.ok(html.includes(styleClass(eventStyles.cardError)));
   assert.match(html, /Provider rate limited/);
   assert.match(html, /stderr line 9/);
   assert.match(html, /AI_APICallError 429/);

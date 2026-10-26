@@ -1,81 +1,85 @@
-import { createStaticStyles } from 'antd-style';
+import * as stylex from '@stylexjs/stylex';
+import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
 
 /** The 接续 tab: one status row, its launch line, and the dialog that starts a new owner. */
-export const styles = createStaticStyles(({ css, cssVar }) => ({
+export const styles = stylex.create({
   /** Owner and status on the left, the action on the right; wraps instead of squeezing on a narrow drawer. */
-  row: css`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    min-inline-size: 0;
-  `,
+  row: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+    minInlineSize: 0,
+  },
   /** Brand mark, owner name and the status tag in one centered line. */
-  lead: css`
-    display: inline-flex;
-    flex: 1 1 auto;
-    gap: 8px;
-    align-items: center;
-    min-inline-size: 0;
-  `,
+  lead: {
+    display: 'inline-flex',
+    flex: '1 1 auto',
+    gap: 8,
+    alignItems: 'center',
+    minInlineSize: 0,
+  },
   /** The owner name gives the tag its room and ellipsizes instead of overflowing. */
-  owner: css`
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 600;
-  `,
+  owner: {
+    minInlineSize: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    fontWeight: 600,
+  },
   /** Keeps the action against the line end when the row wraps. */
-  action: css`
-    flex: none;
-    margin-inline-start: auto;
-  `,
+  action: {
+    flex: 'none',
+    marginInlineStart: 'auto',
+  },
   /** One stacked column: status row, then the host line, then the launch result. */
-  stack: css`
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-inline-size: 0;
-  `,
+  stack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    minInlineSize: 0,
+  },
   /** The Herdr host line under the status row. */
-  host: css`
-    color: ${cssVar.colorTextSecondary};
-    font-variant-numeric: tabular-nums;
-  `,
+  host: {
+    color: cssVar.colorTextSecondary,
+    fontVariantNumeric: 'tabular-nums',
+  },
   /** Dialog body: pick, one sentence, and the launch failure if there is one. */
-  dialog: css`
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-inline-size: 0;
-  `,
+  dialog: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    minInlineSize: 0,
+  },
   /** Profile option: brand mark and profile id in one row. */
-  option: css`
-    display: inline-flex;
-    gap: 6px;
-    align-items: center;
-    min-inline-size: 0;
-  `,
+  option: {
+    display: 'inline-flex',
+    gap: 6,
+    alignItems: 'center',
+    minInlineSize: 0,
+  },
   /** The pick fills the dialog width so a long profile id ellipsizes in the trigger. */
-  pick: css`
-    inline-size: 100%;
-    min-inline-size: 0;
-  `,
+  pick: {
+    inlineSize: '100%',
+    minInlineSize: 0,
+  },
   /** A launch failure keeps its message and its retry button together. */
-  failure: css`
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 8px 12px;
-    border: 1px solid ${cssVar.colorErrorBorder};
-    border-radius: ${cssVar.borderRadiusLG};
-    background: ${cssVar.colorErrorBg};
-    color: ${cssVar.colorErrorText};
-  `,
+  failure: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    paddingBlock: 8,
+    paddingInline: 12,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: cssVar.colorErrorBorder,
+    borderRadius: cssVar.borderRadiusLG,
+    backgroundColor: cssVar.colorErrorBg,
+    color: cssVar.colorErrorText,
+  },
   /** Long host or command messages wrap inside the dialog. */
-  wrap: css`
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  `,
-}));
+  wrap: {
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'anywhere',
+  },
+});

@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
-import { toast, type ToastOptions } from '@lobehub/ui/base-ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
+import { toast, type ToastOptions } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { ConnectionNotice } from '../../src/renderer/api/ConnectionNotice';
 import { ContinuationDialog } from '../../src/renderer/features/roles/OwnerInspector';
@@ -13,7 +13,7 @@ import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';
 import { notifyError } from '../../src/renderer/api/notify';
 
 function markup(node: React.ReactNode) {
-  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode:'dark',enableCustomFonts:false,children:node }) }));
+  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children:node }) }));
 }
 
 test('reconnect content shows one status line and keeps attempt count in a tooltip, then success', () => {

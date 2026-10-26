@@ -2,14 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { PI_MISSING_MODEL_TEXT, missingModelWarning } from '../../src/renderer/features/engines/engine-models';
 import { ModelListWarning } from '../../src/renderer/features/engines/ModelPicker';
 import type { EngineModelList } from '../../src/shared/engines';
 
 const list = (status: EngineModelList['status'], ...ids: string[]): EngineModelList => ({ engine: 'pi', status, source: 'pi --list-models', models: ids.map(id => ({ id })), fetchedAt: '2026-01-01T00:00:00.000Z' });
-const markup = (node: React.ReactNode) => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { enableCustomFonts: false }, node) }));
+const markup = (node: React.ReactNode) => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, null, node) }));
 const SAVED = 'cc-switch-agentplan/glm-5.3-flash';
 
 test('pi: a saved model missing from the current list warns, and the warning goes away once it is listed or replaced', () => {

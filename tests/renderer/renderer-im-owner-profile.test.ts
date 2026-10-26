@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { ImConfig, ImOwnerProfileOption, ImSettingsSnapshot, ImStatus } from '../../src/shared/contracts/im';
 import {
@@ -40,7 +40,7 @@ function profilesOf(): ImOwnerProfileOption[] {
 }
 
 function markup(node: React.ReactNode) {
-  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, children: React.createElement(ThemeProvider, { themeMode: 'light', enableCustomFonts: false, children: node }) }));
+  return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'light', children: node }) }));
 }
 
 test('owner options start with auto, keep snapshot order and label selectable profiles as id · kind · model', () => {
