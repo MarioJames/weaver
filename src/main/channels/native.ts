@@ -43,6 +43,12 @@ export function claudeCredentialsReady(value:any, verifying=false):boolean {
  const v=value?.claudeAiOauth;
  return typeof v?.accessToken==='string'&&!!v.accessToken&&(!v.expiresAt||v.expiresAt>Date.now()||!verifying&&typeof v.refreshToken==='string'&&!!v.refreshToken);
 }
+/** Claude keeps the signed-in account profile even after it clears unusable OAuth tokens. */
+export function claudeAccount(root:string):{accountUuid:string;organizationUuid:string|null}|undefined {
+ const v=nativeJson(root,'.claude.json').oauthAccount;
+ if(typeof v?.accountUuid!=='string'||!v.accountUuid)return;
+ return {accountUuid:v.accountUuid,organizationUuid:typeof v.organizationUuid==='string'?v.organizationUuid:null};
+}
 /** Local materials may be refreshed by the native CLI. Strict login verification also requires current access. */
 export function nativeCredentialsReady(engine:string, secret:ChannelSecret, verifying=false): boolean {
  const root=secret.authDir;

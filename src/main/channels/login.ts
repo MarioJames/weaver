@@ -9,9 +9,10 @@ import { findEngineExecutable, runCapture } from '../engines/probe';
 import { OpenCodeAccounts } from '../engines/opencode-accounts';
 import { RpcError } from '../rpc';
 import type { ChannelBinding } from './runtime';
-import { grokCredential, nativeCredentialsReady, nativeEnvironment, officialEngines, writeNativeConfig, nativeFile } from './native';
+import { claudeAccount, grokCredential, nativeCredentialsReady, nativeEnvironment, officialEngines, writeNativeConfig, nativeFile, nativeJson } from './native';
 
-interface LoginWork { engine?:string; codeSubmitted?:boolean; submitting?:boolean; job:ChannelLogin; scope?:OwnedScope; closed?:Promise<number|null>; done?:boolean; work?:Promise<void>; cleanup?:Promise<void>; helper?:OpenCodeAccounts; finished?:boolean }
+type ClaudeIdentity = NonNullable<ReturnType<typeof claudeAccount>>;
+interface LoginWork { engine?:string; expected?:ClaudeIdentity; codeSubmitted?:boolean; submitting?:boolean; job:ChannelLogin; scope?:OwnedScope; closed?:Promise<number|null>; done?:boolean; work?:Promise<void>; cleanup?:Promise<void>; helper?:OpenCodeAccounts; finished?:boolean }
 export interface ChannelLoginOptions {
  initialize?:(channel:string)=>ChannelBinding;
  env?:NodeJS.ProcessEnv;
@@ -23,6 +24,11 @@ export interface ChannelLoginOptions {
 }
 const active=(job:ChannelLogin)=>['starting','authorizing','verifying'].includes(job.status);
 const safeError=(code:string,message:string)=>new RpcError(code,message);
+/** A new account's marker is plain text; a renewal marker records the account it must keep. */
+function renewalIdentity(root:string):ClaudeIdentity|undefined {
+ const v=nativeJson(root,'.weaver-login-pending');
+ return typeof v.accountUuid==='string'&&v.accountUuid?{accountUuid:v.accountUuid,organizationUuid:typeof v.organizationUuid==='string'?v.organizationUuid:null}:undefined;
+}
 /** Reject arbitrary OAuth query parameters: a CLI line is untrusted output. */
 export function channelVerificationUrl(engine:string,value:string):string|undefined {
  try{
@@ -62,9 +68,12 @@ export class ChannelLogins {
   const current=this.jobs.get(channel);
   if(current?.job.error?.code==='LOGIN_CLEANUP')throw safeError('LOGIN_CLEANUP','上次登录进程未确认停止，请检查服务进程状态后重试');
   if(current&&!current.finished)return structuredClone(current.job);
-  const b=this.selected(channel),engine=b.engineKind??b.channel.engine;
-  if(nativeCredentialsReady(engine,b.secret)||!existsSync(join(b.secret.authDir!,'.weaver-login-pending'))&&['auth.json','.credentials.json','.auth/user','opencode.db'].some(name=>nativeFile(b.secret.authDir!,name,Number.MAX_SAFE_INTEGER)))throw safeError('CHANNEL_ALREADY_AUTHENTICATED','该账号已存在原生认证；请新建独立账号登录，避免改变运行任务身份');
-  const item:LoginWork={job:{channel,id:randomUUID(),status:'starting'}};
+  const b=this.selected(channel),engine=b.engineKind??b.channel.engine,root=b.secret.authDir!;
+  const pending=existsSync(join(root,'.weaver-login-pending'));
+  // Claude clears rejected OAuth tokens but keeps its profile; renewal is bound to that account, recorded before the CLI can overwrite it.
+  const expected=engine!=='claude'?undefined:pending?renewalIdentity(root):claudeAccount(root);
+  if(nativeCredentialsReady(engine,b.secret)||!pending&&!expected&&['auth.json','.credentials.json','.auth/user','opencode.db'].some(name=>nativeFile(root,name,Number.MAX_SAFE_INTEGER)))throw safeError('CHANNEL_ALREADY_AUTHENTICATED','该账号已存在原生认证；请新建独立账号登录，避免改变运行任务身份');
+  const item:LoginWork={job:{channel,id:randomUUID(),status:'starting'},expected};
   this.jobs.set(channel,item);item.work=this.run(item,b);
   return structuredClone(item.job);
  }
@@ -144,7 +153,7 @@ export class ChannelLogins {
   const {job}=item,engine=b.engineKind??b.channel.engine,root=b.secret.authDir!;item.engine=engine;
   let timer:ReturnType<typeof setTimeout>|undefined;
   try{
-   writeNativeConfig(root,'.weaver-login-pending','pending\n');
+   writeNativeConfig(root,'.weaver-login-pending',item.expected?JSON.stringify(item.expected)+'\n':'pending\n');
    const env=nativeEnvironment(engine,root,this.options.env??process.env);
    const executable=await (this.options.find??findEngineExecutable)(engine==='qoder'?'qodercli':engine,env.PATH??'');
    if(!executable)throw safeError('ENGINE_NOT_INSTALLED','未找到原生 CLI，请安装后重试');
@@ -179,6 +188,8 @@ export class ChannelLogins {
    const verified=await this.verify(engine,root,env,executable,item);
    if(!active(job))return;
    if(!verified){this.fail(item,'LOGIN_NOT_READY','未确认官方原生认证已就绪，请重试；若凭据已写入，请新建独立账号或检查认证是否过期');return;}
+   const account=item.expected&&claudeAccount(root);
+   if(item.expected&&(account?.accountUuid!==item.expected.accountUuid||account.organizationUuid!==item.expected.organizationUuid)){this.fail(item,'LOGIN_IDENTITY_CHANGED','登录的 Claude 账号与此账号原来的身份不同，新凭据未启用；请改用原账号登录，或新建独立账号');return;}
    rmSync(join(root,'.weaver-login-pending'),{force:true});
    job.status='succeeded';job.identity={label:`${engine==='qodercli'?'qoder':engine} 官方账号`};
   }catch(error){if(active(job)){if(error instanceof RpcError&&error.code==='ENGINE_NOT_INSTALLED')this.fail(item,error.code,error.message);else this.fail(item,'LOGIN_FAILED','原生登录未完成，请检查 CLI 与网络后重试');}}

@@ -328,3 +328,37 @@ test('a malformed Grok URL code cannot retain a valid-looking chunk prefix as it
   assert.equal(logins.get({channel:job.channel,id:job.id}).userCode,undefined);
  }finally{await logins.close();rmSync(f.root,{recursive:true,force:true});}
 });
+
+test('Claude credentials cleared by the native CLI can be renewed in place only for the same account',async()=>{
+ const f=loginFixture();
+ const account=(accountUuid:string)=>JSON.stringify({oauthAccount:{accountUuid,organizationUuid:'org-fixture',emailAddress:'fixture@example.com'}});
+ const cleared=JSON.stringify({claudeAiOauth:{accessToken:'',refreshToken:'',expiresAt:0}});
+ const issued=JSON.stringify({claudeAiOauth:{accessToken:'fixture-access',refreshToken:'fixture-refresh',expiresAt:Date.now()+3600_000}});
+ const logins=new ChannelLogins(id=>({...f.binding(id),engineKind:'claude'}),{...f.options,find:async()=>'/fixture/claude',capture:async()=>({code:0,stdout:JSON.stringify({loggedIn:true,authMethod:'claude.ai',email:'fixture@example.com'}),stderr:'',timedOut:false,overflow:false})});
+ const login=async(identity:string)=>{
+  const job=await logins.start({channel:'first'});await tick();
+  writeFileSync(join(f.root,'.credentials.json'),issued);writeFileSync(join(f.root,'.claude.json'),account(identity));
+  f.scopes.at(-1)!.emit('close',0);await tick();await tick();
+  return logins.get({channel:'first',id:job.id});
+ };
+ try{
+  writeFileSync(join(f.root,'.credentials.json'),cleared);writeFileSync(join(f.root,'.claude.json'),account('acct-original'));
+  assert.equal(nativeCredentialsReady('claude',{authDir:f.root}),false);
+  const other=await login('acct-other');
+  assert.equal(other.status,'failed');assert.equal(other.error?.code,'LOGIN_IDENTITY_CHANGED');
+  assert.equal(nativeCredentialsReady('claude',{authDir:f.root}),false);
+  // The overwritten profile must not become the new expected identity on retry.
+  assert.equal((await login('acct-other')).error?.code,'LOGIN_IDENTITY_CHANGED');
+  assert.equal((await login('acct-original')).status,'succeeded');
+  assert.equal(nativeCredentialsReady('claude',{authDir:f.root}),true);
+  await assert.rejects(logins.start({channel:'first'}),/新建独立账号/);
+ }finally{await logins.close();rmSync(f.root,{recursive:true,force:true});}
+});
+
+test('unusable stored credentials without a recorded Claude identity still refuse in-place login',async()=>{
+ const f=loginFixture(),logins=new ChannelLogins(id=>({...f.binding(id),engineKind:'claude'}),f.options);
+ try{
+  writeFileSync(join(f.root,'.credentials.json'),JSON.stringify({claudeAiOauth:{accessToken:''}}));
+  await assert.rejects(logins.start({channel:'first'}),/新建独立账号/);assert.equal(f.calls.length,0);
+ }finally{await logins.close();rmSync(f.root,{recursive:true,force:true});}
+});
