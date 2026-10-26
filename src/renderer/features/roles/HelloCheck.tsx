@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import * as stylex from '@stylexjs/stylex';
 import { Zap } from 'lucide-react';
 import { Button, Tag, Text } from '@lobehub/ui';
+import { TitleWithTips } from '@lobehub/ui/dashboard';
 import type { HelloResult } from '../../../shared/engines';
 import { helloRouteKey, startHello, useHelloRun } from '../engines/hello-runs';
 import { useNotifyError } from '../../api/notify';
@@ -26,8 +27,8 @@ export function HelloCheck({ id, record, engine, channelLabel }: { id: string; r
   return <div {...stylex.props(styles.stack, styles.divided)}>
     <div {...stylex.props(styles.spread, styles.alignStart)}>
       <div {...stylex.props(styles.tight)}>
-        <Text strong>可用性</Text>
-        <Text type="secondary" {...stylex.props(styles.meta)}>用当前填写的渠道、模型和推理强度发送一条简短问候，检查能否正常回复。不调用工具，不保存会话，会消耗少量额度。连通成功不代表额度可用。</Text>
+        <TitleWithTips title="连通测试" tips="用当前填写的渠道、模型和推理强度发送一条简短问候，检查能否正常回复。不调用工具，不保存会话，会消耗少量额度。连通成功不代表额度可用。" />
+        <Text type="secondary" {...stylex.props(styles.meta)}>用当前填写的路由发一条问候，会消耗少量额度。</Text>
       </div>
       <Button icon={Zap} loading={run?.running} disabled={!ready} onClick={() => void startHello(runKey, { channel: record.channel, engine, model: record.model.trim(), effort: record.effort.trim() }, `${channelLabel ?? record.channel} · ${record.model.trim()} · ${record.effort.trim()}`)}>连通测试</Button>
     </div>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Activity } from 'lucide-react';
 import * as stylex from '@stylexjs/stylex';
 import { Button, Descriptions, Skeleton, Tag, Text } from '@lobehub/ui';
+import { TitleWithTips } from '@lobehub/ui/dashboard';
 import type { FreeWorkerStatus } from '../../../shared/contracts/monitoring';
 import type { FreeProbe } from './useFreeProbe';
 import { PROBE_HISTORY_SHOWN, lastProbeOf, nextProbeText, probeDurationText, probeNoteText, probeStateView, recentProbes, type ProbeHistoryRecord } from './probe-view';
@@ -66,10 +67,10 @@ export function FreeProbePanel({ worker, probe }: { worker: string; probe: FreeP
   return <section ref={root} aria-label="探测状态" {...stylex.props(styles.stack, styles.divided, probeStyles.panel)}>
     <div {...stylex.props(styles.spread, styles.alignStart)}>
       <div {...stylex.props(styles.tight)}>
-        <Text strong>探测状态</Text>
+        <TitleWithTips title="免费渠道探测" tips="按设置的间隔向免费渠道发送简短问候，保持额度并发现故障。立即探测同样会消耗少量额度。" />
         {running
           ? <Text type="secondary" className={stylex.props(styles.meta).className} role="status">正在向 {worker} 发送问候，最长等待约 2 分钟…</Text>
-          : <Text type="secondary" className={stylex.props(styles.meta).className}>按设置的间隔向免费渠道发送简短问候，保持额度并发现故障。立即探测同样会消耗少量额度。</Text>}
+          : <Text type="secondary" className={stylex.props(styles.meta).className}>按设置的间隔自动探测；立即探测同样会消耗少量额度。</Text>}
       </div>
       <Button icon={Activity} loading={running} disabled={!entry?.probed || probe.unavailable && !status} aria-label={`立即探测 ${worker}`} onClick={() => void probe.probeNow(worker)}>立即探测</Button>
     </div>

@@ -6,7 +6,7 @@ import type { PolicySnapshot } from '../../src/shared/contracts/policy';
 import type { EngineQuotaRecord, QuotaRefreshResult, QuotaWindow } from '../../src/shared/contracts/quota';
 import {
   acceptQuotaPolicy, quotaCountText, quotaNextUpdateMs, quotaPercentText, quotaProgressPercent, quotaRecordStale,
-  quotaRecoveryText, quotaRetryMs, quotaScopeText, quotaStatusText, quotaWindowStale,
+  quotaRecoveryText, quotaRetryMs, quotaScopeText, quotaStatusText, quotaTightestWindow, quotaWindowShortLabel, quotaWindowStale,
 } from '../../src/renderer/features/quota/quota-view';
 
 const NOW = Date.parse('2026-10-19T02:00:00Z');
@@ -147,4 +147,17 @@ test('quota dates follow the compact rule: HH:mm today, MM-DD HH:mm on another d
   assert.equal(dateText(new Date(2026, 9, 20, 11, 48, 34).toISOString(), now), '10-20 11:48');
   assert.equal(dateText(null), '未知');
   assert.equal(dateText('invalid'), '未知');
+});
+
+
+test('one-line quota summaries use the tightest window and shorten known durations', () => {
+  const session = window({ id: 'session', label: '5 小时额度', usedPercent: 22, durationMinutes: 300 });
+  const weekly = window({ id: 'weekly', label: '7 天额度', usedPercent: 61, durationMinutes: 10_080 });
+  const monthly = window({ id: 'monthly', label: 'OpenCode Go · 每月额度', usedPercent: 9, durationMinutes: null });
+  assert.equal(quotaTightestWindow(record({ windows: [session, weekly, monthly] }))?.id, 'weekly');
+  assert.equal(quotaWindowShortLabel(session), '5 小时');
+  assert.equal(quotaWindowShortLabel(weekly), '7 天');
+  assert.equal(quotaWindowShortLabel(monthly), 'OpenCode Go · 每月');
+  assert.equal(quotaWindowShortLabel(window({ label: '额度', durationMinutes: null })), '额度');
+  assert.equal(quotaTightestWindow(record({ status: 'unknown', windows: [session] })), undefined);
 });

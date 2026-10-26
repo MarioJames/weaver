@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import * as stylex from '@stylexjs/stylex';
-import { Alert, Button, InputPassword, Modal, Text } from '@lobehub/ui';
+import { Button, InputPassword, Modal, Text } from '@lobehub/ui';
 import type { ChannelLogin, ChannelLoginRef } from '../../../shared/contracts/channels';
+import { notifyError } from '../../api/notify';
 import { styles } from '../../ui/styles';
 import { resourceStyles } from '../../ui/resource-style';
 import { channelStyles } from './channels-style';
@@ -28,7 +29,6 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
   const [job, setJob] = useState<ChannelLogin>();
   const [pending, setPending] = useState(false);
   const [authorizationCode, setAuthorizationCode] = useState('');
-  const [failure, setFailure] = useState('');
   const [pollRound, setPollRound] = useState(0);
   const mounted = useRef(false);
   const operation = useRef(false);
@@ -38,7 +38,7 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
   const completed = useRef('');
 
   function accept(next: ChannelLogin) {
-    if (next.channel !== channel) throw new Error('登录响应与当前账号不匹配，请重新读取。');
+    if (next.channel !== channel) throw new Error('登录响应与当前账号不匹配，请刷新状态。');
     remember(next);
     if (mounted.current) setJob(next);
   }
@@ -46,7 +46,7 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
     if (operation.current) return;
     operation.current = true;
     const token = ++generation.current;
-    setPending(true); setFailure('');
+    setPending(true);
     try {
       const next = action === 'start' ? await window.weaver.startChannelLogin({ channel })
         : action === 'code' ? await window.weaver.submitChannelLoginCode({ ...reference!, code: authorizationCode })
@@ -55,7 +55,7 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
       if (next.channel === channel) remember(next);
       if (mounted.current && token === generation.current) { accept(next); if (action === 'code') setAuthorizationCode(''); }
     } catch (error) {
-      if (mounted.current && token === generation.current) setFailure(error instanceof Error ? error.message : String(error));
+      if (mounted.current && token === generation.current) notifyError(error, action === 'read' ? '无法刷新登录状态' : action === 'start' ? '无法启动登录' : '登录操作失败');
     } finally {
       operation.current = false;
       if (mounted.current && token === generation.current) setPending(false);
@@ -83,10 +83,10 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
       try {
         const next = await window.weaver.getChannelLogin(reference);
         if (!current || token !== generation.current) return;
-        accept(next); setFailure('');
+        accept(next);
         if (active(next)) timer = setTimeout(() => void poll(), 1000);
       } catch (error) {
-        if (current && token === generation.current) setFailure(error instanceof Error ? error.message : String(error));
+        if (current && token === generation.current) notifyError(error, '无法刷新登录状态');
       }
     }
     timer = setTimeout(() => void poll(), 1000);
@@ -96,7 +96,7 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
   useEffect(() => {
     if (job?.status !== 'succeeded' || completed.current === job.id) return;
     completed.current = job.id;
-    void onSuccess.current().catch(error => { if (mounted.current) setFailure(`登录已验证，但账号列表读取失败：${error instanceof Error ? error.message : String(error)}`); });
+    void onSuccess.current().catch(error => { notifyError(error, '账号列表刷新失败'); });
   }, [job]);
 
   const reference = job ? { channel, id: job.id } : savedRef(channel);
@@ -104,13 +104,17 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
     classNames={{ body: stylex.props(resourceStyles.modalBody).className, footer: stylex.props(resourceStyles.modalFooter).className }} onCancel={onClose}
     footer={<>
       {running && <Button danger disabled={pending} loading={pending} onClick={() => reference && void run('cancel', reference)}>取消此次登录</Button>}
-      {reference && <Button disabled={pending} onClick={() => { setPollRound(value => value + 1); void run('read', reference); }}>重新读取状态</Button>}
-      {(!job || job.status === 'failed' || job.status === 'cancelled' || (!!failure && job.status !== 'succeeded')) && <Button type="primary" loading={pending} disabled={pending} onClick={() => void run('start')}>重试登录</Button>}
-      {job?.status === 'succeeded' && <Button disabled={pending} onClick={() => void onSucceeded().catch(error => setFailure(error instanceof Error ? error.message : String(error)))}>刷新账号凭据状态</Button>}
+      {reference && <Button disabled={pending} onClick={() => { setPollRound(value => value + 1); void run('read', reference); }}>刷新登录状态</Button>}
+      {(!job || job.status === 'failed' || job.status === 'cancelled') && <Button type="primary" loading={pending} disabled={pending} onClick={() => void run('start')}>重试登录</Button>}
+      {job?.status === 'succeeded' && <Button disabled={pending} onClick={() => void onSucceeded().catch(error => notifyError(error, '账号列表刷新失败'))}>刷新凭据状态</Button>}
       <Button onClick={onClose}>关闭</Button>
     </>}>
     <div {...stylex.props(styles.stack)} data-channels-scroll="">
       <Text role="status">{job ? statusText[job.status] : pending ? '正在读取或启动登录' : '尚未确认登录状态'}</Text>
+      {job?.error && <div role="status" {...stylex.props(channelStyles.loginState)}>
+        <Text strong type="danger">原生登录未完成</Text>
+        <Text type="secondary">{job.error.code}：{job.error.message}</Text>
+      </div>}
       <Text type="secondary">请在官方页面完成授权。关闭此窗口后，可从该账号的登录按钮找回状态；关闭不会取消登录。只有独立配置中的凭据通过验证后，账号才可用于执行。</Text>
       {running && job.verificationUrl && <a className={stylex.props(channelStyles.loginLink).className} href={job.verificationUrl} target="_blank" rel="noopener noreferrer">打开官方授权页面：{job.verificationUrl}</a>}
       {running && job.userCode && <Text>设备验证码：<code>{job.userCode}</code></Text>}
@@ -121,8 +125,6 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
         <Text type="secondary">在官方页面完成授权后，粘贴页面返回的完整授权码。发送后仍需等待原生 CLI 验证凭据。</Text>
       </div>}
       {job?.identity?.label && <Text>已验证身份：{job.identity.label}</Text>}
-      {job?.error && <Alert type="error" title="原生登录未完成" description={`${job.error.code}：${job.error.message}`} />}
-      {failure && <Alert type="error" title="无法确认最新状态" description={`${failure}。可重新读取；若服务已重启或登录已失效，请重试登录。`} />}
     </div>
   </Modal>;
 }

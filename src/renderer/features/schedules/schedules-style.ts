@@ -2,23 +2,31 @@ import * as stylex from '@stylexjs/stylex';
 import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
 import { media } from '@lobehub/ui/stylex/media.stylex';
 
-/** The schedules management page: toolbar, compact responsive rows, run history and form layout. */
+/** 定时任务主从页：页头之下列表与主窗格各自滚动，页面本身不滚动。 */
 export const schedulesStyles = stylex.create({
-  /* Page body under PageHeader: filters above, cards below, one vertical stack like the tasks board. */
+  /* Page column under the shell frame: header on top, MasterDetail fills the rest. */
   page: {
     display: 'flex',
     flexDirection: 'column',
-    gap: cssVar.marginSM,
+    blockSize: '100%',
+    minBlockSize: 0,
     minInlineSize: 0,
-    maxInlineSize: '100%',
+    gap: 12,
   },
-  /* Desktop: search + type + refresh stay on one line; narrow screens wrap compactly without horizontal overflow. */
+  body: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    minBlockSize: 0,
+    minInlineSize: 0,
+    overflow: 'hidden',
+  },
+  /* List pane toolbar: search + type filter stay on one line, wrap compactly when narrow. */
   toolbar: {
     display: 'flex',
-    flexWrap: {
-      default: 'nowrap',
-      [media.mobile]: 'wrap',
-    },
+    flexWrap: 'wrap',
     gap: 8,
     alignItems: 'center',
     minInlineSize: 0,
@@ -27,15 +35,8 @@ export const schedulesStyles = stylex.create({
   search: {
     flexGrow: 1,
     flexShrink: 1,
-    flexBasis: {
-      default: 200,
-      [media.mobile]: '100%',
-    },
+    flexBasis: 160,
     minInlineSize: 0,
-    maxInlineSize: {
-      default: 420,
-      [media.mobile]: 'none',
-    },
   },
   kindFilter: {
     flexGrow: 0,
@@ -44,103 +45,137 @@ export const schedulesStyles = stylex.create({
     inlineSize: 132,
     minInlineSize: 0,
   },
-  refresh: {
-    flexGrow: 0,
-    flexShrink: 0,
-    flexBasis: 'auto',
-  },
-  /* Responsive card grid: multiple columns in a 1280 content area, one column at 390 with no horizontal scroll. */
-  list: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))',
-    alignItems: 'start',
-    gap: 12,
-    minInlineSize: 0,
-    maxInlineSize: '100%',
-  },
-  /* One schedule card: identity + status zones above, actions in their own footer zone below. */
-  row: {
+  /* One list row: two lines, no card frame; selection comes from SelectableList. */
+  item: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
+    gap: 4,
     minInlineSize: 0,
     maxInlineSize: '100%',
-    padding: 12,
-    borderWidth: 1,
-    borderStyle: 'solid',
-    borderColor: cssVar.colorBorderSecondary,
-    borderRadius: cssVar.borderRadiusLG,
-    backgroundColor: cssVar.colorBgContainer,
+    paddingBlock: 4,
+    paddingInline: 0,
   },
-  rowHead: {
+  itemHead: {
     display: 'flex',
     gap: 8,
     alignItems: 'center',
     minInlineSize: 0,
     maxInlineSize: '100%',
   },
-  name: {
+  itemName: {
     flexGrow: 1,
     flexShrink: 1,
     flexBasis: 'auto',
+    minInlineSize: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
     fontWeight: cssVar.fontWeightStrong,
-    overflowWrap: 'anywhere',
-    minInlineSize: 0,
   },
-  /* Status + kind tags sit in their own scannable row so long names never squeeze them. */
-  tags: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 4,
-    alignItems: 'center',
-    minInlineSize: 0,
-    maxInlineSize: '100%',
-  },
-  /** Actions live in the card footer, separated from identity/status and wrapping without squeezing. */
-  actions: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 2,
-    alignItems: 'center',
-    minInlineSize: 0,
-    maxInlineSize: '100%',
-    marginBlockStart: 'auto',
-    paddingBlockStart: 8,
-    borderBlockStartWidth: 1,
-    borderBlockStartStyle: 'solid',
-    borderBlockStartColor: cssVar.colorBorderSecondary,
-  },
-  meta: {
+  itemSecond: {
     display: 'flex',
     flexWrap: 'wrap',
     rowGap: 4,
-    columnGap: 14,
+    columnGap: 8,
+    alignItems: 'center',
+    minInlineSize: 0,
+    maxInlineSize: '100%',
     fontSize: cssVar.fontSizeSM,
     color: cssVar.colorTextSecondary,
     fontVariantNumeric: 'tabular-nums',
-    minInlineSize: 0,
-    maxInlineSize: '100%',
   },
-  metaItem: {
-    display: 'inline-flex',
+  itemTags: {
+    display: 'flex',
+    flexWrap: 'wrap',
     gap: 4,
-    alignItems: 'baseline',
+    alignItems: 'center',
     minInlineSize: 0,
-    maxInlineSize: '100%',
   },
-  metaLabel: {
-    flexGrow: 0,
+  resultDot: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    minInlineSize: 0,
+  },
+  resultPoint: (tone: string) => ({
+    display: 'inline-block',
+    inlineSize: 8,
+    blockSize: 8,
+    borderRadius: '50%',
     flexShrink: 0,
-    flexBasis: 'auto',
+    backgroundColor: tone === 'success' ? cssVar.colorSuccess
+      : tone === 'error' ? cssVar.colorErrorText
+        : tone === 'processing' ? cssVar.colorPrimary
+          : cssVar.colorTextQuaternary,
+  }),
+  /* Detail header: name + type on the left, immediate actions on the right. */
+  detailHead: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 12,
+    alignItems: 'center',
+    minInlineSize: 0,
+    paddingBlock: 12,
+    paddingInline: 16,
+    borderBlockEndWidth: 1,
+    borderBlockEndStyle: 'solid',
+    borderBlockEndColor: cssVar.colorBorderSecondary,
   },
-  metaValue: {
-    overflowWrap: 'anywhere',
+  detailTitle: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 200,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
     minInlineSize: 0,
   },
-  staleNote: {
-    margin: 0,
+  detailName: {
+    minInlineSize: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    color: cssVar.colorText,
+    fontSize: 16,
+    fontWeight: cssVar.fontWeightStrong,
+    lineHeight: 1.4,
   },
-  /** The history drawer keeps runs scannable: one bordered block per run, output below. */
+  detailActions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  pendingZone: {
+    flexShrink: 0,
+    paddingBlock: 8,
+    paddingInline: 16,
+    borderBlockEndWidth: 1,
+    borderBlockEndStyle: 'solid',
+    borderBlockEndColor: cssVar.colorBorderSecondary,
+  },
+  detailBody: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+    minInlineSize: 0,
+    paddingBlock: 16,
+    paddingInline: 16,
+  },
+  sectionTitle: {
+    color: cssVar.colorText,
+    fontSize: 14,
+    fontWeight: cssVar.fontWeightStrong,
+    lineHeight: 1.4,
+  },
+  section: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    minInlineSize: 0,
+  },
+  /** The history list keeps runs scannable: one bordered block per run, output below. */
   runs: {
     display: 'flex',
     flexDirection: 'column',
@@ -151,7 +186,7 @@ export const schedulesStyles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
-    paddingBlock: 10,
+    paddingBlock: 12,
     paddingInline: 12,
     borderWidth: 1,
     borderStyle: 'solid',
@@ -187,13 +222,49 @@ export const schedulesStyles = stylex.create({
   intervalInput: {
     inlineSize: 200,
   },
-  footer: {
+  staleNote: {
+    margin: 0,
+  },
+  /* Kept for the legacy drawer reference; the page itself uses itemSecond/itemHead. */
+  meta: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    rowGap: 4,
+    columnGap: 14,
+    fontSize: cssVar.fontSizeSM,
+    color: cssVar.colorTextSecondary,
+    fontVariantNumeric: 'tabular-nums',
+    minInlineSize: 0,
+    maxInlineSize: '100%',
+  },
+  rowHead: {
     display: 'flex',
     gap: 8,
-    justifyContent: 'flex-end',
-    paddingBlockStart: 12,
-    borderBlockStartWidth: 1,
-    borderBlockStartStyle: 'solid',
-    borderBlockStartColor: cssVar.colorBorderSecondary,
+    alignItems: 'center',
+    minInlineSize: 0,
+    maxInlineSize: '100%',
+  },
+  emptyMain: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingBlock: 24,
+    paddingInline: 16,
+    minInlineSize: 0,
+  },
+  /* Narrow screens show one pane at a time; the detail offers a way back to the list. */
+  back: {
+    display: 'none',
+    '@media (max-width: 1023.98px)': {
+      display: 'inline-flex',
+    },
+  },
+  detailTitleLine: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    minInlineSize: 0,
+    maxInlineSize: '100%',
   },
 });

@@ -25,7 +25,8 @@ function health(overrides: Partial<TaskHealth> = {}): TaskHealth {
 
 test('the parent-agent group carries the command bound, defaulting an older policy to 30', () => {
   const html = settings(config => { delete config.herdr.max_command_minutes; });
-  const group = html.slice(html.indexOf('aria-label="父 Agent"'));
+  // The 父 Agent group is the last group: everything after its title is its rows.
+  const group = html.slice(html.indexOf('>父 Agent<'));
   assert.match(group, /单条命令最长运行时间（分钟）/);
   assert.match(group, /id="[^"]*-command"[^>]*value="30"/);
   assert.match(group, /1 到 1440 分钟/);

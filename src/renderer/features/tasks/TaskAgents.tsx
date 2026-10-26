@@ -1,6 +1,8 @@
 import * as stylex from '@stylexjs/stylex';
 import { Button, Descriptions, Tag, Text } from '@lobehub/ui';
 import type { Task } from '../../../shared/contracts/tasks';
+import type { Route } from '../../app/router';
+import { EntityLink } from '../../ui/EntityLink';
 import { DISPLAY_LABELS, DISPLAY_TONES, displayStatus } from '../../format/status-colors';
 import { statusTagColor } from '../../format/tag-colors';
 import { FreeChannelTag } from '../../ui/FreeChannelTag';
@@ -10,11 +12,13 @@ import { TimeText } from '../../ui/TimeText';
 import { styles } from './task-agents-style';
 
 /** Root host evidence and direct children come from the same live task snapshot. */
-export function TaskAgents({ task, tasks, onSelect, ownerKind, freeChannel }: { task: Task; tasks: Task[]; onSelect?: (id: string) => void; ownerKind?: (id?: string) => string | undefined; freeChannel?: (workerId?: string) => boolean }) {
+export function TaskAgents({ task, tasks, onSelect, taskRoute, ownerKind, freeChannel }: { task: Task; tasks: Task[]; onSelect?: (id: string) => void; taskRoute?: (id: string) => Route; ownerKind?: (id?: string) => string | undefined; freeChannel?: (workerId?: string) => boolean }) {
   const parent = tasks.find(item => item.id === task.parentTaskId);
   if (task.parentTaskId) return <section {...stylex.props(styles.section)} aria-label="所属任务">
     <Text type="secondary">父任务</Text>
-    <Button type="text" outdent="start" disabled={!parent || !onSelect} onClick={() => onSelect?.(task.parentTaskId!)}>{parent ? taskTitle(parent) : task.parentTaskId}</Button>
+    {taskRoute
+      ? <EntityLink route={taskRoute(task.parentTaskId)} title={parent?.title ?? task.parentTaskId}>{parent ? taskTitle(parent) : task.parentTaskId}</EntityLink>
+      : <Button type="text" outdent="start" disabled={!parent || !onSelect} onClick={() => onSelect?.(task.parentTaskId!)}>{parent ? taskTitle(parent) : task.parentTaskId}</Button>}
   </section>;
   if (task.executionRole !== 'owner') return null;
   const children = tasks.filter(item => item.parentTaskId === task.id);
@@ -32,7 +36,9 @@ export function TaskAgents({ task, tasks, onSelect, ownerKind, freeChannel }: { 
     {children.length ? <ul {...stylex.props(styles.children)}>{children.map(child => {
       const status = displayStatus(child);
       return <li key={child.id} {...stylex.props(styles.child)}>
-        <Button type="text" outdent="start" className={stylex.props(styles.link).className} disabled={!onSelect} onClick={() => onSelect?.(child.id)}>{taskTitle(child)}</Button>
+        {taskRoute
+          ? <EntityLink route={taskRoute(child.id)} title={child.title}>{taskTitle(child)}</EntityLink>
+          : <Button type="text" outdent="start" className={stylex.props(styles.link).className} disabled={!onSelect} onClick={() => onSelect?.(child.id)}>{taskTitle(child)}</Button>}
         <span {...stylex.props(styles.meta)}>
           <Tag size="small" color={statusTagColor(DISPLAY_TONES[status])}>{DISPLAY_LABELS[status]}</Tag>
           {child.dispatch?.worker ? <>

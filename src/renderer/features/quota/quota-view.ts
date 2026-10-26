@@ -91,3 +91,28 @@ export function quotaRecoveryText(record: EngineQuotaRecord): string {
 
 /** Windows shown under the quota state on engine cards. */
 export function quotaVisibleWindows(record: EngineQuotaRecord): QuotaWindow[] { return record.status === 'unknown' ? [] : record.windows; }
+
+/** A window label shortened for one-line summaries: a known duration wins over the provider wording. */
+export function quotaWindowShortLabel(window: QuotaWindow): string {
+  const minutes = window.durationMinutes;
+  if (minutes !== null && minutes > 0) {
+    if (minutes % 1440 === 0) return `${minutes / 1440} 天`;
+    if (minutes % 60 === 0) return `${minutes / 60} 小时`;
+    return `${minutes} 分钟`;
+  }
+  return window.label.replace(/额度$/, '') || '额度';
+}
+
+/** The window closest to its limit; unknown percentages sort last, ties keep provider order. */
+export function quotaTightestWindow(record: EngineQuotaRecord): QuotaWindow | undefined {
+  let tightest: QuotaWindow | undefined;
+  let score = -1;
+  for (const window of quotaVisibleWindows(record)) {
+    const measured = window.usedPercent ?? (window.used !== null && window.total !== null && window.total > 0
+      ? (window.used / window.total) * 100
+      : window.remainingPercent !== null ? 100 - window.remainingPercent : null);
+    const next = measured === null ? 0 : measured;
+    if (!tightest || next > score) { tightest = window; score = next; }
+  }
+  return tightest;
+}

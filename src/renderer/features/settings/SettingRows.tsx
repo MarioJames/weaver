@@ -1,13 +1,10 @@
 import { notifyError } from '../../api/notify';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as stylex from '@stylexjs/stylex';
-import { Check } from 'lucide-react';
-import { Icon, Spin, Text } from '@lobehub/ui';
 import type { Config } from '../../../shared/contracts/policy';
-import { fieldErrorText, isFieldError, minutesError, type DisplaySettings, type SettingsPatch } from '../../policy/policy-edit';
+import { isFieldError, fieldErrorText, minutesError, type DisplaySettings, type SettingsPatch } from '../../policy/policy-edit';
 import type { PolicyDraft } from '../../policy/usePolicyDraft';
 import { NamedInputNumber } from '../../ui/NamedControls';
-import { styles } from '../../ui/styles';
 import { settingsStyles } from './settings-style';
 
 export type SaveState = { status: 'saving' } | { status: 'saved' } | { status: 'error'; message: string };
@@ -34,41 +31,6 @@ export function useSaver(policy: PolicyDraft) {
     }
   }
   return { states, save };
-}
-
-function Outcome({ state }: { state?: SaveState }) {
-  if (!state) return null;
-  if (state.status === 'saving') return <Spin size="small" aria-label="正在保存" />;
-  if (state.status === 'saved') return <Text type="success" fontSize={12} role="status" className={stylex.props(settingsStyles.outcome).className}><Icon icon={Check} size="small" /> 已保存</Text>;
-  return null;
-}
-
-/** A bad value or a refused save is said right under the control it belongs to; a floating notice is for the request failing, not for the input being wrong. */
-export function Setting({ label, desc, htmlFor, state, error, children }: { label: string; desc: ReactNode; htmlFor: string; state?: SaveState; error?: string; children: ReactNode }) {
-  const message = error || (state?.status === 'error' ? state.message : '');
-  return <div {...stylex.props(settingsStyles.row)}>
-    <div className={stylex.props(settingsStyles.fieldCell, styles.tight).className}>
-      <label htmlFor={htmlFor}><Text strong>{label}</Text></label>
-      <Text fontSize={12}>{desc}</Text>
-    </div>
-    <div {...stylex.props(settingsStyles.controlCell)}>
-      <div {...stylex.props(settingsStyles.controlStack)}>
-        <div {...stylex.props(settingsStyles.controlRow)}><Outcome state={state} />{children}</div>
-        {message && <p id={`${htmlFor}-error`} role="alert" className={stylex.props(styles.error).className}>{message}</p>}
-      </div>
-    </div>
-  </div>;
-}
-
-/** One group: its title and explanation in the left column, its settings in the field and control columns. */
-export function Group({ title, desc, children }: { title: string; desc?: ReactNode; children: ReactNode }) {
-  return <section aria-label={title} {...stylex.props(settingsStyles.group)}>
-    <div className={stylex.props(settingsStyles.groupCell, styles.tight).className}>
-      <Text strong>{title}</Text>
-      {desc && <Text fontSize={12}>{desc}</Text>}
-    </div>
-    <div {...stylex.props(settingsStyles.rows)}>{children}</div>
-  </section>;
 }
 
 /**

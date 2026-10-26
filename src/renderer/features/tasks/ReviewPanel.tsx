@@ -1,12 +1,12 @@
 import { useNotifyError } from '../../api/notify';
 import { useEffect, useRef, useState } from 'react';
 import * as stylex from '@stylexjs/stylex';
-import { Button, Descriptions, Modal, Tag, Text, TextArea } from '@lobehub/ui';
+import { Button, Descriptions, Modal, Tag, Text, TextArea, Tooltip } from '@lobehub/ui';
 import type { Task } from '../../../shared/contracts/tasks';
 import { command } from '../../api/commands';
 import { DISPLAY_LABELS, DISPLAY_TONES, type DisplayStatus } from '../../format/status-colors';
 import { statusTagColor, tagColor } from '../../format/tag-colors';
-import { ownerLabel, taskOwnerId } from './task-view';
+import { ownerDisplayName, ownerLabel, taskOwnerId } from './task-view';
 import { styles } from '../../ui/styles';
 import { AgentLabel } from '../../ui/EngineIcon';
 import { TimeText } from '../../ui/TimeText';
@@ -22,10 +22,10 @@ export function decisionEvent(task: Task) {
 
 const LoadingNote = () => <Text role="status" type="secondary">正在读取结果清单…</Text>;
 
-export interface ReviewViewProps { task: Task; manifest?: ResultManifest; busy: boolean; ownerKind?: (ownerId?: string) => string | undefined; open: boolean; comment: string; onOpen: () => void; onClose: () => void; onComment: (value: string) => void; onSubmit: (name: string, extra: Record<string, unknown>) => void; ready?: boolean; loading?: boolean }
+export interface ReviewViewProps { task: Task; tasks?: readonly Task[]; manifest?: ResultManifest; busy: boolean; ownerKind?: (ownerId?: string) => string | undefined; open: boolean; comment: string; onOpen: () => void; onClose: () => void; onComment: (value: string) => void; onSubmit: (name: string, extra: Record<string, unknown>) => void; ready?: boolean; loading?: boolean }
 
 /** Read-only delivery state and decision; the manual review lives in a modal. */
-export function ReviewView({ task, manifest, busy, ownerKind, open, comment, onOpen, onClose, onComment, onSubmit, ready = true, loading = false }: ReviewViewProps) {
+export function ReviewView({ task, tasks = [], manifest, busy, ownerKind, open, comment, onOpen, onClose, onComment, onSubmit, ready = true, loading = false }: ReviewViewProps) {
   const decided = !!manifest && manifest.acceptance !== 'pending';
   const decision = decided ? decisionEvent(task) : undefined;
   const status = DECISION_STATUS[manifest?.acceptance ?? 'pending'];
@@ -34,7 +34,7 @@ export function ReviewView({ task, manifest, busy, ownerKind, open, comment, onO
     { key: 'delivery', label: '交付', children: <Tag size="small" variant="outlined" color={manifest?.delivery === 'acknowledged' ? tagColor('success') : tagColor('warning')}>{manifest?.delivery === 'acknowledged' ? '已确认收到' : '待确认收到'}</Tag> },
     { key: 'decision', label: '验收结论', children: <Tag size="small" variant="solid" color={statusTagColor(DISPLAY_TONES[status])}>{DISPLAY_LABELS[status]}</Tag> },
     ...(decided ? [
-      { key: 'by', label: '决定者', children: <AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerLabel(task)} /> },
+      { key: 'by', label: '决定者', children: <Tooltip title={ownerLabel(task)}><span><AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerDisplayName(task, tasks)} /></span></Tooltip> },
       ...(decision ? [{ key: 'at', label: '决定时间', children: <TimeText value={decision.at} /> }] : []),
     ] : []),
     ...(task.reviewComment ? [{ key: 'comment', label: '验收说明', span: 2, children: <Text className={stylex.props(styles.wrap).className}>{task.reviewComment}</Text> }] : []),
@@ -53,7 +53,7 @@ export function ReviewView({ task, manifest, busy, ownerKind, open, comment, onO
   </>;
 }
 
-export function ReviewPanel({ task, busy, action, ownerKind, open: controlledOpen, onOpenChange }: { task: Task; busy: boolean; action: (fn: () => Promise<unknown>) => Promise<boolean>; ownerKind?: (ownerId?: string) => string | undefined; open?: boolean; onOpenChange?: (open: boolean) => void }) {
+export function ReviewPanel({ task, tasks = [], busy, action, ownerKind, open: controlledOpen, onOpenChange }: { task: Task; tasks?: readonly Task[]; busy: boolean; action: (fn: () => Promise<unknown>) => Promise<boolean>; ownerKind?: (ownerId?: string) => string | undefined; open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const [manifest, setManifest] = useState<ResultManifest>();
   const [error, setError] = useState('');
   useNotifyError(error, '结果读取失败', { label: '重试', run: () => setAttempt(value => value + 1) });
@@ -98,6 +98,6 @@ export function ReviewPanel({ task, busy, action, ownerKind, open: controlledOpe
   }
   return <section aria-label="交付验收" {...stylex.props(styles.stack)}>
     {!open && loading && <LoadingNote />}
-    <ReviewView task={task} manifest={manifest?.taskId === task.id ? manifest : undefined} busy={busy || submitting} ready={!loading && loadedVersion === version && !error} loading={loading} ownerKind={ownerKind} open={open} comment={comment} onOpen={() => setOpen(true)} onClose={() => setOpen(false)} onComment={setComment} onSubmit={(name, extra) => void submit(name, extra)} />
+    <ReviewView task={task} tasks={tasks} manifest={manifest?.taskId === task.id ? manifest : undefined} busy={busy || submitting} ready={!loading && loadedVersion === version && !error} loading={loading} ownerKind={ownerKind} open={open} comment={comment} onOpen={() => setOpen(true)} onClose={() => setOpen(false)} onComment={setComment} onSubmit={(name, extra) => void submit(name, extra)} />
   </section>;
 }

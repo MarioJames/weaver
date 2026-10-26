@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as stylex from '@stylexjs/stylex';
 import { Button, Icon, Input, InputPassword, Spin, Tag, Text, TextArea, Tooltip } from '@lobehub/ui';
+import { TitleWithTips } from '@lobehub/ui/dashboard';
 import { Check } from 'lucide-react';
 import { notifyError } from '../../api/notify';
 import { TimeText } from '../../ui/TimeText';
+import { styles } from '../../ui/styles';
+import { SettingGroup } from '../../ui/SettingGroup';
+import { SettingRow } from '../../ui/SettingRow';
+import { SaveBar } from '../../ui/SaveBar';
 import { NamedSelect, NamedSwitch } from '../../ui/NamedControls';
 import { tagColor } from '../../format/tag-colors';
 import type { ImSettingsSnapshot, ImStatus } from '../../../shared/contracts/im';
@@ -12,11 +17,10 @@ import { ModelPicker } from '../engines/ModelPicker';
 import { WorkspacePicker } from '../tasks/WorkspacePicker';
 import { MinutesInput } from '../settings/SettingRows';
 import { botStyles } from './bot-style';
-import { BotChannel, BotSetting } from './BotSettingRows';
 import type { PolicyDraft } from '../../policy/usePolicyDraft';
 import {
-  adoptServer, conflictNote, createRequestGate, draftOf, IDLE_RANGE, IM_ENGINE_KINDS, imModelDiscoveryEngine, keepImDraft, modifiedEdit,
-  ownerProfileError, ownerProfileOptions, ownerSelectDisplay, ownerSelectValue, peekImDraft, savePlan, switchDraftChannel, workspaceListError, IM_WORKSPACE_LIMIT, type ImDraft, type ImEdit,
+  adoptServer, conflictNote, createRequestGate, draftOf, IDLE_RANGE, IM_ENGINE_KINDS, imModelDiscoveryEngine, keepImDraft, modifiedEdit, peekImDraft,
+  ownerProfileError, ownerProfileOptions, ownerSelectDisplay, ownerSelectValue, savePlan, switchDraftChannel, workspaceListError, IM_WORKSPACE_LIMIT, type ImDraft, type ImEdit,
 } from './im-state';
 import { IM_STABLE_POLL_MS, IM_TRANSITION_POLL_MS, nextImPollDelay } from './im-polling';
 
@@ -37,19 +41,19 @@ const AGENT: Record<ImStatus['agentState'], { label: string; color: string; desc
 };
 
 /** Agent readiness comes only from the service lifecycle, independently of the Feishu connection. */
-export function AgentStatus({ status, controlId, action }: { status: ImStatus; controlId: string; action?: ReactNode }) {
+export function AgentStatus({ status, controlId, action }: { status: ImStatus; controlId: string; action?: React.ReactNode }) {
   const agent = AGENT[status.agentState];
-  return <BotSetting label="Agent 状态" htmlFor={controlId} desc={<>{status.agentMessage && <>{status.agentMessage}<br /></>}{agent.description}</>}>
+  return <SettingRow label="Agent 状态" hint={<>{status.agentMessage && <>{status.agentMessage}<br /></>}{agent.description}</>}>
     <Tag size="small" color={agent.color} role="status" aria-label={`Agent 状态：${agent.label}`}>{agent.label}</Tag>
     {action}
-  </BotSetting>;
+  </SettingRow>;
 }
 
 /** 后台轮询只吸收真实状态与修订，配置写入一律走显式保存。稳定态低频，过渡态短周期见 im-polling。 */
 const POLL_MS = IM_STABLE_POLL_MS;
 const TRANSITION_POLL_MS = IM_TRANSITION_POLL_MS;
 
-const CHANNEL_DESC = '每个 Bot 是独立单聊的 Agent，直接选用已启用的引擎、模型和思考力度。换引擎、模型、力度或工作空间会结束旧对话并重建 Agent，网络正常的飞书连接保持不断；后台运行不用开着终端标签页。普通聊天只在当前对话回复，不建任务；实际工作可跨引擎派发，仍走 Weaver 任务面板。';
+const CHANNEL_DESC = '每个 Bot 是独立单聊的 Agent，直接选用已启用的引擎、模型和推理强度。换引擎、模型、强度或工作目录会结束旧对话并重建 Agent，网络正常的飞书连接保持不断；后台运行不用开着终端标签页。普通聊天只在当前对话回复，不建任务；实际工作可跨引擎派发，仍走 Weaver 任务面板。';
 
 interface BotOption { value: string; label: string; disabled: boolean }
 
@@ -89,106 +93,157 @@ export interface ImSettingsViewProps {
   onSave: () => void;
 }
 
+/** One control with its own field error underneath; the row stays a SettingRow. */
+function Field({ id, label, error, hint, children }: { id: string; label?: ReactNode; error?: string; hint?: ReactNode; children: ReactNode }) {
+  return <div {...stylex.props(botStyles.field)}>
+    {label && <label htmlFor={id} {...stylex.props(styles.srOnly)}>{label}</label>}
+    {children}
+    {error && <p id={`${id}-error`} role="alert" className={stylex.props(botStyles.error).className}>{error}</p>}
+    {hint && <p className={stylex.props(botStyles.hint).className}>{hint}</p>}
+  </div>;
+}
+
 export function ImSettingsView({
   id, loading, loadError, saved, values, edit, conflict, fieldErrors, saveError, saving, savedTick, refreshing, reconnecting, forceReading, dirty,
   channelOptions, channelUsable, discoveryEngine, engineKind, efforts, openCodeVariant, effortOptions,
   onRetryLoad, onReloadLatest, onRefreshStatus, onReconnect, onUpdate, onChannelChange, onRemoveWorkspace, onAddWorkspace, onTimeoutError, onDiscard, onSave,
 }: ImSettingsViewProps) {
   const lockFields = saving || forceReading;
-  const status = saved?.status;
   const ownerOptions = ownerProfileOptions(saved?.ownerProfiles ?? []);
   // 快照推进（轮询/刷新/策略变化）后，已固定的父 Agent 可能当场失效：这里按最新快照即时说明，
   // 刻意不用关闭豁免（豁免只决定 validateDraft 是否拦下保存，见 im-state）：Bot 关闭时也要一眼看到固定值已失效。
   const ownerLiveError = values && saved
     ? ownerProfileError(values.ownerProfileId ?? '', saved.ownerProfiles, '', true)
     : '';
-  const connection = CONNECTION[status?.connection ?? 'disabled'];
   const configuredSecret = saved?.config.appSecretConfigured ?? false;
-  const statusDesc = !status || status.connection === 'disabled'
-    ? '未启用。打开开关、完成配置并保存后，这里显示真实连接与会话状态。'
-    : <>{status.connection === 'error' && status.message ? `${status.message} ` : ''}活跃会话 {status.activeSessions}，忙碌 {status.busySessions}{status.lastMessageAt && <><br />最近消息 <TimeText value={status.lastMessageAt} /></>}{status.lastReplyAt && <>，最近回复 <TimeText value={status.lastReplyAt} /></>}</>;
 
-  return <BotChannel channel="feishu" title="飞书 IM" desc={CHANNEL_DESC}>
-    {!saved || !values
-      ? loading
+  if (!saved || !values) {
+    return <div {...stylex.props(botStyles.page)}>
+      <p {...stylex.props(botStyles.hint)}>{CHANNEL_DESC}</p>
+      {loading
         ? <div {...stylex.props(botStyles.loading)}><Spin size="small" aria-label="正在读取飞书 IM 设置" /><Text fontSize={12}>正在读取飞书 IM 设置…</Text></div>
-        : <div {...stylex.props(botStyles.loading)}><Text fontSize={12} role="alert">{loadError}</Text><Button size="small" onClick={onRetryLoad}>重试</Button></div>
-      : <>
-          {conflict && edit && <BotSetting label="配置在别处被修改" htmlFor={`${id}-conflict`} desc={conflictNote(edit, saved)} role="alert">
-            <Button id={`${id}-conflict`} size="small" loading={forceReading} disabled={saving || loading} onClick={onReloadLatest}>放弃修改并载入最新</Button>
-          </BotSetting>}
-          <BotSetting label="连接状态" htmlFor={`${id}-refresh`} desc={statusDesc}>
-            <Tag size="small" color={connection.color}>{connection.label}</Tag>
-            <Button id={`${id}-refresh`} size="small" loading={refreshing} disabled={lockFields} onClick={onRefreshStatus}>刷新状态</Button>
-          </BotSetting>
-          <AgentStatus status={saved.status} controlId={`${id}-reconnect`} action={dirty
+        : <div {...stylex.props(botStyles.loading)}><Text fontSize={12} role="alert">{loadError}</Text><Button size="small" onClick={onRetryLoad}>重试</Button></div>}
+    </div>;
+  }
+
+  const status = saved.status;
+  const connection = CONNECTION[status.connection];
+  const statusDesc = status.connection === 'disabled'
+    ? '未启用。打开开关、完成配置并保存后，这里显示真实连接与会话状态。'
+    : <>{status.connection === 'error' && status.message ? `${status.message} ` : ''}活跃会话 {status.activeSessions}，忙碌 {status.busySessions}{status.lastMessageAt && <>, 最近消息 <TimeText value={status.lastMessageAt} /></>}{status.lastReplyAt && <>，最近回复 <TimeText value={status.lastReplyAt} /></>}</>;
+  const conflictMessage = conflict && edit && saved
+    ? <span>配置在别处被修改。{conflictNote(edit, saved)}<Button id={`${id}-conflict`} size="small" loading={forceReading} disabled={saving || loading} onClick={onReloadLatest} className={stylex.props(botStyles.conflictAction).className}>放弃修改并载入最新</Button></span>
+    : undefined;
+
+  if (!saved || !values) {
+    return <div {...stylex.props(botStyles.page)}>
+      <p {...stylex.props(botStyles.hint)}>{CHANNEL_DESC}</p>
+      {loading
+        ? <div {...stylex.props(botStyles.loading)}><Spin size="small" aria-label="正在读取飞书 IM 设置" /><Text fontSize={12}>正在读取飞书 IM 设置…</Text></div>
+        : <div {...stylex.props(botStyles.loading)}><Text fontSize={12} role="alert">{loadError}</Text><Button size="small" onClick={onRetryLoad}>重试</Button></div>}
+    </div>;
+  }
+
+  return <div {...stylex.props(botStyles.page)}>
+    <p {...stylex.props(botStyles.hint)}>{CHANNEL_DESC}</p>
+    <section aria-label="连接与 Agent 状态" {...stylex.props(botStyles.status)}>
+      <div {...stylex.props(botStyles.statusRow)}>
+        <span {...stylex.props(botStyles.statusItem)}>连接状态 <Tag size="small" color={connection.color}>{connection.label}</Tag></span>
+        <span {...stylex.props(botStyles.statusItem)}>Agent 状态 <Tag size="small" color={AGENT[status.agentState].color} role="status" aria-label={`Agent 状态：${AGENT[status.agentState].label}`}>{AGENT[status.agentState].label}</Tag></span>
+        <span {...stylex.props(botStyles.statusItem)}>{statusDesc}</span>
+        <span {...stylex.props(botStyles.statusActions)}>
+          <Button id={`${id}-refresh`} size="small" loading={refreshing} disabled={lockFields} onClick={onRefreshStatus}>刷新</Button>
+          {dirty
             ? <Tooltip title="先保存修改，再重建连接。"><span><Button id={`${id}-reconnect`} size="small" disabled>重建连接与会话</Button></span></Tooltip>
-            : <Tooltip title="会关闭当前引擎进程与会话上下文，再按已保存配置建立新的连接和会话。"><span><Button id={`${id}-reconnect`} size="small" loading={reconnecting} disabled={lockFields || !saved.config.enabled} onClick={onReconnect}>重建连接与会话</Button></span></Tooltip>} />
-          <BotSetting label="启用飞书 IM" htmlFor={`${id}-enabled`} desc="保存后立即生效：保存为关闭即断开连接并结束现有手机对话会话；已派发的任务照常在任务面板继续，不受会话清理影响。">
+            : <Tooltip title="会关闭当前引擎进程与会话上下文，再按已保存配置建立新的连接和会话。"><span><Button id={`${id}-reconnect`} size="small" loading={reconnecting} disabled={lockFields || !saved.config.enabled} onClick={onReconnect}>重建连接与会话</Button></span></Tooltip>}
+        </span>
+      </div>
+    </section>
+    <div {...stylex.props(botStyles.groups)}>
+      <SettingGroup title="连接" tips="飞书开放平台的企业自建应用与准入白名单。">
+        <SettingRow label="启用飞书 IM" tips="保存后立即生效：保存为关闭即断开连接并结束现有手机对话会话；已派发的任务照常在任务面板继续，不受会话清理影响。">
+          <Field id={`${id}-enabled`} label="启用飞书 IM">
             <NamedSwitch id={`${id}-enabled`} aria-label="启用飞书 IM" checked={values.enabled} disabled={lockFields} onChange={checked => onUpdate({ enabled: checked })} />
-          </BotSetting>
-          <BotSetting label="App ID" htmlFor={`${id}-appid`} desc="飞书开放平台企业自建应用的 App ID：cli_ 开头加 16 位十六进制字符。" error={fieldErrors.appId}>
-            <Input id={`${id}-appid`} aria-label="App ID" value={values.appId} placeholder="例如：cli_a1b2c3d4e5f6a7b8" className={stylex.props(botStyles.fullControl).className} disabled={lockFields} onChange={event => onUpdate({ appId: event.target.value })} />
-          </BotSetting>
-          <BotSetting label="App Secret" htmlFor={`${id}-secret`} desc={configuredSecret ? '已保存一份 Secret，不再回显；留空保存保持不变，粘贴新值即覆盖。「清除已保存」在保存时删除它。' : '粘贴开放平台的应用 Secret，只在保存时提交，之后不再回显。'} error={fieldErrors.secret}>
-            <InputPassword id={`${id}-secret`} aria-label="App Secret" value={values.secret} placeholder={configuredSecret ? '已保存；粘贴新的 Secret 可覆盖' : '粘贴应用 Secret'} className={stylex.props(botStyles.fullControl).className} disabled={lockFields} visibilityToggle onChange={event => onUpdate({ secret: event.target.value })} />
+          </Field>
+        </SettingRow>
+        <SettingRow label="App ID" tips="飞书开放平台企业自建应用的 App ID：cli_ 开头加 16 位十六进制字符。">
+          <Field id={`${id}-appid`} label="App ID" error={fieldErrors.appId}>
+            <Input id={`${id}-appid`} aria-label="App ID" value={values.appId} placeholder="例如：cli_a1b2c3d4e5f6a7b8" className={stylex.props(botStyles.control).className} disabled={lockFields} onChange={event => onUpdate({ appId: event.target.value })} />
+          </Field>
+        </SettingRow>
+        <SettingRow label="App Secret" tips={configuredSecret ? '已保存一份 Secret，不再回显；留空保存保持不变，粘贴新值即覆盖。' : '粘贴开放平台的应用 Secret，只在保存时提交，之后不再回显。'}>
+          <Field id={`${id}-secret`} label="App Secret" error={fieldErrors.secret}>
+            <InputPassword id={`${id}-secret`} aria-label="App Secret" value={values.secret} placeholder={configuredSecret ? '已保存；粘贴新的 Secret 可覆盖' : '粘贴应用 Secret'} className={stylex.props(botStyles.control).className} disabled={lockFields} visibilityToggle onChange={event => onUpdate({ secret: event.target.value })} />
             {configuredSecret && (values.clearSecret
               ? <Button size="small" disabled={lockFields} onClick={() => onUpdate({ clearSecret: false })}>撤销清除</Button>
-              : <Tooltip title="随下次「保存修改」删除已存的 Secret：保存后手机链路立即失效，直到粘贴新的 Secret。"><span><Button size="small" disabled={lockFields} onClick={() => onUpdate({ clearSecret: true })}>清除已保存</Button></span></Tooltip>)}
-          </BotSetting>
-          <BotSetting label="open_id 白名单" htmlFor={`${id}-openids`} desc="只接受这些飞书用户发来的单聊文本消息，每行一个。open_id 的获取方式见接入文档，不做自动绑定。" error={fieldErrors.openIds}>
+              : <Tooltip title="随下次「保存」删除已存的 Secret：保存后手机链路立即失效，直到粘贴新的 Secret。"><span><Button size="small" disabled={lockFields} onClick={() => onUpdate({ clearSecret: true })}>清除已保存</Button></span></Tooltip>)}
+          </Field>
+        </SettingRow>
+        <SettingRow label="open_id 白名单" tips="只接受这些飞书用户发来的单聊文本消息，每行一个。open_id 的获取方式见接入文档，不做自动绑定。">
+          <Field id={`${id}-openids`} label="open_id 白名单" error={fieldErrors.openIds}>
             <TextArea id={`${id}-openids`} aria-label="open_id 白名单，每行一个" value={values.openIdsText} placeholder={'ou_xxxxxxxxxxxxxxxx\n（每行一个）'} autoSize={{ minRows: 2, maxRows: 6 }} disabled={lockFields} className={stylex.props(botStyles.wideControl).className} onChange={event => onUpdate({ openIdsText: event.target.value })} />
-          </BotSetting>
-          <BotSetting label="账号或渠道" htmlFor={`${id}-channel`} desc="选择已启用渠道及其引擎；这里只控制 Bot 聊天，不依赖父 Agent 或 worker 配置。" error={fieldErrors.channel || (values.channel && !channelUsable ? '已保存的渠道已失效、未启用或暂不支持，请重新选择。' : '')}>
-            <NamedSelect id={`${id}-channel`} aria-label="账号或渠道" value={values.channel || undefined} options={channelOptions} className={stylex.props(botStyles.fullControl).className} popupMatchSelectWidth={false} disabled={lockFields} placeholder="选择已启用的渠道" onChange={engine => { if (typeof engine === 'string') onChannelChange(engine); }} />
-          </BotSetting>
-          <BotSetting label="模型" htmlFor={`${id}-model`} desc="从引擎提供的模型中选择，也可手动填写；切换渠道后需重新明确模型。" error={fieldErrors.model}>
+          </Field>
+        </SettingRow>
+      </SettingGroup>
+      <SettingGroup title="Agent" tips="Bot 聊天与派发任务使用的引擎、模型、推理强度与父 Agent。">
+        <SettingRow label="账号或渠道" tips="选择已启用渠道及其引擎；这里只控制 Bot 聊天，不依赖父 Agent 或子 Agent 配置。">
+          <Field id={`${id}-channel`} label="账号或渠道" error={fieldErrors.channel || (values.channel && !channelUsable ? '已保存的渠道已失效、未启用或暂不支持，请重新选择。' : '')}>
+            <NamedSelect id={`${id}-channel`} aria-label="账号或渠道" value={values.channel || undefined} options={channelOptions} className={stylex.props(botStyles.control).className} popupMatchSelectWidth={false} disabled={lockFields} placeholder="选择已启用的渠道" onChange={engine => { if (typeof engine === 'string') onChannelChange(engine); }} />
+          </Field>
+        </SettingRow>
+        <SettingRow label="模型" tips="从引擎提供的模型中选择，也可手动填写；切换渠道后需重新明确模型。">
+          <Field id={`${id}-model`} label="模型" error={fieldErrors.model}>
             <fieldset disabled={lockFields} inert={lockFields} className={stylex.props(botStyles.fieldset).className}>
               <ModelPicker kind={engineKind} channel={channelUsable ? values.channel : undefined} id={`${id}-model`} label="模型" engine={channelUsable ? discoveryEngine : ''} value={values.model} placeholder="例如：gpt-6.1-sol 或 claude-opus-5-5" onChange={model => { if (!lockFields) onUpdate({ model }); }} />
             </fieldset>
-          </BotSetting>
-          <BotSetting label="思考力度" htmlFor={`${id}-effort`} desc={efforts ? 'Bot 独立使用的思考力度；保存后随模型一起生效。' : openCodeVariant ? 'OpenCode 的 variant 由模型定义，可直接填写；保存后随模型一起生效。' : '先选择一个支持飞书对话的渠道。'} error={fieldErrors.effort}>
+          </Field>
+        </SettingRow>
+        <SettingRow label="推理强度" tips={efforts ? 'Bot 独立使用的推理强度；保存后随模型一起生效。' : openCodeVariant ? 'OpenCode 的 variant 由模型定义，可直接填写；保存后随模型一起生效。' : '先选择一个支持飞书对话的渠道。'}>
+          <Field id={`${id}-effort`} label="推理强度" error={fieldErrors.effort}>
             {efforts
-              ? <NamedSelect id={`${id}-effort`} aria-label="思考力度" value={values.effort || undefined} options={effortOptions} className={stylex.props(botStyles.fullControl).className} disabled={lockFields || !channelUsable} placeholder="先选择渠道" onChange={effort => { if (typeof effort === 'string') onUpdate({ effort }); }} />
-              : <div {...stylex.props(botStyles.controlStack)}>
-                  <Input id={`${id}-effort`} aria-label="思考力度" value={values.effort} placeholder={openCodeVariant ? '例如：high 或该模型接受的 variant' : '先选择渠道'} className={stylex.props(botStyles.fullControl).className} disabled={lockFields || !channelUsable} onChange={event => onUpdate({ effort: event.target.value })} />
-                  {openCodeVariant && channelUsable && <Text type="secondary" fontSize={12} className={stylex.props(botStyles.wrap).className}>填写该模型接受的 variant。</Text>}
-                </div>}
-          </BotSetting>
-          <BotSetting label="调度主引擎" htmlFor={`${id}-owner`} desc="Bot 派发实际任务时使用的父 Agent：「自动（按策略）」由 Master 按策略选择可用的父 Agent；固定后 Master 只用该父 Agent，不回退。只影响任务派发，不影响 Bot 聊天渠道。" error={fieldErrors.ownerProfileId || ownerLiveError}>
+              ? <NamedSelect id={`${id}-effort`} aria-label="推理强度" value={values.effort || undefined} options={effortOptions} className={stylex.props(botStyles.control).className} disabled={lockFields || !channelUsable} placeholder="先选择渠道" onChange={effort => { if (typeof effort === 'string') onUpdate({ effort }); }} />
+              : <Input id={`${id}-effort`} aria-label="推理强度" value={values.effort} placeholder={openCodeVariant ? '例如：high 或该模型接受的 variant' : '先选择渠道'} className={stylex.props(botStyles.control).className} disabled={lockFields || !channelUsable} onChange={event => onUpdate({ effort: event.target.value })} />}
+            {openCodeVariant && channelUsable && !efforts && <p className={stylex.props(botStyles.hint).className}>填写该模型接受的 variant。</p>}
+          </Field>
+        </SettingRow>
+        <SettingRow label="父 Agent" tips="Bot 派发实际任务时使用的父 Agent：「自动（按策略）」按策略选择可用的父 Agent；固定后只用该父 Agent，不回退。只影响任务派发，不影响 Bot 聊天渠道。">
+          <Field id={`${id}-owner`} label="父 Agent" error={fieldErrors.ownerProfileId || ownerLiveError}>
             {/* 自动在草稿里是 ''，lobe Select 会把 '' 归一为空显示：这里经哨兵（见 ownerSelectDisplay）
                 让触发框直接显示「自动（按策略）」，回调里再映射回 ''（见 ownerSelectValue）。 */}
-            <NamedSelect id={`${id}-owner`} aria-label="调度主引擎" value={ownerSelectDisplay(values.ownerProfileId)} options={ownerOptions} className={stylex.props(botStyles.fullControl).className} popupMatchSelectWidth={false} disabled={lockFields} onChange={owner => onUpdate({ ownerProfileId: ownerSelectValue(owner) })} />
-          </BotSetting>
-          <BotSetting label="工作空间" htmlFor={`${id}-workspaces`} desc={`Bot 可访问列表中的全部目录，并按任务目标在相应目录创建主 Agent 和任务。最多 ${IM_WORKSPACE_LIMIT} 个，选择 Weaver 所在机器上已存在的项目目录；保存后生效。`} error={fieldErrors.workspaces}>
+            <NamedSelect id={`${id}-owner`} aria-label="父 Agent" value={ownerSelectDisplay(values.ownerProfileId)} options={ownerOptions} className={stylex.props(botStyles.control).className} popupMatchSelectWidth={false} disabled={lockFields} onChange={owner => onUpdate({ ownerProfileId: ownerSelectValue(owner) })} />
+          </Field>
+        </SettingRow>
+      </SettingGroup>
+      <SettingGroup title="运行" tips="Bot 可访问的工作目录与空闲会话的超时。">
+        <SettingRow label="工作目录" tips={`Bot 可访问列表中的全部目录，并按任务目标在相应目录创建父 Agent 和任务。最多 ${IM_WORKSPACE_LIMIT} 个，选择 Weaver 所在机器上已存在的项目目录；保存后生效。`}>
+          <Field id={`${id}-workspaces`} label="工作目录" error={fieldErrors.workspaces}>
             <div {...stylex.props(botStyles.workspaces)}>
               {values.workspaces.length
-                ? <ul aria-label="已配置工作空间" {...stylex.props(botStyles.list)}>
+                ? <ul aria-label="已配置工作目录" {...stylex.props(botStyles.list)}>
                     {values.workspaces.map((path, index) => <li key={`${index}-${path}`} {...stylex.props(botStyles.directory)}>
                       <Text fontSize={12} className={stylex.props(botStyles.directoryPath).className}>{path}</Text>
-                      <Button size="small" className={stylex.props(botStyles.directoryAction).className} disabled={lockFields} aria-label={`移除工作空间 ${path}`} onClick={() => onRemoveWorkspace(index)}>移除</Button>
+                      <Button size="small" disabled={lockFields} aria-label={`移除工作目录 ${path}`} onClick={() => onRemoveWorkspace(index)}>移除</Button>
                     </li>)}
                   </ul>
-                : <Text type="secondary" fontSize={12}>尚未添加工作空间。浏览本机目录后添加，启用 Bot 前至少配置一个。</Text>}
-              <WorkspacePicker id={`${id}-workspaces`} label="添加工作空间" placeholder="浏览本机目录并添加" confirmLabel="添加此目录" value="" disabled={lockFields || values.workspaces.length >= IM_WORKSPACE_LIMIT} onChange={onAddWorkspace} />
+                : <Text type="secondary" fontSize={12}>尚未添加工作目录。浏览本机目录后添加，启用 Bot 前至少配置一个。</Text>}
+              <WorkspacePicker id={`${id}-workspaces`} label="添加工作目录" placeholder="浏览本机目录并添加" confirmLabel="添加此目录" value="" disabled={lockFields || values.workspaces.length >= IM_WORKSPACE_LIMIT} onChange={onAddWorkspace} />
               {values.workspaces.length >= IM_WORKSPACE_LIMIT && <Text type="secondary" fontSize={12}>已达 {IM_WORKSPACE_LIMIT} 个上限，移除后可继续添加。</Text>}
             </div>
-          </BotSetting>
-          <BotSetting label="空闲超时（分钟）" htmlFor={`${id}-idle`} desc={`最后一条用户消息后静默超过该时长，会结束旧上下文并立即建立新会话保持待命。${IDLE_RANGE.min} 到 ${IDLE_RANGE.max} 分钟，默认 30。`} error={fieldErrors.timeout}>
-            {/* 受控同步：框里此刻的数（含敲错/清空的 null）每一次敲击都回写草稿，保存计划与放弃/重载见到的都是同一个可见值。 */}
+          </Field>
+        </SettingRow>
+        <SettingRow label="空闲超时（分钟）" tips={`最后一条用户消息后静默超过该时长，会结束旧上下文并立即建立新会话保持待命。${IDLE_RANGE.min} 到 ${IDLE_RANGE.max} 分钟，默认 30。`}>
+          {/* 受控同步：框里此刻的数（含敲错/清空的 null）每一次敲击都回写草稿，保存计划与放弃/重载见到的都是同一个可见值。 */}
+          <Field id={`${id}-idle`} label="空闲超时（分钟）" error={fieldErrors.timeout}>
             <MinutesInput id={`${id}-idle`} label="空闲超时（分钟）" value={values.idleTimeoutMinutes} min={IDLE_RANGE.min} max={IDLE_RANGE.max} step={5} disabled={lockFields} onError={onTimeoutError} onDraftChange={value => onUpdate({ idleTimeoutMinutes: value })} onCommit={value => onUpdate({ idleTimeoutMinutes: value })} />
-          </BotSetting>
-          <BotSetting
-            label="保存" htmlFor={`${id}-save`}
-            desc="以上字段一起保存，保存后立即生效（含启停连接）；渠道、模型、力度或工作空间变化会结束旧上下文并重建 Agent，健康且凭据相同的飞书连接保持，凭据或启停变化以及显式「重建连接与会话」会完整重建。失败时草稿原样保留。未保存的修改切到其他页面后仍保留，回到本页继续编辑，只有保存成功或「放弃修改」会清掉它们。"
-            error={saveError}
-          >
-            <Button id={`${id}-save`} type="primary" size="small" loading={saving} disabled={!dirty || forceReading} onClick={onSave}>保存修改</Button>
-            <Button size="small" disabled={!dirty || lockFields} onClick={onDiscard}>放弃修改</Button>
-            {savedTick && <Text type="success" fontSize={12} role="status"><Icon icon={Check} size="small" /> 已保存</Text>}
-          </BotSetting>
-        </>}
-  </BotChannel>;
+          </Field>
+        </SettingRow>
+      </SettingGroup>
+    </div>
+    <div {...stylex.props(botStyles.footer)}>
+      {savedTick && <Text type="success" fontSize={12} role="status"><Icon icon={Check} size="small" /> 已保存</Text>}
+      <SaveBar dirty={dirty} saving={saving} message={conflictMessage ?? (saveError || undefined)} onSave={onSave} onDiscard={onDiscard} saveDisabled={forceReading} />
+    </div>
+  </div>;
 }
 
 /**
@@ -261,7 +316,7 @@ export function ImSettings({ policy }: { policy: PolicyDraft }) {
       if (!mounted.current || !flight.lands()) return;
       applySnapshot(next, force);
       // 「放弃修改并载入最新」明确成功：整幅采纳当前读取结果，此前保存/字段的过期错误一并清掉，只留下这份读取；
-      // 失败路径不清——草稿、错误与恢复反馈都保留，用户仍可重试。
+      // 失败路径不清——草稿、错误与恢复反馈原样保留，用户仍可重试。
       if (force) { setSaveError(''); setFieldErrors({}); }
     } catch (error) {
       if (!mounted.current || !flight.lands()) return;
@@ -298,7 +353,7 @@ export function ImSettings({ policy }: { policy: PolicyDraft }) {
       if (!mounted.current || !flight.lands()) return;
       applySnapshot(next, false);
     } catch (error) {
-      if (mounted.current && flight.lands()) notifyError(error, '状态刷新失败');
+      if (mounted.current && flight.lands()) notifyError(error, '刷新失败');
     } finally {
       const idle = flight.end();
       if (mounted.current && idle) setRefreshing(false);
@@ -475,7 +530,7 @@ export function ImSettings({ policy }: { policy: PolicyDraft }) {
   const efforts = selectedEngine && isImEngineKind(selectedEngine.kind) ? imEngineEfforts(selectedEngine.kind) : undefined;
   const openCodeVariant = selectedEngine?.kind === 'opencode';
   const effortOptions = (efforts ?? []).map(value => ({ value, label: value, disabled: false }));
-  if (values?.effort && efforts && !efforts.includes(values.effort)) effortOptions.push({ value: values.effort, label: !values.channel && values.effort === 'medium' ? 'medium' : `${values.effort}（请选择引擎支持的力度）`, disabled: true });
+  if (values?.effort && efforts && !efforts.includes(values.effort)) effortOptions.push({ value: values.effort, label: !values.channel && values.effort === 'medium' ? 'medium' : `${values.effort}（请选择引擎支持的强度）`, disabled: true });
 
   const changeChannel = useCallback((engine: string) => {
     if (!values) return;

@@ -9,23 +9,13 @@ import { type Block } from '../../src/shared/contracts/policy';
 import type { Task } from '../../src/shared/contracts/tasks';
 import { OwnerScheduleFields, workerStatusTag, workerWeightLock } from '../../src/renderer/features/roles/OwnerSchedule';
 import { TaskAgents } from '../../src/renderer/features/tasks/TaskAgents';
-import { TaskBoard } from '../../src/renderer/features/tasks/TaskBoard';
 import { TaskComposer, criteriaError, criteriaLines } from '../../src/renderer/features/tasks/TaskComposer';
 import { createTask } from '../../src/renderer/features/tasks/task-create';
 import { recentWorkspaces, rootCancelNotice } from '../../src/renderer/features/tasks/task-view';
-import { columnize } from '../../src/renderer/features/tasks/task-columns';
-import { archivedTasks, nonArchived } from '../../src/renderer/features/tasks/task-archive';
-import { emptySelection, rootIndex } from '../../src/renderer/features/tasks/task-filters';
-import { ENDED_EXPANDED_KEY } from '../../src/renderer/features/tasks/task-persistence';
+import { buildSessions } from '../../src/renderer/features/tasks/task-session';
 
 function markup(node: React.ReactNode) {
   return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) }));
-}
-function withStorage<T>(run: () => T): T {
-  const values: Record<string, string> = { [ENDED_EXPANDED_KEY]: 'true' };
-  const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (key: string) => values[key] ?? null, setItem: (key: string, value: string) => { values[key] = value; } } });
-  try { return run(); } finally { if (previous) Object.defineProperty(globalThis, 'localStorage', previous); else Reflect.deleteProperty(globalThis, 'localStorage'); }
 }
 
 const now = Date.parse('2026-10-19T12:00:00Z');
@@ -33,37 +23,18 @@ const owner = { name: 'Task owner', transport: 'herdr-visible' as const, session
 const make = (id: string, extra: Partial<Task> = {}): Task => ({ id, title: `任务 ${id}`, instruction: 'x', owner, status: 'running', progress: 0, createdAt: '2026-10-19T11:00:00Z', updatedAt: '2026-10-19T11:30:00Z', events: [], artifacts: [], ...extra });
 const root = make('root', { executionRole: 'owner', title: '根任务' });
 const child = (id: string, status: Task['status'], extra: Partial<Task> = {}) => make(id, { parentTaskId: 'root', status, title: `子任务 ${id}`, ...extra });
-const DAY = 24 * 3600e3;
 
- test('board columns hold sub agent tasks; owner roots stay out of the lanes', () => {
+  test('sessions hold sub agent tasks; owner roots stay out of the task lists', () => {
   const parent = make('root', { executionRole: 'owner', title: 'ROOT_PARENT' });
   const orphan = make('orphan', { parentTaskId: 'missing', title: '孤立子任务' });
   const tasks = [parent, child('c1', 'running'), child('c2', 'completed'), orphan];
-  assert.deepEqual(nonArchived(tasks, now).map(task => task.id), ['c1', 'c2', 'orphan']);
-  const html = withStorage(() => markup(React.createElement(TaskBoard, { tasks, filters: { ...emptySelection(), time: 'all' }, now, loading: false, onSelect: () => {} })));
-  const cards = [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]).filter(card => card.includes("<time"));
-  assert.equal(cards.length, 3);
-  assert.ok(cards.some(card => card.includes('子任务 c1')));
-  assert.ok(cards.some(card => card.includes('子任务 c2')));
-  assert.ok(cards.some(card => card.includes('孤立子任务')));
-  assert.ok(cards.every(card => !/<strong[^>]*>ROOT_PARENT</.test(card)));
-  // The root stays reachable as a 父 Agent chip only.
-  assert.match(html, /ROOT_PARENT/);
-});
-
-test('the 父 Agent filter row answers by root task; the archive rows are children, not roots', () => {
-  const old = new Date(now - 2 * DAY).toISOString();
-  const tasks = [
-    root, child('c1', 'running'), child('c2', 'completed', { reviewState: 'accepted' }),
-    make('oldroot', { executionRole: 'owner', status: 'completed', reviewState: 'accepted', updatedAt: old }),
-    make('oldchild', { parentTaskId: 'oldroot', status: 'completed', reviewState: 'accepted', updatedAt: old }),
-  ];
-  const lanes = columnize(nonArchived(tasks, now));
-  assert.deepEqual(lanes.map(lane => lane.map(task => task.id)), [[], ['c1'], [], ['c2']]);
-  assert.deepEqual(archivedTasks(tasks, now).map(task => task.id), ['oldchild']);
-  // The owner row names the root and counts only its board children; the old root itself is not an option.
-  const owners = rootIndex(tasks);
-  assert.ok(owners.get('root') && owners.get('oldroot'));
+  const sessions = buildSessions(tasks, [], now);
+  const web = sessions.find(session => session.key === 'r-root')!;
+  assert.deepEqual(web.tasks.map(task => task.id).sort(), ['c1', 'c2']);
+  assert.ok(!web.tasks.some(task => /ROOT_PARENT/.test(task.title)));
+  assert.equal(web.root?.title, 'ROOT_PARENT');
+  // An orphan without a known root falls back to the unowned bucket.
+  assert.ok(sessions.find(session => session.key === 'unowned')?.tasks.some(task => task.id === 'orphan'));
 });
 
 test('cancelling a running root explains the cascade; other tasks get no prompt', () => {

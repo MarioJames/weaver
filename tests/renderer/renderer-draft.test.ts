@@ -6,23 +6,21 @@ import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { toast, type ToastOptions } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
+import type { Route } from '../../src/renderer/app/router';
 import { PENDING_TASK_TITLE } from '../../src/shared/validation';
 import { DISPLAY_LABELS, DISPLAY_STATUSES, DISPLAY_TONES, displayStatus } from '../../src/renderer/format/status-colors';
 import { TaskAgents } from '../../src/renderer/features/tasks/TaskAgents';
-import { archiveColumns } from '../../src/renderer/features/tasks/ArchiveDrawer';
-import { TaskBoard } from '../../src/renderer/features/tasks/TaskBoard';
+import { sessionWorkspaceLabel } from '../../src/renderer/features/tasks/task-session';
 import { TaskComposer, composerInput, workspacePathError } from '../../src/renderer/features/tasks/TaskComposer';
+import { TaskInspectorView } from '../../src/renderer/features/tasks/TaskInspector';
 import { WorkspacePicker, clearWorkspace, focusDirectoryPicker } from '../../src/renderer/features/tasks/WorkspacePicker';
-import { TaskDetail } from '../../src/renderer/features/tasks/TaskDetail';
 import { draftEdit, draftFields, notifySaveDraftFailure, taskUpdateArgs, updateTask } from '../../src/renderer/features/tasks/task-create';
-import { applyTaskFilters, emptySelection, filterOptions } from '../../src/renderer/features/tasks/task-filters';
 import { isDraft, ownerProfileOf, taskTitle } from '../../src/renderer/features/tasks/task-view';
 
 function markup(node: React.ReactNode) {
   return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) }));
 }
 const owner = { name: 'Task owner', transport: 'herdr-visible' as const, session: 's', pane: 'p' };
-const NOW = Date.parse('2026-10-19T12:00:00Z');
 const make = (id: string, extra: Partial<Task> = {}): Task => ({ id, title: `任务 ${id}`, instruction: 'x', owner, status: 'queued', progress: 0, createdAt: '2026-10-19T11:00:00Z', updatedAt: '2026-10-19T11:30:00Z', events: [], artifacts: [], ...extra });
 const pending = (extra: Partial<Task> = {}) => make('0123456789abcdef', { title: PENDING_TASK_TITLE, ...extra });
 const dispatch = { owner: 'claude_owner', worker: 'claude_worker', engine: 'claude', model: 'sonnet', effort: 'high', execution: 'real' as const, maxParallel: 2 };
@@ -51,16 +49,12 @@ test('an empty goal falls back to 任务 plus the first eight characters of the 
   assert.equal(taskTitle(make('abc', { title: '正式标题', instruction: '别的内容' })), '正式标题');
 });
 
-test('the board card, detail heading, archive row and sub-task list all use the display title', () => {
+test('the detail heading, workspace label and sub-task list all use the display title', () => {
   const draft = pending({ instruction: '# 先写目标首行\n更多细节' });
-  assert.match(markup(React.createElement(TaskBoard, { tasks: [draft], loading: false, onSelect: () => {}, now: NOW })), /先写目标首行/);
-  assert.doesNotMatch(markup(React.createElement(TaskBoard, { tasks: [draft], loading: false, onSelect: () => {}, now: NOW })), new RegExp(PENDING_TASK_TITLE));
-  const detail = markup(React.createElement(TaskDetail, { task: draft, busy: false, onStart: () => {}, onCancel: () => {}, action: async () => true }));
+  const detail = markup(React.createElement(TaskInspectorView, { task: draft, tasks: [draft], busy: false, action: async () => true, taskRoute: (taskId: string): Route => ({ page: 'tasks', view: 'all', taskId }), onClose: () => {}, onEdit: () => {} }));
   assert.match(detail, /先写目标首行/);
   assert.doesNotMatch(detail, new RegExp(PENDING_TASK_TITLE));
-  const titleColumn = archiveColumns().find(column => column.key === 'title')!;
-  const cell = markup((titleColumn.render as (value: unknown, task: Task, index: number) => React.ReactNode)(undefined, draft, 0));
-  assert.match(cell, /title="先写目标首行"/);
+  assert.equal(sessionWorkspaceLabel(draft.workspace ?? ''), '未指定工作目录');
   const root = make('root', { executionRole: 'owner', status: 'running', title: '根任务' });
   const named = make('c1', { parentTaskId: 'root', title: '正式子任务' });
   const unnamed = make('c2', { parentTaskId: 'root', title: PENDING_TASK_TITLE, instruction: '子任务目标' });
@@ -81,20 +75,14 @@ test('only an unstarted root task is a draft', () => {
   for (const status of ['running', 'cancelling', 'completed', 'failed', 'cancelled'] as const) assert.equal(isDraft(make(status, { status })), false);
 });
 
-test('a draft reads 草稿 in the neutral tone, and the status filter can select it', () => {
+test('a draft reads 草稿 in the neutral tone', () => {
   assert.equal(displayStatus(make('d')), 'draft');
   assert.equal(displayStatus(make('s', { scheduled: true })), 'scheduled');
   assert.equal(displayStatus(make('q', { executionRole: 'owner' })), 'queued');
   assert.equal(DISPLAY_LABELS.draft, '草稿');
   assert.equal(DISPLAY_TONES.draft, DISPLAY_TONES.queued);
   assert.ok(DISPLAY_STATUSES.includes('draft'));
-  // The status facet reads the board's rows (sub agent tasks and drafts); owner roots answer from the 父 Agent row instead.
-  const tasks = [make('d'), make('c', { parentTaskId: 'root', status: 'queued' })];
-  const options = filterOptions(tasks, 'status', { ...emptySelection(), time: 'all' }, NOW);
-  assert.deepEqual(options.map(option => [option.value, option.label, option.count]), [['draft', '草稿', 1], ['queued', '待执行', 1]]);
-  assert.deepEqual(applyTaskFilters(tasks, { ...emptySelection(), time: 'all', status: ['draft'] }, undefined, NOW).map(task => task.id), ['d']);
-  const board = markup(React.createElement(TaskBoard, { tasks, loading: false, onSelect: () => {}, now: NOW }));
-  assert.match(board, />草稿</);
+  assert.equal(displayStatus(make('d')), 'draft');
 });
 
 const buttons = (html: string) => [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]);
@@ -184,7 +172,7 @@ test('saving a draft only updates it; 保存并开始 then starts it, and a fail
   assert.deepEqual(calls.splice(0), ['update:d1']);
 });
 
-const detail = (task: Task, onEdit: ((id: string) => void) | null = () => {}) => markup(React.createElement(TaskDetail, { task, busy: false, onStart: () => {}, onEdit: onEdit ?? undefined, onCancel: () => {}, action: async () => true }));
+const detail = (task: Task, onEdit: ((task: Task) => void) | null = () => {}) => markup(React.createElement(TaskInspectorView, { task, tasks: [task], busy: false, action: async () => true, taskRoute: (taskId: string): Route => ({ page: 'tasks', view: 'all', taskId }), onEdit: onEdit ?? undefined, onClose: () => {} }));
 const buttonOf = (html: string, label: string) => buttons(html).find(button => button.includes(label)) ?? '';
 
 test('a draft offers 编辑 beside 开始执行; other tasks have no edit entry', () => {

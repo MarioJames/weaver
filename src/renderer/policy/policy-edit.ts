@@ -137,12 +137,14 @@ export function appendWorker(workers: readonly string[], available: readonly str
 }
 
 
-export function blankOwner(config: Config): Owner {
-  return { enabled: false, channel: Object.keys(config.channels).find(id => config.channels[id]!.enabled && config.engines[config.channels[id]!.engine]?.enabled) ?? Object.keys(config.channels)[0] ?? '', model: '', effort: 'high', workers: Object.keys(config.workers).slice(0, 1), max_parallel: 1 };
+/** A new parent Agent starts empty: every required choice is made by the user, not guessed from the current policy. */
+export function blankOwner(_config: Config): Owner {
+  return { enabled: false, channel: '', model: '', effort: '', workers: [], max_parallel: 1 };
 }
 
-export function blankWorker(config: Config): Worker {
-  return { enabled: false, channels: [Object.keys(config.channels).find(id => config.channels[id]!.enabled && config.engines[config.channels[id]!.engine]?.enabled) ?? Object.keys(config.channels)[0] ?? ''].filter(Boolean), model: '', effort: 'high', description: '' };
+/** A new sub Agent starts empty: every required choice is made by the user, not guessed from the current policy. */
+export function blankWorker(_config: Config): Worker {
+  return { enabled: false, channels: [], model: '', effort: '', description: '' };
 }
 
 /** Worker concurrency cap: off (or no longer limited) removes the key, on stores an integer 1–100; an empty or out-of-range input lands inside that range. */

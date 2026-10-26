@@ -34,10 +34,10 @@ export function styleClass(...styles: StyleArg[]): string {
   return stylex.props(...styles).className ?? '';
 }
 
-/** CSS emitted by the official StyleX compiler for rules in one style module. */
-export function styleCss(moduleUrl: URL, ...styles: StyleArg[]): string {
+/** CSS emitted by the official StyleX compiler for rules in one style module. Dynamic StyleX functions narrow differently at the call site, so this helper accepts their runtime output too. */
+export function styleCss(moduleUrl: URL, ...styles: unknown[]): string {
   const filename = fileURLToPath(moduleUrl);
-  const names = styleClass(...styles).split(/\s+/).filter(Boolean);
+  const names = (stylex.props(...(styles as StyleArg[])).className ?? '').split(/\s+/).filter(Boolean);
   const rules = compile(filename, 'ts').filter(([, style]) =>
     names.some(name => style.ltr.includes(`.${name}`) || style.rtl?.includes(`.${name}`)));
   return stylexBabelPlugin.processStylexRules(rules);

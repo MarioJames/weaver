@@ -233,10 +233,9 @@ function settings(patch: (config: ReturnType<typeof defaultConfig>) => void = ()
 
 test('settings carry a free channel probe group, defaulting to enabled every 10 minutes', () => {
   const html = settings(config => { delete config.free_channel_probe; });
-  assert.match(html, /aria-label="免费渠道探测"/);
+  assert.match(html, />免费渠道探测</);
   assert.match(html, />定时探测</);
-  assert.match(html, /5 到 1440 分钟/);
-  const group = html.slice(html.indexOf('aria-label="免费渠道探测"'), html.indexOf('aria-label="审查"'));
+  const group = html.slice(html.indexOf('>免费渠道探测<'), html.indexOf('>审查<'));
   assert.match(group, /role="switch"[^>]*aria-checked="true"/);
   assert.match(group, /id="[^"]*-probe-interval"[^>]*value="10"/);
   assert.doesNotMatch(group, /id="[^"]*-probe-interval"[^>]*disabled/);
@@ -244,7 +243,7 @@ test('settings carry a free channel probe group, defaulting to enabled every 10 
 
 test('a switched off probe disables its interval and says so', () => {
   const html = settings(config => { config.free_channel_probe = { enabled: false, interval_minutes: 1440 }; });
-  const group = html.slice(html.indexOf('aria-label="免费渠道探测"'), html.indexOf('aria-label="审查"'));
+  const group = html.slice(html.indexOf('>免费渠道探测<'), html.indexOf('>审查<'));
   assert.match(group, /已关闭/);
   assert.match(group, /role="switch"[^>]*aria-checked="false"/);
   assert.match(group, /id="[^"]*-probe-interval"[^>]*value="1440"/);

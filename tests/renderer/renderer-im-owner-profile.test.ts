@@ -173,12 +173,15 @@ test('changing only the pin is a real draft that resets on discard', () => {
   assert.equal(valuesMatchConfig(draftOf({ ...base, ownerProfileId: 'codex_owner' }), { ...base, ownerProfileId: 'codex_owner' }), true);
 });
 
-test('the dispatch-master select carries the required accessible name', () => {
+test('the parent-agent select carries the required accessible name', () => {
   const source = readFileSync(join(import.meta.dirname, '../../src/renderer/features/bots/ImSettings.tsx'), 'utf8');
-  assert.match(source, /aria-label="调度主引擎"/, 'the NamedSelect names itself 调度主引擎');
+  assert.match(source, /aria-label="父 Agent"/, 'the NamedSelect names itself 父 Agent');
+  assert.doesNotMatch(source, /调度主引擎/, 'the old dispatch-master wording is gone');
+  assert.doesNotMatch(source, /思考力度/, 'the old effort wording is gone');
+  assert.doesNotMatch(source, /工作空间/, 'the old workspace wording is gone');
 });
 
-test('the dispatch-master box itself shows the auto label when the pin is empty', () => {
+test('the dispatch-parent box itself shows the auto label when the pin is empty', () => {
   const base = configOf({ enabled: false, ownerProfileId: '' });
   const saved = snapshotOf(base, 5, profilesOf());
   const html = markup(React.createElement(ImSettingsView, {
@@ -192,14 +195,10 @@ test('the dispatch-master box itself shows the auto label when the pin is empty'
     onUpdate: () => {}, onChannelChange: () => {}, onRemoveWorkspace: () => {}, onAddWorkspace: () => {},
     onTimeoutError: () => {}, onDiscard: () => {}, onSave: () => {},
   }));
-  const rowStart = html.indexOf('data-bot-row="bot-owner"');
-  assert.ok(rowStart > 0, 'the dispatch-master row exists');
-  const rowEnd = html.indexOf('data-bot-row="', rowStart + 1);
-  const row = html.slice(rowStart, rowEnd === -1 ? undefined : rowEnd);
-  assert.match(row, /自动（按策略）/, 'the collapsed box directly shows the auto label instead of an empty box');
+  assert.match(html, /自动（按策略）/, 'the collapsed box directly shows the auto label instead of an empty box');
 });
 
-test('the settings row offers the dispatch master with auto first and surfaces the field error', () => {
+test('the settings row offers the parent agent with auto first and surfaces the field error', () => {
   const base = configOf({ enabled: false, ownerProfileId: '' });
   const saved = snapshotOf(base, 5, profilesOf());
   const html = markup(React.createElement(ImSettingsView, {
@@ -213,18 +212,15 @@ test('the settings row offers the dispatch master with auto first and surfaces t
     onUpdate: () => {}, onChannelChange: () => {}, onRemoveWorkspace: () => {}, onAddWorkspace: () => {},
     onTimeoutError: () => {}, onDiscard: () => {}, onSave: () => {},
   }));
-  const rowStart = html.indexOf('data-bot-row="bot-owner"');
-  assert.ok(rowStart > 0, 'the dispatch-master row exists');
-  const row = html.slice(rowStart, html.indexOf('data-bot-row="', rowStart + 1) === -1 ? undefined : html.indexOf('data-bot-row="', rowStart + 1));
-  assert.match(row, /调度主引擎/);
-  assert.match(row, /<label for="bot-owner">/, 'the native label names the control (NamedSelect id contract)');
-  assert.match(row, /id="bot-owner"/);
-  assert.match(row, /父 Agent/);
-  assert.doesNotMatch(row, /负责人|工作代理/);
-  const effortAt = html.indexOf('data-bot-row="bot-effort"');
-  const workspaceAt = html.indexOf('data-bot-row="bot-workspaces"');
-  assert.ok(effortAt > 0 && workspaceAt > 0, 'the neighbouring rows exist');
-  assert.ok(effortAt < rowStart && rowStart < workspaceAt, 'the row sits after effort and before workspaces');
+  assert.match(html, /父 Agent/);
+  assert.match(html, /<label for="bot-owner"/, 'the native label names the control (NamedSelect id contract)');
+  assert.match(html, /id="bot-owner"/);
+  assert.doesNotMatch(html, /调度主引擎/);
+  const effortAt = html.indexOf('id="bot-effort"');
+  const workspaceAt = html.indexOf('id="bot-workspaces"');
+  const ownerAt = html.indexOf('id="bot-owner"');
+  assert.ok(effortAt > 0 && workspaceAt > 0 && ownerAt > 0, 'the neighbouring rows exist');
+  assert.ok(effortAt < ownerAt && ownerAt < workspaceAt, 'the row sits after effort and before workspaces');
 
   const invalid = markup(React.createElement(ImSettingsView, {
     id: 'bot', loading: false, loadError: '', saved, values: { ...draftOf(base), ownerProfileId: 'pi_owner' },

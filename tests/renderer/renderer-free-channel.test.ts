@@ -11,17 +11,15 @@ import type { Task } from '../../src/shared/contracts/tasks';
 import { RolesPage } from '../../src/renderer/features/roles/RolesPage';
 import { OwnerScheduleFields } from '../../src/renderer/features/roles/OwnerSchedule';
 import { TaskAgents } from '../../src/renderer/features/tasks/TaskAgents';
-import { TaskBoard } from '../../src/renderer/features/tasks/TaskBoard';
+import { FreeChannelTag } from '../../src/renderer/ui/FreeChannelTag';
 import { freeChannelLookup } from '../../src/renderer/features/tasks/task-view';
-import { emptySelection } from '../../src/renderer/features/tasks/task-filters';
-import { ENDED_EXPANDED_KEY } from '../../src/renderer/features/tasks/task-persistence';
 import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';
 
 function markup(node: React.ReactNode) {
   return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) }));
 }
 function withStorage<T>(run: () => T): T {
-  const values: Record<string, string> = { [ENDED_EXPANDED_KEY]: 'true' };
+  const values: Record<string, string> = {};
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (key: string) => values[key] ?? null, setItem: (key: string, value: string) => { values[key] = value; } } });
   try { return run(); } finally {
@@ -108,25 +106,13 @@ test('the schedule weights show the free-channel tag per row; paid rows stay pla
   assert.doesNotMatch(rows[0].slice(rows[0].lastIndexOf('listRow')), /免费渠道/);
 });
 
-test('board cards show the same free-channel badge for dispatches to free workers only', () => {
-  const now = Date.parse('2026-10-19T12:00:00Z');
-  const base: Task = {
-    id: 'card', ownerId: 'parent-instance', title: 'FREE_CARD', workspace: '/projects/alpha', instruction: '',
-    owner: { name: 'Parent', transport: 'herdr-visible', session: '', pane: '' },
-    status: 'running', progress: 0, createdAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString(),
-    events: [], artifacts: [],
-    dispatch: { owner: 'parent', worker: 'qoder_worker', engine: 'qoder', engineKind: 'qodercli', model: '', effort: '', execution: 'real', maxParallel: 1, workspace: '/frozen' },
-  };
-  const board = (task: Task, freeChannel?: (workerId?: string) => boolean) => withStorage(() =>
-    markup(React.createElement(TaskBoard, { tasks: [task], filters: { ...emptySelection(), time: 'all' }, now, loading: false, onSelect: () => {}, freeChannel })));
-  const card = (html: string) => [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].find(match => match[0].includes('FREE_CARD'))![0];
-  const free = card(board(base, freeChannelLookup(defaultConfig())));
-  assert.match(free, /免费渠道/);
-  assert.match(free, /--lobe-cyan/);
-  assert.doesNotMatch(card(board({ ...base, dispatch: { ...base.dispatch!, worker: 'claude_worker', engine: 'claude', engineKind: 'claude' } }, freeChannelLookup(defaultConfig()))), /免费渠道/);
-  assert.doesNotMatch(card(board(base)), /免费渠道/, 'no policy, no badge');
-  // An undispatched task and the 父 Agent role tag never carry it.
-  assert.doesNotMatch(board({ ...base, dispatch: undefined }, freeChannelLookup(defaultConfig())), /免费渠道/);
+test('the free-channel tag marks dispatches to free workers only', () => {
+  const tag = markup(React.createElement(FreeChannelTag));
+  assert.match(tag, /免费渠道/);
+  const lookup = freeChannelLookup(defaultConfig());
+  assert.equal(lookup('qoder_worker'), true);
+  assert.equal(lookup('claude_worker'), false);
+  assert.equal(lookup(undefined), false);
 });
 
 test('the root task child list marks children dispatched to free workers', () => {

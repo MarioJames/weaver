@@ -252,9 +252,12 @@ test('the real role form renders every selected member while the parent keeps a 
 
   config.workers.pool.channels = [];
   const empty = render('workers');
-  assert.match(empty, /aria-invalid="true"/);
-  assert.match(empty, /id="[^"]+-channel-error"[^>]*role="alert"|role="alert"[^>]*id="[^"]+-channel-error"/);
-  assert.match(empty, /请至少选择一个账号或渠道/);
+  // An untouched form shows no inline hint yet (it appears after the field is
+  // touched or save is clicked), but saving stays blocked with the reason.
+  assert.doesNotMatch(empty, /aria-invalid="true"/);
+  assert.doesNotMatch(empty, /id="[^"]+-channel-error"/);
+  // No inline hint text (the SaveBar tooltip below still names the same reason).
+  assert.doesNotMatch(empty, />请至少选择一个账号或渠道</);
   assert.match(empty, /title="子 Agent pool：请至少选择一个账号或渠道"/);
   const saveButton = (html: string) => [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]).find(button => button.endsWith('保存</button>'));
   assert.match(saveButton(empty) ?? '', / disabled/);

@@ -1,74 +1,222 @@
 import * as stylex from '@stylexjs/stylex';
 import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
 
-/** Parent / sub agent pages: master-detail split, list entries and the model reply card. */
+/** Parent / sub agent pages: page frame, list rows, editor sections and the model reply card. */
 export const rolesStyles = stylex.create({
-  /** List on the left, the selected record on the right. Collapses to one column on narrow screens. */
-  split: {
-    display: 'grid',
-    gridTemplateColumns: '280px minmax(0, 1fr)',
-    gap: 16,
-    alignItems: 'start',
-    minInlineSize: 0,
-    '@media (max-width: 991.98px)': {
-      gridTemplateColumns: 'minmax(0, 1fr)',
-    },
-  },
-  /** The list stays in view while a long record scrolls the workspace. */
-  listPane: {
-    position: 'sticky',
-    insetBlockStart: 0,
+  /** Header, metrics and master-detail fill the shell; only the panes scroll. */
+  page: {
     display: 'flex',
+    flex: '1 1 0',
     flexDirection: 'column',
+    gap: 12,
+    blockSize: '100%',
+    minBlockSize: 0,
+    minInlineSize: 0,
+    overflow: 'hidden',
+  },
+  body: {
+    display: 'flex',
+    flex: '1 1 0',
+    flexDirection: 'column',
+    minBlockSize: 0,
+    minInlineSize: 0,
+    overflow: 'hidden',
+  },
+  /** The list pane keeps its own scrolling body under a search toolbar. */
+  listBody: {
+    display: 'flex',
+    flex: '1 1 0',
+    flexDirection: 'column',
+    minBlockSize: 0,
+    minInlineSize: 0,
+    // The first option starts below the toolbar border instead of touching it.
+    paddingBlockStart: 8,
+  },
+  toolbar: {
+    display: 'flex',
+    alignItems: 'center',
     gap: 8,
     minInlineSize: 0,
-    '@media (max-width: 991.98px)': {
-      position: 'static',
-    },
   },
-  /** The sortable list keeps the pane's own spacing instead of the browser's list margin. */
-  sortList: {
-    marginBlock: 0,
-  },
-  /** A sortable list row: the drag handle, then the record. */
-  sortItem: {
+  search: {
+    flex: '1 1 0',
     minInlineSize: 0,
   },
-  /** The independent drag handle. Touch drags move the row instead of scrolling the page. */
-  roleGrip: {
-    flex: 'none',
-    marginBlockStart: 2,
-    color: cssVar.colorTextTertiary,
-    touchAction: 'none',
-  },
-  /** The same grip while another action holds the page: it keeps the row width but cannot start a drag. */
-  roleGripOff: {
-    display: 'inline-flex',
-    flex: 'none',
-    alignItems: 'center',
-    justifyContent: 'center',
-    inlineSize: 44,
-    blockSize: 44,
-    marginBlockStart: 2,
-    color: cssVar.colorTextQuaternary,
-  },
-  /** The drag preview shows the record's identity only, never copies its switches or buttons. */
-  roleOverlay: {
+  listEmpty: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 2,
-    boxSizing: 'border-box',
-    inlineSize: '100%',
-    paddingBlock: 8,
-    paddingInline: 10,
-    borderWidth: 1,
-    borderStyle: 'solid',
-    borderColor: cssVar.colorBorderSecondary,
-    borderRadius: cssVar.borderRadius,
-    backgroundColor: cssVar.colorBgElevated,
-    boxShadow: cssVar.boxShadowSecondary,
+    alignItems: 'center',
+    gap: 12,
+    padding: 24,
+    minInlineSize: 0,
+    textAlign: 'center',
   },
-  /** Two fields side by side; one column when the form is narrow. */
+  /** One list row: switch, identity line, then accounts and model. */
+  row: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 8,
+    inlineSize: '100%',
+    minInlineSize: 0,
+    // Same two-line rhythm as the workbench session rows: the option's own
+    // 6px padding plus this inset keeps the selection wrapped around the row.
+    paddingBlock: 2,
+    paddingInline: 0,
+  },
+  switchWrap: {
+    display: 'flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    paddingBlockStart: 2,
+  },
+  rowCopy: {
+    display: 'flex',
+    flex: '1 1 0',
+    flexDirection: 'column',
+    gap: 4,
+    minInlineSize: 0,
+  },
+  rowHead: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    minInlineSize: 0,
+  },
+  rowId: {
+    flex: '1 1 auto',
+    minInlineSize: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    fontWeight: cssVar.fontWeightStrong,
+  },
+  rowMeta: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    minInlineSize: 0,
+    overflow: 'hidden',
+    color: cssVar.colorTextSecondary,
+    fontSize: cssVar.fontSizeSM,
+    lineHeight: 1.4,
+  },
+  rowMetaText: {
+    minInlineSize: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  capTag: {
+    flexShrink: 0,
+  },
+  /** A status dot with its label; the full reason stays on the row title. */
+  status: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    gap: 4,
+    maxInlineSize: '100%',
+    color: cssVar.colorTextSecondary,
+    fontSize: cssVar.fontSizeSM,
+    lineHeight: 1.4,
+    whiteSpace: 'nowrap',
+  },
+  statusDot: {
+    flexShrink: 0,
+    inlineSize: 6,
+    blockSize: 6,
+    borderRadius: '50%',
+    backgroundColor: cssVar.colorTextQuaternary,
+    '[data-tone="processing"]': { backgroundColor: cssVar.colorPrimary },
+    '[data-tone="warning"]': { backgroundColor: cssVar.colorWarning },
+    '[data-tone="orange"]': { backgroundColor: cssVar.orange },
+    '[data-tone="volcano"]': { backgroundColor: cssVar.volcano },
+    '[data-tone="success"]': { backgroundColor: cssVar.colorSuccess },
+    '[data-tone="error"]': { backgroundColor: cssVar.colorError },
+  },
+  roleResume: {
+    alignSelf: 'flex-start',
+    marginInlineStart: -8,
+  },
+  /** The independent drag handle; touch drags reorder instead of scrolling the pane. */
+  roleGrip: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    inlineSize: 20,
+    blockSize: 20,
+    padding: 0,
+    borderWidth: 0,
+    borderRadius: cssVar.borderRadiusSM,
+    backgroundColor: 'transparent',
+    color: cssVar.colorTextTertiary,
+    cursor: 'grab',
+    touchAction: 'none',
+    ':hover': { color: cssVar.colorText, backgroundColor: cssVar.colorFillTertiary },
+    ':focus-visible': {
+      outlineWidth: 2,
+      outlineStyle: 'solid',
+      outlineColor: cssVar.colorPrimaryBorder,
+      outlineOffset: 1,
+    },
+  },
+  /** The same grip while searching or saving: it keeps the row width but cannot start a drag. */
+  roleGripOff: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    inlineSize: 20,
+    blockSize: 20,
+    color: cssVar.colorTextQuaternary,
+    cursor: 'not-allowed',
+  },
+  /** The dragged row stays in place, faded, until the drop reorders the draft. */
+  rowDragging: {
+    opacity: 0.4,
+  },
+  rowDropTarget: {
+    backgroundColor: cssVar.colorFillTertiary,
+  },
+  /** Pane head: back (narrow), engine mark, id and status. */
+  headerRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    minInlineSize: 0,
+    maxInlineSize: '100%',
+  },
+  headerName: {
+    flex: '0 1 auto',
+    minInlineSize: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  headerMeta: {
+    flexShrink: 0,
+    color: cssVar.colorTextSecondary,
+    fontSize: cssVar.fontSizeSM,
+  },
+  mobileBack: {
+    flexShrink: 0,
+  },
+  /** Editor sections keep the settings-page rhythm: a 12px gap, not a separate card floor. */
+  mainBody: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    minInlineSize: 0,
+    padding: 16,
+  },
+  sectionFields: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    minInlineSize: 0,
+  },
+  /** Two fields side by side; one column when the pane is narrow. */
   pair: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
@@ -78,81 +226,77 @@ export const rolesStyles = stylex.create({
       gridTemplateColumns: 'minmax(0, 1fr)',
     },
   },
-  /** The model/effort pair top-aligns when one side grows a hint line. */
   pairStart: {
     alignItems: 'start',
   },
-  /** The parallel-cap input keeps its compact inline size beside its switch. */
   parallelInput: {
     inlineSize: 88,
   },
-  /** The paused-dispatch notice sits off the fields below it. */
+  inlineControl: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    minInlineSize: 0,
+  },
+  fieldHint: {
+    minInlineSize: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    color: cssVar.colorTextSecondary,
+    fontSize: cssVar.fontSizeSM,
+  },
+  /** A pause is page content, fixed at the top of the availability section. */
   blockNotice: {
-    marginBlockEnd: 12,
+    minInlineSize: 0,
   },
-  /** A list entry: its enable switch, then a button that selects it. No outer frame. */
-  roleItem: {
-    display: 'grid',
-    flex: 1,
-    gridTemplateColumns: 'auto minmax(0, 1fr)',
-    gap: '4px 10px',
-    alignItems: 'start',
-    paddingBlock: 8,
-    paddingInline: 10,
-    borderRadius: cssVar.borderRadius,
-    backgroundColor: {
-      default: 'transparent',
-      ':hover': cssVar.colorFillTertiary,
-    },
-    '[aria-current="true"]': {
-      backgroundColor: cssVar.colorFillSecondary,
-    },
-  },
-  /** The enable switch sits on the first text line, not above it. */
-  roleSwitch: {
-    marginBlockStart: 2,
-  },
-  roleButton: {
+  relationGroup: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 2,
+    gap: 8,
     minInlineSize: 0,
+  },
+  relationLabel: {
+    color: cssVar.colorTextSecondary,
+    fontSize: cssVar.fontSizeSM,
+    lineHeight: 1.5,
+  },
+  linkList: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    minInlineSize: 0,
+  },
+  taskList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    margin: 0,
     padding: 0,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    color: 'inherit',
-    font: 'inherit',
-    textAlign: 'start',
-    cursor: 'pointer',
-    ':focus-visible': {
-      outlineWidth: 2,
-      outlineStyle: 'solid',
-      outlineColor: cssVar.colorPrimaryBorder,
-      outlineOffset: 2,
-      borderRadius: cssVar.borderRadiusSM,
-    },
+    minInlineSize: 0,
+    listStyle: 'none',
   },
-  /** The list entry's title row: the id, then the free-channel badge; the badge wraps to its own line before anything overflows. */
-  roleTitle: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '2px 6px',
+  taskRow: {
+    display: 'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr) auto',
     alignItems: 'center',
+    gap: 8,
     minInlineSize: 0,
   },
-  /** The list entry's text button for resuming a paused worker: its own row under the note, never beside the switch or the tags. */
-  roleResume: {
-    gridColumn: 2,
-    justifySelf: 'start',
-    marginInlineStart: -8,
+  taskTime: {
+    color: cssVar.colorTextSecondary,
+    fontSize: cssVar.fontSizeSM,
+    fontVariantNumeric: 'tabular-nums',
+    whiteSpace: 'nowrap',
   },
-  /** A list entry's pause: its kind as a tag, then the reason; the reason moves under the tag when the pane is narrow. */
-  roleNote: {
+  emptyPane: {
     display: 'flex',
-    flexWrap: 'wrap',
-    gap: '2px 6px',
+    flex: '1 1 0',
     alignItems: 'center',
-    minInlineSize: 0,
+    justifyContent: 'center',
+    minBlockSize: 0,
+    padding: 24,
   },
   /** A model reply shown as a message card. */
   replyCard: {
@@ -182,7 +326,6 @@ export const rolesStyles = stylex.create({
     whiteSpace: 'pre-wrap',
     overflowWrap: 'anywhere',
   },
-  /** The reply header's route and timestamp stay on one line. */
   replyTime: {
     whiteSpace: 'nowrap',
   },

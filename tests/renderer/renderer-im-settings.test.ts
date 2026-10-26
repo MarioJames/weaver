@@ -16,8 +16,6 @@ import { ModelListSession } from '../../src/renderer/features/engines/engine-mod
 import type { EngineModelList, EngineModelListInput } from '../../src/shared/engines';
 import { AgentStatus, ImSettingsView, type ImSettingsViewProps } from '../../src/renderer/features/bots/ImSettings';
 import { BotsPage } from '../../src/renderer/features/bots/BotsPage';
-import { botStyles } from '../../src/renderer/features/bots/bot-style';
-import { styleClass } from './style-helpers';
 
 /** The real configured baseline the fixtures branch from, e.g. read at revision 5. */
 const APP_ID = 'cli_a1b2c3d4e5f6a7b8';
@@ -231,7 +229,7 @@ test('validation turns the screen-readable failures into per-field messages and 
   assert.match(validateDraft(textOf(base, { channel: 'default_zed' }), base, withOther).channel ?? '', /受支持引擎/, 'kinds outside the installed catalog are not offered');
   const noOwners = defaultConfig(); noOwners.owners = {}; noOwners.workers = {};
   assert.deepEqual(validateDraft(textOf(base), base, noOwners), {}, 'Bot routing is independent of owner/worker profiles');
-  assert.match(validateDraft(textOf(base, { effort: 'unknown' }), base, noOwners).effort, /思考力度/);
+  assert.match(validateDraft(textOf(base, { effort: 'unknown' }), base, noOwners).effort, /推理强度/);
   assert.match(validateDraft(textOf(base, { model: 'bad model' }), base, noOwners).model, /模型名称/);
   const changedAppId = validateDraft(textOf(base, { appId: 'cli_00000000000000aa' }), base, undefined);
   assert.match(changedAppId.secret, /App ID 变更后.*Secret/, 'matches the store rule: an appId change refuses a silently carried-over secret');
@@ -328,13 +326,12 @@ test('only exclusive requests pause the poll; a poll alone never blocks the pane
 test('the Bot page shows its own heading and IM loading state before the global policy is ready', () => {
   keepImDraft(undefined);
   const html = markup(React.createElement(BotsPage, { policy: {} as PolicyDraft }));
-  assert.match(html, /<h1[^>]*>Bot<\/h1>/);
-  const start = html.indexOf('<section aria-label="飞书 IM"');
-  const end = html.indexOf('</section>', start);
-  assert.ok(start >= 0 && end > start, 'the group section exists');
-  const group = html.slice(start, end);
-  assert.match(group, /正在读取飞书 IM 设置/);
-  assert.ok(html.indexOf('正在读取飞书 IM 设置') < end, 'the loading row sits inside the group, not beside it');
+  assert.match(html, /<h1[^>]*>[\s\S]*?Bot/, 'the page heads with Bot');
+  assert.match(html, /role="tablist"/);
+  const panelStart = html.indexOf('role="tabpanel"');
+  assert.ok(panelStart > 0, 'the selected channel has a tab panel');
+  const panel = html.slice(panelStart);
+  assert.match(panel, /正在读取飞书 IM 设置/);
 });
 
 
@@ -395,7 +392,7 @@ test('all seven catalog engines are offered, validated per kind, and OpenCode ke
   }
   // dsh 原生力度只有 off/low/high/max：medium 非法，切换到 dsh 时回退 low。
   assert.deepEqual(EFFORTS.dsh, ['off', 'low', 'high', 'max']);
-  assert.match(validateDraft(textOf(configOf(), { channel: 'default_dsh', effort: 'medium' }), configOf(), policy).effort ?? '', /思考力度/);
+  assert.match(validateDraft(textOf(configOf(), { channel: 'default_dsh', effort: 'medium' }), configOf(), policy).effort ?? '', /推理强度/);
   assert.equal(switchDraftChannel({ ...textOf(configOf()), effort: 'medium' }, 'default_dsh', policy).effort, 'low');
   assert.equal(switchDraftChannel({ ...textOf(configOf()), effort: 'high' }, 'default_dsh', policy).effort, 'high');
   assert.match(validateDraft(textOf(configOf(), { channel: 'default_opencode', effort: 'has space' }), configOf(), policy).effort ?? '', /variant/);
@@ -490,7 +487,7 @@ test('a directory-list change remains dirty until that exact list is confirmed a
   assert.equal(adoptServer(snapshotOf(base, 4), edit).edit, edit);
   assert.equal(adoptServer(snapshotOf({ ...base, workspaces: ['/projects/beta'] }, 5), edit).edit, undefined);
   const empty = { ...edit, values: { ...edit.values, workspaces: [] } };
-  assert.match(savePlan(empty, undefined).errors.workspaces, /至少.*工作空间/);
+  assert.match(savePlan(empty, undefined).errors.workspaces, /至少.*工作目录/);
   assert.equal(savePlan({ ...empty, values: { ...empty.values, enabled: false } }, undefined).errors.workspaces, undefined);
 });
 
@@ -579,58 +576,46 @@ test('the Bot page offers the real IM channels through one tablist and renders o
   const panelStart = html.indexOf('role="tabpanel"');
   assert.ok(panelStart > 0, 'the selected channel has a tab panel');
   const panel = html.slice(panelStart);
-  assert.match(panel, /data-bot-channel="feishu"/);
   assert.match(panel, /独立单聊的 Agent/);
   assert.match(panel, /正在读取飞书 IM 设置/);
-  const section = panel.slice(panel.indexOf('data-bot-channel="feishu"'));
-  const headerEnd = section.indexOf('</header>');
-  assert.ok(headerEnd > 0, 'the channel explanation is a header at the top of the panel');
-  assert.ok(section.indexOf('独立单聊的 Agent') < headerEnd, 'the old left group column explanation moved into the panel header');
-  assert.ok(section.indexOf('正在读取飞书 IM 设置') > headerEnd, 'the rows follow the channel header instead of a left group column');
 });
 
-test('each Feishu setting is one two-column row: name label plus description on the left, control and its error on the right', () => {
+test('every Feishu setting is a shared SettingRow with its label, control and field error', () => {
   const html = markup(React.createElement(ImSettingsView, viewOf({ fieldErrors: { appId: 'App ID 需要 cli_ 开头' } })));
-  const section = html.slice(html.indexOf('data-bot-channel="feishu"'));
-  assert.ok(section.length > 0);
-  const rows = section.split('<div data-bot-row="').slice(1);
-  assert.ok(rows.length >= 12, 'every existing setting row is still rendered');
-  for (const row of rows) {
-    const marker = row.match(/^([^"]+)"/)?.[1] ?? '';
-    const field = row.indexOf('data-bot-field=""');
-    const control = row.indexOf('data-bot-control=""');
-    assert.ok(field >= 0 && control > field, `${marker} keeps the name/description and control in separate columns`);
-    const htmlFor = row.match(/<label for="([^"]+)">/)?.[1];
-    assert.ok(htmlFor, `${marker} has a label linked to its control`);
-    assert.ok(row.slice(control).includes(`id="${htmlFor}"`), `${marker} label for="${htmlFor}" points into its own control column`);
+  for (const label of ['启用飞书 IM', 'App ID', 'App Secret', 'open_id 白名单', '账号或渠道', '模型', '推理强度', '父 Agent', '工作目录', '空闲超时（分钟）']) {
+    assert.match(html, new RegExp(label), `the ${label} row is rendered`);
   }
-  const appId = rows.find(row => row.startsWith('bot-appid"'));
-  assert.ok(appId, 'the App ID row exists');
-  assert.match(appId, /App ID 需要 cli_ 开头/);
-  assert.ok(appId.indexOf('App ID 需要 cli_ 开头') > appId.indexOf('data-bot-control'), 'the field error sits under the control');
-  const controlClasses = [...section.matchAll(/<div data-bot-control="" class="([^"]+)">/g)].map(match => match[1]);
-  assert.equal(new Set(controlClasses).size, 1, 'all control columns share the same width track');
-  assert.equal(controlClasses[0], styleClass(botStyles.controlCell));
-  const rowClasses = [...section.matchAll(/<div data-bot-row="[^"]*" class="([^"]+)">/g)].map(match => match[1]);
-  assert.equal(new Set(rowClasses).size, 1, 'all rows share the same two-column grid');
-  assert.equal(rowClasses[0], styleClass(botStyles.row));
+  for (const id of ['bot-enabled', 'bot-appid', 'bot-secret', 'bot-openids', 'bot-channel', 'bot-model', 'bot-effort', 'bot-owner', 'bot-workspaces', 'bot-idle', 'bot-refresh', 'bot-reconnect']) {
+    assert.match(html, new RegExp(`id="${id}"`), `the ${id} control is rendered`);
+  }
+  assert.match(html, /App ID 需要 cli_ 开头/);
+  assert.match(html, /role="alert"/);
+  assert.doesNotMatch(html, /data-bot-row/, 'the old BotSetting rows are gone');
+  assert.doesNotMatch(html, /思考力度/, 'the old effort wording is gone');
+  assert.doesNotMatch(html, /调度主引擎/, 'the old dispatch-master wording is gone');
+  assert.doesNotMatch(html, /工作空间/, 'the old workspace wording is gone');
+  assert.doesNotMatch(html, /保存修改/, 'the old save wording is gone');
+  for (const group of ['连接', 'Agent', '运行']) {
+    assert.match(html, new RegExp(`>${group}<`), `the ${group} group is rendered`);
+  }
+  assert.match(html, />刷新</, 'the status action reads 刷新');
+  assert.match(html, /重建连接与会话/);
 });
 
-test('the new channel layout keeps the conflict, workspace empty/limit, save feedback and loading/error states', () => {
+test('the grouped layout keeps the conflict, directory empty/limit, save feedback and loading/error states', () => {
   const conflict = markup(React.createElement(ImSettingsView, viewOf({
     edit: activeEdit(), conflict: true, dirty: true, savedTick: true,
     values: { ...draftOf(configOf()), workspaces: [], idleTimeoutMinutes: null },
   })));
   assert.match(conflict, /配置在别处被修改/);
   assert.match(conflict, /放弃修改并载入最新/);
-  assert.match(conflict, /尚未添加工作空间/);
+  assert.match(conflict, /尚未添加工作目录/);
   assert.match(conflict, /已保存/);
   const full = markup(React.createElement(ImSettingsView, viewOf({
     values: { ...draftOf(configOf()), workspaces: Array.from({ length: 32 }, (_, index) => `/projects/${index}`) },
   })));
   assert.match(full, /已达 32 个上限/);
   const loading = markup(React.createElement(ImSettingsView, viewOf({ saved: undefined, values: undefined, loading: true })));
-  assert.match(loading, /data-bot-channel="feishu"/);
   assert.match(loading, /正在读取飞书 IM 设置/);
   const failed = markup(React.createElement(ImSettingsView, viewOf({ saved: undefined, values: undefined, loading: false, loadError: '读取失败，请重试' })));
   assert.match(failed, /读取失败，请重试/);
@@ -638,26 +623,19 @@ test('the new channel layout keeps the conflict, workspace empty/limit, save fee
 });
 
 test('the effort description follows the engine kind: OpenCode variant versus no usable engine', () => {
-  const opencode = markup(React.createElement(ImSettingsView, viewOf({ efforts: undefined, openCodeVariant: true, channelUsable: false })));
-  assert.match(opencode, /OpenCode 的 variant 由模型定义/);
-  assert.doesNotMatch(opencode, /先选择一个支持飞书对话的渠道/);
+  const opencode = markup(React.createElement(ImSettingsView, viewOf({ efforts: undefined, openCodeVariant: true })));
+  assert.match(opencode, /例如：high 或该模型接受的 variant/);
+  assert.match(opencode, /填写该模型接受的 variant。/);
   const none = markup(React.createElement(ImSettingsView, viewOf({ efforts: undefined, openCodeVariant: false, channelUsable: false })));
-  assert.match(none, /先选择一个支持飞书对话的渠道/);
-  assert.doesNotMatch(none, /OpenCode 的 variant 由模型定义/);
+  assert.match(none, /先选择渠道/);
 });
 
-test('the channel header shows only the description: no repeated channel title under the selected tab', () => {
+test('the tab panel carries the channel description once and the shared setting groups', () => {
   const html = markup(React.createElement(ImSettingsView, viewOf()));
-  const sectionStart = html.indexOf('data-bot-channel="feishu"');
-  assert.ok(sectionStart > 0, 'the feishu channel section exists');
-  const sectionOpen = html.lastIndexOf('<section', sectionStart);
-  assert.ok(sectionOpen >= 0);
-  assert.match(html.slice(sectionOpen, sectionStart), /aria-label="飞书 IM"/, 'the section keeps aria-label for accessibility');
-  const headerStart = html.indexOf('<header', sectionStart);
-  assert.ok(headerStart > sectionStart, 'the channel has a header');
-  const headerEnd = html.indexOf('</header>', headerStart);
-  assert.ok(headerEnd > headerStart);
-  const header = html.slice(headerStart, headerEnd);
-  assert.doesNotMatch(header, /飞书 IM/, 'the selected tab already names the channel; the header must not repeat it');
-  assert.match(header, /独立单聊的 Agent/, 'the channel description stays in the header');
+  assert.match(html, /独立单聊的 Agent/, 'the channel description is shown');
+  assert.doesNotMatch(html, /data-bot-channel/, 'the old channel wrapper is gone');
+  for (const group of ['连接', 'Agent', '运行']) {
+    assert.match(html, new RegExp(`>${group}<`), `the ${group} group title sits above its rows`);
+  }
+  assert.match(html, /连接与 Agent 状态/, 'the top status zone exists');
 });

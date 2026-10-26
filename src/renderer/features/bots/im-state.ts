@@ -39,8 +39,8 @@ export const IDLE_RANGE = { min: 1, max: 1440 } as const;
 export const IM_ENGINE_KINDS: ReadonlySet<string> = new Set(IM_ENGINE_LIST);
 
 /**
- * 换引擎后旧力度非法时的回退：仍被新引擎支持的用户值由调用方保留，
- * 这里只在必须换底时按该引擎原生力度表选一个合法值（优先 medium，其次 low，最后取原生首项）。
+  * 换引擎后旧强度非法时的回退：仍被新引擎支持的用户值由调用方保留，
+  * 这里只在必须换底时按该引擎原生强度表选一个合法值（优先 medium，其次 low，最后取原生首项）。
  * opencode 自由 variant 与未知 kind 沿用 medium 占位（其为合法 variant 字符串）。
  */
 function fallbackEffort(kind: string): string {
@@ -56,7 +56,7 @@ function fallbackEffort(kind: string): string {
 const APP_ID_RE = /^cli_[0-9a-f]{16}$/;
 const OPEN_ID_PREFIX = 'ou_';
 
-/** 换引擎后必须重新明确模型；力度只有仍被新引擎支持时才保留，否则按新引擎原生表回退。 */
+/** 换引擎后必须重新明确模型；强度只有仍被新引擎支持时才保留，否则按新引擎原生表回退。 */
 export function switchDraftChannel(draft: ImDraft, channel: string, config: Config | undefined): Pick<ImDraft, 'channel' | 'model' | 'effort'> {
   if (channel === draft.channel) return { channel, model: draft.model, effort: draft.effort };
   const kind = config?.engines[config.channels[channel]?.engine ?? '']?.kind;
@@ -76,12 +76,12 @@ export const IM_WORKSPACE_LIMIT = 32;
 
 /** 这里只拦可见结构错误；目录存在、realpath 别名与凭据目录保护由控制面在保存时验证。 */
 export function workspaceListError(workspaces: readonly string[], required = false): string {
-  if (workspaces.length > IM_WORKSPACE_LIMIT) return `最多添加 ${IM_WORKSPACE_LIMIT} 个工作空间，请先移除不再使用的目录。`;
-  if (required && workspaces.length === 0) return '开启时至少添加一个工作空间。';
+  if (workspaces.length > IM_WORKSPACE_LIMIT) return `最多添加 ${IM_WORKSPACE_LIMIT} 个工作目录，请先移除不再使用的目录。`;
+  if (required && workspaces.length === 0) return '开启时至少添加一个工作目录。';
   if (workspaces.some(path => !path.startsWith('/') || path.trim() !== path || path.length > 2000 || /[\x00-\x1f\x7f]/.test(path))) {
-    return '工作空间需要是绝对路径，最多 2000 字符，不能包含首尾空格或控制字符。';
+    return '工作目录需要是绝对路径，最多 2000 字符，不能包含首尾空格或控制字符。';
   }
-  if (new Set(workspaces).size !== workspaces.length) return '这个工作空间已在列表中，每个目录只需添加一次。';
+  if (new Set(workspaces).size !== workspaces.length) return '这个工作目录已在列表中，每个目录只需添加一次。';
   return '';
 }
 
@@ -224,16 +224,16 @@ export function validateDraft(draft: ImDraft, saved: ImConfig, config: Config | 
   const engine = channel ? config?.engines[channel.engine] : undefined;
   if (draft.channel && !/^[A-Za-z0-9_-]{1,128}$/.test(draft.channel)) errors.channel = '渠道标识格式不正确，请重新选择。';
   if (draft.model.trim() && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(draft.model.trim())) errors.model = '模型名称格式不正确，可填写字母、数字及 . _ : / -，最多 200 字符。';
-  if (draft.effort && !IM_EFFORT_PATTERN.test(draft.effort)) errors.effort = '思考力度格式不正确，请重新选择。';
+  if (draft.effort && !IM_EFFORT_PATTERN.test(draft.effort)) errors.effort = '推理强度格式不正确，请重新选择。';
   if (draft.enabled) {
     if (!draft.channel) errors.channel = '开启时需要选择支持飞书对话的已启用渠道。';
     else if (!channel?.enabled) errors.channel = '该渠道尚未启用，请在账号与渠道页检查。';
     else if (!engine || !isImEngineKind(engine.kind)) errors.channel = '请选择使用受支持引擎的飞书对话渠道。';
     if (engine && isImEngineKind(engine.kind) && draft.effort && !imEngineEffortAllowed(engine.kind, draft.effort)) {
-      errors.effort = engine.kind === 'opencode' ? '请填写该模型接受的 variant（最多 32 字符）。' : '请选择该引擎支持的思考力度。';
+      errors.effort = engine.kind === 'opencode' ? '请填写该模型接受的 variant（最多 32 字符）。' : '请选择该引擎支持的推理强度。';
     }
     if (!draft.model.trim()) errors.model = '开启时需要选择或填写模型。';
-    if (!draft.effort) errors.effort = '开启时需要选择思考力度。';
+    if (!draft.effort) errors.effort = '开启时需要选择推理强度。';
     if (draft.appId.trim() === '') errors.appId = '开启时需要填写飞书开放平台的 App ID。';
     const secretReady = draft.clearSecret ? draft.secret.trim() !== '' : saved.appSecretConfigured || draft.secret.trim() !== '';
     if (!secretReady) errors.secret = draft.clearSecret ? '清除已保存的 Secret 前请先粘贴新的 Secret，或先关闭开关再保存。' : '开启时需要已保存的 App Secret，或现在粘贴一个新的。';
@@ -267,7 +267,7 @@ export function ownerSelectValue(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
-/** 调度主引擎下拉的选项：首项固定为自动，其余保持快照顺序（后端已按 id 排序）；不可选项禁用并按原因加后缀。 */
+/** 父 Agent 下拉的选项：首项固定为自动，其余保持快照顺序（后端已按 id 排序）；不可选项禁用并按原因加后缀。 */
 export function ownerProfileOptions(profiles: readonly ImOwnerProfileOption[]): { value: string; label: string; disabled: boolean }[] {
   const suffix: Record<string, string> = {
     disabled: '（已停用）',

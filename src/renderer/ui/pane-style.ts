@@ -1,0 +1,68 @@
+import * as stylex from '@stylexjs/stylex';
+import { cssVar } from '@lobehub/ui/stylex/cssVar.stylex';
+
+export const paneStyles = stylex.create({
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: '1 1 0',
+    blockSize: '100%',
+    minBlockSize: 0,
+    minInlineSize: 0,
+    overflow: 'hidden',
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexShrink: 0,
+    gap: 12,
+    minBlockSize: 48,
+    paddingBlock: 8,
+    paddingInline: 16,
+    borderBlockEndWidth: 1,
+    borderBlockEndStyle: 'solid',
+    borderBlockEndColor: cssVar.colorBorderSecondary,
+  },
+  heading: {
+    minInlineSize: 0,
+    overflow: 'hidden',
+    color: cssVar.colorText,
+    fontSize: 16,
+    fontWeight: cssVar.fontWeightStrong,
+    lineHeight: 1.4,
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  actions: {
+    display: 'flex',
+    alignItems: 'center',
+    flexShrink: 0,
+    gap: 8,
+  },
+  toolbar: {
+    flexShrink: 0,
+    paddingBlock: 12,
+    paddingInline: 16,
+    borderBlockEndWidth: 1,
+    borderBlockEndStyle: 'solid',
+    borderBlockEndColor: cssVar.colorBorderSecondary,
+  },
+  body: {
+    flex: '1 1 0',
+    minBlockSize: 0,
+    minInlineSize: 0,
+    overflowX: 'hidden',
+    overflowY: 'auto',
+    scrollbarGutter: 'stable',
+  },
+  footer: {
+    flexShrink: 0,
+    paddingBlock: 12,
+    paddingInline: 16,
+    borderBlockStartWidth: 1,
+    borderBlockStartStyle: 'solid',
+    borderBlockStartColor: cssVar.colorBorderSecondary,
+    backgroundColor: cssVar.colorBgContainer,
+  },
+});

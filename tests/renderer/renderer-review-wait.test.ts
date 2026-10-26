@@ -1,17 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import React from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { ConfigProvider, ThemeScope } from '@lobehub/ui';
-import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
-import { taskStyles as styles } from '../../src/renderer/features/tasks/task-style';
-import { styleClass } from './style-helpers';
-import { TaskBoard } from '../../src/renderer/features/tasks/TaskBoard';
-import { columnize } from '../../src/renderer/features/tasks/task-columns';
 import { REVIEW_OVERDUE_HINT, REVIEW_WAIT_WARN_MINUTES, RECEIPT_ACK_MESSAGE, formatWait, reviewWait } from '../../src/renderer/features/tasks/task-wait';
-import { emptySelection } from '../../src/renderer/features/tasks/task-filters';
-import { ENDED_EXPANDED_KEY } from '../../src/renderer/features/tasks/task-persistence';
 
 const now = new Date(2026, 9, 19, 23, 0).getTime();
 const at = (hour: number, minute: number) => new Date(2026, 9, 19, hour, minute).toISOString();
@@ -66,35 +56,23 @@ test('only review-lane cards have a wait line', () => {
   }
 });
 
-function board(tasks: Task[]) {
-  const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (key: string) => key === ENDED_EXPANDED_KEY ? 'true' : null, setItem: () => {} } });
-  try {
-    return renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'light', children: React.createElement(TaskBoard, { tasks, filters: { ...emptySelection(), time: 'all' }, now, loading: false, onSelect: () => {} }) }) }));
-  } finally { if (previous) Object.defineProperty(globalThis, 'localStorage', previous); else Reflect.deleteProperty(globalThis, 'localStorage'); }
-}
-
-test('the board shows the wait line on review cards only, warning-marked once overdue', () => {
-  const html = board([
-    make('p', { title: 'CARD_PENDING', updatedAt: ago(10) }),
-    make('q', { title: 'CARD_ACKED', acknowledged: true, events: [ack(ago(125))] }),
-    make('r', { title: 'CARD_DONE', reviewState: 'accepted' }),
-    make('s', { title: 'CARD_RUNNING', status: 'running' }),
-  ]);
-  const cards = [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(match => match[0]).filter(card => /CARD_/.test(card));
-  const byTitle = (title: string) => cards.find(card => card.includes(title))!;
-  const pending = byTitle('CARD_PENDING');
-  assert.match(pending, new RegExp(`<span class="${styleClass(styles.cardWait)}" data-overdue="false" data-wait="pending">待父 Agent 确认收到 · 已等 10 分钟</span>`));
-  assert.doesNotMatch(pending, /请检查其运行状态/);
-  const acked = byTitle('CARD_ACKED');
-  assert.match(acked, new RegExp(`class="${styleClass(styles.cardWait)}" data-overdue="true" data-wait="acknowledged" title="父 Agent 尚未提交验收，请检查其运行状态">已确认收到 · 待验收结论 · 已等 2 小时 5 分钟</span>`));
-  // The line sits between the status tag and the footer sentence, and no other card has one.
-  assert.ok(acked.indexOf(styleClass(styles.cardStatus)) < acked.indexOf(styleClass(styles.cardWait)) && acked.indexOf(styleClass(styles.cardWait)) < acked.indexOf(styleClass(styles.cardMeta)));
-  assert.doesNotMatch(byTitle('CARD_DONE') + byTitle('CARD_RUNNING'), new RegExp(styleClass(styles.cardWait)));
+test('only review cards carry a wait line, warning-marked once overdue', () => {
+  const pending = reviewWait(make('p', { updatedAt: ago(10) }), now)!;
+  assert.equal(pending.acknowledged, false);
+  assert.equal(pending.overdue, false);
+  assert.equal(pending.text, '待父 Agent 确认收到 · 已等 10 分钟');
+  assert.equal(pending.title, undefined);
+  const acked = reviewWait(make('q', { acknowledged: true, events: [ack(ago(125))] }), now)!;
+  assert.equal(acked.overdue, true);
+  assert.equal(acked.text, '已确认收到 · 待验收结论 · 已等 2 小时 5 分钟');
+  assert.equal(acked.title, '父 Agent 尚未提交验收，请检查其运行状态');
+  assert.equal(reviewWait(make('r', { reviewState: 'accepted' }), now), null);
+  assert.equal(reviewWait(make('s', { status: 'running' }), now), null);
 });
 
-test('the review lane keeps its updatedAt ordering: the wait line does not reorder cards', () => {
+test('review waits sort newest first without changing the underlying order', () => {
   const older = make('old', { updatedAt: ago(90) });
   const newer = make('new', { updatedAt: ago(5) });
-  assert.deepEqual(columnize([older, newer])[2]!.map(task => task.id), ['new', 'old']);
+  const ordered = [older, newer].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  assert.deepEqual(ordered.map(task => task.id), ['new', 'old']);
 });

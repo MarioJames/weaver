@@ -6,10 +6,11 @@ import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Config } from '../../src/shared/contracts/policy';
 import type { Task } from '../../src/shared/contracts/tasks';
+import type { Route } from '../../src/renderer/app/router';
 import { ownerKindLookup } from '../../src/renderer/features/tasks/task-view';
 import { AgentFacts } from '../../src/renderer/features/tasks/AgentFacts';
 import { AgentLabel, EngineIcon } from '../../src/renderer/ui/EngineIcon';
-import { TaskDetail } from '../../src/renderer/features/tasks/TaskDetail';
+import { TaskInspectorView } from '../../src/renderer/features/tasks/TaskInspector';
 
 function markup(node: React.ReactNode) {
   const props = { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { appearance: 'dark', children: node }) } as React.ComponentProps<typeof ConfigProvider>;
@@ -30,8 +31,6 @@ const policyConfig = {
   herdr: { max_wait_minutes: 15 },
 } as unknown as Config;
 const ownerKind = ownerKindLookup(policyConfig);
-
-const detailProps = { busy: false, onStart: () => {}, onCancel: () => {}, action: async () => true };
 
 /** The rendered icon on its own: the theme injects global styles that would blur a color check. */
 function icon(kind?: string) {
@@ -105,12 +104,11 @@ test('the workspace path stays whole, ellipsizes and offers a copy button', () =
   assert.match(html, /data-base-ui-tooltip-trigger=/);
 });
 
-test('detail hands owner, worker and workspace to the facts block in the overview tab', () => {
-  const html = markup(React.createElement(TaskDetail, { task: claude, ...detailProps, ownerKind }));
-  const tabs = html.indexOf('aria-label="任务记录"');
-  assert.ok(tabs > 0);
-  assert.doesNotMatch(html.slice(0, tabs), /<dt/);
-  assert.match(html.slice(tabs), /role="tabpanel"[\s\S]*<dt[^>]*>父 Agent<\/dt>/);
+test('inspector hands worker, model, session and workspace to the facts block in the overview tab', () => {
+  const html = markup(React.createElement(TaskInspectorView, { task: claude, tasks: [claude], busy: false, action: async () => true, taskRoute: (taskId: string): Route => ({ page: 'tasks', view: 'all', taskId }), ownerKind, onClose: () => {}, onEdit: () => {} }));
+  assert.ok(html.indexOf('aria-label="任务详情页"') > 0);
+  assert.doesNotMatch(html.slice(0, html.indexOf('aria-label="任务详情页"')), /<dt/);
+  assert.match(html, /role="tabpanel"[\s\S]*<dt[^>]*>子 Agent<\/dt>[\s\S]*?claude_worker/);
   assert.doesNotMatch(html, /更新于/);
   assert.doesNotMatch(html, /→/);
   assert.doesNotMatch(html, / · weaver · /);
@@ -135,6 +133,6 @@ test('owner icons use the frozen profile even when ownerId is an instance UUID',
   for (const compact of [true, false]) {
     const task = { ...claude, ownerId: 'instance-uuid' };
     const html = markup(React.createElement(AgentFacts, { task, ownerKind, compact }));
-    assert.match(html, compact ? /aria-label="父 Agent：claude_owner"[\s\S]*<title>Claude Code<\/title>/ : /<dt[^>]*>父 Agent<\/dt><dd[^>]*><span[^>]*><svg[^>]*><title>Claude Code<\/title>/);
+    assert.match(html, compact ? /aria-label="父 Agent：claude_owner"[\s\S]*<title>Claude Code<\/title>/ : /<dt[^>]*>父 Agent<\/dt><dd[^>]*>[\s\S]*?<title>Claude Code<\/title>/);
   }
 });

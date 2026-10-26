@@ -2,12 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import * as stylex from '@stylexjs/stylex';
 import { CopyButton, Descriptions, Text, Tooltip } from '@lobehub/ui';
 import type { Task } from '../../../shared/contracts/tasks';
-import { dispatchKind, ownerHostName, ownerLabel, taskOwnerId } from './task-view';
+import { dispatchKind, ownerDisplayName, ownerLabel, taskOwnerId } from './task-view';
 import type { cardOwner } from './task-view';
 import { AgentLabel } from '../../ui/EngineIcon';
 import { TimeText } from '../../ui/TimeText';
 import { factsStyles } from './agent-facts-style';
-import { taskStyles } from './task-style';
 
 /** `engine / model · effort`, each part only when recorded. */
 export function modelText(task: Task): string | undefined {
@@ -20,7 +19,7 @@ export function modelText(task: Task): string | undefined {
  * Who owns the work, who runs it and where. Compact (board cards) is the parent agent alone; the full block is one
  * responsive Descriptions: sub agent, model and update time on the first row, parent agent and workspace on the second.
  */
-export function AgentFacts({ task, ownerKind, compact, owner }: { task: Task; ownerKind?: (ownerId?: string) => string | undefined; compact?: boolean; owner?: ReturnType<typeof cardOwner> }) {
+export function AgentFacts({ task, tasks = [], ownerKind, compact, owner }: { task: Task; tasks?: readonly Task[]; ownerKind?: (ownerId?: string) => string | undefined; compact?: boolean; owner?: ReturnType<typeof cardOwner> }) {
   const root = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(3);
   useEffect(() => {
@@ -33,11 +32,12 @@ export function AgentFacts({ task, ownerKind, compact, owner }: { task: Task; ow
     return () => observer.disconnect();
   }, [compact]);
   const dispatch = task.dispatch;
-  const parent = <AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerLabel(task)} />;
-  // A card shows the owner host only: the full instance name also carries the workspace and a session time, and stays in the tooltip.
-  const compactName = owner?.name ?? ownerHostName(task);
+  const ownerName = ownerDisplayName(task, tasks);
+  const parent = <AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={ownerName} />;
+  // The full instance name also carries the workspace and a session time, so it stays in the tooltip only.
+  const compactName = owner?.name ?? ownerName;
   const compactTitle = owner?.title ?? ownerLabel(task);
-  if (compact) return <span {...stylex.props(taskStyles.cardParent)} aria-label={`父 Agent：${compactName}`} title={compactTitle}><AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={compactName} /></span>;
+  if (compact) return <span {...stylex.props(factsStyles.cardParent)} aria-label={`父 Agent：${compactName}`} title={compactTitle}><AgentLabel kind={ownerKind?.(taskOwnerId(task))} name={compactName} /></span>;
   const workspace = dispatch?.workspace || task.workspace;
   const model = modelText(task);
   const first = [
@@ -48,7 +48,7 @@ export function AgentFacts({ task, ownerKind, compact, owner }: { task: Task; ow
   // The last item of a short first row takes the free columns so the second row always starts on a new line.
   const items = [
     ...first.map((item, index) => index === first.length - 1 ? { ...item, span: Math.max(1, columns - index % columns) } : item),
-    { key: 'owner', label: '父 Agent', children: <Tooltip title={ownerLabel(task)}>{parent}</Tooltip> },
+    { key: 'owner', label: '父 Agent', children: <Tooltip title={ownerLabel(task)}><span>{parent}</span></Tooltip> },
     ...(workspace ? [{ key: 'workspace', label: '工作目录', span: Math.max(1, columns - 1), children: <span {...stylex.props(factsStyles.value)}>
       <Text className={stylex.props(factsStyles.path).className} ellipsis={{ rows: 1, tooltip: workspace }}>{workspace}</Text>
       <CopyButton aria-label="复制工作目录" content={workspace} size="small" title="复制工作目录" />

@@ -1,6 +1,5 @@
 import type { Task } from '../../../shared/contracts/tasks';
 import { completedAt } from './task-footer';
-import { taskColumn } from './task-columns';
 
 /** A review that has waited longer than this many minutes is shown as overdue (warning color and a hint). */
 export const REVIEW_WAIT_WARN_MINUTES = 30;
@@ -39,7 +38,7 @@ export function acknowledgedAt(task: Task): string {
 
 /** What a 待验收 card says about how long it has waited and on what; null for every other card. */
 export function reviewWait(task: Task, now: number): ReviewWait | null {
-  if (taskColumn(task) !== 'review') return null;
+  if (task.status !== 'completed' || (task.reviewState !== undefined && task.reviewState !== 'pending')) return null;
   const acknowledged = !!task.acknowledged;
   const since = Date.parse(acknowledged ? acknowledgedAt(task) : completedAt(task));
   const minutes = Number.isFinite(since) ? Math.max(0, Math.floor((now - since) / 60000)) : 0;

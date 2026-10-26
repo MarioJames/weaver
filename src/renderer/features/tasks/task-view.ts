@@ -2,6 +2,7 @@ import type { OwnerInstance } from '../../../shared/contracts/owners';
 import type { Config } from '../../../shared/contracts/policy';
 import type { Task } from '../../../shared/contracts/tasks';
 import { PENDING_TASK_TITLE } from '../../../shared/validation';
+import { projectTimeZone, zonedParts } from '../../format/timezone';
 export type TaskFilter = 'all' | 'active' | 'review' | 'closed';
 export function isActive(task: Task): boolean { return ['queued', 'running', 'cancelling'].includes(task.status); }
 /** A draft is a root task nobody has started: still editable, with nothing frozen or dispatched yet. Mirrors the server's tasks.update rule. */
@@ -107,6 +108,72 @@ export function ownerHostName(task: Task): string {
 /** A manual parent Agent instance answers with its current main-task title when one was described, so cards and filters read the work, not the session clock. */
 export function ownerInstanceTitle(task: Task): string | undefined {
   return namedOwnerInstance(task) ? (task as ProfiledTask).owner.title : undefined;
+}
+
+const INSTANCE_CLOCK = /^\d{1,2}:\d{2}$/;
+const padClock = (value: number) => String(value).padStart(2, '0');
+
+/** HH:mm in the project zone; '' when the timestamp is missing. */
+function clockOf(value?: string): string {
+  const ms = value ? Date.parse(value) : NaN;
+  if (!Number.isFinite(ms)) return '';
+  const parts = zonedParts(ms, projectTimeZone());
+  return `${padClock(parts.hour)}:${padClock(parts.minute)}`;
+}
+
+/** What the UI may know about a parent Agent instance without carrying its machine name around. */
+export interface OwnerDisplaySource {
+  name?: string;
+  title?: string;
+  createdAt?: string;
+  /** Engine/provider label used when the instance name has no host segment. */
+  provider?: string;
+}
+
+/**
+ * The fallback name of a parent Agent instance: 「<host> · HH:mm」. The host is the
+ * first segment of the machine name (or the provider), and the clock is the name's
+ * own session time when it has one, else when the instance registered.
+ */
+export function ownerHostLabel(source: OwnerDisplaySource): string {
+  const parts = (source.name ?? '').split(' · ').map(part => part.trim()).filter(Boolean);
+  const host = parts[0] || source.provider || UNASSIGNED_OWNER;
+  const namedClock = parts.length > 1 ? parts[parts.length - 1] : undefined;
+  if (namedClock && INSTANCE_CLOCK.test(namedClock)) return `${host} · ${namedClock}`;
+  // A bare policy profile (claude_owner) is not an instance and has no session clock of its own.
+  // Instance names and a provider-only fallback do get one.
+  if (parts.length === 1) return host;
+  const clock = clockOf(source.createdAt);
+  return clock ? `${host} · ${clock}` : host;
+}
+
+/** The root task a child ultimately belongs to; the task itself when it is a root. */
+function rootTaskOf(task: Task, tasks: readonly Task[]): Task | undefined {
+  if (isRootTask(task)) return task;
+  const byId = new Map(tasks.map(item => [item.id, item]));
+  const seen = new Set<string>([task.id]);
+  let current = task;
+  while (current.parentTaskId && !seen.has(current.parentTaskId)) {
+    seen.add(current.parentTaskId);
+    const parent = byId.get(current.parentTaskId);
+    if (!parent) return undefined;
+    if (isRootTask(parent)) return parent;
+    current = parent;
+  }
+  return undefined;
+}
+
+/**
+ * The name a person reads for a task's parent Agent: its root task title, then the
+ * instance's described title, then 「<host> · HH:mm」. The full instance name (host,
+ * workspace and clock) never appears here; callers keep it for a hover title only.
+ */
+export function ownerDisplayName(task: Task, tasks: readonly Task[] = []): string {
+  const root = rootTaskOf(task, tasks);
+  if (root) return taskTitle(root);
+  const described = ownerInstanceTitle(task);
+  if (described) return described;
+  return ownerHostLabel({ name: ownerLabel(task), provider: dispatchKind(task), createdAt: task.createdAt });
 }
 /** The parent Agent a board card names: an A-type child names its root task, others their owner instance or profile. */
 export function cardOwner(task: Task, rootOf?: (id: string) => Task | undefined): { name: string; title: string } {

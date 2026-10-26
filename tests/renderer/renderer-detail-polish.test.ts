@@ -9,14 +9,9 @@ import { ArtifactsPanel } from '../../src/renderer/features/tasks/ArtifactsPanel
 import { displayLog } from '../../src/renderer/features/tasks/log-view';
 import { compactTime, fullTime } from '../../src/renderer/format/timezone';
 import { notifyError } from '../../src/renderer/api/notify';
-import { readFileSync } from 'node:fs';
-import { transformSync } from 'esbuild';
-import { styles as detailStyles } from '../../src/renderer/features/tasks/task-detail-style';
+import { inspectorStyles } from '../../src/renderer/features/tasks/inspector-style';
 import { styleCss } from './style-helpers';
-const app = readFileSync(new URL('../../src/renderer/app/App.tsx', import.meta.url), 'utf8');
-const routeSource = app.slice(app.indexOf('function pageFromHash'), app.indexOf('/** The hash'));
-const pagesSource = app.slice(app.indexOf('const PAGES ='), app.indexOf('type Page ='));
-const pageFromHash = new Function(transformSync(pagesSource + routeSource.replace('export ', ''), { loader: 'ts' }).code + '; return pageFromHash;')() as () => string;
+import { parseRoute, type Route } from '../../src/renderer/app/router';
 const markup = (node: React.ReactNode) => renderToStaticMarkup(React.createElement(ConfigProvider, { motion, enableCustomFonts: false, children: React.createElement(ThemeScope, { children: node }) }));
 test('completed and interrupted artifact empty states explain the actual status', () => {
   const completed = markup(React.createElement(ArtifactsPanel, { artifacts: [], status: 'completed' }));
@@ -53,32 +48,33 @@ test('not found error displays one Chinese message without raw duplicated codes'
   assert.equal(calls[0].description, '任务不存在');
 });
 test('direct and copied legacy URLs resolve to the same page', () => {
-  const previous = Object.getOwnPropertyDescriptor(globalThis, 'window');
-  try {
-    for (const [pathname, hash, expected] of [['/owners', '', 'owners'], ['/owners', '#/workers', 'workers'], ['/', '#/settings', 'settings'], ['/', '#/bots', 'bots'], ['/bots', '', 'bots'], ['/', '#/schedules', 'schedules'], ['/unknown', '', 'tasks']]) {
-      Object.defineProperty(globalThis, 'window', { configurable: true, value: { location: { pathname, hash } } });
-      assert.equal(pageFromHash(), expected);
-    }
-  } finally { if (previous) Object.defineProperty(globalThis, 'window', previous); else Reflect.deleteProperty(globalThis, 'window'); }
+  for (const [pathname, hash, expected] of [['/owners', '', 'owners'], ['/owners', '#/workers', 'workers'], ['/', '#/settings', 'settings'], ['/', '#/bots', 'bots'], ['/bots', '', 'bots'], ['/', '#/schedules', 'schedules'], ['/unknown', '', 'tasks']]) {
+    assert.equal(parseRoute(hash, pathname).page, expected);
+  }
 });
 
-test('the detail header stacks the action row below the title when narrow, wide layout unchanged', () => {
-  const url = new URL('../../src/renderer/features/tasks/task-detail-style.ts', import.meta.url);
-  const header = styleCss(url, detailStyles.header);
+test('the inspector header stacks the action row below the title when narrow, wide layout unchanged', () => {
+  const url = new URL('../../src/renderer/features/tasks/inspector-style.ts', import.meta.url);
+  const header = styleCss(url, inspectorStyles.header);
   // The header is its own inline-size container; wide keeps the actions beside the heading (wrap only as a fallback).
   assert.match(header, /container-type:inline-size/);
   assert.match(header, /flex-wrap:wrap/);
   assert.doesNotMatch(header, /@container/);
-  assert.match(styleCss(url, detailStyles.heading), /@container \(max-width: 480px\)\{[^}]*flex-basis:100%/);
-  const actions = styleCss(url, detailStyles.actions);
-  assert.match(actions, /@container \(max-width: 480px\)\{[^}]*flex-direction:row/);
-  assert.match(actions, /flex-wrap:wrap/);
+  assert.match(styleCss(url, inspectorStyles.heading), /@container \(max-width: 480px\)\{[^}]*flex-basis:100%/);
+  assert.match(styleCss(url, inspectorStyles.actions), /justify-content:flex-end/);
+  assert.match(styleCss(url, inspectorStyles.tabList), /overflow-x:auto/);
+  assert.match(styleCss(url, inspectorStyles.tabList), /flex-wrap:nowrap/);
+  assert.doesNotMatch(styleCss(url, inspectorStyles.tabList), /mask-image|linear-gradient/);
 });
 
-test('accepted detail omits retry and counts constraints with acceptance criteria', async () => {
-  const { TaskDetail } = await import('../../src/renderer/features/tasks/TaskDetail');
+test('accepted inspector omits retry and folds the prompt into the plain 要求 tab', async () => {
+  const { TaskInspectorView } = await import('../../src/renderer/features/tasks/TaskInspector');
   const task = { id: 'accepted', title: '已验收任务', instruction: '检查', owner: { name: 'parent', transport: 'herdr-visible', session: 's', pane: 'p' }, status: 'completed', reviewState: 'accepted', constraints: ['约束一', '约束二'], acceptanceCriteria: ['标准'], events: [], artifacts: [], progress: 100, createdAt: '2026-10-19T12:00:00Z', updatedAt: '2026-10-19T12:00:00Z' } as const;
-  const html = markup(React.createElement(TaskDetail, { task: { ...task, constraints: [...task.constraints], acceptanceCriteria: [...task.acceptanceCriteria], events: [], artifacts: [] }, busy: false, action: async () => true, onStart() {}, onCancel() {}, onRetry() {} }));
-  assert.doesNotMatch(html, /新建重试任务/);
-  assert.match(html, /要求 3/);
+  const render = (tab?: 'requirements') => markup(React.createElement(TaskInspectorView, { task: { ...task, constraints: [...task.constraints], acceptanceCriteria: [...task.acceptanceCriteria], events: [], artifacts: [] }, tasks: [], busy: false, action: async () => true, taskRoute: (taskId: string): Route => ({ page: 'tasks', view: 'all' as const, taskId }), ...(tab ? { initialTab: tab } : {}), onClose() {}, onEdit() {} }));
+  assert.doesNotMatch(render(), /新建重试任务/);
+  const labels = [...render().matchAll(/role="tab"[^>]*>([\s\S]*?)<\/button>/g)].map(match => match[1].replace(/<[^>]+>/g, ''));
+  assert.deepEqual(labels, ['概况', '时间线0', '结果与验收', '要求']);
+  const requirements = render('requirements');
+  assert.match(requirements, /约束一/);
+  assert.match(requirements, /复制Prompt/);
 });

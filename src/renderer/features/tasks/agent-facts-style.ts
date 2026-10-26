@@ -33,6 +33,17 @@ export const factsStyles = stylex.create({
     minInlineSize: 0,
     overflow: 'hidden',
   },
+  /** A board card's parent name: the one footer part that gives way, ellipsized with the full name on hover. */
+  cardParent: {
+    display: 'inline-block',
+    flex: '1 1 auto',
+    minInlineSize: 0,
+    maxInlineSize: 'calc(100% - 2em)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    verticalAlign: 'bottom',
+  },
   /** A key: definition-list semantics without the user-agent indent or emphasis. */
   key: {
     margin: 0,

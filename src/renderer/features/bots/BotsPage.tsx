@@ -1,10 +1,8 @@
 import { useState, type ReactNode } from 'react';
-import * as stylex from '@stylexjs/stylex';
 import { Tabs } from '@lobehub/ui';
-import { PageHeader } from '@lobehub/ui/dashboard';
+import { PageHeader, TitleWithTips } from '@lobehub/ui/dashboard';
 import type { PolicyDraft } from '../../policy/usePolicyDraft';
 import { ImSettings } from './ImSettings';
-import { botStyles } from './bot-style';
 
 interface BotChannel {
   key: string;
@@ -19,20 +17,12 @@ const CHANNELS: BotChannel[] = [
 export function BotsPage({ policy }: { policy: PolicyDraft }) {
   const [channel, setChannel] = useState(CHANNELS[0].key);
   return <>
-    <PageHeader title="Bot" description="配置聊天渠道及 Bot 使用的引擎、模型和思考力度，修改后点击「保存修改」生效。" />
-    {/*
-      渠道导航在配置卡片之外：Tabs 根承导航与面板，surface 只落在选中渠道的 panel 上，
-      tablist 与 panel 为同级，tablist 永不是 surface 后代；panel 即卡片，container queries 照常以它为界。
-    */}
+    <PageHeader title={<TitleWithTips title="Bot" tips="配置聊天渠道及 Bot 使用的引擎、模型和推理强度，修改后点击「保存」生效。接入说明见飞书开放平台的企业自建应用文档。" />} />
     <Tabs
       activeKey={channel}
       onChange={setChannel}
       variant="square"
       size="small"
-      classNames={{
-        list: stylex.props(botStyles.tabList).className,
-        panel: stylex.props(botStyles.surface, botStyles.tabPanel).className,
-      }}
       items={CHANNELS.map(item => ({ key: item.key, label: item.label, children: item.render(policy) }))}
     />
   </>;

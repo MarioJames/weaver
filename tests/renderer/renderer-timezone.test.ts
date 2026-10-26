@@ -7,13 +7,12 @@ import { toast } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { defaultConfig } from '../../src/main/policy/routing';
 import type { Task } from '../../src/shared/contracts/tasks';
-import { TaskBoard } from '../../src/renderer/features/tasks/TaskBoard';
 import { TimeText } from '../../src/renderer/ui/TimeText';
 import { TimeZoneSelect, timeZoneOptions, FOLLOW_BROWSER } from '../../src/renderer/features/settings/TimeZoneSelect';
-import { Setting, SettingsPage } from '../../src/renderer/features/settings/SettingsPage';
+import { SettingsPage } from '../../src/renderer/features/settings/SettingsPage';
+import { SettingRow } from '../../src/renderer/ui/SettingRow';
 import { displayTimeZone, displayWithTimeZone, fieldErrorText, isFieldError } from '../../src/renderer/policy/policy-edit';
 import { cardFooter, cardFooterText } from '../../src/renderer/features/tasks/task-footer';
-import { applyTaskFilters, emptySelection, facetOptions, filterByTime, ownerChipLabel } from '../../src/renderer/features/tasks/task-filters';
 import { TimeZoneProvider, browserTimeZone, compactTime, fullTime, listTimeZones, offsetLabel, projectTimeZone, setProjectTimeZone, startOfZonedDay, zonedParts } from '../../src/renderer/format/timezone';
 import { dateText } from '../../src/renderer/features/quota/quota-view';
 import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';
@@ -91,65 +90,14 @@ const make = (id: string, updatedAt: string, extra: Partial<Task> = {}): Task =>
   createdAt: updatedAt, updatedAt, events: [], artifacts: [], run: { id: 'run', adapter: 'x', status: 'running', startedAt: updatedAt }, ...extra,
 });
 const NOW = at('2026-10-20T03:40:00Z'); // Shanghai Oct 20 11:40, New York Oct 19 23:40
-const A = make('a', '2026-10-19T16:30:00Z'); // Shanghai 00:30 on the 20th, New York 12:30 on the 19th
-const B = make('b', '2026-10-19T10:00:00Z'); // Shanghai 18:00 on the 19th, New York 06:00 on the 19th
-const C = make('c', '2026-10-19T02:00:00Z'); // Shanghai 10:00 on the 19th, New York 22:00 on the 18th
-const D = make('d', '2026-10-20T03:10:00Z');
-const SAMPLES = [A, B, C, D];
-const ids = (tasks: Task[]) => tasks.map(task => task.id).sort();
 
-test('今天 starts at 00:00 of the project zone: the same tasks fall on different sides in two zones', () => {
-  assert.deepEqual(ids(filterByTime(SAMPLES, 'today', NOW, SH)), ['a', 'd']);
-  assert.deepEqual(ids(filterByTime(SAMPLES, 'today', NOW, NY)), ['a', 'b', 'd']);
-  assert.deepEqual(ids(filterByTime(SAMPLES, 'today', NOW, 'UTC')), ['d']);
-  // The boundary itself is in, one millisecond before is out.
-  const start = at('2026-10-19T16:00:00Z');
-  const edge = [make('in', new Date(start).toISOString()), make('out', new Date(start - 1).toISOString())];
-  assert.deepEqual(ids(filterByTime(edge, 'today', NOW, SH)), ['in']);
-  // It follows the configured zone when no zone is passed.
-  setProjectTimeZone(SH);
-  assert.deepEqual(ids(filterByTime(SAMPLES, 'today', NOW)), ['a', 'd']);
-  setProjectTimeZone(NY);
-  assert.deepEqual(ids(filterByTime(SAMPLES, 'today', NOW)), ['a', 'b', 'd']);
-});
-
-test('rolling windows do not depend on the zone', () => {
-  for (const range of ['1h', '24h', '7d', '30d'] as const) {
-    assert.deepEqual(ids(filterByTime(SAMPLES, range, NOW, SH)), ids(filterByTime(SAMPLES, range, NOW, NY)), range);
-    assert.deepEqual(ids(filterByTime(SAMPLES, range, NOW, SH)), ids(filterByTime(SAMPLES, range, NOW, 'Pacific/Kiritimati')), range);
-  }
-  assert.deepEqual(ids(filterByTime(SAMPLES, '1h', NOW, SH)), ['d']);
-  assert.deepEqual(ids(filterByTime(SAMPLES, '24h', NOW, SH)), ['a', 'b', 'd']);
-  assert.equal(filterByTime(SAMPLES, 'all', NOW, SH).length, 4);
-});
-
-test('the board chips, counts and lanes agree on the zone', () => {
-  const count = (html: string, label: string) => Number(html.match(new RegExp(`${label}</span><span[^>]*>(\\d+)</span>`))?.[1]);
-  const render = (zone: string) => markup(React.createElement(TimeZoneProvider, { zone }, React.createElement(TaskBoard, { tasks: SAMPLES, filters: emptySelection(), now: NOW, loading: false, onSelect: () => {} })));
-  const sh = render(SH);
-  const ny = render(NY);
-  assert.equal(count(sh, '今天'), 2);
-  assert.equal(count(ny, '今天'), 3);
-  for (const label of ['近 1 小时', '近 24 小时', '近 7 天', '全部']) assert.equal(count(sh, label), count(ny, label), label);
-  // Lane content matches the chip: 执行中 holds exactly the tasks of 今天.
-  const lane = (html: string) => (html.match(/data-status-column="running"[\s\S]*?(?=data-status-column="review")/)?.[0].match(/样本 [a-z]/g) ?? []).sort();
-  assert.deepEqual(lane(sh), ['样本 a', '样本 d']);
-  assert.deepEqual(lane(ny), ['样本 a', '样本 b', '样本 d']);
-  // The same count the chip prints is what the filter returns for the zone.
-  setProjectTimeZone(SH);
-  assert.equal(applyTaskFilters(SAMPLES, emptySelection(), undefined, NOW, SAMPLES).length, 2);
-  setProjectTimeZone(NY);
-  assert.equal(applyTaskFilters(SAMPLES, emptySelection(), undefined, NOW, SAMPLES).length, 3);
-});
-
-test('card times follow the zone: footer text, time element and hover', () => {
+test('task times follow the zone: footer text, time element and hover', () => {
   const task = make('x', '2026-10-19T16:30:00Z', { run: { id: 'r', adapter: 'x', status: 'running', startedAt: '2026-10-19T16:10:00Z' }, events: [{ id: 'e', at: '2026-10-19T16:30:00Z', kind: 'log', message: 'ok' }] });
   assert.equal(cardFooterText(cardFooter(task), NOW, SH), '由 Claude 于 00:10 派发 · 最新上报 00:30');
   assert.equal(cardFooterText(cardFooter(task), NOW, NY), '由 Claude 于 12:10 派发 · 最新上报 12:30');
-  const html = markup(React.createElement(TimeZoneProvider, { zone: NY }, React.createElement(TaskBoard, { tasks: [task], filters: { ...emptySelection(), time: 'all' }, now: NOW, loading: false, onSelect: () => {} })));
+  const html = markup(React.createElement(TimeZoneProvider, { zone: NY }, React.createElement(TimeText, { value: task.run!.startedAt, now: NOW })));
   assert.match(html, /title="2026-10-19 12:10:00 UTC-04:00 \(America\/New_York\)">12:10<\/time>/);
-  assert.match(html, /title="2026-10-19 12:30:00 UTC-04:00 \(America\/New_York\)">12:30<\/time>/);
-  const shanghai = markup(React.createElement(TimeZoneProvider, { zone: SH }, React.createElement(TaskBoard, { tasks: [task], filters: { ...emptySelection(), time: 'all' }, now: NOW, loading: false, onSelect: () => {} })));
+  const shanghai = markup(React.createElement(TimeZoneProvider, { zone: SH }, React.createElement(TimeText, { value: task.run!.startedAt, now: NOW })));
   assert.match(shanghai, /title="2026-10-20 00:10:00 UTC\+08:00 \(Asia\/Shanghai\)">00:10<\/time>/);
 });
 
@@ -178,14 +126,13 @@ test('a rejected field is said under the field, in the server\'s words', () => {
   assert.equal(fieldErrorText(real), '「Mars/Base」不是有效的 IANA 时区名，例如 Asia/Shanghai。');
 });
 
-test('a setting shows its error inline under the control and raises no notice', t => {
+test('a setting row shows its hint and raises no alert without an error', t => {
   const calls: unknown[] = [];
   t.mock.method(toast, 'error', (options: unknown) => { calls.push(options); return { id: 'x', close() {}, update() {} }; });
-  const html = markup(React.createElement(Setting, { label: '刷新间隔（分钟）', desc: '5 到 1440 分钟。', htmlFor: 'f', error: '请输入 5 到 1440 之间的整数。', children: React.createElement('input', { id: 'f' }) }));
-  assert.match(html, /<p id="f-error" role="alert"[^>]*>请输入 5 到 1440 之间的整数。<\/p>/);
-  assert.ok(html.indexOf('<input') < html.indexOf('role="alert"'), 'the message sits under the control');
+  const html = markup(React.createElement(SettingRow, { label: '刷新间隔（分钟）', tips: '5 到 1440 分钟。', hint: React.createElement('span', { role: 'alert' }, '请输入 5 到 1440 之间的整数。'), children: React.createElement('input', { id: 'f' }) }));
+  assert.match(html, /<span role="alert">请输入 5 到 1440 之间的整数。<\/span>/);
   assert.equal(calls.length, 0);
-  assert.doesNotMatch(markup(React.createElement(Setting, { label: 'x', desc: 'y', htmlFor: 'g', children: React.createElement('input', { id: 'g' }) })), /role="alert"/);
+  assert.doesNotMatch(markup(React.createElement(SettingRow, { label: 'x', tips: 'y', children: React.createElement('input', { id: 'g' }) })), /role="alert"/);
 });
 
 function settings(zone?: string) {
@@ -207,22 +154,6 @@ test('settings offer 项目时区: browser first, then every zone with its offse
   assert.match(follow, new RegExp(`跟随浏览器（当前：${browserTimeZone().replace('/', '\\/')}）`));
   assert.match(settings(SH), /Asia\/Shanghai UTC\+08:00/);
   assert.match(markup(React.createElement(TimeZoneSelect, { id: 'tz', onChange: () => {} })), /role="combobox"/);
-});
-
-test('parent Agent chips read "host · session time"; the workspace stays in the hover; same host and time stay distinguishable', () => {
-  assert.equal(ownerChipLabel('Claude · weaver · 21:30'), 'Claude · 21:30');
-  assert.equal(ownerChipLabel('Claude'), 'Claude');
-  assert.equal(ownerChipLabel('Claude · 21:30'), 'Claude · 21:30');
-  const one = make('o1', '2026-10-20T03:10:00Z', { owner: { ...owner, name: 'Claude · weaver · 21:30' } });
-  const two = make('o2', '2026-10-20T03:11:00Z', { owner: { ...owner, name: 'Claude · weaver · 21:45' } });
-  const three = make('o3', '2026-10-20T03:12:00Z', { owner: { ...owner, name: 'Claude · docs · 21:30' } });
-  const alone = facetOptions([one, two], 'owner', emptySelection(), NOW);
-  assert.deepEqual(alone.map(option => [option.label, option.title]).sort(), [['Claude · 21:30', 'Claude · weaver · 21:30'], ['Claude · 21:45', 'Claude · weaver · 21:45']]);
-  const clash = facetOptions([one, three], 'owner', emptySelection(), NOW);
-  assert.deepEqual(clash.map(option => option.label).sort(), ['Claude · docs · 21:30', 'Claude · weaver · 21:30']);
-  const board = markup(React.createElement(TaskBoard, { tasks: [one, two], filters: emptySelection(), now: NOW, loading: false, onSelect: () => {} }));
-  assert.match(board, /title="Claude · weaver · 21:30"[^>]*>(?:<[^>]*>)*<span[^>]*>Claude · 21:30<\/span>/);
-  assert.doesNotMatch(board.slice(board.indexOf('aria-label="任务筛选"'), board.indexOf('任务状态列')).replace(/title="[^"]*"/g, ''), /weaver · 21/);
 });
 
 test('no renderer module formats a time on its own: everything goes through timezone.ts', async () => {

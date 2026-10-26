@@ -6,7 +6,6 @@ import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { toast, type ToastOptions } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import { ConnectionNotice } from '../../src/renderer/api/ConnectionNotice';
-import { ContinuationDialog } from '../../src/renderer/features/roles/OwnerInspector';
 import { PolicyHeader } from '../../src/renderer/policy/PolicyHeader';
 import { SettingsPage } from '../../src/renderer/features/settings/SettingsPage';
 import type { PolicyDraft } from '../../src/renderer/policy/usePolicyDraft';
@@ -28,8 +27,7 @@ test('failed policy loads and modal operations add no error content to page flow
   const policy={loading:false,busy:false,dirty:false,loadError:'HTTP_403: 禁止访问',saveError:'CONFLICT: 已变化',conflict:true,issues:[]} as unknown as PolicyDraft;
   const html=markup(React.createElement(React.Fragment,null,
     React.createElement(PolicyHeader,{title:'配置',description:'编辑配置',policy}),
-    React.createElement(SettingsPage,{policy}),
-    React.createElement(ContinuationDialog,{profiles:[],sending:false,failure:'NETWORK: 断线',onChange:()=>{},onRetry:()=>{}})));
+    React.createElement(SettingsPage,{policy})));
   assert.doesNotMatch(html,/HTTP_403|CONFLICT|NETWORK|role="alert"|禁止访问|断线/);
 });
 
