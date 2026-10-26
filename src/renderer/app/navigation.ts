@@ -26,7 +26,7 @@ export function navigationGroups({ attention, blockedOwners, blockedWorkers }: N
       key: 'work',
       label: '工作',
       items: [
-        { href: routeHref({ page: 'tasks', view: 'sessions' }), label: '工作台', icon: ListTodo, ...badge(attention) },
+        { href: routeHref({ page: 'tasks', view: 'board' }), label: '工作台', icon: ListTodo, ...badge(attention) },
         { href: routeHref({ page: 'schedules' }), label: '定时任务', icon: CalendarClock },
       ],
     },

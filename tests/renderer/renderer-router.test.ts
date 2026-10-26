@@ -6,11 +6,12 @@ import { parseRoute, routeHref } from '../../src/renderer/app/router';
 import { blockedProfileCount, navigationGroups } from '../../src/renderer/app/navigation';
 
 const routes: Route[] = [
+  { page: 'tasks', view: 'board' },
+  { page: 'tasks', view: 'board', taskId: 'only-task' },
   { page: 'tasks', view: 'sessions' },
   { page: 'tasks', view: 'sessions', sessionKey: 'o-abc' },
   { page: 'tasks', view: 'sessions', sessionKey: 'unowned' },
   { page: 'tasks', view: 'sessions', sessionKey: 'o-a/b 中', taskId: 'task/一' },
-  { page: 'tasks', view: 'sessions', taskId: 'only-task' },
   { page: 'tasks', view: 'all' },
   { page: 'tasks', view: 'all', taskId: 'task-1' },
   { page: 'schedules' },
@@ -33,6 +34,18 @@ test('every route round-trips through routeHref and parseRoute, ids included', (
   }
 });
 
+test('board routes parse and generate: #/tasks is the board, #/tasks/t/<id> opens the inspector', () => {
+  assert.deepEqual(parseRoute('#/tasks'), { page: 'tasks', view: 'board' });
+  assert.deepEqual(parseRoute('#/tasks/t/abc'), { page: 'tasks', view: 'board', taskId: 'abc' });
+  assert.equal(routeHref({ page: 'tasks', view: 'board' }), '#/tasks');
+  assert.equal(routeHref({ page: 'tasks', view: 'board', taskId: 'a/b' }), '#/tasks/t/a%2Fb');
+  assert.deepEqual(parseRoute('#/tasks/t/a%2Fb'), { page: 'tasks', view: 'board', taskId: 'a/b' });
+});
+
+test('the unselected session view keeps its own address', () => {
+  assert.deepEqual(parseRoute('#/tasks/s'), { page: 'tasks', view: 'sessions' });
+  assert.equal(routeHref({ page: 'tasks', view: 'sessions' }), '#/tasks/s');
+});
 test('ids are encoded inside a segment and decoded back to the same opaque string', () => {
   const href = routeHref({ page: 'tasks', view: 'sessions', sessionKey: 'o-a/b 中', taskId: 'task/一' });
   assert.equal(href, '#/tasks/s/o-a%2Fb%20%E4%B8%AD/t/task%2F%E4%B8%80');
@@ -44,13 +57,13 @@ test('ids are encoded inside a segment and decoded back to the same opaque strin
 test('older pathname links resolve without a hash', () => {
   assert.deepEqual(parseRoute('', '/channels'), { page: 'channels' });
   assert.deepEqual(parseRoute('', '/owners/o%2Fx'), { page: 'owners', id: 'o/x' });
-  assert.deepEqual(parseRoute('', '/'), { page: 'tasks', view: 'sessions' });
-  assert.deepEqual(parseRoute('', '/unknown'), { page: 'tasks', view: 'sessions' });
+  assert.deepEqual(parseRoute('', '/'), { page: 'tasks', view: 'board' });
+  assert.deepEqual(parseRoute('', '/unknown'), { page: 'tasks', view: 'board' });
 });
 
-test('unknown pages and malformed task segments fall back to the session view', () => {
-  for (const hash of ['#/nope', '#/tasks/nope', '#/tasks/s', '']) {
-    assert.deepEqual(parseRoute(hash), { page: 'tasks', view: 'sessions' }, hash);
+test('unknown pages and malformed task segments fall back to the board', () => {
+  for (const hash of ['#/nope', '#/tasks/nope', '']) {
+    assert.deepEqual(parseRoute(hash), { page: 'tasks', view: 'board' }, hash);
   }
   assert.deepEqual(parseRoute('#/tasks/s/key/nope'), { page: 'tasks', view: 'sessions', sessionKey: 'key' });
   assert.deepEqual(parseRoute('#/schedules/gone'), { page: 'schedules', id: 'gone' });

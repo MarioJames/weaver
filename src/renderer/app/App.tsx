@@ -59,7 +59,7 @@ export function App() {
   return <TimeZoneProvider zone={displayTimeZone(policy.snapshot?.config)}><ConsoleShell
     {...stylex.props(shellStyles.shell)}
     storageKey="weaver-nav"
-    brand={<ConsoleBrand label="Weaver" logo={<BrandLogo />} href={routeHref({ page: 'tasks', view: 'sessions' })} />}
+    brand={<ConsoleBrand label="Weaver" logo={<BrandLogo />} href={routeHref({ page: 'tasks', view: 'board' })} />}
     navigation={<ConsoleNav label="主导航" groups={navigation} defaultExpanded="all" pathname={routeHref(route)} />}
     openNavigationLabel="打开导航" closeNavigationLabel="关闭导航" collapseLabel="收起导航" expandLabel="展开导航" skipToContentLabel="跳到内容"
   >

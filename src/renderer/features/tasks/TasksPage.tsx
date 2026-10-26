@@ -15,8 +15,8 @@ import { attentionTasks, needsAttention } from './task-attention';
 import { isOwnerRoot, ownerProfileOf, recentWorkspaces, withOwnerProfiles } from './task-view';
 import { buildSessions, retryAttemptOf, retryChains, sessionKeyOf, sessionWorkspaceLabel, type Session } from './task-session';
 import {
-  WORKBENCH_TIMES, defaultWorkbenchSessions, readTaskPins, readWorkbenchEnded, readWorkbenchSessions,
-  writeTaskPins, writeWorkbenchEnded, writeWorkbenchSessions, type WorkbenchSessions, type WorkbenchTime,
+  WORKBENCH_TIMES, defaultWorkbenchBoard, defaultWorkbenchSessions, readTaskPins, readWorkbenchBoard, readWorkbenchEnded, readWorkbenchSessions,
+  writeTaskPins, writeWorkbenchBoard, writeWorkbenchEnded, writeWorkbenchSessions, type WorkbenchBoard, type WorkbenchSessions, type WorkbenchTime,
 } from './task-persistence';
 import { isPinned, nextPinTime, pruneStalePins, togglePin } from './task-pins';
 import { EditTaskDialog } from './EditTaskDialog';
@@ -25,6 +25,7 @@ import { TaskInspector } from './TaskInspector';
 import { ContinueSessionButton } from './SessionContinueDialog';
 import type { useWorkbench } from './useWorkbench';
 import { MasterDetail } from '../../ui/MasterDetail';
+import { BoardInspectorOverlay, TaskBoardView } from './TaskBoard';
 import { CompactMetrics, type CompactMetricItem } from '../../ui/CompactMetrics';
 import { Pane } from '../../ui/Pane';
 import { SelectableList } from '../../ui/SelectableList';
@@ -135,7 +136,7 @@ export function TasksPage({ work, ownerKind, freeChannel }: {
   freeChannel?: (workerId?: string) => boolean;
 }) {
   const route = useRoute();
-  const view = route.page === 'tasks' ? route.view : 'sessions';
+  const view = route.page === 'tasks' ? route.view : 'board';
   const narrow = useNarrow();
   const wide = useMedia(WIDE_QUERY);
   const tight = useMedia(TIGHT_QUERY);
@@ -156,6 +157,7 @@ export function TasksPage({ work, ownerKind, freeChannel }: {
   const sessionByKey = useMemo(() => new Map(sessions.map(session => [session.key, session])), [sessions]);
 
   const [prefs, setPrefs] = useState<WorkbenchSessions>(readWorkbenchSessions);
+  const [boardPrefs, setBoardPrefs] = useState<WorkbenchBoard>(readWorkbenchBoard);
   const [endedOpen, setEndedOpen] = useState(readWorkbenchEnded);
   const [pins, setPins] = useState(readTaskPins);
   const [creating, setCreating] = useState(false);
@@ -192,6 +194,7 @@ export function TasksPage({ work, ownerKind, freeChannel }: {
   }, [view]);
 
   const updatePrefs = (next: WorkbenchSessions) => { setPrefs(next); writeWorkbenchSessions(next); };
+  const updateBoardPrefs = (next: WorkbenchBoard) => { setBoardPrefs(next); writeWorkbenchBoard(next); };
   const toggleEnded = () => { const next = !endedOpen; setEndedOpen(next); writeWorkbenchEnded(next); };
   const onTogglePin = (id: string) => {
     const next = togglePin(pins, id, nextPinTime(pins, now, Date.now()));
@@ -203,7 +206,11 @@ export function TasksPage({ work, ownerKind, freeChannel }: {
     requestAnimationFrame(() => {
       const row = id ? document.querySelector<HTMLElement>(`[data-task-row="${CSS.escape(id)}"]`) : null;
       if (row?.isConnected) { row.focus({ preventScroll: true }); row.scrollIntoView({ block: 'nearest' }); return; }
-      const fallback = view === 'all' ? allSearchRef.current : searchRef.current;
+      const fallback = view === 'all'
+        ? allSearchRef.current
+        : view === 'board'
+          ? document.querySelector<HTMLElement>('[aria-label="搜索看板"]')
+          : searchRef.current;
       fallback?.focus({ preventScroll: true });
     });
   };
@@ -284,8 +291,12 @@ export function TasksPage({ work, ownerKind, freeChannel }: {
     <Segmented
       aria-label="视图切换"
       value={view}
-      options={[{ value: 'sessions', label: '会话' }, { value: 'all', label: '全部任务' }]}
-      onChange={value => navigate(value === 'all' ? { page: 'tasks', view: 'all' } : { page: 'tasks', view: 'sessions' })}
+      options={[{ value: 'board', label: '看板' }, { value: 'sessions', label: '会话' }, { value: 'all', label: '全部任务' }]}
+      onChange={value => navigate(
+        value === 'all' ? { page: 'tasks', view: 'all' }
+          : value === 'sessions' ? { page: 'tasks', view: 'sessions' }
+            : { page: 'tasks', view: 'board' },
+      )}
     />
   );
 
@@ -454,6 +465,73 @@ export function TasksPage({ work, ownerKind, freeChannel }: {
             inspectorOpen={inspectorOpen}
             onInspectorClose={() => closeInspector({ page: 'tasks', view: 'all' }, allTaskId)}
             mobileView={mobileView}
+          />
+        </div>
+        {editingTask && (
+          <EditTaskDialog open={editing} task={editingTask} profile={ownerProfileOf(editingTask, owners)} busy={work.busy} recentWorkspaces={recentWorkspaces(tasks, 5)} close={() => setEditing(false)}
+            save={(input, start, expectedRevision) => work.action(() => updateTask(taskUpdateArgs({ id: editingTask.id, revision: expectedRevision }, input, ownerProfileOf(editingTask, owners)), start, {
+              update: args => command('tasks.update', args, true),
+              start: id => window.weaver.startTask(id),
+              startFailed: (id, error) => notifyError(error, '草稿已保存，启动失败', { label: '重试启动', run: () => { void work.action(() => window.weaver.startTask(id)); } }),
+            }), notifySaveDraftFailure)} />
+        )}
+        <NewTaskDialog open={creating} busy={work.busy} recentWorkspaces={recentWorkspaces(tasks, 5)} close={() => setCreating(false)} onClosed={() => newTaskRef.current?.focus()}
+          create={(input, start) => work.action(() => createTask(input, start, {
+            create: value => command<{ id: string }>('tasks.create', { ...value }, true),
+            start: id => window.weaver.startTask(id),
+            select: id => navigate({ page: 'tasks', view: 'sessions', sessionKey: `r-${id}` }),
+            startFailed: (id, error) => notifyError(error, '任务已创建，启动失败', { label: '重试启动', run: () => { void work.action(() => window.weaver.startTask(id)); } }),
+          }))} />
+      </section>
+    );
+  }
+
+  // ---- board view (default) ----
+  if (view === 'board') {
+    const boardTaskId = route.page === 'tasks' && route.view === 'board' ? route.taskId : undefined;
+    const boardTask = boardTaskId ? tasksById.get(boardTaskId) : undefined;
+    const closeBoardInspector = (focusId?: string) => {
+      navigate({ page: 'tasks', view: 'board' }, { replace: true });
+      focusTaskRow(focusId);
+    };
+    return (
+      <section aria-label="工作台" {...stylex.props(workbenchStyles.page)}>
+        <PageHeader
+          title={<TitleWithTips title="工作台" tips="看板一眼看清各状态有什么：待执行、执行中、待验收、已结束。点卡片在右侧检查器看细节，地址即状态，刷新与后退都回到同一处。" />}
+          action={<div {...stylex.props(workbenchStyles.detailActions)}>{newTaskAction}{viewSwitch}</div>}
+        />
+        <div {...stylex.props(workbenchStyles.body)}>
+          <TaskBoardView
+            tasks={tasks}
+            now={now}
+            narrow={narrow}
+            prefs={boardPrefs}
+            onPrefsChange={updateBoardPrefs}
+            pins={pins}
+            onTogglePin={onTogglePin}
+            selectedId={boardTaskId}
+            onSelect={id => navigate({ page: 'tasks', view: 'board', taskId: id })}
+            freeChannel={freeChannel}
+            inspector={boardTaskId ? (
+              <BoardInspectorOverlay label="任务检查器" narrow={narrow} onClose={() => closeBoardInspector(boardTaskId)}>
+                {boardTask || tasksById.has(boardTaskId) ? (
+                  <TaskInspector
+                    key={boardTaskId}
+                    taskId={boardTaskId}
+                    tasks={tasks}
+                    work={work}
+                    ownerKind={ownerKind}
+                    freeChannel={freeChannel}
+                    taskRoute={id => ({ page: 'tasks', view: 'board', taskId: id })}
+                    sessionRoute={sessionRouteOf}
+                    onClose={() => closeBoardInspector(boardTaskId)}
+                    onEdit={full => { setEditingTask(full); setEditing(true); }}
+                  />
+                ) : (
+                  <MissingTaskPane onBack={() => closeBoardInspector()} />
+                )}
+              </BoardInspectorOverlay>
+            ) : undefined}
           />
         </div>
         {editingTask && (

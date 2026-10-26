@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 /** The one route shape shared by the shell and every page that links across pages. */
 export type Route =
+  | { page: 'tasks'; view: 'board'; taskId?: string }
   | { page: 'tasks'; view: 'sessions'; sessionKey?: string; taskId?: string }
   | { page: 'tasks'; view: 'all'; taskId?: string }
   | { page: 'schedules' | 'owners' | 'workers' | 'channels'; id?: string }
@@ -36,20 +37,22 @@ function tasksRoute(rest: string[]): Route {
       ? { page: 'tasks', view: 'all', taskId: rest[2] }
       : { page: 'tasks', view: 'all' };
   }
-  if (view === 's' && rest[1]) {
+  if (view === 's') {
+    if (!rest[1]) return { page: 'tasks', view: 'sessions' };
     return rest[2] === 't' && rest[3]
       ? { page: 'tasks', view: 'sessions', sessionKey: rest[1], taskId: rest[3] }
       : { page: 'tasks', view: 'sessions', sessionKey: rest[1] };
   }
-  // `#/tasks/t/<id>` keeps a round trip for a task without a session selected.
-  if (view === 't' && rest[1]) return { page: 'tasks', view: 'sessions', taskId: rest[1] };
-  return { page: 'tasks', view: 'sessions' };
+  // `#/tasks/t/<id>` opens one task over the board; bare `#/tasks` is the board itself.
+  if (view === 't' && rest[1]) return { page: 'tasks', view: 'board', taskId: rest[1] };
+  return { page: 'tasks', view: 'board' };
 }
 
 /**
  * Hash routes, parsed in one place. The hash wins; without one the pathname is
  * read so older `/channels`-style links still land on the same page. Unknown
- * pages fall back to the session view without throwing away a known id.
+ * pages fall back to the board; unknown ids stay in the URL for the page's
+ * 「未找到」 empty state instead of silently jumping away.
  */
 export function parseRoute(hash: string, pathname?: string): Route {
   const source = hash && hash !== '#' ? hash : pathname ?? '';
@@ -60,7 +63,7 @@ export function parseRoute(hash: string, pathname?: string): Route {
   }
   if (page === 'bots') return { page: 'bots' };
   if (page === 'settings') return { page: 'settings' };
-  return { page: 'tasks', view: 'sessions' };
+  return { page: 'tasks', view: 'board' };
 }
 
 function encode(value: string): string {
@@ -71,10 +74,13 @@ function encode(value: string): string {
 export function routeHref(route: Route): string {
   if (route.page === 'tasks') {
     if (route.view === 'all') return route.taskId ? `#/tasks/all/t/${encode(route.taskId)}` : '#/tasks/all';
-    if (!route.sessionKey) return route.taskId ? `#/tasks/t/${encode(route.taskId)}` : '#/tasks';
-    return route.taskId
-      ? `#/tasks/s/${encode(route.sessionKey)}/t/${encode(route.taskId)}`
-      : `#/tasks/s/${encode(route.sessionKey)}`;
+    if (route.view === 'sessions') {
+      if (!route.sessionKey) return route.taskId ? `#/tasks/t/${encode(route.taskId)}` : '#/tasks/s';
+      return route.taskId
+        ? `#/tasks/s/${encode(route.sessionKey)}/t/${encode(route.taskId)}`
+        : `#/tasks/s/${encode(route.sessionKey)}`;
+    }
+    return route.taskId ? `#/tasks/t/${encode(route.taskId)}` : '#/tasks';
   }
   if (route.page === 'bots' || route.page === 'settings') return `#/${route.page}`;
   return route.id ? `#/${route.page}/${encode(route.id)}` : `#/${route.page}`;

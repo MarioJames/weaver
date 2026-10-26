@@ -71,14 +71,15 @@ const page = (tasks: Task[], hash = '#/tasks') => {
   } finally { restoreStorage(); restoreWindow(); }
 };
 
-test('the workbench header offers 新建任务 and the 会话/全部任务 switch, with no board or archive', () => {
+test('the workbench header offers 新建任务 and the 看板/会话/全部任务 switch, defaulting to the board', () => {
   const html = page([]);
   assert.match(html, /工作台/);
   assert.match(html, /新建任务/);
+  assert.match(html, /看板/);
   assert.match(html, /会话/);
   assert.match(html, /全部任务/);
   assert.match(html, /还没有任务/);
-  assert.doesNotMatch(html, /任务看板/);
+  assert.match(html, /搜索任务、子 Agent、工作目录/);
   assert.doesNotMatch(html, /归档/);
   assert.doesNotMatch(html, /任务筛选/);
 });
@@ -87,7 +88,7 @@ test('sessions group by workspace with headings, counts and attention flags', ()
   const root = make('root', { executionRole: 'owner', title: '网页目标', status: 'running', workspace: '/repo/alpha' });
   const running = make('c1', { parentTaskId: 'root', status: 'running', title: '执行子任务', workspace: '/repo/alpha' });
   const failed = make('c2', { parentTaskId: 'root', status: 'failed', title: '失败子任务', workspace: '/repo/alpha' });
-  const html = page([root, running, failed]);
+  const html = page([root, running, failed], '#/tasks/s/r-root');
   assert.match(html, /网页目标/);
   assert.match(html, /alpha/);
   assert.match(html, /1 执行中/);
