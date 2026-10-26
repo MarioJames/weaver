@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
@@ -29,6 +30,19 @@ stylexPlugin.buildStart = async function (options) {
     const filename = require.resolve(tokenModule);
     await Reflect.apply(transform, this, [readFileSync(filename, 'utf8'), filename]);
   }
+};
+
+// The plugin clears its dev CSS-update interval on `server.httpServer` close, but Weaver runs Vite in
+// middleware mode where httpServer is null, so the ref'd interval kept the process alive long after
+// shutdown. Give the hook a stand-in that closes together with the Vite server.
+const { configureServer } = stylexPlugin;
+if (typeof configureServer !== 'function') throw new Error('@stylexjs/unplugin/vite did not expose a callable configureServer hook');
+stylexPlugin.configureServer = function (server) {
+  if (server.httpServer) return configureServer.call(this, server);
+  const httpServer = new EventEmitter();
+  const close = server.close.bind(server);
+  server.close = async () => { try { await close(); } finally { httpServer.emit('close'); } };
+  return configureServer.call(this, new Proxy(server, { get: (target, key) => key === 'httpServer' ? httpServer : Reflect.get(target, key) }));
 };
 
 export default defineConfig({

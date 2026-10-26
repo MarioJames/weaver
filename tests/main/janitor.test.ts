@@ -212,6 +212,26 @@ test('the scheduler honors enabled, disable and the configured interval', async 
   assert.equal(existsSync(kept), true, 'a stale directory survives while cleanup is disabled');
 });
 
+test('stopping during a sweep does not read settings again once the sweep ends', async t => {
+  const root = await rootFor(t);
+  await staleDir(root, 'wv-stop-mid-sweep', NOW);
+  let closed = false;
+  const rejections: unknown[] = [];
+  const onRejection = (reason: unknown) => { rejections.push(reason); };
+  process.on('unhandledRejection', onRejection);
+  t.after(() => { process.off('unhandledRejection', onRejection); });
+  const { janitor } = options(root, {
+    platform: 'win32',
+    now: () => Date.now(),
+    // Shutdown closes the database that backs settings while the startup sweep is still in flight.
+    settings: () => { if (closed) throw new Error('database is not open'); return { enabled: true, ttl_hours: 24, interval_hours: 6 }; },
+    activeDataDirs: () => { janitor.stop(); closed = true; return []; },
+  });
+  janitor.start();
+  await delay(100);
+  assert.deepEqual(rejections, []);
+});
+
 test('a directory in use by a live cwd or open file is kept', { skip: process.platform !== 'linux' }, async t => {
   const root = await rootFor(t);
   const cwdDir = await staleDir(root, 'wv-busy-cwd', NOW);

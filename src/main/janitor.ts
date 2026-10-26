@@ -361,6 +361,8 @@ export class TempJanitor {
     if (this.lastSweepAt !== null && this.now() < this.lastSweepAt + this.intervalMs()) { this.scheduleCheck(); return; }
     try { await this.sweep(); }
     catch (error) { this.log(`sweep failed: ${error instanceof Error ? error.message : String(error)}`); }
+    // stop() may land while the sweep is in flight; shutdown has closed the settings store by then.
+    if (!this.started) return;
     this.scheduleCheck();
   }
 
