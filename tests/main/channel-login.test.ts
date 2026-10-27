@@ -98,6 +98,20 @@ test('credentials written before verification remain gated, then the actual laun
  }finally{release?.();await logins.close();rmSync(f.root,{recursive:true,force:true});}
 });
 
+test('success is reported only after the authenticated hook settles, even when it fails',async()=>{
+ for(const outcome of ['resolve','reject'] as const){
+  const f=loginFixture();let settle!:()=>void;const calls:string[]=[];
+  const logins=new ChannelLogins(f.binding,{...f.options,authenticated:channel=>{calls.push(channel);return new Promise<void>((resolve,reject)=>{settle=outcome==='resolve'?resolve:()=>reject(new Error('probe failed'));});}});
+  try{
+   const job=await logins.start({channel:'first'});await tick();
+   writeFileSync(join(f.root,'auth.json'),JSON.stringify({tokens:{account_id:'fixture',access_token:'fixture-private'}}));
+   f.scopes[0].emit('close',0);await tick();await tick();
+   assert.deepEqual(calls,['first']);assert.equal(logins.get({channel:'first',id:job.id}).status,'verifying');
+   settle();await tick();await tick();assert.equal(logins.get({channel:'first',id:job.id}).status,'succeeded');
+  }finally{await logins.close();rmSync(f.root,{recursive:true,force:true});}
+ }
+});
+
 test('authorization links discard nonofficial hosts and credential-bearing callback URLs',()=>{
  assert.equal(channelVerificationUrl('codex','https://auth.openai.com/codex/device'),'https://auth.openai.com/codex/device');
  for(const value of ['https://auth.openai.com.evil.test/a','https://user:password@auth.openai.com/a','https://auth.openai.com/a?access_token=secret','https://auth.openai.com/a#refresh_token=secret','https://auth.openai.com/a?code=oauth-callback-private'])assert.equal(channelVerificationUrl('codex',value),undefined);

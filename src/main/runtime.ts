@@ -289,7 +289,7 @@ export async function startRuntime(options: RuntimeOptions): Promise<WeaverRunti
     store = new TaskStore(join(dataDir, 'weaver.db'));
     policy = new PolicyStore(store.db);
     channelStore=new ChannelStore(store.db);channelService=new ChannelService(policy,channelStore,{root:join(dataDir,'channels')});
-    channelLogins=new ChannelLogins(binding,{env:options.channels?.env,initialize:id=>channelService.initializeLogin(id)});
+    channelLogins=new ChannelLogins(binding,{env:options.channels?.env,initialize:id=>channelService.initializeLogin(id),authenticated:async id=>refreshQuota({channel:id})});
     importer=new NativeChannelImporter(policy,channelStore,{root:join(dataDir,'channels'),env:options.channels?.env});
     // One read-only source import per managed data directory; tests require an explicit isolated source.
     if(options.channels?.autoImport!==false&&(!testContext||options.channels?.env?.HOME)&&!store.getValue('channels.native-import.v1')){

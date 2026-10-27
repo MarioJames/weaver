@@ -15,6 +15,8 @@ type ClaudeIdentity = NonNullable<ReturnType<typeof claudeAccount>>;
 interface LoginWork { engine?:string; expected?:ClaudeIdentity; codeSubmitted?:boolean; submitting?:boolean; job:ChannelLogin; scope?:OwnedScope; closed?:Promise<number|null>; done?:boolean; work?:Promise<void>; cleanup?:Promise<void>; helper?:OpenCodeAccounts; finished?:boolean }
 export interface ChannelLoginOptions {
  initialize?:(channel:string)=>ChannelBinding;
+ /** Runs before success is reported, so the next read no longer carries the pre-login quota record. */
+ authenticated?:(channel:string)=>Promise<unknown>;
  env?:NodeJS.ProcessEnv;
  start?:typeof startOwnedScope;
  find?:typeof findEngineExecutable;
@@ -191,6 +193,9 @@ export class ChannelLogins {
    const account=item.expected&&claudeAccount(root);
    if(item.expected&&(account?.accountUuid!==item.expected.accountUuid||account.organizationUuid!==item.expected.organizationUuid)){this.fail(item,'LOGIN_IDENTITY_CHANGED','登录的 Claude 账号与此账号原来的身份不同，新凭据未启用；请改用原账号登录，或新建独立账号');return;}
    rmSync(join(root,'.weaver-login-pending'),{force:true});
+   // A quota probe failure is shown on the account itself; the login is already complete.
+   await this.options.authenticated?.(job.channel).catch(()=>{});
+   if(!active(job))return;
    job.status='succeeded';job.identity={label:`${engine==='qodercli'?'qoder':engine} 官方账号`};
   }catch(error){if(active(job)){if(error instanceof RpcError&&error.code==='ENGINE_NOT_INSTALLED')this.fail(item,error.code,error.message);else this.fail(item,'LOGIN_FAILED','原生登录未完成，请检查 CLI 与网络后重试');}}
   finally{

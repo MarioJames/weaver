@@ -39,6 +39,29 @@ test('channel RPC reads locally, refreshes one real identity, isolates API and g
  }finally{await runtime.close();db.close();rmSync(dir,{recursive:true,force:true});}
 });
 
+// The native login runs in a real systemd user scope.
+test('a completed native login replaces the pre-login unauthenticated quota before reporting success',{skip:process.env.WEAVER_CHANNEL_LOGIN_SCOPE_TEST!=='1'},async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'r-'));const db=new DatabaseSync(join(dir,'weaver.db'));const policy=new PolicyStore(db);const secrets=new ChannelStore(db);
+ const bin=join(dir,'bin');mkdirSync(bin);
+ const payload=Buffer.from(JSON.stringify({exp:Date.parse('2100-01-01')/1000})).toString('base64url');
+ writeFileSync(join(bin,'codex'),`#!/bin/sh\nif [ "$2" = status ]; then echo 'Logged in using ChatGPT'; exit 0; fi\nprintf '%s' '${JSON.stringify({auth_mode:'chatgpt',tokens:{access_token:`e30.${payload}.fixture-login-token`,account_id:'fixture-login'}})}' > "$CODEX_HOME/auth.json"\n`,{mode:0o755});
+ const config=policy.snapshot().config;
+ config.channels.fresh={engine:'codex',kind:'subscription',label:'Fresh account',enabled:true};policy.save({revision:0,config,blocks:[]});
+ let requests=0;
+ const prober=new QuotaProber({channels:()=>({fresh:{channel:config.channels.fresh,engineKind:'codex',secret:secrets.getSecret('fresh')??{}}}),root:join(dir,'quota'),env:{HOME:dir},fetch:async()=>{requests++;return Response.json({rate_limit:{allowed:true,limit_reached:false,primary_window:{used_percent:12,reset_at:Date.now()/1000+3600,limit_window_seconds:3600}},credits:{has_credits:false,unlimited:false,balance:'0'}});}});
+ const runtime=await startRuntime({dataDir:dir,port:0,channels:{autoImport:false,env:{HOME:dir,PATH:`${bin}:${process.env.PATH}`,XDG_RUNTIME_DIR:process.env.XDG_RUNTIME_DIR}},quotaProber:prober});
+ const rpc=async(method:string,input?:unknown)=>{const response=await fetch(`${runtime.url}/api/rpc`,{method:'POST',headers:{origin:runtime.url,'content-type':'application/json'},body:JSON.stringify({method,args:input===undefined?[]:[input]})});return {status:response.status,body:await response.json() as any};};
+ try{
+  assert.equal((await rpc('refreshChannelQuota',{channel:'fresh'})).body.result.configurations.fresh.quota.status,'unauthenticated');
+  const job=(await rpc('startChannelLogin',{channel:'fresh'})).body.result;
+  let state=await rpc('getChannelLogin',{channel:'fresh',id:job.id});
+  for(let attempt=0;['starting','authorizing','verifying'].includes(state.body.result.status)&&attempt<500;attempt++){await new Promise(resolve=>setTimeout(resolve,20));state=await rpc('getChannelLogin',{channel:'fresh',id:job.id});}
+  assert.equal(state.body.result.status,'succeeded',JSON.stringify(state.body.result.error));
+  const after=(await rpc('getChannels')).body.result.configurations.fresh;
+  assert.equal(after.hasCredentials,true);assert.equal(requests,1);assert.equal(after.quota.status,'available');
+ }finally{await runtime.close();db.close();rmSync(dir,{recursive:true,force:true});}
+});
+
 test('actual HTTP task reads hide private channel paths while preserving durable owner and host data',async()=>{
  const dir=mkdtempSync(join(tmpdir(),'r-'));
  const runtime=await startRuntime({dataDir:dir,port:0,channels:{autoImport:false,env:{HOME:dir}}});
