@@ -1,10 +1,11 @@
 import { notifyError } from '../../api/notify';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as stylex from '@stylexjs/stylex';
-import { Button, CopyButton, Empty, Input, Modal, Progress, Segmented, Skeleton, Table, Tag, Text } from '@lobehub/ui';
+import { Button, CopyButton, Drawer, Empty, Input, Modal, Progress, Segmented, Skeleton, Table, Tag, Text } from '@lobehub/ui';
 import type { SelectProps, TableColumnsType } from '@lobehub/ui';
-import { PageHeader, TitleWithTips } from '@lobehub/ui/dashboard';
-import { ArrowLeft, ChevronDown, ChevronRight, Pin, PinOff, Search, TriangleAlert } from 'lucide-react';
+import { TitleWithTips } from '@lobehub/ui/dashboard';
+import { PageHeader } from '../../app/PageHeader';
+import { ChevronDown, ChevronRight, Pin, PinOff, Search, TriangleAlert, X } from 'lucide-react';
 import type { Route } from '../../app/router';
 import { navigate, routeHref, useRoute } from '../../app/router';
 import { command } from '../../api/commands';
@@ -654,11 +655,12 @@ export function TasksPage({ work, ownerKind, freeChannel }: {
       onTogglePin={onTogglePin}
       endedOpen={endedOpen}
       onToggleEnded={toggleEnded}
-      narrow={narrow}
       onEditRoot={root => { setEditingTask(root); setEditing(true); }}
       onAskCancel={setAskCancelRoot}
     />
-  ) : tasks.length === 0 ? (
+  ) : null;
+
+  const overviewPane = tasks.length === 0 ? (
     <Pane label="工作台概览" title="概览">
       <div {...stylex.props(workbenchStyles.emptyWrap)}>
         <Empty title="还没有任务" description="创建一个任务后，会话与任务会出现在这里。" action={<Button onClick={() => setCreating(true)}>新建任务</Button>} />
@@ -692,7 +694,6 @@ export function TasksPage({ work, ownerKind, freeChannel }: {
   );
 
   const inspectorOpen = !!sessionTaskId;
-  const mobileView = narrow ? (inspectorOpen ? 'inspector' : sessionKey ? 'main' : 'list') : 'list';
 
   return (
     <section aria-label="工作台" {...stylex.props(workbenchStyles.page)}>
@@ -701,13 +702,27 @@ export function TasksPage({ work, ownerKind, freeChannel }: {
         action={<div {...stylex.props(workbenchStyles.detailActions)}>{newTaskAction}{viewSwitch}</div>}
       />
       <div {...stylex.props(workbenchStyles.body)}>
-        <MasterDetail
-          listLabel="会话列表"
-          mainLabel="会话详情"
-          list={listPane}
-          main={detailPane}
-          inspector={inspectorOpen ? (
-            inspectorTask || tasksById.has(sessionTaskId!) ? (
+        <MasterDetail listLabel="会话列表" mainLabel="工作台概览" list={listPane} main={overviewPane} mobileView="list" />
+      </div>
+      <Drawer
+        open={!!sessionKey}
+        title="会话详情"
+        closable={false}
+        extra={<Button type="text" icon={X} aria-label="关闭会话详情" onClick={() => navigate({ page: 'tasks', view: 'sessions' }, { replace: true })} />}
+        width="min(1100px, 100vw)"
+        styles={{ bodyContent: { padding: 0, height: '100%', overflow: 'hidden' } }}
+        onClose={() => navigate({ page: 'tasks', view: 'sessions' }, { replace: true })}
+      >
+        <div {...stylex.props(workbenchStyles.drawerBody)} onKeyDownCapture={event => {
+          if (event.key === 'Escape' && inspectorOpen) {
+            event.preventDefault();
+            event.stopPropagation();
+            closeInspector({ page: 'tasks', view: 'sessions', sessionKey }, sessionTaskId);
+          }
+        }}>
+          {detailPane}
+          {inspectorOpen && <BoardInspectorOverlay label="任务检查器" narrow={narrow} onClose={() => closeInspector({ page: 'tasks', view: 'sessions', sessionKey }, sessionTaskId)}>
+            {inspectorTask || tasksById.has(sessionTaskId!) ? (
               <TaskInspector
                 key={sessionTaskId}
                 taskId={sessionTaskId!}
@@ -717,21 +732,13 @@ export function TasksPage({ work, ownerKind, freeChannel }: {
                 freeChannel={freeChannel}
                 taskRoute={id => taskRouteIn(id, sessionKey ?? sessionKeyOf(tasksById.get(id)!, tasksById))}
                 sessionRoute={sessionRouteOf}
-                onClose={() => closeInspector(
-                  sessionKey ? { page: 'tasks', view: 'sessions', sessionKey } : { page: 'tasks', view: 'sessions' },
-                  sessionTaskId,
-                )}
+                onClose={() => closeInspector({ page: 'tasks', view: 'sessions', sessionKey }, sessionTaskId)}
                 onEdit={full => { setEditingTask(full); setEditing(true); }}
               />
-            ) : (
-              <MissingTaskPane onBack={() => closeInspector(sessionKey ? { page: 'tasks', view: 'sessions', sessionKey } : { page: 'tasks', view: 'sessions' })} />
-            )
-          ) : undefined}
-          inspectorOpen={inspectorOpen}
-          onInspectorClose={() => closeInspector(sessionKey ? { page: 'tasks', view: 'sessions', sessionKey } : { page: 'tasks', view: 'sessions' }, sessionTaskId)}
-          mobileView={mobileView}
-        />
-      </div>
+            ) : <MissingTaskPane onBack={() => closeInspector({ page: 'tasks', view: 'sessions', sessionKey }, sessionTaskId)} />}
+          </BoardInspectorOverlay>}
+        </div>
+      </Drawer>
       {askCancelRoot && <CancelRootDialog task={askCancelRoot} tasks={tasks} work={work} onClose={() => setAskCancelRoot(undefined)} />}
       {editingTask && (
         <EditTaskDialog open={editing} task={editingTask} profile={ownerProfileOf(editingTask, owners)} busy={work.busy} recentWorkspaces={recentWorkspaces(tasks, 5)} close={() => setEditing(false)}
@@ -823,7 +830,7 @@ function CancelRootDialog({ task, tasks, work, onClose }: {
   );
 }
 
-function SessionDetail({ session, tasks, tasksById, work, ownerKind, freeChannel, now, pins, onTogglePin, endedOpen, onToggleEnded, narrow, onEditRoot, onAskCancel }: {
+export function SessionDetail({ session, tasks, tasksById, work, ownerKind, freeChannel, now, pins, onTogglePin, endedOpen, onToggleEnded, onEditRoot, onAskCancel }: {
   session: Session;
   tasks: Task[];
   tasksById: Map<string, Task>;
@@ -835,7 +842,6 @@ function SessionDetail({ session, tasks, tasksById, work, ownerKind, freeChannel
   onTogglePin: (id: string) => void;
   endedOpen: boolean;
   onToggleEnded: () => void;
-  narrow: boolean;
   onEditRoot: (root: Task) => void;
   onAskCancel: (root: Task) => void;
 }) {
@@ -955,10 +961,7 @@ function SessionDetail({ session, tasks, tasksById, work, ownerKind, freeChannel
   };
 
   return (
-    <Pane
-      label="会话详情"
-      title={narrow ? <Button size="small" icon={<ArrowLeft size={14} />} onClick={() => navigate({ page: 'tasks', view: 'sessions' })}>返回</Button> : undefined}
-    >
+    <Pane label="会话详情">
       <div {...stylex.props(workbenchStyles.detailHead)}>
         <div {...stylex.props(workbenchStyles.detailTitle)}>{session.title}</div>
         <div {...stylex.props(workbenchStyles.detailTags)}>

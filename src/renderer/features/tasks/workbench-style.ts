@@ -19,6 +19,14 @@ export const workbenchStyles = stylex.create({
     minInlineSize: 0,
     overflow: 'hidden',
   },
+  drawerBody: {
+    position: 'relative',
+    display: 'flex',
+    blockSize: '100%',
+    minBlockSize: 0,
+    minInlineSize: 0,
+    overflow: 'hidden',
+  },
   search: {
     inlineSize: '100%',
     minInlineSize: 0,

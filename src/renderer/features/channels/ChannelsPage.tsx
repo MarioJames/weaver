@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as stylex from '@stylexjs/stylex';
 import { ArrowLeft, Bot, LogIn, MessageSquare, MoreHorizontal, Plus, RefreshCw, Trash2, Upload, UserRound } from 'lucide-react';
-import { PageHeader, TitleWithTips } from '@lobehub/ui/dashboard';
+import { TitleWithTips } from '@lobehub/ui/dashboard';
+import { PageHeader } from '../../app/PageHeader';
 import { ActionIcon, Button, DropdownMenu, Empty, Modal, Skeleton, Tag, Text, Tooltip, toast } from '@lobehub/ui';
 import type { Channel, ChannelsSnapshot } from '../../../shared/contracts/channels';
 import type { EngineProbeRecord } from '../../../shared/engines';

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import * as stylex from '@stylexjs/stylex';
 import { ToastHost } from '@lobehub/ui';
 import { ConsoleBrand, ConsoleNav, ConsoleShell, useConsoleShell } from '@lobehub/ui/dashboard';
@@ -19,6 +19,7 @@ import { displayTimeZone } from '../policy/policy-edit';
 import { TimeZoneProvider } from '../format/timezone';
 import { routeHref, useRoute } from './router';
 import { blockedProfileCount, navigationGroups } from './navigation';
+import { PageHeaderTarget } from './PageHeader';
 
 /** The rail keeps only the mark; the full lockup needs the expanded navigation width. */
 function BrandLogo() {
@@ -29,6 +30,7 @@ function BrandLogo() {
 }
 
 export function App() {
+  const [headerTarget, setHeaderTarget] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
     // Focus each newly opened panel once; keyboard navigation within it remains unrestricted.
     const focused = new WeakSet<HTMLElement>();
@@ -56,11 +58,12 @@ export function App() {
     blockedWorkers: blockedProfileCount(policy.snapshot?.workers),
   });
   // The saved policy decides the time zone for the whole page; a draft elsewhere never moves it.
-  return <TimeZoneProvider zone={displayTimeZone(policy.snapshot?.config)}><ConsoleShell
+  return <TimeZoneProvider zone={displayTimeZone(policy.snapshot?.config)}><PageHeaderTarget.Provider value={headerTarget}><ConsoleShell
     {...stylex.props(shellStyles.shell)}
     storageKey="weaver-nav"
     brand={<ConsoleBrand label="Weaver" logo={<BrandLogo />} href={routeHref({ page: 'tasks', view: 'board' })} />}
     navigation={<ConsoleNav label="主导航" groups={navigation} defaultExpanded="all" pathname={routeHref(route)} />}
+    breadcrumb={<div ref={setHeaderTarget} {...stylex.props(shellStyles.headerTarget)} />}
     openNavigationLabel="打开导航" closeNavigationLabel="关闭导航" collapseLabel="收起导航" expandLabel="展开导航" skipToContentLabel="跳到内容"
   >
     <ToastHost position="bottom-right" />
@@ -73,5 +76,5 @@ export function App() {
                 : route.page === 'bots' ? <BotsPage policy={policy} />
                   : <SettingsPage policy={policy} />}
     </div>
-  </ConsoleShell></TimeZoneProvider>;
+  </ConsoleShell></PageHeaderTarget.Provider></TimeZoneProvider>;
 }

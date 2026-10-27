@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Tabs } from '@lobehub/ui';
-import { PageHeader, TitleWithTips } from '@lobehub/ui/dashboard';
+import { TitleWithTips } from '@lobehub/ui/dashboard';
+import { PageHeader } from '../../app/PageHeader';
 import type { PolicyDraft } from '../../policy/usePolicyDraft';
 import { ImSettings } from './ImSettings';
 

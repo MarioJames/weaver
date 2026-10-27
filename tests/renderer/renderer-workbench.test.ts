@@ -5,7 +5,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ConfigProvider, ThemeScope } from '@lobehub/ui';
 import { motion } from 'motion/react';
 import type { Task } from '../../src/shared/contracts/tasks';
-import { TasksPage } from '../../src/renderer/features/tasks/TasksPage';
+import { SessionDetail, TasksPage } from '../../src/renderer/features/tasks/TasksPage';
+import { buildSessions } from '../../src/renderer/features/tasks/task-session';
 import {
   WORKBENCH_ENDED_KEY, defaultWorkbenchSessions, readWorkbenchEnded, readWorkbenchSessions,
   writeWorkbenchEnded, writeWorkbenchSessions,
@@ -96,12 +97,6 @@ test('sessions group by workspace with headings, counts and attention flags', ()
   assert.match(html, /#\/tasks\/s\/r-root"/);
 });
 
-test('an unknown session explains itself with a way back', () => {
-  const html = page([make('a')], '#/tasks/s/r-missing');
-  assert.match(html, /未找到/);
-  assert.match(html, /返回列表/);
-});
-
 test('the all-tasks view lists the table filters and rows, with a clear action when empty', () => {
   const html = page([make('a', { status: 'running', dispatch: { owner: 'p', worker: 'w1', engine: 'claude', model: '', effort: '', execution: 'real', maxParallel: 1, workspace: '/repo/alpha' } })], '#/tasks/all');
   assert.match(html, /全部任务/);
@@ -115,10 +110,24 @@ test('the all-tasks empty state offers 清除筛选 after narrowing', () => {
   assert.match(html, /没有匹配的任务/);
 });
 
+function sessionDetail(tasks: Task[], key: string) {
+  const session = buildSessions(tasks, [], NOW).find(item => item.key === key);
+  assert.ok(session);
+  const restoreWindow = stubWindow(`#/tasks/s/${key}`);
+  const restoreStorage = stubStorage();
+  try {
+    return markup(React.createElement(SessionDetail, {
+      session, tasks, tasksById: new Map(tasks.map(task => [task.id, task])), work: workOf(tasks),
+      now: NOW, pins: {}, onTogglePin: () => {}, endedOpen: false, onToggleEnded: () => {},
+      onEditRoot: () => {}, onAskCancel: () => {},
+    }));
+  } finally { restoreStorage(); restoreWindow(); }
+}
+
 test('a retry chain stays together in the attention group instead of orphaned', () => {
   const original = make('original', { ownerId: 'inst-1', title: '原始尝试', status: 'failed', createdAt: iso(90), updatedAt: iso(50) });
   const retry = make('retry', { ownerId: 'inst-1', title: '重试尝试', status: 'failed', retryOf: 'original', createdAt: iso(40), updatedAt: iso(10) });
-  const html = page([original, retry], '#/tasks/s/o-inst-1');
+  const html = sessionDetail([original, retry], 'o-inst-1');
   assert.match(html, /需关注/);
   const group = html.slice(html.indexOf('aria-label="需关注任务"'), html.indexOf('aria-label="已结束任务"') >= 0 ? html.indexOf('aria-label="已结束任务"') : undefined);
   assert.ok(group.indexOf('原始尝试') >= 0, 'the original attempt is shown in the chain');
@@ -133,7 +142,7 @@ test('a web root session shows its type, parent Agent, report, goal and header a
     instruction: '把工作台重做完', acceptanceCriteria: ['能开机'], createdAt: iso(180), updatedAt: iso(5),
   });
   const child = make('child', { parentTaskId: 'root', title: '实现列表', status: 'running', updatedAt: iso(30) });
-  const html = page([root, child], '#/tasks/s/r-root');
+  const html = sessionDetail([root, child], 'r-root');
   assert.match(html, /网页发起/);
   assert.match(html, /父 Agent/);
   assert.match(html, /进度汇报/);

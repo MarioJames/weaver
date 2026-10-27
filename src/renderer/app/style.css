@@ -26,4 +26,14 @@
     overflow-y: scroll;
     scrollbar-gutter: stable;
   }
+
+}
+
+@media (max-width: 600px) {
+  #root [data-console-shell] .lobe-dashboard-console-shell__topbar {
+    block-size: auto;
+    min-block-size: 56px;
+    padding-block: 8px;
+    align-items: flex-start;
+  }
 }
