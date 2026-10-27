@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { PolicyStore } from '../../src/main/policy/store';
@@ -110,6 +111,18 @@ test('success is reported only after the authenticated hook settles, even when i
    settle();await tick();await tick();assert.equal(logins.get({channel:'first',id:job.id}).status,'succeeded');
   }finally{await logins.close();rmSync(f.root,{recursive:true,force:true});}
  }
+});
+
+test('native login cannot open a browser on the service host and drops its opener afterwards',async()=>{
+ const f=loginFixture(),logins=new ChannelLogins(f.binding,f.options);
+ try{
+  const job=await logins.start({channel:'first'});await tick();
+  const env=f.calls[0].env,opener=dirname(env.BROWSER!);
+  assert.equal(env.PATH,`${opener}:/fixture`);
+  for(const command of [env.BROWSER!,join(opener,'xdg-open')])assert.equal(execFileSync(command,['https://claude.com/cai/oauth/authorize'],{encoding:'utf8'}),'');
+  f.scopes[0].emit('close',1);await tick();await tick();
+  assert.equal(logins.get({channel:'first',id:job.id}).status,'failed');assert.equal(existsSync(opener),false);
+ }finally{await logins.close();rmSync(f.root,{recursive:true,force:true});}
 });
 
 test('authorization links discard nonofficial hosts and credential-bearing callback URLs',()=>{

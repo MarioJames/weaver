@@ -212,9 +212,31 @@ export const channelStyles = stylex.create({
     fontFamily: cssVar.fontFamilyCode,
     minInlineSize: 0,
   },
+  /** The authorization link is shown for the user to open; the login never opens a browser itself. */
+  loginLinkBox: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 8,
+    minInlineSize: 0,
+    paddingBlock: 8,
+    paddingInlineStart: 12,
+    paddingInlineEnd: 8,
+    borderRadius: cssVar.borderRadius,
+    backgroundColor: cssVar.colorFillQuaternary,
+  },
   loginLink: {
+    flex: '1 1 auto',
+    minInlineSize: 0,
     color: cssVar.colorLink,
+    fontFamily: cssVar.fontFamilyCode,
+    fontSize: cssVar.fontSizeSM,
+    lineHeight: 1.6,
     overflowWrap: 'anywhere',
+  },
+  loginCode: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
   },
   /** A failed login job is persistent dialog content, not a transient notice: one fixed status row under the status line. */
   loginState: {

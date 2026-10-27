@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as stylex from '@stylexjs/stylex';
-import { Button, InputPassword, Modal, Text } from '@lobehub/ui';
+import { Button, CopyButton, InputPassword, Modal, Text } from '@lobehub/ui';
 import type { ChannelLogin, ChannelLoginRef } from '../../../shared/contracts/channels';
 import { notifyError } from '../../api/notify';
 import { styles } from '../../ui/styles';
@@ -115,9 +115,19 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
         <Text strong type="danger">原生登录未完成</Text>
         <Text type="secondary">{job.error.code}：{job.error.message}</Text>
       </div>}
-      <Text type="secondary">请在官方页面完成授权。关闭此窗口后，可从该账号的登录按钮找回状态；关闭不会取消登录。只有独立配置中的凭据通过验证后，账号才可用于执行。</Text>
-      {running && job.verificationUrl && <a className={stylex.props(channelStyles.loginLink).className} href={job.verificationUrl} target="_blank" rel="noopener noreferrer">打开官方授权页面：{job.verificationUrl}</a>}
-      {running && job.userCode && <Text>设备验证码：<code>{job.userCode}</code></Text>}
+      <Text type="secondary">关闭此窗口后，可从该账号的登录按钮找回状态；关闭不会取消登录。只有独立配置中的凭据通过验证后，账号才可用于执行。</Text>
+      {running && job.verificationUrl && <div {...stylex.props(styles.tight)}>
+        <Text strong>官方授权链接</Text>
+        <Text type="secondary">复制链接，在要登录该账号的浏览器中打开并完成授权。</Text>
+        <div {...stylex.props(channelStyles.loginLinkBox)}>
+          <a className={stylex.props(channelStyles.loginLink).className} href={job.verificationUrl} target="_blank" rel="noopener noreferrer">{job.verificationUrl}</a>
+          <CopyButton content={job.verificationUrl} size="small" title="复制授权链接" aria-label="复制授权链接" />
+        </div>
+      </div>}
+      {running && job.userCode && <div {...stylex.props(channelStyles.loginCode)}>
+        <Text>设备验证码：<code>{job.userCode}</code></Text>
+        <CopyButton content={job.userCode} size="small" title="复制设备验证码" aria-label="复制设备验证码" />
+      </div>}
       {running && job.acceptsCode && <div {...stylex.props(styles.stack)}>
         <label htmlFor={`authorization-code-${channel}`}>官方返回授权码</label>
         <InputPassword id={`authorization-code-${channel}`} autoComplete="off" value={authorizationCode} disabled={pending} maxLength={4096} placeholder="粘贴官方页面返回的完整 code#state" onChange={event => setAuthorizationCode(event.target.value)} />

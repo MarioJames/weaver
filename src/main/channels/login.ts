@@ -1,5 +1,6 @@
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { stripVTControlCharacters } from 'node:util';
 import type { ChannelLogin, ChannelLoginRef, StartChannelLoginInput, SubmitChannelLoginCodeInput } from '../../shared/contracts/channels';
@@ -153,12 +154,15 @@ export class ChannelLogins {
  }
  private async run(item:LoginWork,b:ChannelBinding):Promise<void>{
   const {job}=item,engine=b.engineKind??b.channel.engine,root=b.secret.authDir!;item.engine=engine;
-  let timer:ReturnType<typeof setTimeout>|undefined;
+  let timer:ReturnType<typeof setTimeout>|undefined,opener:string|undefined;
   try{
    writeNativeConfig(root,'.weaver-login-pending',item.expected?JSON.stringify(item.expected)+'\n':'pending\n');
    const env=nativeEnvironment(engine,root,this.options.env??process.env);
    const executable=await (this.options.find??findEngineExecutable)(engine==='qoder'?'qodercli':engine,env.PATH??'');
    if(!executable)throw safeError('ENGINE_NOT_INSTALLED','未找到原生 CLI，请安装后重试');
+   // The service host is not necessarily the user's browser: Claude and Grok open BROWSER, Qoder and OpenCode run xdg-open; both are no-ops and the dialog shows the link instead.
+   opener=mkdtempSync(join(tmpdir(),'weaver-login-'));writeFileSync(join(opener,'xdg-open'),'#!/bin/sh\nexit 0\n',{mode:0o700});
+   env.BROWSER=join(opener,'xdg-open');env.PATH=`${opener}:${env.PATH??''}`;
    if(!active(job)||this.closing)return;
    const args=engine==='codex'?['login','--device-auth']:engine==='claude'?['auth','login','--claudeai']:engine==='grok'?['--leader-socket',join(root,'leader.sock'),'login','--device-auth']:engine==='opencode'?['console','login','https://opencode.ai/console','--pure']:['--config-dir',root,'login'];
    const scope=(this.options.start??startOwnedScope)({command:[executable,...args],cwd:root,env,stdin:null,keepStdinOpen:true,unit:`dev-weaver-channel-login-${randomUUID()}`});
@@ -201,6 +205,7 @@ export class ChannelLogins {
   finally{
    if(timer)clearTimeout(timer);
    try{await this.stop(item);}catch{this.fail(item,'LOGIN_CLEANUP','无法确认登录进程树已停止，请重新读取状态');}
+   if(opener)rmSync(opener,{recursive:true,force:true});
    item.finished=true;
   }
  }
