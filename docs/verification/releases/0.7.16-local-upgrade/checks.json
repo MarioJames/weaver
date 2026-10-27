@@ -1,0 +1,27 @@
+{
+  "app_url": "http://127.0.0.1:4737",
+  "result": "passed",
+  "viewport": [
+    1440,
+    1000
+  ],
+  "default_keep_days": 1,
+  "prune_events": false,
+  "vacuum": true,
+  "stable_animation_wait_ms": 2000,
+  "screenshot_visually_verified": true,
+  "actions": [
+    "navigate settings",
+    "open cleanup dialog",
+    "close cleanup dialog"
+  ],
+  "read_only": true,
+  "preview_or_apply_called": false,
+  "settings_saved": false,
+  "get_engine_cleanup_http_status": 200,
+  "network_request_count": 27,
+  "http_4xx_5xx": 0,
+  "console_messages": 0,
+  "page_errors": 0,
+  "borrowed_service_and_persistent_data": "untouched"
+}

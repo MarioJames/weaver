@@ -1,0 +1,41 @@
+{
+  "version": "0.7.16",
+  "tag": "v0.7.16",
+  "releaseCommit": "1e77f5a817ece05caf68a4795654753afd960a34",
+  "tagVerified": true,
+  "release": "https://github.com/MarioJames/weaver/releases/tag/v0.7.16",
+  "workflow": "https://github.com/MarioJames/weaver/actions/runs/40449830104",
+  "remoteChecks": {
+    "passed": 2193,
+    "failed": 0,
+    "skipped": 35,
+    "typecheck": "passed",
+    "build": "passed",
+    "platforms": [
+      "linux-x64",
+      "linux-arm64",
+      "darwin-arm64"
+    ]
+  },
+  "asset": {
+    "name": "weaver-linux-x64",
+    "sha256": "488e5a3cf55ae9be360a13d0c8c1591bf496a4b01c253ff095e07cb0b5c31711",
+    "verified": true
+  },
+  "local": {
+    "version": "0.7.16",
+    "pid": 1607947,
+    "url": "http://127.0.0.1:4737",
+    "managedBy": "systemd",
+    "homeHttp": 200,
+    "policyConfigUnchanged": true,
+    "policyRevision": 470,
+    "latestTaskSampleUnchanged": true,
+    "im": "ready and connected",
+    "upgradeBusyTasks": 0,
+    "upgradeImBusySessions": 0
+  },
+  "rollbackBackup": "/home/mocha/.local/share/weaver/backups/local-upgrade-0716-_9i5iq7p",
+  "dataProtection": "Persistent data and credentials retained; cleanup preview/apply never invoked on the live database",
+  "resources": "Production weaver.service retained on port 4737; task Chrome/profile closed and removed; task temp root reclaimed after evidence archival"
+}

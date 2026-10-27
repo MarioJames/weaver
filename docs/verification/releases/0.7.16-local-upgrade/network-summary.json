@@ -1,0 +1,208 @@
+[
+  {
+    "requestId": "DB8339BBC7078029A1233DC476EDE521",
+    "method": "GET",
+    "url": "http://127.0.0.1:4737/",
+    "status": 200
+  },
+  {
+    "requestId": "1609329.2",
+    "method": "GET",
+    "url": "http://127.0.0.1:4737/assets/index-NPRu3cKy.js",
+    "status": 200
+  },
+  {
+    "requestId": "1609329.3",
+    "method": "GET",
+    "url": "http://127.0.0.1:4737/assets/index-BR1JCnA0.css",
+    "status": 200
+  },
+  {
+    "requestId": "1609329.4",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "owners.list"
+  },
+  {
+    "requestId": "1609329.5",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "sync.status"
+  },
+  {
+    "requestId": "1609329.6",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "listTasks",
+    "command": null
+  },
+  {
+    "requestId": "1609329.7",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "capabilities",
+    "command": null
+  },
+  {
+    "requestId": "1609329.8",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "getPolicy",
+    "command": null
+  },
+  {
+    "requestId": "1609329.9",
+    "method": "GET",
+    "url": "http://127.0.0.1:4737/assets/weaver-lockup-DEJ547Af.svg",
+    "status": 200
+  },
+  {
+    "requestId": "1609329.10",
+    "method": "GET",
+    "url": "http://127.0.0.1:4737/assets/weaver-icon-Bvsmo56_.png",
+    "status": 200
+  },
+  {
+    "requestId": "1609329.12",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "listTasks",
+    "command": null
+  },
+  {
+    "requestId": "1609329.13",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "sync.status"
+  },
+  {
+    "requestId": "1609329.14",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "owners.list"
+  },
+  {
+    "requestId": "1609329.15",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "sync.status"
+  },
+  {
+    "requestId": "1609329.16",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "sync.status"
+  },
+  {
+    "requestId": "1609329.17",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "sync.status"
+  },
+  {
+    "requestId": "1609329.18",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "getQuota",
+    "command": null
+  },
+  {
+    "requestId": "1609329.19",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "workerProbeStatus",
+    "command": null
+  },
+  {
+    "requestId": "1609329.20",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "sync.status"
+  },
+  {
+    "requestId": "1609329.21",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "getEngineCleanup",
+    "command": null
+  },
+  {
+    "requestId": "1609329.22",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "sync.status"
+  },
+  {
+    "requestId": "1609329.23",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "sync.status"
+  },
+  {
+    "requestId": "1609329.24",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "sync.status"
+  },
+  {
+    "requestId": "1609329.25",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "sync.status"
+  },
+  {
+    "requestId": "1609329.26",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "sync.status"
+  },
+  {
+    "requestId": "1609329.27",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "sync.status"
+  },
+  {
+    "requestId": "1609329.28",
+    "method": "POST",
+    "url": "http://127.0.0.1:4737/api/rpc",
+    "status": 200,
+    "rpc_method": "command",
+    "command": "sync.status"
+  }
+]
