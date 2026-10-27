@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import { connect, createServer } from 'node:net';
 import { request } from 'node:http';
 import { chmod, mkdtemp, mkdir, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startLocalIPC } from '../../src/main/local-ipc';
@@ -18,6 +18,33 @@ import { RPC_METHODS } from '../../src/shared/contracts/rpc';
 
 const REPO = process.cwd();
 const TASK = { title: 'Imported', instruction: 'demo only', owner: { name: 'demo', transport: 'herdr-visible', session: 's', pane: 'p' } };
+
+/** Only for children spawned below with detached:true: their group is test-owned. */
+async function stopWebFixture(child: ChildProcess): Promise<void> {
+  if (!child.pid) return;
+  const pid = child.pid;
+  const alive = () => readdirSync('/proc').some(entry => {
+    if (!/^\d+$/.test(entry)) return false;
+    try {
+      const fields = readFileSync(`/proc/${entry}/stat`, 'utf8').split(') ').at(-1)!.split(' ');
+      return Number(fields[2]) === pid && !['Z', 'X'].includes(fields[0]!);
+    } catch { return false; } // A process can exit during the scan.
+  });
+  const signal = (value: NodeJS.Signals) => {
+    try { process.kill(-pid, value); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error; }
+  };
+  signal('SIGTERM');
+  let deadline = Date.now() + 3000;
+  while (alive() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+  if (alive()) signal('SIGKILL');
+  deadline = Date.now() + 3000;
+  while (alive() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(alive(), false, `web fixture process group ${pid} survived cleanup`);
+  if (child.exitCode === null && child.signalCode === null) {
+    await new Promise<void>(resolve => child.once('close', () => resolve()));
+  }
+}
 
 function httpCall(port: number, options: { method?: string; path?: string; headers?: Record<string, string | string[]>; body?: string | Buffer }) {
   return new Promise<{ status: number; text: string; json: any; headers: Record<string, string | string[] | undefined> }>((resolve, reject) => {
@@ -340,7 +367,8 @@ test('headless CLI can create, dispatch, review, and leaving does not cancel wor
 
 test('shutdown and restart keep task history', { timeout: 20_000 }, async t => {
   const dataDir = await mkdtemp(join(tmpdir(), 't-'));
-  const child: ChildProcess = spawn(process.execPath, ['--import', 'tsx', 'src/cli/main.ts', 'web', '--no-open', '--port', '0', '--data-dir', dataDir], { cwd: REPO, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child: ChildProcess = spawn(process.execPath, ['--import', 'tsx', 'src/cli/main.ts', 'web', '--no-open', '--port', '0', '--data-dir', dataDir], { cwd: REPO, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  t.after(async () => { await stopWebFixture(child); await rm(dataDir, { recursive: true, force: true }); });
   let stderr = '';
   child.stderr?.on('data', chunk => { stderr += chunk; });
   const url = await new Promise<string>((resolve, reject) => {
@@ -354,36 +382,34 @@ test('shutdown and restart keep task history', { timeout: 20_000 }, async t => {
       resolve(text.split('\n')[0].trim());
     });
   }).catch(async error => {
-    if (stderr.includes('EPERM') || String(error).includes('EPERM')) { t.skip('Sandbox denies Unix socket listen (EPERM); no bypass attempted'); child.kill('SIGKILL'); return ''; }
-    child.kill('SIGKILL');
+    if (stderr.includes('EPERM') || String(error).includes('EPERM')) { t.skip('Sandbox denies Unix socket listen (EPERM); no bypass attempted'); return ''; }
     throw error;
   });
-  if (!url) { await rm(dataDir, { recursive: true, force: true }); return; }
+  if (!url) return;
+  assert.match(url, /^http:\/\/127\.0\.0\.1:\d+$/);
+  const input = join(dataDir, 'create.json');
+  await writeFile(input, JSON.stringify(TASK));
+  const created = await cli(dataDir, ['tasks', 'create', '--input', input, '--command-id', 'keep-1']);
+  assert.equal(created.status, 0, created.stdout + created.stderr);
+  child.kill('SIGTERM');
+  const exit = await new Promise<number | null>(resolve => child.once('exit', code => resolve(code)));
+  assert.equal(exit === 0 || exit === null, true);
+  await assert.rejects(readFile(join(dataDir, 'control.v1.json'), 'utf8'));
+  const saved = new TaskStore(join(dataDir,'weaver.db'));
+  assert.equal(saved.list().length, 1);saved.close();
+  const restarted = await boot(t, dataDir);
+  if (!restarted) return;
   try {
-    assert.match(url, /^http:\/\/127\.0\.0\.1:\d+$/);
-    const input = join(dataDir, 'create.json');
-    await writeFile(input, JSON.stringify(TASK));
-    const created = await cli(dataDir, ['tasks', 'create', '--input', input, '--command-id', 'keep-1']);
-    assert.equal(created.status, 0, created.stdout + created.stderr);
-    child.kill('SIGTERM');
-    const exit = await new Promise<number | null>(resolve => child.once('exit', code => resolve(code)));
-    assert.equal(exit === 0 || exit === null, true);
-    await assert.rejects(readFile(join(dataDir, 'control.v1.json'), 'utf8'));
-    const saved = new TaskStore(join(dataDir,'weaver.db'));
-    assert.equal(saved.list().length, 1);saved.close();
-    const restarted = await boot(t, dataDir);
-    if (!restarted) return;
-    try {
-      const again = await cli(dataDir, ['tasks', 'get', '--task-id', created.json.data.id]);
-      assert.equal(again.status, 0, again.stdout + again.stderr);
-      assert.equal(again.json.data.title, 'Imported');
-    } finally { await restarted.close(); }
-  } finally { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); await rm(dataDir, { recursive: true, force: true }); }
+    const again = await cli(dataDir, ['tasks', 'get', '--task-id', created.json.data.id]);
+    assert.equal(again.status, 0, again.stdout + again.stderr);
+    assert.equal(again.json.data.title, 'Imported');
+  } finally { await restarted.close(); }
 });
 
 test('a repeated stop signal still drains and removes the endpoint', { timeout: 20_000 }, async t => {
   const dataDir = await mkdtemp(join(tmpdir(), 't-'));
-  const child: ChildProcess = spawn(process.execPath, ['--import', 'tsx', 'src/cli/main.ts', 'web', '--dev', '--no-open', '--port', '0', '--data-dir', dataDir], { cwd: REPO, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child: ChildProcess = spawn(process.execPath, ['--import', 'tsx', 'src/cli/main.ts', 'web', '--dev', '--no-open', '--port', '0', '--data-dir', dataDir], { cwd: REPO, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  t.after(async () => { await stopWebFixture(child); await rm(dataDir, { recursive: true, force: true }); });
   let stderr = '';
   child.stderr?.on('data', chunk => { stderr += chunk; });
   const ready = await new Promise<boolean>((resolve, reject) => {
@@ -393,22 +419,43 @@ test('a repeated stop signal still drains and removes the endpoint', { timeout: 
     let text = '';
     child.stdout?.on('data', chunk => { text += chunk; if (/^http:\/\/127\.0\.0\.1:\d+$/m.test(text)) { clearTimeout(timer); resolve(true); } });
   }).catch(error => {
-    child.kill('SIGKILL');
     if (stderr.includes('EPERM') || String(error).includes('EPERM')) { t.skip('Sandbox denies Unix socket listen (EPERM); no bypass attempted'); return false; }
     throw error;
   });
-  try {
-    if (!ready) return;
-    child.removeAllListeners('exit');
-    const exited = new Promise<void>(resolve => child.once('exit', () => resolve()));
-    // A process group stop (Ctrl+C under tsx watch, systemd scope stop) delivers the signal twice.
-    child.kill('SIGINT');
-    await new Promise(resolve => setTimeout(resolve, 2));
-    child.kill('SIGINT');
-    // The exit status is not the contract: a signal landing after the drain, during Node teardown, may still end the process.
-    await exited;
-    await assert.rejects(readFile(join(dataDir, 'control.v1.json'), 'utf8'));
-  } finally { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); await rm(dataDir, { recursive: true, force: true }); }
+  if (!ready) return;
+  child.removeAllListeners('exit');
+  const exited = new Promise<void>(resolve => child.once('exit', () => resolve()));
+  // A process group stop (Ctrl+C under tsx watch, systemd scope stop) delivers the signal twice.
+  child.kill('SIGINT');
+  await new Promise(resolve => setTimeout(resolve, 2));
+  child.kill('SIGINT');
+  // The exit status is not the contract: a signal landing after the drain, during Node teardown, may still end the process.
+  await exited;
+  await assert.rejects(readFile(join(dataDir, 'control.v1.json'), 'utf8'));
+});
+
+test('web fixture cleanup reaps a TERM-ignoring descendant after its parent exits', { timeout: 15_000 }, async t => {
+  const dataDir = await mkdtemp(join(tmpdir(), 't-'));
+  const child = spawn(process.execPath, ['-e', `
+    require('node:child_process').spawn(process.execPath, ['-e',
+      "process.on('SIGTERM',()=>{});console.log(process.pid);setInterval(()=>{},1000)"
+    ], { stdio: ['ignore','inherit','inherit'] });
+  `], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  t.after(async () => { await stopWebFixture(child); await rm(dataDir, { recursive: true, force: true }); });
+  const toolPid = await new Promise<number>((resolve, reject) => {
+    child.stdout.once('data', chunk => resolve(Number(String(chunk).trim())));
+    child.once('error', reject);
+  });
+  assert.ok(toolPid > 0);
+  const exited = new Promise<void>(resolve => child.once('exit', () => resolve()));
+  child.kill('SIGKILL');
+  await exited;
+  process.kill(toolPid, 0); // The inherited tool is still alive after its launcher died.
+  await stopWebFixture(child);
+  let state: string | undefined;
+  try { state = readFileSync(`/proc/${toolPid}/stat`, 'utf8').split(') ').at(-1)!.split(' ')[0]; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  assert.ok(state === undefined || state === 'Z', `fixture descendant ${toolPid} survived cleanup`);
 });
 
 test('engine scan does not create roles', { timeout: 30_000 }, async t => {

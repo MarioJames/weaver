@@ -519,7 +519,7 @@ test('close during identity startup aborts quickly without waiting the identity 
   }
 });
 
-test('null stdin never shuts the host down: it still reaches ready and serves a turn', { timeout: 15000 }, async () => {
+test('null stdin permits turns and repeated stop signals still drain the host and engine', { timeout: 15000 }, async () => {
   const dir = mkdtempSync(join(process.env.WEAVER_PARENT_TEST_TMPDIR ?? tmpdir(), 'wh-oc-null-stdin-'));
   chmodSync(dir, 0o700);
   const workspace = join(dir, 'ws'); mkdirSync(workspace);
@@ -527,7 +527,12 @@ test('null stdin never shuts the host down: it still reaches ready and serves a 
   const endpoint = join(dir, 's'), epoch = randomUUID(), marker = join(dir, 'marker');
   const frames: HostFrame[] = [];
   let wire!: ReturnType<typeof hostWire>;
-  const server = createServer(socket => { wire = hostWire(socket, epoch, frame => frames.push(frame), () => {}); });
+  let disconnected!: () => void;
+  const connectionClosed = new Promise<void>(resolve => { disconnected = resolve; });
+  const server = createServer(socket => {
+    wire = hostWire(socket, epoch, frame => frames.push(frame), () => {});
+    socket.once('close', disconnected);
+  });
   await new Promise<void>(resolve => server.listen(endpoint, resolve)); chmodSync(endpoint, 0o600);
   // StandardInput=null equivalent: stdin backed by /dev/null reports end/close at once.
   const child = spawn(process.execPath, ['--import', 'tsx', new URL('../../src/cli/main.ts', import.meta.url).pathname, '__weaver-im-parent-host', endpoint, epoch], { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -541,6 +546,10 @@ test('null stdin never shuts the host down: it still reaches ready and serves a 
     wire.send({ type: 'submit', id: 1 });
     await until(() => frames.some(frame => frame.type === 'result' && frame.id === 1));
     wire.send({ type: 'close', id: 0 });
+    // Socket teardown starts drain; a concurrent service stop must join it.
+    await connectionClosed;
+    child.kill('SIGTERM');
+    child.kill('SIGTERM');
     await exit;
     assert.equal(child.exitCode, 0);
     await assertFixtureReaped(marker, true);

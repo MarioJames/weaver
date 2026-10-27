@@ -1,13 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, type ChildProcess } from 'node:child_process';
-import { once } from 'node:events';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { createBackgroundParentAgent } from '../../src/main/im/parent-background';
-import type { AsyncRunner } from '../../src/main/owner-host';
+import { fakeRunnerFactory } from '../helpers/background-host-runner';
 import type { ImEngineKind } from '../../src/shared/im-engines';
 
 // End-to-end proof that the unified parent progress channel reaches the Feishu
@@ -24,40 +21,6 @@ import type { ImEngineKind } from '../../src/shared/im-engines';
 // commands / absolute paths) leaks into the card stream. Tool/stage names never
 // appear in the stream: only the fixed copy above.
 
-function fakeRunnerFactory() {
-  let child: ChildProcess | undefined;
-  const invocation = `inv-${randomUUID()}`;
-  const runner: AsyncRunner = async ({ file, args }) => {
-    if (file === 'systemd-run') {
-      const idx = args.indexOf('--');
-      const cmd = args.slice(idx + 1);
-      child = spawn(cmd[0], cmd.slice(1), { stdio: ['ignore', 'ignore', 'ignore'] });
-      child.on('error', () => {});
-      return { code: 0, stdout: '', stderr: '' };
-    }
-    if (file === 'systemctl' && args[1] === 'show') {
-      const alive = !!child && child.exitCode === null && child.signalCode === null;
-      if (!alive) return { code: 0, stdout: 'LoadState=not-found\nActiveState=inactive', stderr: '' };
-      const unit = args[2];
-      return {
-        code: 0,
-        stdout: `Id=${unit}\nLoadState=loaded\nActiveState=active\nInvocationID=${invocation}\nMainPID=${child!.pid}\nControlGroup=/fake`,
-        stderr: '',
-      };
-    }
-    if (file === 'systemctl' && args[1] === 'stop') {
-      const current = child;
-      child = undefined;
-      if (current) {
-        try { current.kill('SIGKILL'); } catch { /* already gone */ }
-        try { await once(current, 'close'); } catch { /* already gone */ }
-      }
-      return { code: 0, stdout: '', stderr: '' };
-    }
-    throw new Error(`unexpected external call: ${file} ${args.join(' ')}`);
-  };
-  return { runner };
-}
 
 const CLI_MAIN = new URL('../../src/cli/main.ts', import.meta.url).pathname;
 // Engine card transcript lives in a test-owned temp directory only: it is created
@@ -153,11 +116,6 @@ function setupBin(c: EngineCase, scenario = 'progress'): Harness {
   mkdirSync(workspace);
   copyFileSync(new URL(`../fixtures/parent/${c.fixtureFile}`, import.meta.url), join(dir, c.binary));
   chmodSync(join(dir, c.binary), 0o700);
-  // Adapters inside the host launch through startParentScope; these shims let
-  // that path run without a real systemd user manager (same shape as the
-  // per-engine direct tests).
-  writeFileSync(join(dir, 'systemd-run'), '#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n', { mode: 0o700 });
-  writeFileSync(join(dir, 'systemctl'), '#!/bin/sh\necho ActiveState=inactive\n', { mode: 0o700 });
   const marker = join(dir, 'marker.ndjson');
   const previousPath = process.env.PATH ?? '';
   const previousScenario = process.env[c.scenarioEnv];
@@ -170,7 +128,7 @@ function setupBin(c: EngineCase, scenario = 'progress'): Harness {
   return { dir, workspace, marker, previousPath, previousScenario, previousMarker, previousSnapshot };
 }
 
-function teardownBin(c: EngineCase, harness: Harness) {
+async function teardownBin(c: EngineCase, harness: Harness) {
   process.env.PATH = harness.previousPath;
   if (harness.previousScenario === undefined) delete process.env[c.scenarioEnv];
   else process.env[c.scenarioEnv] = harness.previousScenario;
@@ -180,6 +138,20 @@ function teardownBin(c: EngineCase, harness: Harness) {
     if (harness.previousSnapshot === undefined) delete process.env[c.snapshotEnv];
     else process.env[c.snapshotEnv] = harness.previousSnapshot;
   }
+  // Failed assertions/close must not leave a fixture alive or erase its identity first.
+  const leaked = markerPids(harness.marker).filter(pid => {
+    try { process.kill(pid, 0); return true; } catch { return false; }
+  });
+  for (const pid of leaked) {
+    const proc = `/proc/${pid}`;
+    try {
+      const argv = readFileSync(`${proc}/cmdline`, 'utf8').split('\0');
+      assert.equal(statSync(proc).uid, process.getuid!());
+      assert.ok(argv.includes(join(harness.dir, c.binary)), `unverified fixture pid ${pid}`);
+      process.kill(pid, 'SIGKILL');
+    } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT' && (error as NodeJS.ErrnoException).code !== 'ESRCH') throw error; }
+  }
+  await untilFixturesGone(harness.marker);
   rmSync(harness.dir, { recursive: true, force: true });
 }
 
@@ -313,11 +285,14 @@ for (const c of ENGINES) {
         '',
       ].join('\n'));
     } finally {
-      await service.close().catch(() => {});
-      await untilFixturesGone(harness.marker).catch(() => {});
-      teardownBin(c, harness);
-      rmSync(dataDir, { recursive: true, force: true });
-      rmSync(serviceDir, { recursive: true, force: true });
+      try {
+        await service.close();
+        await untilFixturesGone(harness.marker);
+      } finally {
+        await teardownBin(c, harness);
+        rmSync(dataDir, { recursive: true, force: true });
+        rmSync(serviceDir, { recursive: true, force: true });
+      }
     }
   });
 }

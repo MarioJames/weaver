@@ -10,6 +10,14 @@ Tests live in one subdirectory per layer under test, mirroring `src/`:
 
 `helpers/` holds shared test utilities and `fixtures/` holds data files; neither contains tests. The `test` script in `package.json` discovers tests recursively via the glob `'tests/**/*.test.ts'`, so any file matching `tests/**/*.test.ts` in a subdirectory is picked up automatically — helper and fixture files must therefore never end in `.test.ts`. New tests go in the subdirectory matching the layer they exercise; cross-layer end-to-end cases go in `integration/`.
 
+## Process and temporary-service cleanup
+
+Register cleanup immediately after spawning, including before readiness checks. Wait for the owned process group or unit and its children to exit before deleting its temporary state. A stop ACK or a deleted directory does not prove process cleanup. Cleanup errors must fail the test; emergency cleanup still runs on failed assertions. Keep ownership evidence when cleanup cannot be confirmed.
+
+Background host tests share `helpers/background-host-runner.ts`: stop lets the real host drain its engine and waits for actual close. The host must keep its signal handler throughout drain because control-socket loss and SIGTERM can arrive together. `im-parent-host.test.ts` covers that race; `im-parent-progress-engines.test.ts` checks engine PIDs after close. Web subprocess tests in `integration/runtime-http.test.ts` own a private process group and clean it even when startup or an assertion fails.
+
+Manual temporary dev/acceptance servers use a task-owned `systemd-run --user --scope --collect --unit=dev-weaver-<task> -p MemoryHigh=8G -p MemoryMax=10G -- <command>`. Record the exact unit and temporary data directory; stop and verify that unit before removing disposable data. Persistent development and business data are retained.
+
 ## Feishu IM: reading route and regression constraints
 
 Before changing the Feishu bridge (`src/main/im/*`, `src/renderer/features/bots/*`, or the IM RPC surface), read `docs/feishu-im.md` as the product contract, then the tests for the boundary being changed:

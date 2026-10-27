@@ -42,7 +42,9 @@ export async function runParentHost(args: readonly string[]): Promise<number> {
       // after the session is already being torn down.
       clearIdentityBudget();
       socket.destroy();
-      process.off('SIGTERM', shutdown);
+      // Keep the handler until drain finishes. Socket loss and systemctl stop
+      // can race; a second SIGTERM must join this drain instead of killing the
+      // host while its resident engine is still alive.
       // Close the engine session first so that even a hidden send whose native
       // engine ignores the abort is settled by real process teardown
       // (close rejects in-flight sends), instead of waiting out the identity
@@ -57,7 +59,7 @@ export async function runParentHost(args: readonly string[]): Promise<number> {
           const closing = session?.close().catch(() => {});
           await Promise.race([identityPromise?.catch(() => {}), new Promise(resolve => setTimeout(resolve, SHUTDOWN_SETTLE_MS))]);
           await closing;
-        } finally { resolve(0); }
+        } finally { process.off('SIGTERM', shutdown); resolve(0); }
       })();
     };
     // An engine failure surfaces as `unavailable` while its send rejection still carries the

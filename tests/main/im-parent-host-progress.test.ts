@@ -1,49 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, type ChildProcess } from 'node:child_process';
-import { once } from 'node:events';
 import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { createBackgroundParentAgent } from '../../src/main/im/parent-background';
 import { ConfirmedParentCancellation } from '../../src/main/im/parent-agent';
-import type { AsyncRunner } from '../../src/main/owner-host';
+import { fakeRunnerFactory } from '../helpers/background-host-runner';
 
-function fakeRunnerFactory() {
-  let child: ChildProcess | undefined;
-  const invocation = `inv-${randomUUID()}`;
-  const runner: AsyncRunner = async ({ file, args }) => {
-    if (file === 'systemd-run') {
-      const idx = args.indexOf('--');
-      const cmd = args.slice(idx + 1);
-      child = spawn(cmd[0], cmd.slice(1), { stdio: ['ignore', 'ignore', 'ignore'] });
-      child.on('error', () => {});
-      return { code: 0, stdout: '', stderr: '' };
-    }
-    if (file === 'systemctl' && args[1] === 'show') {
-      const alive = !!child && child.exitCode === null && child.signalCode === null;
-      if (!alive) return { code: 0, stdout: 'LoadState=not-found\nActiveState=inactive', stderr: '' };
-      const unit = args[2];
-      return {
-        code: 0,
-        stdout: `Id=${unit}\nLoadState=loaded\nActiveState=active\nInvocationID=${invocation}\nMainPID=${child!.pid}\nControlGroup=/fake`,
-        stderr: '',
-      };
-    }
-    if (file === 'systemctl' && args[1] === 'stop') {
-      const current = child;
-      child = undefined;
-      if (current) {
-        try { current.kill('SIGKILL'); } catch { /* already gone */ }
-        try { await once(current, 'close'); } catch { /* already gone */ }
-      }
-      return { code: 0, stdout: '', stderr: '' };
-    }
-    throw new Error(`unexpected external call: ${file} ${args.join(' ')}`);
-  };
-  return { runner, getChild: () => child };
-}
 
 const CLI_MAIN = new URL('../../src/cli/main.ts', import.meta.url).pathname;
 
@@ -394,7 +357,7 @@ test('dsh 进度经后台宿主到达 ImService 卡片并收口只剩答案', { 
     assert.equal(chunks.at(-1), '[setContent]你好，世界');
     assert.equal((cards as unknown[]).length, 1);
   } finally {
-    await service.close().catch(() => {});
+    await service.close();
     teardownDshBin(harness);
     rmSync(dataDir, { recursive: true, force: true });
     rmSync(serviceDir, { recursive: true, force: true });
