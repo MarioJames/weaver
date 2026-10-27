@@ -19,6 +19,7 @@ import { displayTimeZone, displayWithTimeZone } from '../../policy/policy-edit';
 import type { PolicyDraft } from '../../policy/usePolicyDraft';
 import { settingsStyles } from './settings-style';
 import { MinutesInput, useSaver, type SaveState } from './SettingRows';
+import { EngineCleanup } from '../engines/EngineCleanup';
 
 export type { SaveState };
 
@@ -54,7 +55,7 @@ export function SettingsPage({ policy }: { policy: PolicyDraft }) {
   const saved = policy.snapshot?.config;
   const schedule = useSchedule(policy.snapshot?.revision);
   const freeProbe = useFreeProbe(policy.snapshot?.revision);
-  const header = <PageHeader title={<TitleWithTips title="设置" tips="每项修改立即生效。" />} />;
+  const header = <PageHeader title={<TitleWithTips title="设置" tips="每项修改立即生效；数据维护需预览并确认。" />} />;
   useNotifyError(policy.loadError, '配置读取失败');
   if (!saved) {
     if (policy.loadError) return <>{header}
@@ -117,6 +118,11 @@ export function SettingsPage({ policy }: { policy: PolicyDraft }) {
         </SettingRow>
         <SettingRow label="单条命令最长运行时间（分钟）" tips="单条命令持续运行超过这个时长后，任务健康会提示父 Agent 疑似挂死，tasks wait 也会提前返回；不会自动停止命令。范围 1 到 1440 分钟。" hint={inputErrors.command ? <span role="alert">{inputErrors.command}</span> : '范围 1 到 1440 分钟；超时只提示疑似挂死，不会自动停止命令。'} status={<Outcome state={saver.states.command} />}>
           <Control id={`${id}-command`} label="单条命令最长运行时间（分钟）"><MinutesInput id={`${id}-command`} label="单条命令最长运行时间（分钟）" value={maxCommandMinutes(saved)} min={MAX_COMMAND_MINUTES_RANGE.min} max={MAX_COMMAND_MINUTES_RANGE.max} step={5} onError={inputError('command')} onCommit={value => void saver.save('command', () => ({ herdr: { ...saved.herdr, max_command_minutes: value } }))} /></Control>
+        </SettingRow>
+      </SettingGroup>
+      <SettingGroup title="数据维护">
+        <SettingRow label="OpenCode 数据库" tips="清理服务端原生 OpenCode 的过期会话，可选择裁剪事件历史和整理空间。不包含 Weaver 数据库或独立账号数据；执行前先预览并确认。">
+          <EngineCleanup />
         </SettingRow>
       </SettingGroup>
     </div>

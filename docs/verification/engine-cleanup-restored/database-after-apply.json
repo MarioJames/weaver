@@ -1,0 +1,55 @@
+{
+  "session": [
+    [
+      "retained",
+      1793072348252
+    ]
+  ],
+  "message": [
+    [
+      "retained-m",
+      "retained"
+    ]
+  ],
+  "part": [
+    [
+      "retained-p",
+      "retained-m",
+      "retained"
+    ]
+  ],
+  "event_sequence": [
+    [
+      "retained",
+      9,
+      "owner"
+    ],
+    [
+      "orphan",
+      7,
+      "owner"
+    ]
+  ],
+  "event": [
+    [
+      "retained-e",
+      "retained",
+      9,
+      "t",
+      "{}"
+    ],
+    [
+      "orphan-e",
+      "orphan",
+      7,
+      "t",
+      "{}"
+    ]
+  ],
+  "auth": [
+    [
+      "credential",
+      "fixture-private"
+    ]
+  ]
+}

@@ -1,0 +1,20 @@
+- generic [ref=e1] clickable [onclick]
+  - generic
+    - region "Notifications" [ref=e2]
+    - region "Notifications" [ref=e3]
+    - region "Notifications" [ref=e4]
+    - region "Notifications" [ref=e5]
+    - region "Notifications" [ref=e6]
+    - region "Notifications" [ref=e7]
+    - dialog "确认永久删除这些数据？"
+      - generic
+        - heading "确认永久删除这些数据？" [level=2, ref=e8]
+        - button "Close" [ref=e9]
+        - generic
+          - StaticText "将删除 1 个过期会话及其消息、工具调用和事件历史，保留 1 个会话。此操作无法撤销。"
+        - alert
+          - StaticText "另将裁剪 1 个保留会话的 1 条事件"
+          - StaticText "至少空闲 0 分钟的保留会话将失去事件同步与回放历史。本地消息和工具结果保留。"
+        - StaticText "删除完成后会整理数据库空间，可能需要较长时间。"
+        - button "取消" [ref=e10]
+        - button "永久删除并执行清理" [ref=e11]

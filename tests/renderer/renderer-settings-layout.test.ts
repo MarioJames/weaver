@@ -31,9 +31,9 @@ test('the settings page heads with 设置 and the instant-effect tip', () => {
   assert.match(source, /tips="每项修改立即生效/, 'the tip lives in TitleWithTips');
 });
 
-test('five setting groups sit above their rows in the agreed order', () => {
+test('setting groups sit above their rows in the agreed order', () => {
   const html = markup(React.createElement(SettingsPage, { policy: policyOf() }));
-  const groups = ['显示', '额度', '免费渠道探测', '审查', '父 Agent'];
+  const groups = ['显示', '额度', '免费渠道探测', '审查', '父 Agent', '数据维护'];
   const at = groups.map(group => html.indexOf(`>${group}<`));
   for (let i = 0; i < groups.length; i++) assert.ok(at[i]! > 0, `the ${groups[i]} group title is rendered`);
   for (let i = 1; i < groups.length; i++) assert.ok(at[i]! > at[i - 1]!, `${groups[i]} sits after ${groups[i - 1]}`);
@@ -42,6 +42,8 @@ test('five setting groups sit above their rows in the agreed order', () => {
   }
   const firstRow = html.indexOf('项目时区');
   assert.ok(at[0]! < firstRow, 'the group title sits above its rows, not in a left table column');
+  assert.match(html, /OpenCode 数据库/);
+  assert.match(html, />清理数据库<\/button>/);
   assert.doesNotMatch(html, /调度主引擎|思考力度|工作空间|工作区/, 'no retired vocabulary remains in the settings copy');
 });
 

@@ -1,0 +1,27 @@
+{
+  "typecheck": "passed",
+  "build": "passed",
+  "tests": {
+    "passed": 23,
+    "failed": 0,
+    "files": [
+      "tests/main/cleanup-opencode.test.ts",
+      "tests/main/engine-cleanup-api.test.ts",
+      "tests/renderer/renderer-settings-layout.test.ts"
+    ],
+    "final_settings_recheck": "4 passed"
+  },
+  "scan": {
+    "scope": "task source snapshot and package.json",
+    "exit_code": 0,
+    "review": "Only deep relative import candidates; consistent with existing project imports and tsconfig without aliases. Repository-wide changed scan incomplete due to pre-existing untracked worktree directories; task snapshot fully scanned."
+  },
+  "git_diff_check": "passed",
+  "parent_review": "Stable delete confirmation and compact scrolled dialog visually verified",
+  "resource_check": {
+    "unit": "dev-weaver-restore-cleanup-browser.scope inactive/dead",
+    "chrome_pids_using_task_root": [],
+    "task_profiles": "absent"
+  },
+  "data_scope": "Only task-created disposable fixture databases modified; persistent user data preserved"
+}

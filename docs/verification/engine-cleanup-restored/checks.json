@@ -1,0 +1,67 @@
+{
+  "app_url": "http://127.0.0.1:42035",
+  "real_backend": true,
+  "mocked_api": false,
+  "database": "isolated fixture only",
+  "passed": [
+    "settings maintenance OpenCode cleanup entry clickable",
+    "default keepDays=1 pruneEvents=false vacuum=true",
+    "visible keepDays label focuses input; pruneEvents label toggles switch",
+    "keepDays 0,1.5,empty disable preview and execute",
+    "invalid idle hidden by disabling prune does not block preview",
+    "preview counts expiredSessions=1 retained=1 expiredEvents=1 expectedEvents=2",
+    "preview and confirmation cancel preserve database",
+    "parameter change invalidates preview",
+    "apply deletes only expired session and associations, retains message/part/auth/orphan event",
+    "prune idle=0 deletes retained event but preserves message/part/auth/orphan event",
+    "missing fixture reports error, does not create missing database; restoring file allows retry",
+    "closing and reopening retains idle=0/prune=true and applied report",
+    "1440x1000 light and 900x650 light layout",
+    "900x650 native CDP wheel scrollTop=196 max=196; action buttons y586..618 reachable; document scrollWidth=900",
+    "console messages=0 page errors=0 HTTP 4xx/5xx=0"
+  ],
+  "limitations": [
+    "Application fixes appearance=light, dark media emulation cannot activate dark theme; dark acceptance not applicable",
+    "Short cleanup running transition was not reliably captured",
+    "agent-browser wheel delivered no scrolling; native CDP explicit x600/y450 wheel succeeded",
+    "PageDown while input focused did not prove scrolling; native wheel verifies reachability"
+  ],
+  "harness": {
+    "target": "http://127.0.0.1:42035",
+    "mode": "task",
+    "session": "weaver-restore-cleanup",
+    "reuse_page": true,
+    "profile_dir": "/tmp/weaver-restore-cleanup-80WhRC/browser-profile",
+    "timestamp": "20261026T234224",
+    "evidence_dir": "/tmp/weaver-restore-cleanup-80WhRC/.browser-harness/evidence/20261026T234224",
+    "artifacts": {
+      "screenshot": "screenshot.png",
+      "dom": "dom.json",
+      "console": "console.json",
+      "network_xhr": "network-xhr.json",
+      "network_errors": "network-errors.json"
+    },
+    "counts": {
+      "network_xhr": 221,
+      "network_errors": 0
+    },
+    "artifact_errors": []
+  },
+  "recapture": {
+    "app_url": "http://127.0.0.1:41779",
+    "screenshots": [
+      "confirm-delete.png",
+      "prune-confirm.png"
+    ],
+    "wait_after_open_ms": 2000,
+    "visually_verified": true,
+    "fixture_additions": "old-confirm session and retained-recapture event only, no additional apply"
+  },
+  "cleanup": {
+    "service": "dev-weaver-restore-cleanup-browser.scope stopped",
+    "chrome": "own session closed",
+    "profile": "removed by bh",
+    "fixture_and_state": "deleted after evidence retained",
+    "parent_task_root_and_build_log": "preserved"
+  }
+}

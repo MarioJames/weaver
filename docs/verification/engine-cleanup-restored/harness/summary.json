@@ -1,0 +1,21 @@
+{
+  "target": "http://127.0.0.1:42035",
+  "mode": "task",
+  "session": "weaver-restore-cleanup",
+  "reuse_page": true,
+  "profile_dir": "/tmp/weaver-restore-cleanup-80WhRC/browser-profile",
+  "timestamp": "20261026T234224",
+  "evidence_dir": "/tmp/weaver-restore-cleanup-80WhRC/.browser-harness/evidence/20261026T234224",
+  "artifacts": {
+    "screenshot": "screenshot.png",
+    "dom": "dom.json",
+    "console": "console.json",
+    "network_xhr": "network-xhr.json",
+    "network_errors": "network-errors.json"
+  },
+  "counts": {
+    "network_xhr": 221,
+    "network_errors": 0
+  },
+  "artifact_errors": []
+}
