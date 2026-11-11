@@ -9,6 +9,7 @@ import { createNormalizer } from '../../src/main/adapters/cli/normalize';
 import { createRedactedLineBuffer } from '../../src/main/adapters/cli/redact';
 import type { CliAgentInput } from '../../src/main/adapters/cli';
 import type { RealEngineKind } from '../../src/shared/contracts/tasks';
+import { writeFakeOpencode } from '../helpers/fake-opencode';
 
 const instruction = 'MARKER-do-not-put-this-on-argv Reply PONG only.';
 
@@ -27,6 +28,11 @@ test('rejects a missing workspace before any process is started', () => {
 test('prepared argv is fixed, keeps the prompt off the command line, and refuses credential directories', () => {
   const dir = mkdtempSync(join(tmpdir(), 'weaver-cli-argv-'));
   const link = join(dir, 'cred');
+  // opencode argv depends on the installed major version; pin v1 here (v2 is covered in cli-opencode-compat.test.ts).
+  const bin = mkdtempSync(join(tmpdir(), 'weaver-cli-argv-bin-'));
+  writeFakeOpencode(bin, { version: '1.19.3' });
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${bin}:${previousPath}`;
   try {
     symlinkSync(join(homedir(), '.codex'), link);
     assert.throws(() => prepareCliAgentInput(input(link, 'codex')), (error: unknown) => error instanceof CliAgentInputError && error.field === 'workspace');
@@ -52,7 +58,7 @@ test('prepared argv is fixed, keeps the prompt off the command line, and refuses
       if (engine === 'pi') assert.ok(prepared.argv.includes('--no-session') && prepared.argv.includes('--mode') && prepared.argv.includes('json'));
       if (engine === 'opencode') assert.ok(prepared.argv.includes('--pure') && prepared.argv.includes('--auto') && prepared.argv.includes('--dir') && prepared.argv.join(' ').includes('--print-logs --log-level ERROR'));
     }
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally { process.env.PATH = previousPath; rmSync(dir, { recursive: true, force: true }); rmSync(bin, { recursive: true, force: true }); }
 });
 
 test('normalization requires a real vendor terminal, assistant text, and a zero exit', () => {

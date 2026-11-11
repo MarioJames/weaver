@@ -11,6 +11,7 @@ import { MockWorkerAdapter } from '../../src/main/adapters/worker';
 import { CommandHandler } from '../../src/main/commands';
 import { PolicyStore } from '../../src/main/policy/store';
 import { resolve } from 'node:path';
+import { writeFakeOpencode } from '../helpers/fake-opencode';
 
 const instruction = 'Reply PONG only.';
 const prepare = (dir: string, engine: RealEngineKind) => prepareCliAgentInput({
@@ -19,6 +20,10 @@ const prepare = (dir: string, engine: RealEngineKind) => prepareCliAgentInput({
 
 test('only pi gets a session directory; every engine records its prompt file', () => {
   const dir = mkdtempSync(join(tmpdir(), 'weaver-run-record-'));
+  const bin = mkdtempSync(join(tmpdir(), 'weaver-run-record-bin-'));
+  writeFakeOpencode(bin, { version: '1.19.3' });
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${bin}:${previousPath}`;
   try {
     for (const engine of ['pi', 'opencode', 'grok', 'codex', 'qodercli'] as RealEngineKind[]) {
       const prepared = prepare(dir, engine);
@@ -30,7 +35,7 @@ test('only pi gets a session directory; every engine records its prompt file', (
     }
     const created = readdirSync(join(dir, 'state')).filter(name => name.startsWith('pi-session-'));
     assert.equal(created.length, 1, 'exactly one session directory exists, the pi one');
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally { process.env.PATH = previousPath; rmSync(dir, { recursive: true, force: true }); rmSync(bin, { recursive: true, force: true }); }
 });
 
 test('a running agent exposes prompt path and the vendor session id as soon as the stream carries it', async () => {

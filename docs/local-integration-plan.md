@@ -36,6 +36,7 @@
 
 ```text
 opencode 1.19.3:  run --format json --model <provider/model> --variant <effort> --pure --auto --print-logs --log-level ERROR --dir <workspace>
+opencode 2.2.6:   run --format json --model <provider/model>#<effort> --auto --standalone   (cwd 与 $PWD = <workspace>；v2 无 --variant/--pure/--dir；按 `opencode --version` 主版本选择 v1/v2，其他版本明确报错)
 pi 1.3.0:         --print --mode json --model <model> --thinking <effort> --no-session --session-dir <private>
                   --no-extensions --no-mcp --no-skills --no-prompt-templates --no-context-files
                   --tools read,write,edit,bash --approve
@@ -44,6 +45,8 @@ grok 1.0.62:      --prompt-file <private> --output-format streaming-messages-jso
 codex 0.163.0:    exec --json --ephemeral --skip-git-repo-check --sandbox danger-full-access --cd <workspace>
                   --model <model> -c model_reasoning_effort="<effort>" -
 ```
+
+OpenCode v1 的 `--pure` 用于排除外部插件（原 argv 注释也将其与隔离用户 hooks/plugins 的做法对应）。v2.2.6 没有直接等价的 CLI 参数；`--standalone` 仅隔离服务进程，不关闭插件。去掉 `--pure` 后，全局或项目配置的 v2 插件可能参与 worker；已有私有渠道环境仍沿用原有隔离，不改用户配置。v2 的插件控制改用配置中的 `plugins` 禁用规则，见 [官方插件说明](https://opencode.ai/docs/plugins/)，本修复不引入配置覆盖。
 
 ## 4. 终态、结果与取消
 

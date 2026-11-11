@@ -19,7 +19,7 @@ async function run(stderr: string, sleepMs = 60000) {
   writeFileSync(join(dir, 'systemd-run'), '#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n', { mode: 0o700 });
   writeFileSync(join(dir, 'systemctl'), '#!/bin/sh\necho ActiveState=inactive\n', { mode: 0o700 });
   writeFileSync(join(dir, 'stderr.txt'), stderr);
-  writeFileSync(join(dir, 'opencode'), `#!${process.execPath}\nconst fs=require('fs');fs.readFileSync(0);fs.writeFileSync(2,fs.readFileSync(${JSON.stringify(join(dir, 'stderr.txt'))}));setTimeout(()=>{},${sleepMs});`, { mode: 0o700 });
+  writeFileSync(join(dir, 'opencode'), `#!${process.execPath}\nif(process.argv.includes('--version')){console.log('1.19.3');process.exit(0);}const fs=require('fs');fs.readFileSync(0);fs.writeFileSync(2,fs.readFileSync(${JSON.stringify(join(dir, 'stderr.txt'))}));setTimeout(()=>{},${sleepMs});`, { mode: 0o700 });
   process.env.PATH = dir + ':' + previous;
   const kills: string[] = [];
   const agents: ReturnType<typeof startCliAgent>[] = [];

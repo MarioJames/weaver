@@ -8,6 +8,7 @@ import type { Readable } from 'node:stream';
 import type { HelloInput, HelloJob, HelloResult } from '../../shared/engines';
 import type { PiModelCheck } from './pi-model-check';
 import { buildDshOverlayPatch } from '../adapters/cli/argv';
+import { opencodeMajor } from '../adapters/cli/opencode-version';
 
 const PROMPT = 'Reply with exactly: hi';
 const SYSTEM = 'You are a connectivity check. Reply with one short line. Never use tools.';
@@ -171,7 +172,10 @@ export const HELLO_ENGINES: Record<string, { command: string; argv: (model: stri
   claude: { command: 'claude', parse: parseResultObject, argv: (model, effort) => ['-p', PROMPT, '--model', model, '--effort', effort, '--output-format', 'json', '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--disable-slash-commands', '--system-prompt', SYSTEM, '--no-session-persistence'] },
   codex: { command: 'codex', parse: parseCodex, argv: (model, effort) => ['exec', '--json', '--ephemeral', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '--sandbox', 'read-only', '--model', model, '-c', `model_reasoning_effort="${effort}"`, PROMPT] },
   grok: { command: 'grok', parse: parseGrok, argv: (model, effort) => ['-p', PROMPT, '-m', model, '--reasoning-effort', effort, '--output-format', 'json', '--max-turns', '1', '--disable-web-search', '--no-subagents', '--system-prompt-override', SYSTEM] },
-  opencode: { command: 'opencode', parse: parseOpencode, argv: (model, effort) => ['run', '--pure', '--print-logs', '--log-level', 'ERROR', '--format', 'json', '-m', model, '--variant', effort, PROMPT] },
+  // v1 and v2 take different flags (see opencodeRunArgv): v2 has no --variant/--pure/--dir; the scratch cwd replaces --dir.
+  opencode: { command: 'opencode', parse: parseOpencode, argv: (model, effort) => opencodeMajor() === 1
+    ? ['run', '--pure', '--print-logs', '--log-level', 'ERROR', '--format', 'json', '-m', model, '--variant', effort, PROMPT]
+    : ['run', '--standalone', '--format', 'json', '-m', effort ? `${model}#${effort}` : model, PROMPT] },
   pi: { command: 'pi', parse: parsePi, argv: (model, effort) => ['-p', '--mode', 'json', '--model', model, '--thinking', effort, '--no-tools', '--no-mcp', '--no-extensions', '--no-skills', '--no-context-files', '--no-prompt-templates', '--no-themes', '--no-session', '--system-prompt', SYSTEM, PROMPT] },
   // qodercli reports every model as the placeholder "qfmodel", so its vendor model is not shown.
   qodercli: { command: 'qodercli', parse: stdout => ({ ...parseResultObject(stdout), model: undefined }), argv: (model, effort) => ['-p', PROMPT, '-m', model, '--reasoning-effort', effort, '-o', 'json', '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--system-prompt', SYSTEM, '--no-session-persistence'] },
@@ -191,9 +195,11 @@ export interface HelloProcess {
 }
 export type SpawnPrint = (command: string, argv: string[], cwd: string, env?: NodeJS.ProcessEnv) => HelloProcess;
 
-const spawnPrint: SpawnPrint = (command, argv, cwd, suppliedEnv) => {
+export const spawnPrint: SpawnPrint = (command, argv, cwd, suppliedEnv) => {
   const env = { ...(suppliedEnv ?? process.env) };
   delete env.ELECTRON_RUN_AS_NODE;
+  // opencode v2 takes its project directory from $PWD rather than the process cwd, and has no --dir.
+  if (command === 'opencode') env.PWD = cwd;
   return spawn(command, argv, { cwd, env, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 };
 
@@ -256,7 +262,7 @@ export function sayHi(route: Omit<HelloInput,'channel'> & { channel?:string; kin
           return engine.argv(route.model, route.effort, overlayPath);
         })()
         : engine.argv(route.model, route.effort);
-      if (route.kind === 'opencode') argv.push('--dir', scratch);
+      if (route.kind === 'opencode' && opencodeMajor() === 1) argv.push('--dir', scratch);
       const runtime = privateRun = route.channelConfig ? prepareChannelRun({ ...route.channelConfig, model: route.model, stateDir: scratch }) : undefined;
       if (runtime) { argv.unshift(...runtime.argv); const ignore=argv.indexOf('--ignore-user-config'); if(ignore>=0)argv.splice(ignore,1); }
       child = (deps.spawn ?? spawnPrint)(engine.command, argv, scratch, runtime?.env);

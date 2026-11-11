@@ -7,6 +7,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HELLO_ENGINES, HelloJobs, parseHelloInput, sayHi, type SpawnPrint } from '../../src/main/engines/hello';
 import type { HelloResult } from '../../src/shared/engines';
+import { writeFakeOpencode } from '../helpers/fake-opencode';
+
+// opencode argv depends on the installed major version; default to v1 here and switch per test for v2.
+const opencodeV1 = mkdtempSync(join(tmpdir(), 'weaver-hello-opencode-v1-'));
+writeFakeOpencode(opencodeV1, { version: '1.19.3' });
+process.env.PATH = `${opencodeV1}:${process.env.PATH}`;
+test.after(() => rmSync(opencodeV1, { recursive: true, force: true }));
 
 type Call = { command: string; argv: string[]; cwd: string };
 /** Fake CLI: writes the given output, then exits with the given code. */
@@ -193,4 +200,33 @@ test('OpenCode hello pins its absolute scratch directory despite inherited repos
   assert.ok(calls[0].cwd.startsWith('/'));assert.notEqual(calls[0].cwd,process.env.PWD);
   assert.equal(calls[0].argv[calls[0].argv.indexOf('--dir')+1],calls[0].cwd);
  }finally{if(before===undefined)delete process.env.PWD;else process.env.PWD=before;}
+});
+
+test('OpenCode v2 hello folds the variant into the model and relies on the scratch cwd instead of --dir/--pure/--variant', async () => {
+  const v2 = mkdtempSync(join(tmpdir(), 'weaver-hello-opencode-v2-'));
+  const previous = process.env.PATH;
+  writeFakeOpencode(v2, { version: 'opencode v2.2.6' });
+  process.env.PATH = `${v2}:${previous}`;
+  try {
+    const calls: Call[] = [];
+    const result = await probe('opencode', fake('{"type":"step_start"}\n{"type":"text","part":{"text":"hi"}}\n{"type":"step_finish"}', 0, '', calls), { model: 'opencode/glm-5.3-flash-free', effort: 'max' });
+    assert.deepEqual([result.ok, result.reply], [true, 'hi']);
+    assert.deepEqual(calls[0].argv, ['run', '--standalone', '--format', 'json', '-m', 'opencode/glm-5.3-flash-free#max', 'Reply with exactly: hi']);
+    assert.match(calls[0].cwd, /hello-[0-9a-f]{8}$/);
+    for (const removed of ['--dir', '--pure', '--variant', '--log-level', '--print-logs']) assert.equal(calls[0].argv.includes(removed), false, removed);
+  } finally { process.env.PATH = previous; rmSync(v2, { recursive: true, force: true }); }
+});
+
+test('OpenCode hello reports an undetectable opencode instead of guessing a flag set', async () => {
+  const bad = mkdtempSync(join(tmpdir(), 'weaver-hello-opencode-bad-'));
+  const previous = process.env.PATH;
+  writeFakeOpencode(bad, { version: 'banana' });
+  process.env.PATH = `${bad}:${previous}`;
+  try {
+    const calls: Call[] = [];
+    const result = await probe('opencode', fake('', 0, '', calls));
+    assert.equal(result.ok, false);
+    assert.match(result.error ?? '', /could not read a version/);
+    assert.equal(calls.length, 0, 'nothing was launched');
+  } finally { process.env.PATH = previous; rmSync(bad, { recursive: true, force: true }); }
 });

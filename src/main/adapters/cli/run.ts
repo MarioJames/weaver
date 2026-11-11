@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import type { CliAgentEvidence, RealEngineKind, TaskFailure, WorkerRecord } from '../../../shared/contracts/tasks';
 import { redactSecrets } from '../../../shared/redact';
-import { launcherRecords, prepareCliAgentInput, redactRecord } from './launch';
+import { cliChildEnv, launcherRecords, prepareCliAgentInput, redactRecord } from './launch';
 import type { CliAgentInput } from './types';
 import { createNormalizer } from './normalize';
 import { classifyVendorError, classifyVendorEvent } from './vendor-errors';
@@ -705,8 +705,7 @@ export function startCliRun(input: CliAgentInput & { runId: string }, beforeSpaw
     cleanupChannelRun(prepared);
     throw error;
   }
-  const env = { ...(prepared.env ?? process.env) };
-  delete env.ELECTRON_RUN_AS_NODE;
+  const env = cliChildEnv(prepared);
   let scope: OwnedScope;
   try {
     scope = startOwnedScope({

@@ -9,6 +9,7 @@ import { PassThrough } from 'node:stream';
 import type { WorkerRecord } from '../../../shared/contracts/tasks';
 import { buildDshOverlayPatch, buildLaunchSpec } from './argv';
 import { createNormalizer } from './normalize';
+import { OpencodeVersionError, opencodeMajor } from './opencode-version';
 import { redactSecrets } from '../../../shared/redact';
 import { clip, createRedactedLineBuffer } from './redact';
 import { decodeLines, startOwnedScope, type LineOverflow, type OwnedScope } from './scope';
@@ -48,6 +49,18 @@ export interface PreparedCliAgent {
   env?: NodeJS.ProcessEnv;
   channelStateDir?: string;
   channelProfilePath?: string;
+}
+
+/**
+ * Environment for the engine child. opencode v2 has no --dir and takes its project directory from $PWD
+ * (not from the process cwd), so a Weaver server started elsewhere would run the worker in the wrong
+ * directory; PWD is pinned to the workspace the scope already uses as cwd.
+ */
+export function cliChildEnv(prepared: Pick<PreparedCliAgent, 'engine' | 'workspace' | 'env'>): NodeJS.ProcessEnv {
+  const env = { ...(prepared.env ?? process.env) };
+  delete env.ELECTRON_RUN_AS_NODE;
+  if (prepared.engine === 'opencode') env.PWD = prepared.workspace;
+  return env;
 }
 
 function fail(field: string, message: string): never {
@@ -104,6 +117,14 @@ export function prepareCliAgentInput(input: CliAgentInput): PreparedCliAgent {
   if (typeof input.stateDir !== 'string' || !input.stateDir.trim()) fail('stateDir', 'stateDir must be a private job directory');
   try { mkdirSync(input.stateDir, { recursive: true, mode: 0o700 }); } catch { fail('stateDir', 'stateDir could not be created'); }
   const stateDir = existingDirectory('stateDir', input.stateDir);
+  // v1 and v2 take different flags; resolve which one before any run state is written.
+  let major: number | undefined;
+  if (input.engine === 'opencode') {
+    try { major = opencodeMajor(); } catch (error) {
+      if (error instanceof OpencodeVersionError) fail('engine', error.message);
+      throw error;
+    }
+  }
   const id = randomBytes(4).toString('hex');
   const promptPath = path.join(stateDir, `prompt-${id}.txt`);
   const sessionDir = path.join(stateDir, `pi-session-${id}`);
@@ -120,7 +141,7 @@ export function prepareCliAgentInput(input: CliAgentInput): PreparedCliAgent {
   }
   let spec: ReturnType<typeof buildLaunchSpec>;
   try {
-    spec = buildLaunchSpec({ engine: input.engine, model: input.model, effort: input.effort, workspace, instruction: input.instruction, promptPath, sessionDir, leaderSocket, overlayPath });
+    spec = buildLaunchSpec({ engine: input.engine, model: input.model, effort: input.effort, workspace, instruction: input.instruction, promptPath, sessionDir, leaderSocket, overlayPath, opencodeMajor: major });
   } catch (error) {
     fail('effort', error instanceof Error ? error.message : 'Invalid effort');
   }
@@ -180,8 +201,7 @@ class CliAgent extends EventEmitter implements ManagedAgentProcess {
       if(this.engine==='pi'&&value)this.noteActualModel(value);
       this.emitRecords(records);
     }, detail => this.logOversizedLine(detail));
-    const env = { ...(prepared.env ?? process.env) };
-    delete env.ELECTRON_RUN_AS_NODE;
+    const env = cliChildEnv(prepared);
     this.scope = startOwnedScope({ command: prepared.argv, cwd: prepared.workspace, env, stdin: prepared.stdin, ...(prepared.stdin!==null?{stdinPath:prepared.promptPath}:{}), unit: prepared.unit });
     this.scope.on('identity', (invocation: string) => this.emit('identity', invocation));
     this.pid = this.scope.pid;

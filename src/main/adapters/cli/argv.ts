@@ -68,6 +68,22 @@ export function buildDshOverlayPatch(model: string, effort: string): string {
   ].join('\n');
 }
 
+/**
+ * opencode v1 and v2 take different flags. v1 has --variant, --pure and --dir. v2 dropped all three:
+ * the variant rides on the model (`provider/model#variant`), the directory is the process cwd (the
+ * owned scope already starts the child in the workspace), and there is no direct CLI equivalent for --pure (external plugins may now load). v2 also
+ * attaches to a shared background service unless --standalone is given; --standalone keeps the run
+ * in its own server inside the owned scope, so the per-run environment (channel isolation) applies and
+ * cancellation reaches the whole run. Optional stderr debug logging is omitted for v2; vendor errors
+ * still arrive as JSON error events.
+ */
+function opencodeRunArgv(input: { model: string; effort: string; workspace: string; opencodeMajor?: number }): string[] {
+  if (input.opencodeMajor === undefined) throw new Error('opencode launch needs the detected major version');
+  if (input.opencodeMajor === 1) return ['opencode', 'run', '--format', 'json', '--model', input.model, '--variant', input.effort, '--pure', '--auto', '--print-logs', '--log-level', 'ERROR', '--dir', input.workspace];
+  if (input.opencodeMajor === 2) return ['opencode', 'run', '--format', 'json', '--model', input.effort ? `${input.model}#${input.effort}` : input.model, '--auto', '--standalone'];
+  throw new Error(`opencode major version ${input.opencodeMajor} is not supported; Weaver supports v1 and v2`);
+}
+
 export function buildLaunchSpec(input: {
   engine: RealEngineKind;
   model: string;
@@ -79,6 +95,8 @@ export function buildLaunchSpec(input: {
   leaderSocket: string;
   /** dsh only: the private per-run --patch overlay file written by prepare. Unused by every other engine. */
   overlayPath: string;
+  /** opencode only: major version of the installed CLI (1 or 2), detected by prepare. Unused by every other engine. */
+  opencodeMajor?: number;
 }): LaunchSpec {
   switch (input.engine) {
     case 'claude':
@@ -90,10 +108,7 @@ export function buildLaunchSpec(input: {
         argv: ['pi', '--print', '--mode', 'json', '--model', input.model, '--thinking', input.effort, '--no-session', '--session-dir', input.sessionDir, '--no-extensions', '--no-mcp', '--no-skills', '--no-prompt-templates', '--no-context-files', '--tools', 'read,write,edit,bash', '--approve'],
       };
     case 'opencode':
-      return {
-        stdin: input.instruction,
-        argv: ['opencode', 'run', '--format', 'json', '--model', input.model, '--variant', input.effort, '--pure', '--auto', '--print-logs', '--log-level', 'ERROR', '--dir', input.workspace],
-      };
+      return { stdin: input.instruction, argv: opencodeRunArgv(input) };
     case 'grok':
       return {
         stdin: null,
