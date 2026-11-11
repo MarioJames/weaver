@@ -1,5 +1,6 @@
-import { chmodSync, utimesSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { chmodSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { delimiter, join } from 'node:path';
 
 /**
  * A fake `opencode` executable for tests. `--version` prints the given text (and exits with `exit`);
@@ -35,4 +36,21 @@ process.stdout.write(lines.map(line => JSON.stringify(line)).join('\\n') + '\\n'
 export function touchLater(file: string, seconds = 5): void {
   const when = new Date(Date.now() + seconds * 1000);
   utimesSync(file, when, when);
+}
+
+/**
+ * Run `fn` with a fake `opencode` of `version` first on PATH, for tests that pick opencode as an
+ * engine but do not depend on which opencode the machine (or CI, which has none) has installed.
+ */
+export async function withFakeOpencode<T>(version: string, fn: () => T | Promise<T>): Promise<T> {
+  const dir = mkdtempSync(join(tmpdir(), 'weaver-fake-opencode-'));
+  const previous = process.env.PATH;
+  writeFakeOpencode(dir, { version });
+  process.env.PATH = `${dir}${delimiter}${previous ?? ''}`;
+  try {
+    return await fn();
+  } finally {
+    process.env.PATH = previous;
+    rmSync(dir, { recursive: true, force: true });
+  }
 }

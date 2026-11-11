@@ -18,6 +18,7 @@ import { classifyVendorEvent, piErrorText } from '../../src/main/adapters/cli/ve
 import type { CaptureResult } from '../../src/main/engines/probe';
 import type { CliAgentInput } from '../../src/main/adapters/cli/types';
 import type { ManagedProcess } from '../../src/main/adapters/worker';
+import { withFakeOpencode } from '../helpers/fake-opencode';
 
 const CONFIGURED = 'cc-switch-agentplan/glm-5.3-flash';
 // `pi --list-models` after cc-switch switched the provider: only the zhipu models remain.
@@ -216,7 +217,7 @@ test('the pi connectivity hello and free-channel probe check the model first and
     assert.equal(present.ok, true);
     assert.equal(spawned, 1);
     // Other engines are not checked even when a check is supplied.
-    const other = await sayHi({ engine: 'opencode', kind: 'opencode', model: 'opencode/x', effort: 'high' }, { root: dir, spawn: () => { spawned++; return helloChild(); }, checkPiModel: async () => 'must not be consulted' });
+    const other = await withFakeOpencode('opencode v2.2.6', () => sayHi({ engine: 'opencode', kind: 'opencode', model: 'opencode/x', effort: 'high' }, { root: dir, spawn: () => { spawned++; return helloChild(); }, checkPiModel: async () => 'must not be consulted' }));
     assert.equal(other.error?.includes('must not be consulted'), false);
     assert.equal(spawned, 2);
   } finally { rmSync(dir, { recursive: true, force: true }); }

@@ -48,6 +48,7 @@ import { Dispatcher } from '../../src/main/application/scheduling/dispatch';
 import { TaskRecords } from '../../src/main/application/tasks/records';
 import { ScheduleService } from '../../src/main/schedules/service';
 import { chainChannels, chainWorkers } from '../../src/main/application/scheduling/retry';
+import { withFakeOpencode } from '../helpers/fake-opencode';
 
 const tick=()=>new Promise<void>(resolve=>setImmediate(resolve));
 function integrationFixture() {
@@ -178,7 +179,7 @@ test('a queued record with run evidence never vendor-reroutes its frozen account
 });
 
 import { DatabaseSync } from 'node:sqlite';
-test('selected OpenCode subscriptions launch with independent database and all XDG roots',()=>{
+test('selected OpenCode subscriptions launch with independent database and all XDG roots',()=>withFakeOpencode('opencode v2.2.6',()=>{
  const dir=mkdtempSync(join(tmpdir(),'oc-'));try{
   const {config,context}=fixture();config.engines.codex!.kind='opencode';config.workers.pool!.model='opencode-go/fixture';
   context.quotas=context.quotas.map(record=>({...record,engine:'opencode',source:'opencode_go_usage'}));
@@ -190,7 +191,8 @@ test('selected OpenCode subscriptions launch with independent database and all X
    assert.equal(evidence.account,['a','b'][index]);assert.equal(evidence.marker,['a','b'][index]);assert.deepEqual(evidence.env,{OPENCODE_DB:join(root,'opencode.db'),XDG_CONFIG_HOME:join(root,'config'),XDG_DATA_HOME:join(root,'data'),XDG_STATE_HOME:join(root,'state'),XDG_CACHE_HOME:join(root,'cache')});
   }
  }finally{rmSync(dir,{recursive:true,force:true});}
-});
+}));
+
 
 import type { EngineQuotaRecord, QuotaEngine } from '../../src/shared/contracts/quota';
 

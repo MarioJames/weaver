@@ -16,6 +16,7 @@ import type { CliAgentInput } from '../../src/main/adapters/cli';
 import type { WorkerRecord } from '../../src/shared/contracts/tasks';
 
 import type { ManagedProcess } from '../../src/main/adapters/worker';
+import { withFakeOpencode } from '../helpers/fake-opencode';
 
 const TMP = mkdtempSync(join(tmpdir(), 'wv-cli-run-'));
 after(() => rmSync(TMP, { recursive: true, force: true }));
@@ -63,7 +64,7 @@ test('invalid input is rejected before any file is created', () => {
   assert.equal(existsSync(stateDir), false, 'no state dir side effect on validation failure');
 });
 
-test('beforeSpawn runs before spawn and a throw spawns nothing', () => {
+test('beforeSpawn runs before spawn and a throw spawns nothing', () => withFakeOpencode('opencode v2.2.6', () => {
   const input = baseInput();
   let hookCalls = 0;
   let thrown: unknown;
@@ -81,7 +82,8 @@ test('beforeSpawn runs before spawn and a throw spawns nothing', () => {
   assert.ok(existsSync(join(input.stateDir, `stdout-${input.runId}.log`)), 'log files were pre-created');
   // The FDs were closed: the same runId fails closed on the existing files.
   assert.throws(() => startCliRun(input, () => {}), /EEXIST/);
-});
+}));
+
 
 test('fatal candidates in one batch follow auth > quota > rate_limit > model > no_output/early_exit > other', () => {
   const failure = (kind: 'auth' | 'quota' | 'rate_limit' | 'vendor' | 'early_exit' | 'other') => ({ kind, message: kind });
