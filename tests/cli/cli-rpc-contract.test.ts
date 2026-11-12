@@ -28,6 +28,12 @@ test('the RPC contract keeps the public method allowlist and arity', () => {
   }
 });
 
+test('channels login start exposes the relogin input without changing RPC arity', () => {
+  const row = CLI_CATALOG.find(item => item.command === 'channels.login.start');
+  assert.ok(row?.inputFields?.optional?.relogin);
+  assert.equal(row.rpc?.arity, 1);
+});
+
 test('every RPC method in the contract has a handler and no handler is extra', () => {
   const host = {} as RpcHost;
   assert.deepEqual(Object.keys(createRpcHandlers(host)).sort(), Object.keys(RPC_METHODS).sort());

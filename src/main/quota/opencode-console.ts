@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { QuotaFailure, QuotaRenewalPending } from './credentials';
+import { openCodeDbPath, readOpenCodeCredentials } from '../engines/opencode-db';
 
 export const OPENCODE_CONSOLE_ORIGIN = 'https://opencode.ai/console';
 export const OPENCODE_CONSOLE_STATUS_PATH = '/api/go/status';
@@ -30,9 +31,7 @@ export function openCodeDataDir(env: NodeJS.ProcessEnv): string {
 }
 
 export function openCodeConsoleDbPath(env: NodeJS.ProcessEnv): string {
-  const override = env.OPENCODE_DB;
-  if (override === ':memory:' || (override && path.isAbsolute(override))) return override;
-  return path.join(openCodeDataDir(env), 'opencode', override || 'opencode.db');
+  return openCodeDbPath(env);
 }
 
 function normalizeOrigin(url: unknown): string | null {
@@ -81,6 +80,43 @@ export function readOpenCodeConsoleAccount(env: NodeJS.ProcessEnv, now: number, 
 
 function readConsole(env: NodeJS.ProcessEnv, now: number, selected?: { accountID: string; orgID: string }): OpenCodeConsoleIdentity | null {
   const file = openCodeConsoleDbPath(env);
+  // 2.2 stores the console OAuth login in the credential table. A present but
+  // unusable console credential fails closed and never falls back to legacy data.
+  const credentials = readOpenCodeCredentials(file);
+  if (credentials) {
+    const consoleRows = credentials.filter(row => row.integrationID === 'opencode');
+    if (consoleRows.length) {
+      if (selected) {
+        // A selected legacy account/org pair cannot select a credential-table login.
+        throw new QuotaFailure('unsupported', 'OpenCode Console 登录已迁移到 credential 表，请重新读取当前账号');
+      }
+      const active = consoleRows.filter(row => row.active);
+      if (active.length > 1) throw new QuotaFailure('unsupported', 'OpenCode Console 登录账户不明确，不会使用其他账号凭据');
+      const row = active[0] ?? consoleRows[0]!;
+      const token = nonemptyToken(row.access);
+      if (!token) throw new QuotaFailure('unauthenticated', 'OpenCode Console 登录无效，请在 OpenCode 中重新登录后手动刷新');
+      const orgId = nonemptyId(row.metadata?.orgID ?? row.metadata?.orgId);
+      if (!orgId) throw new QuotaFailure('unsupported', 'OpenCode Console 登录组织缺失，不会使用其他账号凭据');
+      const origin = normalizeOrigin(row.metadata?.server) ?? OPENCODE_CONSOLE_ORIGIN;
+      if (origin !== OPENCODE_CONSOLE_ORIGIN) throw new QuotaFailure('unsupported', '原生 Console 登录来源不受支持，不会发送凭据');
+      const account = createHash('sha256')
+        .update('opencode-console')
+        .update('\0')
+        .update(row.id)
+        .update('\0')
+        .update(orgId)
+        .update('\0')
+        .update(origin)
+        .digest('hex');
+      const expires = expiryMs(row.expires);
+      if (expires !== null && expires <= now) {
+        if (row.refresh) throw new QuotaRenewalPending(account);
+        throw new QuotaFailure('unauthenticated', '原生 Console 登录已过期，请在 OpenCode 中重新登录后手动刷新');
+      }
+      const fingerprint = createHash('sha256').update(account).update('\0').update(token).digest('hex');
+      return { token, orgId, origin, account, fingerprint, renewable: !!row.refresh, expiresAt: expires };
+    }
+  }
   let db: DatabaseSync | null = null;
   try {
     db = new DatabaseSync(file, { readOnly: true });

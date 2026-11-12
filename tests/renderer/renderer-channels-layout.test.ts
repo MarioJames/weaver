@@ -109,6 +109,16 @@ test('the detail surface extends into the reserved scrollbar gutter and stays fl
   assert.match(css, /@media \(max-width: 1023\.98px\)\{[^}]*margin-inline-end:0/);
 });
 
+test('official accounts expose an explicit relogin action while keeping identity replacement opt-in', () => {
+  const page = readFileSync(new URL('../../src/renderer/features/channels/ChannelsPage.tsx', import.meta.url), 'utf8');
+  const dialog = readFileSync(new URL('../../src/renderer/features/channels/ChannelLoginDialog.tsx', import.meta.url), 'utf8');
+  assert.match(page, /const relogin = !!state\?\.hasCredentials \|\| \(!!state\?\.hasAuthDir && state\?\.loginPending !== true\)/);
+  assert.match(page, /重新登录/);
+  assert.match(page, /setLoginChannel\(\{id:activeId!,relogin\}\)/);
+  assert.match(dialog, /relogin \? \{ relogin: true \}/);
+  assert.match(dialog, /只有新登录身份与原账号一致时才会替换/);
+});
+
 test('login feedback uses a fixed status row for job errors and toasts for refresh failures', () => {
   const source = readFileSync(new URL('../../src/renderer/features/channels/ChannelLoginDialog.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /<Alert/);

@@ -32,12 +32,12 @@ interface ChannelSecret { config?: string; apiKey?: string; authDir?: string }
 
 添加账号可选择官方订阅或API：Codex、Claude、Grok、OpenCode、Qoder支持新建官方账号并在独立私有根原生登录，也支持导入已有身份；Pi和dsh仅支持API。Qoder API先在原生`/model`完成Custom向导再导入，不能靠通用key/settings表单创建。父、子Agent与IM选择channel，任务详情保存安全的channel/channelLabel；历史任务没有记录时显示未记录。
 
-官方账号保存时建立`data-dir/channels/<id>/native`私有根及`.weaver-login-pending`标记；空根不算凭据就绪。已有合法legacy官方渠道无根时，显式开始登录会在事务中分配根，失败回滚并清理本次新根。API、已删除、不支持的账号拒绝登录；已有认证的账号不能通过登录原地换身份，应新建账号。
+官方账号保存时建立`data-dir/channels/<id>/native`私有根及`.weaver-login-pending`标记；空根不算凭据就绪。已有合法legacy官方渠道无根时，显式开始登录会在事务中分配根，失败回滚并清理本次新根。API、已删除、不支持的账号拒绝登录；已有认证的账号默认不通过普通登录原地换身份。官方账号支持显式`relogin:true`：在与渠道根同级的临时根执行原生登录，成功后严格复验身份；新身份必须与按引擎从原根材料或已记录身份一致，才原子地把渠道指向新根，否则拒绝并保留原凭据。运行中的任务继续使用原根，失败/取消/服务重启不改动原凭据；旧根未自动回收，避免破坏引用它的活动进程。
 
 登录DTO来自`src/shared/contracts/channels.ts`：
 
 ```ts
-startChannelLogin({ channel }): Promise<ChannelLogin>
+startChannelLogin({ channel, relogin? }): Promise<ChannelLogin>
 getChannelLogin({ channel, id }): Promise<ChannelLogin>
 submitChannelLoginCode({ channel, id, code }): Promise<ChannelLogin>
 cancelChannelLogin({ channel, id }): Promise<ChannelLogin>
@@ -52,12 +52,22 @@ cancelChannelLogin({ channel, id }): Promise<ChannelLogin>
 | Codex | `CODEX_HOME`，`login --device-auth` | strict材料检查及`login status`的ChatGPT身份 |
 | Claude | `CLAUDE_CONFIG_DIR`，`auth login --claudeai` | strict材料及`auth status --json`的claude.ai身份 |
 | Grok | `GROK_HOME`，`--leader-socket <root>/leader.sock login --device-auth` | strict材料及官方OIDC userinfo的subject匹配 |
-| OpenCode | 私有`OPENCODE_DB`/XDG根，`console login https://opencode.ai/console --pure` | 副本Account状态中opencode-go与活动组织 |
+| OpenCode | 私有`OPENCODE_DB`/XDG根，2.2.x`auth login opencode --method device --standalone` | 私有根`credential`表中`opencode-go`存在且`models --standalone`列出`opencode-go/`模型 |
 | Qoder | `QODER_CONFIG_DIR`及`--config-dir <root> login` | strict材料及私有根`status --output json`的登录身份 |
 
 Claude原生manual流程显示官方链接、密码输入与提交按钮；本人将官方完整`code#state`通过浏览器RPC `submitChannelLoginCode`传给当前job的自有stdin。不新增CLI code命令或别名；不将返回码放argv、数据库或sessionStorage。参数错误/写入失败保留输入，正常发送后清空，仍等待原生验证；发送不等于登录成功。Codex/Grok/OpenCode显示原生设备码，Qoder使用完整官方设备链接。
 
-新OAuth必须由本人在官方页面授权；源码和fixture不能证明这些真实授权流程均已通过。已有Codex/Claude/Grok本地材料在access过期但含合法非空refresh时允许交由原生CLI续期，`hasCredentials`只表示本地材料可用，不证明远端token、订阅、额度有效；新登录strict检查不以refresh替代当前access。pending账号始终不能运行。OpenCode原生DB按非空普通文件及只读`account_state`活动账号/组织检查，不套普通配置文件512KiB上限。
+新OAuth必须由本人在官方页面授权；源码和fixture不能证明这些真实授权流程均已通过。已有Codex/Claude/Grok本地材料在access过期但含合法非空refresh时允许交由原生CLI续期，`hasCredentials`只表示本地材料可用，不证明远端token、订阅、额度有效；新登录strict检查不以refresh替代当前access。pending账号始终不能运行。OpenCode 2.2.x就绪判断只认私有`opencode.db`中`credential`表的`opencode-go`非空凭据，不把legacy`account`/`account_state`游标当推理凭据，也不套普通配置文件512KiB上限；登录和导入还必须用私有根实际运行`opencode models --standalone`确认能列出`opencode-go/`模型。
+
+### 重新登录（2026-11-11）
+
+已认证的官方账号可在原渠道上重新登录，供令牌过期、刷新返回401或凭据被原生CLI清空的场景恢复；不改变运行任务身份。
+
+- CLI：`channels login start` 输入增加可选 `relogin: true`；界面在已认证或曾配置原生根但凭据不可用时显示「重新登录」，新账号仍显示「登录官方账号」。
+- 隔离：登录进程只写与渠道根同级的临时根，不写原根；沿用现有设备码、Claude手工code提交和取消机制。
+- 身份：Codex用auth材料中的account/subject，Claude用`.claude.json` oauthAccount，Grok用OIDC `sub`（加team），OpenCode用2.2 DB中的account/org或credential ID，Qoder用导入/上次成功登录记录的`.weaver-identity.json`或私有根`status`。原凭据失效不阻止读取身份；无法确认原身份时拒绝relogin并提示新建账号，不做弱匹配。
+- 切换：新登录strict验证通过且身份一致后，事务性把`ChannelSecret.authDir`指向新根；新启动进程用新根，已启动进程继续原根。失败、取消、身份不一致或服务重启都不改原secret，临时根删除。旧根保留，避免活动任务引用被破坏，未实现自动回收。
+- 运行中任务不被打断由“切换指针而非替换原文件”保证；不宣称支持热切换宿主已加载的原生登录。
 
 导入或保存后，角色选择渠道；调度冻结channel/engine/model/effort，运行时从私有store解析binding，校验引擎ID与kind一致，再由`prepareChannelRun`编译原生配置。worker两条launcher、Herdr owner、IM、schedule、Hello、带channel模型列表及额度探针都使用该绑定。缺失绑定或引擎错配明确失败，不偷偷读另一全局账号，也不以mock替代真实执行。没有channel的安装/模型目录查询只表示只读发现能力。
 
@@ -70,7 +80,7 @@ native不是“同引擎就复用”：仅当所选worker与owner渠道相同、
 | Codex | 导入完整auth.json及稳定account身份到私有根 | `CODEX_HOME`；订阅推理生成唯一`--profile`文件，API在独立根写config.toml/auth.json，使用Responses原生provider与文件内bearer key | keyring-only不能当作可复制文件认证；API不回退OpenAI订阅 |
 | Claude Code | 导入.credentials.json及精简oauthAccount元信息 | `CLAUDE_CONFIG_DIR`、`--settings <private>`、`--setting-sources ''`；API使用Messages | OS keychain不能直接复制；企业managed设置仍可高优先级；使用真实launcher |
 | Grok | 导入auth.json并识别稳定OIDC身份 | `GROK_HOME`；API写`[models] default`与单数`[model."id"]`，通过env_key及原生api_backend配置 | 保留导入协议，显式protocol才覆写；不把`[models."id"]`当正确格式 |
-| OpenCode | online backup原生DB，在副本选account/org并复验 | `OPENCODE_DB`、独立XDG目录、`OPENCODE_CONFIG[_DIR]`；禁项目配置，API限制provider并设空原生auth content | 不切来源全局游标；同refresh grant的额外组织导入后默认停用，需独立登录，不宣称并发续期已验 |
+| OpenCode | 2.2.x full-DB一致性备份（含`credential`表），在副本复验opencode-go模型后建立私有根 | `OPENCODE_DB`、独立XDG目录、`OPENCODE_CONFIG[_DIR]`；禁项目配置，API限制provider并设空原生auth content | 只读取来源；不切来源全局游标；就绪以`opencode-go`凭据和`models`列表为准，legacy account游标仅作身份/额度兼容读取 |
 | Qoder | 复制原生opaque .auth/user与machine_id，用原生status确认身份 | `--config-dir`/`QODER_CONFIG_DIR`；BYOK复制有界.models，通过原生模型列表差值生成私有modelID白名单与customs哈希 | API拒绝auto/官方模型；只有catalog/default且无customs/providers不建API；仅providers或验证失败/ID截断保留停用渠道待重新导入；settings不定义BYOK |
 | Pi | 不支持 | `PI_CODING_AGENT_DIR`，私有models.json/auth.json，provider+model/API协议 | 解析原生环境模板，迁移不执行`!command`；2026-10-25已安装Pi 1.4.0，但无可用凭据，未完成真实CLI请求验证 |
 | dsh | 不支持 | `DSH_HOME`、私有.credentials.yaml、`--patch`原生凭据与provider，再应用最终权限overlay | 当前仅deepseek-official与Messages；API key必需，不从项目.env偷偷回退 |
@@ -87,9 +97,9 @@ schema13为已有engine生成确定性`default_<engine-id>`渠道，将Owner/Wor
 
 `importChannels(input)`返回`ImportChannelsResult extends ChannelsSnapshot`，附本次操作的`importResult: { added, existing, updated, notFound, failures }`。前三项分别为新metadata身份数、幂等保留数、显式更新数；`notFound`是本次扫描无候选的engine ID，不等于CLI未安装；`failures`为`{ engine, message }[]`安全错误。部分成功返回实际回执；无可导、全部失败、不合法输入或事务错误拒绝，不能显示假完成。`getChannels`不持久保存操作回执。界面保留零项/部分失败结果、来源/引擎/更新选项，关闭后仍提示部分失败，允许单独选失败引擎与来源重试。2026-10-25首次导入专项实测发现：无有效token的Claude来源仍返回added=1而hasCredentials=false；首次全部导入在UI 15秒超时后后端才提交6条来源。该时点两项为失败，不能用已有记录的幂等existing结果掩盖，详见[首次导入复验](verification/account-channels/import-specific/REPORT.html)。
 
-导入读取原生官方认证、API/provider/model定义和可解析凭据，稳定账号身份、来源根和engine决定`import_*` ID。同账号的渠道metadata与secret同时存在时，重复导入默认跳过，保护托管refresh及用户选择。策略回滚保留secret却移除metadata后，普通导入恢复metadata、必要的legacy角色引用与blocks，精确复用现有托管secret和认证根，不用过时来源覆盖已续期凭据；同一原生根换成另一账号产生另一渠道。`replaceExisting:true`才更新已导入配置与认证：创建新私有根、原子切换secret，保留渠道名称、enabled和角色选择；已运行进程继续旧根。旧根没有因重导而删除，避免破坏活动进程；这不等于已实现自动认证根垃圾回收。 删除渠道后若secret记录已无而同名旧认证根仍存在，普通重导会拒绝认领；在导入弹层勾选「更新已导入的配置与认证」可新建随机root恢复，不覆盖旧根。
+导入读取原生官方认证、API/provider/model定义和可解析凭据，稳定账号身份、来源根和engine决定`import_*` ID。同账号的渠道metadata与secret同时存在时，重复导入默认跳过，保护托管refresh及用户选择。策略回滚保留secret却移除metadata后，普通导入恢复metadata、必要的legacy角色引用与blocks，精确复用现有托管secret和认证根，不用过时来源覆盖已续期凭据；同一原生根换成另一账号产生另一渠道。`replaceExisting:true`才更新已导入配置与认证：创建新私有根、原子切换secret，保留渠道名称、enabled和角色选择；已运行进程继续旧根。旧根没有因重导而删除，避免破坏活动进程；重新登录同样使用临时根并在成功后切换，旧根不自动回收。这不等于已实现自动认证根垃圾回收。 删除渠道后若secret记录已无而同名旧认证根仍存在，普通重导会拒绝认领；在导入弹层勾选「更新已导入的配置与认证」可新建随机root恢复，不覆盖旧根。
 
-OpenCode复用现有原生Account类与SQLite online backup，包含WAL一致内容；枚举、选组织和认证复验均在副本中。普通API配置保留显式inline key优先于auth缓存。原生`{env:KEY}`引用在导入时物化到私有配置；`{file:path}`仅允许来源目录内的有界普通文件，拒绝逃逸/缺文件/缺环境变量，保留来源不改。没有实跑每种原生loader和远端请求，物化测试不等同完整provider兼容证明。
+OpenCode 2.2.x复用现有SQLite online backup，包含WAL一致内容与`credential`表；枚举、模型验证均在副本中。导入读取非空`opencode-go`凭据后，在副本运行`opencode models --standalone`确认至少一个`opencode-go/`模型，再建立私有根并写入`.weaver-identity.json`。legacy`account`/`account_state`只用于身份与额度兼容读取，不再通过`serve --pure`或`/experimental/console/*`切换账号。普通API配置保留显式inline key优先于auth缓存。原生`{env:KEY}`引用在导入时物化到私有配置；`{file:path}`仅允许来源目录内的有界普通文件，拒绝逃逸/缺文件/缺环境变量，保留来源不改。没有实跑每种原生loader和远端请求，物化测试不等同完整provider兼容证明。
 
 导入重映射角色时同步携带既有worker/channel限制和官方quota限制，真正engine级stall仍全局；同渠道的供应商限制不会扩散到后来新建API账号。乐观revision与事务保护metadata/secret一起提交，失败清理本次stage/新target，不改来源和其他运行根。
 
@@ -97,7 +107,7 @@ OpenCode复用现有原生Account类与SQLite online backup，包含WAL一致内
 
 worker权重、并发和model/effort仍属于角色；channel和role启用及既有blocks共同决定可调度性。引擎目录不提供用户停用开关；SQL schema13的`policy_engines.enabled`仅为兼容字段，读取恒true、写入恒1。`PolicyStore.parse`归一历史表/回滚快照中的引擎布尔值并补齐目录，读取不重写历史行；新save明确禁止`engine.enabled=false`，提示改为停用账号或角色。删除引擎页不解除角色/账号停用、quota、manual或stall限制。冻结channel后不能由原生全局游标改身份。旧OpenCode全局登录/switch/pool公共控制面已移除，渠道导入替代它；内部原生切组织只操作私有副本。
 
-额度按channel探测、缓存和持久化，`channels.*.quota_refresh`控制订阅的主动刷新。订阅Codex/Claude/Grok的新鲜明确观测只增删该channel的自有quota block；API没有官方订阅额度。OpenCode Go窗口仅展示，不据此自动暂停整个engine。失败/陈旧观测保留旧限制，供应商模型错误仍走既有vendor路径；真正引擎stall继续按engine处置。共享一次订阅的多个组织不因此获得独立额度或独立refresh grant保证。
+额度按channel探测、缓存和持久化，`channels.*.quota_refresh`控制订阅的主动刷新。订阅Codex/Claude/Grok的新鲜明确观测只增删该channel的自有quota block；API没有官方订阅额度。OpenCode 2.2.x优先读取`credential`表中`opencode` Console OAuth登录（存在时）；否则用`opencode-go` key读取官方Go用量接口。拿不到或格式不认识时显示额度未知及安全原因，不把额度读取失败当作账号登录失败；只有legacy`account`表而无credential表的旧私有根需重新导入或登录。OpenCode Go窗口仅展示，不据此自动暂停整个engine。失败/陈旧观测保留旧限制，供应商模型错误仍走既有vendor路径；真正引擎stall继续按engine处置。共享一次订阅的多个组织不因此获得独立额度或独立refresh grant保证。
 
 ## 证据与当前边界
 

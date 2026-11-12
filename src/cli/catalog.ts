@@ -87,7 +87,7 @@ export const CLI_CATALOG: CatalogCommand[] = [
   cmd('policy.preview', { inputFields: {"required": {"owner": "owner profile ID"}, "optional": {"worker": "explicit worker ID", "runningCount": "integer ≥0"}}, usage: 'policy preview --input <preview.json>' }),
   cmd('policy.history', { inputFields: {"required": {}, "optional": {}, "notes": "Every saved policy revision, newest first: revision, savedAt, source (save, import or rollback:<n>). Each holds a full snapshot that policy rollback can restore."}, usage: 'policy history' }),
   cmd('policy.rollback', { inputFields: {"required": {"revision": "already-saved policy revision integer to restore"}, "optional": {}, "notes": "Restores the stored snapshot of that revision as a NEW revision (history is never rewritten). Needs the user's consent."}, usage: 'policy rollback --input <rollback.json>' }),
-  cmd('channels.login.start', { inputFields:{required:{channel:'official channel ID'}},usage:'channels login start --input <login.json>' }),
+  cmd('channels.login.start', { inputFields:{required:{channel:'official channel ID'},optional:{relogin:'boolean; re-authenticate an existing official account in a temporary root, replace its credentials only when the identity matches'}},usage:'channels login start --input <login.json>' }),
   cmd('channels.login.get', { inputFields:{required:{channel:'official channel ID',id:'login job ID'}},usage:'channels login get --input <login.json>' }),
   cmd('channels.login.cancel', { inputFields:{required:{channel:'official channel ID',id:'login job ID'}},usage:'channels login cancel --input <login.json>' }),
   cmd('channels.list', { usage: 'channels list' }),

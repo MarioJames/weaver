@@ -126,7 +126,7 @@ export function cleanup({ db: filename, keepDays = 1, apply = false, vacuum = fa
     });
     const protectedDigest = () => {
       const hash = createHash('sha256');
-      for (const table of tables.filter(name => ['auth', 'project', 'permission', 'account', 'account_state'].includes(name)).sort()) {
+      for (const table of tables.filter(name => ['auth', 'project', 'permission', 'account', 'account_state', 'credential', 'control_account'].includes(name)).sort()) {
         hash.update(table);
         for (const row of db.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).iterate()) hash.update(JSON.stringify(row));
       }

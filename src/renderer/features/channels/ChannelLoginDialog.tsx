@@ -25,7 +25,7 @@ function remember(job: ChannelLogin) {
   try { sessionStorage.setItem(storageKey(job.channel), JSON.stringify({ channel: job.channel, id: job.id })); } catch { /* The server still owns this job. */ }
 }
 
-export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { channel: string; label: string; onClose: () => void; onSucceeded: () => Promise<void> }) {
+export function ChannelLoginDialog({ channel, label, relogin, onClose, onSucceeded }: { channel: string; label: string; relogin: boolean; onClose: () => void; onSucceeded: () => Promise<void> }) {
   const [job, setJob] = useState<ChannelLogin>();
   const [pending, setPending] = useState(false);
   const [authorizationCode, setAuthorizationCode] = useState('');
@@ -48,7 +48,7 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
     const token = ++generation.current;
     setPending(true);
     try {
-      const next = action === 'start' ? await window.weaver.startChannelLogin({ channel })
+      const next = action === 'start' ? await window.weaver.startChannelLogin({ channel, ...(relogin ? { relogin: true } : {}) })
         : action === 'code' ? await window.weaver.submitChannelLoginCode({ ...reference!, code: authorizationCode })
         : action === 'cancel' ? await window.weaver.cancelChannelLogin(reference!) : await window.weaver.getChannelLogin(reference!);
       // Even if the dialog closed while starting, keep the exact ref for a later reopen.
@@ -100,7 +100,7 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
   }, [job]);
 
   const reference = job ? { channel, id: job.id } : savedRef(channel);
-  return <Modal open title={`登录 ${label}`} width={640} draggable={false} className={stylex.props(resourceStyles.modal).className}
+  return <Modal open title={`${relogin ? '重新登录' : '登录'} ${label}`} width={640} draggable={false} className={stylex.props(resourceStyles.modal).className}
     classNames={{ body: stylex.props(resourceStyles.modalBody).className, footer: stylex.props(resourceStyles.modalFooter).className }} onCancel={onClose}
     footer={<>
       {running && <Button danger disabled={pending} loading={pending} onClick={() => reference && void run('cancel', reference)}>取消此次登录</Button>}
@@ -116,6 +116,7 @@ export function ChannelLoginDialog({ channel, label, onClose, onSucceeded }: { c
         <Text type="secondary">{job.error.code}：{job.error.message}</Text>
       </div>}
       <Text type="secondary">关闭此窗口后，可从该账号的登录按钮找回状态；关闭不会取消登录。只有独立配置中的凭据通过验证后，账号才可用于执行。</Text>
+      {relogin && <Text type="secondary">重新登录在临时目录进行；只有新登录身份与原账号一致时才会替换新启动进程使用的凭据。运行中的任务继续使用原凭据，失败或取消不会改动原凭据。</Text>}
       {running && job.verificationUrl && <div {...stylex.props(styles.tight)}>
         <Text strong>官方授权链接</Text>
         <Text type="secondary">复制链接，在要登录该账号的浏览器中打开并完成授权。</Text>

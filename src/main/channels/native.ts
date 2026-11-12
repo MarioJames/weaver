@@ -1,8 +1,8 @@
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, isAbsolute } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
 import type { ChannelSecret } from '../../shared/contracts/channels';
+import { openCodeGoCredential, openCodeIdentitySubject } from '../engines/opencode-accounts';
 /** Shared by direct process launch and the Herdr shell launch boundary. Constants are safe shell case patterns. */
 export const CHANNEL_AUTH_ENV_PATTERNS = ['ANTHROPIC_*','OPENAI_*','AZURE_OPENAI_*','XAI_*','GROK_*','CODEX_*','CLAUDE_*','QODER_*','OPENCODE_*','PI_CODING_AGENT_DIR','DSH_*','DEEPSEEK_*','GOOGLE_API_KEY','GEMINI_API_KEY','WEAVER_CHANNEL_KEY','*API_KEY','*APIKEY','*ACCESS_TOKEN','*REFRESH_TOKEN','*AUTH_TOKEN','*BEARER_TOKEN','*CLIENT_SECRET','ELECTRON_RUN_AS_NODE'] as const;
 export function isChannelCredentialVariable(name:string): boolean {
@@ -60,12 +60,41 @@ export function nativeCredentialsReady(engine:string, secret:ChannelSecret, veri
   case 'grok': return !!grokCredential(root,verifying);
   case 'qoder': case 'qodercli': return nativeFile(root,'.auth/user')&&nativeFile(root,'.auth/machine_id');
   case 'opencode': {
-   // SQLite account stores contain business data; the config-file size bound does not apply.
+   // 2.2 inference credentials live in the credential table; the legacy account cursor alone cannot list Go models.
    try{const file=lstatSync(join(root,'opencode.db'));if(!file.isFile()||file.isSymbolicLink()||file.size===0)return false;}catch{return false;}
-   let db:DatabaseSync|undefined;
-   try{db=new DatabaseSync(join(root,'opencode.db'),{readOnly:true});const row=db.prepare('SELECT active_account_id, active_org_id FROM account_state WHERE id=1').get();return typeof row?.active_account_id==='string'&&!!row.active_account_id&&typeof row.active_org_id==='string'&&!!row.active_org_id;}catch{return false;}finally{db?.close();}
+   return !!openCodeGoCredential(join(root,'opencode.db'));
   }
   default:return false;
+ }
+}
+export interface StoredNativeIdentity { engine:string; subject:string }
+export function readStoredIdentity(root:string):StoredNativeIdentity|undefined {
+ const value=nativeJson(root,'.weaver-identity.json');
+ return typeof value.engine==='string'&&typeof value.subject==='string'&&value.subject?{engine:value.engine,subject:value.subject}:undefined;
+}
+export function writeStoredIdentity(root:string,engine:string,subject:string|undefined):void {
+ if(!subject)return;
+ writeNativeConfig(root,'.weaver-identity.json',JSON.stringify({engine,subject})+'\n');
+}
+function grokIdentitySubject(root:string):string|undefined {
+ const entries=Object.entries(nativeJson(root,'auth.json')).filter(([key,v]:[string,any])=>key.startsWith('https://auth.x.ai::')&&v?.auth_mode==='oidc');
+ if(entries.length!==1)return;
+ const value=entries[0]![1] as any;
+ const claims=jwtClaims(value.id_token??value.key??value.access_token);
+ const subject=claims.sub??value.account_id??value.user_id;
+ return typeof subject==='string'&&subject?`grok:${subject}:${typeof value.team_id==='string'?value.team_id:''}`:undefined;
+}
+/** Stable local identity used by in-place relogin. It needs no live token; expired material still names the account. */
+export function nativeIdentity(engine:string,root:string):string|undefined {
+ const kind=engine==='qodercli'?'qoder':engine;
+ const stored=readStoredIdentity(root);
+ if(stored?.engine===kind&&stored.subject)return stored.subject;
+ switch(kind){
+  case 'codex':{const v=nativeJson(root,'auth.json');const subject=v.tokens?.account_id??jwtClaims(v.tokens?.id_token).sub??jwtClaims(v.tokens?.access_token).sub;return typeof subject==='string'&&subject?`codex:${subject}`:undefined;}
+  case 'claude':{const account=claudeAccount(root);return account?`claude:${account.accountUuid}:${account.organizationUuid??''}`:undefined;}
+  case 'grok':return grokIdentitySubject(root);
+  case 'opencode':return openCodeIdentitySubject(root);
+  default:return;
  }
 }
 /** The login and inference boundaries use the same credential-stripped native environment. */

@@ -11,7 +11,6 @@ import { execFileSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { QuotaProber } from '../../src/main/quota';
 import { dbQuotaStore } from '../../src/main/storage/quota-snapshot';
-import { parseOpenCodeSwitch } from '../../src/main/engines/opencode-accounts';
 import { createNormalizer } from '../../src/main/adapters/cli/normalize';
 import { prepareChannelRun,cleanupChannelRun } from '../../src/main/channels/runtime';
 import { NativeChannelImporter } from '../../src/main/channels/import';
@@ -62,31 +61,35 @@ test('native import is idempotent, keeps renewed private credentials, rebinds pr
  }finally{db.close();rmSync(temp,{recursive:true,force:true});}
 });
 
-test('OpenCode imports a WAL-consistent private database and never switches the source cursor; duplicate grant org stays disabled',async()=>{
+test('OpenCode imports the 2.2 credential table from a WAL-consistent private database and never switches the source cursor',async()=>{
  const temp=fixture();const db=new DatabaseSync(':memory:');const source=join(temp,'source');mkdirSync(source);const original=new DatabaseSync(join(source,'opencode.db'));
  try{
-  original.exec("PRAGMA journal_mode=WAL;CREATE TABLE account(id TEXT PRIMARY KEY,refresh_token TEXT);CREATE TABLE account_state(id INTEGER PRIMARY KEY,active_account_id TEXT,active_org_id TEXT);INSERT INTO account VALUES('a','fixture-refresh-a');INSERT INTO account_state VALUES(1,'a','org-one');");
-  const policy=new PolicyStore(db);const secrets=new ChannelStore(db);const switched:string[]=[];
-  const importer=new NativeChannelImporter(policy,secrets,{root:join(temp,'managed'),env:{HOME:temp},accountsFactory:env=>{
+  original.exec("PRAGMA journal_mode=WAL;CREATE TABLE credential(id TEXT PRIMARY KEY,integration_id TEXT,label TEXT NOT NULL,value TEXT NOT NULL,connector_id TEXT,method_id TEXT,active INTEGER,time_created INTEGER NOT NULL,time_updated INTEGER NOT NULL);CREATE TABLE account(id TEXT PRIMARY KEY,email TEXT NOT NULL,url TEXT NOT NULL,access_token TEXT NOT NULL,refresh_token TEXT NOT NULL,token_expiry INTEGER,time_created INTEGER NOT NULL,time_updated INTEGER NOT NULL);CREATE TABLE account_state(id INTEGER PRIMARY KEY,active_account_id TEXT,active_org_id TEXT);CREATE TABLE session(id TEXT PRIMARY KEY,time_updated INTEGER NOT NULL);INSERT INTO session VALUES('ses_fixture',1);INSERT INTO credential VALUES('cred_fixture','opencode-go','OpenCode Go','{\"type\":\"key\",\"key\":\"fixture-go-key\"}',NULL,NULL,1,1,1);INSERT INTO account VALUES('acct_fixture','fixture@example.invalid','https://opencode.ai/console','access-fixture','refresh-fixture',9999999999999,1,1);INSERT INTO account_state VALUES(1,'acct_fixture','org_fixture');");
+  const policy=new PolicyStore(db);const secrets=new ChannelStore(db);const seen:string[]=[];
+  const importer=new NativeChannelImporter(policy,secrets,{root:join(temp,'managed'),env:{HOME:temp},openCodeModels:async env=>{
    assert.notEqual(env.OPENCODE_DB,join(source,'opencode.db'));
-   const privateDb=new DatabaseSync(env.OPENCODE_DB!);
-   assert.equal(privateDb.prepare('SELECT refresh_token FROM account').get()!.refresh_token,'fixture-refresh-a');
-   const list=()=>{const state=privateDb.prepare('SELECT * FROM account_state').get()!;return {orgs:['org-one','org-two'].map(orgID=>({accountID:'a',orgID,active:state.active_org_id===orgID,accountEmail:'fixture@example.invalid',accountUrl:'https://opencode.ai/console',orgName:orgID})),consoleManagedProviders:['opencode-go'],switchableOrgCount:2,detail:''};};
-   return {list:async()=>list(),switchAccount:async input=>{const selected=parseOpenCodeSwitch(input);switched.push(selected.orgID);privateDb.prepare('UPDATE account_state SET active_org_id=?').run(selected.orgID);return list();},close:async()=>privateDb.close()};
+   const privateDb=new DatabaseSync(env.OPENCODE_DB!,{readOnly:true});
+   try{
+    assert.equal(privateDb.prepare("SELECT count(*) AS n FROM credential WHERE integration_id='opencode-go'").get()!.n,1);
+    assert.equal(privateDb.prepare('SELECT count(*) AS n FROM session').get()!.n,1);
+    seen.push(env.OPENCODE_DB!);return true;
+   }finally{privateDb.close();}
   }});
   const result=await importer.import({revision:0,engine:'opencode',sourceDir:source});const imported=Object.entries(result.policy.config.channels).filter(([id])=>id.startsWith('import_'));
-  assert.equal(imported.length,2);assert.equal(imported.filter(([,channel])=>channel.enabled).length,1);assert.equal(switched.length,1);
-  assert.equal(original.prepare('SELECT active_org_id FROM account_state').get()!.active_org_id,'org-one');
-  for(const [id,channel]of imported){const secret=secrets.getSecret(id)!;if(channel.enabled){assert.equal(statSync(join(secret.authDir!,'opencode.db')).mode&0o777,0o600);}else{assert.equal(secret.authDir,undefined);assert.throws(()=>prepareChannelRun({channel:{...channel,enabled:true},secret,model:'opencode-go/fixture',stateDir:join(temp,'unsafe-enable')}),/认证目录/);}}
+  assert.equal(imported.length,1);assert.equal(imported[0]![1].enabled,true);assert.equal(seen.length,2,'enumeration and stage both verify models');
+  assert.equal(original.prepare('SELECT active_org_id FROM account_state').get()!.active_org_id,'org_fixture');
+  const secret=secrets.getSecret(imported[0]![0])!;const copied=new DatabaseSync(join(secret.authDir!,'opencode.db'),{readOnly:true});
+  try{assert.equal(copied.prepare("SELECT count(*) AS n FROM credential WHERE integration_id='opencode-go'").get()!.n,1);}finally{copied.close();}
+  assert.equal(statSync(join(secret.authDir!,'opencode.db')).mode&0o777,0o600);
+  assert.match(readFileSync(join(secret.authDir!,'.weaver-identity.json'),'utf8'),/opencode:acct_fixture:org_fixture/);
  }finally{original.close();db.close();rmSync(temp,{recursive:true,force:true});}
 });
 
 test('a concurrent policy save aborts the complete native import and reclaims only its own staged roots',async()=>{
- const temp=fixture();const db=new DatabaseSync(':memory:');const source=join(temp,'source');mkdirSync(source);const nativeDb=new DatabaseSync(join(source,'opencode.db'));nativeDb.exec("CREATE TABLE account(id TEXT);INSERT INTO account VALUES('a')");nativeDb.close();
+ const temp=fixture();const db=new DatabaseSync(':memory:');const source=join(temp,'source');mkdirSync(source);const nativeDb=new DatabaseSync(join(source,'opencode.db'));nativeDb.exec("CREATE TABLE credential(id TEXT PRIMARY KEY,integration_id TEXT,label TEXT NOT NULL,value TEXT NOT NULL,connector_id TEXT,method_id TEXT,active INTEGER,time_created INTEGER NOT NULL,time_updated INTEGER NOT NULL);INSERT INTO credential VALUES('cred_fixture','opencode-go','OpenCode Go','{\"type\":\"key\",\"key\":\"fixture-key\"}',NULL,NULL,1,1,1)");nativeDb.close();
  try{
   const policy=new PolicyStore(db);const secrets=new ChannelStore(db);let changed=false;
-  const view={orgs:[{accountID:'a',orgID:'o',active:true,accountEmail:'fixture@example.invalid',accountUrl:'https://opencode.ai/console',orgName:'fixture'}],consoleManagedProviders:['opencode-go'],switchableOrgCount:1,detail:''};
-  const importer=new NativeChannelImporter(policy,secrets,{root:join(temp,'managed'),env:{HOME:temp},accountsFactory:()=>({list:async()=>{if(!changed){changed=true;const snapshot=policy.snapshot();snapshot.config.workers.codex_worker.model='concurrent-model';policy.save({revision:snapshot.revision,config:snapshot.config,blocks:[]});}return view;},switchAccount:async()=>view,close:async()=>{}})});
+  const importer=new NativeChannelImporter(policy,secrets,{root:join(temp,'managed'),env:{HOME:temp},openCodeModels:async()=>{if(!changed){changed=true;const snapshot=policy.snapshot();snapshot.config.workers.codex_worker.model='concurrent-model';policy.save({revision:snapshot.revision,config:snapshot.config,blocks:[]});}return true;}});
   await assert.rejects(importer.import({revision:0,engine:'opencode',sourceDir:source}),/reload/);
   assert.equal(policy.snapshot().config.workers.codex_worker.model,'concurrent-model');assert.equal(db.prepare('SELECT count(*) AS n FROM channel_secrets').get()!.n,0);
   const {readdirSync}=await import('node:fs');assert.deepEqual(readdirSync(join(temp,'managed')),[]);
@@ -279,13 +282,11 @@ test('a failed isolated OpenCode account verification does not roll back a valid
   const sourceDb=new DatabaseSync(join(dataRoot,'opencode.db'));sourceDb.exec('CREATE TABLE fixture(id TEXT)');sourceDb.close();
   mkdirSync(join(temp,'.dsh'));writeFileSync(join(temp,'.dsh','.credentials.yaml'),'version: 1\nrefs:\n  DEEPSEEK_API_KEY: fixture-dsh-key\n');
   const policy=new PolicyStore(db),secrets=new ChannelStore(db);
-  const org={accountID:'fixture-account',orgID:'fixture-org',accountEmail:'fixture@example.invalid',accountUrl:'https://opencode.ai/console',orgName:'Fixture',active:true};
-  const accounts={list:async()=>({orgs:[org],consoleManagedProviders:['opencode-go'],switchableOrgCount:1,detail:''}),switchAccount:async()=>{throw new Error('native verification unavailable');},close:async()=>{}};
-  const importer=new NativeChannelImporter(policy,secrets,{root:join(temp,'managed'),env:{HOME:temp,OPENCODE_DB:join(dataRoot,'opencode.db')},accountsFactory:()=>accounts});
+  const importer=new NativeChannelImporter(policy,secrets,{root:join(temp,'managed'),env:{HOME:temp,OPENCODE_DB:join(dataRoot,'opencode.db')}});
   const result=await importer.import({revision:0});
   assert.ok(Object.entries(result.policy.config.channels).some(([id,c])=>id.startsWith('import_')&&c.engine==='dsh'));
   assert.equal(Object.values(result.policy.config.channels).filter(c=>c.engine==='opencode').length,1);
-  assert.match(result.configurations.default_opencode.detail!,/opencode.*复验/);
+  assert.match(result.configurations.default_opencode.detail!,/opencode 来源无法导入/);
   assert.equal(result.importResult.added,1);assert.equal(result.importResult.failures[0].engine,'opencode');
   assert.doesNotMatch(JSON.stringify(result),/fixture-dsh-key|native verification unavailable/);
  }finally{db.close();rmSync(temp,{recursive:true,force:true});}

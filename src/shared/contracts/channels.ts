@@ -4,7 +4,7 @@ import type { PolicySnapshot } from './policy';
 export interface Channel { engine: string; label: string; enabled: boolean; kind: 'subscription' | 'api'; quota_refresh?: boolean; provider?: string; baseUrl?: string; protocol?: 'anthropic' | 'openai' | 'openai-responses' }
 /** Private native configuration; never serialize into policy or dispatch. */
 export interface ChannelSecret { config?: string; apiKey?: string; authDir?: string }
-export interface ChannelConfiguration { quota?: EngineQuotaRecord; hasApiKey: boolean; hasConfig: boolean; hasCredentials: boolean; detail?: string }
+export interface ChannelConfiguration { quota?: EngineQuotaRecord; hasApiKey: boolean; hasConfig: boolean; hasCredentials: boolean; hasAuthDir?: boolean; loginPending?: boolean; detail?: string }
 export interface ChannelsSnapshot { policy: PolicySnapshot; configurations: Record<string, ChannelConfiguration> }
 export interface SaveChannelInput { revision: number; id?: string; channel: Channel; config?: string; apiKey?: string }
 export interface DeleteChannelInput { revision: number; id: string }
@@ -12,7 +12,7 @@ export interface ImportChannelsInput { replaceExisting?: boolean; revision: numb
 export interface RefreshChannelQuotaInput { channel: string }
 
 export interface SaveChannelResult extends ChannelsSnapshot { savedChannel: string }
-export interface StartChannelLoginInput { channel: string }
+export interface StartChannelLoginInput { channel: string; relogin?: boolean }
 export interface ChannelLoginRef { channel: string; id: string }
 export interface SubmitChannelLoginCodeInput extends ChannelLoginRef { code: string }
 export interface ChannelLogin {

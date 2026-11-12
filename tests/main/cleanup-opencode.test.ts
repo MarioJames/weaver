@@ -23,12 +23,16 @@ function fixture(run: (path: string, db: DatabaseSync) => void) {
       CREATE TABLE event_sequence(aggregate_id TEXT PRIMARY KEY,seq INTEGER NOT NULL,owner_id TEXT);
       CREATE TABLE event(id TEXT PRIMARY KEY,aggregate_id TEXT NOT NULL REFERENCES event_sequence(aggregate_id) ON DELETE CASCADE,seq INTEGER,type TEXT,data TEXT);
       CREATE TABLE auth(id TEXT PRIMARY KEY,data TEXT);
+      CREATE TABLE credential(id TEXT PRIMARY KEY,integration_id TEXT,label TEXT NOT NULL,value TEXT NOT NULL,active INTEGER);
+      CREATE TABLE control_account(email TEXT PRIMARY KEY,data TEXT);
       INSERT INTO session VALUES ('old',${cutoff - 1}),('boundary',${cutoff}),('new',${now});
       INSERT INTO message VALUES('m-old','old'),('m-new','new');
       INSERT INTO part VALUES('p-old','m-old','old'),('p-new','m-new','new');
       INSERT INTO event_sequence VALUES('old',1,NULL),('new',1,NULL),('orphan',1,NULL);
       INSERT INTO event VALUES('e-old','old',1,'test','{}'),('e-new','new',1,'test','{}'),('e-orphan','orphan',1,'test','{}');
-      INSERT INTO auth VALUES('secret','unchanged');`);
+      INSERT INTO auth VALUES('secret','unchanged');
+      INSERT INTO credential VALUES('cred_fixture','opencode-go','OpenCode Go','{"type":"key","key":"fixture"}',1);
+      INSERT INTO control_account VALUES('fixture@example.invalid','unchanged');`);
     run(path, db);
   } finally { db.close(); rmSync(dir, { recursive: true, force: true }); }
 }
@@ -49,6 +53,8 @@ test('preview preserves rows; apply cascades only expired sessions and linked ev
   }
   assert.deepEqual(db.prepare('SELECT aggregate_id FROM event_sequence ORDER BY aggregate_id').all().map(row => row.aggregate_id), ['new', 'orphan']);
   assert.equal(db.prepare('SELECT data FROM auth').get()!.data, 'unchanged');
+  assert.equal(db.prepare('SELECT value FROM credential').get()!.value, '{"type":"key","key":"fixture"}');
+  assert.equal(db.prepare('SELECT data FROM control_account').get()!.data, 'unchanged');
   assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
   assert.deepEqual(cleanup({ db: path, now, apply: true }).expiredIds, []);
 }));

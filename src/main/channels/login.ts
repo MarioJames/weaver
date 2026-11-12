@@ -1,19 +1,20 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { stripVTControlCharacters } from 'node:util';
 import type { ChannelLogin, ChannelLoginRef, StartChannelLoginInput, SubmitChannelLoginCodeInput } from '../../shared/contracts/channels';
 import { object } from '../../shared/validation';
 import { startOwnedScope, confirmScopeAbsent, type OwnedScope } from '../adapters/cli/scope';
 import { findEngineExecutable, runCapture } from '../engines/probe';
-import { OpenCodeAccounts } from '../engines/opencode-accounts';
+import { openCodeGoModelsReady } from '../engines/opencode-accounts';
 import { RpcError } from '../rpc';
 import type { ChannelBinding } from './runtime';
-import { claudeAccount, grokCredential, nativeCredentialsReady, nativeEnvironment, officialEngines, writeNativeConfig, nativeFile, nativeJson } from './native';
+import { claudeAccount, grokCredential, nativeCredentialsReady, nativeEnvironment, nativeIdentity, officialEngines, readStoredIdentity, writeNativeConfig, writeStoredIdentity, nativeFile, nativeJson } from './native';
 
 type ClaudeIdentity = NonNullable<ReturnType<typeof claudeAccount>>;
-interface LoginWork { engine?:string; expected?:ClaudeIdentity; codeSubmitted?:boolean; submitting?:boolean; job:ChannelLogin; scope?:OwnedScope; closed?:Promise<number|null>; done?:boolean; work?:Promise<void>; cleanup?:Promise<void>; helper?:OpenCodeAccounts; finished?:boolean }
+interface ReloginWork { originalRoot:string; root:string; committed?:boolean }
+interface LoginWork { engine?:string; expected?:ClaudeIdentity; expectedIdentity?:string; relogin?:ReloginWork; codeSubmitted?:boolean; submitting?:boolean; job:ChannelLogin; scope?:OwnedScope; closed?:Promise<number|null>; done?:boolean; work?:Promise<void>; cleanup?:Promise<void>; finished?:boolean }
 export interface ChannelLoginOptions {
  initialize?:(channel:string)=>ChannelBinding;
  /** Runs before success is reported, so the next read no longer carries the pre-login quota record. */
@@ -22,8 +23,13 @@ export interface ChannelLoginOptions {
  start?:typeof startOwnedScope;
  find?:typeof findEngineExecutable;
  capture?:typeof runCapture;
+ fetch?:typeof fetch;
  confirmAbsent?:typeof confirmScopeAbsent;
  loginTimeoutMs?:number;
+ /** Allocates a sibling login root for relogin; the original channel root is never written. */
+ reloginRoot?:(channel:string,originalRoot:string)=>string;
+ /** Atomically points the channel at the verified relogin root after identity comparison. */
+ commitRelogin?:(channel:string,originalRoot:string,newRoot:string)=>void|Promise<void>;
 }
 const active=(job:ChannelLogin)=>['starting','authorizing','verifying'].includes(job.status);
 const safeError=(code:string,message:string)=>new RpcError(code,message);
@@ -49,8 +55,8 @@ export function channelVerificationUrl(engine:string,value:string):string|undefi
  }catch{return;}
 }
 function parse(value:unknown,reference:boolean):StartChannelLoginInput|ChannelLoginRef {
- const v=object(value);const keys=reference?['channel','id']:['channel'];
- if(Object.keys(v).some(k=>!keys.includes(k))||typeof v.channel!=='string'||!/^[a-z][a-z0-9_]{0,63}$/.test(v.channel)||reference&&(typeof v.id!=='string'||!/^[0-9a-f-]{36}$/.test(v.id)))throw safeError('INVALID_REQUEST','登录参数无效');
+ const v=object(value);const keys=reference?['channel','id']:['channel','relogin'];
+ if(Object.keys(v).some(k=>!keys.includes(k))||typeof v.channel!=='string'||!/^[a-z][a-z0-9_]{0,63}$/.test(v.channel)||reference&&(typeof v.id!=='string'||!/^[0-9a-f-]{36}$/.test(v.id))||v.relogin!==undefined&&typeof v.relogin!=='boolean')throw safeError('INVALID_REQUEST','登录参数无效');
  return v as unknown as ChannelLoginRef;
 }
 /** In-memory jobs own only their native login process, never a source account or model run. */
@@ -66,17 +72,28 @@ export class ChannelLogins {
   return b;
  }
  async start(value:StartChannelLoginInput):Promise<ChannelLogin>{
-  const {channel}=parse(value,false);
+  const input=parse(value,false) as StartChannelLoginInput;const {channel}=input;
   if(this.closing)throw safeError('LOGIN_UNAVAILABLE','服务正在关闭');
   const current=this.jobs.get(channel);
   if(current?.job.error?.code==='LOGIN_CLEANUP')throw safeError('LOGIN_CLEANUP','上次登录进程未确认停止，请检查服务进程状态后重试');
   if(current&&!current.finished)return structuredClone(current.job);
   const b=this.selected(channel),engine=b.engineKind??b.channel.engine,root=b.secret.authDir!;
+  if(input.relogin===true){
+   if(!this.options.commitRelogin)throw safeError('LOGIN_UNAVAILABLE','账号私有目录服务不可用');
+   const expectedIdentity=await this.expectedIdentity(engine,root);
+   if(!expectedIdentity)throw safeError('CHANNEL_IDENTITY_UNKNOWN','无法确认此账号原来的身份，不能原地重新登录；请改用原账号重新登录或新建独立账号');
+   const loginRoot=this.options.reloginRoot?.(channel,root)??join(dirname(root),`.relogin-${randomUUID()}`);
+   mkdirSync(loginRoot,{recursive:true,mode:0o700});chmodSync(loginRoot,0o700);
+   const item:LoginWork={job:{channel,id:randomUUID(),status:'starting'},engine,expectedIdentity,relogin:{originalRoot:root,root:loginRoot}};
+   this.jobs.set(channel,item);item.work=this.run(item,b);
+   return structuredClone(item.job);
+  }
   const pending=existsSync(join(root,'.weaver-login-pending'));
   // Claude clears rejected OAuth tokens but keeps its profile; renewal is bound to that account, recorded before the CLI can overwrite it.
   const expected=engine!=='claude'?undefined:pending?renewalIdentity(root):claudeAccount(root);
+  const expectedIdentity=expected?`claude:${expected.accountUuid}:${expected.organizationUuid??''}`:undefined;
   if(nativeCredentialsReady(engine,b.secret)||!pending&&!expected&&['auth.json','.credentials.json','.auth/user','opencode.db'].some(name=>nativeFile(root,name,Number.MAX_SAFE_INTEGER)))throw safeError('CHANNEL_ALREADY_AUTHENTICATED','该账号已存在原生认证；请新建独立账号登录，避免改变运行任务身份');
-  const item:LoginWork={job:{channel,id:randomUUID(),status:'starting'},expected};
+  const item:LoginWork={job:{channel,id:randomUUID(),status:'starting'},engine,expected,expectedIdentity};
   this.jobs.set(channel,item);item.work=this.run(item,b);
   return structuredClone(item.job);
  }
@@ -91,7 +108,7 @@ export class ChannelLogins {
   const item=this.ref(value);
   if(active(item.job)){
    item.job.status='cancelled';
-   try{await this.stop(item);await item.helper?.close();await item.work;}catch{this.fail(item,'LOGIN_CLEANUP','无法确认登录进程已停止，请重新读取状态');}
+   try{await this.stop(item);await item.work;}catch{this.fail(item,'LOGIN_CLEANUP','无法确认登录进程已停止，请重新读取状态');}
   }
   return structuredClone(item.job);
  }
@@ -125,38 +142,55 @@ export class ChannelLogins {
    if(await (this.options.confirmAbsent??confirmScopeAbsent)(scope.unit)!==true)throw safeError('LOGIN_CLEANUP','无法确认登录进程树已停止');
   })();return item.cleanup;
  }
- private async verify(engine:string,root:string,env:NodeJS.ProcessEnv,executable:string,item:LoginWork):Promise<boolean>{
-  if(!nativeCredentialsReady(engine,{authDir:root},true))return false;
+ private async expectedIdentity(engine:string,root:string):Promise<string|undefined>{
+  const local=nativeIdentity(engine,root);if(local)return local;
+  if(engine==='qoder'||engine==='qodercli'){
+   const stored=readStoredIdentity(root);if(stored?.engine==='qoder'&&stored.subject)return stored.subject;
+   const env=nativeEnvironment(engine,root,this.options.env??process.env);
+   const executable=await (this.options.find??findEngineExecutable)('qodercli',env.PATH??'');if(!executable)return;
+   const r=await (this.options.capture??runCapture)(executable,['--config-dir',root,'status','--output','json'],15000,65536,env);
+   if(r.code!==0||r.error||r.overflow||r.timedOut)return;
+   try{const status=JSON.parse(r.stdout);const stable=status.logged_in===true?(status.username??status.email):undefined;return typeof stable==='string'&&stable?`qoder:${stable}`:undefined;}catch{return;}
+  }
+  return;
+ }
+ private async verify(engine:string,root:string,env:NodeJS.ProcessEnv,executable:string):Promise<{ok:boolean;identity?:string}>{
+  if(!nativeCredentialsReady(engine,{authDir:root},true))return {ok:false};
   if(engine==='opencode'){
-   const helper=new OpenCodeAccounts({env});item.helper=helper;
-   try{const snapshot=await helper.list();return snapshot.consoleManagedProviders.includes('opencode-go')&&snapshot.orgs.some(org=>org.active);}finally{await helper.close();item.helper=undefined;}
+   const ok=await openCodeGoModelsReady(env,{find:this.options.find,capture:this.options.capture});
+   return ok?{ok,identity:nativeIdentity('opencode',root)}:{ok:false};
   }
   if(engine==='grok'){
-   const credential=grokCredential(root);if(!credential)return false;
+   const credential=grokCredential(root);if(!credential)return {ok:false};
    // OIDC discovers the provider's own read-only identity endpoint; no model request is sent.
    const request=async(url:string,headers?:Record<string,string>)=>{
-    const response=await fetch(url,{headers,redirect:'error',signal:AbortSignal.timeout(15000)});
+    const response=await (this.options.fetch??fetch)(url,{headers,redirect:'error',signal:AbortSignal.timeout(15000)});
     if(!response.ok||!response.body)throw 0;
     const reader=response.body.getReader();let data='';try{for(;;){const part=await reader.read();if(part.done)break;if(data.length+part.value.length>65536)throw 0;data+=Buffer.from(part.value).toString('utf8');}}finally{await reader.cancel().catch(()=>{});}return JSON.parse(data);
    };
    const discovery=await request('https://auth.x.ai/.well-known/openid-configuration');
-   if(discovery.issuer!=='https://auth.x.ai')return false;
+   if(discovery.issuer!=='https://auth.x.ai')return {ok:false};
    const endpoint=new URL(discovery.userinfo_endpoint);
-   if(endpoint.origin!=='https://auth.x.ai'||endpoint.username||endpoint.password||endpoint.hash||endpoint.search)return false;
-   const identity=await request(endpoint.href,{authorization:`Bearer ${credential.token}`});return identity.sub===credential.subject;
+   if(endpoint.origin!=='https://auth.x.ai'||endpoint.username||endpoint.password||endpoint.hash||endpoint.search)return {ok:false};
+   const identity=await request(endpoint.href,{authorization:`Bearer ${credential.token}`});
+   return {ok:identity.sub===credential.subject,identity:nativeIdentity('grok',root)};
   }
   const args=engine==='codex'?['login','status']:engine==='claude'?['auth','status','--json']:['--config-dir',root,'status','--output','json'];
   const r=await (this.options.capture??runCapture)(executable,args,15000,65536,env);
-  if(r.code!==0||r.error||r.overflow||r.timedOut)return false;
-  if(engine==='codex')return /logged in using chatgpt/i.test(r.stdout+'\n'+r.stderr);
-  const status=JSON.parse(r.stdout);
-  return engine==='claude'?status.loggedIn===true&&status.authMethod==='claude.ai'&&typeof status.email==='string':status.logged_in===true&&typeof (status.username??status.email)==='string';
+  if(r.code!==0||r.error||r.overflow||r.timedOut)return {ok:false};
+  if(engine==='codex'){const ok=/logged in using chatgpt/i.test(r.stdout+'\n'+r.stderr);return {ok,...(ok?{identity:nativeIdentity('codex',root)}:{})};}
+  let status:any;try{status=JSON.parse(r.stdout);}catch{return {ok:false};}
+  if(engine==='claude'){const ok=status.loggedIn===true&&status.authMethod==='claude.ai'&&typeof status.email==='string';return {ok,...(ok?{identity:nativeIdentity('claude',root)}:{})};}
+  const stable=status.logged_in===true?(status.username??status.email):undefined;const ok=typeof stable==='string'&&!!stable;
+  return {ok,...(ok?{identity:`qoder:${stable}`}:{})};
  }
  private async run(item:LoginWork,b:ChannelBinding):Promise<void>{
-  const {job}=item,engine=b.engineKind??b.channel.engine,root=b.secret.authDir!;item.engine=engine;
+  const {job}=item,engine=b.engineKind??b.channel.engine,channelRoot=b.secret.authDir!;item.engine=engine;
+  const root=item.relogin?.root??channelRoot;
+  const identityEngine=engine==='qodercli'?'qoder':engine;
   let timer:ReturnType<typeof setTimeout>|undefined,opener:string|undefined;
   try{
-   writeNativeConfig(root,'.weaver-login-pending',item.expected?JSON.stringify(item.expected)+'\n':'pending\n');
+   writeNativeConfig(root,'.weaver-login-pending',item.expected?JSON.stringify(item.expected)+'\n':item.expectedIdentity?JSON.stringify({engine:identityEngine,subject:item.expectedIdentity})+'\n':'pending\n');
    const env=nativeEnvironment(engine,root,this.options.env??process.env);
    const executable=await (this.options.find??findEngineExecutable)(engine==='qoder'?'qodercli':engine,env.PATH??'');
    if(!executable)throw safeError('ENGINE_NOT_INSTALLED','未找到原生 CLI，请安装后重试');
@@ -164,7 +198,7 @@ export class ChannelLogins {
    opener=mkdtempSync(join(tmpdir(),'weaver-login-'));writeFileSync(join(opener,'xdg-open'),'#!/bin/sh\nexit 0\n',{mode:0o700});
    env.BROWSER=join(opener,'xdg-open');env.PATH=`${opener}:${env.PATH??''}`;
    if(!active(job)||this.closing)return;
-   const args=engine==='codex'?['login','--device-auth']:engine==='claude'?['auth','login','--claudeai']:engine==='grok'?['--leader-socket',join(root,'leader.sock'),'login','--device-auth']:engine==='opencode'?['console','login','https://opencode.ai/console','--pure']:['--config-dir',root,'login'];
+   const args=engine==='codex'?['login','--device-auth']:engine==='claude'?['auth','login','--claudeai']:engine==='grok'?['--leader-socket',join(root,'leader.sock'),'login','--device-auth']:engine==='opencode'?['auth','login','opencode','--method','device','--standalone']:['--config-dir',root,'login'];
    const scope=(this.options.start??startOwnedScope)({command:[executable,...args],cwd:root,env,stdin:null,keepStdinOpen:true,unit:`dev-weaver-channel-login-${randomUUID()}`});
    item.scope=scope;
    item.closed=new Promise(resolve=>{scope.on('error',()=>{this.fail(item,'LOGIN_PROCESS','原生登录启动失败，请检查 CLI 安装后重试');scope.kill('SIGKILL');});scope.once('close',(code:number|null)=>{item.done=true;resolve(code);});});
@@ -191,21 +225,26 @@ export class ChannelLogins {
    if(!active(job))return;
    if(code!==0)throw 0;
    job.status='verifying';
-   const verified=await this.verify(engine,root,env,executable,item);
+   const verified=await this.verify(engine,root,env,executable);
    if(!active(job))return;
-   if(!verified){this.fail(item,'LOGIN_NOT_READY','未确认官方原生认证已就绪，请重试；若凭据已写入，请新建独立账号或检查认证是否过期');return;}
-   const account=item.expected&&claudeAccount(root);
-   if(item.expected&&(account?.accountUuid!==item.expected.accountUuid||account.organizationUuid!==item.expected.organizationUuid)){this.fail(item,'LOGIN_IDENTITY_CHANGED','登录的 Claude 账号与此账号原来的身份不同，新凭据未启用；请改用原账号登录，或新建独立账号');return;}
+   if(!verified.ok){this.fail(item,'LOGIN_NOT_READY','未确认官方原生认证已就绪，请重试；若凭据已写入，请新建独立账号或检查认证是否过期');return;}
+   if(item.expectedIdentity&&verified.identity!==item.expectedIdentity){this.fail(item,'LOGIN_IDENTITY_CHANGED','登录的账号身份与此账号原来的身份不同，新凭据未启用；请改用原账号登录，或新建独立账号');return;}
    rmSync(join(root,'.weaver-login-pending'),{force:true});
+   writeStoredIdentity(root,identityEngine,verified.identity);
+   if(item.relogin){
+    try{await this.options.commitRelogin!(job.channel,item.relogin.originalRoot,root);item.relogin.committed=true;}
+    catch{this.fail(item,'LOGIN_SWITCH_FAILED','新凭据已验证，但未能安全切换到该账号；原凭据仍在使用，请重试');return;}
+   }
    // A quota probe failure is shown on the account itself; the login is already complete.
    await this.options.authenticated?.(job.channel).catch(()=>{});
    if(!active(job))return;
-   job.status='succeeded';job.identity={label:`${engine==='qodercli'?'qoder':engine} 官方账号`};
+   job.status='succeeded';job.identity={label:`${identityEngine} 官方账号`};
   }catch(error){if(active(job)){if(error instanceof RpcError&&error.code==='ENGINE_NOT_INSTALLED')this.fail(item,error.code,error.message);else this.fail(item,'LOGIN_FAILED','原生登录未完成，请检查 CLI 与网络后重试');}}
   finally{
    if(timer)clearTimeout(timer);
    try{await this.stop(item);}catch{this.fail(item,'LOGIN_CLEANUP','无法确认登录进程树已停止，请重新读取状态');}
    if(opener)rmSync(opener,{recursive:true,force:true});
+   if(item.relogin&&!item.relogin.committed)rmSync(item.relogin.root,{recursive:true,force:true});
    item.finished=true;
   }
  }

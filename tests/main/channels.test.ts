@@ -18,7 +18,7 @@ test('channel metadata, native secrets and revisions are separate; empty inputs 
  try{
   let result=service.save({revision:0,channel:api,apiKey:'test-private-key',config:'private-native-text'});
   const id=Object.keys(result.policy.config.channels).find(id=>id.startsWith('channel_'))!;
-  assert.ok(id);assert.deepEqual(result.configurations[id],{hasApiKey:true,hasConfig:true,hasCredentials:false});
+  assert.ok(id);assert.deepEqual(result.configurations[id],{hasApiKey:true,hasConfig:true,hasCredentials:false,hasAuthDir:false,loginPending:false});
   assert.doesNotMatch(JSON.stringify(result),/test-private-key|private-native-text/);
   assert.doesNotMatch(String((db.prepare('SELECT body FROM policy_revisions').get() as any).body),/test-private-key|private-native-text/);
   result=service.save({revision:1,id,channel:{...api,label:'renamed'},apiKey:'',config:''});

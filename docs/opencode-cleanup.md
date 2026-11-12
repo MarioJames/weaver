@@ -32,7 +32,7 @@ node node_modules/typescript/bin/tsc --noEmit
 
 `--prune-events` 是用户明确授权的有损维护：本地会话/消息/工具结果等投影和 event_sequence 的 seq、owner_id 原值完整保留，但旧事件的跨设备同步、回放核验及补发/断线补订阅能力丢失。它不修改事件 JSON、不压缩或重置序号、不删除孤立事件组，也不是 OpenCode 官方提供的无损日志压缩协议。
 
-预览 JSON 的 eventPruning 显示候选会话和事件数、静默边界；统计不读取巨大的 event.data。执行时与过期删除共享事务和同一候选 ID 集合，逐一验证候选事件归零，核验保留 event_sequence 及现有 session/message/part/session_message/session_input/session_context_epoch/todo/session_share 投影内容摘要不变；account/account_state 与认证、项目、权限表也受摘要校验保护。保留会话的事件数按明确候选扣减，孤立事件数量不变。
+预览 JSON 的 eventPruning 显示候选会话和事件数、静默边界；统计不读取巨大的 event.data。执行时与过期删除共享事务和同一候选 ID 集合，逐一验证候选事件归零，核验保留 event_sequence 及现有 session/message/part/session_message/session_input/session_context_epoch/todo/session_share 投影内容摘要不变；account/account_state、credential/control_account 与认证、项目、权限表也受摘要校验保护。保留会话的事件数按明确候选扣减，孤立事件数量不变。
 
 依据 [OpenCode v1.19.4 event 实现](https://github.com/anomalyco/opencode/blob/v1.19.4/packages/core/src/event.ts)：新事件使用保留 sequence 的 latest+1，旧 seq 回放会核验完整事件；durable 订阅和同步直接使用事件历史。会话读取与 LLM 历史走本地投影。删除历史不会禁用未来事件持久化，因此定时目标可持续清理静默会话的新增历史。运行前仍应停止 OpenCode，进程检查与写锁不能取代应用停用。
 

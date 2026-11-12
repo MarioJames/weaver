@@ -5,6 +5,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import type { QuotaEngine, QuotaStatus } from '../../shared/contracts/quota';
 import { parseProviderTimestamp } from './timestamps';
+import { openCodeDbPath, readOpenCodeCredentials } from '../engines/opencode-db';
 
 const MAX_FILE_BYTES = 256 * 1024;
 export type JsonObject = Record<string, unknown>;
@@ -80,6 +81,16 @@ async function readOpenCodeCredential(env: NodeJS.ProcessEnv, now: number): Prom
       orgId: consoleLogin.orgId,
       origin: consoleLogin.origin,
     };
+  }
+  // 2.2's Go inference credential is a key row. It is the same credential the
+  // native CLI uses, so the public Go usage endpoint can read its plan windows.
+  const goRows = readOpenCodeCredentials(openCodeDbPath(env))?.filter(row => row.integrationID === 'opencode-go') ?? [];
+  if (goRows.length) {
+    const active = goRows.filter(row => row.active);
+    const row = active[0] ?? goRows[0]!;
+    if (row.type !== 'key' || !row.key) throw new QuotaFailure('unsupported', 'OpenCode Go 当前登录方式没有可读的套餐额度；连接 Go 订阅后可查看套餐窗口');
+    const account = createHash('sha256').update('opencode').update('\0').update('opencode-go').update('\0').update(row.id).digest('hex');
+    return { token: row.key, fingerprint: createHash('sha256').update(account).update('\0').update(row.key).digest('hex'), account, opencodeKind: 'api' };
   }
   const home = env.HOME || homedir();
   const dataDir = env.XDG_DATA_HOME && env.XDG_DATA_HOME.trim() !== '' ? env.XDG_DATA_HOME : path.join(home, '.local', 'share');

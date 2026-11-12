@@ -16,7 +16,7 @@ import { ChannelStore } from './store';
 import { ChannelService } from './service';
 import { channelEnvironment } from './runtime';
 import { claudeCredentialsReady, nativeCredentialsReady } from './native';
-import { OpenCodeAccounts } from '../engines/opencode-accounts';
+import { openCodeGoCredential, openCodeGoModelsReady, openCodeIdentity, openCodeIdentitySubject } from '../engines/opencode-accounts';
 import { openCodeConsoleDbPath } from '../quota/opencode-console';
 
 function read(file: string, limit=512*1024): string | undefined {
@@ -69,8 +69,8 @@ function jwtSubject(value: unknown): string | undefined {
  if(typeof value!=='string'||value.length>32768)return;
  try{const claims=JSON.parse(Buffer.from(value.split('.')[1]??'', 'base64url').toString('utf8'));return typeof claims.sub==='string'&&claims.sub?claims.sub:undefined;}catch{return;}
 }
-export interface ChannelImportOptions { listQoderModels?: (root:string,env:NodeJS.ProcessEnv)=>Promise<string>; identifyAccount?: (engine:string,root:string,env:NodeJS.ProcessEnv)=>Promise<string|undefined>; root: string; env?: NodeJS.ProcessEnv; accountsFactory?: (env: NodeJS.ProcessEnv) => Pick<OpenCodeAccounts, 'list' | 'switchAccount' | 'close'> }
-interface Candidate { models?: string[]; selected?: boolean; channel: Channel; secret: ChannelSecret; identity: string; modelProvider?: string; authFiles?: Record<string, string | Buffer>; database?: string; account?: { accountID: string; orgID: string } }
+export interface ChannelImportOptions { listQoderModels?: (root:string,env:NodeJS.ProcessEnv)=>Promise<string>; identifyAccount?: (engine:string,root:string,env:NodeJS.ProcessEnv)=>Promise<string|undefined>; openCodeModels?: (env:NodeJS.ProcessEnv)=>Promise<boolean>; root: string; env?: NodeJS.ProcessEnv }
+interface Candidate { models?: string[]; selected?: boolean; channel: Channel; secret: ChannelSecret; identity: string; modelProvider?: string; authFiles?: Record<string, string | Buffer>; database?: string }
 /** Read-only source import. Stable identities preserve credentials refreshed in managed roots on repeated imports. */
 export class NativeChannelImporter {
  constructor(private policy: PolicyStore, private secrets: ChannelStore, private options: ChannelImportOptions) {}
@@ -147,7 +147,7 @@ export class NativeChannelImporter {
     if(existsSync(user)&&existsSync(machine)){
       // Qoder owns this opaque format. Never parse, decrypt or serialize it as JSON.
       for(const file of [user,machine]){const info=lstatSync(file);if(!info.isFile()||info.isSymbolicLink()||info.size>512*1024)throw new Error('Qoder 认证来源必须为有界普通文件');}
-      const authFiles={'.auth/user':readFileSync(user),'.auth/machine_id':readFileSync(machine),'settings.json':JSON.stringify({security:{auth:settings.security?.auth??{}}})};
+      const authFiles:{'.auth/user':Buffer;'.auth/machine_id':Buffer;'settings.json':string;[key:string]:string|Buffer}={'.auth/user':readFileSync(user),'.auth/machine_id':readFileSync(machine),'settings.json':JSON.stringify({security:{auth:settings.security?.auth??{}}})};
       const identityRoot=join(this.options.root,`.identity-${randomUUID()}`);mkdirSync(identityRoot,{recursive:true,mode:0o700});
       let identity:string|undefined;let apiFiles:Record<string,string|Buffer>|undefined;let apiSettings:Record<string,any>|undefined;let apiModels:string[]=[];let apiVerified=false;
       try{
@@ -170,6 +170,7 @@ export class NativeChannelImporter {
        }
       }finally{rmSync(identityRoot,{recursive:true,force:true});}
       if(!identity)throw new Error('Qoder 原生登录缺少稳定账号身份，请在独立目录重新登录');
+      authFiles['.weaver-identity.json']=JSON.stringify({engine:'qoder',subject:`qoder:${identity}`})+'\n';
       add('subscription',`official:${identity}`,{}, {selected:true,authFiles});
       if(apiFiles)add('api',`byok:${identity}`,{config:JSON.stringify(apiSettings)},{models:apiModels,authFiles:apiFiles,channel:{engine:engineId,kind:'api',enabled:apiVerified,label:`qoder BYOK ${hash(identity).slice(0,8)}${apiVerified?'':'（需原生验证）'}`,provider:'native_byok'}});
     }
@@ -189,15 +190,21 @@ export class NativeChannelImporter {
      const info=lstatSync(database);if(!info.isFile()||info.isSymbolicLink())throw new Error('OpenCode 数据库来源必须为普通文件');
      const enumeration=join(this.options.root,`.enumerate-${randomUUID()}`);mkdirSync(enumeration,{recursive:true,mode:0o700});
      temporary.push(enumeration);
-     let orgs: {accountID:string;orgID:string;active?:boolean;accountEmail?:string;orgName?:string}[];
      {
       const sourceDb=new DatabaseSync(database,{readOnly:true});try {await backup(sourceDb,join(enumeration,'opencode.db'));} finally {sourceDb.close();}
+      const go=openCodeGoCredential(join(enumeration,'opencode.db'));
+      if(!go)throw new Error('OpenCode 2.2 数据库没有 opencode-go 推理凭据；请先在 OpenCode 中登录或导入凭据');
+      const identity=openCodeIdentity(enumeration);
+      const subject=openCodeIdentitySubject(enumeration);
+      if(!subject)throw new Error('OpenCode 2.2 数据库缺少可确认的账号身份，请重新登录后导入');
       const isolated={...channelEnvironment(env),OPENCODE_DB:join(enumeration,'opencode.db'),XDG_CONFIG_HOME:join(enumeration,'config'),XDG_DATA_HOME:join(enumeration,'data'),XDG_STATE_HOME:join(enumeration,'state'),XDG_CACHE_HOME:join(enumeration,'cache')};
-      const native=this.options.accountsFactory?.(isolated)??new OpenCodeAccounts({env:isolated});
-      try {orgs=(await native.list()).orgs;} finally {await native.close();}
+      for(const dir of [isolated.XDG_CONFIG_HOME,isolated.XDG_DATA_HOME,isolated.XDG_STATE_HOME,isolated.XDG_CACHE_HOME])mkdirSync(dir,{recursive:true,mode:0o700});
+      const modelsReady=await (this.options.openCodeModels??(next=>openCodeGoModelsReady(next)))(isolated);
+      if(!modelsReady)throw new Error('OpenCode 2.2 私有根无法列出 opencode-go 模型，请检查登录凭据后重试');
+      const owner=identity?.email??identity?.accountID??go.label;
+      const org=identity?.orgID?` / ${identity.orgID}`:'';
+      add('subscription',`official:${subject}`,{}, {database:join(enumeration,'opencode.db'),modelProvider:'opencode-go',selected:true,channel:{engine:engineId,kind:'subscription',label:`opencode ${owner}${org}`.slice(0,120),enabled:true}});
      }
-     const seen=new Set<string>();
-     for(const org of [...orgs].sort((a,b)=>Number(b.active)-Number(a.active))) { const repeated=seen.has(org.accountID);seen.add(org.accountID); add('subscription',`account:${org.accountID}:${org.orgID}`,{}, {database:join(enumeration,'opencode.db'),account:org,modelProvider:'opencode-go',selected:org.active===true, channel:{engine:engineId,kind:'subscription',label:`opencode ${org.accountEmail??org.accountID} / ${org.orgName??org.orgID}${repeated?'（需独立登录）':''}`.slice(0,120),enabled:!repeated}}); }
     }
    }
    if(candidates.length===before)notFound.add(engineId);
@@ -232,9 +239,15 @@ export class NativeChannelImporter {
      if(candidate.database) {
       const db=new DatabaseSync(candidate.database,{readOnly:true});try {await backup(db,join(stage,'opencode.db'));} finally {db.close();}chmodSync(join(stage,'opencode.db'),0o600);
       if(candidate.channel.enabled) {
+       const stagedGo=openCodeGoCredential(join(stage,'opencode.db'));
+       if(!stagedGo)throw new Error('OpenCode 2.2 私有根缺少 opencode-go 推理凭据，请重新登录后导入');
        const isolated={...channelEnvironment(env),OPENCODE_DB:join(stage,'opencode.db'),XDG_CONFIG_HOME:join(stage,'config'),XDG_DATA_HOME:join(stage,'data'),XDG_STATE_HOME:join(stage,'state'),XDG_CACHE_HOME:join(stage,'cache')};
-       const native=this.options.accountsFactory?.(isolated)??new OpenCodeAccounts({env:isolated});
-       try { const listed=await native.list(); const active=listed.orgs.find(org=>org.active); const switched=await native.switchAccount({accountID:candidate.account!.accountID,orgID:candidate.account!.orgID,expectedActive:active?{accountID:active.accountID,orgID:active.orgID}:null});if(!switched.consoleManagedProviders.includes('opencode-go')||!switched.orgs.some(org=>org.active&&org.accountID===candidate.account!.accountID&&org.orgID===candidate.account!.orgID))throw new Error('OpenCode 官方组织凭据复验未完成，请在独立根重新登录'); } finally {await native.close();}
+       for(const dir of [isolated.XDG_CONFIG_HOME,isolated.XDG_DATA_HOME,isolated.XDG_STATE_HOME,isolated.XDG_CACHE_HOME])mkdirSync(dir,{recursive:true,mode:0o700});
+       const modelsReady=await (this.options.openCodeModels??(next=>openCodeGoModelsReady(next)))(isolated);
+       if(!modelsReady)throw new Error('OpenCode 2.2 私有根无法列出 opencode-go 模型，请在独立根重新登录');
+       const subject=openCodeIdentitySubject(stage);
+       if(!subject)throw new Error('OpenCode 2.2 私有根缺少可确认的账号身份，请在独立根重新登录');
+       writeFileSync(join(stage,'.weaver-identity.json'),JSON.stringify({engine:'opencode',subject})+'\n',{mode:0o600});
       }
      }
      if(existsSync(target))throw new Error('目标账号根已存在但没有导入记录，请先核实归属');renameSync(stage,target);createdTargets.push(target);staged.splice(staged.indexOf(stage),1);secret.authDir=target;

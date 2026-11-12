@@ -160,13 +160,13 @@ test('refreshable imported materials are locally ready while strict new login re
  }finally{rmSync(f.root,{recursive:true,force:true});}
 });
 
-test('large live SQLite account state is read from WAL without treating the database as a config file',()=>{
+test('large live SQLite credential state is read from WAL without treating the database as a config file',()=>{
  const f=loginFixture(),db=new DatabaseSync(join(f.root,'opencode.db'));
  try{
-  db.exec("CREATE TABLE padding(data BLOB);INSERT INTO padding VALUES(zeroblob(600000));PRAGMA journal_mode=WAL;CREATE TABLE account_state(id INTEGER PRIMARY KEY,active_account_id TEXT,active_org_id TEXT);INSERT INTO account_state VALUES(1,'fixture-account','fixture-org');");
+  db.exec("CREATE TABLE padding(data BLOB);INSERT INTO padding VALUES(zeroblob(600000));PRAGMA journal_mode=WAL;CREATE TABLE credential(id TEXT PRIMARY KEY,integration_id TEXT,label TEXT NOT NULL,value TEXT NOT NULL,connector_id TEXT,method_id TEXT,active INTEGER,time_created INTEGER NOT NULL,time_updated INTEGER NOT NULL);INSERT INTO credential VALUES('cred_fixture','opencode-go','OpenCode Go','{\"type\":\"key\",\"key\":\"fixture-key\"}',NULL,NULL,1,1,1);");
   assert.ok(statSync(join(f.root,'opencode.db')).size>512*1024);
   assert.equal(nativeCredentialsReady('opencode',{authDir:f.root}),true);
-  db.exec('UPDATE account_state SET active_account_id=NULL');assert.equal(nativeCredentialsReady('opencode',{authDir:f.root}),false);
+  db.exec("UPDATE credential SET integration_id='other'");assert.equal(nativeCredentialsReady('opencode',{authDir:f.root}),false);
  }finally{db.close();rmSync(f.root,{recursive:true,force:true});}
 });
 

@@ -1,6 +1,6 @@
 import { roleChannels } from '../../shared/policy/channels';
-import { mkdirSync, chmodSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { chmodSync, existsSync, lstatSync, mkdirSync, rmSync } from 'node:fs';
+import { dirname, isAbsolute, join } from 'node:path';
 import { parseDshConfig, type ChannelBinding } from './runtime';
 import { nativeCredentialsReady, officialEngines, writeNativeConfig } from './native';
 import { CHANNEL_CONFIG_MAX_BYTES } from '../../shared/contracts/channels';
@@ -12,7 +12,7 @@ import { PolicyStore } from '../policy/store';
 import { ChannelStore } from './store';
 export class ChannelService {
  constructor(private policy: PolicyStore, private secrets: ChannelStore, private options?: {root:string}) { if(policy.connection!==secrets.connection) throw new Error('Channel stores must share one database'); }
- get(): ChannelsSnapshot { const policy=this.policy.snapshot();return {policy,configurations:Object.fromEntries(Object.keys(policy.config.channels).map(id=>{const s=this.secrets.getSecret(id);return [id,{hasApiKey:!!s?.apiKey,hasConfig:!!s?.config,hasCredentials:nativeCredentialsReady(policy.config.engines[policy.config.channels[id]!.engine]?.kind??policy.config.channels[id]!.engine,s??{}),...(!s?.apiKey&&!s?.config&&!s?.authDir?{detail:'尚未导入渠道配置或凭据'}:{})}];}))}; }
+ get(): ChannelsSnapshot { const policy=this.policy.snapshot();return {policy,configurations:Object.fromEntries(Object.keys(policy.config.channels).map(id=>{const s=this.secrets.getSecret(id);const authDir=s?.authDir;return [id,{hasApiKey:!!s?.apiKey,hasConfig:!!s?.config,hasCredentials:nativeCredentialsReady(policy.config.engines[policy.config.channels[id]!.engine]?.kind??policy.config.channels[id]!.engine,s??{}),hasAuthDir:!!authDir,loginPending:!!authDir&&existsSync(join(authDir,'.weaver-login-pending')),...(!s?.apiKey&&!s?.config&&!s?.authDir?{detail:'尚未导入渠道配置或凭据'}:{})}];}))}; }
  private allocate(id:string,engine:string):{account:string;authDir:string}{
   if(!this.options)throw new Error('官方账号私有目录服务不可用');
   const account=join(this.options.root,id);let created=false;
@@ -35,6 +35,31 @@ export class ChannelService {
    if(!secret.authDir){const allocated=this.allocate(id,engineKind);created=allocated.account;secret.authDir=allocated.authDir;this.secrets.putSecret(id,secret);}
    return {channel,secret,engineKind};
   });}catch(error){if(created)rmSync(created,{recursive:true,force:true});throw error;}
+ }
+ /** A relogin never writes the live root; it runs in a sibling root that is committed only after identity verification. */
+ reloginRoot(id:string,currentRoot:string):string{
+  const snapshot=this.policy.snapshot(),channel=snapshot.config.channels[id];
+  if(!channel)throw new Error('Unknown channel');
+  const engineKind=snapshot.config.engines[channel.engine]?.kind??channel.engine;
+  if(channel.kind!=='subscription'||!officialEngines.has(engineKind))throw new Error('仅官方订阅账号支持重新登录');
+  const secret=this.secrets.getSecret(id);
+  if(!secret?.authDir||secret.authDir!==currentRoot)throw new Error('账号认证根已变化，请重新读取后重试');
+  const root=join(dirname(currentRoot),`.relogin-${randomUUID()}`);
+  mkdirSync(root,{mode:0o700});chmodSync(root,0o700);
+  return root;
+ }
+ /** Atomically replaces the channel root; a concurrent edit or deletion refuses the switch. */
+ commitRelogin(id:string,expectedRoot:string,newRoot:string):void{
+  if(!isAbsolute(newRoot)||dirname(newRoot)!==dirname(expectedRoot))throw new Error('重新登录目录无效');
+  let info;try{info=lstatSync(newRoot);}catch{throw new Error('重新登录凭据目录不存在');}
+  if(!info.isDirectory()||info.isSymbolicLink())throw new Error('重新登录凭据目录无效');
+  this.policy.transaction(()=>{
+   const snapshot=this.policy.snapshot(),channel=snapshot.config.channels[id];
+   if(!channel)throw new Error('账号已删除，请重新读取后重试');
+   const secret=this.secrets.getSecret(id);
+   if(!secret?.authDir||secret.authDir!==expectedRoot)throw new Error('账号认证根已变化，请重新读取后重试');
+   secret.authDir=newRoot;this.secrets.putSecret(id,secret);
+  });
  }
  save(input: SaveChannelInput): SaveChannelResult {
   const raw=object(input);exact(raw,['revision','id','channel','config','apiKey']);

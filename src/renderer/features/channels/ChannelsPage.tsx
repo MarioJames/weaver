@@ -70,7 +70,7 @@ export function ChannelsPage({ policy }: { policy: PolicyDraft }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<ChannelDraft>();
   const [showList, setShowList] = useState(false);
-  const [loginChannel, setLoginChannel] = useState<string>();
+  const [loginChannel, setLoginChannel] = useState<{id:string;relogin:boolean}>();
   const [deleting, setDeleting] = useState<string>();
   const [importing, setImporting] = useState(false);
   const [importEngine, setImportEngine] = useState('all');
@@ -252,7 +252,7 @@ export function ChannelsPage({ policy }: { policy: PolicyDraft }) {
         addReturn.current = undefined;
         setAdding(false);
         navigate({ page: 'channels', id: next.savedChannel }, { replace: true });
-        if (next.policy.config.channels[next.savedChannel]?.kind === 'subscription') setLoginChannel(next.savedChannel);
+        if (next.policy.config.channels[next.savedChannel]?.kind === 'subscription') setLoginChannel({id:next.savedChannel,relogin:false});
       }
     });
   }
@@ -370,10 +370,12 @@ export function ChannelsPage({ policy }: { policy: PolicyDraft }) {
     const editing = !adding;
     const allowedEngines = editing ? engineOptions.map(option => option.value) : engineOptions.filter(option => displayDraft.channel.kind === 'subscription' ? subscriptionAllowed(engineKind(option.value)) : directApiAllowed(engineKind(option.value))).map(option => option.value);
     const canSave = channelDraftCanSave(displayDraft, editing, allowedEngines, kind);
-    const loginDisabled = !!busy || policy.busy || !!state?.hasCredentials;
+    const relogin = !!state?.hasCredentials || (!!state?.hasAuthDir && state?.loginPending !== true);
+    const loginDisabled = !!busy || policy.busy;
     const deleteDisabled = !!busy || referenceNames.length > 0;
     const deleteTitle = referenceNames.length ? `仍被 ${referenceNames.join('、')} 引用，先移除引用再删除。` : '删除此账号或渠道';
-    const loginTitle = state?.hasCredentials ? '已有凭据的账号不能原地更换身份；需要更换时新建账号。' : '登录官方账号';
+    const loginTitle = relogin ? '重新登录此官方账号；仅当新身份与原账号一致时替换新启动使用的凭据，运行中的任务不被打断。' : '登录官方账号';
+    const loginLabel = relogin ? '重新登录' : '登录官方账号';
     return <Pane
       label="账号或渠道详情"
       title={paneTitle(<>
@@ -387,10 +389,10 @@ export function ChannelsPage({ policy }: { policy: PolicyDraft }) {
           ? <DropdownMenu placement="bottomRight" items={[
             ...(activeChannel.kind === 'subscription' ? [{
               key: 'login',
-              label: '登录官方账号',
-              desc: state?.hasCredentials ? '已有凭据，不能原地更换身份' : undefined,
+              label: loginLabel,
+              desc: relogin ? '身份一致时替换新启动使用的凭据；运行中任务不打断' : undefined,
               disabled: loginDisabled,
-              onClick: () => setLoginChannel(activeId),
+              onClick: () => setLoginChannel({id:activeId!,relogin}),
             }] : []),
             {
               key: 'delete',
@@ -404,7 +406,7 @@ export function ChannelsPage({ policy }: { policy: PolicyDraft }) {
             <ActionIcon icon={MoreHorizontal} aria-label="更多操作" title="更多操作" />
           </DropdownMenu>
           : <>
-            {activeChannel.kind === 'subscription' && <Button size="small" type="text" icon={LogIn} disabled={loginDisabled} title={loginTitle} onClick={() => setLoginChannel(activeId)}>登录官方账号</Button>}
+            {activeChannel.kind === 'subscription' && <Button size="small" type="text" icon={LogIn} disabled={loginDisabled} title={loginTitle} onClick={() => setLoginChannel({id:activeId!,relogin})}>{loginLabel}</Button>}
             <Tooltip title={deleteTitle}>
               <span {...stylex.props(channelStyles.switchWrap)}>
                 <Button size="small" type="text" danger icon={Trash2} disabled={deleteDisabled} onClick={() => guard.guard(() => setDeleting(activeId))}>删除</Button>
@@ -421,7 +423,7 @@ export function ChannelsPage({ policy }: { policy: PolicyDraft }) {
             {activeChannel.kind === 'api' && <Text type="secondary" className={stylex.props(styles.meta, styles.wrap).className}>{[activeChannel.provider, activeChannel.baseUrl, activeChannel.protocol].filter(Boolean).join(' · ') || '编辑渠道以配置 provider 与 endpoint。'}</Text>}
             <Text type="secondary" className={stylex.props(styles.meta, styles.wrap).className}>{state?.hasConfig ? '已有原生配置覆写，秘密内容不回显。' : '使用引擎原生配置。'}</Text>
             {state?.detail && <Text type="warning" className={stylex.props(styles.meta, styles.wrap).className}>{state.detail}</Text>}
-            {activeChannel.kind === 'subscription' && !state?.hasCredentials && <Text type="secondary" className={stylex.props(styles.meta, styles.wrap).className}>点击「登录官方账号」完成此账号的独立认证，再分配给 Agent。</Text>}
+            {activeChannel.kind === 'subscription' && !state?.hasCredentials && <Text type={state?.hasAuthDir && state?.loginPending !== true ? 'warning' : 'secondary'} className={stylex.props(styles.meta, styles.wrap).className}>{state?.hasAuthDir && state?.loginPending !== true ? '原生凭据不可用或已过期；请点击「重新登录」恢复此账号。' : '点击「登录官方账号」完成此账号的独立认证，再分配给 Agent。'}</Text>}
             {probe?.status === 'missing' && <Text type="warning" className={stylex.props(styles.meta, styles.wrap).className}>未在此机器找到 CLI，请安装对应引擎后重新打开此页面。</Text>}
             {probe?.status === 'probe_failed' && <Text type="warning" className={stylex.props(styles.meta, styles.wrap).className}>CLI 安装探测失败，请检查本机命令后重试。</Text>}
             {probeFailure && <Text type="warning" className={stylex.props(styles.meta, styles.wrap).className}>{probeFailure}</Text>}
@@ -509,7 +511,7 @@ export function ChannelsPage({ policy }: { policy: PolicyDraft }) {
       <MasterDetail list={list} main={<div {...stylex.props(channelStyles.detailFrame)}>{detail ?? addOrEmpty}</div>} listWidth={320} listLabel="账号与渠道列表" mainLabel="账号或渠道详情" mobileView={mobileView} />
     </div>
     <ChannelImportModal open={importing} busy={busy} revision={revision} engineOptions={engineOptions} sourceDir={sourceDir} importEngine={importEngine} replaceExisting={replaceExisting} onSource={setSourceDir} onEngine={setImportEngine} onReplace={setReplaceExisting} onCancel={() => { if (!busy) setImporting(false); }} onImport={() => void runImport()} />
-    {loginChannel && config?.channels[loginChannel] && <ChannelLoginDialog key={`login:${loginChannel}`} channel={loginChannel} label={config.channels[loginChannel].label} onClose={() => setLoginChannel(undefined)} onSucceeded={async () => { if (!await load()) throw new Error('未能刷新账号凭据状态，请重试。'); }} />}
+    {loginChannel && config?.channels[loginChannel.id] && <ChannelLoginDialog key={`login:${loginChannel.id}:${loginChannel.relogin}`} channel={loginChannel.id} relogin={loginChannel.relogin} label={config.channels[loginChannel.id].label} onClose={() => setLoginChannel(undefined)} onSucceeded={async () => { if (!await load()) throw new Error('未能刷新账号凭据状态，请重试。'); }} />}
     <Modal className={stylex.props(resourceStyles.modal).className} classNames={{ body: stylex.props(resourceStyles.modalBody).className, footer: stylex.props(resourceStyles.modalFooter).className }} draggable={false} open={!!deleting} title="删除渠道" okText="删除" cancelText="取消" okButtonProps={{ danger: true, disabled: !!busy || !deleting || deletingBlocked }} confirmLoading={busy === 'delete'} onCancel={() => { if (!busy) setDeleting(undefined); }} onOk={() => deleting && confirmDelete(deleting)}>
       <Text>{deletingBlocked ? `「${deletingChannel?.label ?? deleting}」仍被 ${[...deletingUsers, ...(deletingBot ? ['Bot · 飞书 IM'] : [])].join('、')} 引用，请先更换引用。` : `删除渠道「${deletingChannel?.label ?? deleting}」及其托管配置后不能撤销；之后无法再用它派发任务，来源 CLI 目录不受影响。`}</Text>
     </Modal>
