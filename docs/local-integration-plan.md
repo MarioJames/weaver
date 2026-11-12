@@ -6,7 +6,7 @@
 
 引擎探测只做两件事：`PATH` 里的固定命令名 + 带超时的 `--version`（`weaver engines scan`）。它不登录、不调用模型、不证明认证或模型可用（`authenticated:false`/`modelUsable:false` 恒定）。固定目录为六个 id：`claude / codex / grok / opencode / pi / qoder`（kind 分别为 claude/codex/grok/opencode/pi/qodercli）。目录外的命令不会被探测：不允许调用方传入可执行路径。
 
-本机已核实版本（安装事实，不是可用性承诺）：OpenCode 1.19.3、Pi 1.3.0、Grok 1.0.62、Codex 0.163.0。Claude Code 探测存在但真实执行延期（`deferred`）；`qodercli` 是 `not_implemented`，可以出现在探测记录里但不能配置真实路由角色。Pi `--offline --list-models` 的本机目录含 `cc-switch-agentplan` 的 `ark-code-latest / deepseek-v4.1-flash / glm-5.3-flash / kimi-k3`。
+本机已核实版本（安装事实，不是可用性承诺）：OpenCode 2.2.7（worker 固定 argv 仍区分 v1/v2）、Pi 1.3.0、Grok 1.0.62、Codex 0.163.0。Claude Code 探测存在但真实执行延期（`deferred`）；`qodercli` 是 `not_implemented`，可以出现在探测记录里但不能配置真实路由角色。Pi `--offline --list-models` 的本机目录含 `cc-switch-agentplan` 的 `ark-code-latest / deepseek-v4.1-flash / glm-5.3-flash / kimi-k3`。
 
 ## 2. 启用与角色配置（两步，不互换）
 

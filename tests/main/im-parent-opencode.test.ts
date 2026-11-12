@@ -51,7 +51,7 @@ async function teardown(harness: Harness): Promise<void> {
   rmSync(harness.dir, { recursive: true, force: true });
 }
 
-test('opencode serves one resident session across turns, starts without a prompt and streams attributed public text', async () => {
+test('opencode 2.2 serves one resident session across turns, starts without a prompt and streams attributed public text', async () => {
   const harness = setup('multi', 'default');
   try {
     const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 900 });
@@ -71,19 +71,7 @@ test('opencode serves one resident session across turns, starts without a prompt
   } finally { await teardown(harness); }
 });
 
-test('opencode buffers a part delta that arrives before the assistant message binding', async () => {
-  const harness = setup('delta-first', 'delta-first');
-  try {
-    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 900 });
-    sessions.add(session);
-    const deltas: string[] = [];
-    assert.equal(await session.send('问题', undefined, chunk => deltas.push(chunk)), '你好，世界1');
-    assert.deepEqual(deltas, ['你好，', '世界1']);
-    await session.close();
-  } finally { await teardown(harness); }
-});
-
-test('opencode abort needs the boolean ACK plus session.idle and then reuses the session', async () => {
+test('opencode abort needs the interrupt ACK plus execution.interrupted and then reuses the session', async () => {
   const harness = setup('abort', 'abort');
   try {
     const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 800 });
@@ -92,22 +80,23 @@ test('opencode abort needs the boolean ACK plus session.idle and then reuses the
     let settled = false;
     const pending = session.send('取消', controller.signal, () => controller.abort()).finally(() => { settled = true; });
     const checked = assert.rejects(pending, error => error instanceof ConfirmedParentCancellation && error.name === 'AbortError');
-    await until(() => markers(harness).some(entry => entry.abort), 'abort request');
-    assert.equal(settled, false, 'abort ACK alone released the send');
+    await until(() => markers(harness).some(entry => entry.abort), 'interrupt request');
+    assert.equal(settled, false, 'interrupt ACK alone released the send');
     await checked;
     assert.equal(await session.send('第二轮'), '你好，世界2');
     await session.close();
   } finally { await teardown(harness); }
 });
 
-test('opencode abort without idle or without ACK closes instead of claiming a stop', async () => {
-  for (const [scenario, pattern] of [['abort-missing-idle', /abort|timed out/i], ['abort-false', /abort|did not accept/i]] as const) {
+test('opencode abort without a native terminal or without ACK closes instead of claiming a stop', async () => {
+  for (const [scenario, pattern] of [['abort-missing-idle', /abort|timed out/i], ['abort-false', /did not accept|abort/i]] as const) {
     const harness = setup(scenario, scenario);
     try {
       const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 2500, closeMs: 250 });
       sessions.add(session);
       const controller = new AbortController();
-      await assert.rejects(session.send('取消', controller.signal, () => controller.abort()), pattern);
+      const pending = session.send('取消', controller.signal, () => controller.abort());
+      await assert.rejects(pending, pattern);
       await session.close();
     } finally { await teardown(harness); }
   }
@@ -122,20 +111,20 @@ test('opencode auth and protocol startup failures stay bounded', async () => {
   }
 });
 
-test('opencode provider authentication and divergent snapshots fail closed', async () => {
-  for (const [scenario, reason] of [['auth', 'auth'], ['divergent', 'protocol']] as const) {
+test('opencode provider authentication and execution failures fail closed', async () => {
+  for (const [scenario, reason, pattern] of [['auth', 'auth', /authentication/i], ['execution-failed', 'engine', /Model unavailable/i]] as const) {
     const harness = setup(scenario, scenario);
     try {
       const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 2500, closeMs: 400 });
       sessions.add(session);
-      await assert.rejects(session.send('问题'), error => error instanceof ParentAgentError && error.reason === reason);
+      await assert.rejects(session.send('问题'), error => error instanceof ParentAgentError && error.reason === reason && pattern.test(error.message));
       await session.close();
     } finally { await teardown(harness); }
   }
 });
 
-test('opencode rejects missing final text and missing terminal instead of resolving empty', async () => {
-  for (const [scenario, pattern] of [['missing-final', /public text|protocol/i], ['missing-idle', /timed out/i]] as const) {
+test('opencode rejects missing final text and missing execution terminal instead of resolving empty', async () => {
+  for (const [scenario, pattern] of [['missing-final', /public text|protocol/i], ['missing-terminal', /timed out/i]] as const) {
     const harness = setup(scenario, scenario);
     try {
       const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 1200, closeMs: 300 });
@@ -146,14 +135,14 @@ test('opencode rejects missing final text and missing terminal instead of resolv
   }
 });
 
-test('opencode approves only external paths inside configured roots and rejects other permissions/questions', async () => {
+test('opencode approves only external paths inside configured roots and rejects other permissions/forms', async () => {
   const allowed = setup('perm-allowed', 'permission');
   try {
     const session = await createParentAgent(input(allowed), { launch, startupMs: 4000, turnMs: 3000, closeMs: 500 });
     sessions.add(session);
     assert.equal(await session.send('读取额外目录'), '工具请求已处理');
-    const reply = markers(allowed).find(entry => entry.permissionReply) as { permissionReply: { kind: string; reply: string } } | undefined;
-    assert.deepEqual(reply?.permissionReply, { kind: 'legacy', reply: 'once' });
+    const reply = markers(allowed).find(entry => entry.permissionReply) as { permissionReply: { decision: string } } | undefined;
+    assert.deepEqual(reply?.permissionReply.decision, 'once');
     await session.close();
   } finally { await teardown(allowed); }
   const denied = setup('perm-denied', 'permission-denied');
@@ -161,27 +150,18 @@ test('opencode approves only external paths inside configured roots and rejects 
     const session = await createParentAgent(input(denied), { launch, startupMs: 4000, turnMs: 3000, closeMs: 500 });
     sessions.add(session);
     assert.equal(await session.send('读取系统目录'), '工具请求已处理');
-    const reply = markers(denied).find(entry => entry.permissionReply) as { permissionReply: { kind: string; reply: string } } | undefined;
-    assert.deepEqual(reply?.permissionReply, { kind: 'legacy', reply: 'reject' });
+    const reply = markers(denied).find(entry => entry.permissionReply) as { permissionReply: { decision: string } } | undefined;
+    assert.deepEqual(reply?.permissionReply.decision, 'reject');
     await session.close();
   } finally { await teardown(denied); }
-  const v2 = setup('perm-v2', 'permission-v2');
+  const form = setup('form', 'question');
   try {
-    const session = await createParentAgent(input(v2), { launch, startupMs: 4000, turnMs: 3000, closeMs: 500 });
-    sessions.add(session);
-    assert.equal(await session.send('读取'), '工具请求已处理');
-    const reply = markers(v2).find(entry => entry.permissionReply) as { permissionReply: { kind: string; reply: string } } | undefined;
-    assert.deepEqual(reply?.permissionReply, { kind: 'v2', reply: 'reject' });
-    await session.close();
-  } finally { await teardown(v2); }
-  const question = setup('question', 'question');
-  try {
-    const session = await createParentAgent(input(question), { launch, startupMs: 4000, turnMs: 3000, closeMs: 500 });
+    const session = await createParentAgent(input(form), { launch, startupMs: 4000, turnMs: 3000, closeMs: 500 });
     sessions.add(session);
     assert.equal(await session.send('询问'), '问题已拒绝');
-    assert.ok(markers(question).some(entry => entry.questionRejected));
+    assert.ok(markers(form).some(entry => entry.formCancelled));
     await session.close();
-  } finally { await teardown(question); }
+  } finally { await teardown(form); }
 });
 
 test('opencode gives each chat/user its own server process and session', async () => {
@@ -199,7 +179,7 @@ test('opencode gives each chat/user its own server process and session', async (
   } finally { await teardown(harness); }
 });
 
-test('opencode argv binds loopback with a private password and never trusts another address', async () => {
+test('opencode 2.2 argv binds loopback with a private password and never trusts another address', async () => {
   const harness = setup('args', 'default');
   try {
     const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 500 });
@@ -211,179 +191,14 @@ test('opencode argv binds loopback with a private password and never trusts anot
     assert.equal(snapshot.hasPassword, true);
     assert.equal(snapshot.argv[snapshot.argv.indexOf('--hostname') + 1], '127.0.0.1');
     assert.ok(Number(snapshot.argv[snapshot.argv.indexOf('--port') + 1]) > 0);
-    assert.ok(snapshot.argv.includes('--pure'));
-    assert.deepEqual(markers(harness).filter(entry => entry.turn).map(entry => (entry as { model: { providerID: string; modelID: string } }).model), [
-      { providerID: 'fixture-provider', modelID: 'fixture-model' },
+    assert.ok(!snapshot.argv.includes('--pure'), '2.2 serve has no --pure');
+    assert.deepEqual(markers(harness).filter(entry => entry.turn).map(entry => (entry as { model: { providerID: string; id: string; variant: string } }).model), [
+      { providerID: 'fixture-provider', id: 'fixture-model', variant: 'high' },
     ]);
   } finally { await teardown(harness); }
 });
 
-test('opencode stale same-session idle never settles the current turn early', async () => {
-  const harness = setup('stale-success', 'stale-success');
-  try {
-    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 800 });
-    sessions.add(session);
-    const t0 = Date.now();
-    const pending = session.send('hello');
-    await new Promise(resolve => setTimeout(resolve, 250));
-    assert.equal(markers(harness).filter(entry => entry.abort).length, 0);
-    // The stale idle arrives ~40ms in while the message still has no time.completed:
-    // the send must still be pending here, not resolved with the partial text.
-    assert.ok(Date.now() - t0 >= 200, 'the stale-idle window must have passed');
-    assert.equal(await pending, 'PARTIAL-FULL');
-    assert.ok(Date.now() - t0 >= 400, 'the true terminal arrives only after the stale idle');
-    await session.close();
-  } finally { await teardown(harness); }
-});
-
-test('opencode abort ACK plus stale idle while still busy never reports a confirmed stop', async () => {
-  const harness = setup('stale-cancel', 'stale-cancel');
-  try {
-    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 600 });
-    sessions.add(session);
-    const controller = new AbortController();
-    const pending = session.send('cancel me', controller.signal);
-    const checked = assert.rejects(pending, error => !(error instanceof ConfirmedParentCancellation));
-    await until(() => markers(harness).filter(entry => typeof entry.turn === 'number').length >= 1, 'turn bound');
-    await new Promise(resolve => setTimeout(resolve, 100));
-    controller.abort();
-    await until(() => markers(harness).some(entry => entry.abort), 'abort request');
-    // The stale idle arrives ~20ms after the ACK while the message still has no terminal
-    // and the turn is still busy: no ConfirmedParentCancellation may surface here.
-    await new Promise(resolve => setTimeout(resolve, 350));
-    let settled = false;
-    void pending.then(() => { settled = true; }, () => { settled = true; });
-    await new Promise(resolve => setTimeout(resolve, 0));
-    assert.equal(settled, false, 'stale idle plus ACK must not settle the turn or release the next send');
-    await assert.rejects(session.send('blocked B'), /another send is still in progress/i);
-    await checked;
-    await session.close();
-  } finally { await teardown(harness); }
-});
-
-test('opencode native MessageAbortedError terminal confirms the cancellation and reuses the session', async () => {
-  const harness = setup('abort-error', 'abort-error');
-  try {
-    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 900 });
-    sessions.add(session);
-    const controller = new AbortController();
-    const pending = session.send('取消', controller.signal);
-    await until(() => markers(harness).filter(entry => typeof entry.turn === 'number').length >= 1, 'turn bound');
-    await new Promise(resolve => setTimeout(resolve, 100));
-    controller.abort();
-    await assert.rejects(pending, error => error instanceof ConfirmedParentCancellation && error.name === 'AbortError');
-    await session.close();
-  } finally { await teardown(harness); }
-});
-
-test('opencode abort before the first assistant binds still confirms on the late native terminal', async () => {
-  const harness = setup('abort-early', 'abort-early');
-  try {
-    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 1200 });
-    sessions.add(session);
-    const controller = new AbortController();
-    const pending = session.send('early abort', controller.signal);
-    setTimeout(() => controller.abort(), 20);
-    await assert.rejects(pending, error => error instanceof ConfirmedParentCancellation && error.name === 'AbortError');
-    await session.close();
-  } finally { await teardown(harness); }
-});
-
-test('opencode intermediate tool-calls completion never settles success early; true stop tail wins', async () => {
-  const harness = setup('intermediate-success', 'intermediate-success');
-  try {
-    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 800 });
-    sessions.add(session);
-    const t0 = Date.now();
-    const pending = session.send('hello');
-    await new Promise(resolve => setTimeout(resolve, 250));
-    // A completed finish:"tool-calls" step plus stale idle and busy status arrive ~40ms in:
-    // the send must still be pending here, not resolved with the partial text.
-    let settled = false;
-    void pending.then(() => { settled = true; }, () => { settled = true; });
-    await new Promise(resolve => setTimeout(resolve, 0));
-    assert.equal(settled, false, 'completed tool-calls plus stale idle must not resolve the turn');
-    assert.equal(await pending, 'PARTIAL-FULL');
-    assert.ok(Date.now() - t0 >= 400, 'the true finish:stop terminal arrives only after the stale idle');
-    await session.close();
-  } finally { await teardown(harness); }
-});
-
-test('opencode intermediate tool-calls plus ACK and stale busy idle never confirms cancellation', async () => {
-  const harness = setup('intermediate-cancel', 'intermediate-cancel');
-  try {
-    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 500 });
-    sessions.add(session);
-    const controller = new AbortController();
-    const pending = session.send('cancel me', controller.signal);
-    const checked = assert.rejects(pending, error => !(error instanceof ConfirmedParentCancellation));
-    await until(() => markers(harness).filter(entry => typeof entry.turn === 'number').length >= 1, 'turn bound');
-    await new Promise(resolve => setTimeout(resolve, 100));
-    controller.abort();
-    await until(() => markers(harness).some(entry => entry.abort), 'abort request');
-    // The stale idle arrives ~20ms after the ACK while the message only shows an intermediate
-    // finish:"tool-calls" step and the session stays busy: no ConfirmedParentCancellation here.
-    await new Promise(resolve => setTimeout(resolve, 350));
-    let settled = false;
-    void pending.then(() => { settled = true; }, () => { settled = true; });
-    await new Promise(resolve => setTimeout(resolve, 0));
-    assert.equal(settled, false, 'tool-calls plus ACK plus stale idle must not settle the turn or release the next send');
-    await assert.rejects(session.send('blocked B'), /another send is still in progress/i);
-    await checked;
-    await session.close();
-  } finally { await teardown(harness); }
-});
-
-test('opencode completed without finish never settles early; true stop tail wins', async () => {
-  const harness = setup('missing-finish', 'missing-finish');
-  try {
-    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 800 });
-    sessions.add(session);
-    const t0 = Date.now();
-    const pending = session.send('hello');
-    await new Promise(resolve => setTimeout(resolve, 250));
-    // A completed observation without finish plus stale idle and busy status arrives ~40ms in:
-    // the send must still be pending here, not resolved with the partial text.
-    let settled = false;
-    void pending.then(() => { settled = true; }, () => { settled = true; });
-    await new Promise(resolve => setTimeout(resolve, 0));
-    assert.equal(settled, false, 'completed without finish plus stale idle must not resolve the turn');
-    assert.equal(await pending, 'PARTIAL-FULL');
-    assert.ok(Date.now() - t0 >= 400, 'the true finish:stop terminal arrives only after the insufficient observation');
-    await session.close();
-  } finally { await teardown(harness); }
-});
-
-test('opencode terminal events arriving during the message fetch are re-checked, not swallowed', async () => {
-  const harness = setup('finalize-race', 'finalize-race');
-  try {
-    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 800 });
-    sessions.add(session);
-    // The first GET /message hangs 300ms, the true finish:"stop" terminal plus idle land
-    // mid-fetch, and the held read answers with the stale open snapshot. Dropping that wake
-    // would stall to the turn timeout; the bounded re-check must still resolve the full text.
-    assert.equal(await session.send('hello'), 'PARTIAL-FULL');
-    await session.close();
-  } finally { await teardown(harness); }
-});
-
-test('opencode later tool assistants under the same prompt never truncate or leak the public text', async () => {
-  const harness = setup('multi', 'multi-assistant');
-  try {
-    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 800 });
-    sessions.add(session);
-    const deltas: string[] = [];
-    const text = await session.send('工具步骤', undefined, chunk => deltas.push(chunk));
-    assert.ok(text.includes('最终'), `final text must include the newest assistant tail, got ${JSON.stringify(text)}`);
-    assert.ok(!text.includes('SECRET'), 'reasoning/tool parts must never leak into the public text');
-    assert.ok(!deltas.join('').includes('SECRET'), 'streamed deltas must never leak reasoning/tool parts');
-    // 同一 prompt 下新 assistant 消息的公开文本与之前段落之间补段落分隔。
-    assert.deepEqual(deltas, ['中间-', '\n\n最终']);
-    await session.close();
-  } finally { await teardown(harness); }
-});
-
-test('opencode sends the complete prepared bootstrap as the native system field while startup stays prompt-free', async () => {
+test('opencode sends the complete prepared bootstrap as a session instruction entry while startup stays prompt-free', async () => {
   const harness = setup('bootstrap', 'default');
   try {
     const dataDir = join(harness.dir, "实例 data '特殊' 目录");
@@ -398,9 +213,8 @@ test('opencode sends the complete prepared bootstrap as the native system field 
     assert.equal(turns.length, 2);
     assert.deepEqual(turns.map(entry => entry.text), ['第一条用户消息', '第二条用户消息']);
     for (const turn of turns) {
-      assert.equal(turn.system, instructions, 'every user prompt must carry the exact factory instructions as system');
-      assert.deepEqual(turn.model, { providerID: 'fixture-provider', modelID: 'fixture-model' });
-      assert.equal(turn.variant, 'high');
+      assert.equal(turn.instructions, instructions, 'the exact factory instructions must be attached to the session');
+      assert.deepEqual(turn.model, { providerID: 'fixture-provider', id: 'fixture-model', variant: 'high' });
       assert.match(String(turn.messageID), /^msg/);
     }
     assert.ok(instructions.includes('weaver --data-dir'));
@@ -411,7 +225,7 @@ test('opencode sends the complete prepared bootstrap as the native system field 
   } finally { await teardown(harness); }
 });
 
-test('opencode streams only confirmed public text and drops reasoning deltas before and after metadata', async () => {
+test('opencode streams only public text and drops reasoning, tool and synthetic events', async () => {
   const harness = setup('reasoning-stream', 'reasoning-stream');
   try {
     const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 500 });
@@ -420,38 +234,8 @@ test('opencode streams only confirmed public text and drops reasoning deltas bef
     const text = await session.send('解释一下', undefined, chunk => deltas.push(chunk));
     assert.deepEqual(deltas, ['公开', '-正文'], 'public text must still stream exactly once and in order');
     assert.equal(text, '公开-正文');
-    assert.ok(!deltas.join('').includes('SECRET'), 'reasoning deltas must never reach the public stream');
-    assert.ok(!text.includes('SECRET'), 'reasoning parts must never reach the final text');
-    await session.close();
-  } finally { await teardown(harness); }
-});
-
-test('opencode buffered private parts replay with their original type and flags', async () => {
-  const harness = setup('buffered-private', 'buffered-private');
-  try {
-    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 500 });
-    sessions.add(session);
-    const deltas: string[] = [];
-    const text = await session.send('缓冲', undefined, chunk => deltas.push(chunk));
-    assert.deepEqual(deltas, ['BUFFERED-PUBLIC']);
-    assert.equal(text, 'BUFFERED-PUBLIC');
-    assert.ok(!deltas.join('').includes('SECRET'), 'buffered reasoning/synthetic deltas must never replay publicly');
-    assert.ok(!text.includes('SECRET'), 'buffered private parts must never reach the final text');
-    await session.close();
-  } finally { await teardown(harness); }
-});
-
-test('opencode synthetic and ignored text parts cannot stream or reach the final text', async () => {
-  const harness = setup('synthetic-text', 'synthetic-text');
-  try {
-    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 3000, closeMs: 500 });
-    sessions.add(session);
-    const deltas: string[] = [];
-    const text = await session.send('合成文本', undefined, chunk => deltas.push(chunk));
-    assert.deepEqual(deltas, ['PUBLIC']);
-    assert.equal(text, 'PUBLIC');
-    assert.ok(!deltas.join('').includes('SECRET'), 'synthetic/ignored deltas must never reach the public stream');
-    assert.ok(!text.includes('SECRET'), 'synthetic/ignored text must never reach the final text');
+    assert.ok(!deltas.join('').includes('SECRET'), 'reasoning/synthetic events must never reach the public stream');
+    assert.ok(!text.includes('SECRET'), 'reasoning/synthetic events must never reach the final text');
     await session.close();
   } finally { await teardown(harness); }
 });
@@ -520,9 +304,9 @@ test('opencode emits one start and one progress per top-level tool with native n
       { kind: 'tool', name: 'bash' },
       { kind: 'tool', name: 'read' },
     ]);
-    assert.equal(progress.filter(event => event.kind === 'stage').length, 1, 'start must fire exactly once even after an assistant rebind');
+    assert.equal(progress.filter(event => event.kind === 'stage').length, 1, 'start must fire exactly once');
     const serialized = JSON.stringify(progress);
-    for (const secret of ['SECRET_TOOL_TOKEN', 'SECRET_PATH', 'SECRET_TOOL_TITLE', 'SECRET_TOOL_OUTPUT', 'SECRET_FILE', 'SECRET_SUBTASK', 'SECRET_CHILD', 'SECRET_PATTERN']) {
+    for (const secret of ['SECRET_TOOL_TOKEN', 'SECRET_PATH', 'SECRET_TOOL_TITLE', 'SECRET_TOOL_OUTPUT']) {
       assert.ok(!serialized.includes(secret), `${secret} leaked into progress: ${serialized}`);
     }
     await session.close();
@@ -590,6 +374,39 @@ test('opencode stops calling onProgress after abort and ignores late native tool
     await new Promise(resolve => setTimeout(resolve, 120));
     assert.equal(progress.length, seen, 'no progress may be emitted after the cancellation settles');
     assert.ok(!progress.some(event => event.name === 'grep'), 'the post-abort tool frame must not surface');
+    await session.close();
+  } finally { await teardown(harness); }
+});
+
+test('opencode stale idle and stale execution terminal never settle the current turn early', async () => {
+  for (const scenario of ['stale-idle', 'stale-execution'] as const) {
+    const harness = setup(scenario, scenario);
+    try {
+      const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 800 });
+      sessions.add(session);
+      const t0 = Date.now();
+      const pending = session.send('hello');
+      await new Promise(resolve => setTimeout(resolve, 150));
+      let settled = false;
+      void pending.then(() => { settled = true; }, () => { settled = true; });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert.equal(settled, false, `${scenario}: stale signal must not release the turn`);
+      assert.equal(await pending, '你好，世界1');
+      assert.ok(Date.now() - t0 >= 250, `${scenario}: the true terminal arrives only after the stale signal`);
+      await session.close();
+    } finally { await teardown(harness); }
+  }
+});
+
+test('opencode abort before the first assistant binds still confirms on the late native terminal', async () => {
+  const harness = setup('abort-early', 'abort-early');
+  try {
+    const session = await createParentAgent(input(harness), { launch, startupMs: 4000, turnMs: 4000, closeMs: 1200 });
+    sessions.add(session);
+    const controller = new AbortController();
+    const pending = session.send('early abort', controller.signal);
+    setTimeout(() => controller.abort(), 20);
+    await assert.rejects(pending, error => error instanceof ConfirmedParentCancellation && error.name === 'AbortError');
     await session.close();
   } finally { await teardown(harness); }
 });

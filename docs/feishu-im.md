@@ -130,7 +130,7 @@ DSH 0.2.1-rc.2 已实测 `dsh --profile headless --help` 只提供 `--json` 与 
   | --- | --- | --- |
   | Claude | 逐 token（文本 delta 帧） | `tool_use` 块的 `name` |
   | Codex | 逐 token（文本 delta 帧） | `item`/`started` 事件经闭名单映射的工具名（shell/edit/web_search/mcp 等） |
-  | OpenCode | 逐 token（文本 delta 帧） | `ToolPart` 的 `tool` |
+  | OpenCode | 逐 token（文本 delta 帧） | `session.tool.input.started` 的 `name` |
   | Pi | 逐 token（文本 delta 帧） | `tool_execution_start`/`toolcall_start` 的 `toolName` |
   | Grok | 按 `agent_message_chunk` 文本块 | `tool_call` 的 `kind` 枚举（不读 `title`） |
   | Qoder | 逐 token（文本 delta 帧） | `tool_use` 块的 `name` |
@@ -139,6 +139,10 @@ DSH 0.2.1-rc.2 已实测 `dsh --profile headless --help` 只提供 `--json` 与 
 - **进度事件传递**：生产路径上进度经后台宿主进程的 `progress` 帧传回（只带短标签，宿主侧截断到 64 字符），再由 `progress.ts` 状态机消费；中止后到达的进度一律丢弃，不进入卡片。不传 `onProgress` 的会话无进度状态，行为与此前一致；隐藏的身份回合（`finalAssistantOnly`）同样不发进度。
 - **进度安全与预算**：状态输出从不含 thinking 正文、工具名、参数/结果、命令、路径/凭据或 stderr；`sanitizeProgressName` 仅保留对短名的清洗能力（去控制字符与卡片控制字符、绝对/相对路径只留最后一段文件名、凭据样式字符串经统一 `redactSecrets` 遮蔽、按字符截断到 32），但批次渲染不读取 `name`，也不要求所有适配器传输名均截到 32（传输侧上限是宿主帧的 64 字符）。已渲染的状态单行 ≤80 字符；状态输出有独立预算，最多 20 状态行/2000 字节，这里的 20 统计渲染出的状态行而非工具事件数，状态间新增的空行分隔也计入状态字节，不占正文预算。答案正文上限 20000 字节、卡片元素上限 30000 字符均保持不变。显示批次在开始前会预留结束行预算（含 `*调用结束*` 与可能的最大分隔），剩余不足则整批状态不显示但仍消费事件、正文不丢；继续行同样必须留得下结束预算，预算不足时不追加；因此预算下不会出现孤立的开始/结束/继续行。
 - **最终收口**：最终 `setContent` 与最终卡片只承载最终答案（以及既有的下一步选项按钮），不保留临时状态，也不重放过程文字。
+
+### OpenCode 父 Agent 协议（2.2.x）
+
+OpenCode 父 Agent 只支持已实测的 2.2.x `serve`/HTTP/SSE 面，不保留 v1 分支：启动 `opencode serve --hostname 127.0.0.1 --port <私有端口>`（不再传 v1 的 `--pure`），用子进程环境里的 `OPENCODE_SERVER_PASSWORD` 做 Basic 认证；握手读 `GET /api/info`（版本须为 `2.2.x`）、`POST /api/session`（`location.directory` 与 `model.providerID/id/variant`，响应在 `{data:...}`），再用 `PUT /api/experimental/session/:id/instructions/entries/weaver-bootstrap` 把启动引导挂到常驻会话。每轮 `POST /api/session/:id/prompt` 只发送用户原文，成功判定看 `session.execution.succeeded`，失败看 `session.execution.failed`，中断看 `POST /api/session/:id/interrupt` 的 `{interrupted:true}` 加同会话 `session.execution.interrupted`；`session.idle` 不是轮次终态。公开正文只取 `session.text.delta`/`session.text.ended`，推理与工具分别走 `session.reasoning.*`/`session.tool.*`，不进入正文或进度。权限用 `permission.asked` 的 `action`/`resources` 判断，`external_directory` 且路径在配置根内才批准一次，其余权限与 `form.created` 一律拒绝；关闭时 `DELETE /api/session/:id`（204）后终止私有 `serve` 进程。
 
 ## 等待回复时的短消息提醒
 

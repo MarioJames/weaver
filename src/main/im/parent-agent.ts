@@ -96,10 +96,10 @@ export class ParentAgentError extends Error {
 }
 
 /** Emitted only after a native authoritative terminal proves the current turn really stopped.
- * OpenCode needs its bound current-turn message to show `MessageAbortedError`/`time.completed`
- * after the abort ACK plus `session.idle` (a bare ACK plus a stale same-session idle is not
- * proof); other engines use their own native proof (e.g. Grok reports a matching cancellation
- * without any ACK). Never synthesize this from a transport timeout alone. */
+ * OpenCode 2.2 needs the interrupt ACK (`{interrupted:true}`) plus this session's
+ * `session.execution.interrupted` terminal; `session.idle` is not a turn terminal and a bare ACK
+ * is not proof. Other engines use their own native proof (e.g. Grok reports a matching
+ * cancellation without any ACK). Never synthesize this from a transport timeout alone. */
 export class ConfirmedParentCancellation extends ParentAgentError {
   constructor() { super('Parent turn cancellation was confirmed', 'aborted'); this.name = 'AbortError'; }
 }
