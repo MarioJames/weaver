@@ -701,6 +701,10 @@ func (k *Kernel) ImportLegacy(path, owner string) (*ImportResult, error) {
 				out.Skipped = append(out.Skipped, "候选 "+w.id+"（没有可用账号）")
 				continue
 			}
+			if kind := engineOf[w.channels[0]]; !engine.Known(kind) {
+				out.Skipped = append(out.Skipped, "候选 "+w.id+"（引擎 "+kind+" 不支持）")
+				continue
+			}
 			weight, ok := weights[w.id]
 			if !ok {
 				weight = 0

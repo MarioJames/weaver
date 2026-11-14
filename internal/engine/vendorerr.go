@@ -15,9 +15,6 @@ var (
 
 	engineQuota = map[string]*regexp.Regexp{
 		"opencode": regexp.MustCompile(`(?i)FreeUsageLimitError|GoUsageLimitError|usage limit`),
-		"qodercli": regexp.MustCompile(`(?i)usage limit|quota|credits`),
-		"pi":       regexp.MustCompile(`(?i)usage limit|quota|credits`),
-		"grok":     regexp.MustCompile(`(?i)balance|\b402\b`),
 		"codex":    regexp.MustCompile(`(?i)usage limit|you.?ve hit your limit|limit reached`),
 		"claude":   regexp.MustCompile(`(?i)usage limit|you.?ve hit your limit|limit reached`),
 		"dsh":      regexp.MustCompile(`\bQUOTA\b`),

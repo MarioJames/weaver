@@ -25,7 +25,6 @@ type normalizer struct {
 	failure       string // sticky: a failure event was seen
 	failureDetail string
 	stopReason    string
-	sessionClosed bool // pi: agent_end or a clean agent_settled
 	dshTools      map[string]string
 	unparsed      int
 }
@@ -41,11 +40,7 @@ func newNormalizer(engine string) *normalizer { return &normalizer{engine: engin
 
 // succeeded reports whether the engine has given its final answer.
 func (n *normalizer) succeeded() bool {
-	done := n.done
-	if n.engine == "pi" {
-		done = n.sessionClosed && n.stopReason == "stop"
-	}
-	return done && n.failure == "" && strings.TrimSpace(n.text) != ""
+	return n.done && n.failure == "" && strings.TrimSpace(n.text) != ""
 }
 
 // truncated reports whether the answer was cut off by an output limit.
@@ -139,64 +134,16 @@ func (n *normalizer) push(line string) signal {
 		return signal{}
 	}
 	switch n.engine {
-	case "pi":
-		return n.pi(event)
 	case "opencode":
 		return n.opencode(event)
-	case "grok":
-		return n.grok(event)
 	case "codex":
 		return n.codex(event)
-	case "claude", "qodercli":
+	case "claude":
 		return n.claude(event)
 	case "dsh":
 		return n.dsh(event)
 	}
 	return signal{}
-}
-
-func (n *normalizer) pi(e obj) (s signal) {
-	switch e["type"] {
-	case "session":
-		n.session = str(e["id"])
-	case "agent_start":
-		s.started = true
-	case "message_end":
-		m := asObj(e["message"])
-		if m["role"] != "assistant" {
-			return
-		}
-		u := asObj(m["usage"])
-		n.usage(u["input"], u["output"])
-		n.stopReason = str(m["stopReason"])
-		n.remember(contentText(m["content"]), false)
-		s.output = true
-		if n.stopReason == "error" || n.stopReason == "aborted" {
-			detail := str(m["errorMessage"])
-			if detail == "" {
-				detail = "unknown pi error"
-			}
-			n.fail(n.stopReason, detail)
-		}
-	case "tool_execution_start":
-		s.output = true
-		s.notes = append(s.notes, toolNote(e["toolName"], "开始"))
-	case "tool_execution_end":
-		status := "完成"
-		if e["isError"] == true {
-			status = "失败"
-		}
-		s.notes = append(s.notes, toolNote(e["toolName"], status))
-	case "agent_end":
-		n.sessionClosed = true
-	case "agent_settled":
-		if e["aborted"] == true {
-			n.fail("aborted", "pi run aborted")
-		} else {
-			n.sessionClosed = true
-		}
-	}
-	return
 }
 
 func (n *normalizer) opencode(e obj) (s signal) {
@@ -249,78 +196,6 @@ func (n *normalizer) opencode(e obj) (s signal) {
 	return
 }
 
-func (n *normalizer) grok(e obj) (s signal) {
-	switch e["type"] {
-	case "system":
-		n.session = str(e["session_id"])
-		s.started = true
-	case "assistant":
-		m := asObj(e["message"])
-		u := asObj(m["usage"])
-		n.usage(u["input_tokens"], u["output_tokens"])
-		if text := contentText(m["content"]); strings.TrimSpace(text) != "" {
-			n.remember(text, false)
-		}
-		s.output = true
-		if r := str(m["stop_reason"]); r != "" {
-			n.stopReason = r
-		}
-	case "result":
-		if id := str(e["session_id"]); id != "" {
-			n.session = id
-		}
-		u := asObj(e["usage"])
-		n.usage(u["input_tokens"], u["output_tokens"])
-		if text := str(e["result"]); strings.TrimSpace(text) != "" {
-			n.remember(text, false)
-		}
-		if r := str(e["stop_reason"]); r != "" {
-			n.stopReason = r
-		}
-		if e["is_error"] == true || e["subtype"] != "success" {
-			n.fail("result", grokFailure(e))
-		} else {
-			n.done = true
-		}
-	case "error":
-		message := str(e["message"])
-		if message == "" {
-			message = "grok error"
-		}
-		n.fail("error", message)
-	}
-	return
-}
-
-func grokFailure(e obj) string {
-	var parts []string
-	if r := strings.TrimSpace(str(e["result"])); r != "" {
-		parts = append(parts, r)
-	}
-	switch errs := e["errors"].(type) {
-	case string:
-		if strings.TrimSpace(errs) != "" {
-			parts = append(parts, strings.TrimSpace(errs))
-		}
-	case []any:
-		for _, item := range errs {
-			if s := strings.TrimSpace(str(item)); s != "" {
-				parts = append(parts, s)
-			} else if row := asObj(item); row != nil {
-				if m := strings.TrimSpace(str(row["message"])); m != "" {
-					parts = append(parts, m)
-				} else if m := strings.TrimSpace(str(row["error"])); m != "" {
-					parts = append(parts, m)
-				}
-			}
-		}
-	}
-	if len(parts) == 0 {
-		return "unknown grok error"
-	}
-	return strings.Join(parts, "; ")
-}
-
 func (n *normalizer) codex(e obj) (s signal) {
 	switch e["type"] {
 	case "thread.started":
@@ -363,8 +238,8 @@ func (n *normalizer) codex(e obj) (s signal) {
 	return
 }
 
-// claude and qodercli share the Claude Code stream-json shape: system init,
-// assistant and user turns, then one result.
+// claude speaks the Claude Code stream-json shape: system init, assistant and
+// user turns, then one result.
 func (n *normalizer) claude(e obj) (s signal) {
 	switch e["type"] {
 	case "system":
