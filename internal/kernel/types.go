@@ -96,6 +96,8 @@ type Package struct {
 	Waiting     string     `json:"waiting,omitempty"`
 	Attempt     int        `json:"attempt"`
 	DependsOn   []string   `json:"dependsOn,omitempty"`
+	Advisory    bool       `json:"advisory,omitempty"`
+	AutoAccept  bool       `json:"autoAccept,omitempty"`
 	CreatedAt   int64      `json:"createdAt"`
 	UpdatedAt   int64      `json:"updatedAt"`
 	Current     *Attempt   `json:"current,omitempty"`
@@ -151,7 +153,10 @@ type PlanInput struct {
 }
 
 // PackageInput describes one package of a plan. DependsOn names keys in the
-// same plan or keys already present in the mission.
+// same plan or keys already present in the mission. An advisory package writes
+// a document (a proposal, a review, research) and must not change files. An
+// auto-accept package is accepted when its result arrives, so its dependents
+// start without the owner; a failure still wakes the owner.
 type PackageInput struct {
 	Key         string   `json:"key"`
 	Title       string   `json:"title"`
@@ -160,6 +165,8 @@ type PackageInput struct {
 	Worker      string   `json:"worker,omitempty"`
 	Engine      string   `json:"engine,omitempty"`
 	DependsOn   []string `json:"dependsOn,omitempty"`
+	Advisory    bool     `json:"advisory,omitempty"`
+	AutoAccept  bool     `json:"autoAccept,omitempty"`
 }
 
 // PlanResult reports what a plan created.

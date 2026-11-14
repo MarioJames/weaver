@@ -114,6 +114,19 @@ var methods = map[string]handler{
 		return s.kernel.SubmitPlan(p.Key, p.PlanInput)
 	}),
 
+	"dialogue.start": simple(func(s *Server, p struct {
+		Key string `json:"key"`
+		kernel.DialogueInput
+	}) (any, error) {
+		return s.kernel.StartDialogue(p.Key, p.DialogueInput)
+	}),
+	"dialogue.show": simple(func(s *Server, p struct {
+		Mission string `json:"mission"`
+		Name    string `json:"name"`
+	}) (any, error) {
+		return s.kernel.Dialogue(p.Mission, p.Name)
+	}),
+
 	"package.show": simple(func(s *Server, p struct {
 		Package string `json:"package"`
 	}) (any, error) {

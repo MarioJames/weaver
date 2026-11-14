@@ -26,6 +26,12 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
   weaver mission show <主任务>
   weaver mission close <主任务>
   weaver plan submit --mission <主任务> [--file <计划.json>] [--key <幂等编号>]     计划默认从标准输入读
+                                        包可带 "advisory": true（只出文档、不改文件）和 "autoAccept": true（出结果即采纳并放行下游）
+
+对谈                                          两个候选各出方案、互相评审，只在最终立场给出时唤醒
+  weaver dialogue start --mission <主任务> [--name <名称>] [--rounds 1-3] [--workers <候选,候选>] [--brief-file <说明.md>] [--key <幂等编号>]
+                                        说明默认从标准输入读；默认由 codex 和 claude 各出一方
+  weaver dialogue show --mission <主任务> [--name <名称>]     两方各轮的全文
 
 进度与唤醒
   weaver wait --mission <主任务> [--cursor <序号>] [--timeout 30m]
@@ -215,7 +221,7 @@ func run(argv []string) error {
 		return nil
 	}
 	sub := ""
-	grouped := map[string]bool{"mission": true, "plan": true, "package": true, "timer": true, "account": true, "worker": true, "engine": true, "config": true, "service": true}
+	grouped := map[string]bool{"mission": true, "plan": true, "package": true, "timer": true, "dialogue": true, "account": true, "worker": true, "engine": true, "config": true, "service": true}
 	if grouped[group] {
 		if len(a.pos) == 0 {
 			return fmt.Errorf("%s 需要子命令，见 weaver help", group)
@@ -313,6 +319,45 @@ func run(argv []string) error {
 			return errors.New(`计划需要 "packages" 数组`)
 		}
 		return call("plan.submit", map[string]any{"mission": mission, "key": a.get("key"), "packages": plan["packages"]})
+
+	case "dialogue start":
+		if err := a.allow("mission", "name", "rounds", "workers", "brief-file", "key"); err != nil {
+			return err
+		}
+		mission, err := a.need("mission")
+		if err != nil {
+			return err
+		}
+		var body []byte
+		if file := a.get("brief-file"); file != "" && file != "-" {
+			body, err = os.ReadFile(file)
+		} else {
+			body, err = io.ReadAll(os.Stdin)
+		}
+		if err != nil {
+			return err
+		}
+		params := map[string]any{"mission": mission, "name": a.get("name"), "brief": string(body), "key": a.get("key")}
+		if v := a.get("rounds"); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil {
+				return fmt.Errorf("--rounds 需要整数")
+			}
+			params["rounds"] = n
+		}
+		if v := a.get("workers"); v != "" {
+			params["workers"] = strings.Split(v, ",")
+		}
+		return call("dialogue.start", params)
+	case "dialogue show":
+		if err := a.allow("mission", "name"); err != nil {
+			return err
+		}
+		mission, err := a.need("mission")
+		if err != nil {
+			return err
+		}
+		return call("dialogue.show", map[string]any{"mission": mission, "name": a.get("name")})
 
 	case "package list":
 		mission, err := a.need("mission")

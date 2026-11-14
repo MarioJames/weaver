@@ -173,6 +173,20 @@ func (k *Kernel) Finished(attemptID string, o engine.Outcome) {
 				StateVerdict, t.now, t.now, o.Text, exit, o.InputTokens, o.OutputTokens, attemptID); err != nil {
 				return err
 			}
+			if p.AutoAccept {
+				// The plan said this result needs no verdict: accept it and let
+				// its dependents start. The owner is not woken for it.
+				if _, err := t.Exec(`UPDATE attempts SET state=? WHERE id=?`, StateAccepted, attemptID); err != nil {
+					return err
+				}
+				if err := t.setPackage(p, StateAccepted, ""); err != nil {
+					return err
+				}
+				if _, err := t.event(p.MissionID, p.ID, a.N, EvAccepted, "有结果，按计划自动采纳"); err != nil {
+					return err
+				}
+				return t.dispatch()
+			}
 			if err := t.setPackage(p, StateVerdict, ""); err != nil {
 				return err
 			}

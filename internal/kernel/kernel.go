@@ -228,13 +228,13 @@ func (k *Kernel) runDir(attemptID string) string { return filepath.Join(k.home, 
 
 // ---- row access ----
 
-const packageCols = `id, mission_id, key, title, instruction, workspace, worker, engine, state, waiting, attempt, created_at, updated_at`
+const packageCols = `id, mission_id, key, title, instruction, workspace, worker, engine, state, waiting, attempt, created_at, updated_at, advisory, auto_accept`
 
 type scanner interface{ Scan(dest ...any) error }
 
 func scanPackage(s scanner) (*Package, error) {
 	p := &Package{}
-	err := s.Scan(&p.ID, &p.MissionID, &p.Key, &p.Title, &p.Instruction, &p.Workspace, &p.Worker, &p.Engine, &p.State, &p.Waiting, &p.Attempt, &p.CreatedAt, &p.UpdatedAt)
+	err := s.Scan(&p.ID, &p.MissionID, &p.Key, &p.Title, &p.Instruction, &p.Workspace, &p.Worker, &p.Engine, &p.State, &p.Waiting, &p.Attempt, &p.CreatedAt, &p.UpdatedAt, &p.Advisory, &p.AutoAccept)
 	return p, err
 }
 

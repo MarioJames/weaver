@@ -61,153 +61,155 @@ func checkWorkspace(dir string) error {
 // cycle, an unknown dependency or a duplicate key creates nothing.
 func (k *Kernel) SubmitPlan(key string, in PlanInput) (*PlanResult, error) {
 	out := &PlanResult{}
-	err := k.keyed(key, "plan.submit", out, func(t *tx) error {
-		m, err := getMission(t, in.Mission)
-		if err != nil {
-			return err
-		}
-		if m.ClosedAt != 0 {
-			return errf("CLOSED", "主任务 %s 已关闭", m.ID)
-		}
-		if len(in.Packages) == 0 {
-			return errf("INVALID", "计划里没有工作包")
-		}
-		existing := map[string]string{}
-		rows, err := t.Query(`SELECT key, id FROM packages WHERE mission_id=?`, m.ID)
-		if err != nil {
-			return err
-		}
-		for rows.Next() {
-			var key, id string
-			if err := rows.Scan(&key, &id); err != nil {
-				rows.Close()
-				return err
-			}
-			existing[key] = id
-		}
-		rows.Close()
-
-		ids := map[string]string{}
-		for i := range in.Packages {
-			p := &in.Packages[i]
-			p.Key = strings.TrimSpace(p.Key)
-			if !keyPattern.MatchString(p.Key) {
-				return errf("INVALID", "第 %d 个包的 key %q 不合法：只能用字母、数字、点、下划线和连字符，最长 64", i+1, p.Key)
-			}
-			if _, dup := ids[p.Key]; dup {
-				return errf("INVALID", "计划里 key %q 重复", p.Key)
-			}
-			if _, dup := existing[p.Key]; dup {
-				return errf("INVALID", "主任务里已经有 key 为 %q 的包", p.Key)
-			}
-			if strings.TrimSpace(p.Instruction) == "" {
-				return errf("INVALID", "包 %s 没有指令", p.Key)
-			}
-			if len(p.Instruction) > maxInstruction {
-				return errf("INVALID", "包 %s 的指令超过 %d 字节", p.Key, maxInstruction)
-			}
-			if strings.TrimSpace(p.Title) == "" {
-				p.Title = p.Key
-			}
-			if p.Workspace == "" {
-				p.Workspace = m.Workspace
-			}
-			if err := checkWorkspace(p.Workspace); err != nil {
-				return errf("INVALID", "包 %s：%s", p.Key, AsError(err).Message)
-			}
-			if p.Worker != "" {
-				var n int
-				if err := t.QueryRow(`SELECT COUNT(*) FROM workers WHERE id=?`, p.Worker).Scan(&n); err != nil {
-					return err
-				}
-				if n == 0 {
-					return errf("INVALID", "包 %s 指定的候选 %s 不存在", p.Key, p.Worker)
-				}
-			}
-			if p.Engine != "" && p.Worker == "" {
-				var n int
-				if err := t.QueryRow(`SELECT COUNT(*) FROM workers WHERE engine=?`, p.Engine).Scan(&n); err != nil {
-					return err
-				}
-				if n == 0 {
-					return errf("INVALID", "包 %s 指定的引擎 %s 没有候选", p.Key, p.Engine)
-				}
-			}
-			ids[p.Key] = newID("p_")
-			if p.Workspace != m.Workspace {
-				t.warms = append(t.warms, p.Workspace)
-			}
-		}
-		graph := map[string][]string{}
-		for _, p := range in.Packages {
-			seen := map[string]bool{}
-			for _, dep := range p.DependsOn {
-				if dep == p.Key {
-					return errf("CYCLE", "依赖成环：%s → %s", p.Key, p.Key)
-				}
-				if seen[dep] {
-					continue
-				}
-				seen[dep] = true
-				if _, ok := ids[dep]; ok {
-					graph[p.Key] = append(graph[p.Key], dep)
-				} else if _, ok := existing[dep]; !ok {
-					return errf("INVALID", "包 %s 依赖的 %s 不在这份计划里，也不在主任务已有的包里", p.Key, dep)
-				}
-			}
-		}
-		if cycle := findCycle(in.Packages, graph); cycle != nil {
-			return errf("CYCLE", "依赖成环：%s。整份计划未创建", strings.Join(cycle, " → "))
-		}
-
-		var position int
-		if err := t.QueryRow(`SELECT COALESCE(MAX(position),0) FROM packages WHERE mission_id=?`, m.ID).Scan(&position); err != nil {
-			return err
-		}
-		for _, p := range in.Packages {
-			position++
-			if _, err := t.Exec(`INSERT INTO packages(id, mission_id, key, title, instruction, workspace, worker, engine, state, position, created_at, updated_at)
-				VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, ids[p.Key], m.ID, p.Key, clip(p.Title, 200), p.Instruction, p.Workspace, p.Worker, p.Engine, StatePending, position, t.now, t.now); err != nil {
-				return err
-			}
-		}
-		for _, p := range in.Packages {
-			seen := map[string]bool{}
-			for _, dep := range p.DependsOn {
-				if seen[dep] {
-					continue
-				}
-				seen[dep] = true
-				target := ids[dep]
-				if target == "" {
-					target = existing[dep]
-				}
-				if _, err := t.Exec(`INSERT INTO package_deps(package_id, depends_on) VALUES(?,?)`, ids[p.Key], target); err != nil {
-					return err
-				}
-			}
-		}
-		if _, err := t.event(m.ID, "", 0, EvPlan, fmt.Sprintf("提交计划：%d 个工作包", len(in.Packages))); err != nil {
-			return err
-		}
-		if err := t.dispatch(); err != nil {
-			return err
-		}
-		*out = PlanResult{Mission: m.ID}
-		for _, p := range in.Packages {
-			pkg, err := loadPackage(t, ids[p.Key], false)
-			if err != nil {
-				return err
-			}
-			pkg.Instruction = ""
-			out.Packages = append(out.Packages, pkg)
-		}
-		return t.QueryRow(`SELECT COALESCE(MAX(seq),0) FROM events WHERE mission_id=?`, m.ID).Scan(&out.Cursor)
-	})
-	if err != nil {
+	if err := k.keyed(key, "plan.submit", out, func(t *tx) error { return t.createPlan(&in, out) }); err != nil {
 		return nil, err
 	}
 	return out, nil
+}
+
+// createPlan validates a plan and creates its packages inside the caller's transaction.
+func (t *tx) createPlan(in *PlanInput, out *PlanResult) error {
+	m, err := getMission(t, in.Mission)
+	if err != nil {
+		return err
+	}
+	if m.ClosedAt != 0 {
+		return errf("CLOSED", "主任务 %s 已关闭", m.ID)
+	}
+	if len(in.Packages) == 0 {
+		return errf("INVALID", "计划里没有工作包")
+	}
+	existing := map[string]string{}
+	rows, err := t.Query(`SELECT key, id FROM packages WHERE mission_id=?`, m.ID)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var key, id string
+		if err := rows.Scan(&key, &id); err != nil {
+			rows.Close()
+			return err
+		}
+		existing[key] = id
+	}
+	rows.Close()
+
+	ids := map[string]string{}
+	for i := range in.Packages {
+		p := &in.Packages[i]
+		p.Key = strings.TrimSpace(p.Key)
+		if !keyPattern.MatchString(p.Key) {
+			return errf("INVALID", "第 %d 个包的 key %q 不合法：只能用字母、数字、点、下划线和连字符，最长 64", i+1, p.Key)
+		}
+		if _, dup := ids[p.Key]; dup {
+			return errf("INVALID", "计划里 key %q 重复", p.Key)
+		}
+		if _, dup := existing[p.Key]; dup {
+			return errf("INVALID", "主任务里已经有 key 为 %q 的包", p.Key)
+		}
+		if strings.TrimSpace(p.Instruction) == "" {
+			return errf("INVALID", "包 %s 没有指令", p.Key)
+		}
+		if len(p.Instruction) > maxInstruction {
+			return errf("INVALID", "包 %s 的指令超过 %d 字节", p.Key, maxInstruction)
+		}
+		if strings.TrimSpace(p.Title) == "" {
+			p.Title = p.Key
+		}
+		if p.Workspace == "" {
+			p.Workspace = m.Workspace
+		}
+		if err := checkWorkspace(p.Workspace); err != nil {
+			return errf("INVALID", "包 %s：%s", p.Key, AsError(err).Message)
+		}
+		if p.Worker != "" {
+			var n int
+			if err := t.QueryRow(`SELECT COUNT(*) FROM workers WHERE id=?`, p.Worker).Scan(&n); err != nil {
+				return err
+			}
+			if n == 0 {
+				return errf("INVALID", "包 %s 指定的候选 %s 不存在", p.Key, p.Worker)
+			}
+		}
+		if p.Engine != "" && p.Worker == "" {
+			var n int
+			if err := t.QueryRow(`SELECT COUNT(*) FROM workers WHERE engine=?`, p.Engine).Scan(&n); err != nil {
+				return err
+			}
+			if n == 0 {
+				return errf("INVALID", "包 %s 指定的引擎 %s 没有候选", p.Key, p.Engine)
+			}
+		}
+		ids[p.Key] = newID("p_")
+		if p.Workspace != m.Workspace {
+			t.warms = append(t.warms, p.Workspace)
+		}
+	}
+	graph := map[string][]string{}
+	for _, p := range in.Packages {
+		seen := map[string]bool{}
+		for _, dep := range p.DependsOn {
+			if dep == p.Key {
+				return errf("CYCLE", "依赖成环：%s → %s", p.Key, p.Key)
+			}
+			if seen[dep] {
+				continue
+			}
+			seen[dep] = true
+			if _, ok := ids[dep]; ok {
+				graph[p.Key] = append(graph[p.Key], dep)
+			} else if _, ok := existing[dep]; !ok {
+				return errf("INVALID", "包 %s 依赖的 %s 不在这份计划里，也不在主任务已有的包里", p.Key, dep)
+			}
+		}
+	}
+	if cycle := findCycle(in.Packages, graph); cycle != nil {
+		return errf("CYCLE", "依赖成环：%s。整份计划未创建", strings.Join(cycle, " → "))
+	}
+
+	var position int
+	if err := t.QueryRow(`SELECT COALESCE(MAX(position),0) FROM packages WHERE mission_id=?`, m.ID).Scan(&position); err != nil {
+		return err
+	}
+	for _, p := range in.Packages {
+		position++
+		if _, err := t.Exec(`INSERT INTO packages(id, mission_id, key, title, instruction, workspace, worker, engine, state, position, created_at, updated_at, advisory, auto_accept)
+			VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, ids[p.Key], m.ID, p.Key, clip(p.Title, 200), p.Instruction, p.Workspace, p.Worker, p.Engine, StatePending, position, t.now, t.now, b2i(p.Advisory), b2i(p.AutoAccept)); err != nil {
+			return err
+		}
+	}
+	for _, p := range in.Packages {
+		seen := map[string]bool{}
+		for _, dep := range p.DependsOn {
+			if seen[dep] {
+				continue
+			}
+			seen[dep] = true
+			target := ids[dep]
+			if target == "" {
+				target = existing[dep]
+			}
+			if _, err := t.Exec(`INSERT INTO package_deps(package_id, depends_on) VALUES(?,?)`, ids[p.Key], target); err != nil {
+				return err
+			}
+		}
+	}
+	if _, err := t.event(m.ID, "", 0, EvPlan, fmt.Sprintf("提交计划：%d 个工作包", len(in.Packages))); err != nil {
+		return err
+	}
+	if err := t.dispatch(); err != nil {
+		return err
+	}
+	*out = PlanResult{Mission: m.ID}
+	for _, p := range in.Packages {
+		pkg, err := loadPackage(t, ids[p.Key], false)
+		if err != nil {
+			return err
+		}
+		pkg.Instruction = ""
+		out.Packages = append(out.Packages, pkg)
+	}
+	return t.QueryRow(`SELECT COALESCE(MAX(seq),0) FROM events WHERE mission_id=?`, m.ID).Scan(&out.Cursor)
 }
 
 // findCycle returns the keys along one dependency cycle, or nil.
