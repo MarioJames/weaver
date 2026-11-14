@@ -104,7 +104,7 @@ func (m *Manager) Liveness(attemptID string) Liveness {
 // Sweep stops attempt scopes that no attempt owns any more: standby processes
 // and runs orphaned by a crash. Resident servers are left alone.
 func (m *Manager) Sweep() {
-	out, err := exec.Command("systemctl", "--user", "list-units", "--type=scope", "--state=active", "--plain", "--no-legend", "weaver2-p_*").Output()
+	out, err := exec.Command("systemctl", "--user", "list-units", "--type=scope", "--state=active", "--plain", "--no-legend", "weaver-p_*").Output()
 	if err != nil {
 		return
 	}
@@ -114,7 +114,7 @@ func (m *Manager) Sweep() {
 			continue
 		}
 		unit := strings.TrimSuffix(fields[0], ".scope")
-		attempt := strings.TrimPrefix(unit, "weaver2-")
+		attempt := strings.TrimPrefix(unit, "weaver-")
 		if m.Cold.Tracked(attempt) {
 			continue
 		}

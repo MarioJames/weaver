@@ -3,7 +3,8 @@ package skills
 
 import _ "embed"
 
-// Weaver2 is the skill parent agents follow to drive Weaver 2.
+// Weaver is the skill parent agents follow to drive Weaver. It keeps the name
+// agents-weaver so that an upgrade replaces the skill agents already load.
 //
-//go:embed weaver2/SKILL.md
-var Weaver2 string
+//go:embed agents-weaver/SKILL.md
+var Weaver string

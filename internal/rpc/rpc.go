@@ -37,13 +37,15 @@ func (e *Error) Error() string { return e.Message }
 // ErrUnavailable means the service could not be reached at all.
 var ErrUnavailable = errors.New("service unavailable")
 
-// Home returns the data directory: $WEAVER_HOME, or ~/.local/share/weaver2.
+// Home returns the data directory: $WEAVER_HOME, or ~/.local/share/weaver/v2.
+// The parent directory is where Weaver 0.x kept its state; that is left as it
+// was, and imported accounts keep pointing at credential directories in it.
 func Home() string {
 	if dir := os.Getenv("WEAVER_HOME"); dir != "" {
 		return dir
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".local", "share", "weaver2")
+	return filepath.Join(home, ".local", "share", "weaver", "v2")
 }
 
 // SocketPath returns the service socket inside a data directory.

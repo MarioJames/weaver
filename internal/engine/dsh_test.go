@@ -133,7 +133,7 @@ func TestToolScopeCPUCountsOnlyThisAttemptsScopesAndNeverGoesBack(t *testing.T) 
 	stat("dsh-subprocess-100-aaaa.scope", 2_000_000)
 	stat("dsh-terminal-100-bbbb.scope", 500_000)
 	stat("dsh-subprocess-999-cccc.scope", 9_000_000) // another attempt's dsh
-	stat("weaver2-p_other.1.scope", 7_000_000)
+	stat("weaver-p_other.1.scope", 7_000_000)
 	seen := map[string]uint64{}
 	var total uint64
 	total = addToolScopeCPU(root, []int{100}, seen, total)

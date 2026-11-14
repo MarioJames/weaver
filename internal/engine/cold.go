@@ -96,7 +96,7 @@ type coldRun struct {
 }
 
 func unitFor(attemptID string) string {
-	return "weaver2-" + strings.Map(func(r rune) rune {
+	return "weaver-" + strings.Map(func(r rune) rune {
 		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '_' || r == '-' {
 			return r
 		}

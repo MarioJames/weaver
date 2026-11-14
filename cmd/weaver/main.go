@@ -63,12 +63,13 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
 服务
   weaver status
   weaver daemon                         在前台运行服务
-  weaver service install|uninstall      安装或移除 systemd 用户服务 weaver2.service
+  weaver service install|uninstall      安装或移除 systemd 用户服务 weaver.service；install 会接管 0.x 留下的同名服务
   weaver backup
-  weaver skill                          打印父 Agent 使用的技能说明
+  weaver skill                          打印父 Agent 使用的技能说明（agents-weaver）
+  weaver skill install                  把技能装到 ~/.agents/skills/agents-weaver，并链接到 ~/.claude/skills、~/.codex/skills
   weaver version
 
-数据目录取自 WEAVER_HOME，默认 ~/.local/share/weaver2。输出是 JSON。
+数据目录取自 WEAVER_HOME，默认 ~/.local/share/weaver/v2；0.x 的数据留在 ~/.local/share/weaver，不读不改。输出是 JSON。
 `
 
 func main() {
@@ -206,8 +207,21 @@ func callPatiently(method string, params any, each func(json.RawMessage) (done b
 	}
 }
 
+// canonical maps the flag spellings of 0.x, which agents and instructions still
+// use (weaver --version, weaver --skill), onto the commands.
+func canonical(argv []string) []string {
+	if len(argv) == 0 {
+		return []string{"help"}
+	}
+	if name, ok := map[string]string{"--help": "help", "-h": "help", "--version": "version", "--skill": "skill"}[argv[0]]; ok {
+		return append([]string{name}, argv[1:]...)
+	}
+	return argv
+}
+
 func run(argv []string) error {
-	if len(argv) == 0 || argv[0] == "help" || argv[0] == "--help" || argv[0] == "-h" {
+	argv = canonical(argv)
+	if argv[0] == "help" {
 		fmt.Print(usage)
 		return nil
 	}
@@ -233,8 +247,22 @@ func run(argv []string) error {
 		fmt.Println(daemon.Version)
 		return nil
 	case "skill ":
-		fmt.Print(skills.Weaver2)
-		return nil
+		if len(a.pos) == 0 {
+			fmt.Print(skills.Weaver)
+			return nil
+		}
+		if a.pos[0] != "install" {
+			return fmt.Errorf("skill 只有 install 这一个子命令，见 weaver help")
+		}
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		res, err := installSkill(home)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(res)
 	case "daemon ":
 		return daemon.Run(rpc.Home())
 	case "service install":
@@ -733,7 +761,54 @@ func login(id string) error {
 	return call("account.check", map[string]any{"id": id})
 }
 
-const unitName = "weaver2.service"
+// skillInstall is what "weaver skill install" did.
+type skillInstall struct {
+	Installed string   `json:"installed"`
+	Links     []string `json:"links"`
+	Skipped   []string `json:"skipped,omitempty"`
+}
+
+// installSkill writes the embedded skill to ~/.agents/skills/agents-weaver and
+// links it into the skill directories of the agents present on this machine.
+// The directory is Weaver's own, so an older copy is replaced whole: the 0.x
+// skill shipped reference files whose commands no longer exist. A skill of the
+// same name that an agent directory holds as a real directory is left alone.
+func installSkill(home string) (*skillInstall, error) {
+	dir := filepath.Join(home, ".agents", "skills", "agents-weaver")
+	if err := os.RemoveAll(dir); err != nil { // a symlink to a checkout is removed, not followed
+		return nil, err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(skills.Weaver), 0o644); err != nil {
+		return nil, err
+	}
+	res := &skillInstall{Installed: dir, Links: []string{}}
+	for _, agent := range []string{".claude", ".codex"} {
+		parent := filepath.Join(home, agent, "skills")
+		if _, err := os.Stat(parent); err != nil {
+			continue
+		}
+		link := filepath.Join(parent, "agents-weaver")
+		if info, err := os.Lstat(link); err == nil {
+			if info.Mode()&os.ModeSymlink == 0 {
+				res.Skipped = append(res.Skipped, link+"：已有同名技能且不是链接，没有改动")
+				continue
+			}
+			if err := os.Remove(link); err != nil {
+				return nil, err
+			}
+		}
+		if err := os.Symlink(dir, link); err != nil {
+			return nil, err
+		}
+		res.Links = append(res.Links, link)
+	}
+	return res, nil
+}
+
+const unitName = "weaver.service"
 
 func unitPath() string {
 	home, _ := os.UserHomeDir()

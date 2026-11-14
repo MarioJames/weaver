@@ -235,10 +235,10 @@ func (k *Kernel) maybePush(mission string) {
 }
 
 // PushText renders a wait result for delivery into an agent session. The JSON
-// is the same document `weaver wait` prints.
+// is the same document the wait command prints.
 func PushText(res *WaitResult) string {
 	body, _ := json.Marshal(res)
-	return fmt.Sprintf("[Weaver] 主任务 %s 有 %d 条新进展（与 weaver wait 的返回相同，已标记为已读）：\n%s", res.Mission.ID, len(res.Wakes), body)
+	return fmt.Sprintf("[Weaver] 主任务 %s 有 %d 条新进展（与 wait 命令的返回相同，已标记为已读）：\n%s", res.Mission.ID, len(res.Wakes), body)
 }
 
 // SetTimer schedules a wake-up of the mission.

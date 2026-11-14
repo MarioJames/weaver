@@ -1,130 +1,136 @@
 ---
 name: agents-weaver
-description: "The default way to do development work when the `weaver` CLI is on PATH: you stay the owner and Weaver dispatches the work to worker agents on other engines (OpenCode, Pi, Grok, Codex, Qoder, DeepSeek Harness). Use it for implementation, refactors, migrations, tests, docs, research and verification; the size of a change is never a reason to skip. The only exceptions are a pure question, and doing the work yourself when the user explicitly asks."
+description: "Run development work through the Weaver scheduling engine (`weaver` CLI): split a task into work packages with dependencies, let Weaver launch them on Codex, Claude Code, OpenCode or DeepSeek Harness agents, wait for wake-ups, then accept or return each result. Also runs a design dialogue, in which Codex and Claude each propose a design and review the other's before anything is built. Use it whenever implementation, refactoring, tests, research or verification can be handed to worker agents, and whenever a large architecture or feature-design decision needs a second opinion (对谈, 让 codex 和 claude 讨论方案, design review, debate). Do the work yourself only for a pure question or when the user asks you to."
 ---
 
-# Agents Weaver
+# Weaver
 
-Weaver is the scheduling authority for owner-led work on this machine: its saved policy picks the worker, channel, resolved engine, model and effort for a package; the execution owner stays the owner. Do not run another scheduler, spawn worker CLIs yourself, or pick models outside the policy. Your host's built-in subagent tool runs only a dispatch marked `execution: "native"`.
+Weaver is a scheduling engine. It keeps the package tree and its dependencies, moves each package through its states, launches agents the fastest way each engine allows, and wakes you when something needs you. What to build, whether a result is good, commits, pushes and talking to the user stay with you: you are the owner of the mission, the agents are workers.
 
-## Roles
+Every command prints JSON. Errors go to stderr as `{"error":{"code","message"}}` with a non-zero exit. `weaver help` lists every command.
 
-Decide the role from how you were started, not from the host engine.
+## Choosing how to work
 
-- **Entry Master** — a chat entry such as the Feishu Bot. At startup read [Master guideline](references/master-guideline.md) and follow it as the single home for Master behavior; skip the execution-owner preflight and dispatch flow below. The Master coordinates and reports but never implements or registers as an owner.
-- **Execution root owner** — a host session such as Claude Code or Codex that owns and executes a root, or a root agent started from the Weaver UI. Understand the request, split it, freeze packages, dispatch, verify evidence, decide, and report to the user. Commits, pushes and user communication stay with you.
-- **A worker** runs one frozen package inside its read/write scope and never delegates, commits, pushes or talks to the user. If you were started as a worker, follow that contract and ignore the owner and Master steps below.
+Decide this before writing a plan, because it changes what the plan looks like:
 
-Dispatch every task through Weaver except a pure question — a small edit, test or doc is not a reason to skip. Do the work yourself only when the user explicitly asks; if `weaver` is missing or the service cannot start, say so, then work without delegation.
+| The task | Do this |
+|---|---|
+| A question, or a change smaller than a package would take to describe | Do it yourself |
+| Work whose design is settled or follows an existing pattern | Delegate packages ([the loop](#the-loop)) |
+| Work that hangs on a design decision that is hard to undo and has more than one defensible answer | Open a [design dialogue](#design-dialogue) first, then delegate |
 
-## Learn the current CLI
-
-The installed binary is the authority for syntax and exact fields; this skill keeps only the common commands:
-
-```bash
-weaver --help                            # the command catalog
-weaver tasks wait --help --output json   # fields and required input of one command
-weaver --skill                           # prints this skill
-```
-
-Read IDs, revisions and digests from responses instead of predicting them. For a scalar, use `--field data.id`, `--field data.revision`, or `--field data.manifestDigest`; this reads a response field without shell JSON parsing. Check every command's exit status before using its output. `--field` is for non-streaming read commands only and cannot be combined with `--output`/`--json`. When `tasks list`/`tasks get` responses are too large, add `--view brief` (identity, state, progress, workspace and a short dispatch summary) or `--fields id,status,title` to project only the top-level fields you need; the same `view`/`fields` keys are accepted in `--input` JSON, and omitting both keeps the full response. For an explicit task/child inventory question, narrow by status with `tasks list --status running --view brief`, then fetch one task's detail with `tasks get` (or `tasks events`/`tasks health`) only when needed; for overall running root progress use `tasks overview` (see Root 进度上报).
-
-Use JSON files or `--input -` with a quoted heredoc for request bodies containing Chinese text, newlines or quotes. Do not use `echo "$response" | ...` to parse JSON: zsh echo expands backslash escapes. If forwarding existing JSON is unavoidable, use `printf '%s\n' "$response"`. The [handoff reference](references/handoff.md#shell-safe-input-and-result-review) shows file/stdin input and ack/review without constructing JSON.
-
-## Preflight (once per session)
-
-These steps apply to an execution root owner. An entry Master does not attach an owner or run this owner preflight: it follows [master-guideline](references/master-guideline.md) and starts roots with `ownerProfileId`.
-
-1. `weaver --version`. Missing: tell the user the install one-liner (`curl -fsSL https://raw.githubusercontent.com/MarioJames/weaver/main/install.sh | bash`) and work without delegation.
-2. `APP_NOT_RUNNING` from any command: run `weaver server start` (idempotent; it waits until the service answers). The service is shared by every session: never stop it and never kill its process, even if you started it — only the user stops it. `server stop` no longer cancels workers (they keep running and reattach after restart). Inside a Codex `workspace-write` sandbox, `TRANSPORT_ERROR` means the sandbox blocks the local socket: ask the user to allow `network_access` (`sandbox_workspace_write.network_access = true`); do not change their config yourself.
-3. `weaver policy get --output json`: dispatch through an available owner profile whose channel resolves to your host engine (`claude` for Claude Code, `codex` for Codex); do not infer its account from the engine alone; Weaver picks the worker by balancing weights and current load, so you never choose one; `chatgpt_review` decides whether the [Convorel review](references/convorel.md) gates apply. Weight, block and wait rules: [config](references/config.md).
-4. Register **this session** as an owner, once, right after reading the policy:
-
-   ```sh
-   weaver owners attach --input '{"profileId":"<profile>","name":"Claude · weaver · 14:20","session":"<reference>"}' --command-id owner-<date>-<short hash of session>
-   ```
-
-   `name` = `<Host> · <workspace dir name> · <HH:MM session start>`; `session` = `$CODEX_THREAD_ID` when set, else `$HERDR_PANE_ID` when set, else the absolute workspace path; the `--command-id` stays the same for the whole session, so a lost reply re-issued with it returns the same owner. The first attach needs no `--owner-file`: it returns the logical owner plus `credentialPath`. Keep both; from then on prefix **every** command with the same instance and credential:
-
-   ```sh
-   weaver --data-dir <instance> --owner-file <credentialPath> tasks create --input task.json --command-id <stable-id>
-   ```
-
-   The token lives only in that user-only (0600) file; never print it, copy it into JSON, args or artifacts, or build a command from task text. If the prompt identifies a Herdr-started root or continuation, do not register another owner: read `profileId` with `weaver owners get --input <json>` or `weaver policy get`, then call `owners attach` with that existing `ownerId`, the actual agent name and the current host session to claim the row, and use the returned `credentialPath` for the rest of the work. If you lost the owner id, `weaver owners list` and take the entry with the same name/session — never fall back to `ownerProfileId`, which registers a new throwaway owner for that one task.
-
-   Once this session's main task is clear, give the instance a readable board title: `weaver --data-dir <instance> --owner-file <credentialPath> owners describe --input '{"ownerId":"<id>","title":"<short specific topic>"}' --command-id <stable-id>`. Match the host session title when one exists, and update the title whenever the main task changes. A parent Agent root started from the Weaver page needs no title — the board shows its root task title.
-5. `weaver --data-dir <instance> --owner-file <credentialPath> policy preview --input '{"owner":"<profile>"}'` shows the route Weaver would pick right now, without launching anything.
-
-## UI root tasks
-
-The UI starts a root with `weaver tasks start --task-id <root> --command-id <stable-id>`. This command returns immediately with a running owner root; Herdr starts the configured claude/codex owner in the background. Inspect `tasks get` and `tasks events` for `ownerHost` or a launch failure. A failed launch without an owner host can be retried with `tasks start` and a new stable command ID; `tasks retry` remains for child worker attempts.
-
-If the prompt identifies you as the root owner, do not register another instance: read the profile with `owners get` / `policy get`, `owners attach` with the existing `ownerId` (actual agent name, current host session, that profile) to claim the current row, then use the returned `credentialPath` through the fixed `weaver --data-dir <instance> --owner-file <credentialPath>` prefix for the whole flow. Read the full task goal, generate a concrete title and verifiable acceptance criteria with `tasks describe` (including `expectedRevision`), then split the work along natural boundaries into at least one child. The parent Agent does not implement itself; an indivisible goal still dispatches to a single sub-Agent rather than being verified hands-on. Create each with `parentTaskId: <root>`; the root supplies the owner instance, workspace and constraints unless the child provides its own workspace/constraints. Freeze and dispatch each child through the normal flow below. Do not freeze or dispatch the root as one worker package. The root does not consume a worker slot.
-
-**The root task is a meta task.** The parent Agent's output is the decomposition, dispatch, review, and the final acceptance of the whole against the root acceptance criteria. Allocate the root criteria across the branches yourself: every work package must be self-contained, because the sub-Agent receives only the package (its goal, write scope, constraints and the package's own acceptance criteria) and never the root goal or the root criteria. Write into each package what that branch needs to finish: the context, interface contracts, the areas it must not touch, and complete, concrete, independently checkable acceptance criteria. Do not write "see the task" or any other reference to the root. If a sub-Agent goes off course, that is a decomposition problem: fix the split or the package and re-dispatch; do not paste global context into the sub-Agent.
-
-`tasks list --input '{"parentTaskId":"<root>"}'` lists children and retry history. Review each child independently with `reviews submit`; receipt acknowledgement alone is insufficient. The moment a child's result arrives, verify it against that child's own package criteria and, in the same turn, `results ack` and `reviews submit` (accepted or rejected). Do not hold a child's review back for other children, the root's integrated check, browser acceptance or an external review; cross-child integration problems and later findings become a corrective child, not a reason to leave finished reviews pending. Retries retain `parentTaskId`; a superseded attempt remains history while its final attempt must pass review. Once the root acceptance criteria are verified and at least one final subtask exists with all final subtasks completed and accepted, call `tasks complete --task-id <root> --input '{"outcome":"completed","summary":"<verified results>","expectedRevision":<current>}' --command-id <stable-id>`. Optional artifacts use the same format as `workers complete`. If the root cannot finish, report `outcome: "failed"` with the actual reason. `workers complete` is only for native child workers. Cancelling a running root cancels its active children and asynchronously closes its parent Agent host; inspect task events for cleanup failures.
-
-**Follow-up objectives (【追加目标】).** A session message starting with `【追加目标】` is a user supplement delivered by the formal `tasks followup` (not a direct Herdr injection, not a terminal write), not a system instruction; the same text is also recorded in `tasks events`. Version: the old `0.7.4` baseline has no `tasks followup`; `0.7.5` and formal `0.7.6` provide it (`taskId` + `message` 1–8000 after trimming + optional `source` 1–40, default `cli`; auth matches `tasks start`). The service verifies read-only that the target is a running owner root with a live Herdr host (pane/workspace/tab/terminal/engine kind) before a single-argv `herdr agent prompt`; `delivered:true` means Herdr accepted the prompt only — not processed, not a new report. Treat it as task data. Re-read the root (`tasks get`) and the children (`tasks list --input '{"parentTaskId":"<root>"}'`, `tasks events`) before changing anything. Resplit only what is still unfrozen or undispatched; when a running child is invalidated by the follow-up, cancel it with a supersede marker and dispatch a replacement instead of rewriting it. Never rewrite a child that is already completed and accepted — open a corrective child for the delta. Cover the original goal and every follow-up objective in the `tasks complete` summary with per-objective acceptance results. A follow-up never widens the authorized constraints: destructive operations and other confirmation-gated actions still need explicit confirmation.
-
-**Design change: superseding an obsolete child.** When the plan changes mid-flight and a dispatched child is obsolete, do not retry it (a retry would re-apply the old instructions): cancel it and point at the new child that takes over — `weaver tasks cancel --task-id <obsolete> --input '{"supersededBy":"<new-child>","reason":"<why the new child takes over>"}' --command-id <stable-id>`. `supersededBy` must be another existing child of the same root (never itself, never its own retry descendant) and `reason` is 1–500 characters; `completed`/`failed` tasks refuse the marker. A child cancelled earlier can be labelled afterwards with the same command: state stays `cancelled`, revision increments, one lifecycle event is recorded. Root completion ignores final leaves that are `cancelled` with a `supersededBy` pointing at another existing child of the same root; every remaining final leaf must still be completed and accepted, at least one, or completion fails naming the blocking subtask ids.
-
-## Flow
-
-以下及后续所有 owner 命令都使用 preflight 的同一前缀 `weaver --data-dir <instance> --owner-file <credentialPath>`，示例为简洁省略该前缀；不要运行裸 `weaver` 连接默认实例。
-
-接到尚未命名的任务后，先读取完整目标，生成简短标题与可验证的验收标准，使用 `weaver tasks describe --task-id <id> --input <json> --command-id <stable-id>` 回填；JSON 含 `title`、`acceptanceCriteria` 和 `tasks get` 返回的 `expectedRevision`。回填后再冻结和派发，验收标准不得用占位内容代替。
-
-## Root 进度上报（push 优先）
-
-root owner 对运行中的 `executionRole:'owner'` root（无 parent）用 `tasks report` 主动推送进度；Master 与 Bot 用 `tasks overview` 读取同一份数据。进度上报走此通道；用户明确追加目标走正式 `tasks followup`（先按实际 CLI 能力检测 `tasks followup --help`），不要用其他命令冒充上报；`tasks describe` 只回填标题/验收标准、首个子任务后即锁定，不是进度上报，也不是需求送达。绝不绕过正式 `tasks followup` 直接 Herdr 注入，或向忙碌 owner 终端发送消息；直接注入不等同于正式 `followup`。
-
-版本：旧 `0.7.4` 基线既无 `followup` 也无 `report`/`overview`；正式 `0.7.6` 与 `0.7.5` 提供正式 `followup`，`report`/`overview` 从正式 `0.7.6` 提供。带关联 ID、超时与回应状态的结构化 pull 进度请求未实现，仍是 DESIGN ONLY，不做原型、不添加 pull 产品。`delivered:true` 只表示 Herdr 接受了追加消息，不表示 owner 已处理、不表示新报告已生成；收到后仍等 owner 的下一轮 `report`，绝不把 `delivered` 读成新 `ownerReport`。
-
-上报时机：describe/split 之后、每次 dispatch/review 轮次、遇到阻塞或失败时立即、complete 之前。`summary` 保持一两句（Bot 状态文本只展示前 200 字），`blockers` 只列关键项（状态文本最多显示 3 条）、可核查、不含凭据与敏感路径（服务端只做尽力脱敏，源头必须干净）。请求体用 `--input <file>` 或 `--input -`（配 quoted heredoc），不要拼接 shell；同一次逻辑上报的 `--command-id` 固定，重试复用。
+## The loop
 
 ```sh
-weaver --data-dir <instance> --owner-file <credentialPath> tasks report --task-id <root> --input - --command-id report-0731-01 <<'JSON'
-{"summary":"已复现并定位到竞态，补丁验证中","percent":42,"phase":"验证","blockers":["等待 code review"],"nextSteps":["合入补丁"]}
+# 1. One mission per root task. Run it from the workspace, or pass --workspace.
+weaver mission create --title "Add rate limiting to the gateway"        # → {"id":"m_…"}
+
+# 2. Submit the whole decomposition at once. Independent packages start immediately.
+weaver plan submit --mission m_… --key plan-1 <<'JSON'
+{"packages":[
+  {"key":"limiter","title":"Token bucket","instruction":"…self-contained instruction…"},
+  {"key":"wiring","title":"Wire into middleware","instruction":"…","dependsOn":["limiter"]},
+  {"key":"docs","title":"Document the limits","instruction":"…","worker":"claude_sonnet_high"}
+]}
 JSON
+
+# 3. Block until something needs you. Returns at once if it already happened.
+weaver wait --mission m_…
+
+# 4. Read the result, verify it yourself, then decide.
+weaver package result m_…/limiter
+weaver verdict --package m_…/limiter accept
+weaver verdict --package m_…/wiring return --note "The middleware order is wrong: auth must run first."
+
+# 5. Back to step 3 until every package is accepted, then: weaver mission close m_…
 ```
 
-字段以同一实例的 `weaver --data-dir <instance> tasks report --help --output json`（`report` 额外带 `--owner-file`，`overview`/`followup`/`get` 绑定同一 `--data-dir`）为准：`taskId` 必填；`summary` 必填 1–2000；`percent` 可选（有限数 0–100，省略则不改 root 进度）；`phase` 可选 1–120；`blockers`/`nextSteps` 可选数组，各 ≤10 项、每项 ≤500；`expectedRevision` 可选，用于并发保护。每次成功上报更新最新报告与 revision 并追加一条 progress 事件；同一 `--command-id` 幂等，重发返回同一收据——先查 `weaver operations get --command-id <id>`，不要换新 ID 重试。只有该任务的 owner 凭证能上报，且目标必须是运行中的 owner root（旧任务在完整视图下读到 `ownerReport:null`，属正常兼容）。
+A package reference is its ID or `<mission>/<key>`.
 
-1. `weaver tasks create --input task.json --command-id <stable-id>` — `ownerId` from preflight, goal, absolute workspace, constraints, acceptance criteria ([shapes](references/handoff.md)).
-2. `weaver packages create --task-id <id> --input package.json --command-id <stable-id>` — freezes the exact read/write scope and this branch's own acceptance criteria (omitted `acceptanceCriteria` defaults to the child task's own; explicit ones win and never overwrite the task).
-3. `weaver workers spawn --task-id <id> --input dispatch.json --command-id <stable-id>` — follow the returned `next` action.
-4. For a wait action, check first events within 1–2 minutes, then `weaver tasks wait --task-id <id>` at its default interval; see below.
-5. `weaver tasks results --task-id <id>` and `weaver artifacts read --task-id <id> --input read.json` — then read the real changed files and run the checks yourself; a worker's success text is evidence, not proof. Verify against this package's own criteria only.
-6. `weaver results ack --task-id <id> --expected-revision <current> --manifest-digest <digest> --command-id <stable-id>` — records receipt only; do it in the same turn as step 7.
-7. `weaver reviews submit --task-id <id> --expected-revision <fresh> --manifest-digest <digest> --decision accepted --comment-file review.txt --command-id <stable-id>` — your `accepted`/`rejected` decision after independent review, submitted as soon as the result is verified, without waiting for sibling packages, whole-task checks or external review. A problem found later across packages goes into a new corrective package; the root's overall acceptance and `tasks complete` stay last.
+## Writing a plan
 
-`workers spawn` and `tasks retry` return `next`: real or queued work gives a wait command; native gives `run_subagent` with model, effort, the full prompt and a completion command (`then`). Native inheritance is allowed only when worker/owner channel and parent root.run.channel match and root.run.policyRevision equals the current policy revision; otherwise Weaver selects an isolated CLI. Do not force native based on a shared engine. Existing runs retain their frozen identity. For `run_subagent`, use your built-in subagent tool, then report with `weaver workers complete` using a stable command ID ([report](references/handoff.md#native-execution-report)). Queued routes stay frozen except when a vendor-limit block reroutes queued work within the retry chain's excluded workers; after a wait, `weaver tasks get --task-id <id>` recovers `next` for a now-running native dispatch. Never create duplicate attempts.
+- **Self-contained instructions.** A worker sees only its package: state the goal, the files or areas it may touch, the constraints, and the checks it must run. It also receives the accepted results of the packages it depends on and, on a later attempt, your return note and its previous reply. It does not see this conversation.
+- **Dependencies.** `dependsOn` names keys in the same plan or already in the mission. A dependent starts when its upstream is **accepted**, not when it merely has a result, so your verdict is what releases the next step. Two packages that can run at the same time must not touch the same files.
+- **Routing.** Leave `worker` and `engine` unset: Weaver balances the weighted candidates. Pin `worker` only for a reason you could explain; a pinned package may use a weight-0 candidate, which is how pay-per-use API models are kept out of automatic routing. `weaver worker list` shows the candidates.
+- **`"advisory": true`** for a package whose product is a document: research, an audit, a comparison. The agent is told to leave files alone and to cite what it read, and it reads its upstream results in full.
+- **`"autoAccept": true`** for a result that needs no judgement from you before the next step, such as research feeding an implementation package. It is accepted as it arrives and its dependents start; you are not woken for it. A failure still wakes you. Do not use it on packages that change code: accepting is your statement that you checked the work.
+- **All or nothing.** A cycle, an unknown dependency or a duplicate key rejects the whole plan. You may submit further plans to the same mission as the work unfolds.
+- **`--key`** makes a submission idempotent: repeating the command returns the first result and creates nothing. Use it whenever a reply might have been lost.
 
-A package must be finishable by a worker with no conversation context: goal, absolute workspace, exact read/write scope, constraints (no delegation, no commits, the task scratch root), acceptance checks you can verify, and expected artifacts. Split independent problems into separate packages; never give two writers the same file.
+## Package states
 
-## Waiting rule
+`pending` → `launching` → `running` → `awaiting_verdict` → `accepted`
 
-For a wait action after spawn, use `weaver tasks wait --task-id <id> --for 60` and check `weaver tasks events --task-id <id>` within 1–2 minutes. No worker output by then is suspect: inspect `weaver tasks health --task-id <id>` before deciding it is stuck. Then keep waiting with `weaver tasks wait --task-id <id>` at its default interval: it returns on completion, stalled health, or after `herdr.max_wait_minutes` × 60 s (30 s if policy is unreadable); an explicit `--for` accepts any whole number of seconds of at least 1, with no upper bound. A worker running a long command reports `running_command` and is not stalled; a command past `herdr.max_command_minutes` (default 30) becomes `stalled` with `reason:command_timeout`, and wait returns for your decision. This setting is the longest interval between checks; never sleep or set a longer timer instead. Claude Code may run wait in the background and act on its notification.
+- `pending` carries a `waiting` text that says why: an upstream is not accepted yet, or no candidate is ready.
+- `return` on `awaiting_verdict` starts the next attempt of the same package. The note is required: it is the only thing that tells the next attempt what was wrong.
+- `failed` can be retried with `weaver retry --package …`. A failure caused by a vendor limit pauses that account and moves the package to another ready candidate by itself.
+- `cancelled` is final. `weaver cancel --package …` or `--mission …` returns once the processes are gone. On a resident engine (opencode) a cancel can only interrupt the session: the reply then has `residual: true` and the workspace to check for leftover commands.
 
-Service restarts during wait/watch/get/events/health reconnect within `--reconnect-grace` (default 60 s); progress goes to stderr, stdout keeps one envelope. `wait` may return `reason: 'handoff'` with a `run_subagent` instruction bound to `taskId`+`attemptId`: run the subagent only if that attempt is not already started, never start a second one. New-lifecycle results read `RESULT_NOT_READY` until `run.finalizedAt` commits; `wait` stays until then.
+## Waiting
 
-After each return, inspect status and events. `tasks health` reports `starting` before a real worker’s first output, then `working` / `waiting_model` / `running_command` / `stalled`, silence and CPU activity; `running_command` includes the command summary and how long it has run, and `command_timeout` names the command; finished tasks return `ended` with final `taskStatus`. Unreadable CPU never proves a stall. `tasks wait` returns early with reason `stalled` and a retry/cancel hint; `watch` reports the transition and continues. Real workers fail as `no_output` after 120 s without valid vendor output; this check is separate from the waiting interval. Decide from that evidence whether to keep waiting, cancel, or retry, and say why.
+`weaver wait --mission <id>` returns on a result, a failure, a stall report, a timer or an external wake. Each wake is delivered once: a plain `wait` continues after the last one, and `--cursor <n>` asks for everything after a sequence number.
 
-## Failures and retries
+- `idle: true` means nothing is running and no timer is set, so waiting longer cannot help. Read `hint`, then act: give verdicts, retry, or submit more work.
+- `kind: "stalled"` means a package produced no event for five minutes and its processes used almost no CPU. It is still running. Look at `weaver events --mission <id>` before deciding to cancel: a quiet long build is not a stall.
+- `weaver timer set --mission <id> --in 20m --note "check the long build"` wakes you later. Timers survive service restarts.
+- Inside Herdr, `mission create` records your pane. While you are not waiting, wakes are pushed into your session as a `[Weaver]` message with the same JSON and are not repeated by the next `wait`.
+- A service restart or upgrade does not interrupt running packages, and `wait` reconnects by itself for up to 60 seconds.
 
-`weaver tasks retry --task-id <id> [--cancel] --command-id <stable-id>` is one step: after preflight, optionally cancel an in-flight attempt, clone its frozen package with a continuation note, dispatch and return `next`. The retry continuation carries the previous round's rejected review comment. Omit `--cancel` for a terminal task. Follow `next`; do not spawn again. The retry chain excludes failed/cancelled/cancelling workers by worker ID; completed workers remain eligible, and another worker on the same engine can take over. An attempt that ended on a vendor rate limit or exhausted quota excludes only that worker, so the retry may take a sibling on the same engine. `NO_ALTERNATIVE_WORKER` leaves the original unchanged when none remain. Real never falls back to mock. When a child is obsolete because the design changed rather than because its attempt failed, cancel it with a supersede marker (`tasks cancel --input '{"supersededBy":"<new-child>","reason":"..."}'`) instead of retrying it; retrying would re-apply the obsolete instructions.
+`weaver mission show <id>` gives the mission state and every package. `weaver events --mission <id> [--follow]` is the full stream: launches, hand-off to the engine, tool activity, results, verdicts.
 
-`weaver engines health` summarizes penalties; `weaver engines penalty --engine <id>` includes history. At least two workers on one engine silent **and CPU-idle** for 5 minutes pause it. Penalties do not expire: levels 1/2 require one successful recovery probe; level 3 requires three consecutive successes or the user. Vendor rate limits and exhausted quota block the failing worker first (ladder 10/30/60 minutes per worker, block carries `worker`); only when every eligible worker on the affected channel is blocked is that channel blocked too, released with the earliest worker block. Genuine engine stalls remain engine-scoped. A disabled or blocked engine simply takes its owners and workers out of scheduling; disabling an engine never requires disabling its roles first. `weaver engines unblock --engine <id> --command-id <stable-id>` clears **all** blocks on that engine (manual, quota, model, worker-level and stall) and resets its penalty; this is the user's call, never yours unless requested. `weaver workers unblock --worker <id> --command-id <stable-id>` does the same for one worker only (its own blocks and the channel-wide "all workers limited" block that no longer holds; manual engine-level blocks and other workers stay): equally the user's call, never yours unless requested.
+## Design dialogue
 
-Mutations carry stable `--command-id`s; after an uncertain response, inspect `weaver operations get --command-id <same-id>` before anything else. Never retry blindly with a new ID.
+Some decisions are cheap to make and expensive to undo. For those, let two engines design independently and review each other before any package is written. `weaver dialogue start` runs Codex and Claude on one brief: both write a proposal without seeing the other's, then each reviews the other's and revises its own. You are woken once, when both final positions are in.
 
-## Account/channel boundary
+### When to open one
 
-Roles reference `channel`; resolve its engine through `config.channels[channel].engine` and `config.engines[id].kind`. Official subscriptions are imported from existing native logins into private roots; direct creation is API-only, and Pi/dsh are API-only engines. Qoder BYOK must come from native `/model` Custom configuration and verified import. A failed/missing private binding must not fall back to a global login. Channel reads expose metadata and presence flags, never native credentials. Use the Accounts & Channels page for import/configuration; do not modify user CLI files or switch a global OpenCode cursor. See [policy fields](references/config.md) and [the current implementation contract](../../docs/account-channels-design.md).
+Open a dialogue when the user asks for one (对谈, 讨论一下方案, "have codex and claude debate this", a second opinion on a design), or when all three of these hold:
 
-## Report
+1. **The decision is hard to reverse or wide in reach.** A new subsystem or architecture, a data model, schema or migration strategy, a public interface or protocol, a refactor across modules, a technology choice, or a feature large enough that it will take about five or more packages.
+2. **More than one answer is defensible.** You can name at least two approaches you could argue for, or you cannot yet name the right one. When the codebase already has a pattern for this kind of thing, follow the pattern; that is not a design question.
+3. **You can brief it.** You can state the goal and the constraints, from the request and from reading the code. When the goal itself is unclear ("make it faster"), ask the user for what is missing and open the dialogue once you have it: two engines debating a vague goal return two confident guesses. Details the code or a sensible default can settle are not a reason to ask.
 
-Per package, tell the user: which owner instance you are (its name and id), worker, engine, model, status, the evidence you verified, review result and remaining risk. No credentials, no Weaver socket token, no owner token or credential file body. Clean up only the scratch and resources this task started; the shared Weaver service is never one of them. The owner credential is local trusted-user identity, not tenant or per-owner isolation; do not hand it to untrusted agents or another instance.
+Do not open one for a bug fix, a change that follows an existing pattern, mechanical work (renames, dependency bumps, test backfill), UI polish, a design the user has already decided, or anything urgent. A dialogue costs four strong-model runs and several minutes. Spent on a routine change that is waste; skipped on an architectural one, it is how a mission gets rebuilt halfway through.
 
-Origin and current capability boundary: [provenance](references/provenance.md).
+When it is a close call, do not open one: make the decision yourself and write the reason into your plan.
+
+When you open one on your own judgement, tell the user in one line what you are putting to the dialogue and why, and carry on. Wait for permission only if the user asked to approve each step.
+
+### Running it
+
+```sh
+weaver dialogue start --mission m_… --name cache-design <<'BRIEF'
+Goal: …what must be true when this is done…
+Constraints: …compatibility, performance, deadlines, what must not change…
+Where to look: …paths and existing mechanisms that matter…
+Settle these: 1) … 2) …
+Out of scope: …
+BRIEF
+weaver wait --mission m_…                                   # woken by the final positions, or by a failure
+weaver dialogue show --mission m_… --name cache-design      # state and the full text of every round
+```
+
+- **The brief is all both sides get besides the code**, and every round is a fresh agent that reads it again. Leave your own preferred design out of it: it anchors both sides and you get one design twice. A decision the user has already made goes in as a constraint.
+- One exchange is the default and is enough for most questions. Use `--rounds 2` when the stakes are high and you expect real disagreement; each extra round adds two runs.
+- The sides default to one Codex and one Claude candidate. `--workers a,b` names two candidates instead.
+- `dialogue show` reports `running`, `concluded` or `needs_attention`. If a side failed, `weaver retry --package m_…/cache-design.r1.a` and the dialogue continues from there; do not start a new one.
+
+### From dialogue to work
+
+The dialogue advises. The decision is yours, and the user's where it is theirs.
+
+1. **Read the whole transcript**, not only the closing parts. The reviews are where the facts get checked.
+2. **Sort the points** into agreed and disputed. For every disputed point, and for every agreed point the design rests on, check the claim in the code yourself. Two models agreeing is not evidence: they can share a blind spot.
+3. **Decide point by point.** Take the better-argued side on each; merge only if the parts actually fit together. A dispute that turns on product priority, cost or risk appetite rather than on a technical fact is the user's to settle, so carry it forward instead of settling it.
+4. **Write the final report.** If a `feature-delivery` skill is available, follow it: its design-document format, its acceptance checklist and its delivery rules. Without it, the report still has to contain: the chosen design; what was rejected, one line of reason each; where the two sides disagreed and how you resolved it; the decisions left to the user, each with your recommendation; and a numbered acceptance checklist in which every item is an action with an observable expected result.
+5. **Stop or go.** If the report leaves decisions to the user, present it and wait for the answer. If it leaves none, say so and continue.
+6. **Hand over.** Accept the two final-position packages (`weaver verdict --package m_…/cache-design.r2.a accept`, then `.b`) to close the dialogue. Then submit the implementation plan. Workers see neither the dialogue nor your report, so each package's instruction must carry the part of the decided design it implements and the checklist items it has to satisfy.
+7. **Verify against the checklist** as results come back, as in the loop.
+
+## Rules
+
+- A worker's reply is evidence, not proof. Read the changed files and run the checks before `accept`.
+- Give each verdict as soon as you have verified that package: its dependents are waiting on it.
+- Do not launch engine CLIs yourself, and do not pick models outside `weaver worker list`.
+- Do not stop the service or its engines to fix something: they are shared with other missions. Report what you saw instead.
+- If `weaver` says the service is not running, tell the user (`weaver service install`) and work without delegation.

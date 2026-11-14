@@ -1,10 +1,13 @@
+# Test and build on every push and pull request; publish a GitHub Release on a v* tag.
 name: release
 on:
   push:
+    branches: [main, v2]
     tags: ["v*"]
+  pull_request:
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 permissions:
   contents: read
 jobs:
@@ -12,37 +15,45 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install zsh
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y zsh
-      - name: Require the tag to match package.json
-        run: |
-          tag="${GITHUB_REF_NAME#v}"
-          version="$(node -p "require('./package.json').version")"
-          test "$tag" = "$version" || { echo "tag v$tag does not match package version $version" >&2; exit 1; }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-go@v5
         with:
-          node-version: 24
-          cache: npm
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.2
-      - run: npm ci
-      - run: npm run check
+          go-version-file: go.mod
+      - name: Pick the version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+            printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' || { echo "tag $GITHUB_REF_NAME is not a version" >&2; exit 1; }
+          else
+            version="2.0.0-dev.$(git rev-parse --short HEAD)"
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - run: make test
       - name: Build every published target
-        run: npm run dist
+        run: make dist VERSION="$VERSION"
       - name: Install the artifact the way users do and run it
         run: |
+          export HOME="$RUNNER_TEMP/home"
+          mkdir -p "$HOME"
           ./install.sh --dist-dir dist/release --bin-dir "$RUNNER_TEMP/bin"
-          "$RUNNER_TEMP/bin/weaver" --version | grep -qx "weaver ${GITHUB_REF_NAME#v}"
-          "$RUNNER_TEMP/bin/weaver" --help --output json > /dev/null
+          weaver="$RUNNER_TEMP/bin/weaver"
+          test "$("$weaver" version)" = "$VERSION"
+          test "$("$weaver" --version)" = "$VERSION"
+          "$weaver" daemon 2> "$RUNNER_TEMP/daemon.log" &
+          daemon=$!
+          trap 'kill "$daemon" 2>/dev/null || true' EXIT
+          for _ in $(seq 50); do "$weaver" status > /dev/null 2>&1 && break; sleep 0.1; done
+          "$weaver" status | grep -q "\"version\": *\"$VERSION\"" || { cat "$RUNNER_TEMP/daemon.log" >&2; exit 1; }
+          test -S "$HOME/.local/share/weaver/v2/weaver.sock"
+          "$weaver" mission create --title "ci smoke" --workspace "$RUNNER_TEMP" | grep -q '"id"'
+          "$weaver" skill install | grep -q agents-weaver
+          grep -q '^name: agents-weaver$' "$HOME/.agents/skills/agents-weaver/SKILL.md"
       - uses: actions/upload-artifact@v4
         with:
           name: release
           path: dist/release/
           if-no-files-found: error
   publish:
+    if: github.ref_type == 'tag'
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -52,7 +63,11 @@ jobs:
         with:
           name: release
           path: release
+      # A tag with a suffix (v2.0.0-rc.1) is a prerelease, so "latest" and install.sh skip it.
       - name: Publish the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
+        run: |
+          flags=()
+          case "$GITHUB_REF_NAME" in *-*) flags+=(--prerelease) ;; esac
+          gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes "${flags[@]}"
