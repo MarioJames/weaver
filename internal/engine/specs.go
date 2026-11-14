@@ -228,61 +228,7 @@ var specs = map[string]*spec{
 			return []string{"opencode", "auth", "login"}, env
 		},
 	},
-	"dsh": {
-		bin: "dsh",
-		argv: func(c *launchCtx) ([]string, error) {
-			effort := c.run.Effort
-			if effort == "" {
-				effort = "high"
-			}
-			if !oneOf(effort, "off", "low", "high", "max") {
-				return nil, fmt.Errorf("dsh 的推理强度 %q 不在 off/low/high/max 之内", effort)
-			}
-			// Pin model, effort and an unattended posture for this run only:
-			// workspace-write with approval "ask" fails closed on anything
-			// beyond the workspace, because headless has nobody to ask.
-			overlay := "- id: agent-default-model\n  config:\n    provider: deepseek-official\n    model: " + strconv.Quote(c.run.Model) +
-				"\n- id: llm-deepseek\n  config:\n    reasoningEffort: " + strconv.Quote(effort) +
-				"\n- id: sandbox-policy\n  config:\n    mode: workspace-write\n    workspaceRoot: !!js process.cwd()\n- id: approval\n  config:\n    policy: ask\n- id: credentials\n  disabled: false\n"
-			path, err := c.put("dsh-overlay.yml", overlay)
-			if err != nil {
-				return nil, err
-			}
-			argv := []string{"dsh", "--profile", "headless", "--patch", path}
-			argv = append(argv, c.extra...)
-			return append(argv, "--json"), nil
-		},
-		prepare: func(c *launchCtx) error {
-			a := c.run.Account
-			if a.Kind != "api" || a.APIKey == "" {
-				return errors.New("dsh 需要带密钥的 API 账号")
-			}
-			if a.Provider != "" && a.Provider != "deepseek" && a.Provider != "deepseek-official" {
-				return errors.New("dsh 目前只接入 deepseek-official")
-			}
-			if a.Config != "" {
-				return errors.New("dsh 账号暂不支持附带原生 patch 配置")
-			}
-			home, err := c.privateDir("dsh-home")
-			if err != nil {
-				return err
-			}
-			c.env["DSH_HOME"] = home
-			credential, err := c.put("dsh-home/.credentials.yaml", "version: 1\nrefs:\n  DEEPSEEK_API_KEY: "+strconv.Quote(a.APIKey)+"\nrecords: {}\n")
-			if err != nil {
-				return err
-			}
-			base := a.BaseURL
-			if base == "" {
-				base = "https://api.deepseek.com/anthropic"
-			}
-			patch, err := c.put("dsh-credentials.yml", "- id: credentials\n  disabled: false\n  config:\n    path: "+strconv.Quote(credential)+
-				"\n- id: llm-deepseek\n  config:\n    apiKeyEnv: DEEPSEEK_API_KEY\n    baseURL: "+strconv.Quote(base)+"\n")
-			c.extra = append(c.extra, "--patch", patch)
-			return err
-		},
-		ready: apiReady,
-	},
+	"dsh": {bin: "dsh", argv: dshArgv, prepare: dshPrepare, ready: apiReady},
 }
 
 func oneOf(value string, allowed ...string) bool {

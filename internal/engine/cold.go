@@ -90,6 +90,9 @@ type coldRun struct {
 	exited    chan struct{} // closed when a process we spawned ourselves ends
 	done      chan struct{} // closed when the watcher returns
 	replay    bool          // suppress progress notes until the existing output is consumed
+
+	toolSeen  map[string]uint64 // dsh: CPU last read from each tool scope, in microseconds
+	toolTotal uint64            // dsh: CPU of all tool scopes so far, in nanoseconds
 }
 
 func unitFor(attemptID string) string {
@@ -367,7 +370,8 @@ func (c *Cold) Cancel(attemptID string) (CancelResult, bool) {
 	return CancelResult{}, true
 }
 
-// Liveness samples the scope's cumulative CPU time.
+// Liveness samples the attempt's cumulative CPU time: its scope, plus the
+// scopes dsh makes for tool commands.
 func (c *Cold) Liveness(attemptID string) Liveness {
 	c.mu.Lock()
 	r := c.runs[attemptID]
@@ -375,7 +379,14 @@ func (c *Cold) Liveness(attemptID string) Liveness {
 	if r == nil {
 		return Liveness{}
 	}
-	return Liveness{Known: true, Process: true, CPUNSec: scopeCPU(r.unit)}
+	cpu := scopeCPU(r.unit)
+	r.mu.Lock()
+	engine := r.run.Engine
+	r.mu.Unlock()
+	if engine == "dsh" {
+		cpu += r.toolCPU()
+	}
+	return Liveness{Known: true, Process: true, CPUNSec: cpu}
 }
 
 func scopeCPU(unit string) uint64 {
