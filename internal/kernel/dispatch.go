@@ -10,7 +10,7 @@ import (
 	"github.com/MarioJames/weaver/internal/engine"
 )
 
-const defaultMaxParallel = 10
+const defaultMaxParallel = 32
 
 func (t *tx) setting(key, fallback string) string {
 	var value string
