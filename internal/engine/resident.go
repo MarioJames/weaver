@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -44,10 +45,11 @@ type ResidentStore interface {
 // Resident keeps one `opencode serve` per account and runs each attempt as a
 // session on it. The server lives in its own scope and outlives the service.
 type Resident struct {
-	sink  Sink
-	log   *slog.Logger
-	home  string
-	store ResidentStore
+	sink    Sink
+	log     *slog.Logger
+	home    string
+	store   ResidentStore
+	command func(string, ...string) *exec.Cmd
 
 	mu      sync.Mutex
 	servers map[string]*ocServer // by account ID
@@ -55,7 +57,7 @@ type Resident struct {
 }
 
 func NewResident(sink Sink, log *slog.Logger, home string, store ResidentStore) *Resident {
-	return &Resident{sink: sink, log: log, home: home, store: store, servers: map[string]*ocServer{}, runs: map[string]*ocRun{}}
+	return &Resident{sink: sink, log: log, home: canonicalDirectory(home), store: store, command: exec.Command, servers: map[string]*ocServer{}, runs: map[string]*ocRun{}}
 }
 
 type ocServer struct {
@@ -161,10 +163,37 @@ func newServer(a Account, rec ResidentRecord) *ocServer {
 	return &ocServer{account: a, label: a.Label, rec: rec, base: fmt.Sprintf("http://127.0.0.1:%d", rec.Port), client: &http.Client{}, state: "starting", sessions: map[string]*ocRun{}, warmed: map[string]bool{}}
 }
 
-func residentUnit(accountID string) string { return unitFor("oc-" + accountID) }
+// residentUnit includes the data directory identity because systemd's user
+// namespace is shared by every Weaver instance owned by this OS user.
+func (r *Resident) residentUnit(accountID string) string {
+	homeHash := sha256.Sum256([]byte(r.home))
+	account := strings.TrimPrefix(unitFor(accountID), "weaver-")
+	if len(account) > 96 {
+		hash := sha256.Sum256([]byte(accountID))
+		account = fmt.Sprintf("%s-%x", account[:80], hash[:8])
+	}
+	return fmt.Sprintf("weaver-oc-%x-%s", homeHash[:8], account)
+}
+
+// stopRecord accepts scoped identities directly. Legacy identities have no home
+// marker: require their recorded directory AND a live process in that directory
+// in the named scope. A stale legacy record must not kill another home's server
+// that has since reused the same name.
+func (r *Resident) stopRecord(rec ResidentRecord) {
+	if rec.Unit != r.residentUnit(rec.AccountID) {
+		dir := filepath.Join(r.home, "residents", rec.AccountID)
+		if rec.Unit != unitFor("oc-"+rec.AccountID) || rec.Dir == "" ||
+			canonicalDirectory(rec.Dir) != canonicalDirectory(dir) ||
+			!scopeInDirectory(r.command, rec.Unit, dir) {
+			return
+		}
+	}
+	stopScopeWith(r.command, rec.Unit)
+}
 
 // Resume adopts the servers a previous service instance left running.
-// Records whose server no longer answers are dropped and their scope stopped.
+// Records whose server no longer answers are dropped; their scope is stopped
+// only when its ownership can still be established.
 func (r *Resident) Resume(account func(id string) (Account, error)) {
 	records, err := r.store.Residents()
 	if err != nil {
@@ -172,10 +201,18 @@ func (r *Resident) Resume(account func(id string) (Account, error)) {
 		return
 	}
 	for _, rec := range records {
+		// Records in a copied database can refer to another home's scope.
+		// Only the exact legacy name is eligible for upgrade adoption.
+		if rec.Unit != r.residentUnit(rec.AccountID) &&
+			(rec.Unit != unitFor("oc-"+rec.AccountID) || rec.Dir == "" ||
+				canonicalDirectory(rec.Dir) != canonicalDirectory(filepath.Join(r.home, "residents", rec.AccountID))) {
+			_ = r.store.DeleteResident(rec.AccountID)
+			continue
+		}
 		a, err := account(rec.AccountID)
 		srv := newServer(a, rec)
 		if err != nil || !srv.alive() {
-			stopScope(rec.Unit)
+			r.stopRecord(rec)
 			_ = r.store.DeleteResident(rec.AccountID)
 			continue
 		}
@@ -205,7 +242,7 @@ func (r *Resident) Ensure(a Account) {
 			return
 		}
 	}
-	srv := newServer(a, ResidentRecord{AccountID: a.ID, Unit: residentUnit(a.ID)})
+	srv := newServer(a, ResidentRecord{AccountID: a.ID, Unit: r.residentUnit(a.ID)})
 	r.servers[a.ID] = srv
 	r.mu.Unlock()
 	go r.start(srv)
@@ -253,9 +290,9 @@ func (r *Resident) start(srv *ocServer) {
 		return
 	}
 	defer logFile.Close()
-	unit := residentUnit(srv.account.ID)
-	stopScope(unit) // a leftover from a crashed start would hold the unit name
-	cmd := exec.Command("systemd-run", "--user", "--scope", "--collect", "--quiet", "--unit="+unit, "--working-directory="+dir,
+	unit := r.residentUnit(srv.account.ID)
+	r.stopRecord(ResidentRecord{AccountID: srv.account.ID, Unit: unit}) // leftover from a crashed start
+	cmd := r.command("systemd-run", "--user", "--scope", "--collect", "--quiet", "--unit="+unit, "--working-directory="+dir,
 		"-p", "KillMode=control-group", "-p", "MemoryHigh=8G", "-p", "MemoryMax=10G", "--",
 		bin, "serve", "--port", fmt.Sprint(port), "--hostname", "127.0.0.1")
 	cmd.Dir = dir
@@ -282,7 +319,7 @@ func (r *Resident) start(srv *ocServer) {
 		case <-time.After(50 * time.Millisecond):
 		}
 		if time.Now().After(deadline) {
-			stopScope(unit)
+			r.stopRecord(ResidentRecord{AccountID: srv.account.ID, Unit: unit})
 			fail(errors.New("opencode 常驻服务 30 秒内没有就绪"))
 			return
 		}
@@ -367,7 +404,7 @@ func (r *Resident) retire(srv *ocServer, reason string) {
 		lost = append(lost, run)
 	}
 	srv.sessions = map[string]*ocRun{}
-	unit := srv.rec.Unit
+	rec := srv.rec
 	label := srv.label
 	srv.mu.Unlock()
 	_ = r.store.DeleteResident(srv.account.ID)
@@ -384,7 +421,7 @@ func (r *Resident) retire(srv *ocServer, reason string) {
 			r.sink.Finished(run.run.AttemptID, Outcome{FailureKind: FailLost, FailureMessage: fmt.Sprintf("账号「%s」的 %s，这次运行随之中断", label, reason)})
 		}
 	}
-	stopScope(unit)
+	r.stopRecord(rec)
 }
 
 func (r *Resident) forget(run *ocRun) {

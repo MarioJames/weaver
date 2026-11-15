@@ -402,17 +402,25 @@ func scopeCPU(unit string) uint64 {
 }
 
 func scopeActive(unit string) bool {
+	return scopeActiveWith(exec.Command, unit)
+}
+
+func scopeActiveWith(command func(string, ...string) *exec.Cmd, unit string) bool {
 	if pid, ok := strings.CutPrefix(unit, "pid:"); ok {
 		n, _ := strconv.Atoi(pid)
 		return n > 0 && syscall.Kill(-n, 0) == nil
 	}
-	out, _ := exec.Command("systemctl", "--user", "is-active", unit+".scope").Output()
+	out, _ := command("systemctl", "--user", "is-active", unit+".scope").Output()
 	state := strings.TrimSpace(string(out))
 	return state == "active" || state == "activating" || state == "deactivating"
 }
 
 // stopScope terminates every process of a scope: SIGTERM, then SIGKILL after five seconds.
 func stopScope(unit string) {
+	stopScopeWith(exec.Command, unit)
+}
+
+func stopScopeWith(command func(string, ...string) *exec.Cmd, unit string) {
 	if pid, ok := strings.CutPrefix(unit, "pid:"); ok {
 		n, _ := strconv.Atoi(pid)
 		if n <= 0 {
@@ -426,16 +434,16 @@ func stopScope(unit string) {
 		return
 	}
 	scope := unit + ".scope"
-	_ = exec.Command("systemctl", "--user", "kill", "-s", "SIGTERM", "--kill-whom=all", scope).Run()
-	for i := 0; i < 50 && scopeActive(unit); i++ {
+	_ = command("systemctl", "--user", "kill", "-s", "SIGTERM", "--kill-whom=all", scope).Run()
+	for i := 0; i < 50 && scopeActiveWith(command, unit); i++ {
 		time.Sleep(100 * time.Millisecond)
 	}
-	if scopeActive(unit) {
-		_ = exec.Command("systemctl", "--user", "kill", "-s", "SIGKILL", "--kill-whom=all", scope).Run()
-		for i := 0; i < 30 && scopeActive(unit); i++ {
+	if scopeActiveWith(command, unit) {
+		_ = command("systemctl", "--user", "kill", "-s", "SIGKILL", "--kill-whom=all", scope).Run()
+		for i := 0; i < 30 && scopeActiveWith(command, unit); i++ {
 			time.Sleep(100 * time.Millisecond)
 		}
-		_ = exec.Command("systemctl", "--user", "stop", scope).Run()
+		_ = command("systemctl", "--user", "stop", scope).Run()
 	}
 }
 
