@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -15,111 +14,6 @@ func writeTaskFile(t *testing.T, path, body string) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, []byte(body), 0600); err != nil {
-		t.Fatal(err)
-	}
-}
-func TestTranscriptFormatsAndIncrement(t *testing.T) {
-	for _, engine := range []string{"claude", "codex"} {
-		t.Run(engine, func(t *testing.T) {
-			f := newFixture(t)
-			home := t.TempDir()
-			t.Setenv("HOME", home)
-			m, err := f.k.CreateMission("", "owner", f.ws, nil, &Owner{Engine: engine, Session: "fixture"})
-			if err != nil {
-				t.Fatal(err)
-			}
-			var path, body string
-			if engine == "claude" {
-				path = filepath.Join(home, ".claude/projects/project/fixture.jsonl")
-				body = `{"type":"user","timestamp":"2026-01-01T00:00:00Z","message":{"content":"hello"}}
-{"type":"assistant","timestamp":"2026-01-01T00:00:01Z","message":{"content":[{"type":"thinking","thinking":"secret"},{"type":"text","text":"reply"},{"type":"tool_use","name":"Bash","input":{"command":"weaver plan submit --mission m_test --package p_test"}}]}}
-{"type":"user","message":{"content":[{"type":"tool_result","content":"secret"}]}}
-{"type":"user","isMeta":true,"message":{"content":"secret"}}
-{"type":"assistant","isSidechain":true,"message":{"content":"secret"}}
-{"type":"attachment"}
-unknown
-`
-			} else {
-				path = filepath.Join(home, ".codex/sessions/nested/rollout-test-fixture.jsonl")
-				body = `{"type":"response_item","timestamp":"2026-01-01T00:00:00Z","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"hello"}]}}
-{"type":"response_item","timestamp":"2026-01-01T00:00:01Z","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"reply"}]}}
-{"type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"weaver plan submit --mission m_test --package p_test\"}"}}
-{"type":"response_item","payload":{"type":"reasoning","summary":"secret"}}
-{"type":"response_item","payload":{"type":"function_call_output","output":"secret"}}
-{"type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"secret"}]}}
-{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>secret</environment_context>"}]}}
-unknown
-`
-			}
-			writeTaskFile(t, path, body)
-			tr, err := f.k.MissionTranscript(m.ID, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(tr.Items) != 3 {
-				t.Fatalf("items=%+v", tr.Items)
-			}
-			tool := 0
-			for _, i := range tr.Items {
-				if strings.Contains(i.Text, "secret") {
-					t.Fatal("leak")
-				}
-				if i.Role == "tool" {
-					tool++
-					if i.Weaver == nil || i.Weaver.Command != "plan submit" || i.Weaver.Mission != "m_test" || i.Weaver.Package != "p_test" {
-						t.Fatalf("weaver=%+v", i.Weaver)
-					}
-				}
-			}
-			if tool != 1 {
-				t.Fatal(tool)
-			}
-			next := tr.Next
-			tr, err = f.k.MissionTranscript(m.ID, next)
-			if err != nil || len(tr.Items) != 0 || tr.Next != next {
-				t.Fatalf("increment %+v %v", tr, err)
-			}
-			file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, err = file.WriteString(strings.Split(body, "\n")[0] + "\n")
-			file.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-			tr, err = f.k.MissionTranscript(m.ID, next)
-			if err != nil || len(tr.Items) != 1 {
-				t.Fatalf("append %+v %v", tr, err)
-			}
-		})
-	}
-}
-func TestTranscriptErrors(t *testing.T) {
-	f := newFixture(t)
-	t.Setenv("HOME", t.TempDir())
-	for _, c := range []struct {
-		owner     *Owner
-		code, msg string
-	}{{nil, "NOT_FOUND", "未记录父 Agent"}, {&Owner{"claude", "missing"}, "NOT_FOUND", "找不到父 Agent 的会话记录"}} {
-		m, e := f.k.CreateMission("", "test", f.ws, nil, c.owner)
-		if e != nil {
-			t.Fatal(e)
-		}
-		_, e = f.k.MissionTranscript(m.ID, 0)
-		if e == nil || AsError(e).Code != c.code || AsError(e).Message != c.msg {
-			t.Fatalf("%v", e)
-		}
-	}
-}
-func TestTranscriptLegacyUnsupportedOwner(t *testing.T) {
-	f := newFixture(t)
-	id := f.mission()
-	if _, err := f.k.db.Exec(`UPDATE missions SET owner_engine='other',owner_session='fixture' WHERE id=?`, id); err != nil {
-		t.Fatal(err)
-	}
-	_, err := f.k.MissionTranscript(id, 0)
-	if err == nil || AsError(err).Code != "INVALID" {
 		t.Fatal(err)
 	}
 }
@@ -261,48 +155,16 @@ func TestArchiveRules(t *testing.T) {
 func TestTranscriptToolVariants(t *testing.T) {
 	for _, raw := range []string{`{"type":"response_item","payload":{"type":"custom_tool_call","name":"exec","input":"weaver dialogue start --mission=m_x"}}`, `{"type":"response_item","payload":{"type":"function_call","name":"exec","arguments":"{\"command\":\"weaver dialogue start --mission=m_x\"}"}}`} {
 		items := parseTranscriptLine([]byte(raw), "codex")
-		if len(items) != 1 || items[0].Weaver == nil || items[0].Weaver.Command != "dialogue start" || items[0].Weaver.Mission != "m_x" {
+		if len(items) != 1 || items[0].Role != "tool" || items[0].Tool != "exec" || items[0].Text != "exec: weaver dialogue start --mission=m_x" {
 			t.Fatalf("%+v", items)
 		}
 	}
 }
 
-func TestTranscriptPaginationAndPartialRecord(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "session.jsonl")
-	line := `{"type":"user","message":{"content":"hello"}}` + "\n"
-	writeTaskFile(t, path, strings.Repeat(line, 2001)+`{"type":"user"`)
-	first, err := readTranscript(path, Owner{Engine: "claude"}, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(first.Items) != 2000 || first.Next != int64(len(line)*2000) {
-		t.Fatalf("page size=%d next=%d", len(first.Items), first.Next)
-	}
-	second, err := readTranscript(path, Owner{Engine: "claude"}, first.Next)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(second.Items) != 1 || second.Next != int64(len(line)*2001) {
-		t.Fatalf("second %+v", second)
-	}
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = file.WriteString(`,"message":{"content":"completed"}}` + "\n")
-	file.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	third, err := readTranscript(path, Owner{Engine: "claude"}, second.Next)
-	if err != nil || len(third.Items) != 1 || third.Items[0].Text != "completed" {
-		t.Fatalf("completed %+v %v", third, err)
-	}
-}
-
-func TestMultilineWeaverToolCommand(t *testing.T) {
+// A multi-line command is summarised by its first line.
+func TestToolSummaryFirstLine(t *testing.T) {
 	item := toolItem(1, "Bash", map[string]any{"command": "export TEST_VALUE=1\nweaver verdict --mission 'm_x' --package=p_x accept"})
-	if item.Text != "Bash: export TEST_VALUE=1" || item.Weaver == nil || item.Weaver.Command != "verdict" || item.Weaver.Mission != "m_x" || item.Weaver.Package != "p_x" {
-		t.Fatalf("item=%+v weaver=%+v", item, item.Weaver)
+	if item.Text != "Bash: export TEST_VALUE=1" {
+		t.Fatalf("item=%+v", item)
 	}
 }

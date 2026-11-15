@@ -28,12 +28,6 @@ func init() {
 	}) (any, error) {
 		return s.kernel.SetMissionOwner(p.Mission, p.Engine, p.Session)
 	})
-	methods["mission.transcript"] = simple(func(s *Server, p struct {
-		Mission string `json:"mission"`
-		After   int64  `json:"after"`
-	}) (any, error) {
-		return s.kernel.MissionTranscript(p.Mission, p.After)
-	})
 	methods["mission.archive"] = simple(func(s *Server, p struct {
 		Mission string `json:"mission"`
 	}) (any, error) {

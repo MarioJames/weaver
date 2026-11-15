@@ -28,7 +28,6 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
   weaver mission close <主任务>
   weaver mission archive|unarchive <主任务>
   weaver mission owner --mission <主任务> [--engine claude|codex --session <会话ID>] [--find]
-  weaver mission transcript <主任务> [--after <字节偏移>]
   weaver artifact add --mission <主任务> (--file <绝对路径> | --url <链接>) [--url <链接>] [--kind design|report|evidence|doc] [--title <标题>] [--package <key>]
   weaver artifact list --mission <主任务>
   weaver artifact remove <产物>
@@ -366,22 +365,6 @@ func run(argv []string) error {
 			owner = map[string]string{"engine": a.get("engine"), "session": a.get("session")}
 		}
 		return call("mission.owner", map[string]any{"mission": id, "engine": owner["engine"], "session": owner["session"]})
-	case "mission transcript":
-		if err := a.allow("after"); err != nil {
-			return err
-		}
-		id, err := a.arg(0, "主任务")
-		if err != nil {
-			return err
-		}
-		after := int64(0)
-		if a.has("after") {
-			after, err = strconv.ParseInt(a.get("after"), 10, 64)
-			if err != nil {
-				return err
-			}
-		}
-		return call("mission.transcript", map[string]any{"mission": id, "after": after})
 	case "artifact add":
 		if err := a.allow("mission", "file", "url", "kind", "title", "package"); err != nil {
 			return err
