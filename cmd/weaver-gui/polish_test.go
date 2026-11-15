@@ -59,9 +59,9 @@ func TestPolishScreenshots(t *testing.T) {
 		for _, page := range []string{"概览", "任务", "账号", "候选", "设置"} {
 			click(t, tt, page)
 			if page == "任务" {
-				tasksWait(t, tt, "Weaver 桌面图形界面", 5*time.Second)
-				click(t, tt, "Weaver 桌面图形界面")
-				tasksWait(t, tt, "只做桌面端", 5*time.Second)
+				tasksWait(t, tt, fxTitle, 5*time.Second)
+				click(t, tt, fxTitle)
+				tasksWait(t, tt, "创建主任务", 5*time.Second)
 			}
 			if page == "设置" {
 				waitFor(t, tt, a, func() bool { return !a.busy["skill:check"] })
@@ -302,16 +302,19 @@ func TestNarrowPagesStayUsable(t *testing.T) {
 	if !ok || more.X+more.W > 860 {
 		t.Fatalf("窄屏账号卡片操作越界：%+v %v", more, ok)
 	}
-	// The task page switches to one pane and can go back.
+	// The task page is a list that opens into a detail, and the detail can go back.
 	click(t, tt, "任务")
-	tasksWait(t, tt, "Weaver 桌面图形界面", 5*time.Second)
-	click(t, tt, "Weaver 桌面图形界面")
-	tasksWait(t, tt, "只做桌面端", 5*time.Second)
-	if !tt.HasText("返回列表") || !tt.HasText("侧栏") {
+	tasksWait(t, tt, fxTitle, 5*time.Second)
+	click(t, tt, fxTitle)
+	tasksWait(t, tt, "创建主任务", 5*time.Second)
+	if !tt.HasText("任务") {
 		t.Fatalf("窄屏任务页缺少返回入口：%q", tt.Texts())
 	}
-	click(t, tt, "返回列表")
-	tasksWait(t, tt, "今天较早的任务", 5*time.Second)
+	if _, ok := tt.Find("返回任务列表"); !ok {
+		t.Fatalf("窄屏任务页缺少返回入口：%q", tt.Texts())
+	}
+	click(t, tt, "返回任务列表")
+	tasksWait(t, tt, "Convorel 1.0：Go 常驻进程 + 直连 CDP", 5*time.Second)
 }
 
 // TestEmptyStatesShareOneComponent checks the empty state on the three list

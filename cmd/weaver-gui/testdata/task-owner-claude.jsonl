@@ -1,3 +1,3 @@
 {"type":"user","timestamp":"2026-11-15T06:00:00Z","message":{"content":"只做桌面端"}}
-{"type":"assistant","timestamp":"2026-11-15T06:00:01Z","message":{"content":[{"type":"thinking","thinking":"hidden-thinking"},{"type":"text","text":"先实现骨架，再拆包。"},{"type":"tool_use","name":"Bash","input":{"command":"weaver plan submit --mission contract --file plan.json"}}]}}
+{"type":"assistant","timestamp":"2026-11-15T06:00:01Z","message":{"content":[{"type":"thinking","thinking":"","signature":"sig"},{"type":"thinking","thinking":"先确认范围。","signature":"sig"},{"type":"text","text":"先实现骨架，再拆包。"},{"type":"tool_use","name":"Bash","input":{"command":"weaver plan submit --mission contract --file plan.json"}}]}}
 {"type":"assistant","timestamp":"2026-11-15T06:00:02Z","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"/src/main.go"}}]}}

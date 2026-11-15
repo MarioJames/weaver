@@ -1,381 +1,186 @@
 package main
 
 import (
-	"encoding/json"
+	"image/color"
 	"image/png"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
-	"github.com/MarioJames/weaver/internal/kernel"
-	"github.com/MarioJames/weaver/internal/rpc"
 	"github.com/egoist/mygo/ui"
 )
 
-// Extends the shell's fake RPC service without changing its fixtures for the
-// other concurrently developed pages. No daemon or engine files are touched.
-type tasksFake struct {
-	*fakeService
-	taskMu             sync.Mutex
-	missions, archived []taskMission
-	packages           []taskPackage
-	events             []taskEvent
-	items              []taskItem
-	artifacts          []taskArtifactGroup
-	transcriptError    string
-	methods            []string
-	afters             []int64
+// A1: five tasks make a full-page list with no conversation pane.
+func TestTaskListIsTheLandingPage(t *testing.T) {
+	seeds := watchAvatars(t)
+	_, _, tt := tasksTester(t, 1180, 820)
+	tasksContains(t, tt, "全部 5", "进行中 0", "需关注 0", "已完成 5", "已归档 0", "今天", "3 天内", "更早",
+		fxTitle, "Claude · weaver-gui", "18 / 19", "1 已取消", "产物 2", "采纳 report-update", "未关联父会话 · convorel-go-1-0")
+	rows := 0
+	for _, text := range tt.Texts() {
+		if text == "已完成" {
+			rows++
+		}
+	}
+	if rows != 5 {
+		t.Fatalf("状态标签 %d 个，want 5 行：%q", rows, tt.Texts())
+	}
+	tasksAbsent(t, tt, "选择一个任务，查看父 Agent 对话", "返回对话", "返回任务列表", "搜索")
+	if !tasksOrdered(tt, fxTitle, "Convorel 1.0") || !tasksOrdered(tt, "Convorel 1.0", "opencode 库清理后冒烟") || !tasksOrdered(tt, "opencode 库清理后冒烟", "2.0 切换冒烟") {
+		t.Fatalf("组内或组间顺序不对：%q", tt.Texts())
+	}
+	// Every row carries its own task's portrait, seeded by the mission ID.
+	if got := strings.Join(seeds.all(), "\n"); !strings.Contains(got, fxMain+"||32") || !strings.Contains(got, "m_convorel||32") {
+		t.Fatalf("列表头像种子：%s", got)
+	}
 }
 
-func newTasksFake(t *testing.T) *tasksFake {
-	t.Helper()
-	home := t.TempDir()
-	now := time.Now()
-	at := now.Add(-30 * time.Minute).UnixMilli()
-	f := &tasksFake{fakeService: &fakeService{home: home, data: fixture(home)}}
-	f.missions = []taskMission{
-		{ID: "old", Title: "更早的任务", State: "running", LastActivityAt: now.AddDate(0, 0, -10).UnixMilli()},
-		{ID: "recent", Title: "两天前的任务", State: "closed", LastActivityAt: now.AddDate(0, 0, -2).UnixMilli()},
-		{ID: "main", Title: "Weaver 桌面图形界面", State: "running", Owner: &taskOwner{Engine: "claude", Session: "session-main"}, LastActivityAt: now.UnixMilli(), Total: 2, Counts: map[string]int{"accepted": 1}},
-		{ID: "today", Title: "今天较早的任务", State: "running", Owner: &taskOwner{Engine: "codex", Session: "session-codex"}, LastActivityAt: now.Add(-time.Minute).UnixMilli()},
+// A2: the filter and the scroll position survive a trip into a task.
+func TestTaskListKeepsFilterAndScroll(t *testing.T) {
+	_, _, tt := tasksTesterWith(t, 1180, 380, func(f *tasksFake) {
+		f.missions[1].State, f.missions[1].ClosedAt = "running", 0
+		f.missions[1].Title = "仍在进行的任务"
+	})
+	click(t, tt, "已完成 4")
+	tasksAbsent(t, tt, "仍在进行的任务")
+	last, ok := tt.Find("2.0 切换冒烟")
+	if !ok {
+		t.Fatalf("没有末行：%q", tt.Texts())
 	}
-	f.archived = []taskMission{{ID: "archived", Title: "已完成的旧任务", State: "closed", Archived: true, LastActivityAt: now.AddDate(0, 0, -8).UnixMilli()}}
-	f.packages = []taskPackage{
-		{ID: "main/shell", Key: "shell", Title: "应用骨架", State: "accepted", Worker: "codex_sol_medium", Instruction: "## 指令\n实现应用骨架", CreatedAt: at, Current: &taskAttempt{N: 2, Worker: "codex_sol_medium", CreatedAt: at + 10000, FinishedAt: at + 20000}, Attempts: []*taskAttempt{{N: 1, State: "returned", Result: "## 第一次结果\n需要修订"}, {N: 2, State: "accepted", Result: "## 第二次结果\n检查通过"}}},
-		{ID: "main/server", Key: "server", Title: "服务接口", State: "running", Worker: "opencode_deepseek", CreatedAt: at},
+	tt.Scroll(600, 250, 0, 1000)
+	tt.Advance(time.Second)
+	scrolled, _ := tt.Find("2.0 切换冒烟")
+	if scrolled.Y >= last.Y-20 {
+		t.Fatalf("列表没有滚动：%.0f → %.0f", last.Y, scrolled.Y)
 	}
-	f.events = []taskEvent{{Seq: 1, Kind: "plan", At: at}}
-	for attempt := 1; attempt <= 2; attempt++ {
-		for j, kind := range []string{"launching", "handed", "running", "result", "returned"} {
-			if attempt == 2 && kind == "returned" {
-				kind = "accepted"
-			}
-			msg := ""
-			if kind == "returned" {
-				msg = "补上断线恢复说明"
-			}
-			f.events = append(f.events, taskEvent{Seq: int64(len(f.events) + 1), Package: "main/shell", Key: "shell", Kind: kind, Attempt: attempt, At: at + int64(attempt*10000+j*1000), Message: msg})
-		}
+	openTask(t, tt, "2.0 切换冒烟", "任务结束")
+	tasksAbsent(t, tt, "已完成 4")
+	click(t, tt, "返回任务列表")
+	tasksWait(t, tt, "已完成 4", 3*time.Second)
+	tasksAbsent(t, tt, "仍在进行的任务")
+	back, ok := tt.Find("2.0 切换冒烟")
+	if !ok || back.Y != scrolled.Y {
+		t.Fatalf("滚动位置变了：%.0f → %.0f（%v）", scrolled.Y, back.Y, ok)
 	}
-	f.items = []taskItem{{At: at - 3000, Role: "user", Text: "只做桌面端"}, {At: at - 2000, Role: "assistant", Text: "先实现骨架，再拆包。"}, {At: at - 1000, Role: "thinking", Text: "hidden-thinking"}, {At: at, Role: "tool", Tool: "Bash", Text: "Bash: weaver plan submit --mission main --file plan.json"}}
-	f.items = append(f.items, taskItem{At: at + 1000, Role: "tool", Tool: "Read", Text: "Read: /src/main.go"})
-	f.items[3].Weaver = &kernel.WeaverCall{Command: "plan submit", Mission: "main"}
-	f.artifacts = []taskArtifactGroup{
-		{GroupKey: "design", Items: []taskArtifact{{ID: "design-v2", Kind: "design", Title: "设计 v2", URL: "https://example.org/design-v2", Summary: map[string]any{"decisions": 3, "checks": 9}}, {ID: "design-v1", Kind: "design", Title: "设计 v1", URL: "https://example.org/design-v1"}}},
-		{GroupKey: "report", Items: []taskArtifact{{ID: "report", Kind: "report", Title: "验收报告", Summary: map[string]any{"verdict": "未完成", "pass": 8, "fail": 1, "blocked": 0, "skipped": 0}, URL: "https://example.org/report"}}},
-	}
-	listener, err := net.Listen("unix", rpc.SocketPath(home))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.listener = listener
-	f.wg.Add(1)
-	go func() {
-		defer f.wg.Done()
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				return
-			}
-			f.wg.Add(1)
-			go func() {
-				defer f.wg.Done()
-				defer conn.Close()
-				_ = conn.SetDeadline(time.Now().Add(time.Second))
-				var req rpc.Request
-				if json.NewDecoder(conn).Decode(&req) == nil {
-					f.respondTasks(conn, req)
-				}
-			}()
-		}
-	}()
-	t.Cleanup(f.stop)
-	return f
 }
-func (f *tasksFake) respondTasks(conn net.Conn, req rpc.Request) {
-	f.taskMu.Lock()
-	defer f.taskMu.Unlock()
-	f.methods = append(f.methods, req.Method)
-	var p struct {
-		ID, Mission, Package string
-		Archived             bool
-		After                int64
-	}
-	_ = json.Unmarshal(req.Params, &p)
-	var result any
-	var failure *rpc.Error
-	switch req.Method {
-	case "mission.list":
-		result = f.missions
-		if p.Archived {
-			result = f.archived
-		}
-	case "mission.show":
-		m := taskMission{}
-		for _, candidate := range append(append([]taskMission{}, f.missions...), f.archived...) {
-			if candidate.ID == p.ID {
-				m = candidate
-			}
-		}
-		// mission.show embeds Mission; it does not wrap it in a mission key.
-		result = struct {
-			kernel.Mission
-			Packages []kernel.Package `json:"packages"`
-			Timers   []kernel.Timer   `json:"timers"`
-		}{Mission: m, Packages: f.packages, Timers: []kernel.Timer{}}
-	case "package.show":
-		for _, pkg := range f.packages {
-			if pkg.ID == p.Package {
-				result = pkg
-			}
-		}
-	case "events":
-		filtered := []taskEvent{}
-		for _, e := range f.events {
-			if e.Seq > p.After {
-				filtered = append(filtered, e)
-			}
-		}
-		result = filtered
-	case "artifact.list":
-		groups := []kernel.ArtifactGroup{}
-		for _, group := range f.artifacts {
-			g := kernel.ArtifactGroup{GroupKey: group.GroupKey, Items: []*kernel.Artifact{}}
-			for _, item := range group.Items {
-				summary, err := json.Marshal(item.Summary)
-				if err != nil {
-					panic(err)
-				}
-				g.Items = append(g.Items, &kernel.Artifact{ID: item.ID, Kind: item.Kind, Title: item.Title, Path: item.Path, URL: item.URL, CreatedAt: item.CreatedAt, Summary: summary})
-			}
-			groups = append(groups, g)
-		}
-		result = groups
-	case "mission.transcript":
-		f.afters = append(f.afters, p.After)
-		if f.transcriptError != "" {
-			failure = &rpc.Error{Code: "NOT_FOUND", Message: f.transcriptError}
-		} else {
-			start := min(int(p.After), len(f.items))
-			result = taskTranscript{Session: "session-main", Path: "/sessions/main.jsonl", Items: f.items[start:], Next: int64(len(f.items))}
-		}
-	case "mission.archive", "mission.unarchive":
-		archive := req.Method == "mission.archive"
-		source, dest := &f.archived, &f.missions
-		if archive {
-			source, dest = &f.missions, &f.archived
-		}
-		for i, m := range *source {
-			if m.ID == p.Mission {
-				m.Archived = archive
-				*dest = append(*dest, m)
-				*source = append((*source)[:i], (*source)[i+1:]...)
-				break
-			}
-		}
-		// Archive endpoints return the updated Mission.
-		for _, m := range *dest {
-			if m.ID == p.Mission {
-				result = m
-			}
-		}
-	default:
-		f.fakeService.respond(conn, req)
-		return
-	}
-	body, _ := json.Marshal(result)
-	_ = json.NewEncoder(conn).Encode(rpc.Response{OK: failure == nil, Result: body, Error: failure})
+
+// A3: a task whose main state is attention says why, with an icon.
+func TestTaskListAttention(t *testing.T) {
+	_, _, tt := tasksTesterWith(t, 1180, 820, func(f *tasksFake) {
+		f.missions[1].State, f.missions[1].ClosedAt = "attention", 0
+		f.missions[1].Activity = "acceptance 失败：引擎中途退出"
+	})
+	tasksContains(t, tt, "需关注 1", "已完成 4", "进行中 0", "需关注", "acceptance 失败：引擎中途退出")
+	click(t, tt, "需关注 1")
+	tasksContains(t, tt, "Convorel 1.0：Go 常驻进程 + 直连 CDP", "acceptance 失败：引擎中途退出")
+	tasksAbsent(t, tt, fxTitle)
 }
-func tasksTester(t *testing.T, w, h int) (*tasksFake, *app, *ui.Tester) {
-	t.Helper()
+
+func TestTaskListReadFailure(t *testing.T) {
 	f := newTasksFake(t)
+	f.listError = "数据库暂时不可读"
 	a := testApp(t, f.fakeService)
 	a.page = "任务"
-	tt := ui.NewTester(a.view, w, h)
-	tasksWait(t, tt, "Weaver 桌面图形界面", 5*time.Second)
-	return f, a, tt
-}
-func tasksWait(t *testing.T, tt *ui.Tester, text string, timeout time.Duration) {
-	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		tt.Frame()
-		if tt.HasText(text) {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	t.Fatalf("没有出现 %q: %q", text, tt.Texts())
-}
-func tasksContains(t *testing.T, tt *ui.Tester, texts ...string) {
-	t.Helper()
-	for _, text := range texts {
-		if !tt.HasText(text) {
-			t.Errorf("缺少 %q: %q", text, tt.Texts())
-		}
-	}
-}
-func openTasksMain(t *testing.T, tt *ui.Tester) {
-	t.Helper()
-	click(t, tt, "Weaver 桌面图形界面")
-	tasksWait(t, tt, "只做桌面端", 5*time.Second)
-}
-func TestTasksGroupingTranscriptAndLifecycle(t *testing.T) {
-	f, _, tt := tasksTester(t, 1440, 1000)
-	tasksContains(t, tt, "今天", "3 天内", "更早", "Cl", "Cx")
-	texts := strings.Join(tt.Texts(), "\n")
-	if strings.Index(texts, "Weaver 桌面图形界面") > strings.Index(texts, "今天较早的任务") {
-		t.Fatal("组内未倒序")
-	}
-	if tt.HasText("搜索") {
-		t.Fatal("出现搜索框")
-	}
-	openTasksMain(t, tt)
-	tasksContains(t, tt, "只做桌面端", "先实现骨架，再拆包。", "▸ Read · "+taskTime(f.items[4].At), "▸ weaver plan submit · "+taskTime(f.items[3].At), "子 Agent 2", "shell", "server", "第 1 次尝试", "第 2 次尝试", "补上断线恢复说明", "已采纳", "运行中", "进行中 · 1 / 2 已采纳")
-	for _, fold := range []string{"▸ 指令全文", "▸ 第 1 次结果全文"} {
-		if _, ok := tt.AccessByRole(ui.RoleButton, fold); ok {
-			t.Fatalf("%q 仍然是按钮", fold)
-		}
-		if _, ok := tt.AccessByRole(ui.RoleText, fold); !ok {
-			t.Fatalf("%q 不是左对齐折叠行：%q", fold, tt.Texts())
-		}
-	}
-	if tt.HasText("hidden-thinking") {
-		t.Fatal("显示了 thinking")
-	}
-	texts = strings.Join(tt.Texts(), "\n")
-	if strings.Index(texts, "weaver plan submit") > strings.Index(texts, "shell") {
-		t.Fatal("卡片未插在 submit 之后")
-	}
-	if _, exists := tt.Find("子 Agent"); exists {
-		t.Fatal("已匹配的卡片落入末尾分组")
-	}
-
-	click(t, tt, "▸ weaver plan submit · "+taskTime(f.items[3].At))
-	tasksContains(t, tt, "Bash: weaver plan submit --mission main --file plan.json")
-	click(t, tt, "▸ 指令全文")
-	tasksContains(t, tt, "实现应用骨架", "▾ 指令全文")
-	click(t, tt, "▾ 指令全文")
-	if tt.HasText("实现应用骨架") {
-		t.Fatal("收起后仍显示指令全文")
-	}
-	for _, forbidden := range []string{"发消息", "采纳", "退回", "取消", "重试"} {
-		if _, ok := tt.Find(forbidden); ok {
-			t.Errorf("出现动作入口 %s", forbidden)
-		}
-	}
-}
-func TestTasksPollingIncremental(t *testing.T) {
-	f, _, tt := tasksTester(t, 1440, 1000)
-	openTasksMain(t, tt)
-	click(t, tt, "server")
+	tt := ui.NewTester(a.view, 1180, 820)
+	tasksWait(t, tt, "没能读取任务", 5*time.Second)
+	tasksContains(t, tt, "数据库暂时不可读", "重新读取")
 	f.taskMu.Lock()
-	f.packages[1].State = "accepted"
-	f.events = append(f.events, taskEvent{Seq: int64(len(f.events) + 1), Package: "main/server", Key: "server", Attempt: 1, Kind: "accepted", Message: "服务接口已复核", At: time.Now().UnixMilli()})
-	f.items = append(f.items, taskItem{At: time.Now().UnixMilli(), Role: "assistant", Text: "服务包已采纳"})
+	f.listError = ""
 	f.taskMu.Unlock()
-	tasksWait(t, tt, "服务包已采纳", 3*time.Second)
-	tasksContains(t, tt, "服务接口已复核", "已采纳")
-	texts := strings.Join(tt.Texts(), "\n")
-	if strings.Count(texts, "只做桌面端") != 1 {
-		t.Fatal("增量读取重复显示消息")
+	click(t, tt, "重新读取")
+	tasksWait(t, tt, fxTitle, 5*time.Second)
+}
+
+// A18: archiving from the detail returns to the list, where 恢复 puts it back.
+func TestTaskArchiveAndRestore(t *testing.T) {
+	f, _, tt := tasksTester(t, 1180, 820)
+	openTask(t, tt, fxTitle, "创建主任务")
+	click(t, tt, "归档")
+	tasksWait(t, tt, "已归档 1", 5*time.Second)
+	// The list keeps the filter it had; the archived task is no longer in it.
+	tasksAbsent(t, tt, "返回任务列表", "创建主任务", fxTitle, "恢复")
+	tasksContains(t, tt, "全部 4", "今天")
+	click(t, tt, "已归档 1")
+	tasksWait(t, tt, "恢复", 5*time.Second)
+	tasksContains(t, tt, fxTitle)
+	if calls := f.callsOf("mission.archive"); len(calls) != 1 || calls[0].Params["mission"] != fxMain {
+		t.Fatalf("归档请求：%+v", calls)
 	}
-	f.taskMu.Lock()
-	defer f.taskMu.Unlock()
-	seen := false
-	for _, after := range f.afters {
-		if after > 0 {
-			seen = true
-		}
-	}
-	if !seen {
-		t.Fatal("未使用 after")
-	}
-	for _, method := range f.methods {
-		switch method {
-		case "status", "mission.list", "mission.show", "mission.transcript", "events", "artifact.list", "package.show":
-		default:
-			t.Errorf("任务页调用了 %s", method)
-		}
+	click(t, tt, "恢复")
+	tasksWait(t, tt, "已归档 0", 5*time.Second)
+	tasksWait(t, tt, "今天", 5*time.Second)
+	tasksContains(t, tt, fxTitle, "全部 5", "采纳 report-update")
+	tasksAbsent(t, tt, "恢复")
+	if !tasksOrdered(tt, "今天", fxTitle) || !tasksOrdered(tt, fxTitle, "3 天内") {
+		t.Fatalf("没有回到原分组：%q", tt.Texts())
 	}
 }
-func TestTasksTranscriptErrorsKeepCards(t *testing.T) {
-	for _, message := range []string{"未记录父 Agent", "找不到父 Agent 的会话记录", "暂不支持读取 opencode 的对话记录"} {
-		t.Run(message, func(t *testing.T) {
-			f, _, tt := tasksTester(t, 1440, 1000)
-			f.taskMu.Lock()
-			f.transcriptError = message
-			f.taskMu.Unlock()
-			click(t, tt, "Weaver 桌面图形界面")
-			tasksWait(t, tt, message, 5*time.Second)
-			tasksContains(t, tt, "shell", "server", "子 Agent 2", "产物 3")
-			if message == "找不到父 Agent 的会话记录" {
-				tasksContains(t, tt, "~/.claude/projects/…/session-main.jsonl")
+
+// A19: the narrow window keeps the same structure and keeps everything on screen.
+func TestTaskNarrowWalkthrough(t *testing.T) {
+	for _, width := range []int{860, 760} {
+		t.Run(time.Duration(width).String(), func(t *testing.T) {
+			_, _, tt := tasksTester(t, width, 900)
+			onScreen := func(texts ...string) {
+				t.Helper()
+				for _, text := range texts {
+					r, ok := tt.Find(text)
+					if !ok {
+						t.Errorf("找不到 %q", text)
+						continue
+					}
+					if r.X < 0 || r.X+r.W > float32(width)+0.5 {
+						t.Errorf("%q 超出窗口 %d：%+v", text, width, r)
+					}
+				}
 			}
+			tasksContains(t, tt, "18 / 19", "1 已取消", "产物 2", "采纳 report-update", "Claude · weaver-gui")
+			onScreen("18 / 19", "1 已取消", "产物 2", "采纳 report-update", fxTitle)
+			openTask(t, tt, fxTitle, "创建主任务")
+			onScreen("返回任务列表", "产物 2", "归档", "派出 6 个 Agent", "计划已提交：服务端（opencode）和界面骨架（codex）并行开工，账号页、候选页、内嵌终端登录、构建分发按依赖排队。等待第一批结果。")
+			click(t, tt, "产物 2")
+			tasksWait(t, tt, "验收报告", 3*time.Second)
+			tt.Advance(time.Second)
+			onScreen("设计 v2", "验收报告")
+			tt.Key(0, ui.KeyEscape)
+			tt.Advance(time.Second)
+			tasksAbsent(t, tt, "验收报告")
+			onScreen("返回任务列表")
+			click(t, tt, "返回任务列表")
+			tasksWait(t, tt, "全部 5", 3*time.Second)
+			onScreen(fxTitle)
 		})
 	}
 }
-func TestTasksArtifactsVersionsAndEmpty(t *testing.T) {
-	_, _, tt := tasksTester(t, 1440, 1000)
-	openTasksMain(t, tt)
-	click(t, tt, "产物 3")
-	tasksContains(t, tt, "设计 v2", "2 个版本", "待拍板 3 项 · 验收清单 9 项", "验收报告", "结论：未完成 · 通过 8 · 失败 1")
-	for _, text := range tt.Texts() {
-		if strings.Contains(text, "pass") || strings.Contains(text, "fail") {
-			t.Errorf("报告显示英文状态键：%s", text)
+
+// A27: dumps the review screenshots when WEAVER_TASK_SHOTS names a directory.
+func shotTo(t *testing.T, dir, name string, tt *ui.Tester) {
+	t.Helper()
+	tt.Advance(400 * time.Millisecond)
+	tt.Frame()
+	file, err := os.Create(filepath.Join(dir, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	if err := png.Encode(file, tt.Image()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func tinted(c color.Color) bool {
+	r, g, b, _ := c.RGBA()
+	d := func(x, y uint32) int {
+		if x > y {
+			return int(x-y) >> 8
 		}
+		return int(y-x) >> 8
 	}
-	if tt.HasText("设计 v1") {
-		t.Fatal("旧版本默认展开")
-	}
-	click(t, tt, "2 个版本")
-	tasksContains(t, tt, "设计 v1")
+	return d(r, b) >= 5 || d(r, g) >= 5
 }
-func TestTasksArtifactsEmpty(t *testing.T) {
-	f, _, tt := tasksTester(t, 1440, 1000)
-	f.taskMu.Lock()
-	f.artifacts = nil
-	f.taskMu.Unlock()
-	openTasksMain(t, tt)
-	click(t, tt, "产物 0")
-	tasksContains(t, tt, "还没有产物", "分享时加 --mission <主任务 ID>，或用 weaver artifact add 登记")
-}
-func TestTasksArchiveRestore(t *testing.T) {
-	_, _, tt := tasksTester(t, 1440, 1000)
-	click(t, tt, "已归档（1）")
-	tasksContains(t, tt, "已完成的旧任务")
-	click(t, tt, "恢复")
-	tasksWait(t, tt, "已归档（0）", 5*time.Second)
-	tasksContains(t, tt, "已完成的旧任务", "更早的任务")
-}
-func TestTasksNarrowAndDrawer(t *testing.T) {
-	_, _, tt := tasksTester(t, 800, 900)
-	if tt.HasText("选择一个任务，查看父 Agent 对话") {
-		t.Fatal("窄屏显示了对话栏")
-	}
-	openTasksMain(t, tt)
-	tasksContains(t, tt, "返回列表", "侧栏")
-	if tt.HasText("今天较早的任务") {
-		t.Fatal("窄屏保留列表")
-	}
-	click(t, tt, "侧栏")
-	tasksContains(t, tt, "返回对话", "子 Agent 2")
-	click(t, tt, "返回对话")
-	click(t, tt, "返回列表")
-	tasksContains(t, tt, "今天较早的任务")
-	tt.SetSize(1000, 900)
-	openTasksMain(t, tt)
-	if tt.HasText("子 Agent 2") {
-		t.Fatal("中等窗口侧栏没有收起")
-	}
-	click(t, tt, "侧栏")
-	tasksContains(t, tt, "关闭侧栏", "子 Agent 2")
-	click(t, tt, "关闭侧栏")
-}
+
 func TestTasksAutoArchiveSetting(t *testing.T) {
 	f := newFake(t)
 	a := testApp(t, f)
@@ -406,35 +211,6 @@ func TestTaskArtifactLocalPreference(t *testing.T) {
 		t.Fatalf("%s %v", target, err)
 	}
 }
-func TestTasksScreenshots(t *testing.T) {
-	dir := os.Getenv("WEAVER_TASK_SCREENSHOTS")
-	if dir == "" {
-		t.Skip("未设置任务截图目录")
-	}
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		t.Fatal(err)
-	}
-	_, _, tt := tasksTester(t, 1440, 1000)
-	openTasksMain(t, tt)
-	save := func(name string) {
-		t.Helper()
-		file, err := os.Create(filepath.Join(dir, name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = png.Encode(file, tt.Image())
-		_ = file.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	save("tasks-agents.png")
-	click(t, tt, "产物 3")
-	save("tasks-artifacts.png")
-	tt.SetSize(800, 900)
-	save("tasks-narrow.png")
-}
-
 func TestTaskReportSummary(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -450,4 +226,61 @@ func TestTaskReportSummary(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestTaskScreenshots writes the task page's review screenshots when
+// WEAVER_GUI_SCREENSHOTS names a directory, the same switch TestScreenshots uses.
+func TestTaskScreenshots(t *testing.T) {
+	dir := os.Getenv("WEAVER_GUI_SCREENSHOTS")
+	if dir == "" {
+		t.Skip("未设置截图目录")
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	both := func(f *tasksFake) { withDialogue(f); withConvorel(f) }
+	run := func(name string, w, h int, dark bool, setup func(*tasksFake), steps func(*tasksFake, *ui.Tester)) {
+		t.Run(name, func(t *testing.T) {
+			f, _, tt := tasksTesterWith(t, w, h, setup)
+			tt.SetDark(dark)
+			steps(f, tt)
+			shotTo(t, dir, name+".png", tt)
+		})
+	}
+	list := func(*tasksFake, *ui.Tester) {}
+	open := func(f *tasksFake, tt *ui.Tester) { openTask(t, tt, fxTitle, "创建主任务") }
+	run("list-1180-light", 1180, 700, false, both, list)
+	run("list-1180-dark", 1180, 700, true, both, list)
+	run("list-760", 760, 900, false, both, list)
+	run("detail-1180-light", 1180, 2760, false, nil, open)
+	run("detail-1180-dark", 1180, 2760, true, nil, open)
+	run("detail-760", 760, 3700, false, nil, open)
+	run("drawer-text", 1180, 820, false, nil, func(f *tasksFake, tt *ui.Tester) {
+		open(f, tt)
+		tt.Scroll(600, 500, 0, 1300)
+		tt.Advance(time.Second)
+		click(t, tt, "查看全文 · 612 字")
+		tasksWait(t, tt, "shell · 第 1 次结果", 3*time.Second)
+	})
+	run("drawer-package", 1180, 820, false, nil, func(f *tasksFake, tt *ui.Tester) {
+		open(f, tt)
+		tt.Scroll(600, 500, 0, 1300)
+		tt.Advance(time.Second)
+		click(t, tt, "tasks-gui")
+		tasksWait(t, tt, "状态词已分开", 3*time.Second)
+	})
+	run("panel-artifacts", 1180, 820, false, nil, func(f *tasksFake, tt *ui.Tester) {
+		open(f, tt)
+		click(t, tt, "产物 2")
+		tasksWait(t, tt, "验收报告", 3*time.Second)
+	})
+	run("dialogue-1180", 1180, 1400, false, both, func(f *tasksFake, tt *ui.Tester) {
+		openTask(t, tt, "设计对谈 unit-names", "发起对谈 unit-names")
+	})
+	run("dialogue-1180-dark", 1180, 1400, true, both, func(f *tasksFake, tt *ui.Tester) {
+		openTask(t, tt, "设计对谈 unit-names", "发起对谈 unit-names")
+	})
+	run("convorel-1180", 1180, 900, false, both, func(f *tasksFake, tt *ui.Tester) {
+		openTask(t, tt, "定时任务调度方案审查", "问 Convorel")
+	})
 }

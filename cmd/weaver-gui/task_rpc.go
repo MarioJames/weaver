@@ -2,16 +2,19 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"sort"
 	"time"
-
-	"github.com/egoist/mygo/ui"
 )
 
 // Called while app.mu is held; all RPC work uses captured values and returns
 // through app.action, the same busy/error/cancellation boundary as other pages.
+// Only the list polls here: an open detail follows its timeline instead.
 func (a *app) pollTasks(s *taskState, force bool) {
+	if s.selected != "" {
+		return
+	}
 	if !force && time.Now().Before(s.nextPoll) {
 		return
 	}
@@ -19,13 +22,6 @@ func (a *app) pollTasks(s *taskState, force bool) {
 		return
 	}
 	s.nextPoll = time.Now().Add(2 * time.Second)
-	selected := s.selected
-	revision := s.revision
-	after := s.transcript.Next
-	eventAfter := int64(0)
-	if len(s.events) > 0 {
-		eventAfter = s.events[len(s.events)-1].Seq
-	}
 	a.action("tasks:poll", func() (string, error) {
 		var missions, archived []taskMission
 		if err := a.client.call("mission.list", map[string]bool{"all": true}, &missions); err != nil {
@@ -34,78 +30,14 @@ func (a *app) pollTasks(s *taskState, force bool) {
 		if err := a.client.call("mission.list", map[string]bool{"all": true, "archived": true}, &archived); err != nil {
 			return "", err
 		}
-		var detail taskDetail
-		var events []taskEvent
-		var artifacts []taskArtifactGroup
-		var transcript taskTranscript
-		var transcriptError string
-		var readErr error
-		if selected != "" {
-			readErr = a.client.call("mission.show", map[string]string{"id": selected}, &detail)
-			if readErr == nil {
-				cursor := eventAfter
-				for {
-					var page []taskEvent
-					readErr = a.client.call("events", map[string]any{"mission": selected, "after": cursor, "limit": 1000}, &page)
-					if readErr != nil {
-						break
-					}
-					events = append(events, page...)
-					if len(page) < 1000 {
-						break
-					}
-					next := page[len(page)-1].Seq
-					if next <= cursor {
-						break
-					}
-					cursor = next
-				}
-			}
-			if readErr == nil {
-				readErr = a.client.call("artifact.list", map[string]string{"mission": selected}, &artifacts)
-			}
-			if err := a.client.call("mission.transcript", map[string]any{"mission": selected, "after": after}, &transcript); err != nil {
-				transcriptError = err.Error()
-			}
-			// package.show carries all attempts and their complete instruction/results.
-			for i, p := range detail.Packages {
-				var full taskPackage
-				if err := a.client.call("package.show", map[string]string{"package": p.ID}, &full); err != nil {
-					if readErr == nil {
-						readErr = err
-					}
-				} else {
-					detail.Packages[i] = full
-				}
-			}
-		}
 		a.mu.Lock()
 		defer a.mu.Unlock()
 		if a.ctx.Err() != nil {
 			return "", nil
 		}
 		sort.SliceStable(archived, func(i, j int) bool { return archived[i].LastActivityAt > archived[j].LastActivityAt })
-		s.missions, s.archived = missions, archived
-		if s.selected == selected && s.revision == revision {
-			s.detail, s.artifacts = detail, artifacts
-			if eventAfter == 0 {
-				s.events = events
-			} else {
-				s.events = append(s.events, events...)
-			}
-			s.transcriptError = transcriptError
-			if transcriptError == "" {
-				if after == 0 || transcript.Next < after || s.transcript.Session != transcript.Session {
-					s.transcript = transcript
-				} else {
-					s.transcript.Items = append(s.transcript.Items, transcript.Items...)
-					s.transcript.Next = transcript.Next
-					s.transcript.Path = transcript.Path
-				}
-				sort.SliceStable(s.transcript.Items, func(i, j int) bool { return s.transcript.Items[i].At < s.transcript.Items[j].At })
-			}
-		}
-		return "", readErr
+		s.missions, s.archived, s.loaded = missions, archived, true
+		return "", nil
 	}, func(_ string, err error) {
 		s.error = ""
 		if err != nil {
@@ -113,36 +45,227 @@ func (a *app) pollTasks(s *taskState, force bool) {
 		}
 	})
 }
+
+// selectTask opens a mission's detail: one timeline read now, then a follow loop.
 func (a *app) selectTask(s *taskState, id string) {
-	if s.selected != id {
-		s.revision++
-		s.selected = id
-		s.selectedPackage = ""
-		s.detail = taskDetail{}
-		s.events = nil
-		s.artifacts = nil
-		s.transcript = taskTranscript{}
-		s.transcriptError = ""
-		s.renderedNext = 0
-		s.scroll = ui.ScrollState{}
-		s.expanded = map[string]bool{}
+	s.revision++
+	s.selected = id
+	var seed *taskMission
+	for _, m := range append(append([]taskMission{}, s.missions...), s.archived...) {
+		if m.ID == id {
+			m := m
+			seed = &m
+		}
 	}
-	s.pane = "chat"
+	s.d = newTaskDetail(seed)
+	a.watchTask(s, id, s.revision)
+}
+
+// leaveTask returns to the list; the revision bump stops the follow loop and
+// keeps its last answer from reaching whatever opens next.
+func (a *app) leaveTask(s *taskState) {
+	s.revision++
+	s.selected = ""
+	s.d = taskDetail{}
 	s.nextPoll = time.Time{}
 	a.pollTasks(s, true)
 }
+
+func (s *taskState) current(id string, revision int64) bool {
+	return s.selected == id && s.revision == revision
+}
+
+// watchTask reads the newest page, then long-polls for the changed suffix with
+// the entries it already has. Called with a.mu held.
+func (a *app) watchTask(s *taskState, id string, revision int64) {
+	a.wg.Add(1)
+	go func() {
+		defer a.wg.Done()
+		for {
+			a.mu.Lock()
+			if a.ctx.Err() != nil || !s.current(id, revision) {
+				a.mu.Unlock()
+				return
+			}
+			in := taskTimelineInput{Mission: id}
+			gen := s.d.gen
+			if n := len(s.d.entries); n > 0 {
+				in.From, in.Wait = s.d.entries[0].Ord, true
+				in.Have = make([]string, n)
+				for i, e := range s.d.entries {
+					in.Have[i] = e.Hash
+				}
+			}
+			a.mu.Unlock()
+			var out taskTimeline
+			err := a.client.call("mission.timeline", in, &out)
+			a.mu.Lock()
+			if a.ctx.Err() != nil || !s.current(id, revision) {
+				a.mu.Unlock()
+				return
+			}
+			if err != nil {
+				s.d.err = err.Error()
+				a.notify()
+				a.mu.Unlock()
+				select {
+				case <-a.ctx.Done():
+					return
+				case <-time.After(2 * time.Second):
+				}
+				continue
+			}
+			s.d.err = ""
+			// Older entries arrived while this request was out; ask again with the new window.
+			if gen == s.d.gen {
+				a.applyTimeline(s, in.From != "", &out)
+			}
+			a.notify()
+			a.mu.Unlock()
+		}
+	}()
+}
+
+func (a *app) applyTimeline(s *taskState, suffix bool, out *taskTimeline) {
+	d := &s.d
+	first := !d.loaded
+	if suffix {
+		d.entries = taskMergeEntries(d.entries, out.Entries, out.Keep)
+	} else {
+		d.entries = out.Entries
+	}
+	d.hasMore = out.HasMore
+	if out.Mission != nil {
+		d.mission = out.Mission
+	}
+	d.packages, d.session = out.Packages, out.Session
+	d.loaded, d.grew = true, true
+	if first && d.mission != nil && !taskMissionDone(*d.mission) {
+		d.pinned = true
+	}
+}
+
+// loadEarlier prepends the page before the first entry, keeping the reading position.
+func (a *app) loadEarlier(s *taskState) {
+	d := &s.d
+	if d.loadingMore || len(d.entries) == 0 {
+		return
+	}
+	id, revision, before := s.selected, s.revision, d.entries[0].Ord
+	d.loadingMore = true
+	a.wg.Add(1)
+	go func() {
+		defer a.wg.Done()
+		var out taskTimeline
+		err := a.client.call("mission.timeline", taskTimelineInput{Mission: id, Before: before}, &out)
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if a.ctx.Err() != nil || !s.current(id, revision) {
+			return
+		}
+		d := &s.d
+		d.loadingMore = false
+		if err != nil {
+			d.err = err.Error()
+		} else if len(out.Entries) > 0 && len(d.entries) > 0 && d.entries[0].Ord == before {
+			// Content grows above the viewport; the next frame keeps the distance to the end.
+			d.prepended = true
+			d.entries = append(append([]taskEntry{}, out.Entries...), d.entries...)
+			d.hasMore = out.HasMore
+			d.gen++
+		}
+		a.notify()
+	}()
+}
+
+// openText reads a body by its ref and shows it in the full-text drawer.
+func (a *app) openText(s *taskState, ref string, header taskHeaderInfo) {
+	d := &s.d
+	d.textSeq++
+	seq, id, revision := d.textSeq, s.selected, s.revision
+	d.textOpen, d.textLoading, d.textErr, d.textTitle, d.textBody, d.textHeader = true, true, "", "", "", header
+	a.action(fmt.Sprintf("tasks:text:%d", seq), func() (string, error) {
+		var out taskTextResult
+		err := a.client.call("mission.text", map[string]string{"mission": id, "ref": ref}, &out)
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if s.current(id, revision) && s.d.textSeq == seq {
+			s.d.textLoading = false
+			if err != nil {
+				s.d.textErr = err.Error()
+			} else {
+				s.d.textTitle, s.d.textBody = out.Title, out.Text
+			}
+		}
+		return "", nil
+	}, nil)
+}
+
+// openPackage shows every attempt of one package in the package drawer.
+func (a *app) openPackage(s *taskState, key string) {
+	d := &s.d
+	d.packageSeq++
+	seq, id, revision := d.packageSeq, s.selected, s.revision
+	d.packageOpen, d.packageLoading, d.packageErr, d.packageKey, d.packageData = true, true, "", key, taskPackage{}
+	a.action(fmt.Sprintf("tasks:package:%d", seq), func() (string, error) {
+		var out taskPackage
+		err := a.client.call("package.show", map[string]string{"package": id + "/" + key}, &out)
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if s.current(id, revision) && s.d.packageSeq == seq {
+			s.d.packageLoading = false
+			if err != nil {
+				s.d.packageErr = err.Error()
+			} else {
+				s.d.packageData = out
+			}
+		}
+		return "", nil
+	}, nil)
+}
+
+// openArtifacts lists the mission's artifacts; nothing is read until the panel opens.
+func (a *app) openArtifacts(s *taskState) {
+	d := &s.d
+	d.artifactsOpen, d.artifactsLoading, d.artifactsErr = true, true, ""
+	id, revision := s.selected, s.revision
+	a.action("tasks:artifacts:"+id, func() (string, error) {
+		var groups []taskArtifactGroup
+		err := a.client.call("artifact.list", map[string]string{"mission": id}, &groups)
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if s.current(id, revision) {
+			s.d.artifactsLoading = false
+			if err != nil {
+				s.d.artifactsErr = err.Error()
+			} else {
+				s.d.artifacts = groups
+			}
+		}
+		return "", nil
+	}, nil)
+}
+
 func (a *app) taskArchive(s *taskState, id string, archive bool) {
 	method := "mission.unarchive"
 	if archive {
 		method = "mission.archive"
 	}
 	a.action("tasks:archive:"+id, func() (string, error) { return "", a.client.call(method, map[string]string{"mission": id}, nil) }, func(_ string, err error) {
-		if err == nil {
-			s.nextPoll = time.Time{}
-			a.pollTasks(s, true)
+		if err != nil {
+			return
 		}
+		if archive && s.selected == id {
+			// Back to the list as the reader left it; the task now sits under 已归档.
+			s.revision++
+			s.selected = ""
+			s.d = taskDetail{}
+		}
+		s.nextPoll = time.Time{}
+		a.pollTasks(s, true)
 	})
 }
+
 func taskArtifactTarget(a taskArtifact) (string, error) {
 	if a.Path != "" {
 		if st, err := os.Stat(a.Path); err == nil && st.Mode().IsRegular() {
@@ -153,4 +276,42 @@ func taskArtifactTarget(a taskArtifact) (string, error) {
 		return a.URL, nil
 	}
 	return "", fmt.Errorf("本地文件不存在，且未登记线上链接")
+}
+
+// followBottom keeps an open, running task at its newest content until the
+// reader scrolls up, and resumes once they are back at the end. It moves the
+// page only when the content changed size: writing the offset every frame
+// would cancel a mouse wheel's glide on its first small step.
+func (d *taskDetail) followBottom() {
+	atEnd := d.scroll.Y >= d.scroll.MaxY-4
+	if d.prepended {
+		// The scroll state still describes the layout before the prepend.
+		d.prepended, d.restoreOpen, d.restoreAbove, d.restoreMax = false, true, d.scroll.MaxY-d.scroll.Y, d.scroll.MaxY
+	}
+	if d.restoreOpen {
+		if d.scroll.MaxY != d.restoreMax {
+			d.scroll.Y = max(0, d.scroll.MaxY-d.restoreAbove)
+			d.restoreOpen = false
+		}
+		d.seenMax, d.grew = d.scroll.MaxY, false
+		return
+	}
+	if d.mission == nil || taskMissionDone(*d.mission) {
+		return
+	}
+	changed := d.grew || d.scroll.MaxY != d.seenMax
+	switch {
+	case d.pinned && changed:
+		// Still where the end was before the content changed: go to the new end.
+		if d.scroll.Y >= d.seenMax-4 {
+			d.scroll.Y = math.MaxFloat32
+		} else {
+			d.pinned = false
+		}
+	case d.pinned && !atEnd:
+		d.pinned = false
+	case !d.pinned && atEnd && d.scroll.MaxY > 0:
+		d.pinned = true
+	}
+	d.seenMax, d.grew = d.scroll.MaxY, false
 }

@@ -64,6 +64,9 @@ func taskAvatarSVG(seed, avoid string) *ui.SVG {
 	return svg
 }
 
+// taskAvatarObserver lets tests see which seed each drawn avatar used.
+var taskAvatarObserver func(seed, avoid string, size float32)
+
 func taskAvatar(c *ui.Context, seed string, size float32) {
 	taskAvatarAvoid(c, seed, "", size)
 }
@@ -71,5 +74,8 @@ func taskAvatar(c *ui.Context, seed string, size float32) {
 // taskAvatarAvoid advances a colliding background by one palette slot. Render
 // the first participant normally and pass its seed as avoid for the second.
 func taskAvatarAvoid(c *ui.Context, seed, avoid string, size float32) {
+	if taskAvatarObserver != nil {
+		taskAvatarObserver(seed, avoid, size)
+	}
 	ui.Image(c, taskAvatarSVG(seed, avoid)).Size(size, size).Shrink(0).Radius(size / 2)
 }

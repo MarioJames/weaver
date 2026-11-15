@@ -279,8 +279,20 @@ func (a *app) view(c *ui.Context) {
 			if compact {
 				padding, gap = 16, 14
 			}
-			ui.Scroll(c.Key(a.page)).Grow(1).Basis(0).MinHeight(0).Children(func() {
-				ui.Column(c).Padding(padding).Gap(gap).Children(func() {
+			// The task page scrolls its own list and conversation, so it takes the full height.
+			owned := a.page == "任务" && a.loaded
+			var shell ui.Element
+			if owned {
+				shell = ui.Column(c.Key(a.page))
+			} else {
+				shell = ui.Scroll(c.Key(a.page))
+			}
+			shell.Grow(1).Basis(0).MinHeight(0).Children(func() {
+				body := ui.Column(c).Padding(padding).Gap(gap)
+				if owned {
+					body.Grow(1).Basis(0).MinHeight(0)
+				}
+				body.Children(func() {
 					if !a.loaded {
 						stateLoading(c, "正在连接服务")
 						fieldError(c, a.reason)

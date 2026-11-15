@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -146,52 +145,79 @@ func taskContractService(t *testing.T) (client, string, []string) {
 	return client{}, "", nil
 }
 
+// The page runs against the real service: the list, one timeline read, the
+// full-text and package drawers, the artifact panel and the live follow all
+// decode the service's own structures.
 func TestTasksRealDaemonContract(t *testing.T) {
 	c, mission, ids := taskContractService(t)
 	// testApp isolates HOME and routes newApp to this temporary socket.
 	a := testApp(t, &fakeService{home: c.home})
 	a.page = "任务"
-	tt := ui.NewTester(a.view, 1440, 1600)
+	tt := ui.NewTester(a.view, 1180, 3000)
 	tasksWait(t, tt, "真实服务契约任务", 5*time.Second)
-	tasksContains(t, tt, "Cl", "待结论 · 1 / 2 已采纳")
+	tasksContains(t, tt, "待结论", "1 / 2", "产物 3", "Claude ·")
 	click(t, tt, "真实服务契约任务")
-	tasksWait(t, tt, "只做桌面端", 5*time.Second)
-	at := time.Date(2026, 11, 15, 6, 0, 1, 0, time.UTC).UnixMilli()
-	tasksContains(t, tt, "先实现骨架，再拆包。", "▸ weaver plan submit · "+taskTime(at), "▸ Read · "+taskTime(at+1000), "shell", "server", "子 Agent 2", "第 1 次尝试", "第 2 次尝试", "已退回：补上断线恢复说明", "▸ 第 1 次结果全文", "▸ 第 2 次结果全文")
-	if _, exists := tt.Find("子 Agent"); exists {
-		t.Fatal("计划卡片未匹配 submit，落入末尾分组")
+	tasksWait(t, tt, "先实现骨架，再拆包。", 5*time.Second)
+	tt.Advance(500 * time.Millisecond)
+	tasksContains(t, tt, "只做桌面端", "创建主任务", "派出 2 个 Agent", "shell", "server", "退回", "补上断线恢复说明", "采纳", "父 Agent", "子 Agent", "第 2 次")
+	// What Claude Code filed in a thinking block is shown as the owner's words; a signature-only block adds nothing.
+	tasksContains(t, tt, "先确认范围。")
+	tasksAbsent(t, tt, "没能读取", "未关联父 Agent 会话")
+	if !tasksOrdered(tt, "只做桌面端", "创建主任务") || !tasksOrdered(tt, "创建主任务", "派出 2 个 Agent") {
+		t.Fatalf("顺序：%q", tt.Texts())
 	}
-	texts := strings.Join(tt.Texts(), "\n")
-	if strings.Index(texts, "weaver plan submit") > strings.Index(texts, "shell") {
-		t.Fatal("子 Agent 卡片未出现在 submit 后")
-	}
-	if tt.HasText("hidden-thinking") || tt.HasText("正在读取父 Agent 对话") {
-		t.Fatalf("对话未正常显示: %q", tt.Texts())
-	}
-	click(t, tt, "▸ 第 1 次结果全文")
-	tasksContains(t, tt, "第一次结果，需要修订")
-	click(t, tt, "server")
-	tasksContains(t, tt, "待结论")
+	// The package drawer reads package.show and lists both attempts.
+	click(t, tt, "shell")
+	tasksWait(t, tt, "第二次结果，检查通过", 5*time.Second)
+	tasksContains(t, tt, "实现应用骨架", "第一次结果，需要修订", "补上断线恢复说明")
+	tt.Key(0, ui.KeyEscape)
+	tt.Advance(time.Second)
+	// New verdicts reach the open page through the follow loop.
 	if err := c.call("verdict", map[string]string{"package": ids[1], "verdict": "accept", "note": "服务接口已复核"}, nil); err != nil {
 		t.Fatal(err)
 	}
-	tasksWait(t, tt, "已完成 · 2 / 2 已采纳", 3*time.Second)
-	tasksContains(t, tt, "已采纳：服务接口已复核")
-	// Both archive endpoints return a Mission, and list separates archived tasks.
-	click(t, tt, "归档")
-	tasksWait(t, tt, "已归档（1）", 3*time.Second)
-	click(t, tt, "已归档（1）")
-	click(t, tt, "恢复")
-	tasksWait(t, tt, "已归档（0）", 3*time.Second)
+	tasksWait(t, tt, "服务接口已复核", 5*time.Second)
+	tasksContains(t, tt, "已完成")
 	click(t, tt, "产物 3")
-	tasksContains(t, tt, "设计 v2", "2 个版本", "待拍板 1 项 · 验收清单 1 项", "验收报告", "通过 1 · 失败 1")
+	tasksWait(t, tt, "设计 v2", 5*time.Second)
+	tasksContains(t, tt, "2 个版本", "待拍板 1 项 · 验收清单 1 项", "验收报告", "通过 1 · 失败 1")
 	click(t, tt, "2 个版本")
 	tasksContains(t, tt, "设计 v1")
+	tt.Key(0, ui.KeyEscape)
+	tt.Advance(time.Second)
+	// Both archive endpoints return a Mission, and the list separates archived tasks.
+	click(t, tt, "归档")
+	tasksWait(t, tt, "已归档 1", 5*time.Second)
+	click(t, tt, "已归档 1")
+	tasksWait(t, tt, "恢复", 5*time.Second)
+	click(t, tt, "恢复")
+	tasksWait(t, tt, "已归档 0", 5*time.Second)
 	var restored kernel.Mission
 	if err := c.call("mission.show", map[string]string{"id": mission}, &restored); err != nil {
 		t.Fatal(err)
 	}
 	if restored.Archived || restored.Owner == nil || restored.Owner.Session != "task-owner-claude" {
 		t.Fatalf("恢复的任务: %+v", restored)
+	}
+	// The full-text refs the service hands out are the ones its mission.text accepts.
+	var timeline kernel.TimelineResult
+	if err := c.call("mission.timeline", kernel.TimelineInput{Mission: mission}, &timeline); err != nil {
+		t.Fatal(err)
+	}
+	read := 0
+	for _, e := range timeline.Entries {
+		for _, ref := range []string{e.Ref, e.NoteRef} {
+			if ref == "" {
+				continue
+			}
+			var text kernel.MissionTextResult
+			if err := c.call("mission.text", map[string]string{"mission": mission, "ref": ref}, &text); err != nil || text.Title == "" {
+				t.Errorf("mission.text %s：%+v %v", ref, text, err)
+			}
+			read++
+		}
+	}
+	if read == 0 {
+		t.Fatal("时间线里没有可展开的正文")
 	}
 }

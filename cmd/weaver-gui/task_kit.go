@@ -93,12 +93,23 @@ func taskText(c *ui.Context, text string) ui.Element {
 	return ui.Text(c, text).FontSize(14).LineHeight(1.6).TextColor(theme.TokensOf(c).Text)
 }
 
-func taskUser(c *ui.Context, at, text string) {
+func taskUser(c *ui.Context, at, text string) { taskUserMessage(c, at, text, 0, 0, false) }
+
+// taskUserMessage clips the message to maxLines (0 for no limit). clipped says
+// text is only the head of a body of chars characters. It reports a click on 查看全文.
+func taskUserMessage(c *ui.Context, at, text string, maxLines, chars int, clipped bool) (more bool) {
 	tk := theme.TokensOf(c)
 	ui.Column(c).FillWidth().AlignItems(ui.End).Gap(6).Children(func() {
 		ui.Text(c, "你 · "+at).FontSize(12).TextColor(tk.TextQuaternary)
-		ui.Column(c).MaxWidth(560).MinWidth(0).Padding(10, 14).Radius(14, 4, 14, 14).Background(tk.FillSecondary).Children(func() { taskText(c, text) })
+		ui.Column(c).MaxWidth(560).MinWidth(0).Padding(10, 14).Radius(14, 4, 14, 14).Background(tk.FillSecondary).Gap(8).Children(func() {
+			if maxLines > 0 {
+				more = taskPreviewChars(c, text, maxLines, chars, clipped)
+			} else {
+				taskText(c, text)
+			}
+		})
 	})
+	return
 }
 
 func taskMore(c *ui.Context, label string) bool {
@@ -117,13 +128,9 @@ type taskPreviewMeasure struct {
 	lines int
 }
 
-// taskPreview uses the last layout's actual text width, so soft wrapping and
+// taskOverflows uses the last layout's actual text width, so soft wrapping and
 // explicit newlines both count. No Elements or shaped layouts survive a frame.
-func taskPreview(c *ui.Context, text string, maxLines int) bool {
-	t := taskText(c, text)
-	if maxLines <= 0 || text == "" {
-		return false
-	}
+func taskOverflows(c *ui.Context, t ui.Element, text string, font ui.Font, maxLines int) bool {
 	t.MaxLines(maxLines)
 	m := ui.Local(t, "task-preview", func() taskPreviewMeasure { return taskPreviewMeasure{} })
 	width := t.LayoutBounds().W
@@ -133,10 +140,29 @@ func taskPreview(c *ui.Context, text string, maxLines int) bool {
 	}
 	if m.text != text || m.width != width {
 		m.text, m.width = text, width
-		m.lines = len(ui.ShapeText(text, ui.Font{Size: 14, LineHeight: 1.6}, width).Lines())
+		m.lines = len(ui.ShapeText(text, font, width).Lines())
 	}
-	if m.lines > maxLines {
-		return taskMore(c, fmt.Sprintf("查看全文 · %d 字", utf8.RuneCountInString(text)))
+	return m.lines > maxLines
+}
+
+func taskPreview(c *ui.Context, text string, maxLines int) bool {
+	return taskPreviewChars(c, text, maxLines, 0, false)
+}
+
+// taskPreviewChars shows the entry for the full text when text is only the head
+// of the body (clipped) or does not fit maxLines. The label counts the full
+// body: chars, or text itself when chars is 0.
+func taskPreviewChars(c *ui.Context, text string, maxLines, chars int, clipped bool) bool {
+	t := taskText(c, text)
+	if maxLines <= 0 || text == "" {
+		return false
+	}
+	if chars <= 0 {
+		chars = utf8.RuneCountInString(text)
+	}
+	over := taskOverflows(c, t, text, ui.Font{Size: 14, LineHeight: 1.6}, maxLines)
+	if over || clipped {
+		return taskMore(c, fmt.Sprintf("查看全文 · %d 字", chars))
 	}
 	return false
 }
@@ -197,6 +223,11 @@ func taskChip(c *ui.Context, icon *ui.SVG, tone taskTone) {
 }
 
 func taskProcessRow(c *ui.Context, icon *ui.SVG, tone taskTone, action, target, at string, detail func()) {
+	taskProcessRowEnd(c, icon, tone, action, target, at, nil, detail)
+}
+
+// taskProcessRowEnd adds a trailing control after the time.
+func taskProcessRowEnd(c *ui.Context, icon *ui.SVG, tone taskTone, action, target, at string, end, detail func()) {
 	tk := theme.TokensOf(c)
 	ui.Row(c).FillWidth().Gap(12).AlignItems(ui.Start).Children(func() {
 		ui.Column(c).Width(32).Shrink(0).AlignItems(ui.Center).Children(func() { taskChip(c, icon, tone) })
@@ -208,6 +239,9 @@ func taskProcessRow(c *ui.Context, icon *ui.SVG, tone taskTone, action, target, 
 				}
 				ui.Box(c).Grow(1)
 				ui.Text(c, at).FontSize(12).TextColor(tk.TextQuaternary).SingleLine().Shrink(0)
+				if end != nil {
+					end()
+				}
 			})
 			if detail != nil {
 				detail()
@@ -227,6 +261,26 @@ func taskQuote(c *ui.Context, text string, lines int, more string) (clicked bool
 			}
 			if more != "" {
 				clicked = taskMore(c, more)
+			}
+		})
+	})
+	return
+}
+
+// taskQuoteNote clips a quote to lines and offers 查看全文 when text is a head
+// of a longer body (clipped) or does not fit. It reports a click on the entry.
+func taskQuoteNote(c *ui.Context, text string, chars, lines int, clipped bool) (clicked bool) {
+	tk := theme.TokensOf(c)
+	ui.Row(c).Gap(10).AlignItems(ui.Stretch).Children(func() {
+		ui.Box(c).Width(2).Shrink(0).Radius(1).Background(tk.Border)
+		ui.Column(c).Grow(1).Basis(0).MinWidth(0).Gap(4).Children(func() {
+			t := ui.Text(c, text).FontSize(13).LineHeight(1.6).TextColor(tk.TextSecondary)
+			if chars <= 0 {
+				chars = utf8.RuneCountInString(text)
+			}
+			over := taskOverflows(c, t, text, ui.Font{Size: 13, LineHeight: 1.6}, lines)
+			if over || clipped {
+				clicked = taskMore(c, fmt.Sprintf("查看全文 · %d 字", chars))
 			}
 		})
 	})
