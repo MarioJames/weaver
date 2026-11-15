@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -24,6 +25,7 @@ type normalizer struct {
 	done          bool   // the vendor's own success terminal was seen
 	failure       string // sticky: a failure event was seen
 	failureDetail string
+	lastError     string // latest non-terminal error, the reason if the run later fails
 	stopReason    string
 	dshTools      map[string]string
 	unparsed      int
@@ -225,17 +227,36 @@ func (n *normalizer) codex(e obj) (s signal) {
 		n.usage(u["input_tokens"], u["output_tokens"])
 		n.done = true
 		n.stopReason = "completed"
-	case "turn.failed", "error":
+	case "error":
+		// codex prints an error event for every stream retry ("Reconnecting...
+		// 2/5 (...)") and carries on; only turn.failed or the exit ends the turn.
 		message := str(e["message"])
 		if message == "" {
 			message = str(asObj(e["error"])["message"])
 		}
-		if message == "" {
-			message = str(e["type"])
+		if message = strings.TrimSpace(message); message != "" {
+			n.lastError = clip(Redact(message), 4000)
+			s.notes = append(s.notes, reconnectNote(message))
 		}
-		n.fail(str(e["type"]), message)
+	case "turn.failed":
+		message := str(asObj(e["error"])["message"])
+		if message == "" {
+			message = str(e["message"])
+		}
+		if strings.TrimSpace(message) == "" {
+			message = n.lastError
+		}
+		if strings.TrimSpace(message) == "" {
+			message = "turn.failed"
+		}
+		n.fail("turn.failed", message)
 	}
 	return
+}
+
+// reconnectNote turns a vendor retry notice into a progress line for the parent.
+func reconnectNote(message string) string {
+	return "引擎重连：" + clip(vendorMessage(Redact(message)), 300)
 }
 
 // claude speaks the Claude Code stream-json shape: system init, assistant and
@@ -243,9 +264,25 @@ func (n *normalizer) codex(e obj) (s signal) {
 func (n *normalizer) claude(e obj) (s signal) {
 	switch e["type"] {
 	case "system":
-		if e["subtype"] == "init" {
+		switch e["subtype"] {
+		case "init":
 			n.session = str(e["session_id"])
 			s.started = true
+		case "api_retry":
+			// SDKAPIRetryMessage: Claude Code is retrying a failed API call and
+			// will go on by itself; a terminal failure still arrives as result.
+			detail := strings.TrimSpace(str(e["error"]))
+			if status := num(e["error_status"]); status > 0 {
+				detail = strings.TrimSpace(fmt.Sprintf("%d %s", status, detail))
+			}
+			if detail != "" {
+				n.lastError = clip(Redact(detail), 4000)
+			}
+			note := "第 " + fmt.Sprint(num(e["attempt"])) + "/" + fmt.Sprint(num(e["max_retries"])) + " 次"
+			if detail != "" {
+				note += "，" + detail
+			}
+			s.notes = append(s.notes, reconnectNote(note))
 		}
 	case "assistant":
 		m := asObj(e["message"])

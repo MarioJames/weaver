@@ -643,7 +643,7 @@ func (c *Cold) failure(r *coldRun, norm *normalizer, exit exitRecord, exitKnown 
 		stderr = strings.TrimSpace(Redact(lastBytes(string(body), 2048)))
 	}
 	now := time.Now()
-	for _, text := range []string{norm.failureDetail, stderr} {
+	for _, text := range []string{norm.failureDetail, norm.lastError, stderr} {
 		if text == "" {
 			continue
 		}
@@ -668,7 +668,9 @@ func (c *Cold) failure(r *coldRun, norm *normalizer, exit exitRecord, exitKnown 
 	default:
 		o.FailureKind, o.FailureMessage = FailNoResult, "引擎正常退出，但没有给出最终回复"
 	}
-	if stderr != "" && norm.failureDetail == "" {
+	if norm.failure == "" && norm.lastError != "" {
+		o.FailureMessage += "：" + clip(norm.lastError, 1200)
+	} else if stderr != "" && norm.failureDetail == "" {
 		o.FailureMessage += "：" + clip(lastLines(stderr, 6), 1200)
 	}
 	return o
