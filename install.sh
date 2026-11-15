@@ -167,12 +167,27 @@ if [ "$gui" = 1 ]; then
   gui_exec="${gui_exec//\$/\\\$}"
   gui_exec="${gui_exec//\`/\\\`}"
   gui_exec="${gui_exec//%/%%}"
+  # The menu and the taskbar look the icon up by name; GTK reads an existing icon cache instead of the directory.
+  icon_line=""
+  if [ -f "$gui_root/weaver-gui/weaver-gui.png" ]; then
+    icon_dir="$HOME/.local/share/icons/hicolor/256x256/apps"
+    mkdir -p "$icon_dir"
+    cp -f -- "$gui_root/weaver-gui/weaver-gui.png" "$icon_dir/.weaver-gui.png.tmp"
+    mv -f -- "$icon_dir/.weaver-gui.png.tmp" "$icon_dir/weaver-gui.png"
+    if [ -f "$HOME/.local/share/icons/hicolor/icon-theme.cache" ] && command -v gtk-update-icon-cache >/dev/null; then
+      gtk-update-icon-cache -f -t -q "$HOME/.local/share/icons/hicolor" || true
+    fi
+    icon_line="Icon=weaver-gui"
+  fi
   desktop_work="$(mktemp "$HOME/.local/share/applications/.weaver-gui.XXXXXX")"
+  # GTK names the window class and the Wayland app id after the executable, weaver-gui.
   cat > "$desktop_work" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=Weaver
 Exec="$gui_exec"
+$icon_line
+StartupWMClass=weaver-gui
 Terminal=false
 Categories=Development;
 DESKTOP

@@ -46,7 +46,8 @@ gui-dist:
 	stage=$$(mktemp -d dist/gui-$(ARCH).XXXXXX); trap 'rm -rf "$$stage"' EXIT; \
 	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o "$$stage/weaver-gui" ./cmd/weaver-gui; \
 	cp "$$cache" "$$stage/libghostty-vt.so"; \
-	tar -czf $(OUT)/weaver-gui-linux-$(LABEL).tar.gz -C "$$stage" weaver-gui libghostty-vt.so
+	cp cmd/weaver-gui/assets/weaver-icon.png "$$stage/weaver-gui.png"; \
+	tar -czf $(OUT)/weaver-gui-linux-$(LABEL).tar.gz -C "$$stage" weaver-gui libghostty-vt.so weaver-gui.png
 
 install: dist
 	./install.sh --dist-dir $(OUT) --gui

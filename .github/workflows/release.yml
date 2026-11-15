@@ -43,6 +43,8 @@ jobs:
           test -L "$RUNNER_TEMP/bin/weaver-gui"
           test -f "$HOME/.local/lib/weaver-gui/libghostty-vt.so"
           test -f "$HOME/.local/share/applications/weaver-gui.desktop"
+          test -f "$HOME/.local/share/icons/hicolor/256x256/apps/weaver-gui.png"
+          grep -qx 'Icon=weaver-gui' "$HOME/.local/share/applications/weaver-gui.desktop"
           (cd dist/release && sha256sum --check SHA256SUMS)
           if go version -m "$RUNNER_TEMP/bin/weaver" | grep -Eq 'github.com/(egoist/mygo|lobehub/lobe-mygo)'; then
             echo 'weaver unexpectedly depends on GUI libraries' >&2; exit 1

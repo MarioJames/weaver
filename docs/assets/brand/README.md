@@ -52,6 +52,13 @@ Weaver 是本地异构 Agent 任务调度控制面：由负责人 Agent 将任�
 
 界面素材是同一套定稿的运行时导出。正式横向组合是图文比例的依据；后台导出仅去掉白底、裁剪外围留白并使用较小的内嵌 PNG，不单独改变字标比例。更新品牌时应同步正式素材和界面文件，并检查展开、收起和移动抽屉。
 
+## 桌面应用
+
+- 侧栏与窄窗口顶栏用「围巾图标 + 路径字标」，按界面组合的图文比例绘制：图标 28 DIP（可见约 24）、字标 17 DIP，窄窗口整体缩到 7/8。字标浅色主题用暖炭色，深色主题用界面正文色。
+- [运行时图标](../../../cmd/weaver-gui/assets/weaver-icon.png)：与 `weaver-icon-256.png` 字节一致（测试校验），同时是窗口图标，并随 GUI 压缩包作为 `weaver-gui.png` 发布。
+- [运行时字标](../../../cmd/weaver-gui/assets/weaver-wordmark.svg)：界面组合 SVG 中同一组字标路径，填色为 `currentColor`。
+- `install.sh --gui` 把图标装到 `~/.local/share/icons/hicolor/256x256/apps/weaver-gui.png`，桌面条目写 `Icon=weaver-gui`、`StartupWMClass=weaver-gui`；Wayland 按 app id `weaver-gui` 匹配该条目取图标。KWin 在窗口出现时确定图标，升级前已打开的窗口需重开才会换上。
+
 ## 来源与验证
 
 方案由内置 imagegen 生成，经用户选定 M「珊瑚」定稿。`weaver-icon.png` 与选中稿的文件字节一致，原图 SHA-256：

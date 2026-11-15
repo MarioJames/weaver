@@ -93,21 +93,6 @@ func (a *app) navigation(c *ui.Context, compact bool) {
 	})
 }
 
-func brand(c *ui.Context, compact bool) {
-	tk := theme.TokensOf(c)
-	size := float32(26)
-	textSize := float32(15)
-	if compact {
-		size, textSize = 24, 14
-	}
-	ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-		ui.Row(c).Size(size, size).Radius(8).Background(tk.Primary).Center().Children(func() {
-			ui.Text(c, "W").FontSize(13).FontWeight(700).TextColor(tk.PrimaryForeground)
-		})
-		ui.Text(c, "Weaver").FontSize(textSize).FontWeight(700).TextColor(tk.Text)
-	})
-}
-
 func (a *app) navigateTo(page string) {
 	a.page = page
 	if page == "设置" && !a.skillChecked {
