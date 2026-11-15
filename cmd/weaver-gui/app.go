@@ -75,6 +75,7 @@ type workerStats struct {
 	MedianSeconds       float64 `json:"medianSeconds"`
 }
 type worker struct {
+	Role         string      `json:"role"`
 	Stats        workerStats `json:"stats"`
 	ID           string      `json:"id"`
 	Engine       string      `json:"engine"`

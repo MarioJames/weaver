@@ -29,6 +29,8 @@ type workerConfig struct {
 }
 type workerPageState struct {
 	shown                                                          bool
+	debater                                                        bool
+	clearing                                                       bool
 	original                                                       *worker
 	id, engine, model, effort, intelligence, parallel, description string
 	accounts                                                       []string
@@ -53,6 +55,12 @@ func (s *workerPageState) open(a *app, w *worker) {
 	}
 	s.loadConfigs(a)
 }
+func (s *workerPageState) openDebater(a *app, id string, w *worker) {
+	s.open(a, w)
+	s.debater = true
+	s.id = id
+}
+
 func (s *workerPageState) loadConfigs(a *app) {
 	if s.engine != "dsh" {
 		return
@@ -173,23 +181,34 @@ func (s *workerPageState) drawer(a *app, c *ui.Context) {
 					if s.original != nil {
 						title = "编辑 " + s.id
 					}
+					if s.debater {
+						title = "配置" + debaterName(s.id)
+						if s.original != nil {
+							title = "编辑" + debaterName(s.id)
+						}
+					}
 					ui.Text(c, title).FontSize(17).FontWeight(600).Grow(1)
 					close := ui.ButtonBase(c).Label("关闭候选编辑").Size(28, 28).Radius(tk.BorderRadiusSM).Center().
 						TextColor(tk.TextTertiary).Cursor(ui.CursorPointer)
 					close.Children(func() { ui.Icon(c, lucide.X()).FontSize(16) })
-					if close.Clicked() {
+					if close.Disabled(a.busy["worker:save"] || a.busy["worker:clear"]).Clicked() {
 						s.shown = false
 					}
 				})
 				ui.Box(c).Height(1).AlignSelf(ui.Stretch).Background(tk.Split)
 				ui.Scroll(c).Grow(1).Basis(0).MinHeight(0).Padding(20, 24).Children(func() {
 					ui.Column(c).Gap(12).Children(func() {
-						workerInput(c, "ID", &s.id, s.original != nil)
+						if !s.debater {
+							workerInput(c, "ID", &s.id, s.original != nil)
+						}
 						formRow(c, "引擎", func(label ui.Element) {
-							if s.original != nil {
+							if s.original != nil && !s.debater {
 								display.Text(c, s.engine+"（建好后不能改）", display.TextProps{Type: display.TextSecondary})
 							} else if ui.Select(c, &s.engine, []string{"claude", "codex", "opencode", "dsh"}).LabelledBy(label).Changed() {
 								s.accounts = []string{}
+								s.model = ""
+								s.configs = map[string]workerConfig{}
+								s.configErrors = map[string]string{}
 								s.effort = ""
 							}
 						})
@@ -239,7 +258,7 @@ func (s *workerPageState) drawer(a *app, c *ui.Context) {
 								for _, m := range models {
 									options = append(options, field.SelectOption{Value: m, Label: m})
 								}
-								field.Select(c, &s.model, field.SelectProps{Size: theme.Small, Options: options}).Label("模型").LabelledBy(label)
+								field.Select(c, &s.model, field.SelectProps{Size: theme.Small, Options: options, Placeholder: "选择模型"}).Label("模型").LabelledBy(label)
 							})
 							formRow(c, "强度", func(label ui.Element) {
 								if constrained {
@@ -253,39 +272,83 @@ func (s *workerPageState) drawer(a *app, c *ui.Context) {
 							workerInput(c, "模型", &s.model, false)
 							workerInput(c, "强度", &s.effort, false)
 						}
-						formRow(c, "能力分", func(label ui.Element) {
-							ui.Column(c).Width(120).Children(func() {
-								field.Input(c, &s.intelligence, field.InputProps{Size: theme.Small}).Label("能力分").LabelledBy(label)
-							})
-						})
-						formRow(c, "并行上限", func(label ui.Element) {
-							formFieldStack(c, func() {
+						if !s.debater {
+							formRow(c, "能力分", func(label ui.Element) {
 								ui.Column(c).Width(120).Children(func() {
-									field.Input(c, &s.parallel, field.InputProps{Size: theme.Small}).Label("并行上限").LabelledBy(label)
+									field.Input(c, &s.intelligence, field.InputProps{Size: theme.Small}).Label("能力分").LabelledBy(label)
 								})
-								formHelp(c, "0 为不限")
 							})
-						})
-						workerInput(c, "说明", &s.description, false)
+							formRow(c, "并行上限", func(label ui.Element) {
+								formFieldStack(c, func() {
+									ui.Column(c).Width(120).Children(func() {
+										field.Input(c, &s.parallel, field.InputProps{Size: theme.Small}).Label("并行上限").LabelledBy(label)
+									})
+									formHelp(c, "0 为不限")
+								})
+							})
+							workerInput(c, "说明", &s.description, false)
+						}
 						fieldError(c, s.err)
 					})
 				})
 				ui.Box(c).Height(1).AlignSelf(ui.Stretch).Background(tk.Split)
-				ui.Row(c).Padding(14, 20).Gap(8).Justify(ui.End).AlignItems(ui.Center).Children(func() {
-					saving := a.busy["worker:save"]
+				ui.Row(c).Padding(14, 20).Gap(8).Wrap().Justify(ui.End).AlignItems(ui.Center).Children(func() {
+					saving := a.busy["worker:save"] || a.busy["worker:clear"]
+					if s.debater && s.original != nil {
+						if s.clearing {
+							display.Text(c, "确认清空"+debaterName(s.id)+"？", display.TextProps{})
+							if ui.Button(c, "保留席位").Disabled(saving).Clicked() {
+								s.clearing = false
+							}
+							if ui.Button(c, "确认移除").Disabled(saving).Clicked() {
+								id := s.id
+								a.action("worker:clear", func() (string, error) {
+									err := a.client.call("worker.remove", map[string]string{"id": id}, nil)
+									if err == nil {
+										a.refresh()
+									}
+									return "", err
+								}, func(_ string, err error) {
+									if err != nil {
+										s.err = err.Error()
+									} else {
+										s.shown = false
+									}
+								})
+							}
+						} else if ui.Button(c, "清空席位").Disabled(saving).Clicked() {
+							s.clearing = true
+						}
+					}
 					if ui.Button(c, "取消").Disabled(saving).Clicked() {
 						s.shown = false
 					}
-					a.primaryButton(c, "worker:save", "保存", func() { s.save(a) })
+					a.primaryButton(c, "worker:save", "保存", func() {
+						if !saving {
+							s.save(a)
+						}
+					})
 				})
 			})
-			if !a.busy["worker:save"] && (panel.PressedOutside() || back.OverlayShortcut(0, ui.KeyEscape)) {
+			if !a.busy["worker:save"] && !a.busy["worker:clear"] && (panel.PressedOutside() || back.OverlayShortcut(0, ui.KeyEscape)) {
 				s.shown = false
 			}
 		})
 	})
 }
 func (s *workerPageState) save(a *app) {
+	if a.busy["worker:save"] || a.busy["worker:clear"] {
+		return
+	}
+	if s.debater {
+		if strings.TrimSpace(s.model) == "" || len(s.accounts) == 0 {
+			s.err = "请选择模型和至少一个账号"
+			return
+		}
+		s.submit(a, map[string]any{"id": s.id, "engine": s.engine, "model": s.model, "effort": s.effort, "accounts": append([]string{}, s.accounts...)})
+		return
+	}
+
 	intelligence, err := strconv.ParseFloat(strings.TrimSpace(s.intelligence), 64)
 	if err != nil || !validWorkerIntelligence(intelligence) {
 		s.err = "能力分只能为 0（未评分）或 1–10，步长 0.5"
@@ -319,6 +382,10 @@ func (s *workerPageState) save(a *app) {
 	if old == nil || s.description != old.Description {
 		p["description"] = s.description
 	}
+	s.submit(a, p)
+}
+
+func (s *workerPageState) submit(a *app, p map[string]any) {
 	s.err = ""
 	a.action("worker:save", func() (string, error) {
 		err := a.client.call("worker.set", p, nil)

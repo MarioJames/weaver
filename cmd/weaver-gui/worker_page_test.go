@@ -15,9 +15,12 @@ import (
 )
 
 type workerRPC struct {
-	f      *fakeService
-	calls  []map[string]any
-	reject bool
+	f           *fakeService
+	calls       []map[string]any
+	configCalls []map[string]any
+	removeCalls []map[string]any
+	hold        <-chan struct{}
+	reject      bool
 }
 
 func newWorkerRPC(t *testing.T) *workerRPC {
@@ -64,9 +67,17 @@ func newWorkerRPC(t *testing.T) *workerRPC {
 				if json.NewDecoder(conn).Decode(&req) != nil {
 					return
 				}
-				if req.Method != "worker.set" && req.Method != "worker.remove" && req.Method != "account.config" {
+				if req.Method != "worker.set" && req.Method != "worker.remove" && req.Method != "account.config" && req.Method != "config.set" {
 					f.respond(conn, req)
 					return
+				}
+				if req.Method == "worker.set" {
+					f.mu.Lock()
+					hold := w.hold
+					f.mu.Unlock()
+					if hold != nil {
+						<-hold
+					}
 				}
 				w.respond(conn, req)
 			}()
@@ -83,6 +94,9 @@ func (w *workerRPC) respond(conn net.Conn, req rpc.Request) {
 	var result any
 	var failure *rpc.Error
 	switch req.Method {
+	case "config.set":
+		w.configCalls = append(w.configCalls, p)
+		f.data.Settings[p["key"].(string)] = p["value"].(string)
 	case "account.config":
 		result = map[string]any{"provider": "openai", "config": map[string]any{"models": []any{map[string]any{"id": "gpt-6.1-terra", "reasoningEfforts": map[string]any{"xhigh": map[string]any{}, "max": map[string]any{}}}}}}
 	case "worker.set":
@@ -104,8 +118,12 @@ func (w *workerRPC) respond(conn net.Conn, req rpc.Request) {
 		}
 		data, _ := json.Marshal(p)
 		json.Unmarshal(data, &f.data.Workers[pos])
+		if p["id"] == "debater_a" || p["id"] == "debater_b" {
+			f.data.Workers[pos].Role = "debater"
+		}
 		result = f.data.Workers[pos]
 	case "worker.remove":
+		w.removeCalls = append(w.removeCalls, p)
 		for i, v := range f.data.Workers {
 			if v.ID == p["id"] {
 				f.data.Workers = append(f.data.Workers[:i], f.data.Workers[i+1:]...)

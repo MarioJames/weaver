@@ -19,14 +19,14 @@ func (a *app) workersPage(c *ui.Context) {
 	root := ui.Column(c).Key("workers-page")
 	state := ui.Local(root, "workers", func() workerPageState { return workerPageState{} })
 	root.Children(func() {
-		a.pageHeader(c, "候选", fmt.Sprintf("%d 个候选", len(a.snapshot.Workers)), func() {
+		a.pageHeader(c, "候选", fmt.Sprintf("%d 个候选", len(a.executionWorkers())), func() {
 			if ui.PrimaryButton(c, "新建候选").Clicked() {
 				state.open(a, nil)
 			}
 		})
 		width, _ := c.Size()
 		switch {
-		case len(a.snapshot.Workers) == 0:
+		case len(a.executionWorkers()) == 0:
 			stateEmpty(c, lucide.Bot(), "还没有候选", "候选决定一个包交给哪个引擎、模型和账号。先从已在用的账号建一个。", "新建候选", func() {
 				state.open(a, nil)
 			})
@@ -38,6 +38,7 @@ func (a *app) workersPage(c *ui.Context) {
 				a.workerTable(c, state)
 			}
 		}
+		a.debaterSection(c, state, width < 1080)
 	})
 	state.drawer(a, c)
 }
@@ -53,10 +54,170 @@ func (a *app) workerTable(c *ui.Context, state *workerPageState) {
 			}
 		})
 		ui.Box(c).Height(1).AlignSelf(ui.Stretch).Background(tk.Split)
-		for i, w := range a.snapshot.Workers {
-			a.workerRow(c.Key(w.ID), w, state, i < len(a.snapshot.Workers)-1)
+		for i, w := range a.executionWorkers() {
+			a.workerRow(c.Key(w.ID), w, state, i < len(a.executionWorkers())-1)
 		}
 	})
+}
+
+func (a *app) executionWorkers() []worker {
+	workers := make([]worker, 0, len(a.snapshot.Workers))
+	for _, w := range a.snapshot.Workers {
+		if w.Role != "debater" {
+			workers = append(workers, w)
+		}
+	}
+	return workers
+}
+
+func debaterName(id string) string {
+	if id == "debater_a" {
+		return "甲方"
+	}
+	return "乙方"
+}
+
+func (a *app) debaterSection(c *ui.Context, state *workerPageState, narrow bool) {
+	tk := theme.TokensOf(c)
+	ui.Column(c).Gap(12).Padding(24, 0, 0, 0).Children(func() {
+		display.Text(c, "对谈人", display.TextProps{Strong: true, FontSize: 16})
+		display.Text(c, "设计对谈固定由这两位出方案并互评。对谈人不参与工作包的选路。", display.TextProps{Type: display.TextSecondary, FontSize: 12})
+		ui.Column(c).Gap(0).Border(1, tk.BorderSecondary).Radius(10).Clip().Children(func() {
+			if !narrow {
+				ui.Row(c).Padding(10, 12).Gap(12).Background(tk.FillQuaternary).Children(func() {
+					for i, label := range []string{"席位", "引擎与模型", "思考力度", "账号", "操作"} {
+						debaterCell(c, i, func() {
+							display.Text(c, label, display.TextProps{Type: display.TextSecondary, FontSize: 12, Strong: true})
+						})
+					}
+				})
+			}
+			for i, id := range []string{"debater_a", "debater_b"} {
+				var seat *worker
+				for _, w := range a.snapshot.Workers {
+					if w.ID == id {
+						v := w
+						seat = &v
+						break
+					}
+				}
+				name := debaterName(id)
+				identity := func() {
+					ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+						avoid := ""
+						if i == 1 {
+							avoid = "debater_a"
+						}
+						taskAvatarAvoid(c, id, avoid, 24)
+						display.Text(c, name, display.TextProps{Strong: true})
+						taskRoleTag(c, taskRoleDebater)
+					})
+				}
+				details := func(col int) {
+					if seat == nil {
+						if col == 1 {
+							display.Text(c, "未配置", display.TextProps{Type: display.TextSecondary})
+						}
+						return
+					}
+					switch col {
+					case 1:
+						display.Text(c, seat.Engine+" · "+seat.Model, display.TextProps{FontSize: 13}).MaxLines(2)
+					case 2:
+						effort := seat.Effort
+						if effort == "" {
+							effort = "默认"
+						}
+						display.Text(c, effort, display.TextProps{Type: display.TextSecondary, FontSize: 13})
+					case 3:
+						for _, id := range seat.Accounts {
+							label := "账号"
+							for _, acc := range a.snapshot.Accounts {
+								if acc.ID == id && acc.Label != "" {
+									label = acc.Label
+									break
+								}
+							}
+							display.Text(c, label, display.TextProps{Type: display.TextSecondary, FontSize: 13}).MaxLines(2)
+						}
+						if !seat.Available && seat.Reason != "" {
+							ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
+								ui.Icon(c, lucide.TriangleAlert()).FontSize(13).TextColor(tk.Warning)
+								display.Text(c, seat.Reason, display.TextProps{FontSize: 12}).TextColor(tk.Warning).Grow(1).Basis(0).MinWidth(0)
+							})
+						}
+					}
+				}
+				operation := func() {
+					label := "编辑"
+					if seat == nil {
+						label = "配置"
+					}
+					if action.Button(c, label, action.ButtonProps{Size: theme.Small}).Label(label + name).Clicked() {
+						state.openDebater(a, id, seat)
+					}
+				}
+				if narrow {
+					ui.Column(c).Key("debater:" + id).Padding(16).Gap(10).Children(func() {
+						ui.Row(c).AlignItems(ui.Center).Justify(ui.SpaceBetween).Children(func() { identity(); operation() })
+						for col := 1; col <= 3; col++ {
+							details(col)
+						}
+					})
+				} else {
+					ui.Row(c).Key("debater:"+id).Padding(10, 12).Gap(12).AlignItems(ui.Center).Children(func() {
+						debaterCell(c, 0, identity)
+						for col := 1; col <= 3; col++ {
+							debaterCell(c, col, func() { details(col) })
+						}
+						debaterCell(c, 4, operation)
+					})
+				}
+				if i == 0 {
+					ui.Box(c).Height(1).AlignSelf(ui.Stretch).Background(tk.Split)
+				}
+			}
+		})
+		ui.Row(c).Gap(8).Wrap().AlignItems(ui.Center).Children(func() {
+			display.Text(c, "默认互评轮数", display.TextProps{Type: display.TextSecondary, FontSize: 12})
+			key := "dialogue_rounds"
+			f := a.fields[key]
+			if f == nil {
+				f = &settingField{}
+				a.fields[key] = f
+			}
+			if !a.busy["config:"+key] {
+				f.value = a.snapshot.Settings[key]
+				if f.value == "" {
+					f.value = "1"
+				}
+			}
+			ui.Column(c).Width(80).Children(func() {
+				if field.Select(c, &f.value, field.SelectProps{Size: theme.Small, Options: []field.SelectOption{{Value: "1", Label: "1 轮"}, {Value: "2", Label: "2 轮"}, {Value: "3", Label: "3 轮"}}}).Label("默认互评轮数").Disabled(a.busy["config:"+key]).Changed() {
+					a.saveSetting(key, f.value)
+				}
+			})
+			display.Text(c, "父 Agent 发起时可以另行指定", display.TextProps{Type: display.TextSecondary, FontSize: 12})
+			fieldError(c, f.err)
+		})
+	})
+}
+
+func debaterCell(c *ui.Context, col int, body func()) {
+	e := ui.Column(c).MinWidth(0)
+	switch col {
+	case 0:
+		e.Width(165)
+	case 1:
+		e.Grow(1).Basis(0)
+	case 2:
+		e.Width(90)
+	case 3:
+		e.Width(190)
+	case 4:
+		e.Width(68)
+	}
+	e.Children(body)
 }
 
 func workerCell(c *ui.Context, i int, body func()) {
@@ -72,7 +233,7 @@ func workerCell(c *ui.Context, i int, body func()) {
 
 func (a *app) workerShares(c *ui.Context) {
 	rated, unrated := []worker{}, 0
-	for _, w := range a.snapshot.Workers {
+	for _, w := range a.executionWorkers() {
 		switch {
 		case w.Intelligence == 0:
 			unrated++
@@ -104,7 +265,7 @@ func (a *app) workerShares(c *ui.Context) {
 			note += fmt.Sprintf("其余 %d 个未评分：只在包指定它时使用。", unrated)
 		}
 		display.Text(c, note, display.TextProps{Type: display.TextSecondary, FontSize: 12})
-		for _, w := range a.snapshot.Workers {
+		for _, w := range a.executionWorkers() {
 			if !w.Available && w.Reason != "" && w.Intelligence != 0 {
 				fieldError(c, w.ID+"："+w.Reason)
 			}
@@ -225,7 +386,7 @@ func (a *app) workerRow(c *ui.Context, w worker, s *workerPageState, divider boo
 func (a *app) workerCards(c *ui.Context, state *workerPageState) {
 	tk := theme.TokensOf(c)
 	ui.Column(c).Gap(12).Children(func() {
-		for _, w := range a.snapshot.Workers {
+		for _, w := range a.executionWorkers() {
 			w := w
 			key := "worker:" + w.ID
 			f := a.fields[key]
