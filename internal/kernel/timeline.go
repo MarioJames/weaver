@@ -70,6 +70,8 @@ type TimelineArtifact struct {
 	URL   string `json:"url,omitempty"`
 }
 type TimelineEntry struct {
+	Convorel  string            `json:"convorel,omitempty"`
+	State     string            `json:"state,omitempty"`
 	Ord       string            `json:"ord"`
 	Hash      string            `json:"hash"`
 	Kind      string            `json:"kind"`
@@ -180,11 +182,21 @@ func (k *Kernel) Timeline(ctx context.Context, in TimelineInput) (*TimelineResul
 			return nil, err
 		}
 		var out *TimelineResult
+		if err = k.prefetchConvorel(in.Mission); err != nil {
+			return nil, err
+		}
 		err = k.read(func() error { var e error; out, e = k.composeTimeline(in.Mission); return e })
 		if err != nil {
 			return nil, err
 		}
 		all := out.Entries
+		pendingReview := false
+		for _, e := range all {
+			if e.Kind == "review" && e.State == "waiting" {
+				pendingReview = true
+				break
+			}
+		}
 		if in.From != "" {
 			start := sort.Search(len(all), func(i int) bool { return all[i].Ord >= in.From })
 			out.HasMore = start > 0
@@ -209,14 +221,34 @@ func (k *Kernel) Timeline(ctx context.Context, in TimelineInput) (*TimelineResul
 		if !in.Wait || in.From == "" || out.Keep != len(in.Have) || len(out.Entries) > 0 {
 			return out, nil
 		}
+		var refresh <-chan time.Time
+		var poll *time.Timer
+		if pendingReview {
+			poll = time.NewTimer(convorelRefresh)
+			refresh = poll.C
+		}
+		// Stop the poll on every exit, including notifications and cancellation.
 		select {
 		case <-ctx.Done():
+			if poll != nil {
+				poll.Stop()
+			}
 			return nil, ctx.Err()
 		case <-k.stop:
+			if poll != nil {
+				poll.Stop()
+			}
 			return out, nil
 		case <-deadline.C:
+			if poll != nil {
+				poll.Stop()
+			}
 			return out, nil
+		case <-refresh:
 		case <-ch:
+		}
+		if poll != nil {
+			poll.Stop()
 		}
 		// Coalesce a burst with a fixed window, so continuous progress cannot starve readers.
 		debounce := time.NewTimer(100 * time.Millisecond)
@@ -285,7 +317,17 @@ func (k *Kernel) composeTimeline(mission string) (*TimelineResult, error) {
 		return nil, err
 	}
 	out.Session = session
+	reviews, represented, err := k.timelineConvorel(m, items)
+	if err != nil {
+		return nil, err
+	}
+	for _, review := range reviews {
+		add(review.entry)
+	}
 	for _, v := range items {
+		if v.Role == "tool" && represented[v.Ref] {
+			continue
+		}
 		kind := v.Role
 		if kind == "assistant" {
 			kind = "owner"
@@ -575,33 +617,14 @@ func timelineSessionItems(q querier, m *Mission) ([]SessionItem, TimelineSession
 	if stored != "" {
 		state.State = stored
 	}
-	var previousClosed int64
-	err = q.QueryRow(`SELECT COALESCE(closed_at,0) FROM missions WHERE owner_engine=? AND owner_session=? AND (created_at<? OR (created_at=? AND rowid<(SELECT rowid FROM missions WHERE id=?))) ORDER BY created_at DESC,rowid DESC LIMIT 1`, o.Engine, o.Session, m.CreatedAt, m.CreatedAt, m.ID).Scan(&previousClosed)
-	if err != nil && err != sql.ErrNoRows {
+	start, end, err := timelineSessionBounds(q, m)
+	if err != nil {
 		return nil, state, err
 	}
-	boundary := func(closed int64) (int64, error) {
-		var seq int64
-		e := q.QueryRow(`SELECT COALESCE((SELECT seq FROM session_items WHERE engine=? AND session=? AND role='user' AND at>? ORDER BY at,seq LIMIT 1),0)`, o.Engine, o.Session, closed).Scan(&seq)
-		return seq, e
+	if end == -1 {
+		return nil, state, nil
 	}
-	start, end := int64(0), int64(0)
-	if previousClosed != 0 {
-		start, err = boundary(previousClosed)
-		if err != nil {
-			return nil, state, err
-		}
-		if start == 0 {
-			return nil, state, nil
-		}
-	}
-	if m.ClosedAt != 0 {
-		end, err = boundary(m.ClosedAt)
-		if err != nil {
-			return nil, state, err
-		}
-	}
-	rows, err := q.Query(`SELECT seq,at,role,tool,text FROM session_items WHERE engine=? AND session=? AND seq>=? AND (?=0 OR seq<?) ORDER BY seq`, o.Engine, o.Session, start, end, end)
+	rows, err := q.Query(`SELECT seq,at,role,tool,text,ref FROM session_items WHERE engine=? AND session=? AND seq>=? AND (?=0 OR seq<?) ORDER BY seq`, o.Engine, o.Session, start, end, end)
 	if err != nil {
 		return nil, state, err
 	}
@@ -609,7 +632,7 @@ func timelineSessionItems(q querier, m *Mission) ([]SessionItem, TimelineSession
 	out := []SessionItem{}
 	for rows.Next() {
 		v := SessionItem{Engine: o.Engine, Session: o.Session}
-		if err = rows.Scan(&v.Seq, &v.At, &v.Role, &v.Tool, &v.Text); err != nil {
+		if err = rows.Scan(&v.Seq, &v.At, &v.Role, &v.Tool, &v.Text, &v.Ref); err != nil {
 			return nil, state, err
 		}
 		out = append(out, v)
@@ -618,11 +641,48 @@ func timelineSessionItems(q querier, m *Mission) ([]SessionItem, TimelineSession
 	return out, state, rows.Err()
 }
 
+// timelineSessionBounds returns sequence boundaries; end=-1 means no display interval.
+func timelineSessionBounds(q querier, m *Mission) (int64, int64, error) {
+	var previousClosed int64
+	err := q.QueryRow(`SELECT COALESCE(closed_at,0) FROM missions WHERE owner_engine=? AND owner_session=? AND (created_at<? OR (created_at=? AND rowid<(SELECT rowid FROM missions WHERE id=?))) ORDER BY created_at DESC,rowid DESC LIMIT 1`, m.Owner.Engine, m.Owner.Session, m.CreatedAt, m.CreatedAt, m.ID).Scan(&previousClosed)
+	if err != nil && err != sql.ErrNoRows {
+		return 0, 0, err
+	}
+	boundary := func(closed int64) (int64, error) {
+		var seq int64
+		e := q.QueryRow(`SELECT COALESCE((SELECT seq FROM session_items WHERE engine=? AND session=? AND role='user' AND at>? ORDER BY at,seq LIMIT 1),0)`, m.Owner.Engine, m.Owner.Session, closed).Scan(&seq)
+		return seq, e
+	}
+	start, end := int64(0), int64(0)
+	if previousClosed != 0 {
+		start, err = boundary(previousClosed)
+		if err != nil {
+			return 0, 0, err
+		}
+		if start == 0 {
+			return 0, -1, nil
+		}
+	}
+	if m.ClosedAt != 0 {
+		end, err = boundary(m.ClosedAt)
+		if err != nil {
+			return 0, 0, err
+		}
+	}
+	return start, end, nil
+}
+
 // MissionText checks ownership, including the session display interval, before returning a body.
-// Refs are session:<seq>, result:<attempt ID>, event:<seq>, or instruction:<mission>/<key>.
+// Refs are session:<seq>, result:<attempt ID>, event:<seq>, instruction:<mission>/<key>,
+// or ask:<convorel ID>:<round> and review:<convorel ID>:<round>.
 // An instruction ref can also use the package ID from existing package APIs.
 func (k *Kernel) MissionText(mission, ref string) (*MissionTextResult, error) {
 	out := &MissionTextResult{}
+	if strings.HasPrefix(ref, "ask:") || strings.HasPrefix(ref, "review:") {
+		if err := k.prefetchConvorel(mission); err != nil {
+			return nil, err
+		}
+	}
 	err := k.read(func() error {
 		m, err := getMission(k.db, mission)
 		if err != nil {
@@ -633,6 +693,28 @@ func (k *Kernel) MissionText(mission, ref string) (*MissionTextResult, error) {
 			return errf("INVALID", "正文引用不合法")
 		}
 		switch kind {
+		case "ask", "review":
+			items, _, e := timelineSessionItems(k.db, m)
+			if e != nil {
+				return e
+			}
+			reviews, _, e := k.timelineConvorel(m, items)
+			if e != nil {
+				return e
+			}
+			for _, review := range reviews {
+				entry := review.entry
+				if entry.Ref != ref {
+					continue
+				}
+				out.Text = review.text
+				out.Title = fmt.Sprintf("问 Convorel · 第 %d 轮", entry.Round)
+				if kind == "review" {
+					out.Title = fmt.Sprintf("Convorel · 第 %d 轮回复", entry.Round)
+				}
+				return nil
+			}
+			return errf("NOT_FOUND", "正文不属于这个主任务")
 		case "session":
 			seq, e := strconv.ParseInt(id, 10, 64)
 			if e != nil {

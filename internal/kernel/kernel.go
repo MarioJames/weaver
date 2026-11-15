@@ -65,7 +65,10 @@ type Kernel struct {
 
 	mu        sync.Mutex
 	sessionMu sync.Mutex
-	sessionWG sync.WaitGroup
+	// Convorel records by ID, filled outside mu by prefetchConvorel.
+	convorelMu sync.Mutex
+	convorel   map[string]convorelCacheEntry
+	sessionWG  sync.WaitGroup
 
 	subMu   sync.Mutex
 	subs    map[string]map[chan struct{}]struct{}

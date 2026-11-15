@@ -19,3 +19,4 @@ CREATE INDEX events_mission_at ON events(mission_id,at);
 CREATE INDEX session_items_owner_speech ON session_items(engine,session,seq) WHERE role='assistant';
 CREATE INDEX events_mission_kind_seq ON events(mission_id,kind,seq);
 CREATE INDEX packages_dialogue_activity ON packages(mission_id,position) WHERE advisory=1;
+CREATE INDEX session_items_ref ON session_items(engine,session,ref) WHERE ref<>'';
