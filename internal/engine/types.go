@@ -59,6 +59,12 @@ type Outcome struct {
 	ExitCode       *int
 	InputTokens    int
 	OutputTokens   int
+	// CacheReadTokens and CacheWriteTokens are billed apart from InputTokens.
+	CacheReadTokens  int
+	CacheWriteTokens int
+	// CostUSD is the price the engine itself reported for the run (Claude
+	// Code does); nil when it reported none.
+	CostUSD *float64
 }
 
 // Sink receives lifecycle reports. Every method is safe to call more than

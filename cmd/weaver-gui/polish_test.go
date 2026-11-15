@@ -29,11 +29,10 @@ func TestPolishScreenshots(t *testing.T) {
 		{ID: "dsh_terra_xhigh", Engine: "dsh", Model: "gpt-6.1-terra", Effort: "xhigh", Weight: 0, Enabled: true, Available: true, Accounts: []string{"a5"}},
 		{ID: "dsh_haiku_xhigh", Engine: "dsh", Model: "claude-haiku-5-5", Effort: "xhigh", Weight: 0, Enabled: true, Available: true, Accounts: []string{"a6"}},
 	}
-	f.data.Accounts[5].Usage = &usage{Supported: true, Provider: "openai", SpentMonth: moneyPtr(12.40),
-		Balance: moneyPtr(50), BalanceAt: checked, Remaining: moneyPtr(41.85), Interval: 300, CheckedAt: checked}
-	f.data.Accounts[6].Usage = &usage{Supported: true, Provider: "anthropic", SpentMonth: moneyPtr(3.10),
-		Balance: moneyPtr(50), BalanceAt: checked, Remaining: moneyPtr(1.90), AlertBelow: moneyPtr(5),
-		Low: true, Interval: 300, CheckedAt: checked}
+	f.data.Accounts[5].Usage = &usage{Month: usageTotals{Runs: 12, InputTokens: 1_200_000, OutputTokens: 86_000},
+		Balance: moneyPtr(50), BalanceAt: checked}
+	f.data.Accounts[6].Usage = &usage{Month: usageTotals{Runs: 37, Cost: moneyPtr(3.10)},
+		Balance: moneyPtr(50), BalanceAt: checked, Remaining: moneyPtr(1.90), AlertBelow: moneyPtr(5), Low: true}
 	a := testApp(t, f.fakeService)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -137,7 +136,7 @@ func TestAccountActionsFitCommonWidths(t *testing.T) {
 }
 
 // TestAccountUsageCellsKeepCopyInsideColumn checks the compact usage cells:
-// "未配置用量查询" stays whole inside its column, and every "配置" link starts
+// "本月没有运行" stays whole inside its column, and every "配置" link starts
 // on the same left edge as the amount or hint above it.
 func TestAccountUsageCellsKeepCopyInsideColumn(t *testing.T) {
 	aligned := func(a, b float32) bool {
@@ -147,32 +146,31 @@ func TestAccountUsageCellsKeepCopyInsideColumn(t *testing.T) {
 	for _, width := range []int{1100, 1280, 1600} {
 		t.Run(fmt.Sprint(width), func(t *testing.T) {
 			f := newAccountService(t)
-			checked := time.Now().Add(-3 * time.Minute).UnixMilli()
-			seedUsage(f, "a5", &usage{Supported: true, Provider: "openai", SpentMonth: moneyPtr(3.10),
-				Balance: moneyPtr(50), BalanceAt: checked, Remaining: moneyPtr(1.90), Interval: 300, CheckedAt: checked})
+			seedUsage(f, "a5", &usage{Month: usageTotals{Runs: 12, Cost: moneyPtr(3.10)},
+				Balance: moneyPtr(50), Remaining: moneyPtr(1.90)})
 			_, tt := openAccounts(t, f)
 			tt.SetSize(width, 900)
 			tt.Frame()
 
-			header, ok := tt.Find("本月已花费")
+			header, ok := tt.Find("本月用量")
 			if !ok {
 				t.Fatalf("找不到用量列表头：%q", tt.Texts())
 			}
 			columnRight := header.X + accountColumns[3].width
-			empty, ok := tt.Find("未配置用量查询")
+			empty, ok := tt.Find("本月没有运行")
 			if !ok {
-				t.Fatalf("找不到未配置用量文案：%q", tt.Texts())
+				t.Fatalf("找不到没有运行的文案：%q", tt.Texts())
 			}
-			// Seven 11px characters measure 77; anything under 76 is a cut.
-			if empty.W < 76 {
-				t.Fatalf("未配置用量查询被截断：%+v", empty)
+			// Six 11px characters measure 66; anything under 65 is a cut.
+			if empty.W < 65 {
+				t.Fatalf("本月没有运行被截断：%+v", empty)
 			}
 			if empty.X+empty.W > columnRight+0.5 {
-				t.Fatalf("未配置用量查询越过列宽 %.0f：%+v", columnRight, empty)
+				t.Fatalf("本月没有运行越过列宽 %.0f：%+v", columnRight, empty)
 			}
 			emptyConfig, ok := tt.Find("配置用量 dsh deepseek-official")
 			if !ok {
-				t.Fatalf("找不到未配置行的配置按钮：%q", tt.Texts())
+				t.Fatalf("找不到没有运行行的配置按钮：%q", tt.Texts())
 			}
 			configText, ok := tt.Find("配置")
 			if !ok {
@@ -187,22 +185,22 @@ func TestAccountUsageCellsKeepCopyInsideColumn(t *testing.T) {
 
 			spent, ok := tt.Find("$3.10")
 			if !ok {
-				t.Fatalf("找不到本月已花费：%q", tt.Texts())
+				t.Fatalf("找不到本月用量：%q", tt.Texts())
 			}
-			updated, ok := tt.Find("3 分钟前更新")
+			runs, ok := tt.Find("12 次")
 			if !ok {
-				t.Fatalf("找不到用量更新时间：%q", tt.Texts())
+				t.Fatalf("找不到运行次数：%q", tt.Texts())
 			}
 			config, ok := tt.Find("配置用量 OpenAI API（dsh）")
 			if !ok {
-				t.Fatalf("找不到已配置行的配置按钮：%q", tt.Texts())
+				t.Fatalf("找不到有用量行的配置按钮：%q", tt.Texts())
 			}
 			if config.W > 32 {
-				t.Fatalf("已配置行的配置链接带了 %.0f 宽的内边距", config.W)
+				t.Fatalf("有用量行的配置链接带了 %.0f 宽的内边距", config.W)
 			}
-			for name, rect := range map[string]ui.Rect{"花费": spent, "更新时间": updated, "配置": config} {
+			for name, rect := range map[string]ui.Rect{"金额": spent, "次数": runs, "配置": config} {
 				if !aligned(rect.X, spent.X) {
-					t.Fatalf("%s x=%.1f 没有与花费 x=%.1f 左对齐", name, rect.X, spent.X)
+					t.Fatalf("%s x=%.1f 没有与金额 x=%.1f 左对齐", name, rect.X, spent.X)
 				}
 				if rect.X+rect.W > columnRight+0.5 {
 					t.Fatalf("%s 越过列宽 %.0f：%+v", name, columnRight, rect)
@@ -231,12 +229,12 @@ func TestDrawerFormsAlignLabels(t *testing.T) {
 	click(t, tt, "取消")
 
 	click(t, tt, "配置用量 OpenAI API（dsh）")
-	assertLabelAligned(t, tt, "管理密钥")
+	assertLabelAligned(t, tt, "当前余额")
 	assertLabelAligned(t, tt, "低于多少提示")
-	query, _ := tt.Find("立即查询")
+	closeButton, _ := tt.Find("关闭")
 	saveButton, ok := tt.Find("保存")
-	if !ok || saveButton.X <= query.X {
-		t.Fatalf("用量面板主按钮不在右侧：查询 %+v 保存 %+v", query, saveButton)
+	if !ok || saveButton.X <= closeButton.X {
+		t.Fatalf("用量面板主按钮不在右侧：关闭 %+v 保存 %+v", closeButton, saveButton)
 	}
 	click(t, tt, "关闭")
 

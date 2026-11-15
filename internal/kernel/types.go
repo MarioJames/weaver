@@ -230,7 +230,6 @@ type Account struct {
 	AuthDir     string        `json:"authDir,omitempty"`
 	HasAPIKey   bool          `json:"hasApiKey,omitempty"`
 	HasConfig   bool          `json:"hasConfig,omitempty"`
-	HasAdminKey bool          `json:"hasAdminKey,omitempty"`
 	BaseURL     string        `json:"baseUrl,omitempty"`
 	Provider    string        `json:"provider,omitempty"`
 	Protocol    string        `json:"protocol,omitempty"`
@@ -245,35 +244,67 @@ type Account struct {
 	Usage       *AccountUsage `json:"usage,omitempty"`
 }
 
-// AccountUsage is the spend and balance view of one API channel. Amounts are
-// in US dollars. It is omitted from an account until the channel is configured
-// for usage queries (an admin key) or carries a recorded balance.
+// AccountUsage is the usage of one API account, counted from what its runs
+// reported. Amounts are US dollars; prices are per model and million tokens. Remaining
+// is set only when a balance is recorded and every run since then is priced.
 type AccountUsage struct {
-	Supported  bool     `json:"supported"`
-	Provider   string   `json:"provider,omitempty"`
-	SpentMonth *float64 `json:"spentMonth,omitempty"`
-	Balance    *float64 `json:"balance,omitempty"`
-	BalanceAt  int64    `json:"balanceAt,omitempty"`
-	Remaining  *float64 `json:"remaining,omitempty"`
-	AlertBelow *float64 `json:"alertBelow,omitempty"`
-	Low        bool     `json:"low,omitempty"`
-	Interval   int      `json:"interval"`
-	CheckedAt  int64    `json:"checkedAt,omitempty"`
-	Error      string   `json:"error,omitempty"`
+	Month             UsageTotals  `json:"month"`
+	Models            []ModelUsage `json:"models"`
+	Balance           *float64     `json:"balance,omitempty"`
+	BalanceAt         int64        `json:"balanceAt,omitempty"`
+	AlertBelow        *float64     `json:"alertBelow,omitempty"`
+	SpentSinceBalance *float64     `json:"spentSinceBalance,omitempty"`
+	Remaining         *float64     `json:"remaining,omitempty"`
+	Low               bool         `json:"low,omitempty"`
+}
+
+// UsageTotals sums the runs of a period. Cost is nil when no run in it has a
+// price; Unpriced counts runs that had tokens but neither a reported price
+// nor account prices to value them.
+type UsageTotals struct {
+	Runs             int      `json:"runs"`
+	InputTokens      int64    `json:"inputTokens"`
+	OutputTokens     int64    `json:"outputTokens"`
+	CacheReadTokens  int64    `json:"cacheReadTokens"`
+	CacheWriteTokens int64    `json:"cacheWriteTokens"`
+	Cost             *float64 `json:"cost,omitempty"`
+	Unpriced         int      `json:"unpriced,omitempty"`
+}
+
+// ModelUsage is one model of an account: its prices and this month's runs.
+type ModelUsage struct {
+	Model    string      `json:"model"`
+	Prices   UsagePrices `json:"prices"`
+	Runs     int         `json:"runs"`
+	Cost     *float64    `json:"cost,omitempty"`
+	Unpriced int         `json:"unpriced,omitempty"`
+}
+
+// ModelPrice sets the prices of one model on an account.
+type ModelPrice struct {
+	Model string `json:"model"`
+	UsagePrices
+}
+
+// UsagePrices are prices in US dollars per million tokens.
+type UsagePrices struct {
+	Input      *float64 `json:"input,omitempty"`
+	Output     *float64 `json:"output,omitempty"`
+	CacheRead  *float64 `json:"cacheRead,omitempty"`
+	CacheWrite *float64 `json:"cacheWrite,omitempty"`
 }
 
 // AccountConfigView is a channel read back for editing: the native JSON config
 // as an object, with every apiKey field removed. Secrets never appear here.
 type AccountConfigView struct {
-	ID          string `json:"id"`
-	Engine      string `json:"engine"`
-	Kind        string `json:"kind"`
-	Provider    string `json:"provider,omitempty"`
-	Protocol    string `json:"protocol,omitempty"`
-	BaseURL     string `json:"baseUrl,omitempty"`
-	HasAPIKey   bool   `json:"hasApiKey"`
-	HasAdminKey bool   `json:"hasAdminKey"`
-	Config      any    `json:"config"`
+	ID        string `json:"id"`
+	Engine    string `json:"engine"`
+	Kind      string `json:"kind"`
+	Provider  string `json:"provider,omitempty"`
+	Protocol  string `json:"protocol,omitempty"`
+	BaseURL   string `json:"baseUrl,omitempty"`
+	HasAPIKey bool   `json:"hasApiKey"`
+	Config    any    `json:"config"`
 }
 
 // ModelInfo is one model offered by a channel's models endpoint.

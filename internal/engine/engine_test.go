@@ -302,7 +302,7 @@ func TestOpencodeNormalizerOnARecordedRun(t *testing.T) {
 			started = true
 		}
 	}
-	if !started || !n.succeeded() || n.result() != "MOCK_REPLY_OK" || n.in != 5 || n.out != 3 || !strings.HasPrefix(n.session, "ses_") {
+	if !started || !n.succeeded() || n.result() != "MOCK_REPLY_OK" || n.in != 10 || n.out != 6 || !strings.HasPrefix(n.session, "ses_") {
 		t.Fatalf("started=%v succeeded=%v result=%q tokens=%d/%d session=%q", started, n.succeeded(), n.result(), n.in, n.out, n.session)
 	}
 }

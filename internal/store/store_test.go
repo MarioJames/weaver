@@ -6,10 +6,7 @@ import (
 	"testing"
 )
 
-var usageColumns = []string{
-	"admin_key", "balance_usd", "balance_at", "balance_baseline_usd", "alert_below_usd",
-	"usage_interval_s", "usage_spent_month_usd", "usage_since_balance_usd", "usage_checked_at", "usage_error",
-}
+var usageColumns = []string{"balance_usd", "balance_at", "alert_below_usd"}
 
 func accountColumns(t *testing.T, db *sql.DB) map[string]bool {
 	t.Helper()
@@ -96,15 +93,13 @@ func TestMigrationUpgradesAVersionTwoDatabase(t *testing.T) {
 			t.Errorf("upgraded accounts is missing %s", name)
 		}
 	}
-	var adminKey, usageError, label string
-	var interval int
+	var label string
 	var balance sql.NullFloat64
-	if err := db.QueryRow(`SELECT admin_key, usage_error, usage_interval_s, balance_usd, label FROM accounts WHERE id='old'`).
-		Scan(&adminKey, &usageError, &interval, &balance, &label); err != nil {
+	if err := db.QueryRow(`SELECT balance_usd, label FROM accounts WHERE id='old'`).Scan(&balance, &label); err != nil {
 		t.Fatal(err)
 	}
-	if adminKey != "" || usageError != "" || interval != 300 || balance.Valid || label != "旧渠道" {
-		t.Fatalf("old row after upgrade: admin_key=%q usage_error=%q interval=%d balance=%v label=%q", adminKey, usageError, interval, balance, label)
+	if balance.Valid || label != "旧渠道" {
+		t.Fatalf("old row after upgrade: balance=%v label=%q", balance, label)
 	}
 	var applied int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE name='0003_account_usage.sql'`).Scan(&applied); err != nil {
@@ -151,5 +146,68 @@ func TestMigrationFourUpgradesVersionThree(t *testing.T) {
 	}
 	if err = migrate(db); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestMigrationFiveKeepsTheBalanceOfAVersionFourDatabase upgrades a database
+// as v2.1.0 left it: an admin key, a balance and its query results. The hand
+// entered balance, its time and the alert line must survive; the run history
+// gets the new usage columns with their defaults.
+func TestMigrationFiveKeepsTheBalanceOfAVersionFourDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "weaver.db")
+	makeVersionTwo(t, path)
+	old, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old.SetMaxOpenConns(1)
+	for _, name := range []string{"0003_account_usage.sql", "0004_mission_owner_artifacts.sql"} {
+		body, err := migrations.ReadFile("migrations/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := old.Exec(string(body)); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if _, err := old.Exec(`INSERT INTO schema_migrations(name, applied_at) VALUES(?, 0)`, name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := old.Exec(`UPDATE accounts SET admin_key='sk-ant-admin', balance_usd=50, balance_at=1700, alert_below_usd=5,
+		usage_spent_month_usd=3, usage_error='x' WHERE id='old';
+		INSERT INTO missions(id,title,workspace,created_at) VALUES('m','m','/tmp',1);
+		INSERT INTO packages(id,mission_id,key,title,instruction,workspace,state,position,created_at,updated_at) VALUES('p','m','k','k','do','/tmp','running',0,1,1);
+		INSERT INTO attempts(id,package_id,mission_id,n,state,worker,account_id,engine,model,effort,mode,input_tokens,output_tokens,created_at)
+			VALUES('t','p','m',1,'failed','w','old','dsh','m','','cold',10,2,1)`); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+
+	for round := 0; round < 2; round++ {
+		db, err := Open(path)
+		if err != nil {
+			t.Fatalf("open %d: %v", round, err)
+		}
+		cols := accountColumns(t, db)
+		if cols["admin_key"] {
+			t.Fatal("admin_key survived the upgrade")
+		}
+		var balance, alert sql.NullFloat64
+		var at sql.NullInt64
+		if err := db.QueryRow(`SELECT balance_usd, balance_at, alert_below_usd FROM accounts WHERE id='old'`).Scan(&balance, &at, &alert); err != nil {
+			t.Fatal(err)
+		}
+		if balance.Float64 != 50 || at.Int64 != 1700 || alert.Float64 != 5 {
+			t.Fatalf("balance=%v at=%v alert=%v", balance, at, alert)
+		}
+		var in, cacheRead int
+		var cost sql.NullFloat64
+		if err := db.QueryRow(`SELECT input_tokens, cache_read_tokens, cost_usd FROM attempts WHERE id='t'`).Scan(&in, &cacheRead, &cost); err != nil {
+			t.Fatal(err)
+		}
+		if in != 10 || cacheRead != 0 || cost.Valid {
+			t.Fatalf("attempt after upgrade: in=%d cacheRead=%d cost=%v", in, cacheRead, cost)
+		}
+		db.Close()
 	}
 }

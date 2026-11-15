@@ -23,20 +23,16 @@ func TestAccountConfigStripsEveryAPIKeyFieldAndNeverReturnsSecrets(t *testing.T)
 		`"models":[{"id":"m1","apiKey":"sk-model"},{"id":"m2","nested":{"ApiKey":"sk-nested","keep":"yes"}}],` +
 		`"meta":{"apiKEY":"sk-upper"}}`
 	addUsageAccount(t, k, "acct-config", "openai", "", config)
-	key := "admin-secret"
-	if _, err := k.SetAccountUsage("acct-config", UsagePatch{AdminKey: &key}); err != nil {
-		t.Fatal(err)
-	}
 	view, err := k.AccountConfig("acct-config")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !view.HasAPIKey || !view.HasAdminKey || view.Engine != "dsh" || view.Provider != "openai" {
+	if !view.HasAPIKey || view.Engine != "dsh" || view.Provider != "openai" {
 		t.Fatalf("view = %+v", view)
 	}
 	body, _ := json.Marshal(view)
 	text := string(body)
-	for _, secret := range []string{"sk-inline", "sk-model", "sk-nested", "sk-upper", key} {
+	for _, secret := range []string{"sk-inline", "sk-model", "sk-nested", "sk-upper"} {
 		if strings.Contains(text, secret) {
 			t.Fatalf("%q leaked in %s", secret, text)
 		}
@@ -55,11 +51,8 @@ func TestAccountConfigStripsEveryAPIKeyFieldAndNeverReturnsSecrets(t *testing.T)
 		t.Fatal(err)
 	}
 	all, _ := json.Marshal(accounts)
-	if strings.Contains(string(all), key) || strings.Contains(string(all), "sk-inline") {
+	if strings.Contains(string(all), "sk-inline") {
 		t.Fatalf("account list leaked a secret: %s", all)
-	}
-	if !strings.Contains(string(all), `"hasAdminKey":true`) {
-		t.Fatalf("account list does not report hasAdminKey: %s", all)
 	}
 }
 
@@ -73,9 +66,6 @@ func TestAccountConfigWithoutNativeConfigIsNull(t *testing.T) {
 	body, _ := json.Marshal(view)
 	if !strings.Contains(string(body), `"config":null`) {
 		t.Fatalf("config = %s, want null", body)
-	}
-	if view.HasAdminKey {
-		t.Fatal("hasAdminKey without a key")
 	}
 }
 

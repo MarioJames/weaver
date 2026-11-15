@@ -555,7 +555,7 @@ func (c *Cold) watch(r *coldRun) {
 
 		if released && !cancelled && !r.finished && norm.succeeded() {
 			r.finished = true
-			c.sink.Finished(id, Outcome{Success: true, Text: norm.result(), InputTokens: norm.in, OutputTokens: norm.out})
+			c.sink.Finished(id, norm.outcome(true))
 			if r.mode == ModeStandby {
 				// A standby process waits for more input forever; ending it is the normal path.
 				go c.stop(r)
@@ -606,7 +606,7 @@ func (c *Cold) watch(r *coldRun) {
 				}
 			case norm.succeeded():
 				r.finished = true
-				c.sink.Finished(id, Outcome{Success: true, Text: norm.result(), InputTokens: norm.in, OutputTokens: norm.out})
+				c.sink.Finished(id, norm.outcome(true))
 				if exitKnown && exit.Code != 0 {
 					c.sink.Anomaly(id, fmt.Sprintf("进程在给出结果后以退出码 %d 结束", exit.Code))
 				}
@@ -641,7 +641,7 @@ func (c *Cold) exitCode(attemptID string, code int) {
 
 // failure builds the terminal report of a run that ended without a result.
 func (c *Cold) failure(r *coldRun, norm *normalizer, exit exitRecord, exitKnown bool) Outcome {
-	o := Outcome{Text: norm.result(), InputTokens: norm.in, OutputTokens: norm.out}
+	o := norm.outcome(false)
 	if exitKnown {
 		code := exit.Code
 		o.ExitCode = &code

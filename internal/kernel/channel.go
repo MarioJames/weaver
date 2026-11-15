@@ -3,10 +3,13 @@ package kernel
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MarioJames/weaver/internal/engine"
 )
@@ -18,10 +21,10 @@ func (k *Kernel) AccountConfig(id string) (*AccountConfigView, error) {
 	view := &AccountConfigView{}
 	err := k.read(func() error {
 		var configText string
-		err := k.db.QueryRow(`SELECT id, engine, kind, provider, protocol, base_url, api_key<>'', config, admin_key<>''
+		err := k.db.QueryRow(`SELECT id, engine, kind, provider, protocol, base_url, api_key<>'', config
 			FROM accounts WHERE id=?`, id).
 			Scan(&view.ID, &view.Engine, &view.Kind, &view.Provider, &view.Protocol, &view.BaseURL,
-				&view.HasAPIKey, &configText, &view.HasAdminKey)
+				&view.HasAPIKey, &configText)
 		if err == sql.ErrNoRows {
 			return errf("NOT_FOUND", "账号 %s 不存在", id)
 		}
@@ -303,4 +306,64 @@ func (k *Kernel) validateDshWorker(t *tx, id string) error {
 		}
 	}
 	return nil
+}
+
+// accountBaseURL is the address the account will actually call: the explicit
+// field wins, then the native config's baseURL.
+func accountBaseURL(a engine.Account) string {
+	if base := strings.TrimSpace(a.BaseURL); base != "" {
+		return base
+	}
+	if a.Config == "" {
+		return ""
+	}
+	var block map[string]any
+	if json.Unmarshal([]byte(a.Config), &block) != nil {
+		return ""
+	}
+	if base, _ := block["baseURL"].(string); strings.TrimSpace(base) != "" {
+		return base
+	}
+	if env, _ := block["env"].(map[string]any); env != nil {
+		for _, key := range []string{"ANTHROPIC_BASE_URL", "OPENAI_BASE_URL"} {
+			if base, _ := env[key].(string); strings.TrimSpace(base) != "" {
+				return base
+			}
+		}
+	}
+	return ""
+}
+
+var vendorHTTPClient = &http.Client{Timeout: 15 * time.Second}
+
+// apiGet performs one vendor request with the shared 15 second timeout.
+func apiGet(req *http.Request, what string) (int, []byte, error) {
+	resp, err := vendorHTTPClient.Do(req)
+	if err != nil {
+		return 0, nil, fmt.Errorf("请求%s接口失败：%v", what, err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return resp.StatusCode, nil, fmt.Errorf("读取%s接口响应失败：%v", what, err)
+	}
+	return resp.StatusCode, body, nil
+}
+
+// upstreamMessage keeps the vendor's own explanation, falling back to the HTTP
+// status and a clipped body.
+func upstreamMessage(status int, body []byte) string {
+	var parsed struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &parsed) == nil && strings.TrimSpace(parsed.Error.Message) != "" {
+		return parsed.Error.Message
+	}
+	text := strings.TrimSpace(string(body))
+	if text == "" {
+		return fmt.Sprintf("HTTP %d", status)
+	}
+	return fmt.Sprintf("HTTP %d：%s", status, clip(text, 300))
 }

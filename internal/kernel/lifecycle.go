@@ -169,8 +169,8 @@ func (k *Kernel) Finished(attemptID string, o engine.Outcome) {
 			exit = *o.ExitCode
 		}
 		if o.Success {
-			if _, err := t.Exec(`UPDATE attempts SET state=?, finished_at=?, started_at=COALESCE(started_at,?), result=?, exit_code=COALESCE(?,exit_code), input_tokens=?, output_tokens=? WHERE id=?`,
-				StateVerdict, t.now, t.now, o.Text, exit, o.InputTokens, o.OutputTokens, attemptID); err != nil {
+			if _, err := t.Exec(`UPDATE attempts SET state=?, finished_at=?, started_at=COALESCE(started_at,?), result=?, exit_code=COALESCE(?,exit_code), input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_write_tokens=?, cost_usd=? WHERE id=?`,
+				StateVerdict, t.now, t.now, o.Text, exit, o.InputTokens, o.OutputTokens, o.CacheReadTokens, o.CacheWriteTokens, nullable(o.CostUSD), attemptID); err != nil {
 				return err
 			}
 			if p.AutoAccept {
@@ -204,8 +204,8 @@ func (k *Kernel) Finished(attemptID string, o engine.Outcome) {
 		if message == "" {
 			message = "引擎没有给出原因"
 		}
-		if _, err := t.Exec(`UPDATE attempts SET state=?, finished_at=?, failure_kind=?, failure_message=?, result=?, exit_code=COALESCE(?,exit_code), input_tokens=?, output_tokens=? WHERE id=?`,
-			StateFailed, t.now, kind, clip(message, 4000), o.Text, exit, o.InputTokens, o.OutputTokens, attemptID); err != nil {
+		if _, err := t.Exec(`UPDATE attempts SET state=?, finished_at=?, failure_kind=?, failure_message=?, result=?, exit_code=COALESCE(?,exit_code), input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_write_tokens=?, cost_usd=? WHERE id=?`,
+			StateFailed, t.now, kind, clip(message, 4000), o.Text, exit, o.InputTokens, o.OutputTokens, o.CacheReadTokens, o.CacheWriteTokens, nullable(o.CostUSD), attemptID); err != nil {
 			return err
 		}
 		limited := kind == engine.FailQuota || kind == engine.FailRateLimit || kind == engine.FailAuth

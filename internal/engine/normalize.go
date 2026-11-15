@@ -20,7 +20,10 @@ type normalizer struct {
 	text    string
 	clipped bool
 	session string
-	in, out int
+	// Token counts as the vendor bills them: in excludes cached input.
+	in, out               int
+	cacheRead, cacheWrite int
+	cost                  *float64 // the vendor's own price for the run, when it reports one
 
 	done          bool   // the vendor's own success terminal was seen
 	failure       string // sticky: a failure event was seen
@@ -78,6 +81,32 @@ func (n *normalizer) usage(in, out any) {
 	if v := num(out); v > 0 {
 		n.out = v
 	}
+}
+
+// addUsage sums the usage of one step into the run, for engines that report
+// each model call separately.
+func (n *normalizer) addUsage(in, out, cacheRead, cacheWrite any) {
+	n.in += num(in)
+	n.out += num(out)
+	n.cacheRead += num(cacheRead)
+	n.cacheWrite += num(cacheWrite)
+}
+
+func (n *normalizer) addCost(v any) {
+	f, ok := v.(float64)
+	if !ok || f < 0 {
+		return
+	}
+	if n.cost == nil {
+		n.cost = new(float64)
+	}
+	*n.cost += f
+}
+
+// outcome is the run's result with the usage gathered so far.
+func (n *normalizer) outcome(success bool) Outcome {
+	return Outcome{Success: success, Text: n.result(), InputTokens: n.in, OutputTokens: n.out,
+		CacheReadTokens: n.cacheRead, CacheWriteTokens: n.cacheWrite, CostUSD: n.cost}
 }
 
 func contentText(content any) string {
@@ -170,7 +199,9 @@ func (n *normalizer) opencode(e obj) (s signal) {
 		s.notes = append(s.notes, toolNote(part["tool"], status))
 	case "step_finish":
 		tokens := asObj(part["tokens"])
-		n.usage(tokens["input"], tokens["output"])
+		cache := asObj(tokens["cache"])
+		n.addUsage(tokens["input"], tokens["output"], cache["read"], cache["write"])
+		n.addCost(part["cost"])
 		reason := str(part["reason"])
 		n.stopReason = reason
 		// tool-calls and other reasons are intermediate; a later stop can still
@@ -223,8 +254,14 @@ func (n *normalizer) codex(e obj) (s signal) {
 			s.notes = append(s.notes, toolNote(kind, status))
 		}
 	case "turn.completed":
+		// OpenAI counts cached input inside input_tokens; split it out so the
+		// cached part can be priced on its own.
 		u := asObj(e["usage"])
-		n.usage(u["input_tokens"], u["output_tokens"])
+		in, cached := num(u["input_tokens"]), num(u["cached_input_tokens"])
+		if cached > in {
+			cached = in
+		}
+		n.in, n.out, n.cacheRead = in-cached, num(u["output_tokens"]), cached
 		n.done = true
 		n.stopReason = "completed"
 	case "error":
@@ -310,6 +347,16 @@ func (n *normalizer) claude(e obj) (s signal) {
 		}
 		u := asObj(e["usage"])
 		n.usage(u["input_tokens"], u["output_tokens"])
+		if v := num(u["cache_read_input_tokens"]); v > 0 {
+			n.cacheRead = v
+		}
+		if v := num(u["cache_creation_input_tokens"]); v > 0 {
+			n.cacheWrite = v
+		}
+		if _, ok := e["total_cost_usd"].(float64); ok {
+			n.cost = nil
+			n.addCost(e["total_cost_usd"])
+		}
 		text := str(e["result"])
 		if e["is_error"] == true || e["subtype"] != "success" {
 			detail := strings.TrimSpace(text)
@@ -352,15 +399,9 @@ func (n *normalizer) dsh(e obj) (s signal) {
 		case "turn_start":
 			s.started = true
 		case "step_end":
+			// Each step_end carries that step's usage only, so the run is the sum.
 			if u := asObj(e["usage"]); u != nil {
-				in, out := u["input_tokens"], u["output_tokens"]
-				if in == nil {
-					in = u["inputTokens"]
-				}
-				if out == nil {
-					out = u["outputTokens"]
-				}
-				n.usage(in, out)
+				n.addUsage(u["inputTokens"], u["outputTokens"], u["cacheReadTokens"], u["cacheWriteTokens"])
 			}
 		case "turn_end":
 			reason := asObj(e["reason"])

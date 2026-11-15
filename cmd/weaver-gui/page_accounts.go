@@ -102,7 +102,7 @@ var accountColumns = []accountColumn{
 	{title: "账号", grow: true, weight: 3, minW: 130},
 	{title: "状态", width: 108},
 	{title: "用它的候选", grow: true, weight: 2, minW: 120},
-	{title: "本月已花费", width: 96},
+	{title: "本月用量", width: 96},
 	{title: "估算剩余", width: 88},
 	{title: "启用", width: 36, align: ui.Center},
 	{title: "操作", width: 116, align: ui.End},
@@ -199,9 +199,6 @@ func (a *app) accountRow(c *ui.Context, acc account, divider bool) {
 }
 
 func (a *app) accountRowErrors(c *ui.Context, acc account) {
-	if acc.Kind == "api" && acc.Usage != nil && acc.Usage.Error != "" {
-		display.Text(c, acc.Usage.Error, display.TextProps{Type: display.TextDanger, FontSize: 12}).Padding(0, 12, 10, 12)
-	}
 	for _, key := range accountErrorKeys(acc.ID) {
 		if message := a.errors[key]; message != "" {
 			ui.Column(c).Padding(0, 12, 10, 12).Children(func() { fieldError(c, message) })

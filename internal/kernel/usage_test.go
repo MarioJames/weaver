@@ -1,16 +1,9 @@
 package kernel
 
 import (
-	"bytes"
-	"encoding/json"
 	"io"
 	"log/slog"
-	"net/http"
-	"net/http/httptest"
 	"path/filepath"
-	"strconv"
-	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,8 +11,7 @@ import (
 	"github.com/MarioJames/weaver/internal/store"
 )
 
-// fixedKernel builds a kernel whose clock is the given variable. The pointer
-// lets a test move time forward between queries.
+// fixedKernel builds a kernel whose clock is the given variable.
 func fixedKernel(t *testing.T, clock *time.Time, logw io.Writer) *Kernel {
 	t.Helper()
 	home := t.TempDir()
@@ -62,347 +54,151 @@ func near(t *testing.T, got *float64, want float64, what string) {
 	}
 }
 
-func withOpenAICosts(t *testing.T, url string) {
-	t.Helper()
-	old := openAICostsURL
-	openAICostsURL = url
-	t.Cleanup(func() { openAICostsURL = old })
+func f64(v float64) *float64 { return &v }
+
+func set(v float64) OptionalFloat { return OptionalFloat{Set: true, Value: &v} }
+
+func price(model string, in, out, cacheRead float64) ModelPrice {
+	return ModelPrice{Model: model, UsagePrices: UsagePrices{Input: f64(in), Output: f64(out), CacheRead: f64(cacheRead)}}
 }
 
-func withAnthropicCosts(t *testing.T, url string) {
-	t.Helper()
-	old := anthropicCostURL
-	anthropicCostURL = url
-	t.Cleanup(func() { anthropicCostURL = old })
+func (u *AccountUsage) model(name string) ModelUsage {
+	for _, m := range u.Models {
+		if m.Model == name {
+			return m
+		}
+	}
+	return ModelUsage{}
 }
 
-func TestUsagePatchTellsAbsentBalanceFromNull(t *testing.T) {
-	var omitted struct {
-		ID string `json:"id"`
-		UsagePatch
-	}
-	if err := json.Unmarshal([]byte(`{"id":"a"}`), &omitted); err != nil {
-		t.Fatal(err)
-	}
-	if omitted.Balance.Set || omitted.AlertBelow.Set {
-		t.Fatalf("an absent field was treated as set: %+v", omitted.UsagePatch)
-	}
-	var cleared struct {
-		ID string `json:"id"`
-		UsagePatch
-	}
-	if err := json.Unmarshal([]byte(`{"id":"a","adminKey":"","balance":null,"alertBelow":null}`), &cleared); err != nil {
-		t.Fatal(err)
-	}
-	if cleared.AdminKey == nil || *cleared.AdminKey != "" {
-		t.Fatalf("adminKey = %v, want an explicit empty string", cleared.AdminKey)
-	}
-	if !cleared.Balance.Set || cleared.Balance.Value != nil || !cleared.AlertBelow.Set || cleared.AlertBelow.Value != nil {
-		t.Fatalf("null fields were not kept as clears: %+v", cleared.UsagePatch)
-	}
-	var set struct {
-		ID string `json:"id"`
-		UsagePatch
-	}
-	if err := json.Unmarshal([]byte(`{"id":"a","balance":12.5}`), &set); err != nil {
-		t.Fatal(err)
-	}
-	if !set.Balance.Set || set.Balance.Value == nil || *set.Balance.Value != 12.5 {
-		t.Fatalf("balance = %+v", set.Balance)
-	}
+// finishOn runs one package on a candidate of account acct-gamma: gamma runs
+// model m, delta model m2. It finishes the run with the given usage.
+func (f *fixture) finishOn(mission, worker, key string, o engine.Outcome) {
+	f.t.Helper()
+	ids := f.submit(mission, PackageInput{Key: key, Instruction: "do " + key, Worker: worker})
+	id := attemptID(ids[key], 1)
+	f.k.Handed(id, engine.ModeCold, "unit")
+	f.k.Started(id, "")
+	o.Success, o.Text = true, "done"
+	f.k.Finished(id, o)
 }
 
-func TestOpenAIUsageSumsBucketsAndFollowsPages(t *testing.T) {
-	clock := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)
-	k := fixedKernel(t, &clock, nil)
-	monthStart := utcMonthStart(clock)
-	pages := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("Authorization"); got != "Bearer admin-secret" {
-			t.Errorf("Authorization = %q", got)
-		}
-		q := r.URL.Query()
-		if got := q.Get("start_time"); got != strconv.FormatInt(monthStart.Unix(), 10) {
-			t.Errorf("start_time = %s, want %d", got, monthStart.Unix())
-		}
-		if got := q.Get("end_time"); got != strconv.FormatInt(clock.Unix(), 10) {
-			t.Errorf("end_time = %s, want %d", got, clock.Unix())
-		}
-		if q.Get("bucket_width") != "1d" || q.Get("limit") != "31" {
-			t.Errorf("query = %v", q)
-		}
-		pages++
-		switch q.Get("page") {
-		case "":
-			io.WriteString(w, `{"data":[{"results":[{"amount":{"value":1.25,"currency":"usd"}},{"amount":{"value":1,"currency":"usd"}}]}],"has_more":true,"next_page":"p2"}`)
-		case "p2":
-			io.WriteString(w, `{"data":[{"results":[{"amount":{"value":1.5,"currency":"usd"}}]}],"has_more":false,"next_page":null}`)
-		default:
-			t.Errorf("unexpected page %q", q.Get("page"))
-		}
-	}))
-	defer server.Close()
-	withOpenAICosts(t, server.URL+"/costs")
+func (f *fixture) usage(id string) *AccountUsage {
+	f.t.Helper()
+	a, err := f.k.Account(id)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	if a.Usage == nil {
+		f.t.Fatalf("%s has no usage view", id)
+	}
+	return a.Usage
+}
 
-	addUsageAccount(t, k, "acct-openai", "openai", "", "")
-	key := "admin-secret"
-	if _, err := k.SetAccountUsage("acct-openai", UsagePatch{AdminKey: &key}); err != nil {
+// TestUsageIsCountedFromWhatRunsReported walks the whole bookkeeping: a
+// reported price is taken as is, tokens are valued at the prices of their
+// own model, and the balance is reduced only by runs after it was recorded.
+func TestUsageIsCountedFromWhatRunsReported(t *testing.T) {
+	f := newFixture(t)
+	zero := 0
+	if _, err := f.k.SetWorker(WorkerInput{ID: "delta", Engine: "codex", Model: "m2", Weight: &zero, Accounts: []string{"acct-gamma"}}); err != nil {
 		t.Fatal(err)
 	}
-	a, err := k.QueryAccountUsage("acct-openai")
+	m := f.mission()
+
+	f.finishOn(m, "gamma", "claude", engine.Outcome{InputTokens: 12, OutputTokens: 40, CostUSD: f64(0.42)})
+	f.finishOn(m, "gamma", "dsh", engine.Outcome{InputTokens: 2000, OutputTokens: 400, CacheReadTokens: 6000})
+	f.finishOn(m, "delta", "other", engine.Outcome{InputTokens: 1000, OutputTokens: 100})
+	u := f.usage("acct-gamma")
+	if u.Month.Runs != 3 || u.Month.InputTokens != 3012 || u.Month.OutputTokens != 540 || u.Month.CacheReadTokens != 6000 || u.Month.Unpriced != 2 {
+		t.Fatalf("month without prices = %+v", u.Month)
+	}
+	near(t, u.Month.Cost, 0.42, "cost of the priced run")
+	if len(u.Models) != 2 || u.model("m").Runs != 2 || u.model("m2").Unpriced != 1 {
+		t.Fatalf("models = %+v", u.Models)
+	}
+
+	// Each model has its own prices; a model without any stays unpriced.
+	if _, err := f.k.SetAccountUsage("acct-gamma", UsagePatch{Prices: []ModelPrice{price("m", 1, 5, 0.1)}}); err != nil {
+		t.Fatal(err)
+	}
+	u = f.usage("acct-gamma")
+	// 0.42 reported, plus (2000×1 + 400×5 + 6000×0.1) / 1e6; the reported run is not re-priced.
+	near(t, u.model("m").Cost, 0.4246, "model m")
+	if u.model("m2").Cost != nil || u.Month.Unpriced != 1 {
+		t.Fatalf("m2 got m's prices: %+v month=%+v", u.model("m2"), u.Month)
+	}
+	if _, err := f.k.SetAccountUsage("acct-gamma", UsagePatch{Prices: []ModelPrice{price("m2", 10, 20, 0)}}); err != nil {
+		t.Fatal(err)
+	}
+	u = f.usage("acct-gamma")
+	near(t, u.model("m2").Cost, 0.012, "model m2") // (1000×10 + 100×20) / 1e6
+	near(t, u.Month.Cost, 0.4366, "month")
+	if p := u.model("m").Prices; p.Input == nil || *p.Input != 1 {
+		t.Fatalf("setting m2 changed m: %+v", p)
+	}
+
+	time.Sleep(5 * time.Millisecond) // the balance is stamped strictly after the runs above
+	a, err := f.k.SetAccountUsage("acct-gamma", UsagePatch{Balance: set(50)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a.Usage == nil || !a.Usage.Supported || a.Usage.Provider != "openai" {
-		t.Fatalf("usage = %+v", a.Usage)
-	}
-	near(t, a.Usage.SpentMonth, 3.75, "spentMonth")
-	if pages != 2 {
-		t.Fatalf("read %d pages, want 2", pages)
-	}
-	if a.Usage.CheckedAt != clock.UnixMilli() || a.Usage.Error != "" {
-		t.Fatalf("usage = %+v", a.Usage)
-	}
-}
-
-func TestAnthropicUsageReadsCentAmountsAndFollowsPages(t *testing.T) {
-	clock := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)
-	k := fixedKernel(t, &clock, nil)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("x-api-key"); got != "admin-secret" {
-			t.Errorf("x-api-key = %q", got)
-		}
-		if got := r.Header.Get("anthropic-version"); got != "2023-06-01" {
-			t.Errorf("anthropic-version = %q", got)
-		}
-		q := r.URL.Query()
-		if got := q.Get("starting_at"); got != "2026-11-01T00:00:00Z" {
-			t.Errorf("starting_at = %q", got)
-		}
-		if got := q.Get("ending_at"); got != "2026-11-15T12:00:00Z" {
-			t.Errorf("ending_at = %q", got)
-		}
-		switch q.Get("page") {
-		case "":
-			io.WriteString(w, `{"data":[{"results":[{"amount":"150.5"}]}],"has_more":true,"next_page":"next"}`)
-		case "next":
-			io.WriteString(w, `{"data":[{"results":[{"amount":"49.5"}]}],"has_more":false,"next_page":null}`)
-		default:
-			t.Errorf("unexpected page %q", q.Get("page"))
-		}
-	}))
-	defer server.Close()
-	withAnthropicCosts(t, server.URL+"/cost_report")
-
-	addUsageAccount(t, k, "acct-anthropic", "anthropic", "", "")
-	key := "admin-secret"
-	if _, err := k.SetAccountUsage("acct-anthropic", UsagePatch{AdminKey: &key}); err != nil {
-		t.Fatal(err)
-	}
-	a, err := k.QueryAccountUsage("acct-anthropic")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if a.Usage == nil || a.Usage.Provider != "anthropic" {
-		t.Fatalf("usage = %+v", a.Usage)
-	}
-	near(t, a.Usage.SpentMonth, 2.00, "spentMonth")
-}
-
-func TestBalanceBaselineKeepsEarlierSameDaySpendOutOfTheEstimate(t *testing.T) {
-	recorded := time.Date(2026, 11, 15, 10, 0, 0, 0, time.UTC)
-	clock := recorded
-	k := fixedKernel(t, &clock, nil)
-	dayStart := utcDayStart(recorded)
-	monthStart := utcMonthStart(recorded)
-	var baselineCalls, dayCalls, monthCalls int
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		q := r.URL.Query()
-		switch q.Get("start_time") {
-		case strconv.FormatInt(monthStart.Unix(), 10):
-			monthCalls++
-			io.WriteString(w, `{"data":[{"results":[{"amount":{"value":9,"currency":"usd"}}]}],"has_more":false}`)
-		case strconv.FormatInt(dayStart.Unix(), 10):
-			if q.Get("end_time") == strconv.FormatInt(recorded.Unix(), 10) {
-				baselineCalls++
-				io.WriteString(w, `{"data":[{"results":[{"amount":{"value":5,"currency":"usd"}}]}],"has_more":false}`)
-			} else {
-				dayCalls++
-				io.WriteString(w, `{"data":[{"results":[{"amount":{"value":8,"currency":"usd"}}]}],"has_more":false}`)
-			}
-		default:
-			t.Errorf("unexpected start_time %q", q.Get("start_time"))
-		}
-	}))
-	defer server.Close()
-	withOpenAICosts(t, server.URL+"/costs")
-
-	addUsageAccount(t, k, "acct-balance", "openai", "", "")
-	key := "admin-secret"
-	balance := 50.0
-	a, err := k.SetAccountUsage("acct-balance", UsagePatch{AdminKey: &key, Balance: OptionalFloat{Set: true, Value: &balance}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if baselineCalls != 1 {
-		t.Fatalf("baseline queried %d times, want 1", baselineCalls)
-	}
-	near(t, a.Usage.Balance, 50, "balance")
 	near(t, a.Usage.Remaining, 50, "remaining right after recording")
+	if a.Usage.BalanceAt == 0 {
+		t.Fatal("balance has no time")
+	}
 
-	clock = time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)
-	a, err = k.QueryAccountUsage("acct-balance")
+	f.finishOn(m, "gamma", "later", engine.Outcome{InputTokens: 1, CostUSD: f64(2.66)})
+	u = f.usage("acct-gamma")
+	near(t, u.Remaining, 47.34, "remaining")
+	near(t, u.SpentSinceBalance, 2.66, "spent since balance")
+	if u.Low {
+		t.Fatal("low without an alert line")
+	}
+	a, err = f.k.SetAccountUsage("acct-gamma", UsagePatch{AlertBelow: set(48)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if monthCalls != 1 || dayCalls != 1 {
-		t.Fatalf("queries: month=%d day=%d, want 1 and 1", monthCalls, dayCalls)
-	}
-	near(t, a.Usage.SpentMonth, 9, "spentMonth")
-	near(t, a.Usage.Remaining, 47, "remaining")
-	if a.Usage.Low {
-		t.Fatalf("low before the alert line is set: %+v", a.Usage)
-	}
-
-	alert := 48.0
-	a, err = k.SetAccountUsage("acct-balance", UsagePatch{AlertBelow: OptionalFloat{Set: true, Value: &alert}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	near(t, a.Usage.Remaining, 47, "remaining")
 	if !a.Usage.Low {
-		t.Fatalf("remaining 47 below alert 48 must be low: %+v", a.Usage)
+		t.Fatalf("47.34 below 48 must be low: %+v", a.Usage)
 	}
 	// Low only marks the data: the account stays ready and is not paused.
 	if !a.Ready || a.PausedUntil != 0 {
 		t.Fatalf("low usage changed dispatch state: ready=%v paused=%d", a.Ready, a.PausedUntil)
 	}
-}
 
-func TestUsageFailureKeepsTheVendorsOwnMessageAndTheAccountReady(t *testing.T) {
-	clock := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)
-	var logs bytes.Buffer
-	k := fixedKernel(t, &clock, &logs)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, `{"type":"error","error":{"type":"authentication_error","message":"The Admin API requires an Admin API key or an organization-scoped API key."}}`)
-	}))
-	defer server.Close()
-	withAnthropicCosts(t, server.URL+"/cost_report")
-
-	addUsageAccount(t, k, "acct-fail", "anthropic", "", "")
-	key := "admin-secret-value"
-	if _, err := k.SetAccountUsage("acct-fail", UsagePatch{AdminKey: &key}); err != nil {
+	// Removing a model's prices leaves its later spend unpriced: no estimate.
+	if _, err := f.k.SetAccountUsage("acct-gamma", UsagePatch{Prices: []ModelPrice{{Model: "m2"}}}); err != nil {
 		t.Fatal(err)
 	}
-	a, err := k.QueryAccountUsage("acct-fail")
+	f.finishOn(m, "delta", "unpriced", engine.Outcome{InputTokens: 100, OutputTokens: 10})
+	u = f.usage("acct-gamma")
+	if u.Remaining != nil || u.Low || u.model("m2").Unpriced != 2 {
+		t.Fatalf("unpriced spend since balance: remaining=%v low=%v m2=%+v", u.Remaining, u.Low, u.model("m2"))
+	}
+	near(t, u.Balance, 50, "balance is kept")
+}
+
+func TestUsageSettingsRejectBadInput(t *testing.T) {
+	f := newFixture(t)
+	bad := price("m", 1, -1, 0)
+	if _, err := f.k.SetAccountUsage("acct-alpha", UsagePatch{Prices: []ModelPrice{bad}}); AsError(err).Code != "INVALID" {
+		t.Fatalf("negative price: %v", err)
+	}
+	if _, err := f.k.AddAccount(AccountInput{ID: "sub", Engine: "claude", Kind: "subscription", AuthDir: t.TempDir()}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.k.SetAccountUsage("sub", UsagePatch{Balance: set(10)}); AsError(err).Code != "INVALID" {
+		t.Fatalf("subscription account: %v", err)
+	}
+	a, err := f.k.Account("sub")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "The Admin API requires an Admin API key or an organization-scoped API key."
-	if a.Usage.Error != want {
-		t.Fatalf("usage.error = %q, want %q", a.Usage.Error, want)
-	}
-	if !a.Ready {
-		t.Fatal("a usage failure changed ready")
-	}
-	if strings.Contains(logs.String(), key) {
-		t.Fatalf("the admin key reached the log: %s", logs.String())
-	}
-	accounts, err := k.Accounts()
-	if err != nil {
-		t.Fatal(err)
-	}
-	body, _ := json.Marshal(accounts)
-	if strings.Contains(string(body), key) || !strings.Contains(string(body), `"hasAdminKey":true`) {
-		t.Fatalf("account list leaked or lost the admin key: %s", body)
-	}
-}
-
-func TestUnsupportedChannelsRefuseUsageConfiguration(t *testing.T) {
-	clock := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)
-	k := fixedKernel(t, &clock, nil)
-	for _, tc := range []struct {
-		id, provider, base string
-	}{
-		{"acct-deepseek", "deepseek-official", ""},
-		{"acct-relay", "openai", "https://relay.example/v1"},
-	} {
-		addUsageAccount(t, k, tc.id, tc.provider, tc.base, "")
-	}
-	if _, err := k.AddAccount(AccountInput{ID: "acct-sub", Engine: "codex", Kind: "subscription"}); err != nil {
-		t.Fatal(err)
-	}
-	key := "admin-secret"
-	for _, id := range []string{"acct-deepseek", "acct-relay", "acct-sub"} {
-		_, err := k.SetAccountUsage(id, UsagePatch{AdminKey: &key})
-		if got := AsError(err); got.Code != "INVALID" || got.Message != unsupportedUsage {
-			t.Errorf("%s: err = %v, want INVALID %q", id, err, unsupportedUsage)
-		}
-	}
-}
-
-func TestUsageSchedulerQueriesOnlyAccountsThatHaveAKey(t *testing.T) {
-	clock := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)
-	k := fixedKernel(t, &clock, nil)
-	var calls atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls.Add(1)
-		io.WriteString(w, `{"data":[{"results":[{"amount":{"value":1,"currency":"usd"}}]}],"has_more":false}`)
-	}))
-	defer server.Close()
-	withOpenAICosts(t, server.URL+"/costs")
-
-	addUsageAccount(t, k, "acct-scheduled", "openai", "", "")
-	addUsageAccount(t, k, "acct-manual", "openai", "", "")
-	key := "admin-secret"
-	interval := 1
-	if _, err := k.SetAccountUsage("acct-scheduled", UsagePatch{AdminKey: &key, Interval: &interval}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := k.SetAccountUsage("acct-manual", UsagePatch{Interval: &interval}); err != nil {
-		t.Fatal(err)
-	}
-	k.scheduleUsage()
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		a, _ := k.Account("acct-scheduled")
-		if a.Usage != nil && a.Usage.SpentMonth != nil {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("the scheduler did not query the account with an admin key")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	time.Sleep(50 * time.Millisecond)
-	if got := calls.Load(); got != 1 {
-		t.Fatalf("queried %d accounts, want only the one with an admin key", got)
-	}
-	a, _ := k.Account("acct-manual")
 	if a.Usage != nil {
-		t.Fatalf("the unconfigured account gained usage data: %+v", a.Usage)
+		t.Fatalf("subscription account has a usage view: %+v", a.Usage)
 	}
-}
-
-func TestBalancedAccountWithoutAdminKeyStillShowsTheBalance(t *testing.T) {
-	clock := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)
-	k := fixedKernel(t, &clock, nil)
-	addUsageAccount(t, k, "acct-nokey", "openai", "", "")
-	balance := 12.5
-	a, err := k.SetAccountUsage("acct-nokey", UsagePatch{Balance: OptionalFloat{Set: true, Value: &balance}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if a.Usage == nil || a.Usage.Error != "还没有配置管理密钥" {
-		t.Fatalf("usage = %+v", a.Usage)
-	}
-	near(t, a.Usage.Balance, 12.5, "balance")
-	near(t, a.Usage.Remaining, 12.5, "remaining")
-	if a.HasAdminKey {
-		t.Fatal("hasAdminKey without a key")
-	}
-	if _, err := k.QueryAccountUsage("acct-nokey"); AsError(err).Code != "INVALID" {
-		t.Fatalf("query without a key: %v", err)
+	if u := f.usage("acct-alpha"); u.model("m").Prices.set() {
+		t.Fatal("a rejected price was stored")
 	}
 }

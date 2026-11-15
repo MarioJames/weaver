@@ -33,15 +33,14 @@ type dshModel struct {
 }
 
 type accountConfigView struct {
-	ID          string `json:"id"`
-	Engine      string `json:"engine"`
-	Kind        string `json:"kind"`
-	Provider    string `json:"provider,omitempty"`
-	Protocol    string `json:"protocol,omitempty"`
-	BaseURL     string `json:"baseUrl,omitempty"`
-	HasAPIKey   bool   `json:"hasApiKey"`
-	HasAdminKey bool   `json:"hasAdminKey"`
-	Config      any    `json:"config"`
+	ID        string `json:"id"`
+	Engine    string `json:"engine"`
+	Kind      string `json:"kind"`
+	Provider  string `json:"provider,omitempty"`
+	Protocol  string `json:"protocol,omitempty"`
+	BaseURL   string `json:"baseUrl,omitempty"`
+	HasAPIKey bool   `json:"hasApiKey"`
+	Config    any    `json:"config"`
 }
 
 type modelInfo struct {

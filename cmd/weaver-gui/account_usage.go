@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -14,61 +15,70 @@ import (
 	"github.com/lobehub/lobe-mygo/pkg/theme"
 )
 
+// priceFields are the four prices of a model, in the order the drawer shows
+// them, with the service's field names.
+var priceFields = [4]struct{ label, param string }{
+	{"输入", "input"},
+	{"输出", "output"},
+	{"缓存读", "cacheRead"},
+	{"缓存写", "cacheWrite"},
+}
+
 type usagePanel struct {
 	ID             string
 	Label          string
-	AdminKey       string
-	HasAdminKey    bool
 	Balance        string
 	BalanceInitial string
 	BalanceAt      int64
 	Alert          string
-	Interval       int
-	Supported      bool
+	Models         []modelPriceRow
+	Month          usageTotals
 	Err            string
 }
 
+// modelPriceRow is one model of the account with its prices as typed.
+type modelPriceRow struct {
+	modelUsage
+	Values [4]string
+}
+
+func (p usagePrices) list() [4]*float64 {
+	return [4]*float64{p.Input, p.Output, p.CacheRead, p.CacheWrite}
+}
+
 func (a *app) openUsage(acc account) {
-	p := &usagePanel{ID: acc.ID, Label: accountLabel(acc), HasAdminKey: acc.HasAdminKey, Interval: 300, Supported: true}
-	if u := acc.Usage; u != nil {
-		p.Supported = u.Supported
-		p.Interval = u.Interval
-		if p.Interval == 0 {
-			p.Interval = 300
-		}
-		if u.Balance != nil {
-			p.Balance = fmt.Sprintf("%.2f", *u.Balance)
-			p.BalanceInitial = p.Balance
-		}
-		p.BalanceAt = u.BalanceAt
-		if u.AlertBelow != nil {
-			p.Alert = fmt.Sprintf("%g", *u.AlertBelow)
-		}
-	}
+	p := &usagePanel{ID: acc.ID, Label: accountLabel(acc)}
+	p.applyUsage(acc)
 	st := accountsFor(a)
 	st.usage = p
 	st.usageOpen = true
 }
 
+// usageSpentCell is the month column: the dollar amount when the runs are
+// priced, otherwise their tokens with a hint to fill in prices.
 func (a *app) usageSpentCell(c *ui.Context, acc account, width float32) {
 	col := ui.Column(c).Gap(1).AlignItems(ui.Start)
 	if width > 0 {
 		col.Width(width)
 	}
 	col.Children(func() {
-		u := acc.Usage
-		if u == nil {
-			display.Text(c, "未配置用量查询", display.TextProps{Type: display.TextSecondary, FontSize: 11}).MaxLines(2)
-			a.usageConfigButton(c, acc)
-			return
+		var m usageTotals
+		if acc.Usage != nil {
+			m = acc.Usage.Month
 		}
-		if u.SpentMonth != nil {
-			display.Text(c, money(*u.SpentMonth), display.TextProps{Strong: true, FontSize: 13})
-		} else {
-			display.Text(c, "—", display.TextProps{Type: display.TextSecondary})
-		}
-		if u.CheckedAt > 0 {
-			display.Text(c, updatedAgo(u.CheckedAt), display.TextProps{Type: display.TextSecondary, FontSize: 11}).MaxLines(1)
+		switch {
+		case m.Cost != nil:
+			display.Text(c, money(*m.Cost), display.TextProps{Strong: true, FontSize: 13})
+			note := fmt.Sprintf("%d 次", m.Runs)
+			if m.Unpriced > 0 {
+				note += fmt.Sprintf(" · %d 次未计价", m.Unpriced)
+			}
+			display.Text(c, note, display.TextProps{Type: display.TextSecondary, FontSize: 11}).MaxLines(2)
+		case m.Runs > 0:
+			display.Text(c, tokens(m.InputTokens+m.OutputTokens+m.CacheReadTokens+m.CacheWriteTokens)+" 令牌", display.TextProps{Strong: true, FontSize: 13}).MaxLines(1)
+			display.Text(c, fmt.Sprintf("%d 次 · 未填单价", m.Runs), display.TextProps{Type: display.TextSecondary, FontSize: 11}).MaxLines(2)
+		default:
+			display.Text(c, "本月没有运行", display.TextProps{Type: display.TextSecondary, FontSize: 11}).MaxLines(2)
 		}
 		a.usageConfigButton(c, acc)
 	})
@@ -76,7 +86,7 @@ func (a *app) usageSpentCell(c *ui.Context, acc account, width float32) {
 
 func (a *app) usageConfigButton(c *ui.Context, acc account) {
 	// Text links carry no horizontal padding so the label starts on the same
-	// left edge as the amount and update text above it.
+	// left edge as the amount above it.
 	b := action.Button(c, "配置", action.ButtonProps{Variant: action.Text, Size: theme.Small}).PaddingX(0)
 	b.Label("配置用量 " + accountLabel(acc))
 	if b.Clicked() {
@@ -91,12 +101,9 @@ func (a *app) usageRemainingCell(c *ui.Context, acc account, width float32) {
 	}
 	col.Children(func() {
 		u := acc.Usage
-		if u == nil {
-			display.Text(c, "—", display.TextProps{Type: display.TextSecondary})
-			return
-		}
-		if u.Remaining != nil {
-			text := money(*u.Remaining)
+		switch {
+		case u != nil && u.Remaining != nil:
+			text := remainingMoney(*u.Remaining)
 			if u.Low {
 				threshold := 0.0
 				if u.AlertBelow != nil {
@@ -108,33 +115,53 @@ func (a *app) usageRemainingCell(c *ui.Context, acc account, width float32) {
 				display.Text(c, text, display.TextProps{FontSize: 12}).MaxLines(1)
 			}
 			display.Text(c, "估算", display.TextProps{Type: display.TextSecondary, FontSize: 11})
-			return
+		case u != nil && u.Balance != nil:
+			display.Text(c, "填单价后可估算", display.TextProps{Type: display.TextSecondary, FontSize: 11}).MaxLines(2)
+		default:
+			display.Text(c, "—", display.TextProps{Type: display.TextSecondary})
 		}
-		display.Text(c, "—", display.TextProps{Type: display.TextSecondary})
 	})
 }
 
+// money shows a spent amount to the cent; a spend under one cent is not 0.
 func money(v float64) string {
+	if v > 0 && v < 0.005 {
+		return "<$0.01"
+	}
 	return fmt.Sprintf("$%.2f", v)
 }
 
-func updatedAgo(ms int64) string {
-	if ms <= 0 {
-		return "尚未更新"
+// remainingMoney rounds down to the cent, so a balance just under the alert
+// line never reads as equal to it.
+func remainingMoney(v float64) string {
+	return fmt.Sprintf("$%.2f", math.Floor(v*100+1e-9)/100)
+}
+
+// tokens shortens a token count: 860, 86K, 1.2M.
+func tokens(n int64) string {
+	switch {
+	case n >= 1_000_000:
+		return strings.TrimSuffix(fmt.Sprintf("%.1f", float64(n)/1e6), ".0") + "M"
+	case n >= 1_000:
+		return strings.TrimSuffix(fmt.Sprintf("%.1f", float64(n)/1e3), ".0") + "K"
 	}
-	d := time.Since(time.UnixMilli(ms))
-	if d < time.Minute {
-		return "刚刚更新"
+	return strconv.FormatInt(n, 10)
+}
+
+// monthSummary is the drawer's one line about this month's runs.
+func monthSummary(m usageTotals) string {
+	if m.Runs == 0 {
+		return "本月还没有运行记录"
 	}
-	minutes := int(d.Minutes())
-	if minutes < 60 {
-		return fmt.Sprintf("%d 分钟前更新", minutes)
+	text := fmt.Sprintf("本月 %d 次运行 · 输入 %s · 输出 %s · 缓存读 %s · 缓存写 %s", m.Runs,
+		tokens(m.InputTokens), tokens(m.OutputTokens), tokens(m.CacheReadTokens), tokens(m.CacheWriteTokens))
+	if m.Cost != nil {
+		text += " · 约 " + money(*m.Cost)
 	}
-	hours := minutes / 60
-	if hours < 24 {
-		return fmt.Sprintf("%d 小时前更新", hours)
+	if m.Unpriced > 0 {
+		text += fmt.Sprintf(" · %d 次未计价", m.Unpriced)
 	}
-	return fmt.Sprintf("%d 天前更新", hours/24)
+	return text
 }
 
 func (a *app) usageView(c *ui.Context) {
@@ -150,10 +177,9 @@ func (a *app) usageView(c *ui.Context) {
 		size = width - 24
 	}
 	feedback.Drawer(c, &open, feedback.DrawerProps{
-		Title: "用量查询 · " + p.Label,
+		Title: "用量 · " + p.Label,
 		Size:  size,
 		Footer: func() {
-			a.button(c, "account:usage.query:"+p.ID, "立即查询", func() { a.queryUsage(p) })
 			if action.Button(c, "关闭", action.ButtonProps{}).Clicked() {
 				open = false
 			}
@@ -162,23 +188,11 @@ func (a *app) usageView(c *ui.Context) {
 	}, func() {
 		ui.Column(c).Gap(12).Children(func() {
 			fieldError(c, p.Err)
-			if !p.Supported {
-				display.Text(c, "这个渠道暂不支持用量查询（只支持 OpenAI、Anthropic 官方）", display.TextProps{Type: display.TextSecondary, FontSize: 12})
-			}
-			formRow(c, "管理密钥", func(label ui.Element) {
-				formFieldStack(c, func() {
-					field.InputPassword(c, &p.AdminKey, field.InputProps{Size: theme.Small}).Label("管理密钥").LabelledBy(label)
-					if p.HasAdminKey {
-						formHelp(c, "已设置，留空表示不改")
-					}
-					formHelp(c, "只用来查消费，保存后不再显示。OpenAI 在组织设置的 Admin keys 里创建。")
-				})
-			})
-			formRow(c, "当前充值余额", func(label ui.Element) {
+			formRow(c, "当前余额", func(label ui.Element) {
 				formFieldStack(c, func() {
 					ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 						ui.Column(c).Width(120).Children(func() {
-							field.Input(c, &p.Balance, field.InputProps{Size: theme.Small, Placeholder: "50.00"}).Label("当前充值余额").LabelledBy(label)
+							field.Input(c, &p.Balance, field.InputProps{Size: theme.Small, Placeholder: "50.00"}).Label("当前余额").LabelledBy(label)
 						})
 						help := "充值后在这里重填"
 						if p.BalanceAt > 0 {
@@ -193,17 +207,15 @@ func (a *app) usageView(c *ui.Context) {
 					field.Input(c, &p.Alert, field.InputProps{Size: theme.Small, Placeholder: "5"}).Label("低于多少提示").LabelledBy(label)
 				})
 			})
-			formRow(c, "自动查询", func(label ui.Element) {
-				current := strconv.Itoa(p.Interval)
-				ui.Column(c).Width(140).Children(func() {
-					sel := field.Select(c, &current, field.SelectProps{Size: theme.Small, Options: intervalOptions(p.Interval)}).Label("自动查询").LabelledBy(label)
-					if sel.Changed() {
-						if n, err := strconv.Atoi(current); err == nil {
-							p.Interval = n
-						}
-					}
-				})
-			})
+			display.Text(c, "单价按模型填写，单位是美元 / 百万令牌。引擎回报了金额时（Claude）用回报值；其余按所属模型的单价折算，留空的项按 0 计，四项都空的模型只统计令牌。",
+				display.TextProps{Type: display.TextSecondary, FontSize: 12})
+			if len(p.Models) == 0 {
+				display.Text(c, "这个账号还没有候选在用，也没有运行记录；在候选里用上它以后，这里会列出模型。", display.TextProps{Type: display.TextSecondary, FontSize: 12})
+			}
+			for i := range p.Models {
+				a.modelPriceBlock(c, &p.Models[i])
+			}
+			display.Text(c, monthSummary(p.Month), display.TextProps{Type: display.TextSecondary, FontSize: 12})
 		})
 	})
 	if !open {
@@ -212,74 +224,81 @@ func (a *app) usageView(c *ui.Context) {
 	}
 }
 
-func intervalOptions(current int) []field.SelectOption {
-	options := []field.SelectOption{
-		{Value: "0", Label: "手动"},
-		{Value: "60", Label: "每 1 分钟"},
-		{Value: "300", Label: "每 5 分钟"},
-		{Value: "900", Label: "每 15 分钟"},
-		{Value: "3600", Label: "每 60 分钟"},
-	}
-	for _, option := range options {
-		if option.Value == strconv.Itoa(current) {
-			return options
-		}
-	}
-	return append(options, field.SelectOption{Value: strconv.Itoa(current), Label: fmt.Sprintf("每 %d 秒", current)})
-}
-
-func (a *app) queryUsage(p *usagePanel) {
-	var updated account
-	a.action("account:usage.query:"+p.ID, func() (string, error) {
-		err := a.client.call("account.usage", map[string]string{"id": p.ID}, &updated)
-		if err == nil {
-			a.refresh()
-		}
-		return "", err
-	}, func(_ string, err error) {
-		if accountsFor(a).usage != p {
-			return
-		}
-		if err != nil {
-			p.Err = err.Error()
-			return
-		}
-		p.Err = ""
-		p.applyUsage(updated)
-		if updated.Usage != nil && updated.Usage.Error != "" {
-			p.Err = updated.Usage.Error
-		}
+// modelPriceBlock is one model: its name, this month's runs and four prices.
+func (a *app) modelPriceBlock(c *ui.Context, m *modelPriceRow) {
+	tk := theme.TokensOf(c)
+	ui.Column(c.Key("price:"+m.Model)).Padding(10, 12).Gap(8).Radius(tk.BorderRadius).Border(1, tk.BorderSecondary).Children(func() {
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+			display.Text(c, m.Model, display.TextProps{Code: true, FontSize: 12}).MaxLines(1)
+			ui.Box(c).Grow(1)
+			display.Text(c, modelSummary(m.modelUsage), display.TextProps{Type: display.TextSecondary, FontSize: 11}).MaxLines(1)
+		})
+		ui.Row(c).Gap(8).Children(func() {
+			for i, f := range priceFields {
+				i, f := i, f
+				ui.Column(c).Grow(1).Basis(0).MinWidth(0).Gap(4).Children(func() {
+					// The visible caption is short; the field's own name says
+					// which model it prices.
+					display.Text(c, f.label, display.TextProps{Type: display.TextSecondary, FontSize: 11})
+					field.Input(c, &m.Values[i], field.InputProps{Size: theme.Small}).Label(m.Model + " " + f.label + "单价")
+				})
+			}
+		})
 	})
 }
 
+func modelSummary(m modelUsage) string {
+	if m.Runs == 0 {
+		return "本月没有运行"
+	}
+	text := fmt.Sprintf("本月 %d 次", m.Runs)
+	if m.Cost != nil {
+		text += " · 约 " + money(*m.Cost)
+	}
+	if m.Unpriced > 0 {
+		text += fmt.Sprintf(" · %d 次未计价", m.Unpriced)
+	}
+	return text
+}
+
 func (a *app) saveUsage(p *usagePanel) {
-	params := map[string]any{"id": p.ID, "interval": p.Interval}
-	adminKey := p.AdminKey
-	if adminKey != "" {
-		params["adminKey"] = adminKey
+	params := map[string]any{"id": p.ID}
+	value := func(text, name, key string) bool {
+		v, err := parseMoney(text)
+		if err != nil || (v != nil && *v < 0) {
+			p.Err = name + "需要不小于 0 的数字"
+			return false
+		}
+		if v == nil {
+			params[key] = nil
+		} else {
+			params[key] = *v
+		}
+		return true
 	}
-	balance, err := parseMoney(p.Balance)
-	if err != nil {
-		p.Err = "当前充值余额需要数字"
+	// Only a changed balance is sent: sending it stamps a new record time.
+	if p.Balance != p.BalanceInitial && !value(p.Balance, "当前余额", "balance") {
 		return
 	}
-	if balance != nil && p.Balance != p.BalanceInitial {
-		params["balance"] = *balance
-	} else if balance == nil && p.BalanceInitial != "" {
-		params["balance"] = nil
-	}
-	alert, err := parseMoney(p.Alert)
-	if err != nil {
-		p.Err = "低于多少提示需要数字"
+	if !value(p.Alert, "低于多少提示", "alertBelow") {
 		return
 	}
-	if alert != nil {
-		params["alertBelow"] = *alert
+	prices := []map[string]any{}
+	for _, m := range p.Models {
+		entry := map[string]any{"model": m.Model}
+		for i, f := range priceFields {
+			v, err := parseMoney(m.Values[i])
+			if err != nil || (v != nil && *v < 0) {
+				p.Err = m.Model + " 的" + f.label + "单价需要不小于 0 的数字"
+				return
+			}
+			if v != nil {
+				entry[f.param] = *v
+			}
+		}
+		prices = append(prices, entry)
 	}
-	if p.Alert == "" {
-		params["alertBelow"] = nil
-	}
-	balanceText := p.Balance
+	params["prices"] = prices
 	var updated account
 	a.action("account:usage.save:"+p.ID, func() (string, error) {
 		err := a.client.call("account.usage.set", params, &updated)
@@ -296,33 +315,38 @@ func (a *app) saveUsage(p *usagePanel) {
 			return
 		}
 		p.Err = ""
-		if adminKey != "" {
-			p.HasAdminKey = true
-			p.AdminKey = ""
-		}
-		p.BalanceInitial = balanceText
 		p.applyUsage(updated)
-		if updated.Usage != nil && updated.Usage.Error != "" {
-			p.Err = updated.Usage.Error
-		}
-		a.showToast("用量查询已保存")
+		a.showToast("用量设置已保存")
 	})
 }
 
+// applyUsage fills the drawer from the service's view of the account.
 func (p *usagePanel) applyUsage(acc account) {
 	u := acc.Usage
 	if u == nil {
 		return
 	}
-	p.Supported = u.Supported
-	p.Interval = u.Interval
+	p.Balance = ""
 	if u.Balance != nil {
 		p.Balance = fmt.Sprintf("%.2f", *u.Balance)
 	}
+	p.BalanceInitial = p.Balance
 	p.BalanceAt = u.BalanceAt
+	p.Alert = ""
 	if u.AlertBelow != nil {
 		p.Alert = fmt.Sprintf("%g", *u.AlertBelow)
 	}
+	p.Models = p.Models[:0]
+	for _, m := range u.Models {
+		row := modelPriceRow{modelUsage: m}
+		for i, v := range m.Prices.list() {
+			if v != nil {
+				row.Values[i] = fmt.Sprintf("%g", *v)
+			}
+		}
+		p.Models = append(p.Models, row)
+	}
+	p.Month = u.Month
 }
 
 func parseMoney(text string) (*float64, error) {

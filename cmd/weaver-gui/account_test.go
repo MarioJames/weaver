@@ -24,7 +24,6 @@ type accountService struct {
 	fakeService
 	configs       map[string]any
 	addCalls      int
-	usageCalls    int
 	usageSetCalls int
 	modelCalls    int
 	workerCalls   []map[string]any
@@ -205,73 +204,58 @@ func (f *accountService) respond(conn net.Conn, req rpc.Request) {
 				{ID: "gpt-6.1-mini", Name: "gpt-6.1-mini", ContextWindow: 128000, MaxTokens: 32000},
 			}
 		}
-	case "account.usage":
-		var p struct{ ID string }
-		json.Unmarshal(req.Params, &p)
-		f.usageCalls++
-		acc := f.find(p.ID)
-		if acc == nil {
-			failure = &rpc.Error{Code: "NOT_FOUND", Message: "账号不存在"}
-		} else if !acc.HasAdminKey {
-			failure = &rpc.Error{Code: "INVALID", Message: "这个渠道还没有配置管理密钥"}
-		} else {
-			result = acc
-		}
 	case "account.usage.set":
-		var p struct {
-			ID         string
-			AdminKey   string
-			Balance    *float64
-			AlertBelow *float64
-			Interval   *int
-		}
+		var p map[string]json.RawMessage
 		json.Unmarshal(req.Params, &p)
+		var id string
+		json.Unmarshal(p["id"], &id)
 		f.usageSetCalls++
-		acc := f.find(p.ID)
+		acc := f.find(id)
 		if acc == nil {
 			failure = &rpc.Error{Code: "NOT_FOUND", Message: "账号不存在"}
 			break
 		}
-		if acc.Provider == "deepseek-official" {
-			failure = &rpc.Error{Code: "INVALID", Message: "这个渠道暂不支持用量查询（只支持 OpenAI、Anthropic 官方）"}
-			break
+		if acc.Usage == nil {
+			acc.Usage = &usage{}
 		}
-		if p.Interval != nil {
-			if acc.Usage == nil {
-				acc.Usage = &usage{}
-			}
-			acc.Usage.Interval = *p.Interval
-		}
-		if p.AdminKey != "" {
-			acc.HasAdminKey = true
-			if acc.Usage == nil {
-				acc.Usage = &usage{}
-			}
-			acc.Usage.Supported = true
-			acc.Usage.Provider = acc.Provider
-			if p.AdminKey == "sk-ant-user-secret" {
-				acc.Usage.Error = "The Admin API requires an Admin API key or an organization-scoped API key."
-			} else {
-				acc.Usage.Error = ""
+		u := acc.Usage
+		value := func(key string, target **float64) {
+			if raw, ok := p[key]; ok {
+				var v *float64
+				json.Unmarshal(raw, &v)
+				*target = v
 			}
 		}
-		if p.Balance != nil {
-			if acc.Usage == nil {
-				acc.Usage = &usage{}
+		value("alertBelow", &u.AlertBelow)
+		if raw, ok := p["prices"]; ok {
+			var prices []struct {
+				Model string
+				usagePrices
 			}
-			acc.Usage.Balance = p.Balance
-			acc.Usage.BalanceAt = time.Now().UnixMilli()
-			acc.Usage.Remaining = p.Balance
-		}
-		if p.AlertBelow != nil {
-			if acc.Usage == nil {
-				acc.Usage = &usage{}
+			json.Unmarshal(raw, &prices)
+			for _, price := range prices {
+				for i := range u.Models {
+					if u.Models[i].Model == price.Model {
+						u.Models[i].Prices = price.usagePrices
+					}
+				}
 			}
-			acc.Usage.AlertBelow = p.AlertBelow
 		}
-		if acc.Usage != nil && acc.Usage.Remaining != nil && acc.Usage.AlertBelow != nil {
-			acc.Usage.Low = *acc.Usage.Remaining < *acc.Usage.AlertBelow
+		if _, ok := p["balance"]; ok {
+			value("balance", &u.Balance)
+			u.BalanceAt = time.Now().UnixMilli()
+			u.SpentSinceBalance = nil
 		}
+		u.Remaining = nil
+		if u.Balance != nil {
+			spent := 0.0
+			if u.SpentSinceBalance != nil {
+				spent = *u.SpentSinceBalance
+			}
+			remaining := *u.Balance - spent
+			u.Remaining = &remaining
+		}
+		u.Low = u.Remaining != nil && u.AlertBelow != nil && *u.Remaining < *u.AlertBelow
 		result = acc
 	case "account.pause":
 		var p struct {
@@ -405,7 +389,6 @@ func seedUsage(f *accountService, id string, u *usage) {
 	acc := f.find(id)
 	if acc != nil {
 		acc.Usage = u
-		acc.HasAdminKey = true
 	}
 }
 
@@ -648,33 +631,93 @@ func TestAccountsA24CustomAddressAndFetchFailure(t *testing.T) {
 	}
 }
 
-func TestAccountsA26NoUsageQueryWhenUnconfigured(t *testing.T) {
+// TestUsageSettingsRoundTrip covers A2: balance, alert line and the four
+// prices are saved and come back when the drawer opens again.
+func TestUsageSettingsRoundTrip(t *testing.T) {
 	f := newAccountService(t)
-	_, tt := openAccounts(t, f)
-	if !tt.HasText("未配置用量查询") {
-		t.Fatalf("没有未配置文案：%q", tt.Texts())
+	seedUsage(f, "a6", &usage{Models: []modelUsage{{Model: "claude-haiku-5-5"}, {Model: "claude-sonnet-5-5"}}})
+	a, tt := openAccounts(t, f)
+	click(t, tt, "配置用量 Anthropic API（dsh）")
+	for label, value := range map[string]string{"当前余额": "50", "低于多少提示": "5",
+		"claude-haiku-5-5 输入单价": "1", "claude-haiku-5-5 输出单价": "5", "claude-haiku-5-5 缓存读单价": "0.1", "claude-haiku-5-5 缓存写单价": "1.25",
+		"claude-sonnet-5-5 输入单价": "3", "claude-sonnet-5-5 输出单价": "15"} {
+		edit(t, tt, label, value, false)
 	}
-	click(t, tt, "配置用量 OpenAI API（dsh）")
-	if !tt.HasText("当前充值余额") {
-		t.Fatalf("用量面板没有打开：%q", tt.Texts())
+	click(t, tt, "保存")
+	waitFor(t, tt, a, func() bool { return !a.busy["account:usage.save:a6"] && f.setCalls() == 1 })
+	if !tt.HasText("用量设置已保存") {
+		t.Fatalf("没有保存提示：%q", tt.Texts())
 	}
+	click(t, tt, "关闭")
+	click(t, tt, "配置用量 Anthropic API（dsh）")
+	p := accountsFor(a).usage
+	if p == nil || p.Balance != "50.00" || p.Alert != "5" || len(p.Models) != 2 ||
+		p.Models[0].Values != [4]string{"1", "5", "0.1", "1.25"} || p.Models[1].Values != [4]string{"3", "15", "", ""} {
+		t.Fatalf("再次打开的值不对：%+v", p)
+	}
+	if !tt.HasText("记录于 " + time.UnixMilli(p.BalanceAt).Format("01-02 15:04")) {
+		t.Fatalf("没有余额记录时间：%q", tt.Texts())
+	}
+	// Saving again without touching the balance must not restamp it.
+	click(t, tt, "保存")
+	waitFor(t, tt, a, func() bool { return !a.busy["account:usage.save:a6"] && f.setCalls() == 2 })
 	f.mu.Lock()
-	calls := f.usageCalls
+	at := f.find("a6").Usage.BalanceAt
 	f.mu.Unlock()
-	if calls != 0 {
-		t.Fatalf("未配置时查询了 %d 次", calls)
+	if at != p.BalanceAt {
+		t.Fatalf("没改余额却重记了时间：%d → %d", p.BalanceAt, at)
 	}
 }
 
+func (f *accountService) setCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.usageSetCalls
+}
+
+// TestUsageRejectsABadPrice covers A3: nothing is sent and the stored value stays.
+func TestUsageRejectsABadPrice(t *testing.T) {
+	f := newAccountService(t)
+	seedUsage(f, "a6", &usage{Models: []modelUsage{{Model: "claude-haiku-5-5", Prices: usagePrices{Input: moneyPtr(1)}}}})
+	_, tt := openAccounts(t, f)
+	click(t, tt, "配置用量 Anthropic API（dsh）")
+	for _, bad := range []string{"abc", "-1"} {
+		clearField(t, tt, "claude-haiku-5-5 输入单价")
+		edit(t, tt, "claude-haiku-5-5 输入单价", bad, false)
+		click(t, tt, "保存")
+		tt.Advance(time.Second)
+		if !tt.HasText("claude-haiku-5-5 的输入单价需要不小于 0 的数字") {
+			t.Fatalf("%q 没有报错：%q", bad, tt.Texts())
+		}
+	}
+	if f.setCalls() != 0 {
+		t.Fatalf("非法单价被提交了 %d 次", f.setCalls())
+	}
+}
+
+// TestUsageWithoutPricesShowsTokens covers A8.
+func TestUsageWithoutPricesShowsTokens(t *testing.T) {
+	f := newAccountService(t)
+	seedUsage(f, "a5", &usage{Month: usageTotals{Runs: 12, InputTokens: 1_200_000, OutputTokens: 150_000, Unpriced: 12},
+		Balance: moneyPtr(50), BalanceAt: time.Now().UnixMilli()})
+	_, tt := openAccounts(t, f)
+	for _, text := range []string{"1.4M 令牌", "12 次 · 未填单价", "填单价后可估算"} {
+		if !tt.HasText(text) {
+			t.Fatalf("没有 %q：%q", text, tt.Texts())
+		}
+	}
+	click(t, tt, "配置用量 OpenAI API（dsh）")
+	if !tt.HasText("本月 12 次运行 · 输入 1.2M · 输出 150K · 缓存读 0 · 缓存写 0 · 12 次未计价") {
+		t.Fatalf("抽屉里没有本月统计：%q", tt.Texts())
+	}
+}
+
+// TestAccountsA30LowRemainingIsRed covers A7.
 func TestAccountsA30LowRemainingIsRed(t *testing.T) {
 	f := newAccountService(t)
-	checked := time.Now().Add(-3 * time.Minute).UnixMilli()
-	seedUsage(f, "a5", &usage{Supported: true, Provider: "openai", SpentMonth: moneyPtr(3.10),
-		Balance: moneyPtr(50), BalanceAt: checked, Remaining: moneyPtr(1.90), Interval: 300, CheckedAt: checked})
+	seedUsage(f, "a5", &usage{Month: usageTotals{Runs: 37, Cost: moneyPtr(48.10)},
+		Balance: moneyPtr(50), BalanceAt: time.Now().UnixMilli(), SpentSinceBalance: moneyPtr(48.10), Remaining: moneyPtr(1.90)})
 	a, tt := openAccounts(t, f)
-	if !tt.HasText("3 分钟前更新") {
-		t.Fatalf("没有更新时间：%q", tt.Texts())
-	}
 	click(t, tt, "配置用量 OpenAI API（dsh）")
 	edit(t, tt, "低于多少提示", "5", false)
 	click(t, tt, "保存")
@@ -696,31 +739,6 @@ func TestAccountsA30LowRemainingIsRed(t *testing.T) {
 	if !tt.HasText("OpenAI API（dsh） 估算剩余低于 $5") {
 		t.Fatalf("概览没有提醒：%q", tt.Texts())
 	}
-}
-
-func TestAccountsA31UpstreamErrorAndNoSecret(t *testing.T) {
-	f := newAccountService(t)
-	a, tt := openAccounts(t, f)
-	click(t, tt, "配置用量 Anthropic API（dsh）")
-	edit(t, tt, "管理密钥", "sk-ant-user-secret", false)
-	click(t, tt, "保存")
-	waitFor(t, tt, a, func() bool {
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		acc := f.find("a6")
-		return acc != nil && acc.Usage != nil && acc.Usage.Error != "" && !a.busy["account:usage.save:a6"]
-	})
-	click(t, tt, "立即查询")
-	waitFor(t, tt, a, func() bool { return !a.busy["account:usage.query:a6"] })
-	click(t, tt, "关闭")
-	message := "The Admin API requires an Admin API key or an organization-scoped API key."
-	if !tt.HasText(message) {
-		t.Fatalf("没有显示上游原话：%q", tt.Texts())
-	}
-	if !tt.HasText("就绪") {
-		t.Fatalf("账号不再就绪：%q", tt.Texts())
-	}
-	assertNoSecret(t, a, tt, "sk-ant-user-secret")
 }
 
 func clearField(t *testing.T, tt *ui.Tester, label string) {
@@ -777,11 +795,10 @@ func TestAccountScreenshots(t *testing.T) {
 	}
 	f := newAccountService(t)
 	checked := time.Now().Add(-3 * time.Minute).UnixMilli()
-	seedUsage(f, "a5", &usage{Supported: true, Provider: "openai", SpentMonth: moneyPtr(12.40),
-		Balance: moneyPtr(50), BalanceAt: checked, Remaining: moneyPtr(41.85), Interval: 300, CheckedAt: checked})
-	seedUsage(f, "a6", &usage{Supported: true, Provider: "anthropic", SpentMonth: moneyPtr(3.10),
-		Balance: moneyPtr(50), BalanceAt: checked, Remaining: moneyPtr(1.90), AlertBelow: moneyPtr(5),
-		Low: true, Interval: 300, CheckedAt: checked})
+	seedUsage(f, "a5", &usage{Month: usageTotals{Runs: 12, InputTokens: 1_200_000, OutputTokens: 150_000, Unpriced: 12},
+		Balance: moneyPtr(50), BalanceAt: checked})
+	seedUsage(f, "a6", &usage{Month: usageTotals{Runs: 37, Cost: moneyPtr(2.66)}, Models: []modelUsage{{Model: "claude-haiku-5-5", Prices: usagePrices{Input: moneyPtr(1), Output: moneyPtr(5)}, Runs: 37, Cost: moneyPtr(2.66)}},
+		Balance: moneyPtr(50), BalanceAt: checked, SpentSinceBalance: moneyPtr(2.66), Remaining: moneyPtr(47.34), AlertBelow: moneyPtr(48), Low: true})
 	a, tt := openAccounts(t, f)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -957,5 +974,21 @@ func TestDSHAddWithoutKeyUsesServiceValidation(t *testing.T) {
 	f.mu.Unlock()
 	if count != 7 || calls != 1 {
 		t.Fatalf("账号数 %d，add 调用 %d", count, calls)
+	}
+}
+
+// A balance just under the alert line must not read as equal to it, and a
+// spend under one cent must not read as nothing.
+func TestUsageAmountsNeverReadWrong(t *testing.T) {
+	for _, c := range []struct{ got, want string }{
+		{remainingMoney(49.996843), "$49.99"},
+		{remainingMoney(47.34), "$47.34"},
+		{money(0.000915), "<$0.01"},
+		{money(0), "$0.00"},
+		{money(2.666), "$2.67"},
+	} {
+		if c.got != c.want {
+			t.Errorf("got %q, want %q", c.got, c.want)
+		}
 	}
 }

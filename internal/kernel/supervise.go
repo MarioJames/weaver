@@ -62,7 +62,6 @@ func (k *Kernel) Start() error {
 	go k.timerLoop()
 	go k.superviseLoop()
 	go k.maintenanceLoop()
-	go k.usageLoop()
 	go k.archiveLoop()
 	return k.Dispatch()
 }

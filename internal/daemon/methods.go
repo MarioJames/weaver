@@ -301,7 +301,7 @@ var methods = map[string]handler{
 		return s.kernel.AccountConfig(p.ID)
 	}),
 	"account.models": simple(func(s *Server, p kernel.ModelFetchInput) (any, error) { return s.kernel.FetchModels(p) }),
-	"account.usage":  simple(func(s *Server, p struct{ ID string }) (any, error) { return s.kernel.QueryAccountUsage(p.ID) }),
+	"account.usage":  simple(func(s *Server, p struct{ ID string }) (any, error) { return s.kernel.Account(p.ID) }),
 	"account.usage.set": simple(func(s *Server, p struct {
 		ID string `json:"id"`
 		kernel.UsagePatch

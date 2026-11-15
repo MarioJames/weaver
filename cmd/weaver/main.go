@@ -62,8 +62,10 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
   weaver account set <账号> [--label <名称>] [--enabled true|false] [--api-key-env <环境变量名>] [--base-url <地址>]
   weaver account config <账号>                  读回渠道配置（不含密钥）
   weaver account models <账号>                  从渠道接口拉取模型清单
-  weaver account usage <账号> [--admin-key-env <环境变量名>] [--clear-admin-key] [--balance <美元>] [--clear-balance] [--alert-below <美元>] [--interval 5m|0]
-                                            不带参数时立即查询一次用量；管理密钥只从环境变量名读取
+  weaver account usage <账号> [--balance <美元>] [--clear-balance] [--alert-below <美元>] [--clear-alert]
+                         [--model <模型> (--price-input|--price-output|--price-cache-read|--price-cache-write <美元/百万令牌> | --clear-prices)]
+                                            用量按每次运行回报的令牌和费用累计，单价按模型设置，一次替换该模型的四项；
+                                            不带参数时显示本月用量和估算剩余
   weaver account import-legacy [--from <旧库路径>] [--owner claude_owner]
   weaver worker list | remove <候选>
   weaver worker set <候选> [--engine <引擎>] [--model <模型>] [--effort <强度>] [--weight <权重>] [--max-parallel <数量>] [--enabled true|false] [--accounts <账号,账号>]
@@ -107,7 +109,7 @@ type args struct {
 }
 
 var switches = map[string]bool{"all": true, "archived": true, "follow": true, "stderr": true, "no-notify": true, "help": true,
-	"clear-admin-key": true, "clear-balance": true}
+	"clear-balance": true, "clear-alert": true, "clear-prices": true}
 
 func parse(argv []string) (*args, error) {
 	a := &args{flags: map[string]string{}}
@@ -716,7 +718,7 @@ func run(argv []string) error {
 		}
 		return call("account.models", map[string]any{"id": id})
 	case "account usage":
-		if err := a.allow("admin-key-env", "clear-admin-key", "balance", "clear-balance", "alert-below", "interval"); err != nil {
+		if err := a.allow("balance", "clear-balance", "alert-below", "clear-alert", "model", "price-input", "price-output", "price-cache-read", "price-cache-write", "clear-prices"); err != nil {
 			return err
 		}
 		id, err := a.arg(0, "账号")
@@ -725,70 +727,51 @@ func run(argv []string) error {
 		}
 		params := map[string]any{"id": id}
 		changed := false
-		money := func(flag string) (float64, error) {
+		number := func(flag string) (float64, error) {
 			v, err := strconv.ParseFloat(a.get(flag), 64)
-			if err != nil || math.IsNaN(v) || math.IsInf(v, 0) {
-				return 0, fmt.Errorf("--%s 需要金额，例如 5.00", flag)
+			if err != nil || math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
+				return 0, fmt.Errorf("--%s 需要不小于 0 的数字，例如 5.00", flag)
 			}
 			return v, nil
 		}
-		if a.has("admin-key-env") {
-			if a.has("clear-admin-key") {
-				return errors.New("--admin-key-env 和 --clear-admin-key 不能同时使用")
+		set := func(target map[string]any, flag, clear, key string) error {
+			if a.has(flag) && a.has(clear) {
+				return fmt.Errorf("--%s 和 --%s 不能同时使用", flag, clear)
 			}
-			name := a.get("admin-key-env")
-			if name == "" {
-				return errors.New("--admin-key-env 需要环境变量名")
+			if a.has(flag) {
+				v, err := number(flag)
+				if err != nil {
+					return err
+				}
+				target[key] = v
+				changed = true
+			} else if clear != "clear-prices" && a.has(clear) {
+				target[key] = nil
+				changed = true
 			}
-			value := os.Getenv(name)
-			if value == "" {
-				return fmt.Errorf("环境变量 %s 是空的", name)
-			}
-			params["adminKey"] = value
-			changed = true
+			return nil
 		}
-		if a.has("clear-admin-key") {
-			params["adminKey"] = ""
-			changed = true
+		if err := set(params, "balance", "clear-balance", "balance"); err != nil {
+			return err
 		}
-		if a.has("balance") {
-			if a.has("clear-balance") {
-				return errors.New("--balance 和 --clear-balance 不能同时使用")
-			}
-			v, err := money("balance")
-			if err != nil {
+		if err := set(params, "alert-below", "clear-alert", "alertBelow"); err != nil {
+			return err
+		}
+		// Prices belong to one model: the price flags replace all four of it.
+		price := map[string]any{"model": a.get("model")}
+		for flag, key := range map[string]string{"price-input": "input", "price-output": "output", "price-cache-read": "cacheRead", "price-cache-write": "cacheWrite"} {
+			if err := set(price, flag, "clear-prices", key); err != nil {
 				return err
 			}
-			params["balance"] = v
-			changed = true
 		}
-		if a.has("clear-balance") {
-			params["balance"] = nil
-			changed = true
-		}
-		if a.has("alert-below") {
-			v, err := money("alert-below")
-			if err != nil {
-				return err
+		if len(price) > 1 || a.has("clear-prices") {
+			if a.get("model") == "" {
+				return errors.New("单价按模型设置，需要 --model <模型>")
 			}
-			params["alertBelow"] = v
+			params["prices"] = []any{price}
 			changed = true
-		}
-		if a.has("interval") {
-			value := a.get("interval")
-			seconds := 0
-			if value != "0" {
-				d, err := time.ParseDuration(value)
-				if err != nil || d <= 0 {
-					return errors.New("--interval 需要时长，例如 5m；0 表示只手动查询")
-				}
-				seconds = int(d.Round(time.Second) / time.Second)
-				if seconds < 1 {
-					seconds = 1
-				}
-			}
-			params["interval"] = seconds
-			changed = true
+		} else if a.has("model") {
+			return errors.New("--model 要和 --price-* 或 --clear-prices 一起用")
 		}
 		if !changed {
 			return call("account.usage", params)

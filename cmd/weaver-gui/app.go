@@ -23,7 +23,6 @@ type account struct {
 	AuthDir     string `json:"authDir,omitempty"`
 	HasAPIKey   bool   `json:"hasApiKey,omitempty"`
 	HasConfig   bool   `json:"hasConfig,omitempty"`
-	HasAdminKey bool   `json:"hasAdminKey,omitempty"`
 	BaseURL     string `json:"baseUrl,omitempty"`
 	Provider    string `json:"provider,omitempty"`
 	Protocol    string `json:"protocol,omitempty"`
@@ -38,17 +37,36 @@ type account struct {
 	Usage       *usage `json:"usage,omitempty"`
 }
 type usage struct {
-	Supported  bool     `json:"supported"`
-	Provider   string   `json:"provider,omitempty"`
-	SpentMonth *float64 `json:"spentMonth,omitempty"`
-	Balance    *float64 `json:"balance,omitempty"`
-	BalanceAt  int64    `json:"balanceAt,omitempty"`
-	Remaining  *float64 `json:"remaining,omitempty"`
-	AlertBelow *float64 `json:"alertBelow,omitempty"`
-	Low        bool     `json:"low,omitempty"`
-	Interval   int      `json:"interval"`
-	CheckedAt  int64    `json:"checkedAt,omitempty"`
-	Error      string   `json:"error,omitempty"`
+	Month             usageTotals  `json:"month"`
+	Models            []modelUsage `json:"models"`
+	Balance           *float64     `json:"balance,omitempty"`
+	BalanceAt         int64        `json:"balanceAt,omitempty"`
+	AlertBelow        *float64     `json:"alertBelow,omitempty"`
+	SpentSinceBalance *float64     `json:"spentSinceBalance,omitempty"`
+	Remaining         *float64     `json:"remaining,omitempty"`
+	Low               bool         `json:"low,omitempty"`
+}
+type usageTotals struct {
+	Runs             int      `json:"runs"`
+	InputTokens      int64    `json:"inputTokens"`
+	OutputTokens     int64    `json:"outputTokens"`
+	CacheReadTokens  int64    `json:"cacheReadTokens"`
+	CacheWriteTokens int64    `json:"cacheWriteTokens"`
+	Cost             *float64 `json:"cost,omitempty"`
+	Unpriced         int      `json:"unpriced,omitempty"`
+}
+type modelUsage struct {
+	Model    string      `json:"model"`
+	Prices   usagePrices `json:"prices"`
+	Runs     int         `json:"runs"`
+	Cost     *float64    `json:"cost,omitempty"`
+	Unpriced int         `json:"unpriced,omitempty"`
+}
+type usagePrices struct {
+	Input      *float64 `json:"input,omitempty"`
+	Output     *float64 `json:"output,omitempty"`
+	CacheRead  *float64 `json:"cacheRead,omitempty"`
+	CacheWrite *float64 `json:"cacheWrite,omitempty"`
 }
 type worker struct {
 	ID          string   `json:"id"`
