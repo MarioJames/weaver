@@ -199,6 +199,27 @@ func TestSessionUserFilters(t *testing.T) {
 		}
 	}
 }
+
+// A message the user types while the agent is working is recorded as a queued
+// command, not as a user row; background task notifications use the same record.
+func TestSessionQueuedUserMessage(t *testing.T) {
+	line := func(mode string, prompt any) []byte {
+		b, _ := json.Marshal(map[string]any{"type": "attachment", "timestamp": "2026-11-15T14:26:59.106Z", "attachment": map[string]any{"type": "queued_command", "commandMode": mode, "prompt": prompt}})
+		return b
+	}
+	for _, prompt := range []any{"头像多给我几个风格", []any{map[string]any{"type": "text", "text": "头像多给我几个风格"}}} {
+		got := parseTranscriptLine(line("prompt", prompt), "claude")
+		if len(got) != 1 || got[0].Role != "user" || got[0].Text != "头像多给我几个风格" || got[0].At == 0 {
+			t.Fatalf("%v: %+v", prompt, got)
+		}
+	}
+	if got := parseTranscriptLine(line("task-notification", "<task-notification>done</task-notification>"), "claude"); len(got) != 0 {
+		t.Fatalf("notification kept: %+v", got)
+	}
+	if got := parseTranscriptLine([]byte(`{"type":"attachment","attachment":{"type":"file","prompt":"x"}}`), "claude"); len(got) != 0 {
+		t.Fatalf("other attachment kept: %+v", got)
+	}
+}
 func TestSessionFollowSharedPartialMissingA14(t *testing.T) {
 	for _, engine := range []string{"claude", "codex"} {
 		t.Run(engine, func(t *testing.T) {

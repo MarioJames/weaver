@@ -211,6 +211,7 @@ func (k *Kernel) AddArtifact(in ArtifactInput) (*Artifact, error) {
 			}
 		}
 		_, err := t.Exec(`INSERT INTO artifacts(id,mission_id,package_key,kind,title,group_key,path,url,sha256,size,summary,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET package_key=excluded.package_key,kind=excluded.kind,title=excluded.title,group_key=excluded.group_key,path=excluded.path,sha256=excluded.sha256,size=excluded.size,summary=excluded.summary`, a.ID, a.MissionID, a.PackageKey, a.Kind, a.Title, a.GroupKey, a.Path, a.URL, a.SHA256, a.Size, string(a.Summary), a.CreatedAt)
+		t.touched[a.MissionID] = true
 		return err
 	})
 	return a, err
@@ -244,14 +245,14 @@ func (k *Kernel) Artifacts(mission string) ([]ArtifactGroup, error) {
 }
 func (k *Kernel) RemoveArtifact(id string) error {
 	return k.write(func(t *tx) error {
-		r, err := t.Exec(`DELETE FROM artifacts WHERE id=?`, id)
-		if err != nil {
+		var mission string
+		if err := t.QueryRow(`SELECT mission_id FROM artifacts WHERE id=?`, id).Scan(&mission); err == sql.ErrNoRows {
+			return errf("NOT_FOUND", "产物不存在")
+		} else if err != nil {
 			return err
 		}
-		n, err := r.RowsAffected()
-		if err == nil && n == 0 {
-			return errf("NOT_FOUND", "产物不存在")
-		}
+		_, err := t.Exec(`DELETE FROM artifacts WHERE id=?`, id)
+		t.touched[mission] = true
 		return err
 	})
 }

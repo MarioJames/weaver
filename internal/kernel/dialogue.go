@@ -234,7 +234,9 @@ func (k *Kernel) Dialogue(mission, name string) (*DialogueTranscript, error) {
 	out := &DialogueTranscript{Mission: mission, Name: name, Rounds: []DialogueRound{}}
 	byKey := map[string]*Package{}
 	for _, p := range packages {
-		byKey[p.Key] = p
+		if _, _, _, ok := parseDialoguePackage(p.Key, p.Advisory); ok {
+			byKey[p.Key] = p
+		}
 	}
 	for round := 1; ; round++ {
 		a, b := byKey[dialogueKey(name, round, "a")], byKey[dialogueKey(name, round, "b")]
@@ -291,4 +293,28 @@ func (k *Kernel) Dialogue(mission, name string) (*DialogueTranscript, error) {
 		}
 	}
 	return out, nil
+}
+
+// parseDialoguePackage is the shared structural test for advisory dialogue packages.
+func parseDialoguePackage(key string, advisory bool) (name string, round int, side string, ok bool) {
+	if !advisory {
+		return
+	}
+	if len(key) < 3 {
+		return "", 0, "", false
+	}
+	side = key[len(key)-1:]
+	if key[len(key)-2] != '.' || (side != "a" && side != "b") {
+		return "", 0, "", false
+	}
+	prefix := key[:len(key)-2]
+	i := strings.LastIndex(prefix, ".r")
+	if i <= 0 {
+		return "", 0, "", false
+	}
+	n, err := strconv.Atoi(prefix[i+2:])
+	if err != nil || n < 1 || strconv.Itoa(n) != prefix[i+2:] {
+		return "", 0, "", false
+	}
+	return prefix[:i], n, side, true
 }

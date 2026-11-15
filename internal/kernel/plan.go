@@ -216,7 +216,12 @@ func (t *tx) createPlan(in *PlanInput, out *PlanResult) error {
 			}
 		}
 	}
-	if _, err := t.event(m.ID, "", 0, EvPlan, fmt.Sprintf("提交计划：%d 个工作包", len(in.Packages))); err != nil {
+	planSeq, err := t.event(m.ID, "", 0, EvPlan, fmt.Sprintf("提交计划：%d 个工作包", len(in.Packages)))
+	if err != nil {
+		return err
+	}
+	// The timeline lists a plan's packages from this record, never by timestamps.
+	if _, err := t.Exec(`UPDATE packages SET plan_seq=? WHERE mission_id=? AND plan_seq IS NULL`, planSeq, m.ID); err != nil {
 		return err
 	}
 	if err := t.dispatch(); err != nil {
@@ -426,6 +431,8 @@ func (k *Kernel) CloseMission(id string) (*Mission, error) {
 			return errf("ACTIVE", "主任务还有 %d 个包在运行，先取消或等它们结束", active)
 		}
 		_, err = t.Exec(`UPDATE missions SET closed_at=? WHERE id=? AND closed_at IS NULL`, t.now, id)
+		// Closing writes no event; the timeline's waiters still have to hear of it.
+		t.touched[id] = true
 		return err
 	})
 	if err != nil {

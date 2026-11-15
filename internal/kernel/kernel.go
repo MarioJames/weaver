@@ -37,11 +37,13 @@ type Pusher func(session, pane, text string) error
 
 // Options configures a Kernel.
 type Options struct {
-	QuotaClient *quota.Client
-	DB          *sql.DB
-	Home        string
-	Engines     Engines
-	Push        Pusher
+	// TimelineWait bounds an unchanged timeline long poll; zero uses 20 seconds.
+	TimelineWait time.Duration
+	QuotaClient  *quota.Client
+	DB           *sql.DB
+	Home         string
+	Engines      Engines
+	Push         Pusher
 	// Check reports whether an account's credential material is usable.
 	Check func(engine.Account) (bool, string)
 	Log   *slog.Logger
@@ -51,14 +53,15 @@ type Options struct {
 // Kernel owns all mission state. Every mutation runs in one SQLite transaction
 // under mu; launches, cancels and notifications happen after commit.
 type Kernel struct {
-	quotaClient *quota.Client
-	db          *sql.DB
-	home        string
-	eng         Engines
-	push        Pusher
-	check       func(engine.Account) (bool, string)
-	log         *slog.Logger
-	now         func() time.Time
+	timelineWait time.Duration
+	quotaClient  *quota.Client
+	db           *sql.DB
+	home         string
+	eng          Engines
+	push         Pusher
+	check        func(engine.Account) (bool, string)
+	log          *slog.Logger
+	now          func() time.Time
 
 	mu        sync.Mutex
 	sessionMu sync.Mutex
@@ -89,7 +92,7 @@ type activity struct {
 // New creates a kernel. Call Start to resume supervision and timers.
 func New(o Options) *Kernel {
 	k := &Kernel{
-		quotaClient: o.QuotaClient, db: o.DB, home: o.Home, eng: o.Engines, push: o.Push, check: o.Check, log: o.Log, now: o.Now,
+		timelineWait: o.TimelineWait, quotaClient: o.QuotaClient, db: o.DB, home: o.Home, eng: o.Engines, push: o.Push, check: o.Check, log: o.Log, now: o.Now,
 		subs: map[string]map[chan struct{}]struct{}{}, waiters: map[string]int{}, pushing: map[string]bool{},
 		activity: map[string]*activity{}, timerKick: make(chan struct{}, 1), stop: make(chan struct{}),
 	}
@@ -362,7 +365,12 @@ func getMission(q querier, id string) (*Mission, error) {
 		m.Total += n
 	}
 	m.State = missionState(m.Counts, m.Total)
-	return m, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	m.Activity, err = missionActivity(q, m)
+	return m, err
 }
 
 // missionState derives a mission's state from its packages.
@@ -473,4 +481,12 @@ func (k *Kernel) forget(attemptID string) {
 
 // Close stops background loops. Running attempts are left alone: they belong
 // to their own scopes and are picked up again by the next Start.
-func (k *Kernel) Close() { k.stopOnce.Do(func() { close(k.stop) }); k.sessionWG.Wait() }
+func (k *Kernel) Close() {
+	k.stopOnce.Do(func() {
+		// Serialize with context-aware timeline reads registering a session sync.
+		k.subMu.Lock()
+		close(k.stop)
+		k.subMu.Unlock()
+	})
+	k.sessionWG.Wait()
+}

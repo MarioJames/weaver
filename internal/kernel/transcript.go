@@ -145,11 +145,19 @@ func parseTranscriptLine(line []byte, engine string) []TranscriptItem {
 			return nil
 		}
 		role = str(row, "type")
-		if role != "user" && role != "assistant" {
+		switch role {
+		case "user", "assistant":
+			content = object(row["message"])["content"]
+		case "attachment":
+			// What the user typed while the agent was working.
+			q := object(row["attachment"])
+			if str(q, "type") != "queued_command" || str(q, "commandMode") != "prompt" {
+				return nil
+			}
+			role, content = "user", q["prompt"]
+		default:
 			return nil
 		}
-		msg := object(row["message"])
-		content = msg["content"]
 	} else {
 		if str(row, "type") != "response_item" {
 			return nil

@@ -1,8 +1,26 @@
 package daemon
 
-import "github.com/MarioJames/weaver/internal/kernel"
+import (
+	"context"
+	"encoding/json"
+
+	"github.com/MarioJames/weaver/internal/kernel"
+)
 
 func init() {
+	methods["mission.timeline"] = func(s *Server, ctx context.Context, params json.RawMessage, _ func(any) error) (any, error) {
+		in, err := decode[kernel.TimelineInput](params)
+		if err != nil {
+			return nil, err
+		}
+		return s.kernel.Timeline(ctx, in)
+	}
+	methods["mission.text"] = simple(func(s *Server, p struct {
+		Mission string `json:"mission"`
+		Ref     string `json:"ref"`
+	}) (any, error) {
+		return s.kernel.MissionText(p.Mission, p.Ref)
+	})
 	methods["mission.owner"] = simple(func(s *Server, p struct {
 		Mission string `json:"mission"`
 		Engine  string `json:"engine"`

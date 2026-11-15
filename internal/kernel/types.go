@@ -64,6 +64,7 @@ func AsError(err error) *Error {
 
 // Mission is a root task: the unit a parent agent waits on.
 type Mission struct {
+	Activity       string         `json:"activity"`
 	Owner          *Owner         `json:"owner,omitempty"`
 	Archived       bool           `json:"archived"`
 	ArchivedAt     int64          `json:"archivedAt,omitempty"`
