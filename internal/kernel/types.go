@@ -64,16 +64,27 @@ func AsError(err error) *Error {
 
 // Mission is a root task: the unit a parent agent waits on.
 type Mission struct {
-	ID        string         `json:"id"`
-	Title     string         `json:"title"`
-	Workspace string         `json:"workspace"`
-	State     string         `json:"state"`
-	Counts    map[string]int `json:"counts"`
-	Total     int            `json:"total"`
-	Cursor    int64          `json:"cursor"`
-	Notify    *Notify        `json:"notify,omitempty"`
-	CreatedAt int64          `json:"createdAt"`
-	ClosedAt  int64          `json:"closedAt,omitempty"`
+	Owner          *Owner         `json:"owner,omitempty"`
+	Archived       bool           `json:"archived"`
+	ArchivedAt     int64          `json:"archivedAt,omitempty"`
+	LastActivityAt int64          `json:"lastActivityAt"`
+	Artifacts      int            `json:"artifacts"`
+	ID             string         `json:"id"`
+	Title          string         `json:"title"`
+	Workspace      string         `json:"workspace"`
+	State          string         `json:"state"`
+	Counts         map[string]int `json:"counts"`
+	Total          int            `json:"total"`
+	Cursor         int64          `json:"cursor"`
+	Notify         *Notify        `json:"notify,omitempty"`
+	CreatedAt      int64          `json:"createdAt"`
+	ClosedAt       int64          `json:"closedAt,omitempty"`
+}
+
+// Owner identifies the parent Agent's native session.
+type Owner struct {
+	Engine  string `json:"engine"`
+	Session string `json:"session"`
 }
 
 // Notify is the Herdr pane that receives wake-ups while nobody is waiting.

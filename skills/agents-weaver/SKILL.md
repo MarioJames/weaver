@@ -45,6 +45,10 @@ weaver verdict --package m_…/wiring return --note "The middleware order is wro
 # 5. Back to step 3 until every package is accepted, then: weaver mission close m_…
 ```
 
+`mission create` automatically records the parent Agent session (Claude Code or Codex).
+
+When delivering designs, acceptance reports or other artifacts, upload with feature-delivery’s sharing script and `--mission <mission>` to register them automatically. Register documents that are not shared with `weaver artifact add`.
+
 A package reference is its ID or `<mission>/<key>`.
 
 ## Writing a plan

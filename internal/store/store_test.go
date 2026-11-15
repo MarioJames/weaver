@@ -114,3 +114,42 @@ func TestMigrationUpgradesAVersionTwoDatabase(t *testing.T) {
 		t.Fatalf("0003 applied %d times", applied)
 	}
 }
+
+func TestMigrationFourUpgradesVersionThree(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "weaver.db")
+	makeVersionTwo(t, path)
+	old, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := migrations.ReadFile("migrations/0003_account_usage.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = old.Exec(string(body)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = old.Exec(`INSERT INTO schema_migrations VALUES('0003_account_usage.sql',0); INSERT INTO missions(id,title,workspace,created_at) VALUES('old','old','/tmp',1)`); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var engine, session string
+	var archived sql.NullInt64
+	if err = db.QueryRow(`SELECT owner_engine,owner_session,archived_at FROM missions WHERE id='old'`).Scan(&engine, &session, &archived); err != nil {
+		t.Fatal(err)
+	}
+	if engine != "" || session != "" || archived.Valid {
+		t.Fatal("invalid defaults")
+	}
+	if _, err = db.Exec(`INSERT INTO artifacts(id,mission_id,kind,title,group_key,created_at) VALUES('a','old','doc','Doc','Doc',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if err = migrate(db); err != nil {
+		t.Fatal(err)
+	}
+}

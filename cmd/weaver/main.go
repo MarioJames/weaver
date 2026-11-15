@@ -22,10 +22,15 @@ import (
 const usage = `weaver：需求开发的调度引擎。主任务拆成工作包，派给各引擎的 Agent 执行。
 
 主任务与计划
-  weaver mission create --title <标题> [--workspace <目录>] [--pane <Herdr 窗格>] [--no-notify] [--key <幂等编号>]
-  weaver mission list [--all]
+  weaver mission create --title <标题> [--workspace <目录>] [--pane <Herdr 窗格>] [--no-notify] [--key <幂等编号>] [--owner-engine <引擎>] [--owner-session <会话>]
+  weaver mission list [--all] [--archived]
   weaver mission show <主任务>
   weaver mission close <主任务>
+  weaver mission archive|unarchive <主任务>
+  weaver mission transcript <主任务> [--after <字节偏移>]
+  weaver artifact add --mission <主任务> (--file <绝对路径> | --url <链接>) [--url <链接>] [--kind design|report|evidence|doc] [--title <标题>] [--package <key>]
+  weaver artifact list --mission <主任务>
+  weaver artifact remove <产物>
   weaver plan submit --mission <主任务> [--file <计划.json>] [--key <幂等编号>]     计划默认从标准输入读
                                         包可带 "advisory": true（只出文档、不改文件）和 "autoAccept": true（出结果即采纳并放行下游）
 
@@ -63,7 +68,7 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
   weaver worker list | remove <候选>
   weaver worker set <候选> [--engine <引擎>] [--model <模型>] [--effort <强度>] [--weight <权重>] [--max-parallel <数量>] [--enabled true|false] [--accounts <账号,账号>]
   weaver engine list | start <账号> | stop <账号>
-  weaver config list | set <键> <值>
+  weaver config list | set <键> <值>          archive_after_days: 0（关闭）/1/3/7（默认）/30
 
 服务
   weaver status
@@ -101,7 +106,7 @@ type args struct {
 	pos   []string
 }
 
-var switches = map[string]bool{"all": true, "follow": true, "stderr": true, "no-notify": true, "help": true,
+var switches = map[string]bool{"all": true, "archived": true, "follow": true, "stderr": true, "no-notify": true, "help": true,
 	"clear-admin-key": true, "clear-balance": true}
 
 func parse(argv []string) (*args, error) {
@@ -241,7 +246,7 @@ func run(argv []string) error {
 		return nil
 	}
 	sub := ""
-	grouped := map[string]bool{"mission": true, "plan": true, "package": true, "timer": true, "dialogue": true, "account": true, "worker": true, "engine": true, "config": true, "service": true}
+	grouped := map[string]bool{"artifact": true, "mission": true, "plan": true, "package": true, "timer": true, "dialogue": true, "account": true, "worker": true, "engine": true, "config": true, "service": true}
 	if grouped[group] {
 		if len(a.pos) == 0 {
 			return fmt.Errorf("%s 需要子命令，见 weaver help", group)
@@ -281,7 +286,7 @@ func run(argv []string) error {
 		return call("backup", nil)
 
 	case "mission create":
-		if err := a.allow("title", "workspace", "pane", "herdr-session", "no-notify", "key"); err != nil {
+		if err := a.allow("title", "workspace", "pane", "herdr-session", "no-notify", "key", "owner-engine", "owner-session"); err != nil {
 			return err
 		}
 		title, err := a.need("title")
@@ -294,6 +299,7 @@ func run(argv []string) error {
 		}
 		workspace, _ = filepath.Abs(workspace)
 		params := map[string]any{"title": title, "workspace": workspace, "key": a.get("key")}
+		params["owner"] = missionOwner(a)
 		// A parent agent running inside Herdr gets wake-ups pushed into its own pane.
 		pane := a.get("pane")
 		if pane == "" && !a.has("no-notify") {
@@ -308,7 +314,7 @@ func run(argv []string) error {
 		}
 		return call("mission.create", params)
 	case "mission list":
-		return call("mission.list", map[string]any{"all": a.has("all")})
+		return call("mission.list", map[string]any{"all": a.has("all"), "archived": a.has("archived")})
 	case "mission show":
 		id, err := a.arg(0, "主任务")
 		if err != nil {
@@ -321,6 +327,59 @@ func run(argv []string) error {
 			return err
 		}
 		return call("mission.close", map[string]any{"id": id})
+
+	case "mission archive", "mission unarchive":
+		if err := a.allow(); err != nil {
+			return err
+		}
+		id, err := a.arg(0, "主任务")
+		if err != nil {
+			return err
+		}
+		return call("mission."+sub, map[string]any{"mission": id})
+	case "mission transcript":
+		if err := a.allow("after"); err != nil {
+			return err
+		}
+		id, err := a.arg(0, "主任务")
+		if err != nil {
+			return err
+		}
+		after := int64(0)
+		if a.has("after") {
+			after, err = strconv.ParseInt(a.get("after"), 10, 64)
+			if err != nil {
+				return err
+			}
+		}
+		return call("mission.transcript", map[string]any{"mission": id, "after": after})
+	case "artifact add":
+		if err := a.allow("mission", "file", "url", "kind", "title", "package"); err != nil {
+			return err
+		}
+		mission, err := a.need("mission")
+		if err != nil {
+			return err
+		}
+		return call("artifact.add", map[string]any{"mission": mission, "path": a.get("file"), "url": a.get("url"), "kind": a.get("kind"), "title": a.get("title"), "package": a.get("package")})
+	case "artifact list":
+		if err := a.allow("mission"); err != nil {
+			return err
+		}
+		mission, err := a.need("mission")
+		if err != nil {
+			return err
+		}
+		return call("artifact.list", map[string]any{"mission": mission})
+	case "artifact remove":
+		if err := a.allow(); err != nil {
+			return err
+		}
+		id, err := a.arg(0, "产物")
+		if err != nil {
+			return err
+		}
+		return call("artifact.remove", map[string]any{"id": id})
 
 	case "plan submit":
 		if err := a.allow("mission", "file", "key"); err != nil {
@@ -959,4 +1018,32 @@ func serviceUninstall() error {
 	_ = exec.Command("systemctl", "--user", "daemon-reload").Run()
 	fmt.Println("已移除 " + unitName + "。正在运行的 Agent 和常驻引擎不受影响；数据目录保留。")
 	return nil
+}
+
+// missionOwner runs in the CLI, where the parent Agent's environment is available.
+func missionOwner(a *args) map[string]string {
+	engine, session := "", ""
+	ancestor, found := ancestorAgent()
+	if found {
+		switch ancestor {
+		case "claude":
+			session = os.Getenv("CLAUDE_CODE_SESSION_ID")
+		case "codex":
+			session = os.Getenv("CODEX_THREAD_ID")
+		}
+		if session != "" {
+			engine = ancestor
+		}
+	} else if session = os.Getenv("CLAUDE_CODE_SESSION_ID"); session != "" {
+		engine = "claude"
+	} else if session = os.Getenv("CODEX_THREAD_ID"); session != "" {
+		engine = "codex"
+	}
+	if a.has("owner-engine") {
+		engine = a.get("owner-engine")
+	}
+	if a.has("owner-session") {
+		session = a.get("owner-session")
+	}
+	return map[string]string{"engine": engine, "session": session}
 }

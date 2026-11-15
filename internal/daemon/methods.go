@@ -73,13 +73,15 @@ var methods = map[string]handler{
 		Title     string         `json:"title"`
 		Workspace string         `json:"workspace"`
 		Notify    *kernel.Notify `json:"notify"`
+		Owner     *kernel.Owner  `json:"owner"`
 	}) (any, error) {
-		return s.kernel.CreateMission(p.Key, p.Title, p.Workspace, p.Notify)
+		return s.kernel.CreateMission(p.Key, p.Title, p.Workspace, p.Notify, p.Owner)
 	}),
 	"mission.list": simple(func(s *Server, p struct {
-		All bool `json:"all"`
+		All      bool `json:"all"`
+		Archived bool `json:"archived"`
 	}) (any, error) {
-		return emptyIfNil(s.kernel.Missions(p.All))
+		return emptyIfNil(s.kernel.Missions(p.All, p.Archived))
 	}),
 	"mission.show": simple(func(s *Server, p struct {
 		ID string `json:"id"`

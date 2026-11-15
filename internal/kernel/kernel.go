@@ -318,8 +318,11 @@ func getMission(q querier, id string) (*Mission, error) {
 	m := &Mission{Counts: map[string]int{}}
 	var session, pane string
 	var closed sql.NullInt64
-	err := q.QueryRow(`SELECT id, title, workspace, notify_session, notify_pane, wake_cursor, created_at, closed_at FROM missions WHERE id=?`, id).
-		Scan(&m.ID, &m.Title, &m.Workspace, &session, &pane, &m.Cursor, &m.CreatedAt, &closed)
+	var owner Owner
+	err := q.QueryRow(`SELECT id, title, workspace, notify_session, notify_pane, wake_cursor, created_at, closed_at, owner_engine, owner_session, COALESCE(archived_at,0),
+ COALESCE((SELECT MAX(at) FROM events WHERE mission_id=missions.id),created_at),
+ (SELECT COUNT(*) FROM artifacts WHERE mission_id=missions.id) FROM missions WHERE id=?`, id).
+		Scan(&m.ID, &m.Title, &m.Workspace, &session, &pane, &m.Cursor, &m.CreatedAt, &closed, &owner.Engine, &owner.Session, &m.ArchivedAt, &m.LastActivityAt, &m.Artifacts)
 	if err == sql.ErrNoRows {
 		return nil, errf("NOT_FOUND", "主任务 %s 不存在", id)
 	}
@@ -330,6 +333,10 @@ func getMission(q querier, id string) (*Mission, error) {
 		m.Notify = &Notify{Session: session, Pane: pane}
 	}
 	m.ClosedAt = closed.Int64
+	m.Archived = m.ArchivedAt != 0
+	if owner.Engine != "" || owner.Session != "" {
+		m.Owner = &owner
+	}
 	rows, err := q.Query(`SELECT state, COUNT(*) FROM packages WHERE mission_id=? GROUP BY state`, id)
 	if err != nil {
 		return nil, err

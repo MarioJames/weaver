@@ -502,10 +502,11 @@ func (k *Kernel) Workers() ([]*Worker, error) {
 
 // Settings the kernel understands, with their defaults.
 var settingDefaults = map[string]string{
-	"max_parallel":  fmt.Sprint(defaultMaxParallel),
-	"stall_seconds": fmt.Sprint(int(defaultStall.Seconds())),
-	"resident":      "on",
-	"standby":       "on",
+	"archive_after_days": "7",
+	"max_parallel":       fmt.Sprint(defaultMaxParallel),
+	"stall_seconds":      fmt.Sprint(int(defaultStall.Seconds())),
+	"resident":           "on",
+	"standby":            "on",
 }
 
 func (k *Kernel) Settings() (map[string]string, error) {
@@ -542,6 +543,12 @@ func (k *Kernel) Setting(key string) string {
 
 func (k *Kernel) SetSetting(key, value string) error {
 	switch key {
+	case "archive_after_days":
+		switch value {
+		case "0", "1", "3", "7", "30":
+		default:
+			return errf("INVALID", "archive_after_days 只能是 0、1、3、7、30")
+		}
 	case "max_parallel":
 		if n, err := strconv.Atoi(value); err != nil || n < 0 {
 			return errf("INVALID", "max_parallel 需要非负整数，0 表示不限")

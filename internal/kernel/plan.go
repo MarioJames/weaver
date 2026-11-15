@@ -14,7 +14,7 @@ const maxInstruction = 60000
 
 // CreateMission registers a root task. notify may be nil. A repeated key
 // returns the mission created the first time.
-func (k *Kernel) CreateMission(key, title, workspace string, notify *Notify) (*Mission, error) {
+func (k *Kernel) CreateMission(key, title, workspace string, notify *Notify, owners ...*Owner) (*Mission, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, errf("INVALID", "主任务需要标题")
@@ -25,12 +25,16 @@ func (k *Kernel) CreateMission(key, title, workspace string, notify *Notify) (*M
 	out := &Mission{}
 	err := k.keyed(key, "mission.create", out, func(t *tx) error {
 		id := newID("m_")
+		owner := Owner{}
+		if len(owners) > 0 && owners[0] != nil {
+			owner = *owners[0]
+		}
 		session, pane := "", ""
 		if notify != nil {
 			session, pane = notify.Session, notify.Pane
 		}
-		if _, err := t.Exec(`INSERT INTO missions(id, title, workspace, notify_session, notify_pane, created_at) VALUES(?,?,?,?,?,?)`,
-			id, clip(title, 200), workspace, session, pane, t.now); err != nil {
+		if _, err := t.Exec(`INSERT INTO missions(id, title, workspace, notify_session, notify_pane, created_at, owner_engine, owner_session) VALUES(?,?,?,?,?,?,?,?)`,
+			id, clip(title, 200), workspace, session, pane, t.now, owner.Engine, owner.Session); err != nil {
 			return err
 		}
 		m, err := getMission(t, id)
@@ -282,13 +286,16 @@ func (k *Kernel) Mission(id string) (*Mission, error) {
 }
 
 // Missions lists missions, newest first. Closed missions are included only when all is set.
-func (k *Kernel) Missions(all bool) ([]*Mission, error) {
+func (k *Kernel) Missions(all bool, archived ...bool) ([]*Mission, error) {
 	var out []*Mission
 	err := k.read(func() error {
-		query := `SELECT id FROM missions WHERE closed_at IS NULL ORDER BY created_at DESC`
-		if all {
-			query = `SELECT id FROM missions ORDER BY created_at DESC`
+		query := `SELECT id FROM missions WHERE archived_at IS NULL`
+		if len(archived) > 0 && archived[0] {
+			query = `SELECT id FROM missions WHERE archived_at IS NOT NULL`
+		} else if !all {
+			query += ` AND closed_at IS NULL`
 		}
+		query += ` ORDER BY created_at DESC`
 		ids, err := queryStrings(k.db, query)
 		if err != nil {
 			return err
