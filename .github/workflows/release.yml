@@ -27,6 +27,9 @@ jobs:
             version="2.0.0-dev.$(git rev-parse --short HEAD)"
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
+      # Login tests use the terminal library; GitHub-hosted runners can fetch its
+      # checksum-pinned release from github.com (the same source used by make dist).
+      # requireLoginTerminal skips native cases if loading fails; fallback tests still run.
       - run: make test
       - name: Build every published target
         run: make dist VERSION="$VERSION"
@@ -34,7 +37,20 @@ jobs:
         run: |
           export HOME="$RUNNER_TEMP/home"
           mkdir -p "$HOME"
-          ./install.sh --dist-dir dist/release --bin-dir "$RUNNER_TEMP/bin"
+          ./install.sh --dist-dir dist/release --bin-dir "$RUNNER_TEMP/bin" --no-service
+          test ! -e "$RUNNER_TEMP/bin/weaver-gui"
+          ./install.sh --dist-dir dist/release --bin-dir "$RUNNER_TEMP/bin" --gui --no-service
+          test -L "$RUNNER_TEMP/bin/weaver-gui"
+          test -f "$HOME/.local/lib/weaver-gui/libghostty-vt.so"
+          test -f "$HOME/.local/share/applications/weaver-gui.desktop"
+          (cd dist/release && sha256sum --check SHA256SUMS)
+          if go version -m "$RUNNER_TEMP/bin/weaver" | grep -Eq 'github.com/(egoist/mygo|lobehub/lobe-mygo)'; then
+            echo 'weaver unexpectedly depends on GUI libraries' >&2; exit 1
+          fi
+          if ldd "$RUNNER_TEMP/bin/weaver" > "$RUNNER_TEMP/ldd.log" 2>&1; then
+            cat "$RUNNER_TEMP/ldd.log" >&2; exit 1
+          fi
+          grep -Eq 'not a dynamic executable|statically linked' "$RUNNER_TEMP/ldd.log"
           weaver="$RUNNER_TEMP/bin/weaver"
           test "$("$weaver" version)" = "$VERSION"
           test "$("$weaver" --version)" = "$VERSION"

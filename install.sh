@@ -15,15 +15,19 @@ dist_dir=""
 action=install
 force=0
 restart=1
+gui=0
+service=1
 unit=weaver.service
 
 die() { printf 'install.sh: %s\n' "$*" >&2; exit 1; }
 usage() {
   cat <<'USAGE'
-install.sh [--version TAG] [--bin-dir DIR] [--dist-dir DIR] [--no-restart] [--uninstall]
+install.sh [--version TAG] [--bin-dir DIR] [--dist-dir DIR] [--gui] [--no-service] [--no-restart] [--uninstall]
   --version TAG   install a specific release, e.g. v2.0.0 (default: latest)
   --bin-dir DIR   where to place the weaver executable (default: ~/.local/bin)
   --dist-dir DIR  install from already built artifacts (weaver-linux-<arch> + SHA256SUMS), e.g. dist/release after "make dist"
+  --gui           also install the GUI and terminal library with a desktop entry
+  --no-service    do not query or modify the user service (isolated installations)
   --no-restart    leave a running weaver.service on the old executable until its next restart
   --force         replace an existing --bin-dir/weaver that is not a Weaver executable
   --uninstall     remove the executable only; ~/.local/share/weaver is kept
@@ -38,6 +42,8 @@ while [ $# -gt 0 ]; do
     --bin-dir=*) bin_dir="${1#*=}"; shift ;;
     --dist-dir) [ $# -ge 2 ] || die "--dist-dir requires a value"; dist_dir="$2"; shift 2 ;;
     --dist-dir=*) dist_dir="${1#*=}"; shift ;;
+    --gui) gui=1; shift ;;
+    --no-service) service=0; shift ;;
     --no-restart) restart=0; shift ;;
     --force) force=1; shift ;;
     --uninstall) action=uninstall; shift ;;
@@ -57,7 +63,7 @@ weaver_version() {
 }
 # The service this script may touch is the one that runs this very executable.
 # "daemon" tells a Weaver 2 service from a 0.x one ("weaver web ..."), which the new executable cannot run.
-service_exec() { command -v systemctl >/dev/null && systemctl --user show -p ExecStart --value "$unit" 2>/dev/null; }
+service_exec() { [ "$service" = 1 ] && command -v systemctl >/dev/null && systemctl --user show -p ExecStart --value "$unit" 2>/dev/null; }
 service_uses_target() { service_exec | grep -Fq "path=$(readlink -f "$target") "; }
 service_is_v2() { service_exec | grep -Fq "argv[]=$(readlink -f "$target") daemon ;"; }
 
@@ -91,7 +97,9 @@ fi
 
 mkdir -p "$bin_dir"
 work="$(mktemp -d "$bin_dir/.weaver-install.XXXXXX")"
-trap 'rm -rf -- "$work"' EXIT
+gui_work=""
+desktop_work=""
+trap 'rm -rf -- "$work"; [ -z "$gui_work" ] || rm -rf -- "$gui_work"; [ -z "$desktop_work" ] || rm -f -- "$desktop_work"' EXIT
 
 if [ -n "$dist_dir" ]; then
   cp -- "$dist_dir/$asset" "$work/$asset" || die "$dist_dir/$asset not found"
@@ -108,6 +116,32 @@ else
   curl -fsSL --retry 3 -o "$work/SHA256SUMS" "$base/SHA256SUMS" || die "download failed: $base/SHA256SUMS"
 fi
 
+# Fetch and verify the optional archive before changing either installed executable.
+gui_asset="weaver-gui-linux-$arch.tar.gz"
+if [ "$gui" = 1 ]; then
+  if [ -n "$dist_dir" ]; then
+    cp -- "$dist_dir/$gui_asset" "$work/$gui_asset" || die "$dist_dir/$gui_asset not found"
+  else
+    curl -fsSL --retry 3 -o "$work/$gui_asset" "$base/$gui_asset" || die "download failed: $base/$gui_asset"
+  fi
+  gui_sha="$(awk -v name="$gui_asset" '$2 == name { print $1 }' "$work/SHA256SUMS")"
+  [ -n "$gui_sha" ] || die "SHA256SUMS has no entry for $gui_asset"
+  [ "$gui_sha" = "$(sha256sum "$work/$gui_asset" | cut -d' ' -f1)" ] || die "checksum mismatch for $gui_asset"
+  # Immutable version directories let a single symlink rename switch binary and library together.
+  gui_root="$HOME/.local/lib"
+  gui_versions="$gui_root/.weaver-gui-versions"
+  mkdir -p "$gui_versions" "$HOME/.local/share/applications"
+  [ ! -e "$gui_root/weaver-gui" ] || [ -L "$gui_root/weaver-gui" ] || die "$gui_root/weaver-gui exists and is not a symlink"
+  gui_work="$(mktemp -d "$gui_versions/.install.XXXXXX")"
+  tar -xzf "$work/$gui_asset" -C "$gui_work" --no-same-owner
+  [ -f "$gui_work/weaver-gui" ] && [ -f "$gui_work/libghostty-vt.so" ] || die "incomplete GUI archive"
+  chmod 755 "$gui_work/weaver-gui"
+  if [ ! -d "$gui_versions/$gui_sha" ]; then
+    mv -- "$gui_work" "$gui_versions/$gui_sha"
+    gui_work=""
+  fi
+fi
+
 expected="$(awk -v name="$asset" '$2 == name { print $1 }' "$work/SHA256SUMS")"
 [ -n "$expected" ] || die "SHA256SUMS has no entry for $asset"
 actual="$(sha256sum "$work/$asset" | cut -d' ' -f1)"
@@ -117,6 +151,35 @@ installed="$("$work/$asset" version)" || die "the executable does not run on thi
 # Same directory, so the rename is atomic and a running service keeps its old file until restarted.
 mv -f -- "$work/$asset" "$target"
 printf 'installed weaver %s at %s\n' "$installed" "$target"
+
+if [ "$gui" = 1 ]; then
+  # Stage the switch beside its destination even when --bin-dir is on another filesystem.
+  [ -z "$gui_work" ] || rm -rf -- "$gui_work"
+  gui_work="$(mktemp -d "$gui_root/.weaver-gui-switch.XXXXXX")"
+  ln -s "$gui_versions/$gui_sha" "$gui_work/current"
+  mv -Tf -- "$gui_work/current" "$gui_root/weaver-gui"
+  ln -s "$gui_root/weaver-gui/weaver-gui" "$work/gui-bin"
+  mv -Tf -- "$work/gui-bin" "$bin_dir/weaver-gui"
+  # Escape desktop-entry reserved characters inside its quoted Exec argument.
+  gui_exec="$bin_dir/weaver-gui"
+  gui_exec="${gui_exec//\\/\\\\}"
+  gui_exec="${gui_exec//\"/\\\"}"
+  gui_exec="${gui_exec//\$/\\\$}"
+  gui_exec="${gui_exec//\`/\\\`}"
+  gui_exec="${gui_exec//%/%%}"
+  desktop_work="$(mktemp "$HOME/.local/share/applications/.weaver-gui.XXXXXX")"
+  cat > "$desktop_work" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Weaver
+Exec="$gui_exec"
+Terminal=false
+Categories=Development;
+DESKTOP
+  chmod 644 "$desktop_work"
+  mv -f -- "$desktop_work" "$HOME/.local/share/applications/weaver-gui.desktop"
+  printf 'installed weaver-gui at %s\n' "$bin_dir/weaver-gui"
+fi
 
 # Agents follow the installed skill, so an installed copy moves with the executable.
 if [ -e "$HOME/.agents/skills/agents-weaver" ]; then

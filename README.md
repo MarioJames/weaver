@@ -26,6 +26,16 @@ weaver skill install       # ~/.agents/skills/agents-weaver, linked from ~/.clau
 
 Run it again to update. The executable is replaced atomically and a running `weaver.service` is restarted onto it; running packages and resident engines live in their own systemd scopes and are not interrupted, and a `weaver wait` in progress reconnects by itself. An installed skill is updated with the executable.
 
+To also install the optional desktop GUI (Weaver), pass `--gui`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/MarioJames/weaver/main/install.sh | bash -s -- --gui
+# Or install locally built CLI and GUI artifacts:
+./install.sh --dist-dir dist/release --gui
+```
+
+`make install` builds and installs both the CLI and GUI. The GUI archive includes `weaver-gui` and its matching `libghostty-vt.so`. Both are installed together under `~/.local/lib/weaver-gui/`, with a launcher at `~/.local/bin/weaver-gui` (or `--bin-dir`) and `~/.local/share/applications/weaver-gui.desktop`. An atomic symlink switch selects a checksum-named directory under `~/.local/lib/.weaver-gui-versions/`; previous versions remain there so an open GUI can still load its matching library. The CLI remains a single static binary without GUI dependencies. Omit `--gui` to retain the CLI-only installation. `--no-service` skips all service queries and changes, which is useful with a temporary `HOME`; `--no-restart` only suppresses restarting. `--uninstall` continues to remove only the CLI executable.
+
 ## Upgrading from 0.x
 
 `install.sh` over a 0.x `weaver` is the upgrade. Then:
