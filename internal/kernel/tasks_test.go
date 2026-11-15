@@ -101,7 +101,7 @@ func TestTranscriptErrors(t *testing.T) {
 	for _, c := range []struct {
 		owner     *Owner
 		code, msg string
-	}{{nil, "NOT_FOUND", "未记录父 Agent"}, {&Owner{"claude", "missing"}, "NOT_FOUND", "找不到父 Agent 的会话记录"}, {&Owner{"other", "fixture"}, "INVALID", "暂不支持读取 other 的对话记录"}} {
+	}{{nil, "NOT_FOUND", "未记录父 Agent"}, {&Owner{"claude", "missing"}, "NOT_FOUND", "找不到父 Agent 的会话记录"}} {
 		m, e := f.k.CreateMission("", "test", f.ws, nil, c.owner)
 		if e != nil {
 			t.Fatal(e)
@@ -110,6 +110,17 @@ func TestTranscriptErrors(t *testing.T) {
 		if e == nil || AsError(e).Code != c.code || AsError(e).Message != c.msg {
 			t.Fatalf("%v", e)
 		}
+	}
+}
+func TestTranscriptLegacyUnsupportedOwner(t *testing.T) {
+	f := newFixture(t)
+	id := f.mission()
+	if _, err := f.k.db.Exec(`UPDATE missions SET owner_engine='other',owner_session='fixture' WHERE id=?`, id); err != nil {
+		t.Fatal(err)
+	}
+	_, err := f.k.MissionTranscript(id, 0)
+	if err == nil || AsError(err).Code != "INVALID" {
+		t.Fatal(err)
 	}
 }
 func TestArtifacts(t *testing.T) {

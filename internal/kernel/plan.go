@@ -41,6 +41,9 @@ func (k *Kernel) CreateMission(key, title, workspace string, notify *Notify, own
 			id, clip(title, 200), workspace, session, pane, t.now, owner.Engine, owner.Session); err != nil {
 			return err
 		}
+		if err := t.registerSession(owner); err != nil {
+			return err
+		}
 		m, err := getMission(t, id)
 		if err != nil {
 			return err

@@ -23,6 +23,7 @@ type TranscriptItem struct {
 	Role   string      `json:"role"`
 	Text   string      `json:"text"`
 	Tool   string      `json:"tool,omitempty"`
+	Ref    string      `json:"ref,omitempty"`
 	Weaver *WeaverCall `json:"weaver,omitempty"`
 }
 type Transcript struct {
@@ -48,15 +49,21 @@ func (k *Kernel) MissionTranscript(mission string, after int64) (*Transcript, er
 	if strings.ContainsAny(m.Owner.Session, "/\\") || m.Owner.Session == "." || m.Owner.Session == ".." {
 		return nil, errf("NOT_FOUND", "找不到父 Agent 的会话记录")
 	}
-	home := os.Getenv("HOME")
+	path := findSessionPath(os.Getenv("HOME"), *m.Owner)
+	if path == "" {
+		return nil, errf("NOT_FOUND", "找不到父 Agent 的会话记录")
+	}
+	return readTranscript(path, *m.Owner, after)
+}
+func findSessionPath(home string, owner Owner) string {
 	var path string
-	if m.Owner.Engine == "claude" {
+	if owner.Engine == "claude" {
 		dirs, _ := os.ReadDir(filepath.Join(home, ".claude", "projects"))
 		for _, d := range dirs {
 			if !d.IsDir() {
 				continue
 			}
-			p := filepath.Join(home, ".claude", "projects", d.Name(), m.Owner.Session+".jsonl")
+			p := filepath.Join(home, ".claude", "projects", d.Name(), owner.Session+".jsonl")
 			if st, e := os.Stat(p); e == nil && st.Mode().IsRegular() {
 				path = p
 				break
@@ -64,16 +71,13 @@ func (k *Kernel) MissionTranscript(mission string, after int64) (*Transcript, er
 		}
 	} else {
 		_ = filepath.WalkDir(filepath.Join(home, ".codex", "sessions"), func(p string, d fs.DirEntry, e error) error {
-			if e == nil && !d.IsDir() && strings.HasPrefix(d.Name(), "rollout-") && strings.HasSuffix(d.Name(), "-"+m.Owner.Session+".jsonl") {
+			if e == nil && !d.IsDir() && strings.HasPrefix(d.Name(), "rollout-") && strings.HasSuffix(d.Name(), "-"+owner.Session+".jsonl") {
 				path = p
 			}
 			return nil
 		})
 	}
-	if path == "" {
-		return nil, errf("NOT_FOUND", "找不到父 Agent 的会话记录")
-	}
-	return readTranscript(path, *m.Owner, after)
+	return path
 }
 func readTranscript(path string, owner Owner, after int64) (*Transcript, error) {
 	if after < 0 {
@@ -137,7 +141,7 @@ func parseTranscriptLine(line []byte, engine string) []TranscriptItem {
 	var content any
 	role := ""
 	if engine == "claude" {
-		if row["isSidechain"] == true || row["isMeta"] == true {
+		if row["isSidechain"] == true || row["isMeta"] == true || row["isCompactSummary"] == true {
 			return nil
 		}
 		role = str(row, "type")
@@ -157,6 +161,9 @@ func parseTranscriptLine(line []byte, engine string) []TranscriptItem {
 			if role != "user" && role != "assistant" {
 				return nil
 			}
+			if str(p, "channel") == "analysis" {
+				return nil
+			}
 			content = p["content"]
 		case "custom_tool_call", "function_call":
 			input := p["arguments"]
@@ -171,7 +178,11 @@ func parseTranscriptLine(line []byte, engine string) []TranscriptItem {
 	out := []TranscriptItem{}
 	addText := func(text string) {
 		text = strings.TrimSpace(text)
-		if text == "" {
+		if role == "user" {
+			text = cleanUserText(text)
+		}
+		// "No response requested." is Claude Code's stock reply to a message that asked for nothing.
+		if text == "" || role == "assistant" && text == "No response requested." {
 			return
 		}
 		if role == "user" && (strings.Contains(text, "<environment_context>") || strings.HasPrefix(text, "# AGENTS.md instructions") || strings.HasPrefix(text, "<permissions instructions>")) {
@@ -189,6 +200,11 @@ func parseTranscriptLine(line []byte, engine string) []TranscriptItem {
 		switch str(v, "type") {
 		case "text", "input_text", "output_text":
 			addText(str(v, "text"))
+		case "thinking":
+			// Claude Code files what the owner says ahead of a tool call here; most blocks carry only a signature.
+			if role == "assistant" {
+				addText(str(v, "thinking"))
+			}
 		case "tool_use":
 			if role == "assistant" {
 				out = append(out, toolItem(at, str(v, "name"), v["input"]))
@@ -216,7 +232,7 @@ func toolItem(at int64, name string, input any) TranscriptItem {
 	summary := ""
 	search := raw
 	p := object(input)
-	for _, key := range []string{"command", "cmd", "file_path", "path", "pattern", "query", "url"} {
+	for _, key := range []string{"command", "cmd", "file_path", "path", "pattern", "query", "url", "skill"} {
 		if s := str(p, key); s != "" {
 			summary = s
 			if key == "command" || key == "cmd" {
@@ -228,8 +244,16 @@ func toolItem(at int64, name string, input any) TranscriptItem {
 	if summary == "" {
 		summary = raw
 	}
+	if d := strings.TrimSpace(str(p, "description")); d != "" {
+		summary = d
+	}
 	summary = strings.SplitN(summary, "\n", 2)[0]
-	item := TranscriptItem{At: at, Role: "tool", Tool: name, Text: name + ": " + clip(summary, 300)}
+	item := TranscriptItem{At: at, Role: "tool", Tool: name, Text: sessionSummary(name + ": " + summary)}
+	if loc := convorelCommand.FindStringIndex(search); loc != nil {
+		if m := convorelID.FindStringSubmatch(search[loc[1]:]); m != nil {
+			item.Ref = "convorel:" + m[1] + m[2] + m[3]
+		}
+	}
 	if m := weaverPattern.FindStringSubmatch(search); m != nil {
 		cmd := m[1]
 		switch cmd {
@@ -250,4 +274,24 @@ func toolItem(at int64, name string, input any) TranscriptItem {
 		item.Weaver = w
 	}
 	return item
+}
+
+var userWrapper = regexp.MustCompile(`(?s)<(system-reminder|command-name|command-message|command-args|local-command-stdout|local-command-stderr|local-command-caveat)>.*?</(?:system-reminder|command-name|command-message|command-args|local-command-stdout|local-command-stderr|local-command-caveat)>`)
+
+// Only ask and followup send a question; wait, result, history and the rest read one back.
+var convorelCommand = regexp.MustCompile(`(?:^|[\s/;|&"'])convorel\s+(?:--(?:config-dir|state-dir)(?:=|\s+)\S+\s+)*(?:ask|followup)\s+`)
+var convorelID = regexp.MustCompile(`--id(?:=|\s+)(?:"([^"]+)"|'([^']+)'|([^\s;|&"']+))`)
+
+func cleanUserText(s string) string {
+	if strings.HasPrefix(s, "Base directory for this skill:") || strings.HasPrefix(s, "[Request interrupted") {
+		return ""
+	}
+	return strings.TrimSpace(userWrapper.ReplaceAllString(s, ""))
+}
+func sessionSummary(s string) string {
+	r := []rune(s)
+	if len(r) > 300 {
+		return string(r[:299]) + "…"
+	}
+	return s
 }

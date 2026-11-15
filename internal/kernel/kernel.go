@@ -60,7 +60,9 @@ type Kernel struct {
 	log         *slog.Logger
 	now         func() time.Time
 
-	mu sync.Mutex
+	mu        sync.Mutex
+	sessionMu sync.Mutex
+	sessionWG sync.WaitGroup
 
 	subMu   sync.Mutex
 	subs    map[string]map[chan struct{}]struct{}
@@ -97,6 +99,8 @@ func New(o Options) *Kernel {
 	if k.log == nil {
 		k.log = slog.New(slog.DiscardHandler)
 	}
+	k.sessionWG.Add(1)
+	go k.sessionLoop()
 	return k
 }
 
@@ -126,6 +130,7 @@ type tx struct {
 	warms    []string
 	touched  map[string]bool
 	woke     map[string]bool
+	sessions []Owner
 	timers   bool
 }
 
@@ -153,6 +158,11 @@ func (k *Kernel) write(fn func(t *tx) error) error {
 }
 
 func (k *Kernel) afterCommit(t *tx) {
+	for _, owner := range t.sessions {
+		if err := k.syncSession(owner); err != nil {
+			k.log.Error("session sync failed", "err", err)
+		}
+	}
 	for _, run := range t.launches {
 		k.touch(run.AttemptID)
 		k.eng.Launch(run)
@@ -463,4 +473,4 @@ func (k *Kernel) forget(attemptID string) {
 
 // Close stops background loops. Running attempts are left alone: they belong
 // to their own scopes and are picked up again by the next Start.
-func (k *Kernel) Close() { k.stopOnce.Do(func() { close(k.stop) }) }
+func (k *Kernel) Close() { k.stopOnce.Do(func() { close(k.stop) }); k.sessionWG.Wait() }

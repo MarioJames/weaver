@@ -3,6 +3,13 @@ package daemon
 import "github.com/MarioJames/weaver/internal/kernel"
 
 func init() {
+	methods["mission.owner"] = simple(func(s *Server, p struct {
+		Mission string `json:"mission"`
+		Engine  string `json:"engine"`
+		Session string `json:"session"`
+	}) (any, error) {
+		return s.kernel.SetMissionOwner(p.Mission, p.Engine, p.Session)
+	})
 	methods["mission.transcript"] = simple(func(s *Server, p struct {
 		Mission string `json:"mission"`
 		After   int64  `json:"after"`

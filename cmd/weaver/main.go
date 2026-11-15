@@ -27,6 +27,7 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
   weaver mission show <主任务>
   weaver mission close <主任务>
   weaver mission archive|unarchive <主任务>
+  weaver mission owner --mission <主任务> [--engine claude|codex --session <会话ID>] [--find]
   weaver mission transcript <主任务> [--after <字节偏移>]
   weaver artifact add --mission <主任务> (--file <绝对路径> | --url <链接>) [--url <链接>] [--kind design|report|evidence|doc] [--title <标题>] [--package <key>]
   weaver artifact list --mission <主任务>
@@ -340,6 +341,31 @@ func run(argv []string) error {
 			return err
 		}
 		return call("mission."+sub, map[string]any{"mission": id})
+	case "mission owner":
+		if err := a.allow("mission", "engine", "session", "find"); err != nil {
+			return err
+		}
+		id, err := a.need("mission")
+		if err != nil {
+			return err
+		}
+		if a.has("find") && (a.has("engine") || a.has("session")) {
+			return fmt.Errorf("--find 不能与 --engine 或 --session 同用")
+		}
+		owner := missionOwner(a)
+		if a.has("find") {
+			home := os.Getenv("HOME")
+			owner, err = findMissionOwner(id, map[string]string{"claude": filepath.Join(home, ".claude", "projects"), "codex": filepath.Join(home, ".codex", "sessions")})
+			if err != nil {
+				return err
+			}
+		} else if a.has("engine") || a.has("session") {
+			if !a.has("engine") || !a.has("session") {
+				return fmt.Errorf("--engine 和 --session 需要一起指定")
+			}
+			owner = map[string]string{"engine": a.get("engine"), "session": a.get("session")}
+		}
+		return call("mission.owner", map[string]any{"mission": id, "engine": owner["engine"], "session": owner["session"]})
 	case "mission transcript":
 		if err := a.allow("after"); err != nil {
 			return err
