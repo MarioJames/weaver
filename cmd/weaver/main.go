@@ -31,7 +31,7 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
   weaver artifact add --mission <主任务> (--file <绝对路径> | --url <链接>) [--url <链接>] [--kind design|report|evidence|doc] [--title <标题>] [--package <key>]
   weaver artifact list --mission <主任务>
   weaver artifact remove <产物>
-  weaver plan submit --mission <主任务> [--file <计划.json>] [--key <幂等编号>]     计划默认从标准输入读
+  weaver plan submit --mission <主任务> [--file <计划.json>] [--key <幂等编号>]     计划默认从标准输入读；每个包必填 intelligence（1–10，步长 0.5，判断空间越大分值越高）
                                         包可带 "advisory": true（只出文档、不改文件）和 "autoAccept": true（出结果即采纳并放行下游）
 
 对谈                                          两个候选各出方案、互相评审，只在最终立场给出时唤醒
@@ -57,6 +57,7 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
   weaver cancel (--package <包> | --mission <主任务>)
 
 账号、候选与引擎
+  weaver account quota [<账号>]  读取订阅账号的额度窗口（已用百分比、重置时间）与额度系数
   weaver account list | check [<账号>] | login <账号> | pause <账号> --for 30m [--reason <原因>] | resume <账号> | remove <账号>
   weaver account add --engine <引擎> --kind subscription|api [--id <ID>] [--label <名称>] [--auth-dir <目录>] [--api-key-env <环境变量名>] [--base-url <地址>] [--provider <名称>] [--protocol <协议>]
   weaver account set <账号> [--label <名称>] [--enabled true|false] [--api-key-env <环境变量名>] [--base-url <地址>]
@@ -68,7 +69,7 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
                                             不带参数时显示本月用量和估算剩余
   weaver account import-legacy [--from <旧库路径>] [--owner claude_owner]
   weaver worker list | remove <候选>
-  weaver worker set <候选> [--engine <引擎>] [--model <模型>] [--effort <强度>] [--weight <权重>] [--max-parallel <数量>] [--enabled true|false] [--accounts <账号,账号>]
+  weaver worker set <候选> [--engine <引擎>] [--model <模型>] [--effort <强度>] [--intelligence <能力分>] [--max-parallel <数量>] [--enabled true|false] [--accounts <账号,账号>]
   weaver engine list | start <账号> | stop <账号>
   weaver config list | set <键> <值>          archive_after_days: 0（关闭）/1/3/7（默认）/30
 
@@ -646,6 +647,12 @@ func run(argv []string) error {
 
 	case "account list":
 		return call("account.list", nil)
+	case "account quota":
+		id := ""
+		if len(a.pos) > 0 {
+			id = a.pos[0]
+		}
+		return call("account.quota", map[string]any{"id": id})
 	case "account check":
 		id := ""
 		if len(a.pos) > 0 {
@@ -798,7 +805,7 @@ func run(argv []string) error {
 		}
 		return call("worker.remove", map[string]any{"id": id})
 	case "worker set":
-		if err := a.allow("engine", "model", "effort", "weight", "max-parallel", "enabled", "accounts", "description"); err != nil {
+		if err := a.allow("engine", "model", "effort", "intelligence", "max-parallel", "enabled", "accounts", "description"); err != nil {
 			return err
 		}
 		id, err := a.arg(0, "候选")
@@ -811,7 +818,7 @@ func run(argv []string) error {
 				params[flag] = a.get(flag)
 			}
 		}
-		for flag, field := range map[string]string{"weight": "weight", "max-parallel": "maxParallel"} {
+		for flag, field := range map[string]string{"max-parallel": "maxParallel"} {
 			if a.has(flag) {
 				n, err := strconv.Atoi(a.get(flag))
 				if err != nil {
@@ -819,6 +826,13 @@ func run(argv []string) error {
 				}
 				params[field] = n
 			}
+		}
+		if a.has("intelligence") {
+			n, err := strconv.ParseFloat(a.get("intelligence"), 64)
+			if err != nil || (n != 0 && (n < 1 || n > 10 || math.Mod(n*2, 1) != 0)) {
+				return errors.New("INVALID：能力分只能为 0（未评分）或 1–10，步长 0.5")
+			}
+			params["intelligence"] = n
 		}
 		if a.has("enabled") {
 			params["enabled"] = a.get("enabled") == "true"

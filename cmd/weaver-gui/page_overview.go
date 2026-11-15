@@ -29,7 +29,7 @@ func (s snapshot) warnings() []string {
 		for _, id := range w.Accounts {
 			used[id] = true
 		}
-		if w.Weight > 0 {
+		if w.Intelligence > 0 {
 			positive = true
 		}
 	}
@@ -54,7 +54,7 @@ func (s snapshot) warnings() []string {
 		warnings = append([]string{fmt.Sprintf("%d 个账号没有候选在用", unused)}, warnings...)
 	}
 	if !positive {
-		warnings = append(warnings, "没有权重大于 0 的候选")
+		warnings = append(warnings, "没有能力分大于 0 的候选")
 	}
 	return warnings
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"slices"
 	"sort"
 	"strconv"
@@ -27,17 +28,17 @@ type workerConfig struct {
 	} `json:"config"`
 }
 type workerPageState struct {
-	shown                                                    bool
-	original                                                 *worker
-	id, engine, model, effort, weight, parallel, description string
-	accounts                                                 []string
-	configs                                                  map[string]workerConfig
-	configErrors                                             map[string]string
-	err                                                      string
+	shown                                                          bool
+	original                                                       *worker
+	id, engine, model, effort, intelligence, parallel, description string
+	accounts                                                       []string
+	configs                                                        map[string]workerConfig
+	configErrors                                                   map[string]string
+	err                                                            string
 }
 
 func (s *workerPageState) open(a *app, w *worker) {
-	*s = workerPageState{shown: true, engine: "claude", weight: "0", parallel: "0", accounts: []string{}, configs: map[string]workerConfig{}, configErrors: map[string]string{}}
+	*s = workerPageState{shown: true, engine: "claude", intelligence: "0", parallel: "0", accounts: []string{}, configs: map[string]workerConfig{}, configErrors: map[string]string{}}
 	if w != nil {
 		v := *w
 		s.original = &v
@@ -45,7 +46,7 @@ func (s *workerPageState) open(a *app, w *worker) {
 		s.engine = w.Engine
 		s.model = w.Model
 		s.effort = w.Effort
-		s.weight = strconv.Itoa(w.Weight)
+		s.intelligence = strconv.FormatFloat(w.Intelligence, 'f', -1, 64)
 		s.parallel = strconv.Itoa(w.MaxParallel)
 		s.description = w.Description
 		s.accounts = append([]string{}, w.Accounts...)
@@ -252,9 +253,9 @@ func (s *workerPageState) drawer(a *app, c *ui.Context) {
 							workerInput(c, "模型", &s.model, false)
 							workerInput(c, "强度", &s.effort, false)
 						}
-						formRow(c, "权重", func(label ui.Element) {
+						formRow(c, "能力分", func(label ui.Element) {
 							ui.Column(c).Width(120).Children(func() {
-								field.Input(c, &s.weight, field.InputProps{Size: theme.Small}).Label("权重").LabelledBy(label)
+								field.Input(c, &s.intelligence, field.InputProps{Size: theme.Small}).Label("能力分").LabelledBy(label)
 							})
 						})
 						formRow(c, "并行上限", func(label ui.Element) {
@@ -285,9 +286,9 @@ func (s *workerPageState) drawer(a *app, c *ui.Context) {
 	})
 }
 func (s *workerPageState) save(a *app) {
-	weight, err := strconv.Atoi(strings.TrimSpace(s.weight))
-	if err != nil {
-		s.err = "权重需要整数"
+	intelligence, err := strconv.ParseFloat(strings.TrimSpace(s.intelligence), 64)
+	if err != nil || !validWorkerIntelligence(intelligence) {
+		s.err = "能力分只能为 0（未评分）或 1–10，步长 0.5"
 		return
 	}
 	parallel, err := strconv.Atoi(strings.TrimSpace(s.parallel))
@@ -306,8 +307,8 @@ func (s *workerPageState) save(a *app) {
 	if old == nil || s.effort != old.Effort {
 		p["effort"] = s.effort
 	}
-	if old == nil || weight != old.Weight {
-		p["weight"] = weight
+	if old == nil || intelligence != old.Intelligence {
+		p["intelligence"] = intelligence
 	}
 	if old == nil || parallel != old.MaxParallel {
 		p["maxParallel"] = parallel
@@ -341,4 +342,8 @@ func stringOptions(values []string) []field.SelectOption {
 		options = append(options, field.SelectOption{Value: v, Label: v})
 	}
 	return options
+}
+
+func validWorkerIntelligence(n float64) bool {
+	return n == 0 || (n >= 1 && n <= 10 && math.Mod(n*2, 1) == 0)
 }

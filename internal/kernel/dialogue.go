@@ -1,6 +1,7 @@
 package kernel
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 )
@@ -96,20 +97,22 @@ func (k *Kernel) StartDialogue(key string, in DialogueInput) (*DialogueResult, e
 	}
 	out := &DialogueResult{}
 	err := k.keyed(key, "dialogue.start", out, func(t *tx) error {
-		// Each side is pinned to a candidate, or to an engine when none was named.
+		// Pin each side to its named or highest-rated enabled candidate.
 		type side struct{ worker, engine, label string }
 		sides := []side{{engine: "codex", label: "codex"}, {engine: "claude", label: "claude"}}
 		if len(in.Workers) == 2 {
 			sides = []side{{worker: in.Workers[0], label: in.Workers[0]}, {worker: in.Workers[1], label: in.Workers[1]}}
 		} else {
-			for _, s := range sides {
-				var n int
-				if err := t.QueryRow(`SELECT COUNT(*) FROM workers WHERE engine=? AND enabled=1`, s.engine).Scan(&n); err != nil {
+			for i := range sides {
+				s := &sides[i]
+				err := t.QueryRow(`SELECT id FROM workers WHERE engine=? AND enabled=1 AND intelligence>0 ORDER BY intelligence DESC, position, id LIMIT 1`, s.engine).Scan(&s.worker)
+				if err == sql.ErrNoRows {
+					return errf("INVALID", "对谈默认由 codex 和 claude 各出一方，但没有启用且已评分的 %s 候选；请先评分，或用 --workers 指定两个候选", s.engine)
+				}
+				if err != nil {
 					return err
 				}
-				if n == 0 {
-					return errf("INVALID", "对谈默认由 codex 和 claude 各出一方，但没有启用的 %s 候选；用 --workers 指定两个候选", s.engine)
-				}
+				s.label = s.worker
 			}
 		}
 		last := in.Rounds + 1
@@ -118,7 +121,7 @@ func (k *Kernel) StartDialogue(key string, in DialogueInput) (*DialogueResult, e
 			for i, s := range sides {
 				p := PackageInput{
 					Key: dialogueKey(in.Name, round, dialogueSides[i]), Worker: s.worker, Engine: s.engine,
-					Advisory: true, AutoAccept: round < last,
+					Intelligence: 9, Advisory: true, AutoAccept: round < last,
 				}
 				if round == 1 {
 					p.Title = fmt.Sprintf("对谈 %s · 方案 · %s", in.Name, s.label)

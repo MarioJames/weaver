@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/MarioJames/weaver/internal/engine"
+	"github.com/MarioJames/weaver/internal/quota"
 )
 
 // Engines is what the kernel needs from the launch layer.
@@ -36,10 +37,11 @@ type Pusher func(session, pane, text string) error
 
 // Options configures a Kernel.
 type Options struct {
-	DB      *sql.DB
-	Home    string
-	Engines Engines
-	Push    Pusher
+	QuotaClient *quota.Client
+	DB          *sql.DB
+	Home        string
+	Engines     Engines
+	Push        Pusher
 	// Check reports whether an account's credential material is usable.
 	Check func(engine.Account) (bool, string)
 	Log   *slog.Logger
@@ -49,13 +51,14 @@ type Options struct {
 // Kernel owns all mission state. Every mutation runs in one SQLite transaction
 // under mu; launches, cancels and notifications happen after commit.
 type Kernel struct {
-	db    *sql.DB
-	home  string
-	eng   Engines
-	push  Pusher
-	check func(engine.Account) (bool, string)
-	log   *slog.Logger
-	now   func() time.Time
+	quotaClient *quota.Client
+	db          *sql.DB
+	home        string
+	eng         Engines
+	push        Pusher
+	check       func(engine.Account) (bool, string)
+	log         *slog.Logger
+	now         func() time.Time
 
 	mu sync.Mutex
 
@@ -84,7 +87,7 @@ type activity struct {
 // New creates a kernel. Call Start to resume supervision and timers.
 func New(o Options) *Kernel {
 	k := &Kernel{
-		db: o.DB, home: o.Home, eng: o.Engines, push: o.Push, check: o.Check, log: o.Log, now: o.Now,
+		quotaClient: o.QuotaClient, db: o.DB, home: o.Home, eng: o.Engines, push: o.Push, check: o.Check, log: o.Log, now: o.Now,
 		subs: map[string]map[chan struct{}]struct{}{}, waiters: map[string]int{}, pushing: map[string]bool{},
 		activity: map[string]*activity{}, timerKick: make(chan struct{}, 1), stop: make(chan struct{}),
 	}
@@ -228,25 +231,25 @@ func (k *Kernel) runDir(attemptID string) string { return filepath.Join(k.home, 
 
 // ---- row access ----
 
-const packageCols = `id, mission_id, key, title, instruction, workspace, worker, engine, state, waiting, attempt, created_at, updated_at, advisory, auto_accept`
+const packageCols = `id, mission_id, key, title, instruction, workspace, worker, engine, state, waiting, attempt, created_at, updated_at, advisory, auto_accept, intelligence`
 
 type scanner interface{ Scan(dest ...any) error }
 
 func scanPackage(s scanner) (*Package, error) {
 	p := &Package{}
-	err := s.Scan(&p.ID, &p.MissionID, &p.Key, &p.Title, &p.Instruction, &p.Workspace, &p.Worker, &p.Engine, &p.State, &p.Waiting, &p.Attempt, &p.CreatedAt, &p.UpdatedAt, &p.Advisory, &p.AutoAccept)
+	err := s.Scan(&p.ID, &p.MissionID, &p.Key, &p.Title, &p.Instruction, &p.Workspace, &p.Worker, &p.Engine, &p.State, &p.Waiting, &p.Attempt, &p.CreatedAt, &p.UpdatedAt, &p.Advisory, &p.AutoAccept, &p.Intelligence)
 	return p, err
 }
 
 const attemptCols = `id, n, state, worker, account_id, engine, model, effort, mode, note, unit, run_dir, vendor_session, created_at,
  COALESCE(handed_at,0), COALESCE(started_at,0), COALESCE(first_output_at,0), COALESCE(finished_at,0), COALESCE(stalled_at,0),
- exit_code, failure_kind, failure_message, result, input_tokens, output_tokens`
+ exit_code, failure_kind, failure_message, result, input_tokens, output_tokens, route_note`
 
 func scanAttempt(s scanner) (*Attempt, error) {
 	a := &Attempt{}
 	var exit sql.NullInt64
 	err := s.Scan(&a.ID, &a.N, &a.State, &a.Worker, &a.Account, &a.Engine, &a.Model, &a.Effort, &a.Mode, &a.Note, &a.Unit, &a.RunDir, &a.VendorSession, &a.CreatedAt,
-		&a.HandedAt, &a.StartedAt, &a.FirstOutputAt, &a.FinishedAt, &a.StalledAt, &exit, &a.FailureKind, &a.FailureMessage, &a.Result, &a.InputTokens, &a.OutputTokens)
+		&a.HandedAt, &a.StartedAt, &a.FirstOutputAt, &a.FinishedAt, &a.StalledAt, &exit, &a.FailureKind, &a.FailureMessage, &a.Result, &a.InputTokens, &a.OutputTokens, &a.RouteNote)
 	if exit.Valid {
 		code := int(exit.Int64)
 		a.ExitCode = &code

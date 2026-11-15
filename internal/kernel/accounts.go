@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/MarioJames/weaver/internal/engine"
+	"github.com/MarioJames/weaver/internal/quota"
 )
 
 // AccountInput creates an account. Secrets go in and never come back out.
@@ -174,7 +175,7 @@ func (k *Kernel) Accounts() ([]*Account, error) {
 		rows, err := k.db.Query(`SELECT a.id, a.engine, a.kind, a.label, a.auth_dir, a.api_key<>'', a.config<>'', a.base_url, a.provider, a.protocol, a.enabled, a.ready, a.ready_reason,
 			COALESCE(a.checked_at,0), COALESCE(a.paused_until,0), a.pause_reason,
 			(SELECT COUNT(*) FROM attempts t WHERE t.account_id=a.id AND t.state IN (?,?)),
-			a.balance_usd, a.balance_at, a.alert_below_usd
+			a.balance_usd, a.balance_at, a.alert_below_usd, a.quota, COALESCE(a.quota_checked_at,0), a.quota_error
 			FROM accounts a ORDER BY a.created_at, a.id`, StateLaunch, StateRunning)
 		if err != nil {
 			return err
@@ -183,14 +184,19 @@ func (k *Kernel) Accounts() ([]*Account, error) {
 		for rows.Next() {
 			a := &Account{}
 			var s usageSettings
+			var quotaText, quotaError string
+			var quotaChecked int64
 			if err := rows.Scan(&a.ID, &a.Engine, &a.Kind, &a.Label, &a.AuthDir, &a.HasAPIKey, &a.HasConfig, &a.BaseURL, &a.Provider, &a.Protocol, &a.Enabled, &a.Ready, &a.ReadyReason,
 				&a.CheckedAt, &a.PausedUntil, &a.PauseReason, &a.Running,
-				&s.balance, &s.balanceAt, &s.alert); err != nil {
+				&s.balance, &s.balanceAt, &s.alert, &quotaText, &quotaChecked, &quotaError); err != nil {
 				rows.Close()
 				return err
 			}
 			if a.PausedUntil <= now {
 				a.PausedUntil, a.PauseReason = 0, ""
+			}
+			if supportsQuota(a.Engine, a.Kind) {
+				a.Quota = quotaView(quotaText, quotaChecked, quotaError, k.now())
 			}
 			if a.Kind == "api" {
 				settings[a.ID] = s
@@ -321,15 +327,15 @@ func (k *Kernel) ResumeAccount(id string) (*Account, error) {
 
 // WorkerInput creates or updates a routing candidate. Unset fields keep their value.
 type WorkerInput struct {
-	ID          string   `json:"id"`
-	Engine      string   `json:"engine,omitempty"`
-	Model       string   `json:"model,omitempty"`
-	Effort      *string  `json:"effort,omitempty"`
-	Weight      *int     `json:"weight,omitempty"`
-	MaxParallel *int     `json:"maxParallel,omitempty"`
-	Enabled     *bool    `json:"enabled,omitempty"`
-	Accounts    []string `json:"accounts,omitempty"`
-	Description *string  `json:"description,omitempty"`
+	ID           string   `json:"id"`
+	Engine       string   `json:"engine,omitempty"`
+	Model        string   `json:"model,omitempty"`
+	Effort       *string  `json:"effort,omitempty"`
+	Intelligence *float64 `json:"intelligence,omitempty"`
+	MaxParallel  *int     `json:"maxParallel,omitempty"`
+	Enabled      *bool    `json:"enabled,omitempty"`
+	Accounts     []string `json:"accounts,omitempty"`
+	Description  *string  `json:"description,omitempty"`
 }
 
 func (k *Kernel) SetWorker(in WorkerInput) (*Worker, error) {
@@ -379,11 +385,11 @@ func (k *Kernel) SetWorker(in WorkerInput) (*Worker, error) {
 				return err
 			}
 		}
-		if in.Weight != nil {
-			if *in.Weight < 0 {
-				return errf("INVALID", "权重不能为负")
+		if in.Intelligence != nil {
+			if *in.Intelligence != 0 && !validIntelligence(*in.Intelligence) {
+				return errf("INVALID", "能力分只能为 0（未评分）或 1–10，步长 0.5")
 			}
-			if _, err := t.Exec(`UPDATE workers SET weight=? WHERE id=?`, *in.Weight, in.ID); err != nil {
+			if _, err := t.Exec(`UPDATE workers SET intelligence=? WHERE id=?`, *in.Intelligence, in.ID); err != nil {
 				return err
 			}
 		}
@@ -468,13 +474,13 @@ func (k *Kernel) Workers() ([]*Worker, error) {
 		for _, w := range rt.Workers {
 			live[w.ID] = w
 		}
-		rows, err := t.Query(`SELECT id, engine, model, effort, weight, max_parallel, enabled, description FROM workers ORDER BY position, id`)
+		rows, err := t.Query(`SELECT id, engine, model, effort, intelligence, max_parallel, enabled, description FROM workers ORDER BY position, id`)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
 			w := &Worker{Accounts: []string{}}
-			if err := rows.Scan(&w.ID, &w.Engine, &w.Model, &w.Effort, &w.Weight, &w.MaxParallel, &w.Enabled, &w.Description); err != nil {
+			if err := rows.Scan(&w.ID, &w.Engine, &w.Model, &w.Effort, &w.Intelligence, &w.MaxParallel, &w.Enabled, &w.Description); err != nil {
 				rows.Close()
 				return err
 			}
@@ -488,6 +494,11 @@ func (k *Kernel) Workers() ([]*Worker, error) {
 			if w.Accounts == nil {
 				w.Accounts = []string{}
 			}
+			samples := rt.WorkerStats[w.ID]
+			if samples == nil {
+				samples = &statBuckets{}
+			}
+			w.Stats = samples.view()
 			rw := live[w.ID]
 			switch {
 			case !w.Enabled:
@@ -497,18 +508,28 @@ func (k *Kernel) Workers() ([]*Worker, error) {
 			default:
 				w.Running = rw.Running
 				for _, a := range rw.Accounts {
-					if a.Ready {
+					if !a.Ready {
+						if w.Reason == "" {
+							w.Reason = a.Reason
+						}
+					} else if quota.Factor(a.Snapshot, w.Model, k.now()) <= 0 {
+						if w.Reason == "" {
+							name := a.Account.Label
+							if name == "" {
+								name = a.Account.ID
+							}
+							w.Reason = quotaExhaustedReason(name, a.Snapshot, w.Model, k.now())
+						}
+					} else {
 						w.Available = true
-					} else if w.Reason == "" {
-						w.Reason = a.Reason
 					}
 				}
 				if w.Available {
 					w.Reason = ""
-					if w.Weight == 0 {
-						w.Reason = "权重为 0：只在包指定它时使用"
-					}
 				}
+			}
+			if w.Intelligence == 0 {
+				w.Reason = "未评分：只在包指定它时使用；用 weaver worker set <候选> --intelligence <1-10> 评分"
 			}
 		}
 		return nil
@@ -602,7 +623,7 @@ type ImportResult struct {
 
 // ImportLegacy copies accounts and routing candidates from a Weaver 0.7
 // database. Credential directories are referenced in place, not copied.
-// Candidate weights come from the given owner; a missing weight means 5.
+// Imported candidates start unrated.
 // Records whose ID already exists are skipped. No task history is imported.
 func (k *Kernel) ImportLegacy(path, owner string) (*ImportResult, error) {
 	old, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
@@ -667,18 +688,6 @@ func (k *Kernel) ImportLegacy(path, owner string) (*ImportResult, error) {
 	}
 	rows.Close()
 
-	weights := map[string]int{}
-	rows, err = old.Query(`SELECT worker_id, COALESCE(weight,5) FROM policy_owner_workers WHERE owner_id=?`, owner)
-	if err == nil {
-		for rows.Next() {
-			var id string
-			var weight int
-			if rows.Scan(&id, &weight) == nil {
-				weights[id] = weight
-			}
-		}
-		rows.Close()
-	}
 	type worker struct {
 		id, model, effort, description string
 		enabled                        bool
@@ -742,12 +751,8 @@ func (k *Kernel) ImportLegacy(path, owner string) (*ImportResult, error) {
 				out.Skipped = append(out.Skipped, "候选 "+w.id+"（引擎 "+kind+" 不支持）")
 				continue
 			}
-			weight, ok := weights[w.id]
-			if !ok {
-				weight = 0
-			}
-			if _, err := t.Exec(`INSERT INTO workers(id, engine, model, effort, weight, max_parallel, enabled, position, description) VALUES(?,?,?,?,?,?,?,?,?)`,
-				w.id, engineOf[w.channels[0]], w.model, w.effort, weight, w.maxParallel, b2i(w.enabled), i+1, w.description); err != nil {
+			if _, err := t.Exec(`INSERT INTO workers(id, engine, model, effort, intelligence, max_parallel, enabled, position, description) VALUES(?,?,?,?,?,?,?,?,?)`,
+				w.id, engineOf[w.channels[0]], w.model, w.effort, 0, w.maxParallel, b2i(w.enabled), i+1, w.description); err != nil {
 				return err
 			}
 			for j, channel := range w.channels {

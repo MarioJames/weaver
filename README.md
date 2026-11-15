@@ -84,12 +84,12 @@ Codex and Claude each write a proposal from the brief without seeing the other's
 ```sh
 weaver account add --engine codex --kind subscription --id codex_sub --auth-dir ~/.codex
 weaver account add --engine dsh --kind api --id dsh_openai --provider openai --api-key-env OPENAI_API_KEY
-weaver worker set codex_medium --engine codex --model <model> --effort medium --weight 5 --accounts codex_sub
+weaver worker set codex_medium --engine codex --model <model> --effort medium --intelligence 8 --accounts codex_sub
 weaver worker list
 weaver config list            # max_parallel (32), stall_seconds (300), resident (on), standby (on)
 ```
 
-A candidate ("worker") is an engine, a model and an effort on one or more accounts. Packages are balanced over candidates by weight; a weight of 0 keeps a candidate out of automatic routing, to be used only when a package names it. A vendor limit pauses the account and moves the package to another ready candidate.
+A candidate ("worker") is an engine, a model and an effort on one or more accounts. Each candidate has an `intelligence` rating from 1 to 10 that you set, and each package states the `intelligence` its instruction needs. A package only goes to candidates rated at least that high; among those, Weaver prefers the one with the better first-attempt acceptance rate, shorter typical duration, healthier subscription quota and lighter load. A candidate without a rating stays out of automatic routing and is used only when a package names it. `weaver account quota` shows the quota windows of subscription accounts. A vendor limit pauses the account and moves the package to another ready candidate.
 
 How a package is launched depends on the engine: OpenCode runs as a resident server per account (`weaver engine list|start|stop`), Claude Code is kept warm for packages about to start, Codex and DeepSeek Harness are started per attempt.
 

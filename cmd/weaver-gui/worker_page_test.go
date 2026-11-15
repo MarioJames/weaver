@@ -34,12 +34,13 @@ func newWorkerRPC(t *testing.T) *workerRPC {
 	f.data.Accounts[5].ID = "dsh_openai"
 	f.data.Workers = nil
 	for i, id := range ids {
-		weight := 0
+		intelligence := 0.0
 		if i < 2 {
-			weight = 5
+			intelligence = 5
 		}
-		f.data.Workers = append(f.data.Workers, worker{ID: id, Engine: engines[i], Model: models[i], Effort: efforts[i], Weight: weight, Enabled: true, Available: true, Accounts: []string{f.data.Accounts[bindings[i]].ID}})
+		f.data.Workers = append(f.data.Workers, worker{ID: id, Engine: engines[i], Model: models[i], Effort: efforts[i], Intelligence: intelligence, Enabled: true, Available: true, Accounts: []string{f.data.Accounts[bindings[i]].ID}})
 	}
+	f.data.Workers[0].Stats = workerStats{Samples: 20, FirstAcceptanceRate: 0.85, MedianSeconds: 480}
 	w := &workerRPC{f: f}
 	l, err := net.Listen("unix", rpc.SocketPath(f.home))
 	if err != nil {
@@ -122,9 +123,9 @@ func workersTester(t *testing.T) (*workerRPC, *app, *ui.Tester) {
 	tt := ui.NewTester(a.view, 1440, 1100)
 	return w, a, tt
 }
-func TestWorkerSharesAndInlineSave(t *testing.T) {
+func TestWorkerIntelligenceAndInlineSave(t *testing.T) {
 	w, a, tt := workersTester(t)
-	for _, text := range []string{"6 个候选", "ChatGPT Pro 5x", "codex_sol_medium 50%", "opencode_deepseek 50%", "其余 4 个权重为 0：只在包指定它时使用"} {
+	for _, text := range []string{"6 个候选", "ChatGPT Pro 5x", "5 · codex_sol_medium", "5 · opencode_deepseek"} {
 		if !tt.HasText(text) {
 			t.Fatalf("缺少 %s: %v", text, tt.Texts())
 		}
@@ -132,32 +133,29 @@ func TestWorkerSharesAndInlineSave(t *testing.T) {
 	if strings.Contains(strings.Join(tt.Texts(), " "), "import_") {
 		t.Fatal(tt.Texts())
 	}
-	edit(t, tt, "opencode_deepseek 权重", "15", true)
-	waitFor(t, tt, a, func() bool { return a.snapshot.Workers[1].Weight == 15 && !a.busy["worker:opencode_deepseek"] })
-	if !tt.HasText("codex_sol_medium 25%") || !tt.HasText("opencode_deepseek 75%") {
+	edit(t, tt, "opencode_deepseek 能力分", "8.5", true)
+	waitFor(t, tt, a, func() bool { return a.snapshot.Workers[1].Intelligence == 8.5 && !a.busy["worker:opencode_deepseek"] })
+	if a.snapshot.Workers[0].Intelligence != 5 || a.snapshot.Workers[1].Intelligence != 8.5 {
 		t.Fatal(tt.Texts())
 	}
 	w.f.mu.Lock()
 	p := w.calls[0]
 	w.f.mu.Unlock()
-	if len(p) != 2 || p["id"] != "opencode_deepseek" || p["weight"] != float64(15) {
+	if len(p) != 2 || p["id"] != "opencode_deepseek" || p["intelligence"] != float64(8.5) {
 		t.Fatal(p)
 	}
-	edit(t, tt, "opencode_deepseek 权重", "5", false)
-	click(t, tt, "codex_sol_medium 权重")
-	waitFor(t, tt, a, func() bool { return a.snapshot.Workers[1].Weight == 5 })
+	edit(t, tt, "opencode_deepseek 能力分", "5", false)
+	click(t, tt, "codex_sol_medium 能力分")
+	waitFor(t, tt, a, func() bool { return a.snapshot.Workers[1].Intelligence == 5 })
 	for _, id := range []string{"codex_sol_medium", "opencode_deepseek"} {
 		click(t, tt, id+" 启用")
 		waitFor(t, tt, a, func() bool { return !a.busy["worker:"+id+":enabled"] })
 	}
-	if !tt.HasText("没有权重大于 0 的候选") || tt.HasText("codex_sol_medium 50%") {
-		t.Fatal(tt.Texts())
+	if a.snapshot.Workers[0].Enabled || a.snapshot.Workers[1].Enabled {
+		t.Fatal("候选未停用")
 	}
 	click(t, tt, "codex_sol_medium 启用")
 	waitFor(t, tt, a, func() bool { return a.snapshot.Workers[0].Enabled })
-	if tt.HasText("没有权重大于 0 的候选") {
-		t.Fatal(tt.Texts())
-	}
 }
 func TestWorkerCreateAndReadOnlyEngine(t *testing.T) {
 	_, a, tt := workersTester(t)
@@ -232,24 +230,20 @@ func TestWorkerExternalRefresh(t *testing.T) {
 	a.start()
 	// A command-line update is represented by a status change outside the GUI.
 	w.f.mu.Lock()
-	w.f.data.Workers[0].Weight = 9
+	w.f.data.Workers[0].Intelligence = 9
 	w.f.mu.Unlock()
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
 		tt.Frame()
 		a.mu.Lock()
-		ok := a.snapshot.Workers[0].Weight == 9
+		ok := a.snapshot.Workers[0].Intelligence == 9
 		a.mu.Unlock()
 		if ok {
-			tt.Frame()
-			if !tt.HasText("codex_sol_medium 64%") {
-				t.Fatal(tt.Texts())
-			}
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatal("外部权重变动未在 3 秒内反映")
+	t.Fatal("外部能力分变动未在 3 秒内反映")
 }
 func TestWorkerScreenshots(t *testing.T) {
 	dir := os.Getenv("WEAVER_WORKER_SCREENSHOTS")
@@ -298,5 +292,30 @@ func TestWorkerUnavailableReasonAndModelRules(t *testing.T) {
 	_, _, constrained := s.options()
 	if constrained {
 		t.Fatal("清单外模型应允许手填强度")
+	}
+}
+
+func TestWorkerStatisticsVisible(t *testing.T) {
+	_, _, tt := workersTester(t)
+	for _, text := range []string{"首次采纳", "中位耗时", "85%", "20 次", "8 分"} {
+		if !tt.HasText(text) {
+			t.Fatalf("missing %q: %v", text, tt.Texts())
+		}
+	}
+}
+
+// An out-of-range rating is rejected in place and never reaches the service.
+func TestWorkerRejectsInvalidIntelligence(t *testing.T) {
+	w, a, tt := workersTester(t)
+	edit(t, tt, "opencode_deepseek 能力分", "7.3", true)
+	tt.Frame()
+	if !tt.HasText("能力分只能为 0（未评分）或 1–10，步长 0.5") {
+		t.Fatal(tt.Texts())
+	}
+	w.f.mu.Lock()
+	calls := len(w.calls)
+	w.f.mu.Unlock()
+	if calls != 0 || a.snapshot.Workers[1].Intelligence != 5 {
+		t.Fatalf("calls=%d intelligence=%v", calls, a.snapshot.Workers[1].Intelligence)
 	}
 }

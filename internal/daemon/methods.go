@@ -281,6 +281,11 @@ var methods = map[string]handler{
 		s.engines.Resident.Stop(p.ID)
 		return ok{true}, nil
 	}),
+	"account.quota": simple(func(s *Server, p struct {
+		ID string `json:"id"`
+	}) (any, error) {
+		return s.kernel.RefreshQuotas(p.ID)
+	}),
 	"account.check": simple(func(s *Server, p struct {
 		ID string `json:"id"`
 	}) (any, error) {

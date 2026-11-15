@@ -28,27 +28,27 @@ type accountForm struct {
 	ProviderErr string
 
 	// dsh channel fields, kept on the same value as the base fields above.
-	Preset            string
-	Headers           []headerRow
-	Models            []dshModel
-	Extra             map[string]any
-	Advanced          bool
-	AdvancedText      string
-	AdvancedErr       string
-	Loading           bool
-	FetchErr          string
-	CreateWorker      bool
-	CandidateModel    string
-	CandidateID       string
-	CandidateEffort   string
-	CandidateWeight   string
-	CandidateIDCustom bool
+	Preset                string
+	Headers               []headerRow
+	Models                []dshModel
+	Extra                 map[string]any
+	Advanced              bool
+	AdvancedText          string
+	AdvancedErr           string
+	Loading               bool
+	FetchErr              string
+	CreateWorker          bool
+	CandidateModel        string
+	CandidateID           string
+	CandidateEffort       string
+	CandidateIntelligence string
+	CandidateIDCustom     bool
 
 	Err string
 }
 
 func newAccountForm() *accountForm {
-	f := &accountForm{Mode: "add", Engine: "dsh", Kind: "api", CandidateWeight: "0"}
+	f := &accountForm{Mode: "add", Engine: "dsh", Kind: "api", CandidateIntelligence: "0"}
 	f.applyPreset("openai")
 	return f
 }
@@ -57,7 +57,7 @@ func (a *app) openEdit(acc account) {
 	f := &accountForm{
 		Mode: "edit", ID: acc.ID, Engine: acc.Engine, Kind: acc.Kind, Label: accountLabel(acc),
 		HasAPIKey: acc.HasAPIKey, HadConfig: acc.HasConfig, Provider: acc.Provider, Protocol: acc.Protocol, BaseURL: acc.BaseURL,
-		CandidateWeight: "0",
+		CandidateIntelligence: "0",
 	}
 	st := accountsFor(a)
 	st.form = f

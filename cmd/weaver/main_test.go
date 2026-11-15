@@ -149,3 +149,19 @@ func TestMissionOwnerNearestAncestor(t *testing.T) {
 		})
 	}
 }
+
+func TestWorkerRejectsWeightFlag(t *testing.T) {
+	err := run([]string{"worker", "set", "candidate", "--weight", "8"})
+	if err == nil || !strings.Contains(err.Error(), "未知选项 --weight") {
+		t.Fatalf("%v", err)
+	}
+}
+
+func TestWorkerRejectsInvalidIntelligenceBeforeRPC(t *testing.T) {
+	for _, score := range []string{"7.3", "0.5", "11", "NaN", "+Inf"} {
+		err := run([]string{"worker", "set", "candidate", "--intelligence", score})
+		if err == nil || !strings.Contains(err.Error(), "INVALID") {
+			t.Fatalf("%s: %v", score, err)
+		}
+	}
+}

@@ -74,21 +74,21 @@ func open(t *testing.T, home string, eng *fakeEngines, push chan string) *Kernel
 	return k
 }
 
-// newFixture seeds two weight-5 candidates on separate accounts and one weight-0 candidate.
+// newFixture seeds two ability-5 candidates on separate accounts and one intelligence-0 candidate.
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	home := t.TempDir()
 	f := &fixture{t: t, eng: &fakeEngines{liveness: engine.Liveness{Known: true}}, home: home, ws: t.TempDir(), push: make(chan string, 8)}
 	f.k = open(t, home, f.eng, f.push)
-	five, zero := 5, 0
+	five, zero := 5.0, 0.0
 	for _, w := range []struct {
-		id     string
-		weight *int
+		id           string
+		intelligence *float64
 	}{{"alpha", &five}, {"beta", &five}, {"gamma", &zero}} {
 		if _, err := f.k.AddAccount(AccountInput{ID: "acct-" + w.id, Engine: "codex", Kind: "api", APIKey: "k", Label: w.id}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.k.SetWorker(WorkerInput{ID: w.id, Engine: "codex", Model: "m", Weight: w.weight, Accounts: []string{"acct-" + w.id}}); err != nil {
+		if _, err := f.k.SetWorker(WorkerInput{ID: w.id, Engine: "codex", Model: "m", Intelligence: w.intelligence, Accounts: []string{"acct-" + w.id}}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -134,7 +134,7 @@ func (f *fixture) succeed(pkg string, n int, text string) {
 }
 
 func pkg(key string, deps ...string) PackageInput {
-	return PackageInput{Key: key, Instruction: "do " + key, DependsOn: deps}
+	return PackageInput{Intelligence: 1, Key: key, Instruction: "do " + key, DependsOn: deps}
 }
 
 func TestIndependentPackagesAreAllReleasedBySubmit(t *testing.T) {
@@ -377,7 +377,7 @@ func TestCancelOnResidentEngineWarnsAboutLeftoverProcesses(t *testing.T) {
 	}
 }
 
-func TestRoutingUsesOnlyWeightedCandidatesAndBalancesThem(t *testing.T) {
+func TestRoutingUsesOnlyIntelligenceedCandidatesAndBalancesThem(t *testing.T) {
 	f := newFixture(t)
 	var plan []PackageInput
 	for i := 0; i < 10; i++ {
@@ -399,9 +399,9 @@ func (f *fixture) missionID() string {
 	return missions[0].ID
 }
 
-func TestPinnedPackageUsesAZeroWeightCandidate(t *testing.T) {
+func TestPinnedPackageUsesAZeroIntelligenceCandidate(t *testing.T) {
 	f := newFixture(t)
-	ids := f.submit(f.mission(), PackageInput{Key: "a", Instruction: "x", Worker: "gamma"})
+	ids := f.submit(f.mission(), PackageInput{Intelligence: 1, Key: "a", Instruction: "x", Worker: "gamma"})
 	p, _ := f.k.Package(ids["a"])
 	if p.State != StateLaunch || p.Current.Worker != "gamma" {
 		t.Fatalf("pinned package: state=%s worker=%v", p.State, p.Current)
@@ -530,7 +530,7 @@ func TestResultIsPushedWhenNobodyWaitsAndNotRepeatedToTheNextWait(t *testing.T) 
 
 func TestPrewarmIsRequestedOnceUpstreamHasItsResult(t *testing.T) {
 	f := newFixture(t)
-	ids := f.submit(f.mission(), pkg("a"), PackageInput{Key: "b", Instruction: "x", Worker: "gamma", DependsOn: []string{"a"}})
+	ids := f.submit(f.mission(), pkg("a"), PackageInput{Intelligence: 1, Key: "b", Instruction: "x", Worker: "gamma", DependsOn: []string{"a"}})
 	if len(f.eng.prewarmed) != 0 {
 		t.Fatalf("prewarmed before the upstream result")
 	}

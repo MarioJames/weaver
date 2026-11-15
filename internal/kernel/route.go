@@ -2,122 +2,135 @@ package kernel
 
 import (
 	"fmt"
+	"math"
 	"strings"
+	"time"
 
 	"github.com/MarioJames/weaver/internal/engine"
+	"github.com/MarioJames/weaver/internal/quota"
 )
 
 // routeWorker is one routing candidate with its live load.
 type routeWorker struct {
-	ID          string
-	Engine      string
-	Model       string
-	Effort      string
-	Weight      int
-	MaxParallel int
-	Running     int
-	Accounts    []*routeAccount
+	ID           string
+	Engine       string
+	Model        string
+	Effort       string
+	Intelligence float64
+	MaxParallel  int
+	Running      int
+	Accounts     []*routeAccount
+	Stats        *statBuckets
 }
-
 type routeAccount struct {
-	Account engine.Account
-	Ready   bool
-	Reason  string
-	Running int
+	Account  engine.Account
+	Ready    bool
+	Reason   string
+	Running  int
+	Snapshot *quota.Snapshot
 }
 
-// routing is a snapshot of the candidates; pick mutates the load counters so
-// a batch of packages spreads across candidates within one dispatch.
+// routing mutates counters so a batch spreads within one dispatch.
 type routing struct {
-	Workers []*routeWorker
-	Active  int
-	Cap     int
+	Now         time.Time
+	Workers     []*routeWorker
+	Active      int
+	Cap         int
+	Stats       *statSample
+	WorkerStats map[string]*statBuckets
 }
 
-// pick selects the candidate with the least (running+1)/weight among those
-// that are allowed and have a ready account; ties go to the earlier candidate.
-// A package pinned to a worker uses it regardless of weight. A package pinned
-// to an engine chooses among that engine's candidates; when all of them have
-// weight 0 they count as equal.
-func (r *routing) pick(pinWorker, pinEngine string) (*routeWorker, *routeAccount, string) {
+func (r *routing) pick(pinWorker, pinEngine string, requirement float64) (*routeWorker, *routeAccount, string) {
 	if r.Cap > 0 && r.Active >= r.Cap {
 		return nil, nil, fmt.Sprintf("已达到并行上限 %d，等待在跑的包结束", r.Cap)
 	}
-	var pool []*routeWorker
-	for _, w := range r.Workers {
-		switch {
-		case pinWorker != "":
-			if w.ID == pinWorker {
-				pool = append(pool, w)
-			}
-		case pinEngine != "":
-			if w.Engine == pinEngine {
-				pool = append(pool, w)
-			}
-		default:
-			if w.Weight > 0 {
-				pool = append(pool, w)
-			}
-		}
-	}
-	if len(pool) == 0 {
-		switch {
-		case pinWorker != "":
-			return nil, nil, fmt.Sprintf("候选 %s 不存在或已停用", pinWorker)
-		case pinEngine != "":
-			return nil, nil, fmt.Sprintf("引擎 %s 没有启用的候选", pinEngine)
-		}
-		return nil, nil, "没有权重大于 0 的候选"
-	}
-	equal := pinWorker != ""
-	if pinEngine != "" {
-		equal = true
-		for _, w := range pool {
-			if w.Weight > 0 {
-				equal = false
-			}
-		}
-	}
 	var best *routeWorker
 	var bestAccount *routeAccount
-	var bestScore float64
+	var bestStats PerformanceStats
+	var bestScore, bestQuota float64
+	now := r.Now
+	if now.IsZero() {
+		now = time.Now()
+	}
 	var reasons []string
-	for _, w := range pool {
-		weight := w.Weight
-		if equal {
-			weight = 1
-		}
-		if weight <= 0 {
-			continue
+	eligible := 0
+	for _, w := range r.Workers {
+		if pinWorker != "" {
+			if w.ID != pinWorker {
+				continue
+			}
+		} else {
+			if pinEngine != "" && w.Engine != pinEngine {
+				continue
+			}
+			if w.Intelligence == 0 {
+				reasons = append(reasons, w.ID+"：未评分")
+				continue
+			}
+			if w.Intelligence < requirement {
+				reasons = append(reasons, fmt.Sprintf("%s：能力 %g，低于需求 %g", w.ID, w.Intelligence, requirement))
+				continue
+			}
 		}
 		if w.MaxParallel > 0 && w.Running >= w.MaxParallel {
 			reasons = append(reasons, fmt.Sprintf("%s 已达到并行上限 %d", w.ID, w.MaxParallel))
 			continue
 		}
 		var account *routeAccount
+		var accountQuota float64
+		var accountReasons []string
 		for _, a := range w.Accounts {
-			if a.Ready && (account == nil || a.Running < account.Running) {
+			factor := quota.Factor(a.Snapshot, w.Model, now)
+			if factor <= 0 {
+				name := a.Account.Label
+				if name == "" {
+					name = a.Account.ID
+				}
+				accountReasons = append(accountReasons, quotaExhaustedReason(name, a.Snapshot, w.Model, now))
+				continue
+			}
+			if !a.Ready {
+				accountReasons = append(accountReasons, a.Reason)
+				continue
+			}
+			if account == nil || factor > accountQuota || (factor == accountQuota && a.Running < account.Running) {
 				account = a
+				accountQuota = factor
 			}
 		}
 		if account == nil {
 			why := "没有绑定账号"
-			if len(w.Accounts) > 0 {
-				why = w.Accounts[0].Reason
+			if len(accountReasons) > 0 {
+				why = strings.Join(accountReasons, "、")
 			}
-			reasons = append(reasons, fmt.Sprintf("%s：%s", w.ID, why))
+			reasons = append(reasons, w.ID+"："+why)
 			continue
 		}
-		score := float64(w.Running+1) / float64(weight)
-		if best == nil || score < bestScore {
-			best, bestAccount, bestScore = w, account, score
+		eligible++
+		stats := w.Stats.performance(requirement, r.Stats)
+		score := stats.FirstAcceptanceRate * accountQuota / (math.Max(stats.MedianSeconds, 0.001) * float64(w.Running+1))
+		if best == nil || score > bestScore {
+			best, bestAccount, bestStats, bestScore, bestQuota = w, account, stats, score, accountQuota
 		}
 	}
 	if best == nil {
-		return nil, nil, "没有就绪的候选（" + strings.Join(reasons, "；") + "）"
+		if pinWorker != "" {
+			return nil, nil, fmt.Sprintf("候选 %s 不存在、已停用或不可用（%s）", pinWorker, strings.Join(reasons, "；"))
+		}
+		return nil, nil, fmt.Sprintf("没有 intelligence ≥ %g 的可用候选（%s）", requirement, strings.Join(reasons, "；"))
+	}
+	note := fmt.Sprintf("包指定了候选 %s", best.ID)
+	if pinWorker == "" {
+		note = fmt.Sprintf("需求 %g → %s（能力 %g）：首次采纳 %.0f%%（%d 次）、中位耗时 %.0f 分、额度系数 %.2f", requirement, best.ID, best.Intelligence, bestStats.FirstAcceptanceRate*100, bestStats.Samples, bestStats.MedianSeconds/60, bestQuota)
+		if eligible > 1 {
+			note += fmt.Sprintf("；另有 %d 个够格候选得分较低", eligible-1)
+		}
+	}
+	if runes := []rune(note); len(runes) > 200 {
+		note = string(runes[:199]) + "…"
 	}
 	best.Running++
 	bestAccount.Running++
 	r.Active++
-	return best, bestAccount, ""
+	return best, bestAccount, note
 }

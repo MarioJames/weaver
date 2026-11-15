@@ -221,7 +221,7 @@ func (k *Kernel) Finished(attemptID string, o engine.Outcome) {
 			if err != nil {
 				return err
 			}
-			if w, _, _ := rt.pick(p.Worker, p.Engine); w != nil {
+			if w, _, _ := rt.pick(p.Worker, p.Engine, p.Intelligence); w != nil {
 				if _, err := t.event(p.MissionID, p.ID, a.N, EvProgress, fmt.Sprintf("第 %d 次尝试因账号受限失败（%s），改派其他候选", a.N, clip(message, 300))); err != nil {
 					return err
 				}

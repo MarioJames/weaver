@@ -95,28 +95,30 @@ type Notify struct {
 
 // Package is one unit of work run by one agent.
 type Package struct {
-	ID          string     `json:"id"`
-	MissionID   string     `json:"missionId"`
-	Key         string     `json:"key"`
-	Title       string     `json:"title"`
-	Instruction string     `json:"instruction,omitempty"`
-	Workspace   string     `json:"workspace"`
-	Worker      string     `json:"worker,omitempty"`
-	Engine      string     `json:"engine,omitempty"`
-	State       string     `json:"state"`
-	Waiting     string     `json:"waiting,omitempty"`
-	Attempt     int        `json:"attempt"`
-	DependsOn   []string   `json:"dependsOn,omitempty"`
-	Advisory    bool       `json:"advisory,omitempty"`
-	AutoAccept  bool       `json:"autoAccept,omitempty"`
-	CreatedAt   int64      `json:"createdAt"`
-	UpdatedAt   int64      `json:"updatedAt"`
-	Current     *Attempt   `json:"current,omitempty"`
-	Attempts    []*Attempt `json:"attempts,omitempty"`
+	Intelligence float64    `json:"intelligence"`
+	ID           string     `json:"id"`
+	MissionID    string     `json:"missionId"`
+	Key          string     `json:"key"`
+	Title        string     `json:"title"`
+	Instruction  string     `json:"instruction,omitempty"`
+	Workspace    string     `json:"workspace"`
+	Worker       string     `json:"worker,omitempty"`
+	Engine       string     `json:"engine,omitempty"`
+	State        string     `json:"state"`
+	Waiting      string     `json:"waiting,omitempty"`
+	Attempt      int        `json:"attempt"`
+	DependsOn    []string   `json:"dependsOn,omitempty"`
+	Advisory     bool       `json:"advisory,omitempty"`
+	AutoAccept   bool       `json:"autoAccept,omitempty"`
+	CreatedAt    int64      `json:"createdAt"`
+	UpdatedAt    int64      `json:"updatedAt"`
+	Current      *Attempt   `json:"current,omitempty"`
+	Attempts     []*Attempt `json:"attempts,omitempty"`
 }
 
 // Attempt is one run of a package on one engine.
 type Attempt struct {
+	RouteNote      string `json:"routeNote"`
 	ID             string `json:"id"`
 	N              int    `json:"n"`
 	State          string `json:"state"`
@@ -146,15 +148,16 @@ type Attempt struct {
 
 // Event is one line of a mission's progress stream.
 type Event struct {
-	Seq     int64  `json:"seq"`
-	Mission string `json:"missionId"`
-	Package string `json:"packageId,omitempty"`
-	Key     string `json:"key,omitempty"`
-	Attempt int    `json:"attempt,omitempty"`
-	Kind    string `json:"kind"`
-	Wake    bool   `json:"wake,omitempty"`
-	Message string `json:"message,omitempty"`
-	At      int64  `json:"at"`
+	Data    map[string]any `json:"data,omitempty"`
+	Seq     int64          `json:"seq"`
+	Mission string         `json:"missionId"`
+	Package string         `json:"packageId,omitempty"`
+	Key     string         `json:"key,omitempty"`
+	Attempt int            `json:"attempt,omitempty"`
+	Kind    string         `json:"kind"`
+	Wake    bool           `json:"wake,omitempty"`
+	Message string         `json:"message,omitempty"`
+	At      int64          `json:"at"`
 }
 
 // PlanInput is a decomposition submitted in one command.
@@ -169,15 +172,16 @@ type PlanInput struct {
 // auto-accept package is accepted when its result arrives, so its dependents
 // start without the owner; a failure still wakes the owner.
 type PackageInput struct {
-	Key         string   `json:"key"`
-	Title       string   `json:"title"`
-	Instruction string   `json:"instruction"`
-	Workspace   string   `json:"workspace,omitempty"`
-	Worker      string   `json:"worker,omitempty"`
-	Engine      string   `json:"engine,omitempty"`
-	DependsOn   []string `json:"dependsOn,omitempty"`
-	Advisory    bool     `json:"advisory,omitempty"`
-	AutoAccept  bool     `json:"autoAccept,omitempty"`
+	Intelligence float64  `json:"intelligence"`
+	Key          string   `json:"key"`
+	Title        string   `json:"title"`
+	Instruction  string   `json:"instruction"`
+	Workspace    string   `json:"workspace,omitempty"`
+	Worker       string   `json:"worker,omitempty"`
+	Engine       string   `json:"engine,omitempty"`
+	DependsOn    []string `json:"dependsOn,omitempty"`
+	Advisory     bool     `json:"advisory,omitempty"`
+	AutoAccept   bool     `json:"autoAccept,omitempty"`
 }
 
 // PlanResult reports what a plan created.
@@ -241,6 +245,7 @@ type Account struct {
 	PauseReason string        `json:"pauseReason,omitempty"`
 	Running     int           `json:"running"`
 	Resident    string        `json:"resident,omitempty"`
+	Quota       *AccountQuota `json:"quota,omitempty"`
 	Usage       *AccountUsage `json:"usage,omitempty"`
 }
 
@@ -317,16 +322,17 @@ type ModelInfo struct {
 
 // Worker is a routing candidate: one engine, model and effort on a set of accounts.
 type Worker struct {
-	ID          string   `json:"id"`
-	Engine      string   `json:"engine"`
-	Model       string   `json:"model"`
-	Effort      string   `json:"effort,omitempty"`
-	Weight      int      `json:"weight"`
-	MaxParallel int      `json:"maxParallel,omitempty"`
-	Enabled     bool     `json:"enabled"`
-	Accounts    []string `json:"accounts"`
-	Description string   `json:"description,omitempty"`
-	Running     int      `json:"running"`
-	Available   bool     `json:"available"`
-	Reason      string   `json:"reason,omitempty"`
+	Stats        WorkerStats `json:"stats"`
+	ID           string      `json:"id"`
+	Engine       string      `json:"engine"`
+	Model        string      `json:"model"`
+	Effort       string      `json:"effort,omitempty"`
+	Intelligence float64     `json:"intelligence"`
+	MaxParallel  int         `json:"maxParallel,omitempty"`
+	Enabled      bool        `json:"enabled"`
+	Accounts     []string    `json:"accounts"`
+	Description  string      `json:"description,omitempty"`
+	Running      int         `json:"running"`
+	Available    bool        `json:"available"`
+	Reason       string      `json:"reason,omitempty"`
 }

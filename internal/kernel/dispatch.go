@@ -22,7 +22,7 @@ func (t *tx) setting(key, fallback string) string {
 
 // loadRouting snapshots the candidates and their live load.
 func (t *tx) loadRouting() (*routing, error) {
-	rt := &routing{Cap: defaultMaxParallel}
+	rt := &routing{Cap: defaultMaxParallel, Now: time.UnixMilli(t.now)}
 	if n, err := strconv.Atoi(t.setting("max_parallel", "")); err == nil && n >= 0 {
 		rt.Cap = n
 	}
@@ -48,28 +48,35 @@ func (t *tx) loadRouting() (*routing, error) {
 		perAccount[l.account] += n
 	}
 
-	rows, err = t.Query(`SELECT id, engine, model, effort, weight, max_parallel FROM workers WHERE enabled=1 ORDER BY position, id`)
+	rows, err = t.Query(`SELECT id, engine, model, effort, intelligence, max_parallel FROM workers WHERE enabled=1 ORDER BY position, id`)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		w := &routeWorker{}
-		if err := rows.Scan(&w.ID, &w.Engine, &w.Model, &w.Effort, &w.Weight, &w.MaxParallel); err != nil {
+		if err := rows.Scan(&w.ID, &w.Engine, &w.Model, &w.Effort, &w.Intelligence, &w.MaxParallel); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		rt.Workers = append(rt.Workers, w)
 	}
 	rows.Close()
+	stats, all, err := t.loadStats()
+	if err != nil {
+		return nil, err
+	}
+	rt.Stats = all
+	rt.WorkerStats = stats
 	accounts := map[string]*routeAccount{}
 	for _, w := range rt.Workers {
+		w.Stats = stats[w.ID]
 		for l, n := range running {
 			if l.worker == w.ID {
 				w.Running += n
 			}
 		}
 		rows, err := t.Query(`SELECT a.id, a.engine, a.kind, a.label, a.auth_dir, a.api_key, a.config, a.base_url, a.provider, a.protocol,
-			a.enabled, a.ready, a.ready_reason, COALESCE(a.paused_until,0), a.pause_reason
+			a.enabled, a.ready, a.ready_reason, COALESCE(a.paused_until,0), a.pause_reason, a.quota
 			FROM worker_accounts wa JOIN accounts a ON a.id=wa.account_id WHERE wa.worker_id=? ORDER BY wa.position, a.id`, w.ID)
 		if err != nil {
 			return nil, err
@@ -77,16 +84,16 @@ func (t *tx) loadRouting() (*routing, error) {
 		for rows.Next() {
 			var a engine.Account
 			var enabled, ready int
-			var readyReason, pauseReason string
+			var readyReason, pauseReason, quotaText string
 			var pausedUntil int64
 			if err := rows.Scan(&a.ID, &a.Engine, &a.Kind, &a.Label, &a.AuthDir, &a.APIKey, &a.Config, &a.BaseURL, &a.Provider, &a.Protocol,
-				&enabled, &ready, &readyReason, &pausedUntil, &pauseReason); err != nil {
+				&enabled, &ready, &readyReason, &pausedUntil, &pauseReason, &quotaText); err != nil {
 				rows.Close()
 				return nil, err
 			}
 			ra := accounts[a.ID]
 			if ra == nil {
-				ra = &routeAccount{Account: a, Running: perAccount[a.ID]}
+				ra = &routeAccount{Snapshot: parseQuota(quotaText), Account: a, Running: perAccount[a.ID]}
 				name := a.Label
 				if name == "" {
 					name = a.ID
@@ -171,7 +178,7 @@ func (t *tx) dispatch() error {
 			// Every remaining upstream has its result in: the verdict is the
 			// only thing left, so a pinned package can warm its engine now.
 			if imminent && (p.Worker != "" || p.Engine != "") {
-				if w, a, _ := rt.pick(p.Worker, p.Engine); w != nil {
+				if w, a, _ := rt.pick(p.Worker, p.Engine, p.Intelligence); w != nil {
 					w.Running--
 					a.Running--
 					rt.Active--
@@ -183,7 +190,7 @@ func (t *tx) dispatch() error {
 			}
 			continue
 		}
-		w, a, reason := rt.pick(p.Worker, p.Engine)
+		w, a, reason := rt.pick(p.Worker, p.Engine, p.Intelligence)
 		if w == nil {
 			if reason != p.Waiting {
 				if _, err := t.Exec(`UPDATE packages SET waiting=? WHERE id=?`, reason, id); err != nil {
@@ -193,7 +200,7 @@ func (t *tx) dispatch() error {
 			}
 			continue
 		}
-		if err := t.startAttempt(p, w, a); err != nil {
+		if err := t.startAttempt(p, w, a, reason); err != nil {
 			return err
 		}
 	}
@@ -202,7 +209,7 @@ func (t *tx) dispatch() error {
 
 func attemptID(pkg string, n int) string { return fmt.Sprintf("%s.%d", pkg, n) }
 
-func (t *tx) startAttempt(p *Package, w *routeWorker, a *routeAccount) error {
+func (t *tx) startAttempt(p *Package, w *routeWorker, a *routeAccount, routeNote string) error {
 	var note string
 	if err := t.QueryRow(`SELECT next_note FROM packages WHERE id=?`, p.ID).Scan(&note); err != nil {
 		return err
@@ -214,8 +221,8 @@ func (t *tx) startAttempt(p *Package, w *routeWorker, a *routeAccount) error {
 	n := p.Attempt + 1
 	id := attemptID(p.ID, n)
 	dir := t.k.runDir(id)
-	if _, err := t.Exec(`INSERT INTO attempts(id, package_id, mission_id, n, state, worker, account_id, engine, model, effort, mode, note, instruction, run_dir, created_at)
-		VALUES(?,?,?,?,?,?,?,?,?,?,'',?,?,?,?)`, id, p.ID, p.MissionID, n, StateLaunch, w.ID, a.Account.ID, w.Engine, w.Model, w.Effort, note, instruction, dir, t.now); err != nil {
+	if _, err := t.Exec(`INSERT INTO attempts(id, package_id, mission_id, n, state, worker, account_id, engine, model, effort, mode, note, instruction, run_dir, created_at, route_note)
+		VALUES(?,?,?,?,?,?,?,?,?,?,'',?,?,?,?,?)`, id, p.ID, p.MissionID, n, StateLaunch, w.ID, a.Account.ID, w.Engine, w.Model, w.Effort, note, instruction, dir, t.now, routeNote); err != nil {
 		return err
 	}
 	if _, err := t.Exec(`UPDATE packages SET next_note='' WHERE id=?`, p.ID); err != nil {

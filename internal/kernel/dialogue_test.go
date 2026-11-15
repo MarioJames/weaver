@@ -9,15 +9,14 @@ import (
 	"github.com/MarioJames/weaver/internal/engine"
 )
 
-// dialogueFixture adds one claude candidate next to the codex ones, at weight 0
-// like the real setup: a dialogue must still be able to use it.
+// dialogueFixture adds a rated claude candidate next to the codex ones.
 func dialogueFixture(t *testing.T) *fixture {
 	f := newFixture(t)
-	zero := 0
+	zero := 5.0
 	if _, err := f.k.AddAccount(AccountInput{ID: "acct-claude", Engine: "claude", Kind: "api", APIKey: "k", Label: "claude"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.k.SetWorker(WorkerInput{ID: "claude_w", Engine: "claude", Model: "m", Weight: &zero, Accounts: []string{"acct-claude"}}); err != nil {
+	if _, err := f.k.SetWorker(WorkerInput{ID: "claude_w", Engine: "claude", Model: "m", Intelligence: &zero, Accounts: []string{"acct-claude"}}); err != nil {
 		t.Fatal(err)
 	}
 	return f
@@ -37,7 +36,7 @@ func (f *fixture) last(pkgID string) string {
 
 func TestAdvisoryPackageIsToldToWriteADocumentAndLeaveFilesAlone(t *testing.T) {
 	f := newFixture(t)
-	ids := f.submit(f.mission(), PackageInput{Key: "work", Instruction: "do it"}, PackageInput{Key: "advice", Instruction: "compare the options", Advisory: true})
+	ids := f.submit(f.mission(), PackageInput{Intelligence: 1, Key: "work", Instruction: "do it"}, PackageInput{Intelligence: 1, Key: "advice", Instruction: "compare the options", Advisory: true})
 	advice, work := f.last(ids["advice"]), f.last(ids["work"])
 	if !strings.Contains(advice, "Do not create, modify or delete files") {
 		t.Errorf("an advisory package must be told not to change files:\n%s", advice)
@@ -53,7 +52,7 @@ func TestAdvisoryPackageIsToldToWriteADocumentAndLeaveFilesAlone(t *testing.T) {
 func TestAutoAcceptedResultReleasesDependentsWithoutWakingTheOwner(t *testing.T) {
 	f := newFixture(t)
 	m := f.mission()
-	ids := f.submit(m, PackageInput{Key: "a", Instruction: "first", AutoAccept: true}, pkg("b", "a"))
+	ids := f.submit(m, PackageInput{Intelligence: 1, Key: "a", Instruction: "first", AutoAccept: true}, pkg("b", "a"))
 	f.succeed(ids["a"], 1, "A-RESULT")
 	if s := f.state(ids["a"]); s != StateAccepted {
 		t.Fatalf("a is %s after its result, want accepted", s)
@@ -69,7 +68,7 @@ func TestAutoAcceptedResultReleasesDependentsWithoutWakingTheOwner(t *testing.T)
 		t.Fatalf("an auto-accepted result woke the owner: %+v", res.Wakes)
 	}
 	// A failure is never hidden, auto-accept or not.
-	ids2 := f.submit(m, PackageInput{Key: "c", Instruction: "x", AutoAccept: true})
+	ids2 := f.submit(m, PackageInput{Intelligence: 1, Key: "c", Instruction: "x", AutoAccept: true})
 	f.fail(ids2["c"], 1, "boom")
 	res, _ = f.k.Wait(context.Background(), m, nil, 100*time.Millisecond)
 	if len(res.Wakes) != 1 || res.Wakes[0].Kind != EvFailed {

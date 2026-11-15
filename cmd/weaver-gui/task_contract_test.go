@@ -66,7 +66,7 @@ func taskContractService(t *testing.T) (client, string, []string) {
 	must(err)
 	m, err := k.CreateMission("contract", "真实服务契约任务", home, nil, &kernel.Owner{Engine: "claude", Session: "task-owner-claude"})
 	must(err)
-	plan, err := k.SubmitPlan("", kernel.PlanInput{Mission: m.ID, Packages: []kernel.PackageInput{{Key: "shell", Title: "应用骨架", Instruction: "实现应用骨架", Worker: "contract-worker"}, {Key: "server", Title: "服务接口", Instruction: "实现服务接口", Worker: "contract-worker"}}})
+	plan, err := k.SubmitPlan("", kernel.PlanInput{Mission: m.ID, Packages: []kernel.PackageInput{{Intelligence: 1, Key: "shell", Title: "应用骨架", Instruction: "实现应用骨架", Worker: "contract-worker"}, {Intelligence: 1, Key: "server", Title: "服务接口", Instruction: "实现服务接口", Worker: "contract-worker"}}})
 	must(err)
 	ids := []string{plan.Packages[0].ID, plan.Packages[1].ID}
 	finish := func(id, result string) {

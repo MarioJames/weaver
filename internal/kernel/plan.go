@@ -1,12 +1,16 @@
 package kernel
 
 import (
+	"database/sql"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 )
+
+func validIntelligence(n float64) bool { return n >= 1 && n <= 10 && math.Mod(n*2, 1) == 0 }
 
 var keyPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 
@@ -111,6 +115,12 @@ func (t *tx) createPlan(in *PlanInput, out *PlanResult) error {
 		if _, dup := existing[p.Key]; dup {
 			return errf("INVALID", "主任务里已经有 key 为 %q 的包", p.Key)
 		}
+		if p.Intelligence == 0 {
+			return errf("INVALID", "包 %s 缺少 intelligence（1–10，步长 0.5）：指令留给执行者的判断空间越大，分值越高", p.Key)
+		}
+		if !validIntelligence(p.Intelligence) {
+			return errf("INVALID", "包 %s 的 intelligence 不合法（1–10，步长 0.5）：指令留给执行者的判断空间越大，分值越高", p.Key)
+		}
 		if strings.TrimSpace(p.Instruction) == "" {
 			return errf("INVALID", "包 %s 没有指令", p.Key)
 		}
@@ -135,13 +145,18 @@ func (t *tx) createPlan(in *PlanInput, out *PlanResult) error {
 				return errf("INVALID", "包 %s 指定的候选 %s 不存在", p.Key, p.Worker)
 			}
 		}
-		if p.Engine != "" && p.Worker == "" {
-			var n int
-			if err := t.QueryRow(`SELECT COUNT(*) FROM workers WHERE engine=?`, p.Engine).Scan(&n); err != nil {
+		if p.Worker == "" {
+			var highest float64
+			var candidate string
+			err := t.QueryRow(`SELECT intelligence, id FROM workers WHERE enabled=1 AND intelligence>0 AND (?='' OR engine=?) ORDER BY intelligence DESC, position, id LIMIT 1`, p.Engine, p.Engine).Scan(&highest, &candidate)
+			if err != nil && err != sql.ErrNoRows {
 				return err
 			}
-			if n == 0 {
-				return errf("INVALID", "包 %s 指定的引擎 %s 没有候选", p.Key, p.Engine)
+			if highest < p.Intelligence {
+				if highest == 0 {
+					return errf("NO_CANDIDATE", "包 %s 需要 intelligence %g，没有已启用且已评分的候选；请先用 weaver worker set <候选> --intelligence <1-10> 评分", p.Key, p.Intelligence)
+				}
+				return errf("NO_CANDIDATE", "包 %s 需要 intelligence %g，已启用的候选最高为 %g（%s）：由父 Agent 自己完成这个包，或启用、评分更强的候选", p.Key, p.Intelligence, highest, candidate)
 			}
 		}
 		ids[p.Key] = newID("p_")
@@ -177,8 +192,8 @@ func (t *tx) createPlan(in *PlanInput, out *PlanResult) error {
 	}
 	for _, p := range in.Packages {
 		position++
-		if _, err := t.Exec(`INSERT INTO packages(id, mission_id, key, title, instruction, workspace, worker, engine, state, position, created_at, updated_at, advisory, auto_accept)
-			VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, ids[p.Key], m.ID, p.Key, clip(p.Title, 200), p.Instruction, p.Workspace, p.Worker, p.Engine, StatePending, position, t.now, t.now, b2i(p.Advisory), b2i(p.AutoAccept)); err != nil {
+		if _, err := t.Exec(`INSERT INTO packages(id, mission_id, key, title, instruction, workspace, worker, engine, state, position, created_at, updated_at, advisory, auto_accept, intelligence)
+			VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, ids[p.Key], m.ID, p.Key, clip(p.Title, 200), p.Instruction, p.Workspace, p.Worker, p.Engine, StatePending, position, t.now, t.now, b2i(p.Advisory), b2i(p.AutoAccept), p.Intelligence); err != nil {
 			return err
 		}
 	}
@@ -373,7 +388,7 @@ func (k *Kernel) Events(mission string, after int64, limit int) ([]Event, error)
 		if _, err := getMission(k.db, mission); err != nil {
 			return err
 		}
-		rows, err := k.db.Query(`SELECT e.seq, e.mission_id, e.package_id, COALESCE(p.key,''), e.attempt, e.kind, e.wake, e.message, e.at
+		rows, err := k.db.Query(`SELECT e.seq, e.mission_id, e.package_id, COALESCE(p.key,''), e.attempt, e.kind, e.wake, e.message, e.at, COALESCE((SELECT route_note FROM attempts a WHERE a.package_id=e.package_id AND a.n=e.attempt),'')
 			FROM events e LEFT JOIN packages p ON p.id=e.package_id WHERE e.mission_id=? AND e.seq>? ORDER BY e.seq LIMIT ?`, mission, after, limit)
 		if err != nil {
 			return err
@@ -382,8 +397,12 @@ func (k *Kernel) Events(mission string, after int64, limit int) ([]Event, error)
 		for rows.Next() {
 			var e Event
 			var wake int
-			if err := rows.Scan(&e.Seq, &e.Mission, &e.Package, &e.Key, &e.Attempt, &e.Kind, &wake, &e.Message, &e.At); err != nil {
+			var routeNote string
+			if err := rows.Scan(&e.Seq, &e.Mission, &e.Package, &e.Key, &e.Attempt, &e.Kind, &wake, &e.Message, &e.At, &routeNote); err != nil {
 				return err
+			}
+			if e.Kind == EvLaunching {
+				e.Data = map[string]any{"routeNote": routeNote}
 			}
 			e.Wake = wake == 1
 			out = append(out, e)

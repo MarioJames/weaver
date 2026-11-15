@@ -42,7 +42,7 @@ func fixture(home string) snapshot {
 		s.Accounts = append(s.Accounts, account{ID: fmt.Sprintf("a%d", i), Label: label, Engine: engine, Kind: kind, Enabled: i != 3, Ready: i != 3})
 	}
 	for i, id := range []string{"a0", "a1", "a2", "a2", "a5", "a6"} {
-		s.Workers = append(s.Workers, worker{ID: fmt.Sprintf("w%d", i), Accounts: []string{id}, Enabled: true, Available: true, Weight: 1})
+		s.Workers = append(s.Workers, worker{ID: fmt.Sprintf("w%d", i), Accounts: []string{id}, Enabled: true, Available: true, Intelligence: 1})
 	}
 	s.Residents = []resident{{AccountID: "a2", State: "ready", Port: 45571, Sessions: 0}}
 	return s
@@ -199,14 +199,14 @@ func TestOverview(t *testing.T) {
 	}
 	f.mu.Lock()
 	for i := range f.data.Workers {
-		f.data.Workers[i].Weight = 0
+		f.data.Workers[i].Intelligence = 0
 	}
 	alertBelow := 5.0
 	f.data.Accounts[0].Usage = &usage{Low: true, AlertBelow: &alertBelow}
 	f.mu.Unlock()
 	a.refresh()
 	tt.Frame()
-	if !tt.HasText("没有权重大于 0 的候选") || !tt.HasText("Claude 5x Max 估算剩余低于 $5") {
+	if !tt.HasText("没有能力分大于 0 的候选") || !tt.HasText("Claude 5x Max 估算剩余低于 $5") {
 		t.Fatalf("缺少告警：%q", tt.Texts())
 	}
 }

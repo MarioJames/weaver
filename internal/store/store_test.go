@@ -211,3 +211,55 @@ func TestMigrationFiveKeepsTheBalanceOfAVersionFourDatabase(t *testing.T) {
 		db.Close()
 	}
 }
+
+func TestIntelligenceMigrationUpgradesAndReopens(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "weaver.db")
+	makeVersionTwo(t, path)
+	old, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = old.Exec(`INSERT INTO workers(id,engine,model,weight) VALUES('w','codex','m',8)`); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+	for i := 0; i < 2; i++ {
+		db, err := Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var score float64
+		if err := db.QueryRow(`SELECT intelligence FROM workers WHERE id='w'`).Scan(&score); err != nil {
+			db.Close()
+			t.Fatal(err)
+		}
+		if score != 0 {
+			db.Close()
+			t.Fatalf("legacy candidate was automatically scored %g", score)
+		}
+		var count int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('workers') WHERE name='weight'`).Scan(&count); err != nil {
+			db.Close()
+			t.Fatal(err)
+		}
+		if count != 0 {
+			db.Close()
+			t.Fatal("legacy column retained")
+		}
+		if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE name='0006_worker_intelligence.sql'`).Scan(&count); err != nil {
+			db.Close()
+			t.Fatal(err)
+		}
+		if count != 1 {
+			db.Close()
+			t.Fatal(count)
+		}
+		for _, col := range []string{"quota", "quota_checked_at", "quota_error"} {
+			if !accountColumns(t, db)[col] {
+				db.Close()
+				t.Fatalf("missing %s", col)
+			}
+		}
+		db.Close()
+	}
+}

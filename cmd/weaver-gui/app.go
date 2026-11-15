@@ -16,25 +16,26 @@ import (
 // Wire-only models keep the desktop client independent of the service kernel.
 // 新页面直接复用这些字段；认证秘密从不出现在 status 的快照里。
 type account struct {
-	ID          string `json:"id"`
-	Engine      string `json:"engine"`
-	Kind        string `json:"kind"`
-	Label       string `json:"label,omitempty"`
-	AuthDir     string `json:"authDir,omitempty"`
-	HasAPIKey   bool   `json:"hasApiKey,omitempty"`
-	HasConfig   bool   `json:"hasConfig,omitempty"`
-	BaseURL     string `json:"baseUrl,omitempty"`
-	Provider    string `json:"provider,omitempty"`
-	Protocol    string `json:"protocol,omitempty"`
-	Enabled     bool   `json:"enabled"`
-	Ready       bool   `json:"ready"`
-	ReadyReason string `json:"readyReason,omitempty"`
-	CheckedAt   int64  `json:"checkedAt,omitempty"`
-	PausedUntil int64  `json:"pausedUntil,omitempty"`
-	PauseReason string `json:"pauseReason,omitempty"`
-	Running     int    `json:"running"`
-	Resident    string `json:"resident,omitempty"`
-	Usage       *usage `json:"usage,omitempty"`
+	ID          string        `json:"id"`
+	Engine      string        `json:"engine"`
+	Kind        string        `json:"kind"`
+	Label       string        `json:"label,omitempty"`
+	AuthDir     string        `json:"authDir,omitempty"`
+	HasAPIKey   bool          `json:"hasApiKey,omitempty"`
+	HasConfig   bool          `json:"hasConfig,omitempty"`
+	BaseURL     string        `json:"baseUrl,omitempty"`
+	Provider    string        `json:"provider,omitempty"`
+	Protocol    string        `json:"protocol,omitempty"`
+	Enabled     bool          `json:"enabled"`
+	Ready       bool          `json:"ready"`
+	ReadyReason string        `json:"readyReason,omitempty"`
+	CheckedAt   int64         `json:"checkedAt,omitempty"`
+	PausedUntil int64         `json:"pausedUntil,omitempty"`
+	PauseReason string        `json:"pauseReason,omitempty"`
+	Running     int           `json:"running"`
+	Resident    string        `json:"resident,omitempty"`
+	Quota       *accountQuota `json:"quota,omitempty"`
+	Usage       *usage        `json:"usage,omitempty"`
 }
 type usage struct {
 	Month             usageTotals  `json:"month"`
@@ -68,19 +69,25 @@ type usagePrices struct {
 	CacheRead  *float64 `json:"cacheRead,omitempty"`
 	CacheWrite *float64 `json:"cacheWrite,omitempty"`
 }
+type workerStats struct {
+	Samples             int     `json:"samples"`
+	FirstAcceptanceRate float64 `json:"firstAcceptanceRate"`
+	MedianSeconds       float64 `json:"medianSeconds"`
+}
 type worker struct {
-	ID          string   `json:"id"`
-	Engine      string   `json:"engine"`
-	Model       string   `json:"model"`
-	Effort      string   `json:"effort,omitempty"`
-	Weight      int      `json:"weight"`
-	MaxParallel int      `json:"maxParallel,omitempty"`
-	Enabled     bool     `json:"enabled"`
-	Accounts    []string `json:"accounts"`
-	Description string   `json:"description,omitempty"`
-	Running     int      `json:"running"`
-	Available   bool     `json:"available"`
-	Reason      string   `json:"reason,omitempty"`
+	Stats        workerStats `json:"stats"`
+	ID           string      `json:"id"`
+	Engine       string      `json:"engine"`
+	Model        string      `json:"model"`
+	Effort       string      `json:"effort,omitempty"`
+	Intelligence float64     `json:"intelligence"`
+	MaxParallel  int         `json:"maxParallel,omitempty"`
+	Enabled      bool        `json:"enabled"`
+	Accounts     []string    `json:"accounts"`
+	Description  string      `json:"description,omitempty"`
+	Running      int         `json:"running"`
+	Available    bool        `json:"available"`
+	Reason       string      `json:"reason,omitempty"`
 }
 type overview struct {
 	Missions int            `json:"openMissions"`

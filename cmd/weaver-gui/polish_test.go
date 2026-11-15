@@ -22,12 +22,12 @@ func TestPolishScreenshots(t *testing.T) {
 	checked := time.Now().Add(-3 * time.Minute).UnixMilli()
 	f.data.Accounts[2].Resident = "ready"
 	f.data.Workers = []worker{
-		{ID: "codex_sol_medium", Engine: "codex", Model: "gpt-6.1-sol", Effort: "medium", Weight: 5, Enabled: true, Available: true, Accounts: []string{"a1"}},
-		{ID: "opencode_deepseek", Engine: "opencode", Model: "deepseek-v4.1-flash", Effort: "max", Weight: 5, Enabled: true, Available: true, Accounts: []string{"a2"}},
-		{ID: "claude_sonnet_high", Engine: "claude", Model: "sonnet", Effort: "high", Weight: 0, Enabled: true, Available: true, Accounts: []string{"a0"}},
-		{ID: "opencode_muse", Engine: "opencode", Model: "muse-spark-1.3-contributor", Effort: "max", Weight: 0, Enabled: true, Available: true, Accounts: []string{"a2"}},
-		{ID: "dsh_terra_xhigh", Engine: "dsh", Model: "gpt-6.1-terra", Effort: "xhigh", Weight: 0, Enabled: true, Available: true, Accounts: []string{"a5"}},
-		{ID: "dsh_haiku_xhigh", Engine: "dsh", Model: "claude-haiku-5-5", Effort: "xhigh", Weight: 0, Enabled: true, Available: true, Accounts: []string{"a6"}},
+		{ID: "codex_sol_medium", Engine: "codex", Model: "gpt-6.1-sol", Effort: "medium", Intelligence: 5, Enabled: true, Available: true, Accounts: []string{"a1"}},
+		{ID: "opencode_deepseek", Engine: "opencode", Model: "deepseek-v4.1-flash", Effort: "max", Intelligence: 5, Enabled: true, Available: true, Accounts: []string{"a2"}},
+		{ID: "claude_sonnet_high", Engine: "claude", Model: "sonnet", Effort: "high", Intelligence: 0, Enabled: true, Available: true, Accounts: []string{"a0"}},
+		{ID: "opencode_muse", Engine: "opencode", Model: "muse-spark-1.3-contributor", Effort: "max", Intelligence: 0, Enabled: true, Available: true, Accounts: []string{"a2"}},
+		{ID: "dsh_terra_xhigh", Engine: "dsh", Model: "gpt-6.1-terra", Effort: "xhigh", Intelligence: 0, Enabled: true, Available: true, Accounts: []string{"a5"}},
+		{ID: "dsh_haiku_xhigh", Engine: "dsh", Model: "claude-haiku-5-5", Effort: "xhigh", Intelligence: 0, Enabled: true, Available: true, Accounts: []string{"a6"}},
 	}
 	f.data.Accounts[5].Usage = &usage{Month: usageTotals{Runs: 12, InputTokens: 1_200_000, OutputTokens: 86_000},
 		Balance: moneyPtr(50), BalanceAt: checked}
@@ -152,7 +152,7 @@ func TestAccountUsageCellsKeepCopyInsideColumn(t *testing.T) {
 			tt.SetSize(width, 900)
 			tt.Frame()
 
-			header, ok := tt.Find("本月用量")
+			header, ok := tt.Find("用量 / 额度")
 			if !ok {
 				t.Fatalf("找不到用量列表头：%q", tt.Texts())
 			}

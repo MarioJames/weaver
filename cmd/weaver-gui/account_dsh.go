@@ -314,9 +314,9 @@ func (a *app) dshCandidate(c *ui.Context, f *accountForm) {
 			ui.Column(c).Width(100).Children(func() {
 				field.Select(c, &f.CandidateEffort, field.SelectProps{Size: theme.Small, Options: effortOptions}).Label("候选强度")
 			})
-			display.Text(c, "权重", display.TextProps{Type: display.TextSecondary, FontSize: 12})
+			display.Text(c, "能力分", display.TextProps{Type: display.TextSecondary, FontSize: 12})
 			ui.Column(c).Width(64).Children(func() {
-				field.Input(c, &f.CandidateWeight, field.InputProps{Size: theme.Small}).Label("候选权重")
+				field.Input(c, &f.CandidateIntelligence, field.InputProps{Size: theme.Small}).Label("候选能力分")
 			})
 		})
 	})
@@ -383,8 +383,8 @@ func (f *accountForm) reconcileCandidate() {
 	if !f.CandidateIDCustom || f.CandidateID == "" {
 		f.CandidateID = f.defaultCandidateID()
 	}
-	if f.CandidateWeight == "" {
-		f.CandidateWeight = "0"
+	if f.CandidateIntelligence == "" {
+		f.CandidateIntelligence = "0"
 	}
 }
 
@@ -520,16 +520,16 @@ func (a *app) saveDSHChannel(f *accountForm) {
 			f.Err = "候选强度不在这个模型支持的思考力度里"
 			return
 		}
-		weight, err := strconv.Atoi(strings.TrimSpace(f.CandidateWeight))
-		if err != nil || weight < 0 {
-			f.Err = "候选权重需要非负整数"
+		intelligence, err := strconv.ParseFloat(strings.TrimSpace(f.CandidateIntelligence), 64)
+		if err != nil || !validWorkerIntelligence(intelligence) {
+			f.Err = "候选能力分只能为 0（未评分）或 1–10，步长 0.5"
 			return
 		}
 		if strings.TrimSpace(f.CandidateID) == "" {
 			f.Err = "候选 ID 必填"
 			return
 		}
-		candidate = &workerCreate{ID: strings.TrimSpace(f.CandidateID), Model: model, Effort: effort, Weight: weight}
+		candidate = &workerCreate{ID: strings.TrimSpace(f.CandidateID), Model: model, Effort: effort, Intelligence: intelligence}
 		f.CandidateID = candidate.ID
 	}
 	a.action("account:save", func() (string, error) {
@@ -544,7 +544,7 @@ func (a *app) saveDSHChannel(f *accountForm) {
 		if candidate != nil && created != "" {
 			workerParams := map[string]any{
 				"id": candidate.ID, "engine": "dsh", "model": candidate.Model,
-				"accounts": []string{created}, "weight": candidate.Weight,
+				"accounts": []string{created}, "intelligence": candidate.Intelligence,
 			}
 			if candidate.Effort != "" {
 				workerParams["effort"] = candidate.Effort
@@ -576,10 +576,10 @@ func (a *app) saveDSHChannel(f *accountForm) {
 }
 
 type workerCreate struct {
-	ID     string
-	Model  string
-	Effort string
-	Weight int
+	ID           string
+	Model        string
+	Effort       string
+	Intelligence float64
 }
 
 func (f *accountForm) nativeConfig() (string, error) {

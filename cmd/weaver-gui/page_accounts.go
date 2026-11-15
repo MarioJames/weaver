@@ -102,8 +102,8 @@ var accountColumns = []accountColumn{
 	{title: "账号", grow: true, weight: 3, minW: 130},
 	{title: "状态", width: 108},
 	{title: "用它的候选", grow: true, weight: 2, minW: 120},
-	{title: "本月用量", width: 96},
-	{title: "估算剩余", width: 88},
+	{title: "用量 / 额度", width: 132},
+	{title: "剩余 / 重置", width: 104},
 	{title: "启用", width: 36, align: ui.Center},
 	{title: "操作", width: 116, align: ui.End},
 }
@@ -171,12 +171,8 @@ func (a *app) accountRow(c *ui.Context, acc account, divider bool) {
 				accountCell(c, 3, func(cell ui.Element) { a.usageSpentCell(c, acc, 0) })
 				accountCell(c, 4, func(cell ui.Element) { a.usageRemainingCell(c, acc, 0) })
 			} else {
-				accountCell(c, 3, func(cell ui.Element) {
-					display.Text(c, "—", display.TextProps{Type: display.TextSecondary})
-				})
-				accountCell(c, 4, func(cell ui.Element) {
-					display.Text(c, "—", display.TextProps{Type: display.TextSecondary})
-				})
+				accountCell(c, 3, func(cell ui.Element) { a.quotaUsedCell(c, acc) })
+				accountCell(c, 4, func(cell ui.Element) { a.quotaResetCell(c, acc) })
 			}
 			accountCell(c, 5, func(cell ui.Element) {
 				on := acc.Enabled
@@ -199,6 +195,7 @@ func (a *app) accountRow(c *ui.Context, acc account, divider bool) {
 }
 
 func (a *app) accountRowErrors(c *ui.Context, acc account) {
+	a.accountQuotaError(c, acc)
 	for _, key := range accountErrorKeys(acc.ID) {
 		if message := a.errors[key]; message != "" {
 			ui.Column(c).Padding(0, 12, 10, 12).Children(func() { fieldError(c, message) })
@@ -238,6 +235,11 @@ func (a *app) accountCards(c *ui.Context) {
 						ui.Row(c).Gap(28).Children(func() {
 							ui.Column(c).Grow(1).Basis(0).Children(func() { a.usageSpentCell(c, acc, 0) })
 							ui.Column(c).Grow(1).Basis(0).Children(func() { a.usageRemainingCell(c, acc, 0) })
+						})
+					} else if len(quotaWindows(acc)) > 0 {
+						ui.Row(c).Gap(16).Children(func() {
+							ui.Column(c).Width(180).Gap(2).Children(func() { a.quotaUsedCell(c, acc) })
+							ui.Column(c).Gap(2).Children(func() { a.quotaResetCell(c, acc) })
 						})
 					}
 					ui.Row(c).Gap(8).AlignItems(ui.Start).Children(func() {
@@ -401,6 +403,9 @@ func (a *app) accountActions(c *ui.Context, acc account, open *bool) {
 		if acc.Kind == "subscription" {
 			items = append(items, overlay.MenuItem{Key: "login", Label: "登录 " + label, Icon: lucide.LogIn()})
 		}
+		if hasQuota(acc) {
+			items = append(items, overlay.MenuItem{Key: "quota", Label: "刷新额度 " + label, Icon: lucide.RefreshCw()})
+		}
 		if acc.PausedUntil > time.Now().UnixMilli() {
 			items = append(items, overlay.MenuItem{Key: "resume", Label: "恢复 " + label, Icon: lucide.Play()})
 		} else {
@@ -415,6 +420,8 @@ func (a *app) accountActions(c *ui.Context, acc account, open *bool) {
 		switch chosen {
 		case "login":
 			a.openLogin(acc)
+		case "quota":
+			a.write("account:quota:"+acc.ID, "account.quota", map[string]any{"id": acc.ID})
 		case "pause":
 			a.openPause(acc)
 		case "resume":

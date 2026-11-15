@@ -75,7 +75,7 @@ func (u *AccountUsage) model(name string) ModelUsage {
 // model m, delta model m2. It finishes the run with the given usage.
 func (f *fixture) finishOn(mission, worker, key string, o engine.Outcome) {
 	f.t.Helper()
-	ids := f.submit(mission, PackageInput{Key: key, Instruction: "do " + key, Worker: worker})
+	ids := f.submit(mission, PackageInput{Intelligence: 1, Key: key, Instruction: "do " + key, Worker: worker})
 	id := attemptID(ids[key], 1)
 	f.k.Handed(id, engine.ModeCold, "unit")
 	f.k.Started(id, "")
@@ -100,8 +100,8 @@ func (f *fixture) usage(id string) *AccountUsage {
 // own model, and the balance is reduced only by runs after it was recorded.
 func TestUsageIsCountedFromWhatRunsReported(t *testing.T) {
 	f := newFixture(t)
-	zero := 0
-	if _, err := f.k.SetWorker(WorkerInput{ID: "delta", Engine: "codex", Model: "m2", Weight: &zero, Accounts: []string{"acct-gamma"}}); err != nil {
+	// A new candidate is unrated, so only a package that names it uses it.
+	if _, err := f.k.SetWorker(WorkerInput{ID: "delta", Engine: "codex", Model: "m2", Accounts: []string{"acct-gamma"}}); err != nil {
 		t.Fatal(err)
 	}
 	m := f.mission()

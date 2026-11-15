@@ -16,6 +16,7 @@ Decide this before writing a plan, because it changes what the plan looks like:
 | The task | Do this |
 |---|---|
 | A question, or a change smaller than a package would take to describe | Do it yourself |
+| Sequential work where each step depends on what the last one showed: operating a machine, a live incident, a single-question lookup | Do it yourself |
 | Work whose design is settled or follows an existing pattern | Delegate packages ([the loop](#the-loop)) |
 | Work that hangs on a design decision that is hard to undo and has more than one defensible answer | Open a [design dialogue](#design-dialogue) first, then delegate |
 
@@ -28,9 +29,9 @@ weaver mission create --title "Add rate limiting to the gateway"        # → {"
 # 2. Submit the whole decomposition at once. Independent packages start immediately.
 weaver plan submit --mission m_… --key plan-1 <<'JSON'
 {"packages":[
-  {"key":"limiter","title":"Token bucket","instruction":"…self-contained instruction…"},
-  {"key":"wiring","title":"Wire into middleware","instruction":"…","dependsOn":["limiter"]},
-  {"key":"docs","title":"Document the limits","instruction":"…","worker":"claude_sonnet_high"}
+  {"key":"limiter","title":"Token bucket","instruction":"…self-contained instruction…","intelligence":8},
+  {"key":"wiring","title":"Wire into middleware","instruction":"…","intelligence":7,"dependsOn":["limiter"]},
+  {"key":"docs","title":"Document the limits","instruction":"…","intelligence":6}
 ]}
 JSON
 
@@ -55,11 +56,29 @@ A package reference is its ID or `<mission>/<key>`.
 
 - **Self-contained instructions.** A worker sees only its package: state the goal, the files or areas it may touch, the constraints, and the checks it must run. It also receives the accepted results of the packages it depends on and, on a later attempt, your return note and its previous reply. It does not see this conversation.
 - **Dependencies.** `dependsOn` names keys in the same plan or already in the mission. A dependent starts when its upstream is **accepted**, not when it merely has a result, so your verdict is what releases the next step. Two packages that can run at the same time must not touch the same files.
-- **Routing.** Leave `worker` and `engine` unset: Weaver balances the weighted candidates. Pin `worker` only for a reason you could explain; a pinned package may use a weight-0 candidate, which is how pay-per-use API models are kept out of automatic routing. `weaver worker list` shows the candidates.
+- **Intelligence.** Every package states `intelligence`, a number from 1 to 10 in steps of 0.5: how much judgement its instruction leaves to the worker (see [the scale](#intelligence)). Weaver only considers candidates rated at least that high and chooses among them by itself, from each candidate's first-attempt acceptance rate, typical duration, remaining quota and current load. The reply and `weaver package show` name the chosen candidate with a one-line `routeNote`. You do not rank candidates and you do not need their names.
+- **Pinning.** `worker` pins a package to one candidate regardless of its rating; use it only for a reason you could explain, such as a second opinion from a specific engine. `engine` restricts the choice to one engine. `weaver worker list` shows the candidates, their ratings and their measured results.
 - **`"advisory": true`** for a package whose product is a document: research, an audit, a comparison. The agent is told to leave files alone and to cite what it read, and it reads its upstream results in full.
 - **`"autoAccept": true`** for a result that needs no judgement from you before the next step, such as research feeding an implementation package. It is accepted as it arrives and its dependents start; you are not woken for it. A failure still wakes you. Do not use it on packages that change code: accepting is your statement that you checked the work.
-- **All or nothing.** A cycle, an unknown dependency or a duplicate key rejects the whole plan. You may submit further plans to the same mission as the work unfolds.
+- **All or nothing.** A cycle, an unknown dependency, a duplicate key, a missing `intelligence` or a package no enabled candidate is rated for (`NO_CANDIDATE`) rejects the whole plan. You may submit further plans to the same mission as the work unfolds.
 - **`--key`** makes a submission idempotent: repeating the command returns the first result and creates nothing. Use it whenever a reply might have been lost.
+
+## Intelligence
+
+Packages and candidates share one scale. A candidate's rating is set by the user and says up to which level it still gets things right on the first attempt. A package's number says which level its instruction is written at. Rate the instruction you actually wrote, not the task in the abstract: spelling out more of the work lowers the number, and lets more candidates take it.
+
+| `intelligence` | The instruction |
+|---|---|
+| 6 | Names the files, the change and the checks to run. Following it is enough: batch renames, test backfill, an endpoint added from a template, read-only collection. |
+| 7 | Gives the goal, the area and the constraints. The worker finds the path inside one module, following a pattern that already exists. |
+| 8 | Crosses files or modules. The worker has to read the code to locate things and handle neighbouring cases the instruction did not mention: an ordinary feature, a located bug, a refactor. |
+| 9 | Gives only the goal and the acceptance criteria. The worker makes design trade-offs, or a mistake is costly: concurrency, migrations, hard debugging. |
+| 10 | Needs someone who would question the instruction itself. Do this yourself or open a design dialogue. |
+
+- Use half steps for work that sits between two rows, and numbers below 6 for purely mechanical work.
+- Do not inflate the number to get a stronger model: the strongest candidates are few, and a package that asks for them waits behind every other package that does.
+- When a plan is rejected with `NO_CANDIDATE`, the message names the highest rating available. Either write that package's instruction in more detail so it honestly fits a lower level, or do the package yourself. Do not lower the number without changing the instruction.
+- When a result comes back wrong because the worker lacked the judgement the instruction needed, a `return` sends the same package to the same pool of candidates. Cancel it and submit the work again with a higher number or a more detailed instruction.
 
 ## Package states
 

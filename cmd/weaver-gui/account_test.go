@@ -24,6 +24,7 @@ type accountService struct {
 	fakeService
 	configs       map[string]any
 	addCalls      int
+	quotaCalls    int
 	usageSetCalls int
 	modelCalls    int
 	workerCalls   []map[string]any
@@ -50,12 +51,12 @@ func newAccountService(t *testing.T) *accountService {
 	f.data.Accounts[6].HasAPIKey = true
 	importID := f.data.Accounts[0].ID
 	f.data.Workers = []worker{
-		{ID: "claude_sonnet_high", Engine: "claude", Model: "sonnet", Effort: "high", Weight: 0, Enabled: true, Available: true, Accounts: []string{importID}},
-		{ID: "codex_sol_medium", Engine: "codex", Model: "gpt-6.1-sol", Effort: "medium", Weight: 5, Enabled: true, Available: true, Accounts: []string{"a1"}},
-		{ID: "opencode_deepseek", Engine: "opencode", Model: "deepseek-v4.1-flash", Effort: "max", Weight: 5, Enabled: true, Available: true, Accounts: []string{"a2"}},
-		{ID: "opencode_muse", Engine: "opencode", Model: "muse-spark-1.3-contributor", Effort: "max", Weight: 0, Enabled: true, Available: true, Accounts: []string{"a2"}},
-		{ID: "dsh_terra_xhigh", Engine: "dsh", Model: "gpt-6.1-terra", Effort: "xhigh", Weight: 0, Enabled: true, Available: true, Accounts: []string{"a5"}},
-		{ID: "dsh_haiku_xhigh", Engine: "dsh", Model: "claude-haiku-5-5", Effort: "xhigh", Weight: 0, Enabled: true, Available: true, Accounts: []string{"a6"}},
+		{ID: "claude_sonnet_high", Engine: "claude", Model: "sonnet", Effort: "high", Intelligence: 0, Enabled: true, Available: true, Accounts: []string{importID}},
+		{ID: "codex_sol_medium", Engine: "codex", Model: "gpt-6.1-sol", Effort: "medium", Intelligence: 5, Enabled: true, Available: true, Accounts: []string{"a1"}},
+		{ID: "opencode_deepseek", Engine: "opencode", Model: "deepseek-v4.1-flash", Effort: "max", Intelligence: 5, Enabled: true, Available: true, Accounts: []string{"a2"}},
+		{ID: "opencode_muse", Engine: "opencode", Model: "muse-spark-1.3-contributor", Effort: "max", Intelligence: 0, Enabled: true, Available: true, Accounts: []string{"a2"}},
+		{ID: "dsh_terra_xhigh", Engine: "dsh", Model: "gpt-6.1-terra", Effort: "xhigh", Intelligence: 0, Enabled: true, Available: true, Accounts: []string{"a5"}},
+		{ID: "dsh_haiku_xhigh", Engine: "dsh", Model: "claude-haiku-5-5", Effort: "xhigh", Intelligence: 0, Enabled: true, Available: true, Accounts: []string{"a6"}},
 	}
 	f.configs["a5"] = map[string]any{
 		"api":         "openai-responses",
@@ -169,6 +170,15 @@ func (f *accountService) respond(conn net.Conn, req rpc.Request) {
 			acc.Protocol = *p.Protocol
 		}
 		result = acc
+	case "account.quota":
+		var p struct{ ID string }
+		_ = json.Unmarshal(req.Params, &p)
+		f.quotaCalls++
+		acc := f.find(p.ID)
+		if acc != nil {
+			acc.Quota = &accountQuota{Status: "available", Windows: []quotaWindow{{Label: "5 小时额度", UsedPercent: 42, ResetsAt: time.Now().Add(time.Hour).UnixMilli()}}, CheckedAt: time.Now().UnixMilli(), Factor: 1}
+			result = []account{*acc}
+		}
 	case "account.check":
 		var p struct{ ID string }
 		json.Unmarshal(req.Params, &p)
@@ -319,9 +329,9 @@ func (f *accountService) respond(conn net.Conn, req rpc.Request) {
 		engineName, _ := p["engine"].(string)
 		model, _ := p["model"].(string)
 		effort, _ := p["effort"].(string)
-		weight := 0
-		if n, ok := p["weight"].(float64); ok {
-			weight = int(n)
+		intelligence := 0.0
+		if n, ok := p["intelligence"].(float64); ok {
+			intelligence = n
 		}
 		var accounts []string
 		if list, ok := p["accounts"].([]any); ok {
@@ -331,8 +341,8 @@ func (f *accountService) respond(conn net.Conn, req rpc.Request) {
 				}
 			}
 		}
-		f.data.Workers = append(f.data.Workers, worker{ID: id, Engine: engineName, Model: model, Effort: effort, Weight: weight, Enabled: true, Available: true, Accounts: accounts})
-		result = map[string]any{"id": id, "weight": weight}
+		f.data.Workers = append(f.data.Workers, worker{ID: id, Engine: engineName, Model: model, Effort: effort, Intelligence: intelligence, Enabled: true, Available: true, Accounts: accounts})
+		result = map[string]any{"id": id, "intelligence": intelligence}
 	default:
 		failure = &rpc.Error{Code: "NOT_FOUND", Message: "未知方法"}
 	}
@@ -562,8 +572,8 @@ func TestAccountsA23CandidateEfforts(t *testing.T) {
 		if form.CandidateID != "dsh_terra_xhigh" {
 			t.Fatalf("候选 ID 默认值 = %q", form.CandidateID)
 		}
-		if form.CandidateWeight != "0" {
-			t.Fatalf("候选权重默认值 = %q", form.CandidateWeight)
+		if form.CandidateIntelligence != "0" {
+			t.Fatalf("候选能力分默认值 = %q", form.CandidateIntelligence)
 		}
 	})
 	edit(t, tt, "候选 ID", "dsh_my_choice", false)
@@ -585,8 +595,8 @@ func TestAccountsA23CandidateEfforts(t *testing.T) {
 	if call["id"] != "dsh_terra_xhigh" || call["model"] != "gpt-6.1-terra" || call["effort"] != "xhigh" {
 		t.Fatalf("worker.set 参数不对：%+v", call)
 	}
-	if weight, _ := call["weight"].(float64); weight != 0 {
-		t.Fatalf("候选权重 = %v", call["weight"])
+	if intelligence, _ := call["intelligence"].(float64); intelligence != 0 {
+		t.Fatalf("候选能力分 = %v", call["intelligence"])
 	}
 	assertNoSecret(t, a, tt, "sk-test-secret-value")
 }
@@ -795,6 +805,9 @@ func TestAccountScreenshots(t *testing.T) {
 	}
 	f := newAccountService(t)
 	checked := time.Now().Add(-3 * time.Minute).UnixMilli()
+	f.find("a1").Quota = &accountQuota{Status: "available", Windows: []quotaWindow{{Label: "5 小时额度", UsedPercent: 42, ResetsAt: time.Now().Add(time.Hour).UnixMilli()}, {Label: "7 天额度", UsedPercent: 76, ResetsAt: time.Now().Add(50 * time.Hour).UnixMilli()}}, CheckedAt: checked, Factor: 1}
+	f.find("import_e6f3c04da52965f2b7c02668").Quota = &accountQuota{Status: "available", Windows: []quotaWindow{{Label: "5 小时额度", UsedPercent: 0}, {Label: "7 天额度", UsedPercent: 98, ResetsAt: time.Now().Add(11 * time.Hour).UnixMilli()}}, CheckedAt: checked, Factor: 0.3}
+
 	seedUsage(f, "a5", &usage{Month: usageTotals{Runs: 12, InputTokens: 1_200_000, OutputTokens: 150_000, Unpriced: 12},
 		Balance: moneyPtr(50), BalanceAt: checked})
 	seedUsage(f, "a6", &usage{Month: usageTotals{Runs: 37, Cost: moneyPtr(2.66)}, Models: []modelUsage{{Model: "claude-haiku-5-5", Prices: usagePrices{Input: moneyPtr(1), Output: moneyPtr(5)}, Runs: 37, Cost: moneyPtr(2.66)}},
@@ -990,5 +1003,36 @@ func TestUsageAmountsNeverReadWrong(t *testing.T) {
 		if c.got != c.want {
 			t.Errorf("got %q, want %q", c.got, c.want)
 		}
+	}
+}
+
+func TestAccountQuotaRefresh(t *testing.T) {
+	f := newAccountService(t)
+	a, tt := openAccounts(t, f)
+	// Nothing was read yet: the row keeps its dashes and offers no extra line.
+	if tt.HasText("读取于") {
+		t.Fatal("quota shown before it was read")
+	}
+	openAccountMore(t, tt, "Claude 5x Max")
+	click(t, tt, "刷新额度 Claude 5x Max")
+	waitFor(t, tt, a, func() bool {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		return f.quotaCalls == 1 && !a.busy["account:quota:import_e6f3c04da52965f2b7c02668"]
+	})
+	tt.Frame()
+	for _, label := range []string{"5 小时额度 已用 42%"} {
+		if _, ok := tt.Find(label); !ok {
+			t.Fatalf("missing %q: %v", label, tt.Texts())
+		}
+	}
+	found := false
+	for _, text := range tt.Texts() {
+		if strings.HasPrefix(text, "读取于 ") {
+			found = true
+		}
+	}
+	if !found || !tt.HasText("42%") || !tt.HasText("5 小时") {
+		t.Fatalf("missing refreshed quota window: %v", tt.Texts())
 	}
 }
