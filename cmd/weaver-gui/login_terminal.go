@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
+	"time"
 
 	"github.com/egoist/mygo/plugins/terminal"
 )
@@ -26,28 +28,86 @@ func (a *app) startLoginTerminal(p *loginPanel) error {
 	if err != nil {
 		return err
 	}
+	catcher, env, err := newLinkCatcher()
+	if err != nil {
+		return fmt.Errorf("无法准备登录链接目录：%w", err)
+	}
 	term, err := terminal.New(terminal.Options{
 		Command: []string{weaver, "account", "login", p.ID},
+		Env:     env,
 		Cursor:  terminal.CursorBar,
 		NoBlink: true,
 		OnExit:  func(code int) { a.loginCommandExited(p, code) },
 	})
 	if err != nil {
+		os.RemoveAll(catcher)
 		return fmt.Errorf("无法启动内嵌终端：%w", err)
 	}
 	p.Term = term
+	p.linkDir = catcher
 	a.wg.Add(1)
 	go func() {
 		defer a.wg.Done()
-		select {
-		case <-a.ctx.Done():
-			// 应用退出时也结束登录命令，避免留下子进程。
-			p.closing.Store(true)
-			term.Close()
-		case <-term.Done():
-		}
+		// The catcher outlives the command: a browser call can still be on
+		// its way when the command exits, and the link stays useful.
+		defer os.RemoveAll(catcher)
+		a.watchLoginLinks(p, catcher, term)
 	}()
 	return nil
+}
+
+// newLinkCatcher makes the directory that stands in for the browser. The
+// engines' sign-in commands open their link through $BROWSER (Claude Code,
+// Codex) or xdg-open from PATH (opencode); both point at a script there that
+// appends the link to a file instead of opening anything.
+func newLinkCatcher() (string, []string, error) {
+	dir, err := os.MkdirTemp("", "weaver-login-")
+	if err != nil {
+		return "", nil, err
+	}
+	links := filepath.Join(dir, "links")
+	script := "#!/bin/sh\nfor link in \"$@\"; do printf '%s\\n' \"$link\" >> " + shellQuote(links) + "; done\n"
+	opener := filepath.Join(dir, "xdg-open")
+	if err := os.WriteFile(opener, []byte(script), 0o700); err != nil {
+		os.RemoveAll(dir)
+		return "", nil, err
+	}
+	return dir, []string{"BROWSER=" + opener, "PATH=" + dir + string(os.PathListSeparator) + os.Getenv("PATH")}, nil
+}
+
+func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
+
+// watchLoginLinks shows the latest link the command tried to open until the
+// dialog closes or the app quits. Quitting also ends the command, so no child
+// process is left behind.
+func (a *app) watchLoginLinks(p *loginPanel, dir string, term *terminal.Terminal) {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	seen := ""
+	for {
+		select {
+		case <-a.ctx.Done():
+			p.closing.Store(true)
+			term.Close()
+			return
+		case <-p.closed:
+			return
+		case <-ticker.C:
+		}
+		data, err := os.ReadFile(filepath.Join(dir, "links"))
+		if err != nil {
+			continue
+		}
+		lines := strings.Fields(string(data))
+		if len(lines) == 0 || lines[len(lines)-1] == seen {
+			continue
+		}
+		seen = lines[len(lines)-1]
+		a.mu.Lock()
+		p.Link = seen
+		a.notify()
+		a.mu.Unlock()
+	}
 }
 
 // resolveWeaverCommand prefers a weaver beside this executable, then PATH.

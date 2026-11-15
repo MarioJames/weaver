@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"image/png"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -392,4 +394,77 @@ exec sleep 30
 	pid := readLoginPID(t, pidFile)
 	click(t, tt, "关闭")
 	waitFor(t, tt, a, func() bool { return !loginProcessAlive(pid) })
+}
+
+// TestLoginLinkIsOfferedNotOpened covers A9–A12: the sign-in command's
+// attempt to open a browser, through $BROWSER or xdg-open on PATH, lands in
+// the dialog instead; the user opens or copies it, and closing the dialog
+// removes the catcher.
+func TestLoginLinkIsOfferedNotOpened(t *testing.T) {
+	requireLoginTerminal(t)
+	s := newLoginService(t)
+	step := filepath.Join(t.TempDir(), "step")
+	t.Setenv("LOGIN_STEP_FILE", step)
+	installFakeWeaver(t, `
+echo "Opening browser to sign in…"
+while [ ! -e "$LOGIN_STEP_FILE" ]; do sleep 0.05; done
+"$BROWSER" 'https://claude.com/cai/oauth/authorize?code=true&state=one'
+while [ "$(cat "$LOGIN_STEP_FILE")" != 2 ]; do sleep 0.05; done
+xdg-open 'https://auth.openai.com/oauth/authorize?state=two'
+sleep 30
+`)
+
+	a, tt := loginTestOpen(t, s)
+	// testApp stubs runCommand; record the browser call on top of it.
+	var openedMu sync.Mutex
+	var opened []string
+	runCommand = func(_ context.Context, name string, args ...string) ([]byte, error) {
+		openedMu.Lock()
+		defer openedMu.Unlock()
+		opened = append(opened, name+" "+strings.Join(args, " "))
+		return nil, nil
+	}
+	openAccountMore(t, tt, "Claude 5x Max")
+	click(t, tt, "登录 Claude 5x Max")
+	waitFor(t, tt, a, func() bool {
+		p := accountsFor(a).login
+		return p != nil && p.Term != nil && strings.Contains(p.Term.Text(), "Opening browser")
+	})
+	if !tt.HasText("等待登录命令给出链接…") {
+		t.Fatalf("链接出来前没有等待提示：%q", tt.Texts())
+	}
+	p := accountsFor(a).login
+	dir := p.linkDir
+
+	first := "https://claude.com/cai/oauth/authorize?code=true&state=one"
+	os.WriteFile(step, []byte("1"), 0o644)
+	waitFor(t, tt, a, func() bool { return p.Link == first })
+	if !tt.HasText(first) || !tt.HasText("在浏览器打开") {
+		t.Fatalf("弹窗没有显示链接：%q", tt.Texts())
+	}
+	click(t, tt, "复制链接")
+	if tt.Clipboard() != first || !tt.HasText("已复制链接") {
+		t.Fatalf("剪贴板 %q，提示 %q", tt.Clipboard(), tt.Texts())
+	}
+
+	second := "https://auth.openai.com/oauth/authorize?state=two"
+	os.WriteFile(step, []byte("2"), 0o644)
+	waitFor(t, tt, a, func() bool { return p.Link == second })
+	click(t, tt, "在浏览器打开")
+	waitFor(t, tt, a, func() bool {
+		openedMu.Lock()
+		defer openedMu.Unlock()
+		return len(opened) > 0
+	})
+	openedMu.Lock()
+	if len(opened) != 1 || opened[0] != "xdg-open "+second {
+		t.Fatalf("打开浏览器的调用不对：%q", opened)
+	}
+	openedMu.Unlock()
+
+	click(t, tt, "关闭")
+	waitFor(t, tt, a, func() bool {
+		_, err := os.Stat(dir)
+		return os.IsNotExist(err)
+	})
 }

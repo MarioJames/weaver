@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/egoist/mygo/plugins/terminal"
@@ -31,10 +32,19 @@ type loginPanel struct {
 	Finished     bool
 	CheckStarted bool
 	CheckDone    bool
+	// Link is the latest sign-in link the command tried to open in a
+	// browser. The command never opens one itself: the dialog offers it.
+	Link    string
+	linkDir string
 	// closing is set before the terminal is hung up. The exit callback then
 	// leaves the account as it was instead of checking it.
 	closing atomic.Bool
+	// closed ends the link watcher; closeOnce guards it.
+	closed    chan struct{}
+	closeOnce sync.Once
 }
+
+func loginOpenKey(id string) string { return "account:login-open:" + id }
 
 func loginCheckKey(id string) string { return "account:login-check:" + id }
 
@@ -49,6 +59,7 @@ func (a *app) openLogin(acc account) {
 		Ready:   acc.Ready,
 		Reason:  acc.ReadyReason,
 		Command: "weaver account login " + acc.ID,
+		closed:  make(chan struct{}),
 	}
 	// Set the panel before starting the program: an exit may come before the
 	// first frame draws the terminal.
@@ -73,6 +84,7 @@ func (a *app) closeLogin(p *loginPanel) {
 		st.login = nil
 	}
 	p.closing.Store(true)
+	p.closeOnce.Do(func() { close(p.closed) })
 	if p.Term != nil {
 		term := p.Term
 		p.Term = nil
@@ -102,6 +114,7 @@ func (a *app) loginView(c *ui.Context) {
 				a.loginStatus(c, p)
 			})
 			if p.Term != nil {
+				a.loginLink(c, p)
 				a.loginTerminal(c, p)
 			} else {
 				a.loginFallback(c, p)
@@ -156,6 +169,36 @@ func (a *app) loginStatus(c *ui.Context, p *loginPanel) {
 		reason = "服务没有给出原因"
 	}
 	display.Text(c, reason, display.TextProps{Type: display.TextSecondary, FontSize: 12})
+}
+
+// loginLink offers the link the command wanted to open: in the system browser
+// or copied, for a browser of the user's choice.
+func (a *app) loginLink(c *ui.Context, p *loginPanel) {
+	if p.Link == "" {
+		display.Text(c, "等待登录命令给出链接…", display.TextProps{Type: display.TextSecondary, FontSize: 12})
+		return
+	}
+	tk := theme.TokensOf(c)
+	link := p.Link
+	ui.Column(c).Padding(12).Gap(8).Radius(tk.BorderRadius).Background(tk.FillTertiary).Children(func() {
+		display.Text(c, "登录链接", display.TextProps{Strong: true})
+		display.Text(c, link, display.TextProps{Code: true, FontSize: 12}).MaxLines(4)
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+			open := action.Button(c, "在浏览器打开", action.ButtonProps{Variant: action.Primary, Size: theme.Small})
+			open.Disabled(a.busy[loginOpenKey(p.ID)])
+			if open.Clicked() {
+				a.action(loginOpenKey(p.ID), func() (string, error) {
+					return command(a.ctx, "xdg-open", link)
+				}, nil)
+			}
+			if action.Button(c, "复制链接", action.ButtonProps{Size: theme.Small}).Clicked() {
+				c.WriteClipboard(link)
+				a.showToast("已复制链接")
+			}
+		})
+		display.Text(c, "在本机浏览器里完成授权后，登录命令会结束，这里随即重新检查。", display.TextProps{Type: display.TextSecondary, FontSize: 12})
+		fieldError(c, a.errors[loginOpenKey(p.ID)])
+	})
 }
 
 func (a *app) loginTerminal(c *ui.Context, p *loginPanel) {
