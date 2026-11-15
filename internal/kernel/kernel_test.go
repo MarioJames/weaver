@@ -308,7 +308,8 @@ func TestWaitReturnsAtOnceWhenNothingCanArrive(t *testing.T) {
 func TestTimerSetBeforeRestartFiresAfterIt(t *testing.T) {
 	f := newFixture(t)
 	m := f.mission()
-	due := time.Now().Add(600 * time.Millisecond)
+	// Timers are stored in milliseconds, so compare against the stored precision.
+	due := time.Now().Add(600 * time.Millisecond).Truncate(time.Millisecond)
 	if _, err := f.k.SetTimer("", m, due, "看一眼构建"); err != nil {
 		t.Fatal(err)
 	}
