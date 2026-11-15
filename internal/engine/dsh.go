@@ -32,6 +32,18 @@ func dshNative(a Account) bool {
 	return a.Provider == "" || a.Provider == "deepseek" || a.Provider == "deepseek-official"
 }
 
+// DSHNative reports whether an account uses dsh's built-in DeepSeek route.
+func DSHNative(a Account) bool { return dshNative(a) }
+
+// DSHAPI returns the protocol an account's provider implies.
+func DSHAPI(a Account) string { return dshAPI(a) }
+
+// DSHEndpoint returns the default protocol and base URL of a known vendor.
+func DSHEndpoint(provider string) (api, base string, ok bool) {
+	e, ok := dshEndpoints[provider]
+	return e.api, e.base, ok
+}
+
 func dshAPI(a Account) string {
 	switch a.Protocol {
 	case "anthropic", "anthropic-messages":

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,6 +55,10 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
   weaver account list | check [<账号>] | login <账号> | pause <账号> --for 30m [--reason <原因>] | resume <账号> | remove <账号>
   weaver account add --engine <引擎> --kind subscription|api [--id <ID>] [--label <名称>] [--auth-dir <目录>] [--api-key-env <环境变量名>] [--base-url <地址>] [--provider <名称>] [--protocol <协议>]
   weaver account set <账号> [--label <名称>] [--enabled true|false] [--api-key-env <环境变量名>] [--base-url <地址>]
+  weaver account config <账号>                  读回渠道配置（不含密钥）
+  weaver account models <账号>                  从渠道接口拉取模型清单
+  weaver account usage <账号> [--admin-key-env <环境变量名>] [--clear-admin-key] [--balance <美元>] [--clear-balance] [--alert-below <美元>] [--interval 5m|0]
+                                            不带参数时立即查询一次用量；管理密钥只从环境变量名读取
   weaver account import-legacy [--from <旧库路径>] [--owner claude_owner]
   weaver worker list | remove <候选>
   weaver worker set <候选> [--engine <引擎>] [--model <模型>] [--effort <强度>] [--weight <权重>] [--max-parallel <数量>] [--enabled true|false] [--accounts <账号,账号>]
@@ -96,7 +101,8 @@ type args struct {
 	pos   []string
 }
 
-var switches = map[string]bool{"all": true, "follow": true, "stderr": true, "no-notify": true, "help": true}
+var switches = map[string]bool{"all": true, "follow": true, "stderr": true, "no-notify": true, "help": true,
+	"clear-admin-key": true, "clear-balance": true}
 
 func parse(argv []string) (*args, error) {
 	a := &args{flags: map[string]string{}}
@@ -638,6 +644,97 @@ func run(argv []string) error {
 			return err
 		}
 		return login(id)
+	case "account config":
+		id, err := a.arg(0, "账号")
+		if err != nil {
+			return err
+		}
+		return call("account.config", map[string]any{"id": id})
+	case "account models":
+		id, err := a.arg(0, "账号")
+		if err != nil {
+			return err
+		}
+		return call("account.models", map[string]any{"id": id})
+	case "account usage":
+		if err := a.allow("admin-key-env", "clear-admin-key", "balance", "clear-balance", "alert-below", "interval"); err != nil {
+			return err
+		}
+		id, err := a.arg(0, "账号")
+		if err != nil {
+			return err
+		}
+		params := map[string]any{"id": id}
+		changed := false
+		money := func(flag string) (float64, error) {
+			v, err := strconv.ParseFloat(a.get(flag), 64)
+			if err != nil || math.IsNaN(v) || math.IsInf(v, 0) {
+				return 0, fmt.Errorf("--%s 需要金额，例如 5.00", flag)
+			}
+			return v, nil
+		}
+		if a.has("admin-key-env") {
+			if a.has("clear-admin-key") {
+				return errors.New("--admin-key-env 和 --clear-admin-key 不能同时使用")
+			}
+			name := a.get("admin-key-env")
+			if name == "" {
+				return errors.New("--admin-key-env 需要环境变量名")
+			}
+			value := os.Getenv(name)
+			if value == "" {
+				return fmt.Errorf("环境变量 %s 是空的", name)
+			}
+			params["adminKey"] = value
+			changed = true
+		}
+		if a.has("clear-admin-key") {
+			params["adminKey"] = ""
+			changed = true
+		}
+		if a.has("balance") {
+			if a.has("clear-balance") {
+				return errors.New("--balance 和 --clear-balance 不能同时使用")
+			}
+			v, err := money("balance")
+			if err != nil {
+				return err
+			}
+			params["balance"] = v
+			changed = true
+		}
+		if a.has("clear-balance") {
+			params["balance"] = nil
+			changed = true
+		}
+		if a.has("alert-below") {
+			v, err := money("alert-below")
+			if err != nil {
+				return err
+			}
+			params["alertBelow"] = v
+			changed = true
+		}
+		if a.has("interval") {
+			value := a.get("interval")
+			seconds := 0
+			if value != "0" {
+				d, err := time.ParseDuration(value)
+				if err != nil || d <= 0 {
+					return errors.New("--interval 需要时长，例如 5m；0 表示只手动查询")
+				}
+				seconds = int(d.Round(time.Second) / time.Second)
+				if seconds < 1 {
+					seconds = 1
+				}
+			}
+			params["interval"] = seconds
+			changed = true
+		}
+		if !changed {
+			return call("account.usage", params)
+		}
+		return call("account.usage.set", params)
 	case "account import-legacy":
 		from := a.get("from")
 		if from == "" {

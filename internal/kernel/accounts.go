@@ -173,7 +173,9 @@ func (k *Kernel) Accounts() ([]*Account, error) {
 		now := k.ms()
 		rows, err := k.db.Query(`SELECT a.id, a.engine, a.kind, a.label, a.auth_dir, a.api_key<>'', a.config<>'', a.base_url, a.provider, a.protocol, a.enabled, a.ready, a.ready_reason,
 			COALESCE(a.checked_at,0), COALESCE(a.paused_until,0), a.pause_reason,
-			(SELECT COUNT(*) FROM attempts t WHERE t.account_id=a.id AND t.state IN (?,?))
+			(SELECT COUNT(*) FROM attempts t WHERE t.account_id=a.id AND t.state IN (?,?)),
+			a.admin_key<>'', a.config, a.balance_usd, a.balance_at, a.alert_below_usd,
+			a.usage_interval_s, a.usage_spent_month_usd, a.usage_since_balance_usd, a.usage_checked_at, a.usage_error
 			FROM accounts a ORDER BY a.created_at, a.id`, StateLaunch, StateRunning)
 		if err != nil {
 			return err
@@ -181,13 +183,20 @@ func (k *Kernel) Accounts() ([]*Account, error) {
 		defer rows.Close()
 		for rows.Next() {
 			a := &Account{}
+			var configText, usageError string
+			var balance, alert, spent, since sql.NullFloat64
+			var balanceAt, usageChecked sql.NullInt64
+			var interval int
 			if err := rows.Scan(&a.ID, &a.Engine, &a.Kind, &a.Label, &a.AuthDir, &a.HasAPIKey, &a.HasConfig, &a.BaseURL, &a.Provider, &a.Protocol, &a.Enabled, &a.Ready, &a.ReadyReason,
-				&a.CheckedAt, &a.PausedUntil, &a.PauseReason, &a.Running); err != nil {
+				&a.CheckedAt, &a.PausedUntil, &a.PauseReason, &a.Running,
+				&a.HasAdminKey, &configText, &balance, &balanceAt, &alert, &interval, &spent, &since, &usageChecked, &usageError); err != nil {
 				return err
 			}
 			if a.PausedUntil <= now {
 				a.PausedUntil, a.PauseReason = 0, ""
 			}
+			a.Usage = usageView(a.HasAdminKey, engine.Account{Engine: a.Engine, Kind: a.Kind, Config: configText, BaseURL: a.BaseURL, Provider: a.Provider, Protocol: a.Protocol},
+				balance, balanceAt, alert, interval, spent, since, usageChecked, usageError)
 			out = append(out, a)
 		}
 		return rows.Err()
@@ -390,6 +399,11 @@ func (k *Kernel) SetWorker(in WorkerInput) (*Worker, error) {
 				if _, err := t.Exec(`INSERT INTO worker_accounts(worker_id, account_id, position) VALUES(?,?,?)`, in.ID, account, i); err != nil {
 					return err
 				}
+			}
+		}
+		if engineKind == "dsh" {
+			if err := k.validateDshWorker(t, in.ID); err != nil {
+				return err
 			}
 		}
 		return t.dispatch()

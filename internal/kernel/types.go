@@ -212,24 +212,65 @@ type Timer struct {
 
 // Account is a stored engine account without its secret material.
 type Account struct {
+	ID          string        `json:"id"`
+	Engine      string        `json:"engine"`
+	Kind        string        `json:"kind"`
+	Label       string        `json:"label,omitempty"`
+	AuthDir     string        `json:"authDir,omitempty"`
+	HasAPIKey   bool          `json:"hasApiKey,omitempty"`
+	HasConfig   bool          `json:"hasConfig,omitempty"`
+	HasAdminKey bool          `json:"hasAdminKey,omitempty"`
+	BaseURL     string        `json:"baseUrl,omitempty"`
+	Provider    string        `json:"provider,omitempty"`
+	Protocol    string        `json:"protocol,omitempty"`
+	Enabled     bool          `json:"enabled"`
+	Ready       bool          `json:"ready"`
+	ReadyReason string        `json:"readyReason,omitempty"`
+	CheckedAt   int64         `json:"checkedAt,omitempty"`
+	PausedUntil int64         `json:"pausedUntil,omitempty"`
+	PauseReason string        `json:"pauseReason,omitempty"`
+	Running     int           `json:"running"`
+	Resident    string        `json:"resident,omitempty"`
+	Usage       *AccountUsage `json:"usage,omitempty"`
+}
+
+// AccountUsage is the spend and balance view of one API channel. Amounts are
+// in US dollars. It is omitted from an account until the channel is configured
+// for usage queries (an admin key) or carries a recorded balance.
+type AccountUsage struct {
+	Supported  bool     `json:"supported"`
+	Provider   string   `json:"provider,omitempty"`
+	SpentMonth *float64 `json:"spentMonth,omitempty"`
+	Balance    *float64 `json:"balance,omitempty"`
+	BalanceAt  int64    `json:"balanceAt,omitempty"`
+	Remaining  *float64 `json:"remaining,omitempty"`
+	AlertBelow *float64 `json:"alertBelow,omitempty"`
+	Low        bool     `json:"low,omitempty"`
+	Interval   int      `json:"interval"`
+	CheckedAt  int64    `json:"checkedAt,omitempty"`
+	Error      string   `json:"error,omitempty"`
+}
+
+// AccountConfigView is a channel read back for editing: the native JSON config
+// as an object, with every apiKey field removed. Secrets never appear here.
+type AccountConfigView struct {
 	ID          string `json:"id"`
 	Engine      string `json:"engine"`
 	Kind        string `json:"kind"`
-	Label       string `json:"label,omitempty"`
-	AuthDir     string `json:"authDir,omitempty"`
-	HasAPIKey   bool   `json:"hasApiKey,omitempty"`
-	HasConfig   bool   `json:"hasConfig,omitempty"`
-	BaseURL     string `json:"baseUrl,omitempty"`
 	Provider    string `json:"provider,omitempty"`
 	Protocol    string `json:"protocol,omitempty"`
-	Enabled     bool   `json:"enabled"`
-	Ready       bool   `json:"ready"`
-	ReadyReason string `json:"readyReason,omitempty"`
-	CheckedAt   int64  `json:"checkedAt,omitempty"`
-	PausedUntil int64  `json:"pausedUntil,omitempty"`
-	PauseReason string `json:"pauseReason,omitempty"`
-	Running     int    `json:"running"`
-	Resident    string `json:"resident,omitempty"`
+	BaseURL     string `json:"baseUrl,omitempty"`
+	HasAPIKey   bool   `json:"hasApiKey"`
+	HasAdminKey bool   `json:"hasAdminKey"`
+	Config      any    `json:"config"`
+}
+
+// ModelInfo is one model offered by a channel's models endpoint.
+type ModelInfo struct {
+	ID            string `json:"id"`
+	Name          string `json:"name,omitempty"`
+	ContextWindow int    `json:"contextWindow,omitempty"`
+	MaxTokens     int    `json:"maxTokens,omitempty"`
 }
 
 // Worker is a routing candidate: one engine, model and effort on a set of accounts.

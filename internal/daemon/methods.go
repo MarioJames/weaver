@@ -293,6 +293,19 @@ var methods = map[string]handler{
 		}
 		return s.withResidents(accounts), nil
 	}),
+	"account.config": simple(func(s *Server, p struct {
+		ID string `json:"id"`
+	}) (any, error) {
+		return s.kernel.AccountConfig(p.ID)
+	}),
+	"account.models": simple(func(s *Server, p kernel.ModelFetchInput) (any, error) { return s.kernel.FetchModels(p) }),
+	"account.usage":  simple(func(s *Server, p struct{ ID string }) (any, error) { return s.kernel.QueryAccountUsage(p.ID) }),
+	"account.usage.set": simple(func(s *Server, p struct {
+		ID string `json:"id"`
+		kernel.UsagePatch
+	}) (any, error) {
+		return s.kernel.SetAccountUsage(p.ID, p.UsagePatch)
+	}),
 	"account.pause": simple(func(s *Server, p struct {
 		ID     string `json:"id"`
 		ForMs  int64  `json:"forMs"`

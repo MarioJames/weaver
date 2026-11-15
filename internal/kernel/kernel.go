@@ -67,6 +67,9 @@ type Kernel struct {
 	actMu    sync.Mutex
 	activity map[string]*activity
 
+	usageMu   sync.Mutex
+	usageRuns map[string]chan struct{}
+
 	timerKick chan struct{}
 	stop      chan struct{}
 	stopOnce  sync.Once
@@ -86,7 +89,7 @@ func New(o Options) *Kernel {
 	k := &Kernel{
 		db: o.DB, home: o.Home, eng: o.Engines, push: o.Push, check: o.Check, log: o.Log, now: o.Now,
 		subs: map[string]map[chan struct{}]struct{}{}, waiters: map[string]int{}, pushing: map[string]bool{},
-		activity: map[string]*activity{}, timerKick: make(chan struct{}, 1), stop: make(chan struct{}),
+		activity: map[string]*activity{}, usageRuns: map[string]chan struct{}{}, timerKick: make(chan struct{}, 1), stop: make(chan struct{}),
 	}
 	if k.now == nil {
 		k.now = time.Now
