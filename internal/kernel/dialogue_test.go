@@ -2,6 +2,8 @@ package kernel
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -9,8 +11,9 @@ import (
 	"github.com/MarioJames/weaver/internal/engine"
 )
 
-// dialogueFixture adds a rated claude candidate next to the codex ones.
+// dialogueFixture adds a rated claude candidate and both dialogue seats.
 func dialogueFixture(t *testing.T) *fixture {
+	t.Helper()
 	f := newFixture(t)
 	zero := 5.0
 	if _, err := f.k.AddAccount(AccountInput{ID: "acct-claude", Engine: "claude", Kind: "api", APIKey: "k", Label: "claude"}); err != nil {
@@ -18,6 +21,15 @@ func dialogueFixture(t *testing.T) *fixture {
 	}
 	if _, err := f.k.SetWorker(WorkerInput{ID: "claude_w", Engine: "claude", Model: "m", Intelligence: &zero, Accounts: []string{"acct-claude"}}); err != nil {
 		t.Fatal(err)
+	}
+
+	for _, seat := range []struct{ id, engine, account, model, effort string }{
+		{"debater_a", "codex", "acct-alpha", "top-a", "high"},
+		{"debater_b", "claude", "acct-claude", "top-b", "max"},
+	} {
+		if _, err := f.k.SetWorker(WorkerInput{ID: seat.id, Engine: seat.engine, Model: seat.model, Effort: &seat.effort, Accounts: []string{seat.account}}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return f
 }
@@ -155,8 +167,8 @@ func TestDialogueRunsProposalsThenCrossReviewAndWakesOnlyAtTheEnd(t *testing.T) 
 func TestDialogueNeedsTwoDifferentReadySides(t *testing.T) {
 	f := newFixture(t) // codex only
 	m := f.mission()
-	if _, err := f.k.StartDialogue("", DialogueInput{Mission: m, Brief: "x"}); err == nil || !strings.Contains(AsError(err).Message, "claude") {
-		t.Fatalf("without a claude candidate the dialogue must be refused and say so, got %v", err)
+	if _, err := f.k.StartDialogue("", DialogueInput{Mission: m, Brief: "x"}); err == nil || !strings.Contains(AsError(err).Message, "甲方") {
+		t.Fatalf("without dialogue seats the dialogue must be refused and say so, got %v", err)
 	}
 	if ps, _ := f.k.Packages(m); len(ps) != 0 {
 		t.Fatalf("a refused dialogue created %d packages", len(ps))
@@ -211,5 +223,186 @@ func TestDialogueContinuesAfterAFailedSideIsRetried(t *testing.T) {
 	}
 	if tr, _ := f.k.Dialogue(m, ""); tr.State != "running" {
 		t.Fatalf("state = %s, want running", tr.State)
+	}
+}
+
+func TestDialogueDebaterPinsAndAttemptConfigurationA28(t *testing.T) {
+	f := dialogueFixture(t)
+	d, err := f.k.StartDialogue("", DialogueInput{Mission: f.mission(), Brief: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, p := range d.Packages {
+		id, model, effort, label := "debater_a", "top-a", "high", "甲方"
+		if i%2 == 1 {
+			id, model, effort, label = "debater_b", "top-b", "max", "乙方"
+		}
+		if p.Worker != id || p.Engine != "" || !strings.Contains(p.Title, label) {
+			t.Fatalf("package: %+v", p)
+		}
+		if i < 2 {
+			full, err := f.k.Package(p.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if full.Current == nil || full.Current.Worker != id || full.Current.Model != model || full.Current.Effort != effort {
+				t.Fatalf("attempt: %+v", full.Current)
+			}
+		}
+	}
+}
+
+func TestDebatersExcludedFromAutomaticAndEngineRoutingA29(t *testing.T) {
+	f := dialogueFixture(t)
+	// The seats are idle while the execution candidates carry load; they must
+	// stay out of automatic and engine-pinned routing all the same.
+	var packages []PackageInput
+	for i := 0; i < 20; i++ {
+		packages = append(packages, PackageInput{Intelligence: 1, Key: fmt.Sprintf("auto%d", i), Instruction: "x"})
+	}
+	for i, e := range []string{"codex", "codex", "claude", "claude"} {
+		packages = append(packages, PackageInput{Intelligence: 1, Key: fmt.Sprintf("engine%d", i), Instruction: "x", Engine: e})
+	}
+	ids := f.submit(f.mission(), packages...)
+	for _, id := range ids {
+		p, err := f.k.Package(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.Current == nil {
+			t.Fatalf("package did not launch: %+v", p)
+		}
+		if p.Current.Worker == "debater_a" || p.Current.Worker == "debater_b" {
+			t.Fatalf("routed to seat: %+v", p.Current)
+		}
+	}
+}
+
+func TestDialogueRejectsUnconfiguredDebatersAtomicallyA30(t *testing.T) {
+	for _, reason := range []string{"missing", "disabled", "unbound", "account-disabled", "not-ready", "paused"} {
+		t.Run(reason, func(t *testing.T) {
+			f := dialogueFixture(t)
+			err := f.k.write(func(tx *tx) error {
+				var err error
+				switch reason {
+				case "missing":
+					_, err = tx.Exec("DELETE FROM workers WHERE id='debater_b'")
+				case "disabled":
+					_, err = tx.Exec("UPDATE workers SET enabled=0 WHERE id='debater_b'")
+				case "unbound":
+					_, err = tx.Exec("DELETE FROM worker_accounts WHERE worker_id='debater_b'")
+				case "account-disabled":
+					_, err = tx.Exec("UPDATE accounts SET enabled=0 WHERE id='acct-claude'")
+				case "not-ready":
+					_, err = tx.Exec("UPDATE accounts SET ready=0,ready_reason='需要登录' WHERE id='acct-claude'")
+				case "paused":
+					_, err = tx.Exec("UPDATE accounts SET paused_until=?,pause_reason='限流' WHERE id='acct-claude'", tx.now+60000)
+				}
+				return err
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			m := f.mission()
+			_, err = f.k.StartDialogue("", DialogueInput{Mission: m, Brief: "x"})
+			want := map[string]string{"missing": "不存在", "disabled": "已停用", "unbound": "没有绑定账号", "account-disabled": "账号「claude」已停用", "not-ready": "需要登录", "paused": "限流"}[reason]
+			if err == nil || AsError(err).Code != "INVALID" || !strings.Contains(err.Error(), "乙方") || !strings.Contains(err.Error(), want) || !strings.Contains(err.Error(), "--workers") || !strings.Contains(err.Error(), "对谈人") {
+				t.Fatalf("error: %v", err)
+			}
+			ps, err := f.k.Packages(m)
+			if err != nil || len(ps) != 0 {
+				t.Fatalf("packages=%v err=%v", ps, err)
+			}
+		})
+	}
+}
+
+func TestDebaterConfigurationAndRole(t *testing.T) {
+	f := dialogueFixture(t)
+	rated := 9.0
+	if _, err := f.k.SetWorker(WorkerInput{ID: "debater_a", Intelligence: &rated}); err == nil || AsError(err).Code != "INVALID" || !strings.Contains(err.Error(), "对谈人不参与选路") {
+		t.Fatalf("rated seat: %v", err)
+	}
+	// Changing a seat's engine must replace the model and accounts with it.
+	for _, in := range []WorkerInput{{ID: "debater_a", Engine: "claude"}, {ID: "debater_a", Engine: "claude", Model: "changed"}, {ID: "debater_a", Engine: "claude", Accounts: []string{"acct-claude"}}} {
+		if _, err := f.k.SetWorker(in); err == nil || AsError(err).Code != "INVALID" {
+			t.Fatalf("partial engine change accepted: %+v: %v", in, err)
+		}
+	}
+	w, err := f.k.SetWorker(WorkerInput{ID: "debater_a", Engine: "claude", Model: "changed", Accounts: []string{"acct-claude"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.Engine != "claude" || w.Intelligence != 0 {
+		t.Fatalf("seat: %+v", w)
+	}
+	for _, id := range []string{"debater_a", "debater_b", "alpha"} {
+		w, err := f.k.Worker(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := json.Marshal(w)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body map[string]any
+		if err = json.Unmarshal(b, &body); err != nil {
+			t.Fatal(err)
+		}
+		role := "debater"
+		if id == "alpha" {
+			role = "worker"
+		}
+		if body["role"] != role {
+			t.Fatalf("%s JSON: %s", id, b)
+		}
+	}
+	if _, err := f.k.SetWorker(WorkerInput{ID: "alpha", Engine: "claude", Accounts: []string{"acct-claude"}}); err == nil {
+		t.Fatal("ordinary engine changed")
+	}
+	if err := f.k.RemoveWorker("debater_a"); err != nil {
+		t.Fatal(err)
+	}
+	for _, in := range []WorkerInput{
+		{ID: "debater_a"}, {ID: "debater_a", Engine: "codex"}, {ID: "debater_a", Engine: "codex", Model: "m"},
+	} {
+		if _, err := f.k.SetWorker(in); err == nil {
+			t.Fatalf("incomplete seat accepted: %+v", in)
+		}
+	}
+	_, err = f.k.StartDialogue("", DialogueInput{Mission: f.mission(), Brief: "x"})
+	if err == nil || !strings.Contains(err.Error(), "甲方") {
+		t.Fatalf("removed seat: %v", err)
+	}
+}
+
+func TestDialogueRoundsSetting(t *testing.T) {
+	f := dialogueFixture(t)
+	if got := f.k.Setting("dialogue_rounds"); got != "1" {
+		t.Fatalf("default=%q", got)
+	}
+	for _, v := range []string{"0", "4", "-1", "x", "01", ""} {
+		if err := f.k.SetSetting("dialogue_rounds", v); err == nil {
+			t.Fatalf("accepted %q", v)
+		}
+	}
+	for _, v := range []string{"1", "2", "3"} {
+		if err := f.k.SetSetting("dialogue_rounds", v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d, err := f.k.StartDialogue("", DialogueInput{Mission: f.mission(), Brief: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Packages) != 8 {
+		t.Fatalf("rounds setting ignored: %d", len(d.Packages))
+	}
+	d, err = f.k.StartDialogue("", DialogueInput{Mission: f.mission(), Brief: "x", Rounds: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Packages) != 4 {
+		t.Fatalf("explicit rounds ignored: %d", len(d.Packages))
 	}
 }

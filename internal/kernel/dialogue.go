@@ -3,6 +3,7 @@ package kernel
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -16,8 +17,8 @@ type DialogueInput struct {
 	Mission string   `json:"mission"`
 	Name    string   `json:"name"`    // key prefix; several dialogues may live in one mission
 	Brief   string   `json:"brief"`   // the question, its constraints and what a good answer settles
-	Rounds  int      `json:"rounds"`  // exchanges after the proposals: 1 (default) to 3
-	Workers []string `json:"workers"` // two candidates; default: one codex and one claude candidate
+	Rounds  int      `json:"rounds"`  // exchanges after the proposals: 1 to 3; zero uses dialogue_rounds
+	Workers []string `json:"workers"` // two candidates; default: debater_a and debater_b
 }
 
 // DialogueResult reports the packages a dialogue created.
@@ -84,7 +85,7 @@ func (k *Kernel) StartDialogue(key string, in DialogueInput) (*DialogueResult, e
 		return nil, errf("INVALID", "对谈说明超过 %d 字节", maxBrief)
 	}
 	if in.Rounds == 0 {
-		in.Rounds = 1
+		in.Rounds, _ = strconv.Atoi(k.Setting("dialogue_rounds"))
 	}
 	if in.Rounds < 1 || in.Rounds > maxDialogueRounds {
 		return nil, errf("INVALID", "交换轮数只能是 1 到 %d", maxDialogueRounds)
@@ -97,22 +98,50 @@ func (k *Kernel) StartDialogue(key string, in DialogueInput) (*DialogueResult, e
 	}
 	out := &DialogueResult{}
 	err := k.keyed(key, "dialogue.start", out, func(t *tx) error {
-		// Pin each side to its named or highest-rated enabled candidate.
+		// Default dialogues require both seats to be configured before creating a plan.
 		type side struct{ worker, engine, label string }
-		sides := []side{{engine: "codex", label: "codex"}, {engine: "claude", label: "claude"}}
+		sides := []side{{worker: "debater_a", label: "甲方"}, {worker: "debater_b", label: "乙方"}}
 		if len(in.Workers) == 2 {
 			sides = []side{{worker: in.Workers[0], label: in.Workers[0]}, {worker: in.Workers[1], label: in.Workers[1]}}
 		} else {
-			for i := range sides {
-				s := &sides[i]
-				err := t.QueryRow(`SELECT id FROM workers WHERE engine=? AND enabled=1 AND intelligence>0 ORDER BY intelligence DESC, position, id LIMIT 1`, s.engine).Scan(&s.worker)
-				if err == sql.ErrNoRows {
-					return errf("INVALID", "对谈默认由 codex 和 claude 各出一方，但没有启用且已评分的 %s 候选；请先评分，或用 --workers 指定两个候选", s.engine)
-				}
-				if err != nil {
+			rt, err := t.loadRouting()
+			if err != nil {
+				return err
+			}
+			for _, s := range sides {
+				var enabled bool
+				err := t.QueryRow(`SELECT enabled FROM workers WHERE id=?`, s.worker).Scan(&enabled)
+				reason := ""
+				switch {
+				case err == sql.ErrNoRows:
+					reason = "席位不存在"
+				case err != nil:
 					return err
+				case !enabled:
+					reason = "席位已停用"
+				default:
+					for _, w := range rt.Workers {
+						if w.ID != s.worker {
+							continue
+						}
+						reason = "没有绑定账号"
+						if len(w.Accounts) > 0 {
+							var reasons []string
+							for _, a := range w.Accounts {
+								if a.Ready {
+									reasons = nil
+									break
+								}
+								reasons = append(reasons, a.Reason)
+							}
+							reason = strings.Join(reasons, "；")
+						}
+						break
+					}
 				}
-				s.label = s.worker
+				if reason != "" {
+					return errf("INVALID", "%s对谈人：%s；在图形界面候选页的「对谈人」里配置，或用 --workers 临时指定两个候选", s.label, reason)
+				}
 			}
 		}
 		last := in.Rounds + 1

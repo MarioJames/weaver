@@ -342,6 +342,9 @@ func (k *Kernel) SetWorker(in WorkerInput) (*Worker, error) {
 	if !idPattern.MatchString(in.ID) {
 		return nil, errf("INVALID", "候选 ID %q 不合法", in.ID)
 	}
+	if isDebater(in.ID) && in.Intelligence != nil && *in.Intelligence != 0 {
+		return nil, errf("INVALID", "对谈人不参与选路，不需要能力分")
+	}
 	err := k.write(func(t *tx) error {
 		var engineKind string
 		err := t.QueryRow(`SELECT engine FROM workers WHERE id=?`, in.ID).Scan(&engineKind)
@@ -367,7 +370,20 @@ func (k *Kernel) SetWorker(in WorkerInput) (*Worker, error) {
 			return err
 		} else {
 			if in.Engine != "" && in.Engine != engineKind {
-				return errf("INVALID", "候选 %s 的引擎是 %s，不能改成 %s；请新建候选", in.ID, engineKind, in.Engine)
+				if !isDebater(in.ID) {
+					return errf("INVALID", "候选 %s 的引擎是 %s，不能改成 %s；请新建候选", in.ID, engineKind, in.Engine)
+				}
+				if !engine.Known(in.Engine) {
+					return errf("INVALID", "不支持的引擎 %q，可用：%s", in.Engine, strings.Join(engine.Kinds(), "、"))
+				}
+				// The old engine's model and accounts mean nothing on the new one.
+				if in.Model == "" || len(in.Accounts) == 0 {
+					return errf("INVALID", "对谈人换引擎时需要同时指定模型和该引擎的账号")
+				}
+				if _, err := t.Exec(`UPDATE workers SET engine=? WHERE id=?`, in.Engine, in.ID); err != nil {
+					return err
+				}
+				engineKind = in.Engine
 			}
 			if in.Model != "" {
 				if _, err := t.Exec(`UPDATE workers SET model=? WHERE id=?`, in.Model, in.ID); err != nil {
@@ -484,6 +500,10 @@ func (k *Kernel) Workers() ([]*Worker, error) {
 				rows.Close()
 				return err
 			}
+			w.Role = "worker"
+			if isDebater(w.ID) {
+				w.Role = "debater"
+			}
 			out = append(out, w)
 		}
 		rows.Close()
@@ -540,6 +560,7 @@ func (k *Kernel) Workers() ([]*Worker, error) {
 // Settings the kernel understands, with their defaults.
 var settingDefaults = map[string]string{
 	"archive_after_days": "7",
+	"dialogue_rounds":    "1",
 	"max_parallel":       fmt.Sprint(defaultMaxParallel),
 	"stall_seconds":      fmt.Sprint(int(defaultStall.Seconds())),
 	"resident":           "on",
@@ -580,6 +601,10 @@ func (k *Kernel) Setting(key string) string {
 
 func (k *Kernel) SetSetting(key, value string) error {
 	switch key {
+	case "dialogue_rounds":
+		if value != "1" && value != "2" && value != "3" {
+			return errf("INVALID", "dialogue_rounds 只能是 1、2、3")
+		}
 	case "archive_after_days":
 		switch value {
 		case "0", "1", "3", "7", "30":

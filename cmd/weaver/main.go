@@ -36,7 +36,7 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
 
 对谈                                          两个候选各出方案、互相评审，只在最终立场给出时唤醒
   weaver dialogue start --mission <主任务> [--name <名称>] [--rounds 1-3] [--workers <候选,候选>] [--brief-file <说明.md>] [--key <幂等编号>]
-                                        说明默认从标准输入读；默认由 codex 和 claude 各出一方
+                                        说明默认从标准输入读；默认使用甲方、乙方对谈人席位；--rounds 缺省取 dialogue_rounds 设置
   weaver dialogue show --mission <主任务> [--name <名称>]     两方各轮的全文
 
 进度与唤醒

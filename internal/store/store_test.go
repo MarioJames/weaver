@@ -263,3 +263,76 @@ func TestIntelligenceMigrationUpgradesAndReopens(t *testing.T) {
 		db.Close()
 	}
 }
+
+func TestMigrationDebaterSeats(t *testing.T) {
+	for _, mode := range []string{"empty", "candidates", "existing"} {
+		t.Run(mode, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "weaver.db")
+			db, err := Open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			body, err := migrations.ReadFile("migrations/0007_debaters.sql")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var count int
+			if err = db.QueryRow(`SELECT COUNT(*) FROM workers WHERE id IN ('debater_a','debater_b')`).Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+			if count != 0 {
+				t.Fatalf("database without candidates has %d seats", count)
+			}
+			if mode == "empty" {
+				return
+			}
+			// Candidates as an installation rated them before upgrading.
+			_, err = db.Exec(`
+				INSERT INTO accounts(id,engine,kind,created_at) VALUES('c','codex','api',0),('h','claude','api',0);
+				INSERT INTO workers(id,engine,model,effort,intelligence,position,enabled) VALUES
+				('low','codex','low','low',4,0,1),
+				('later','codex','later','medium',9,5,1),
+				('best','codex','top','high',9,2,1),
+				('off','codex','off','max',10,0,0),
+				('claude','claude','opus','max',7,3,1);
+				INSERT INTO worker_accounts VALUES('best','c',3),('claude','h',2);
+			`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode == "existing" {
+				if _, err := db.Exec(`INSERT INTO workers(id,engine,model,effort,enabled) VALUES('debater_a','codex','custom','custom',0); INSERT INTO worker_accounts VALUES('debater_a','h',7)`); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// Running it twice also proves it leaves existing seats and bindings alone.
+			for i := 0; i < 2; i++ {
+				if _, err = db.Exec(string(body)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, seat := range []struct {
+				id, engine, model, effort, account string
+				enabled, position                  int
+			}{
+				{"debater_a", "codex", "top", "high", "c", 1, 3},
+				{"debater_b", "claude", "opus", "max", "h", 1, 2},
+			} {
+				if mode == "existing" && seat.id == "debater_a" {
+					seat.model, seat.effort, seat.account, seat.enabled, seat.position = "custom", "custom", "h", 0, 7
+				}
+				var engine, model, effort, account string
+				var intelligence float64
+				var enabled, position, bindings int
+				err = db.QueryRow(`SELECT w.engine,w.model,w.effort,w.intelligence,w.enabled,wa.account_id,wa.position,(SELECT COUNT(*) FROM worker_accounts WHERE worker_id=w.id) FROM workers w JOIN worker_accounts wa ON wa.worker_id=w.id WHERE w.id=?`, seat.id).Scan(&engine, &model, &effort, &intelligence, &enabled, &account, &position, &bindings)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if engine != seat.engine || model != seat.model || effort != seat.effort || intelligence != 0 || enabled != seat.enabled || account != seat.account || position != seat.position || bindings != 1 {
+					t.Fatalf("%s: %s %s %s intelligence=%g enabled=%d account=%s position=%d bindings=%d", seat.id, engine, model, effort, intelligence, enabled, account, position, bindings)
+				}
+			}
+		})
+	}
+}

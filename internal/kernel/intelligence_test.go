@@ -196,7 +196,9 @@ func TestRoutingNoteInAttemptAndLaunchingEvent(t *testing.T) {
 	}
 	t.Fatal("missing launching event")
 }
-func TestDialogueChoosesHighestRatedWorkers(t *testing.T) {
+
+// The default dialogue runs on the two seats; candidate ratings do not move it.
+func TestDialogueDefaultUsesSeatsWhateverTheRatings(t *testing.T) {
 	f := dialogueFixture(t)
 	score := 8.5
 	if _, err := f.k.SetWorker(WorkerInput{ID: "beta", Intelligence: &score}); err != nil {
@@ -207,9 +209,9 @@ func TestDialogueChoosesHighestRatedWorkers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, p := range d.Packages {
-		want := "beta"
+		want := "debater_a"
 		if i%2 == 1 {
-			want = "claude_w"
+			want = "debater_b"
 		}
 		if p.Worker != want || p.Intelligence != 9 {
 			t.Fatalf("%+v", p)
@@ -219,8 +221,8 @@ func TestDialogueChoosesHighestRatedWorkers(t *testing.T) {
 	if _, err := f.k.SetWorker(WorkerInput{ID: "claude_w", Intelligence: &score}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.k.StartDialogue("", DialogueInput{Mission: f.mission(), Brief: "Compare"}); err == nil || !strings.Contains(err.Error(), "评分") {
-		t.Fatal(err)
+	if _, err := f.k.StartDialogue("", DialogueInput{Mission: f.mission(), Brief: "Compare"}); err != nil {
+		t.Fatalf("an unrated candidate must not stop a dialogue on the seats: %v", err)
 	}
 }
 

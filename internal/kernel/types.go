@@ -322,6 +322,7 @@ type ModelInfo struct {
 
 // Worker is a routing candidate: one engine, model and effort on a set of accounts.
 type Worker struct {
+	Role         string      `json:"role"`
 	Stats        WorkerStats `json:"stats"`
 	ID           string      `json:"id"`
 	Engine       string      `json:"engine"`
@@ -335,4 +336,9 @@ type Worker struct {
 	Running      int         `json:"running"`
 	Available    bool        `json:"available"`
 	Reason       string      `json:"reason,omitempty"`
+}
+
+// isDebater identifies the two reserved dialogue seats.
+func isDebater(id string) bool {
+	return id == "debater_a" || id == "debater_b"
 }

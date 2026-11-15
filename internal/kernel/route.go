@@ -60,6 +60,10 @@ func (r *routing) pick(pinWorker, pinEngine string, requirement float64) (*route
 				continue
 			}
 		} else {
+			// Dialogue seats serve only packages pinned to them.
+			if isDebater(w.ID) {
+				continue
+			}
 			if pinEngine != "" && w.Engine != pinEngine {
 				continue
 			}
