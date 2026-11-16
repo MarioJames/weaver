@@ -94,8 +94,13 @@ func TestTaskDialogueOneSideFails(t *testing.T) {
 func TestTaskConvorel(t *testing.T) {
 	f, _, tt := tasksTesterWith(t, 1180, 3000, withConvorel)
 	openTask(t, tt, "定时任务调度方案审查", "问 Convorel")
-	tasksContains(t, tt, "Convorel", "外部审查", "ChatGPT 6 Pro", "Cv", "父 Agent", "问 Convorel", "等待回复…",
+	tasksContains(t, tt, "Convorel", "外部审查", "ChatGPT 6 Pro", "父 Agent", "问 Convorel", "等待回复…",
 		"请审查 Weaver 新增定时任务管理的实现方案", "结论：方案方向可行", "查看全文 · 1800 字")
+	// Convorel speaks under its own mark, not a lettered placeholder.
+	tasksAbsent(t, tt, "Cv")
+	if _, ok := tt.Find("Convorel 标志"); !ok {
+		t.Errorf("没有画出 Convorel 标志")
+	}
 	if n := strings.Count(strings.Join(tt.Texts(), "\n"), "问 Convorel"); n != 2 {
 		t.Errorf("提问 %d 次，want 2", n)
 	}

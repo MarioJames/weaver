@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"unicode/utf8"
 
@@ -33,11 +34,20 @@ func taskRoleTag(c *ui.Context, role string) {
 	display.Tag(c, role, display.TagProps{Color: color, Size: theme.Small})
 }
 
+// convorelIconPNG is Convorel's default mark (交融版), byte for byte the
+// 256×256 file of its repository: docs/assets/brand/convorel-expressive-icon-256.png.
+//
+//go:embed assets/convorel-icon.png
+var convorelIconPNG []byte
+
+var convorelIcon = mustDecodeImage(convorelIconPNG)
+
+// taskConvorelMark is Convorel's avatar: its own mark, unscaled in proportion
+// and with its cut-outs open, on the same round seat the generated portraits use.
 func taskConvorelMark(c *ui.Context, size float32) {
 	tk := theme.TokensOf(c)
-	// BgSolid reverses in dark mode; the placeholder stays dark in both themes.
-	ui.Column(c).Size(size, size).Shrink(0).Radius(size / 4).Background(ui.RGB(0, 0, 0)).Center().Children(func() {
-		ui.Text(c, "Cv").FontSize(size * 0.4).FontWeight(700).TextColor(tk.TextLightSolid)
+	ui.Column(c).Size(size, size).Shrink(0).Radius(size / 2).Background(tk.FillTertiary).Center().Label("Convorel 标志").Children(func() {
+		ui.Image(c, convorelIcon).Size(size, size).Shrink(0)
 	})
 }
 
