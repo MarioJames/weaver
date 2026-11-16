@@ -31,7 +31,8 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
   weaver artifact add --mission <主任务> (--file <绝对路径> | --url <链接>) [--url <链接>] [--kind design|report|evidence|doc] [--title <标题>] [--package <key>]
   weaver artifact list --mission <主任务>
   weaver artifact remove <产物>
-  weaver plan submit --mission <主任务> [--file <计划.json>] [--key <幂等编号>]     计划默认从标准输入读；每个包必填 intelligence（1–10，步长 0.5，判断空间越大分值越高）
+  weaver plan submit --mission <主任务> [--file <计划.json>] [--key <幂等编号>]     计划默认从标准输入读；每个包必填 intelligence（1–10，步长 0.5，指令留给执行者的判断空间越大分值越高），
+                                        包交给够格的最低档候选；回执的 shape 是并行宽度，宽度不足或高分包过多时带 advice
                                         包可带 "advisory": true（只出文档、不改文件）和 "autoAccept": true（出结果即采纳并放行下游）
 
 对谈                                          两个候选各出方案、互相评审，只在最终立场给出时唤醒

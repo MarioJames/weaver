@@ -72,7 +72,12 @@ func checkWorkspace(dir string) error {
 // cycle, an unknown dependency or a duplicate key creates nothing.
 func (k *Kernel) SubmitPlan(key string, in PlanInput) (*PlanResult, error) {
 	out := &PlanResult{}
-	if err := k.keyed(key, "plan.submit", out, func(t *tx) error { return t.createPlan(&in, out) }); err != nil {
+	if err := k.keyed(key, "plan.submit", out, func(t *tx) error {
+		if err := t.createPlan(&in, out); err != nil {
+			return err
+		}
+		return t.shape(out)
+	}); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -237,6 +242,94 @@ func (t *tx) createPlan(in *PlanInput, out *PlanResult) error {
 		out.Packages = append(out.Packages, pkg)
 	}
 	return t.QueryRow(`SELECT COALESCE(MAX(seq),0) FROM events WHERE mission_id=?`, m.ID).Scan(&out.Cursor)
+}
+
+// shape measures a submitted plan and, when its form cannot beat the owner
+// doing the work, says why. Delegation only pays through width: a package
+// costs the owner an instruction and a verification, and costs the worker the
+// time to read its way in.
+func (t *tx) shape(out *PlanResult) error {
+	inPlan := map[string]bool{}
+	for _, p := range out.Packages {
+		inPlan[p.Key] = true
+	}
+	depth := map[string]int{}
+	var walk func(p *Package) int
+	byKey := map[string]*Package{}
+	for _, p := range out.Packages {
+		byKey[p.Key] = p
+	}
+	walk = func(p *Package) int {
+		if d := depth[p.Key]; d > 0 {
+			return d
+		}
+		d := 1
+		for _, dep := range p.DependsOn {
+			if inPlan[dep] {
+				d = max(d, walk(byKey[dep])+1)
+			}
+		}
+		depth[p.Key] = d
+		return d
+	}
+	s := PlanShape{Packages: len(out.Packages)}
+	pendingReady := 0
+	for _, p := range out.Packages {
+		s.Waves = max(s.Waves, walk(p))
+		if p.Intelligence >= 8 {
+			s.High++
+		}
+		unmet, err := t.unmet(p.ID)
+		if err != nil {
+			return err
+		}
+		if len(unmet) == 0 {
+			s.Ready++
+			if p.State == StatePending {
+				pendingReady++
+			}
+		}
+	}
+	if err := t.QueryRow(`SELECT COUNT(*) FROM packages WHERE mission_id=? AND state IN (?,?)`, out.Mission, StateLaunch, StateRunning).Scan(&s.Parallel); err != nil {
+		return err
+	}
+	s.Parallel += pendingReady
+	out.Shape = s
+
+	if s.Parallel < 3 {
+		advice := fmt.Sprintf("这份计划提交后只有 %d 个包能立即开工，主任务同时在跑的包不到三个。写指令、worker 读代码和你的核对通常会抵掉提速：除非这些包单个就要跑十几分钟（构建发布、长测试、浏览器验收、大范围检索），否则自己做更快；有前置包时把前置自己做掉，把结果写进各包指令，再一次并行派出。", s.Ready)
+		if n, err := t.singlePlanRun(out.Mission); err != nil {
+			return err
+		} else if n >= 2 {
+			advice += fmt.Sprintf("这是本主任务连续第 %d 份单包计划：把修正攒成一批并行派出，比写指令还小的直接自己改。", n)
+		}
+		out.Advice = append(out.Advice, advice)
+	}
+	if s.High*3 > s.Packages {
+		out.Advice = append(out.Advice, fmt.Sprintf("%d 个包里有 %d 个评到 8 分以上。8 分表示把定位和做法都留给了 worker：先把你已经知道的位置、原因和可参照的写法写进指令再重评，确实只能给目标的包通常该由你自己做。强候选很少，高分包会排队，并消耗难题才需要的额度。", s.Packages, s.High))
+	}
+	return nil
+}
+
+// singlePlanRun counts the mission's latest plans that held one package each.
+func (t *tx) singlePlanRun(mission string) (int, error) {
+	rows, err := t.Query(`SELECT COUNT(*) FROM packages WHERE mission_id=? AND plan_seq IS NOT NULL GROUP BY plan_seq ORDER BY plan_seq DESC`, mission)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	run := 0
+	for rows.Next() {
+		var n int
+		if err := rows.Scan(&n); err != nil {
+			return 0, err
+		}
+		if n != 1 {
+			break
+		}
+		run++
+	}
+	return run, rows.Err()
 }
 
 // findCycle returns the keys along one dependency cycle, or nil.

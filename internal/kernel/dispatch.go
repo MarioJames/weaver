@@ -173,7 +173,14 @@ func (t *tx) dispatch() error {
 			}
 			continue
 		}
-		w, a, reason := rt.pick(p.Worker, p.Engine, p.Intelligence)
+		requirement, lift, err := t.escalate(rt, p)
+		if err != nil {
+			return err
+		}
+		w, a, reason := rt.pick(p.Worker, p.Engine, requirement)
+		if w != nil && lift != "" {
+			reason = clip(lift+reason, 200)
+		}
 		if w == nil {
 			if reason != p.Waiting {
 				if _, err := t.Exec(`UPDATE packages SET waiting=? WHERE id=?`, reason, id); err != nil {
@@ -188,6 +195,38 @@ func (t *tx) dispatch() error {
 		}
 	}
 	return nil
+}
+
+// escalate raises the level a package is routed at after an attempt that was
+// not accepted: the next one goes to a candidate rated above the one that did
+// the work, so a package rated too low costs one retry instead of a loop. A
+// vendor limit says nothing about the package and a pin is the owner's choice;
+// neither escalates.
+func (t *tx) escalate(rt *routing, p *Package) (float64, string, error) {
+	if p.Worker != "" || p.Attempt == 0 {
+		return p.Intelligence, "", nil
+	}
+	var state, failure, worker string
+	var rating float64
+	err := t.QueryRow(`SELECT a.state, a.failure_kind, a.worker, COALESCE((SELECT intelligence FROM workers w WHERE w.id=a.worker),0)
+		FROM attempts a WHERE a.package_id=? AND a.n=?`, p.ID, p.Attempt).Scan(&state, &failure, &worker, &rating)
+	if err == sql.ErrNoRows {
+		return p.Intelligence, "", nil
+	}
+	if err != nil {
+		return 0, "", err
+	}
+	limited := failure == engine.FailQuota || failure == engine.FailRateLimit || failure == engine.FailAuth
+	if rating == 0 || (state != StateReturned && (state != StateFailed || limited)) {
+		return p.Intelligence, "", nil
+	}
+	// Nothing rated higher: stay with the tier that last had it rather than drop back.
+	for _, level := range []float64{rating + 0.5, rating} {
+		if level > p.Intelligence && rt.rated(p.Engine, level) {
+			return level, fmt.Sprintf("升档：上次 %s（能力 %g）未被采纳。", worker, rating), nil
+		}
+	}
+	return p.Intelligence, "", nil
 }
 
 func attemptID(pkg string, n int) string { return fmt.Sprintf("%s.%d", pkg, n) }

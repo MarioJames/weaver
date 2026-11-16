@@ -1,6 +1,6 @@
 ---
 name: agents-weaver
-description: "Run development work through the Weaver scheduling engine (`weaver` CLI): split a task into work packages with dependencies, let Weaver launch them on Codex, Claude Code, OpenCode or DeepSeek Harness agents, wait for wake-ups, then accept or return each result. Also runs a design dialogue, in which Codex and Claude each propose a design and review the other's before anything is built. Use it whenever implementation, refactoring, tests, research or verification can be handed to worker agents, and whenever a large architecture or feature-design decision needs a second opinion (对谈, 让 codex 和 claude 讨论方案, design review, debate). Do the work yourself only for a pure question or when the user asks you to."
+description: "Run development work as a swarm through the Weaver scheduling engine (`weaver` CLI): cut a task into work packages that run at the same time, let Weaver launch them on Codex, Claude Code, OpenCode or DeepSeek Harness agents, wait for wake-ups, then accept or return each result. Also runs a design dialogue, in which Codex and Claude each propose a design and review the other's before anything is built. Use it when the work can be cut so that three or more packages start at once, when one long job that would fill your context (browser acceptance, a long test loop, a build and release, a wide search) can run beside your own work, and whenever a large architecture or feature-design decision needs a second opinion (对谈, 让 codex 和 claude 讨论方案, design review, debate). Do the work yourself when it is a question, a chain of dependent steps, or too narrow to run in parallel."
 ---
 
 # Weaver
@@ -11,14 +11,37 @@ Every command prints JSON. Errors go to stderr as `{"error":{"code","message"}}`
 
 ## Choosing how to work
 
+Weaver exists to finish a mission sooner by running work side by side. Every package costs about four minutes before it saves any: you write the instruction, the worker reads its way into the code, you verify the result. Packages handed off one at a time are slower than doing the work yourself.
+
 Decide this before writing a plan, because it changes what the plan looks like:
 
 | The task | Do this |
 |---|---|
-| A question, or a change smaller than a package would take to describe | Do it yourself |
-| Sequential work where each step depends on what the last one showed: operating a machine, a live incident, a single-question lookup | Do it yourself |
-| Work whose design is settled or follows an existing pattern | Delegate packages ([the loop](#the-loop)) |
+| A question, or a change smaller than its instruction would be | Do it yourself |
+| A chain in which each step depends on what the last one showed: operating a machine, a live incident, narrowing down one bug | Do it yourself |
+| Work you can cut so that **three or more packages start at once** | Delegate ([cut it](#cutting-the-work), then [the loop](#the-loop)) |
+| One or two packages that each run long and would fill your context: browser acceptance, a long test loop, a build and release, a wide search | Delegate, and work on something else while they run |
 | Work that hangs on a design decision that is hard to undo and has more than one defensible answer | Open a [design dialogue](#design-dialogue) first, then delegate |
+
+"Do it yourself" is a valid outcome of this skill. A plan of three packages in which one is the prerequisite of the other two is a queue, not a swarm.
+
+## Cutting the work
+
+The speed-up is the width of the wave: how many packages are at work at the same moment. Cut for width, in this order.
+
+1. **Do the spine yourself.** Whatever every other package would wait for is yours: the decision, the shared contract (type and function names, the schema, routes, file layout, a sample payload), the scaffold, the located cause of a bug. Do it before you submit and write its outcome into each instruction as fact. A prerequisite package holds the whole wave back for its run time plus your verdict, and leaves to a worker what you should have decided.
+2. **When you do not know enough to cut, scout wide.** Send three to six scouts at once, each `advisory` and `autoAccept`, each with one narrow question and a fixed answer format (paths, line numbers, counts, a yes or no with evidence). Cut the work when they report. Do not explore alone for long, and do not send one scout after another.
+3. **Cut by ownership, never by phase.** Each package owns files, directories, documents or hosts that no other running package touches, and its instruction names them. Each package carries its own tests and checks. "Implement, then test, then review" as three packages is a pipeline of width one.
+4. **Shard batch work.** The same change across many files, documents or hosts is one instruction applied to several slices. Give each package an explicit list of the paths or IDs it owns.
+5. **Aim for three to ten minutes of worker time per package.** Merge anything shorter into a neighbour, or do it yourself. Split anything longer than fifteen minutes unless it cannot be split (a build, one long test run).
+6. **Add `dependsOn` only when a package needs what you cannot write down in advance:** the actual output of its upstream. What you can decide now goes into the instruction instead. Checking the integrated whole is the one legitimate last wave.
+
+Packages that must edit the same files belong in one package, or in separate worktrees: a package may set its own `"workspace"`.
+
+Check the shape before you submit, and read it back afterwards. The reply to `plan submit` carries `shape` (`ready`: packages of this plan that wait for nothing; `waves`: the longest dependency chain; `parallel`: packages of the mission at work once the plan is in; `high`: packages rated 8 or above) and, when the shape is weak, `advice`:
+
+- Fewer than three packages at work and none of them long: cancel the plan and do the work yourself, or finish the spine and submit the rest as one wave.
+- More than a third of the packages rated 8 or above: the spine is not done. See [Intelligence](#intelligence).
 
 ## The loop
 
@@ -26,14 +49,17 @@ Decide this before writing a plan, because it changes what the plan looks like:
 # 1. One mission per root task. Run it from the workspace, or pass --workspace.
 weaver mission create --title "Add rate limiting to the gateway"        # → {"id":"m_…"}
 
-# 2. Submit the whole decomposition at once. Independent packages start immediately.
+# 2. Submit the whole wave at once. You decided the limiter's interface yourself, so nothing waits for it.
 weaver plan submit --mission m_… --key plan-1 <<'JSON'
 {"packages":[
-  {"key":"limiter","title":"Token bucket","instruction":"…self-contained instruction…","intelligence":8},
-  {"key":"wiring","title":"Wire into middleware","instruction":"…","intelligence":7,"dependsOn":["limiter"]},
-  {"key":"docs","title":"Document the limits","instruction":"…","intelligence":6}
+  {"key":"limiter","title":"Token bucket in internal/limit","instruction":"…self-contained instruction, with the interface you decided…","intelligence":6.5},
+  {"key":"wiring","title":"Call the limiter from the middleware","instruction":"…written against the same interface…","intelligence":6},
+  {"key":"config","title":"Limits in the config schema","instruction":"…","intelligence":6},
+  {"key":"docs","title":"Document the limits","instruction":"…","intelligence":6},
+  {"key":"e2e","title":"End-to-end check of the limited routes","instruction":"…","intelligence":7,"dependsOn":["limiter","wiring","config"]}
 ]}
 JSON
+# The reply reports the shape: {"shape":{"packages":5,"ready":4,"waves":2,"parallel":4,"high":0}}
 
 # 3. Block until something needs you. Returns at once if it already happened.
 weaver wait --mission m_…
@@ -55,8 +81,8 @@ A package reference is its ID or `<mission>/<key>`.
 ## Writing a plan
 
 - **Self-contained instructions.** A worker sees only its package: state the goal, the files or areas it may touch, the constraints, and the checks it must run. It also receives the accepted results of the packages it depends on and, on a later attempt, your return note and its previous reply. It does not see this conversation.
-- **Dependencies.** `dependsOn` names keys in the same plan or already in the mission. A dependent starts when its upstream is **accepted**, not when it merely has a result, so your verdict is what releases the next step. Two packages that can run at the same time must not touch the same files.
-- **Intelligence.** Every package states `intelligence`, a number from 1 to 10 in steps of 0.5: how much judgement its instruction leaves to the worker (see [the scale](#intelligence)). Weaver only considers candidates rated at least that high and chooses among them by itself, from each candidate's first-attempt acceptance rate, typical duration, remaining quota and current load. The reply and `weaver package show` name the chosen candidate with a one-line `routeNote`. You do not rank candidates and you do not need their names.
+- **Dependencies.** `dependsOn` names keys in the same plan or already in the mission. A dependent starts when its upstream is **accepted**, not when it merely has a result, so every edge costs the upstream's run time plus your verdict. Two packages that can run at the same time must not touch the same files.
+- **Intelligence.** Every package states `intelligence`, a number from 1 to 10 in steps of 0.5: what its instruction leaves for the worker to work out (see [the scale](#intelligence)). Weaver gives the package to the lowest-rated candidates that qualify, chooses among those from each one's first-attempt acceptance rate, typical duration, remaining quota and current load, and moves up a tier only when they are full or unavailable. The reply and `weaver package show` name the chosen candidate with a one-line `routeNote`. You do not rank candidates and you do not need their names.
 - **Pinning.** `worker` pins a package to one candidate regardless of its rating; use it only for a reason you could explain, such as a second opinion from a specific engine. `engine` restricts the choice to one engine. `weaver worker list` shows the candidates, their ratings and their measured results.
 - **`"advisory": true`** for a package whose product is a document: research, an audit, a comparison. The agent is told to leave files alone and to cite what it read, and it reads its upstream results in full.
 - **`"autoAccept": true`** for a result that needs no judgement from you before the next step, such as research feeding an implementation package. It is accepted as it arrives and its dependents start; you are not woken for it. A failure still wakes you. Do not use it on packages that change code: accepting is your statement that you checked the work.
@@ -65,20 +91,45 @@ A package reference is its ID or `<mission>/<key>`.
 
 ## Intelligence
 
-Packages and candidates share one scale. A candidate's rating is set by the user and says up to which level it still gets things right on the first attempt. A package's number says which level its instruction is written at. Rate the instruction you actually wrote, not the task in the abstract: spelling out more of the work lowers the number, and lets more candidates take it.
+Packages and candidates share one scale. A candidate's rating is set by the user and says up to which level it still gets things right on the first attempt. A package's number says what its instruction leaves for the worker to work out. The number decides who does the work: the lowest-rated candidates that qualify take it, and there are more of them, on more accounts, than of the strong ones.
 
-| `intelligence` | The instruction |
+Work the number out from the instruction you wrote; do not estimate it from the task. An instruction answers three questions:
+
+- **Where**: the files, symbols, documents or hosts.
+- **What**: the change to make or the question to answer, and the approach.
+- **Check**: the commands to run and the result to expect.
+
+| `intelligence` | The instruction leaves open |
 |---|---|
-| 6 | Names the files, the change and the checks to run. Following it is enough: batch renames, test backfill, an endpoint added from a template, read-only collection. |
-| 7 | Gives the goal, the area and the constraints. The worker finds the path inside one module, following a pattern that already exists. |
-| 8 | Crosses files or modules. The worker has to read the code to locate things and handle neighbouring cases the instruction did not mention: an ordinary feature, a located bug, a refactor. |
-| 9 | Gives only the goal and the acceptance criteria. The worker makes design trade-offs, or a mistake is costly: concurrency, migrations, hard debugging. |
-| 10 | Needs someone who would question the instruction itself. Do this yourself or open a design dialogue. |
+| 6 | Nothing. Where, what and check are written down, and following them is enough. |
+| 7 | One kind of decision, inside a boundary you named: the exact place within one module, or the details of a change that follows a pattern or a specification you pointed to. |
+| 8 | Where and what together, or one of them across a wide area. You gave the goal, the area and the constraints; the worker reads across modules to locate the work and handles neighbouring cases you did not list, or has to confirm a suspected cause by experiment. |
+| 9 | Everything but the goal and the acceptance criteria: the worker makes the design trade-offs or finds an unknown cause, or correctness rests on reasoning no instruction can spell out (concurrency, data migration). |
+| 10 | The instruction itself may be wrong. Do this yourself or open a design dialogue. |
 
-- Use half steps for work that sits between two rows, and numbers below 6 for purely mechanical work.
-- Do not inflate the number to get a stronger model: the strongest candidates are few, and a package that asks for them waits behind every other package that does.
-- When a plan is rejected with `NO_CANDIDATE`, the message names the highest rating available. Either write that package's instruction in more detail so it honestly fits a lower level, or do the package yourself. Do not lower the number without changing the instruction.
-- When a result comes back wrong because the worker lacked the judgement the instruction needed, a `return` sends the same package to the same pool of candidates. Cancel it and submit the work again with a higher number or a more detailed instruction.
+Use half steps for an instruction that sits between two rows, and numbers below 6 for work a script could nearly do.
+
+A review, an audit or a classification is rated the same way: where is the set to go through, what is the criteria to judge each item by, check is the form of the answer. With the criteria listed it is a 6.5 or a 7; "find what is wrong in here" is an 8.
+
+These do not raise the number:
+
+- **Stakes.** Production, credentials, customer data, an urgent incident. Write the limits into the instruction (read-only, which account, what must never run), mark an investigation `advisory`, and verify the result. A stronger model is not a substitute for a written limit.
+- **Size.** Many files, a long instruction, a long run. Shard it, or accept that it runs long.
+- **Wanting it right the first time.** A package that is returned goes to a higher-rated candidate on its next attempt by itself, so a number that turns out too low costs one retry. A number that is too high makes the package queue for the few strong candidates and spends the quota that the hard packages need.
+- **A candidate you have in mind.** Do not read `weaver worker list` to pick a number that lands on a particular candidate.
+
+Most packages of a well-cut plan are 6 or 7, because you did the spine: you already know where and what. When a package comes out at 8 or above, first write what you already know into its instruction (the file you located, the cause you found, the pattern to follow) and rate it again. What still sits at 9 is usually yours to do.
+
+| The instruction says | Rate it |
+|---|---|
+| "Replace URL prefix A with B in these 44 documents (IDs listed). Nothing else may change. Read each one back and compare hashes." | 6. All three are given; the full job of 175 documents is four such packages. |
+| "Read-only, through account X with `default_transaction_read_only=on`: find the size, ID and creation time of the file named N. Take the column names from `schemas/file.ts`. Output only these columns." | 6.5. Production does not raise it; the worker only has to map the schema. |
+| "`raw += chunk` glues two segments into one line (wire log at P). Reproduce it from that log, fix the merge in `continuation.ts`, run tests T." | 7. The cause and the place are given; the form of the fix is left open. |
+| "Add an audit entry to every mutation of the billing module, in the style of `orders/audit.ts`." | 8. The worker has to find the mutations and judge the odd ones. |
+| "Uploads time out now and then under load. Find out why and fix it." | 9. Unknown cause: scout it or do it yourself. |
+
+- When a plan is rejected with `NO_CANDIDATE`, the message names the highest rating available. Either write that package's instruction in more detail so that it honestly fits a lower level, or do the package yourself. Do not lower the number without changing the instruction.
+- A `return` or a `retry` sends the next attempt to a candidate rated above the one whose attempt was not accepted, when there is one; the `routeNote` says so. A package pinned with `worker` stays where it is pinned.
 
 ## Package states
 
@@ -88,6 +139,12 @@ Packages and candidates share one scale. A candidate's rating is set by the user
 - `return` on `awaiting_verdict` starts the next attempt of the same package. The note is required: it is the only thing that tells the next attempt what was wrong.
 - `failed` can be retried with `weaver retry --package …`. A failure caused by a vendor limit pauses that account and moves the package to another ready candidate by itself.
 - `cancelled` is final. `weaver cancel --package …` or `--mission …` returns once the processes are gone. On a resident engine (opencode) a cancel can only interrupt the session: the reply then has `residual: true` and the workspace to check for leftover commands.
+
+## While a wave runs
+
+- **Give each verdict at once.** Verify a result as soon as it arrives: its dependents, and the mission's clock, wait on you.
+- **Do not hand off follow-ups one at a time.** Verification turns up corrections. Make the ones smaller than their instruction yourself, as long as no running package owns the file. Collect the rest and submit them together as the next wave, cut by the same rules. A mission that grows by one single-package plan after another is serial work with overhead on top.
+- **Use the time.** While the wave runs, prepare the next one: its spine, its instructions, the acceptance checklist.
 
 ## Waiting
 

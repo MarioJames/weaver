@@ -190,6 +190,22 @@ type PlanResult struct {
 	Mission  string     `json:"missionId"`
 	Packages []*Package `json:"packages"`
 	Cursor   int64      `json:"cursor"`
+	Shape    PlanShape  `json:"shape"`
+	// Advice is present when the shape cannot beat the owner doing the work.
+	Advice []string `json:"advice,omitempty"`
+}
+
+// PlanShape says how wide a plan really is.
+type PlanShape struct {
+	Packages int `json:"packages"`
+	// Ready counts the packages of this plan that wait for nothing.
+	Ready int `json:"ready"`
+	// Waves is the longest dependency chain inside the plan.
+	Waves int `json:"waves"`
+	// Parallel counts the mission's packages at work once this plan is in.
+	Parallel int `json:"parallel"`
+	// High counts the packages rated 8 or above.
+	High int `json:"high"`
 }
 
 // Wake is one reason a wait returned.

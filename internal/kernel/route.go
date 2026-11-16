@@ -53,7 +53,9 @@ func (r *routing) pick(pinWorker, pinEngine string, requirement float64) (*route
 		now = time.Now()
 	}
 	var reasons []string
-	eligible := 0
+	// eligible are the tiers that could take the package now; passed are the
+	// qualified ones that are full or unavailable.
+	var eligible, passed []float64
 	for _, w := range r.Workers {
 		if pinWorker != "" {
 			if w.ID != pinWorker {
@@ -78,6 +80,7 @@ func (r *routing) pick(pinWorker, pinEngine string, requirement float64) (*route
 		}
 		if w.MaxParallel > 0 && w.Running >= w.MaxParallel {
 			reasons = append(reasons, fmt.Sprintf("%s 已达到并行上限 %d", w.ID, w.MaxParallel))
+			passed = append(passed, w.Intelligence)
 			continue
 		}
 		var account *routeAccount
@@ -108,12 +111,16 @@ func (r *routing) pick(pinWorker, pinEngine string, requirement float64) (*route
 				why = strings.Join(accountReasons, "、")
 			}
 			reasons = append(reasons, w.ID+"："+why)
+			passed = append(passed, w.Intelligence)
 			continue
 		}
-		eligible++
+		eligible = append(eligible, w.Intelligence)
 		stats := w.Stats.performance(requirement, r.Stats)
 		score := stats.FirstAcceptanceRate * accountQuota / (math.Max(stats.MedianSeconds, 0.001) * float64(w.Running+1))
-		if best == nil || score > bestScore {
+		// The lowest tier that qualifies takes the package, so the strong
+		// candidates stay free for the packages only they can do. The measured
+		// score decides inside a tier.
+		if best == nil || w.Intelligence < best.Intelligence || (w.Intelligence == best.Intelligence && score > bestScore) {
 			best, bestAccount, bestStats, bestScore, bestQuota = w, account, stats, score, accountQuota
 		}
 	}
@@ -125,9 +132,27 @@ func (r *routing) pick(pinWorker, pinEngine string, requirement float64) (*route
 	}
 	note := fmt.Sprintf("包指定了候选 %s", best.ID)
 	if pinWorker == "" {
-		note = fmt.Sprintf("需求 %g → %s（能力 %g）：首次采纳 %.0f%%（%d 次）、中位耗时 %.0f 分、额度系数 %.2f", requirement, best.ID, best.Intelligence, bestStats.FirstAcceptanceRate*100, bestStats.Samples, bestStats.MedianSeconds/60, bestQuota)
-		if eligible > 1 {
-			note += fmt.Sprintf("；另有 %d 个够格候选得分较低", eligible-1)
+		tier := "够格的最低档"
+		for _, level := range passed {
+			if level < best.Intelligence {
+				tier = "更低档已满或不可用"
+				break
+			}
+		}
+		note = fmt.Sprintf("需求 %g → %s（能力 %g，"+tier+"）：首次采纳 %.0f%%（%d 次）、中位耗时 %.0f 分、额度系数 %.2f", requirement, best.ID, best.Intelligence, bestStats.FirstAcceptanceRate*100, bestStats.Samples, bestStats.MedianSeconds/60, bestQuota)
+		peers, higher := -1, 0
+		for _, level := range eligible {
+			if level == best.Intelligence {
+				peers++
+			} else {
+				higher++
+			}
+		}
+		if peers > 0 {
+			note += fmt.Sprintf("；同档另有 %d 个候选得分较低", peers)
+		}
+		if higher > 0 {
+			note += fmt.Sprintf("；%d 个更高档候选留给更难的包", higher)
 		}
 	}
 	if runes := []rune(note); len(runes) > 200 {
@@ -137,4 +162,17 @@ func (r *routing) pick(pinWorker, pinEngine string, requirement float64) (*route
 	bestAccount.Running++
 	r.Active++
 	return best, bestAccount, note
+}
+
+// rated reports whether an enabled candidate is rated for a level, whatever its load.
+func (r *routing) rated(pinEngine string, level float64) bool {
+	for _, w := range r.Workers {
+		if isDebater(w.ID) || (pinEngine != "" && w.Engine != pinEngine) {
+			continue
+		}
+		if w.Intelligence > 0 && w.Intelligence >= level {
+			return true
+		}
+	}
+	return false
 }
