@@ -102,10 +102,19 @@ type TimelineEntry struct {
 	Round     int               `json:"round,omitempty"`
 	RoundKind string            `json:"roundKind,omitempty"`
 }
+
+// TimelineEarlier summarizes the conversation of the owner session before
+// this mission's part; Mission and Title name the mission that part followed.
+type TimelineEarlier struct {
+	Mission string `json:"mission"`
+	Title   string `json:"title"`
+	Count   int    `json:"count"`
+}
 type TimelineResult struct {
 	Mission  *Mission          `json:"mission"`
 	Packages []TimelinePackage `json:"packages"`
 	Session  TimelineSession   `json:"session"`
+	Earlier  *TimelineEarlier  `json:"earlier,omitempty"`
 	Entries  []TimelineEntry   `json:"entries"`
 	Keep     int               `json:"keep"`
 	HasMore  bool              `json:"hasMore"`
@@ -268,6 +277,54 @@ func (k *Kernel) Timeline(ctx context.Context, in TimelineInput) (*TimelineResul
 	}
 }
 
+// sessionText is what an item says. Rows synced before the LobeHub guide was
+// stripped at parse time still carry it, so it is stripped here as well.
+func sessionText(v SessionItem) string {
+	if v.Role == "user" {
+		return strings.TrimSpace(stripLobeHubGuide(v.Text))
+	}
+	return v.Text
+}
+
+// sessionEntry turns one owner-session item into its timeline entry; ok is
+// false for a user row that said nothing of its own.
+func sessionEntry(v SessionItem) (TimelineEntry, bool) {
+	kind := v.Role
+	if kind == "assistant" {
+		kind = "owner"
+	}
+	if kind == "tool" {
+		kind = "ops"
+	}
+	e := TimelineEntry{Ord: timelineOrd(v.At, 0, seqOrd(v.Seq)), At: v.At, Kind: kind}
+	if kind == "ops" {
+		e.Ops = []TimelineOp{{At: v.At, Tool: v.Tool, Text: v.Text}}
+		e.To = v.At
+	} else {
+		text := sessionText(v)
+		if text == "" {
+			return e, false
+		}
+		e.body(text, fmt.Sprintf("session:%d", v.Seq))
+	}
+	return e, true
+}
+
+// foldOps merges adjacent operations; only neighbours in the final order fold.
+func foldOps(entries []TimelineEntry) []TimelineEntry {
+	merged := make([]TimelineEntry, 0, len(entries))
+	for _, e := range entries {
+		if e.Kind == "ops" && len(merged) > 0 && merged[len(merged)-1].Kind == "ops" {
+			prev := &merged[len(merged)-1]
+			prev.Ops = append(prev.Ops, e.Ops...)
+			prev.To = e.To
+		} else {
+			merged = append(merged, e)
+		}
+	}
+	return merged
+}
+
 type timelinePkg struct {
 	summary        TimelinePackage
 	id             string
@@ -317,6 +374,9 @@ func (k *Kernel) composeTimeline(mission string) (*TimelineResult, error) {
 		return nil, err
 	}
 	out.Session = session
+	if out.Earlier, _, err = timelineEarlier(k.db, m); err != nil {
+		return nil, err
+	}
 	reviews, represented, err := k.timelineConvorel(m, items)
 	if err != nil {
 		return nil, err
@@ -328,21 +388,9 @@ func (k *Kernel) composeTimeline(mission string) (*TimelineResult, error) {
 		if v.Role == "tool" && represented[v.Ref] {
 			continue
 		}
-		kind := v.Role
-		if kind == "assistant" {
-			kind = "owner"
+		if e, ok := sessionEntry(v); ok {
+			add(e)
 		}
-		if kind == "tool" {
-			kind = "ops"
-		}
-		e := TimelineEntry{Ord: timelineOrd(v.At, 0, seqOrd(v.Seq)), At: v.At, Kind: kind}
-		if kind == "ops" {
-			e.Ops = []TimelineOp{{At: v.At, Tool: v.Tool, Text: v.Text}}
-			e.To = v.At
-		} else {
-			e.body(v.Text, fmt.Sprintf("session:%d", v.Seq))
-		}
-		add(e)
 	}
 	events, err := timelineEvents(k.db, mission)
 	if err != nil {
@@ -489,17 +537,7 @@ func (k *Kernel) composeTimeline(mission string) (*TimelineResult, error) {
 		return nil, err
 	}
 	sort.Slice(out.Entries, func(i, j int) bool { return out.Entries[i].Ord < out.Entries[j].Ord })
-	// Only adjacent operations in the final merged timeline fold together.
-	merged := make([]TimelineEntry, 0, len(out.Entries))
-	for _, e := range out.Entries {
-		if e.Kind == "ops" && len(merged) > 0 && merged[len(merged)-1].Kind == "ops" {
-			prev := &merged[len(merged)-1]
-			prev.Ops = append(prev.Ops, e.Ops...)
-			prev.To = e.To
-		} else {
-			merged = append(merged, e)
-		}
-	}
+	merged := foldOps(out.Entries)
 	for i := range merged {
 		b, _ := json.Marshal(merged[i])
 		h := sha256.Sum256(b)
@@ -643,9 +681,8 @@ func timelineSessionItems(q querier, m *Mission) ([]SessionItem, TimelineSession
 
 // timelineSessionBounds returns sequence boundaries; end=-1 means no display interval.
 func timelineSessionBounds(q querier, m *Mission) (int64, int64, error) {
-	var previousClosed int64
-	err := q.QueryRow(`SELECT COALESCE(closed_at,0) FROM missions WHERE owner_engine=? AND owner_session=? AND (created_at<? OR (created_at=? AND rowid<(SELECT rowid FROM missions WHERE id=?))) ORDER BY created_at DESC,rowid DESC LIMIT 1`, m.Owner.Engine, m.Owner.Session, m.CreatedAt, m.CreatedAt, m.ID).Scan(&previousClosed)
-	if err != nil && err != sql.ErrNoRows {
+	_, _, previousClosed, err := previousSessionMission(q, m)
+	if err != nil {
 		return 0, 0, err
 	}
 	boundary := func(closed int64) (int64, error) {
@@ -670,6 +707,71 @@ func timelineSessionBounds(q querier, m *Mission) (int64, int64, error) {
 		}
 	}
 	return start, end, nil
+}
+
+// previousSessionMission is the mission created just before m in the same owner session.
+func previousSessionMission(q querier, m *Mission) (id, title string, closed int64, err error) {
+	err = q.QueryRow(`SELECT id,title,COALESCE(closed_at,0) FROM missions WHERE owner_engine=? AND owner_session=? AND (created_at<? OR (created_at=? AND rowid<(SELECT rowid FROM missions WHERE id=?))) ORDER BY created_at DESC,rowid DESC LIMIT 1`, m.Owner.Engine, m.Owner.Session, m.CreatedAt, m.CreatedAt, m.ID).Scan(&id, &title, &closed)
+	if err == sql.ErrNoRows {
+		err = nil
+	}
+	return
+}
+
+// timelineEarlier describes the session conversation before this mission's
+// part and returns the first sequence of that part; nil when nothing precedes it.
+func timelineEarlier(q querier, m *Mission) (*TimelineEarlier, int64, error) {
+	if m.Owner == nil || m.Owner.Session == "" || (m.Owner.Engine != "claude" && m.Owner.Engine != "codex") {
+		return nil, 0, nil
+	}
+	start, _, err := timelineSessionBounds(q, m)
+	if err != nil || start <= 0 {
+		return nil, 0, err
+	}
+	out := &TimelineEarlier{}
+	if out.Mission, out.Title, _, err = previousSessionMission(q, m); err != nil {
+		return nil, 0, err
+	}
+	err = q.QueryRow(`SELECT COUNT(*) FROM session_items WHERE engine=? AND session=? AND seq<? AND role IN ('user','assistant')`, m.Owner.Engine, m.Owner.Session, start).Scan(&out.Count)
+	if err != nil {
+		return nil, 0, err
+	}
+	return out, start, nil
+}
+
+// EarlierTimeline returns the owner-session conversation before this
+// mission's part: user messages, the owner's words and folded operations.
+func (k *Kernel) EarlierTimeline(mission string) ([]TimelineEntry, error) {
+	out := []TimelineEntry{}
+	err := k.read(func() error {
+		m, err := getMission(k.db, mission)
+		if err != nil {
+			return err
+		}
+		info, start, err := timelineEarlier(k.db, m)
+		if err != nil || info == nil {
+			return err
+		}
+		rows, err := k.db.Query(`SELECT seq,at,role,tool,text,ref FROM session_items WHERE engine=? AND session=? AND seq<? ORDER BY seq`, m.Owner.Engine, m.Owner.Session, start)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var v SessionItem
+			if err = rows.Scan(&v.Seq, &v.At, &v.Role, &v.Tool, &v.Text, &v.Ref); err != nil {
+				return err
+			}
+			if e, ok := sessionEntry(v); ok {
+				out = append(out, e)
+			}
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return foldOps(out), nil
 }
 
 // MissionText checks ownership, including the session display interval, before returning a body.
@@ -720,22 +822,22 @@ func (k *Kernel) MissionText(mission, ref string) (*MissionTextResult, error) {
 			if e != nil {
 				return errf("INVALID", "正文引用不合法")
 			}
-			items, _, e := timelineSessionItems(k.db, m)
+			// The conversation before this mission's part is shown on demand,
+			// so only the end of the part bounds what can be read.
+			v, e := missionSessionItem(k.db, m, seq)
 			if e != nil {
 				return e
 			}
-			for _, v := range items {
-				if v.Seq == seq {
-					out.Text = v.Text
-					label := "用户"
-					if v.Role == "assistant" {
-						label = map[string]string{"claude": "Claude", "codex": "Codex"}[v.Engine]
-					}
-					out.Title = label + " · " + time.UnixMilli(v.At).Format("15:04")
-					return nil
-				}
+			if v == nil {
+				return errf("NOT_FOUND", "正文不属于这个主任务")
 			}
-			return errf("NOT_FOUND", "正文不属于这个主任务")
+			out.Text = sessionText(*v)
+			label := "用户"
+			if v.Role == "assistant" {
+				label = map[string]string{"claude": "Claude", "codex": "Codex"}[v.Engine]
+			}
+			out.Title = label + " · " + time.UnixMilli(v.At).Format("15:04")
+			return nil
 		case "result":
 			var key string
 			var n int
@@ -792,6 +894,27 @@ func (k *Kernel) MissionText(mission, ref string) (*MissionTextResult, error) {
 		return err
 	})
 	return out, err
+}
+
+// missionSessionItem returns item seq of the owner session when it lies before
+// the end of the mission's part, or nil.
+func missionSessionItem(q querier, m *Mission, seq int64) (*SessionItem, error) {
+	if m.Owner == nil || m.Owner.Session == "" || (m.Owner.Engine != "claude" && m.Owner.Engine != "codex") {
+		return nil, nil
+	}
+	_, end, err := timelineSessionBounds(q, m)
+	if err != nil || end == -1 || (end != 0 && seq >= end) {
+		return nil, err
+	}
+	v := &SessionItem{Engine: m.Owner.Engine, Session: m.Owner.Session}
+	err = q.QueryRow(`SELECT seq,at,role,tool,text,ref FROM session_items WHERE engine=? AND session=? AND seq=?`, v.Engine, v.Session, seq).Scan(&v.Seq, &v.At, &v.Role, &v.Tool, &v.Text, &v.Ref)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return v, nil
 }
 
 // missionActivity uses indexed event lookups and package metadata, never transcripts or result bodies.

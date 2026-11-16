@@ -64,6 +64,13 @@ type taskDetail struct {
 	restoreMax   float32
 	expanded     map[string]bool
 
+	// earlier is the owner-session conversation before this mission's part.
+	// It is read the first time it is opened and shown in place.
+	earlierInfo                 *kernel.TimelineEarlier
+	earlier                     []taskEntry
+	earlierOpen, earlierLoading bool
+	earlierErr                  string
+
 	artifactsOpen, artifactsLoading bool
 	artifactsErr                    string
 	artifacts                       []taskArtifactGroup

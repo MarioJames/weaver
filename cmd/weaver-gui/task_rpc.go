@@ -142,6 +142,7 @@ func (a *app) applyTimeline(s *taskState, suffix bool, out *taskTimeline) {
 		d.mission = out.Mission
 	}
 	d.packages, d.session = out.Packages, out.Session
+	d.earlierInfo = out.Earlier
 	d.loaded = true
 	d.grew = d.grew || changed
 	if first && d.mission != nil && !taskMissionDone(*d.mission) {
@@ -177,6 +178,42 @@ func (a *app) loadEarlier(s *taskState) {
 			d.entries = append(append([]taskEntry{}, out.Entries...), d.entries...)
 			d.hasMore = out.HasMore
 			d.gen++
+		}
+		a.notify()
+	}()
+}
+
+// toggleEarlier shows or hides the conversation before this mission's part,
+// reading it the first time. Hiding keeps the distance to the end, so the
+// reader stays on what they were looking at.
+func (a *app) toggleEarlier(s *taskState) {
+	d := &s.d
+	if d.earlierOpen {
+		d.earlierOpen, d.prepended = false, true
+		return
+	}
+	d.earlierOpen = true
+	if d.earlier != nil || d.earlierLoading {
+		return
+	}
+	d.earlierLoading, d.earlierErr = true, ""
+	id, revision := s.selected, s.revision
+	a.wg.Add(1)
+	go func() {
+		defer a.wg.Done()
+		out := []taskEntry{}
+		err := a.client.call("mission.earlier", map[string]string{"mission": id}, &out)
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if a.ctx.Err() != nil || !s.current(id, revision) {
+			return
+		}
+		d := &s.d
+		d.earlierLoading = false
+		if err != nil {
+			d.earlierErr = err.Error()
+		} else {
+			d.earlier = out
 		}
 		a.notify()
 	}()

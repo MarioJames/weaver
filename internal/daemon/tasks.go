@@ -21,6 +21,11 @@ func init() {
 	}) (any, error) {
 		return s.kernel.MissionText(p.Mission, p.Ref)
 	})
+	methods["mission.earlier"] = simple(func(s *Server, p struct {
+		Mission string `json:"mission"`
+	}) (any, error) {
+		return s.kernel.EarlierTimeline(p.Mission)
+	})
 	methods["mission.owner"] = simple(func(s *Server, p struct {
 		Mission string `json:"mission"`
 		Engine  string `json:"engine"`

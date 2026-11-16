@@ -139,21 +139,65 @@ func (a *app) taskTimelineView(c *ui.Context, s *taskState) {
 						}
 					})
 				}
-				for i := 0; i < len(d.entries); {
-					e := d.entries[i]
-					next := i + 1
-					if e.Kind == "owner" || e.Kind == "ops" {
-						// One speaker header covers the owner's run of speech and operations.
-						for next < len(d.entries) && (d.entries[next].Kind == "owner" || d.entries[next].Kind == "ops") {
-							next++
-						}
-					}
-					group := d.entries[i:next]
-					ui.Column(c.Key(e.Ord)).FillWidth().Children(func() { a.taskEntryView(c, s, group, i) })
-					i = next
+				if !d.hasMore && d.earlierInfo != nil {
+					a.taskEarlier(c, s)
 				}
+				a.taskEntries(c, s, d.entries)
 			})
 		})
+	})
+}
+
+func (a *app) taskEntries(c *ui.Context, s *taskState, entries []taskEntry) {
+	for i := 0; i < len(entries); {
+		e := entries[i]
+		next := i + 1
+		if e.Kind == "owner" || e.Kind == "ops" {
+			// One speaker header covers the owner's run of speech and operations.
+			for next < len(entries) && (entries[next].Kind == "owner" || entries[next].Kind == "ops") {
+				next++
+			}
+		}
+		group := entries[i:next]
+		ui.Column(c.Key(e.Ord)).FillWidth().Children(func() { a.taskEntryView(c, s, group) })
+		i = next
+	}
+}
+
+// taskEarlier heads a mission created later in a session: it names the
+// mission this part follows and opens the conversation before it in place.
+func (a *app) taskEarlier(c *ui.Context, s *taskState) {
+	d := &s.d
+	info := d.earlierInfo
+	toggle := func(label string) {
+		if action.Button(c, label, action.ButtonProps{Variant: action.Text, Size: theme.Small}).Disabled(d.earlierLoading).Clicked() {
+			a.toggleEarlier(s)
+		}
+	}
+	label := "展开此前的对话"
+	if info.Count > 0 {
+		label = fmt.Sprintf("展开此前 %d 条对话", info.Count)
+	}
+	if d.earlierOpen {
+		label = "收起此前的对话"
+	}
+	ui.Column(c.Key("earlier-session")).FillWidth().Gap(18).Children(func() {
+		taskProcessRowEnd(c, lucide.History(), taskToneNeutral, "接续自任务", info.Title, "", func() { toggle(label) }, nil)
+		if !d.earlierOpen {
+			return
+		}
+		switch {
+		case d.earlierLoading:
+			display.Text(c, "正在读取此前的对话…", display.TextProps{Type: display.TextSecondary, FontSize: 13}).PaddingStart(44)
+		case d.earlierErr != "":
+			ui.Column(c).PaddingStart(44).Children(func() { fieldError(c, d.earlierErr) })
+		default:
+			a.taskEntries(c, s, d.earlier)
+			ui.Column(c).FillWidth().Gap(4).AlignItems(ui.Center).Children(func() {
+				taskDivider(c, "以上是此前的对话", true)
+				toggle("收起此前的对话")
+			})
+		}
 	})
 }
 
@@ -204,7 +248,7 @@ func (a *app) taskSpeech(c *ui.Context, s *taskState, h taskHeaderInfo, e taskEn
 	})
 }
 
-func (a *app) taskEntryView(c *ui.Context, s *taskState, group []taskEntry, index int) {
+func (a *app) taskEntryView(c *ui.Context, s *taskState, group []taskEntry) {
 	d := &s.d
 	e := group[0]
 	at := taskTime(e.At)

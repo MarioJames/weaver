@@ -218,8 +218,57 @@ func TestTimelineSessionBoundsAndClosedReply(t *testing.T) {
 	if len(ae) != 2 || ae[1].Text != "closing first" || len(be) != 2 || be[0].Text != "second" || be[1].Text != "closing second" {
 		t.Fatalf("%+v %+v", ae, be)
 	}
-	if _, e := f.k.MissionText(second, ae[0].Ref); e == nil {
-		t.Fatal("out of range session ref accepted")
+	if _, e := f.k.MissionText(first, be[0].Ref); e == nil {
+		t.Fatal("a later mission's session ref accepted")
+	}
+}
+
+// A mission created later in a session can show the conversation before its
+// own part, in place; what came after the mission stays out of reach.
+func TestTimelineEarlierConversation(t *testing.T) {
+	f := newFixture(t)
+	t.Setenv("HOME", f.home)
+	first, second := f.mission(), f.mission()
+	if e := f.k.write(func(tx *tx) error {
+		_, e := tx.Exec(`UPDATE missions SET created_at=CASE id WHEN ? THEN 100 ELSE 300 END,closed_at=CASE id WHEN ? THEN 200 ELSE 400 END WHERE id IN (?,?)`, first, first, first, second)
+		return e
+	}); e != nil {
+		t.Fatal(e)
+	}
+	injectTimelineItems(t, f, first,
+		SessionItem{At: 50, Role: "user", Text: "first"},
+		SessionItem{At: 60, Role: "tool", Tool: "Bash", Text: "ls"},
+		SessionItem{At: 210, Role: "assistant", Text: "closing first"},
+		SessionItem{At: 250, Role: "user", Text: "second"},
+		SessionItem{At: 410, Role: "assistant", Text: "closing second"},
+		SessionItem{At: 450, Role: "user", Text: "third"})
+	injectTimelineItems(t, f, second)
+	if a := timeline(t, f, first); a.Earlier != nil {
+		t.Fatalf("the first mission of a session has nothing earlier: %+v", a.Earlier)
+	}
+	info, err := f.k.Mission(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := timeline(t, f, second)
+	if b.Earlier == nil || b.Earlier.Mission != first || b.Earlier.Title != info.Title || b.Earlier.Count != 2 {
+		t.Fatalf("earlier = %+v", b.Earlier)
+	}
+	entries, err := f.k.EarlierTimeline(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 3 || entries[0].Kind != "user" || entries[0].Text != "first" || entries[1].Kind != "ops" || len(entries[1].Ops) != 1 || entries[2].Kind != "owner" || entries[2].Text != "closing first" {
+		t.Fatalf("earlier entries = %+v", entries)
+	}
+	if text, e := f.k.MissionText(second, entries[0].Ref); e != nil || text.Text != "first" {
+		t.Fatalf("earlier full text = %+v, %v", text, e)
+	}
+	if _, e := f.k.MissionText(second, "session:6"); e == nil {
+		t.Fatal("a session ref after the mission ended was accepted")
+	}
+	if entries, err := f.k.EarlierTimeline(first); err != nil || len(entries) != 0 {
+		t.Fatalf("first mission earlier = %+v, %v", entries, err)
 	}
 }
 func TestTimelineDialogueA15A16A17(t *testing.T) {
@@ -632,5 +681,21 @@ func TestTimelineCancellationDuringSessionSync(t *testing.T) {
 		}
 	case <-time.After(150 * time.Millisecond):
 		t.Fatal("session sync prevented request cancellation")
+	}
+}
+
+// Rows synced before the guide was stripped at parse time still read clean.
+func TestTimelineStoredLobeHubGuideIsStripped(t *testing.T) {
+	f := newFixture(t)
+	t.Setenv("HOME", f.home)
+	m := f.mission()
+	guide := "## LobeHub CLI (`lh`)\n\nYou are running inside a LobeHub conversation.\n\n- **Leave these alone:** `lh hetero`."
+	injectTimelineItems(t, f, m, SessionItem{At: 50, Role: "user", Text: guide + "\n\n发一下 macOS 的最新版本"}, SessionItem{At: 60, Role: "user", Text: guide})
+	users := entriesOf(timeline(t, f, m), "user")
+	if len(users) != 1 || users[0].Text != "发一下 macOS 的最新版本" {
+		t.Fatalf("users = %+v", users)
+	}
+	if text, err := f.k.MissionText(m, users[0].Ref); err != nil || text.Text != "发一下 macOS 的最新版本" {
+		t.Fatalf("full text = %+v, %v", text, err)
 	}
 }

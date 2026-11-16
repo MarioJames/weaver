@@ -600,3 +600,29 @@ func TestTaskArtifactsOpenAndEmpty(t *testing.T) {
 	tasksWait(t, tt, "还没有产物", 3*time.Second)
 	tasksContains(t, tt, "分享时加 --mission <主任务 ID>，或用 weaver artifact add 登记")
 }
+
+// A mission created later in a session opens the conversation before it in
+// place and folds it away again.
+func TestTaskEarlierConversation(t *testing.T) {
+	_, _, tt := tasksTesterWith(t, 1180, 800, func(f *tasksFake) {
+		f.timelines[fxMain].Earlier = &kernel.TimelineEarlier{Mission: "m_prev", Title: "梳理发布记录与历史归档", Count: 2}
+		f.earlier = map[string][]taskEntry{fxMain: {
+			{Ord: "e1", Kind: "user", At: fxDay(20, 37), Text: "09 和 10 里的文档重新梳理一下", Ref: "session:1"},
+			{Ord: "e2", Kind: "ops", At: fxDay(20, 38), To: fxDay(20, 38), Ops: []kernel.TimelineOp{{At: fxDay(20, 38), Tool: "Bash", Text: "lh kb view"}}},
+			{Ord: "e3", Kind: "owner", At: fxDay(20, 40), Text: "09 已全部归组，回读校验通过。", Ref: "session:3"},
+		}}
+	})
+	openTask(t, tt, fxTitle, "创建主任务")
+	tasksContains(t, tt, "接续自任务", "梳理发布记录与历史归档", "展开此前 2 条对话")
+	tasksAbsent(t, tt, "09 和 10 里的文档重新梳理一下")
+	click(t, tt, "展开此前 2 条对话")
+	tasksWait(t, tt, "09 已全部归组，回读校验通过。", 3*time.Second)
+	tasksContains(t, tt, "09 和 10 里的文档重新梳理一下", "1 步操作", "以上是此前的对话", "创建主任务")
+	if user, owner := rectOf(t, tt, "09 和 10 里的文档重新梳理一下"), rectOf(t, tt, "创建主任务"); user.Y >= owner.Y {
+		t.Fatalf("此前的对话没有排在本任务之前：%v %v", user, owner)
+	}
+	click(t, tt, "收起此前的对话")
+	tt.Advance(time.Second)
+	tasksAbsent(t, tt, "09 和 10 里的文档重新梳理一下", "以上是此前的对话")
+	tasksContains(t, tt, "展开此前 2 条对话")
+}

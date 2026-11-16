@@ -34,6 +34,7 @@ type tasksFake struct {
 	taskMu             sync.Mutex
 	missions, archived []taskMission
 	timelines          map[string]*taskTimeline
+	earlier            map[string][]taskEntry
 	texts              map[string]kernel.MissionTextResult
 	textErrors         map[string]string
 	packages           map[string]taskPackage
@@ -343,7 +344,7 @@ func (f *tasksFake) timeline(in kernel.TimelineInput) (*taskTimeline, *rpc.Error
 	if f.timelineError != "" {
 		return nil, &rpc.Error{Code: "INTERNAL", Message: f.timelineError}
 	}
-	out := &taskTimeline{Packages: t.Packages, Session: t.Session, Mission: t.Mission}
+	out := &taskTimeline{Packages: t.Packages, Session: t.Session, Mission: t.Mission, Earlier: t.Earlier}
 	if m, ok := f.mission(in.Mission); ok {
 		out.Mission = &m
 	}
@@ -417,6 +418,10 @@ func (f *tasksFake) respondTasks(conn net.Conn, req rpc.Request) {
 		if f.listError != "" {
 			failure = &rpc.Error{Code: "INTERNAL", Message: f.listError}
 		}
+		f.taskMu.Unlock()
+	case "mission.earlier":
+		f.taskMu.Lock()
+		result = append([]taskEntry{}, f.earlier[str("mission")]...)
 		f.taskMu.Unlock()
 	case "mission.text":
 		f.taskMu.Lock()
