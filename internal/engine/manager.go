@@ -9,14 +9,14 @@ import (
 )
 
 // Manager picks how each attempt is launched: a session on a resident server,
-// a standby process, or a cold start.
+// or a cold start.
 type Manager struct {
 	sink     Sink
 	log      *slog.Logger
 	home     string
 	Cold     *Cold
 	Resident *Resident
-	// Setting reads a kernel setting ("resident", "standby").
+	// Setting reads a kernel setting ("resident").
 	Setting func(key string) string
 }
 
@@ -37,9 +37,6 @@ func (m *Manager) Launch(run Run) {
 			}
 			m.sink.Note(run.AttemptID, "opencode 常驻服务不可用，这次改为冷启动")
 			m.Resident.Ensure(run.Account)
-		}
-		if SupportsStandby(run.Engine) && m.Cold.Release(run) {
-			return
 		}
 		m.Cold.Launch(run)
 	}()
@@ -75,17 +72,6 @@ func (m *Manager) Reattach(run Run, mode, unit, vendorSession string) {
 	}
 }
 
-// Prewarm implements the kernel's Engines interface.
-func (m *Manager) Prewarm(run Run) {
-	if m.Setting("standby") == "off" {
-		return
-	}
-	go m.Cold.Prewarm(run)
-}
-
-// DropPrewarm implements the kernel's Engines interface.
-func (m *Manager) DropPrewarm(packageID string) { go m.Cold.DropPrewarm(packageID) }
-
 // Warm implements the kernel's Engines interface.
 func (m *Manager) Warm(workspace string) {
 	if m.Setting("resident") != "off" {
@@ -101,8 +87,8 @@ func (m *Manager) Liveness(attemptID string) Liveness {
 	return m.Resident.Liveness(attemptID)
 }
 
-// Sweep stops attempt scopes that no attempt owns any more: standby processes
-// and runs orphaned by a crash. Resident servers are left alone.
+// Sweep stops attempt scopes that no attempt owns any more: runs orphaned by
+// a crash. Resident servers are left alone.
 func (m *Manager) Sweep() {
 	out, err := exec.Command("systemctl", "--user", "list-units", "--type=scope", "--state=active", "--plain", "--no-legend", "weaver-p_*").Output()
 	if err != nil {

@@ -86,7 +86,7 @@ weaver account add --engine codex --kind subscription --id codex_sub --auth-dir 
 weaver account add --engine dsh --kind api --id dsh_openai --provider openai --api-key-env OPENAI_API_KEY
 weaver worker set codex_medium --engine codex --model <model> --effort medium --intelligence 8 --accounts codex_sub
 weaver worker list
-weaver config list            # max_parallel (32), stall_seconds (300), quota_refresh_minutes (5), resident (on), standby (on)
+weaver config list            # max_parallel (32), stall_seconds (300), quota_refresh_minutes (5), resident (on)
 ```
 
 A candidate ("worker") is an engine, a model and an effort on one or more accounts. Each candidate has an `intelligence` rating from 1 to 10 that you set, and each package states the `intelligence` its instruction needs. A package only goes to candidates rated at least that high; among those, Weaver prefers the one with the better first-attempt acceptance rate, shorter typical duration, healthier subscription quota and lighter load. A candidate without a rating stays out of automatic routing and is used only when a package names it. `weaver account quota` shows the quota windows of subscription accounts. A vendor limit pauses the account and moves the package to another ready candidate.

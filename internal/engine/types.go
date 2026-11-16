@@ -7,7 +7,6 @@ import "time"
 const (
 	ModeCold     = "cold"     // one process per attempt
 	ModeResident = "resident" // a session on a long-lived engine server
-	ModeStandby  = "standby"  // a process started ahead of time, fed the prompt on release
 )
 
 // Account is the credential context an attempt runs under.

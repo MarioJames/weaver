@@ -297,3 +297,25 @@ func TestQuotaRefreshIntervalIsConfigurable(t *testing.T) {
 		t.Fatalf("interval = %s, want 30m", got)
 	}
 }
+
+// A setting the kernel no longer has, such as the retired claude standby,
+// stays in old databases but is not listed.
+func TestRetiredSettingIsNotListed(t *testing.T) {
+	f := newFixture(t)
+	if err := f.k.write(func(t *tx) error {
+		_, err := t.Exec(`INSERT INTO settings(key, value) VALUES('standby','off')`)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	all, err := f.k.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := all["standby"]; ok {
+		t.Fatalf("settings = %v", all)
+	}
+	if err := f.k.SetSetting("standby", "on"); err == nil {
+		t.Fatal("the retired standby setting was accepted")
+	}
+}

@@ -22,10 +22,6 @@ type Engines interface {
 	Cancel(attemptID string) engine.CancelResult
 	// Reattach resumes supervision of an attempt that was active when the service last stopped.
 	Reattach(run engine.Run, mode, unit, vendorSession string)
-	// Prewarm starts a standby process for a package that is about to be released.
-	Prewarm(run engine.Run)
-	// DropPrewarm discards a standby process that will not be used.
-	DropPrewarm(packageID string)
 	// Warm prepares resident engines for work in a directory.
 	Warm(workspace string)
 	// Liveness reports process activity for the stall check.
@@ -131,8 +127,6 @@ type tx struct {
 	k        *Kernel
 	now      int64
 	launches []engine.Run
-	prewarms []engine.Run
-	drops    []string
 	warms    []string
 	touched  map[string]bool
 	woke     map[string]bool
@@ -175,12 +169,6 @@ func (k *Kernel) afterCommit(t *tx) {
 	}
 	for _, dir := range t.warms {
 		k.eng.Warm(dir)
-	}
-	for _, id := range t.drops {
-		k.eng.DropPrewarm(id)
-	}
-	for _, run := range t.prewarms {
-		k.eng.Prewarm(run)
 	}
 	if t.timers {
 		select {

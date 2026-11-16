@@ -26,7 +26,7 @@ type fakeService struct {
 }
 
 func fixture(home string) snapshot {
-	s := snapshot{Version: "2.0.0", PID: 386116, StartedAt: time.Now().Add(-5 * time.Hour).UnixMilli(), Home: home, Settings: map[string]string{"max_parallel": "32", "stall_seconds": "300", "quota_refresh_minutes": "5", "resident": "on", "standby": "on"}, Overview: overview{Capacity: 32, Missions: 2, Timers: 3}}
+	s := snapshot{Version: "2.0.0", PID: 386116, StartedAt: time.Now().Add(-5 * time.Hour).UnixMilli(), Home: home, Settings: map[string]string{"max_parallel": "32", "stall_seconds": "300", "quota_refresh_minutes": "5", "resident": "on"}, Overview: overview{Capacity: 32, Missions: 2, Timers: 3}}
 	labels := []string{"Claude 5x Max", "ChatGPT Pro 5x", "opencode no••@gmail.com", "opencode im••@gmail.com / Default", "dsh deepseek-official", "OpenAI API（dsh）", "Anthropic API（dsh）"}
 	for i, label := range labels {
 		engine, kind := "dsh", "api"
@@ -242,8 +242,6 @@ func TestSettingsSaveAndRejection(t *testing.T) {
 	edit(t, tt, "卡住判定", "600", false)
 	click(t, tt, "全局并行上限")
 	waitFor(t, tt, a, func() bool { return a.snapshot.Settings["stall_seconds"] == "600" })
-	click(t, tt, "claude 待命")
-	waitFor(t, tt, a, func() bool { return a.snapshot.Settings["standby"] == "off" })
 	edit(t, tt, "额度刷新间隔", "30", true)
 	waitFor(t, tt, a, func() bool {
 		return !a.busy["config:quota_refresh_minutes"] && a.snapshot.Settings["quota_refresh_minutes"] == "30"

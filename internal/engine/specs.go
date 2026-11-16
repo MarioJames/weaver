@@ -39,8 +39,6 @@ func (c *launchCtx) privateDir(name string) (string, error) {
 
 type spec struct {
 	bin string
-	// standby: the CLI can be started ahead of its prompt and fed JSON messages on stdin.
-	standby bool
 	// argv builds the cold-start command after prepare has filled c.extra.
 	argv func(c *launchCtx) ([]string, error)
 	// prepare sets the account environment and writes private config files.
@@ -53,7 +51,7 @@ type spec struct {
 
 var specs = map[string]*spec{
 	"claude": {
-		bin: "claude", standby: true,
+		bin: "claude",
 		argv: func(c *launchCtx) ([]string, error) {
 			argv := []string{"claude", "-p", "--output-format", "stream-json", "--verbose", "--model", c.run.Model}
 			if c.run.Effort != "" {

@@ -23,8 +23,6 @@ type taskContractEngines struct{}
 func (taskContractEngines) Launch(engine.Run)                           {}
 func (taskContractEngines) Cancel(string) engine.CancelResult           { return engine.CancelResult{} }
 func (taskContractEngines) Reattach(engine.Run, string, string, string) {}
-func (taskContractEngines) Prewarm(engine.Run)                          {}
-func (taskContractEngines) DropPrewarm(string)                          {}
 func (taskContractEngines) Warm(string)                                 {}
 func (taskContractEngines) Liveness(string) engine.Liveness             { return engine.Liveness{} }
 
@@ -58,7 +56,6 @@ func taskContractService(t *testing.T) (client, string, []string) {
 		}
 	}
 	must(k.SetSetting("resident", "off"))
-	must(k.SetSetting("standby", "off"))
 	_, err = k.AddAccount(kernel.AccountInput{ID: "contract-account", Engine: "codex", Kind: "api", APIKey: "test-only", Label: "contract"})
 	must(err)
 	_, err = k.SetWorker(kernel.WorkerInput{ID: "contract-worker", Engine: "codex", Model: "test-model", Accounts: []string{"contract-account"}})

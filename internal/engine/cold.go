@@ -46,29 +46,25 @@ exit $code
 `
 
 const (
-	exitGrace      = 30 * time.Second // how long a process may linger after giving its result
-	failureGrace   = 15 * time.Second // how long a process may linger after reporting a failure
-	standbyTTL     = 10 * time.Minute // a standby process nobody released is discarded
-	standbyMaximum = 4
+	exitGrace    = 30 * time.Second // how long a process may linger after giving its result
+	failureGrace = 15 * time.Second // how long a process may linger after reporting a failure
 )
 
 // Cold runs one process per attempt inside its own systemd scope. Output goes
 // to files in the run directory, so supervision can be resumed after the
-// service restarts. A standby process is the same thing started early, with a
-// FIFO as stdin that receives the prompt on release.
+// service restarts.
 type Cold struct {
 	sink Sink
 	log  *slog.Logger
 	// Direct runs the wrapper without systemd-run. Only tests use it.
 	Direct bool
 
-	mu       sync.Mutex
-	runs     map[string]*coldRun // by attempt ID
-	standbys map[string]*coldRun // by package ID, not yet released
+	mu   sync.Mutex
+	runs map[string]*coldRun // by attempt ID
 }
 
 func NewCold(sink Sink, log *slog.Logger) *Cold {
-	return &Cold{sink: sink, log: log, runs: map[string]*coldRun{}, standbys: map[string]*coldRun{}}
+	return &Cold{sink: sink, log: log, runs: map[string]*coldRun{}}
 }
 
 type coldRun struct {
@@ -77,16 +73,12 @@ type coldRun struct {
 	mode string
 
 	mu        sync.Mutex
-	run       Run      // replaced on release, when the real attempt is known
-	fifo      *os.File // standby only: the write end of the prompt FIFO
-	released  bool     // the prompt has been delivered
+	run       Run
 	handed    bool
 	started   bool
-	sawStart  bool // the engine reported it is up (possibly before release)
 	finished  bool // the terminal report was sent
 	cancelled bool
-	gone      bool // the process is known to have ended
-	bornAt    time.Time
+	gone      bool          // the process is known to have ended
 	exited    chan struct{} // closed when a process we spawned ourselves ends
 	done      chan struct{} // closed when the watcher returns
 	replay    bool          // suppress progress notes until the existing output is consumed
@@ -108,7 +100,7 @@ func (r *coldRun) path(name string) string { return filepath.Join(r.dir, name) }
 
 // Launch starts a fresh process for the attempt.
 func (c *Cold) Launch(run Run) {
-	r, err := c.start(run, false)
+	r, err := c.start(run)
 	if err != nil {
 		c.sink.Finished(run.AttemptID, Outcome{FailureKind: FailLaunch, FailureMessage: err.Error()})
 		return
@@ -116,116 +108,7 @@ func (c *Cold) Launch(run Run) {
 	go c.watch(r)
 }
 
-// SupportsStandby reports whether the engine can be started ahead of its prompt.
-func SupportsStandby(engine string) bool { s := specs[engine]; return s != nil && s.standby }
-
-// Prewarm starts a standby process for a package unless one is already waiting.
-func (c *Cold) Prewarm(run Run) {
-	if !SupportsStandby(run.Engine) {
-		return
-	}
-	c.mu.Lock()
-	if _, ok := c.standbys[run.PackageID]; ok || len(c.standbys) >= standbyMaximum {
-		c.mu.Unlock()
-		return
-	}
-	// Reserve the slot before the slow part so concurrent dispatches do not start two.
-	placeholder := &coldRun{run: run, dir: run.RunDir}
-	c.standbys[run.PackageID] = placeholder
-	c.mu.Unlock()
-	r, err := c.start(run, true)
-	c.mu.Lock()
-	if c.standbys[run.PackageID] != placeholder {
-		// Dropped while starting.
-		c.mu.Unlock()
-		if err == nil {
-			c.stop(r)
-		}
-		return
-	}
-	if err != nil {
-		delete(c.standbys, run.PackageID)
-		c.mu.Unlock()
-		c.log.Warn("standby start failed", "package", run.PackageID, "err", err)
-		return
-	}
-	c.standbys[run.PackageID] = r
-	c.mu.Unlock()
-	go c.watch(r)
-}
-
-// DropPrewarm discards a package's standby process, if any.
-func (c *Cold) DropPrewarm(packageID string) {
-	c.mu.Lock()
-	r := c.standbys[packageID]
-	delete(c.standbys, packageID)
-	c.mu.Unlock()
-	if r != nil && r.unit != "" {
-		r.mu.Lock()
-		r.cancelled = true
-		r.mu.Unlock()
-		c.stop(r)
-	}
-}
-
-// Release hands the prompt to a standby process that matches the run. It
-// reports false when there is none, and the caller falls back to a cold start.
-func (c *Cold) Release(run Run) bool {
-	c.mu.Lock()
-	r := c.standbys[run.PackageID]
-	if r == nil || r.unit == "" {
-		c.mu.Unlock()
-		return false
-	}
-	delete(c.standbys, run.PackageID)
-	c.mu.Unlock()
-	r.mu.Lock()
-	usable := r.run.Account.ID == run.Account.ID && r.run.Model == run.Model && r.run.Effort == run.Effort && r.run.Workspace == run.Workspace && r.dir == run.RunDir
-	if usable {
-		r.run = run
-	}
-	r.mu.Unlock()
-	if usable {
-		c.mu.Lock()
-		c.runs[run.AttemptID] = r
-		c.mu.Unlock()
-	}
-	r.mu.Lock()
-	if !usable || r.gone || r.cancelled {
-		r.cancelled = true
-		r.mu.Unlock()
-		c.mu.Lock()
-		if c.runs[run.AttemptID] == r {
-			delete(c.runs, run.AttemptID)
-		}
-		c.mu.Unlock()
-		c.stop(r)
-		return false
-	}
-	message, _ := json.Marshal(map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": []any{map[string]any{"type": "text", "text": run.Instruction}}}})
-	_ = os.WriteFile(r.path("prompt.txt"), []byte(run.Instruction), 0o600)
-	_, err := r.fifo.Write(append(message, '\n'))
-	if err != nil {
-		r.cancelled = true
-		r.mu.Unlock()
-		c.mu.Lock()
-		delete(c.runs, run.AttemptID)
-		c.mu.Unlock()
-		c.stop(r)
-		return false
-	}
-	r.released, r.handed = true, true
-	sawStart := r.sawStart
-	r.started = sawStart
-	r.mu.Unlock()
-	c.sink.Handed(run.AttemptID, ModeStandby, r.unit)
-	if sawStart {
-		c.sink.Started(run.AttemptID, "")
-	}
-	return true
-}
-
-func (c *Cold) start(run Run, standby bool) (*coldRun, error) {
+func (c *Cold) start(run Run) (*coldRun, error) {
 	s := specs[run.Engine]
 	if s == nil {
 		return nil, fmt.Errorf("不支持的引擎 %s", run.Engine)
@@ -233,7 +116,7 @@ func (c *Cold) start(run Run, standby bool) (*coldRun, error) {
 	if err := os.MkdirAll(run.RunDir, 0o700); err != nil {
 		return nil, err
 	}
-	for _, stale := range []string{"stdout.jsonl", "stderr.log", "exit.json", "started", "stdin.fifo"} {
+	for _, stale := range []string{"stdout.jsonl", "stderr.log", "exit.json", "started"} {
 		os.Remove(filepath.Join(run.RunDir, stale))
 	}
 	ctx := &launchCtx{run: run, env: map[string]string{}, stdin: true}
@@ -249,38 +132,20 @@ func (c *Cold) start(run Run, standby bool) (*coldRun, error) {
 		return nil, fmt.Errorf("本机没有安装 %s", argv[0])
 	}
 	argv[0] = bin
-	r := &coldRun{run: run, dir: run.RunDir, unit: unitFor(run.AttemptID), mode: ModeCold, released: !standby, bornAt: time.Now(), exited: make(chan struct{}), done: make(chan struct{})}
+	r := &coldRun{run: run, dir: run.RunDir, unit: unitFor(run.AttemptID), mode: ModeCold, exited: make(chan struct{}), done: make(chan struct{})}
 
-	var stdin *os.File
-	switch {
-	case standby:
-		r.mode = ModeStandby
-		argv = append(argv, "--input-format", "stream-json")
-		if err := syscall.Mkfifo(r.path("stdin.fifo"), 0o600); err != nil {
-			return nil, err
-		}
-		// Read-write, so the engine never sees end-of-file while it waits,
-		// even if this service restarts. A plain blocking descriptor keeps
-		// O_NONBLOCK out of the child's stdin.
-		fd, err := syscall.Open(r.path("stdin.fifo"), syscall.O_RDWR|syscall.O_CLOEXEC, 0)
-		if err != nil {
-			return nil, err
-		}
-		stdin = os.NewFile(uintptr(fd), "stdin.fifo")
-		r.fifo = stdin
-	default:
-		if err := os.WriteFile(ctx.promptPath(), []byte(run.Instruction), 0o600); err != nil {
-			return nil, err
-		}
-		name := os.DevNull
-		if ctx.stdin {
-			name = ctx.promptPath()
-		}
-		if stdin, err = os.Open(name); err != nil {
-			return nil, err
-		}
-		defer stdin.Close()
+	if err := os.WriteFile(ctx.promptPath(), []byte(run.Instruction), 0o600); err != nil {
+		return nil, err
 	}
+	name := os.DevNull
+	if ctx.stdin {
+		name = ctx.promptPath()
+	}
+	stdin, err := os.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer stdin.Close()
 	stdout, err := os.OpenFile(r.path("stdout.jsonl"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return nil, err
@@ -308,9 +173,6 @@ func (c *Cold) start(run Run, standby bool) (*coldRun, error) {
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, stdout, stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
-		if r.fifo != nil {
-			r.fifo.Close()
-		}
 		return nil, fmt.Errorf("无法启动进程：%w", err)
 	}
 	pid := cmd.Process.Pid
@@ -321,25 +183,17 @@ func (c *Cold) start(run Run, standby bool) (*coldRun, error) {
 	if c.Direct {
 		r.unit = "pid:" + strconv.Itoa(pid)
 	}
-	if !standby {
-		c.mu.Lock()
-		c.runs[run.AttemptID] = r
-		c.mu.Unlock()
-	}
+	c.mu.Lock()
+	c.runs[run.AttemptID] = r
+	c.mu.Unlock()
 	return r, nil
 }
 
 // Reattach resumes watching an attempt whose process was started by an earlier service instance.
 func (c *Cold) Reattach(run Run, mode, unit string) {
-	r := &coldRun{run: run, dir: run.RunDir, unit: unit, mode: mode, bornAt: time.Now(), done: make(chan struct{}), replay: true, released: true, handed: true}
+	r := &coldRun{run: run, dir: run.RunDir, unit: unit, mode: mode, done: make(chan struct{}), replay: true, handed: true}
 	if r.unit == "" {
 		r.unit = unitFor(run.AttemptID)
-	}
-	if mode == ModeStandby {
-		// Keep a writer on the FIFO for symmetry with a fresh standby; the prompt was already delivered.
-		if fd, err := syscall.Open(r.path("stdin.fifo"), syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0); err == nil {
-			r.fifo = os.NewFile(uintptr(fd), "stdin.fifo")
-		}
 	}
 	c.mu.Lock()
 	c.runs[run.AttemptID] = r
@@ -447,15 +301,7 @@ func stopScopeWith(command func(string, ...string) *exec.Cmd, unit string) {
 	}
 }
 
-func (c *Cold) stop(r *coldRun) {
-	stopScope(r.unit)
-	r.mu.Lock()
-	if r.fifo != nil {
-		r.fifo.Close()
-		r.fifo = nil
-	}
-	r.mu.Unlock()
-}
+func (c *Cold) stop(r *coldRun) { stopScope(r.unit) }
 
 type exitRecord struct {
 	PID  int `json:"pid"`
@@ -479,22 +325,13 @@ func (c *Cold) watch(r *coldRun) {
 	defer close(r.done)
 	defer func() {
 		r.mu.Lock()
-		attempt, pkg := r.run.AttemptID, r.run.PackageID
+		attempt := r.run.AttemptID
 		r.mu.Unlock()
 		c.mu.Lock()
 		if c.runs[attempt] == r {
 			delete(c.runs, attempt)
 		}
-		if c.standbys[pkg] == r {
-			delete(c.standbys, pkg)
-		}
 		c.mu.Unlock()
-		r.mu.Lock()
-		if r.fifo != nil {
-			r.fifo.Close()
-			r.fifo = nil
-		}
-		r.mu.Unlock()
 	}()
 	watcher := newDirWatch(r.dir)
 	defer watcher.close()
@@ -511,9 +348,9 @@ func (c *Cold) watch(r *coldRun) {
 	for {
 		r.mu.Lock()
 		id := r.run.AttemptID
-		released, cancelled := r.released, r.cancelled
+		cancelled := r.cancelled
 		announceHanded := false
-		if released && !r.handed {
+		if !r.handed {
 			if _, err := os.Stat(r.path("started")); err == nil {
 				r.handed, announceHanded = true, true
 			}
@@ -525,18 +362,11 @@ func (c *Cold) watch(r *coldRun) {
 		for _, line := range lines.read() {
 			sig := norm.push(line)
 			r.mu.Lock()
-			if sig.started {
-				r.sawStart = true
-			}
-			released = r.released
-			announce := released && r.sawStart && !r.started
+			announce := sig.started && !r.started
 			if announce {
 				r.started = true
 			}
 			r.mu.Unlock()
-			if !released {
-				continue
-			}
 			if announce || (sig.started && !replay) {
 				c.sink.Started(id, norm.session)
 			}
@@ -553,17 +383,12 @@ func (c *Cold) watch(r *coldRun) {
 		}
 		replay = false
 
-		if released && !cancelled && !r.finished && norm.succeeded() {
+		if !cancelled && !r.finished && norm.succeeded() {
 			r.finished = true
 			c.sink.Finished(id, norm.outcome(true))
-			if r.mode == ModeStandby {
-				// A standby process waits for more input forever; ending it is the normal path.
-				go c.stop(r)
-			} else {
-				killAt, killNote = time.Now().Add(exitGrace), fmt.Sprintf("给出结果后 %d 秒仍未退出，已结束进程", int(exitGrace.Seconds()))
-			}
+			killAt, killNote = time.Now().Add(exitGrace), fmt.Sprintf("给出结果后 %d 秒仍未退出，已结束进程", int(exitGrace.Seconds()))
 		}
-		if released && !cancelled && !r.finished && norm.failure != "" && killAt.IsZero() {
+		if !cancelled && !r.finished && norm.failure != "" && killAt.IsZero() {
 			killAt = time.Now().Add(failureGrace)
 		}
 
@@ -591,9 +416,9 @@ func (c *Cold) watch(r *coldRun) {
 			}
 			r.mu.Lock()
 			r.gone = true
-			released, cancelled = r.released, r.cancelled
+			cancelled = r.cancelled
 			r.mu.Unlock()
-			if !released || cancelled {
+			if cancelled {
 				return
 			}
 			if exitKnown {
@@ -601,7 +426,7 @@ func (c *Cold) watch(r *coldRun) {
 			}
 			switch {
 			case r.finished:
-				if exitKnown && exit.Code != 0 && r.mode != ModeStandby && !killed {
+				if exitKnown && exit.Code != 0 && !killed {
 					c.sink.Anomaly(id, fmt.Sprintf("进程在给出结果后以退出码 %d 结束", exit.Code))
 				}
 			case norm.succeeded():
@@ -621,12 +446,6 @@ func (c *Cold) watch(r *coldRun) {
 			if r.finished && killNote != "" {
 				c.sink.Anomaly(id, killNote)
 			}
-			go c.stop(r)
-		}
-		if !released && time.Since(r.bornAt) > standbyTTL {
-			r.mu.Lock()
-			r.cancelled = true
-			r.mu.Unlock()
 			go c.stop(r)
 		}
 		watcher.wait(200 * time.Millisecond)

@@ -51,7 +51,6 @@ func (a *app) settingsPage(c *ui.Context) {
 				{"stall_seconds", "卡住判定", "秒没有新事件就算卡住", false},
 				{"quota_refresh_minutes", "额度刷新间隔", "分钟自动读取一次订阅账号额度，1 到 1440", false},
 				{"resident", "opencode 常驻", "订阅账号保持一个常驻服务，包来了直接进", true},
-				{"standby", "claude 待命", "提前起好进程等包", true},
 			} {
 				a.settingRow(c, item.key, item.label, item.desc, item.toggle)
 			}

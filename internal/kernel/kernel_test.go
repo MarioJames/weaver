@@ -18,7 +18,6 @@ type fakeEngines struct {
 	mu        sync.Mutex
 	launched  []engine.Run
 	cancelled []string
-	prewarmed []engine.Run
 	residual  bool
 	liveness  engine.Liveness
 }
@@ -35,13 +34,7 @@ func (f *fakeEngines) Cancel(id string) engine.CancelResult {
 	return engine.CancelResult{Residual: f.residual, Workspace: "/ws"}
 }
 func (f *fakeEngines) Reattach(engine.Run, string, string, string) {}
-func (f *fakeEngines) Prewarm(run engine.Run) {
-	f.mu.Lock()
-	f.prewarmed = append(f.prewarmed, run)
-	f.mu.Unlock()
-}
-func (f *fakeEngines) DropPrewarm(string) {}
-func (f *fakeEngines) Warm(string)        {}
+func (f *fakeEngines) Warm(string)                                 {}
 func (f *fakeEngines) Liveness(string) engine.Liveness {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -525,17 +518,5 @@ func TestResultIsPushedWhenNobodyWaitsAndNotRepeatedToTheNextWait(t *testing.T) 
 	}
 	if len(res.Wakes) != 0 {
 		t.Fatalf("the pushed result was delivered again: %+v", res.Wakes)
-	}
-}
-
-func TestPrewarmIsRequestedOnceUpstreamHasItsResult(t *testing.T) {
-	f := newFixture(t)
-	ids := f.submit(f.mission(), pkg("a"), PackageInput{Intelligence: 1, Key: "b", Instruction: "x", Worker: "gamma", DependsOn: []string{"a"}})
-	if len(f.eng.prewarmed) != 0 {
-		t.Fatalf("prewarmed before the upstream result")
-	}
-	f.succeed(ids["a"], 1, "A")
-	if len(f.eng.prewarmed) == 0 || f.eng.prewarmed[0].PackageID != ids["b"] || f.eng.prewarmed[0].AttemptID != attemptID(ids["b"], 1) {
-		t.Fatalf("prewarm requests = %+v", f.eng.prewarmed)
 	}
 }

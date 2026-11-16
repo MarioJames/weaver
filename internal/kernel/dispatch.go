@@ -161,12 +161,8 @@ func (t *tx) dispatch() error {
 		}
 		if len(unmet) > 0 {
 			parts := make([]string, len(unmet))
-			imminent := true
 			for i, d := range unmet {
 				parts[i] = fmt.Sprintf("%s（%s）", d.key, stateLabel(d.state))
-				if d.state != StateVerdict {
-					imminent = false
-				}
 			}
 			waiting := "等待上游被采纳：" + strings.Join(parts, "、")
 			if waiting != p.Waiting {
@@ -174,19 +170,6 @@ func (t *tx) dispatch() error {
 					return err
 				}
 				t.touched[p.MissionID] = true
-			}
-			// Every remaining upstream has its result in: the verdict is the
-			// only thing left, so a pinned package can warm its engine now.
-			if imminent && (p.Worker != "" || p.Engine != "") {
-				if w, a, _ := rt.pick(p.Worker, p.Engine, p.Intelligence); w != nil {
-					w.Running--
-					a.Running--
-					rt.Active--
-					t.prewarms = append(t.prewarms, engine.Run{
-						AttemptID: attemptID(p.ID, p.Attempt+1), PackageID: p.ID, Title: p.Title, Workspace: p.Workspace,
-						Engine: w.Engine, Model: w.Model, Effort: w.Effort, Account: a.Account, RunDir: t.k.runDir(attemptID(p.ID, p.Attempt+1)),
-					})
-				}
 			}
 			continue
 		}

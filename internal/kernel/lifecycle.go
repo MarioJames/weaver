@@ -34,8 +34,6 @@ func modeLabel(mode string) string {
 	switch mode {
 	case engine.ModeResident:
 		return "常驻会话"
-	case engine.ModeStandby:
-		return "待命进程"
 	}
 	return "冷启动"
 }
@@ -193,7 +191,6 @@ func (k *Kernel) Finished(attemptID string, o engine.Outcome) {
 			if _, err := t.event(p.MissionID, p.ID, a.N, EvResult, "有结果，等待采纳或退回"); err != nil {
 				return err
 			}
-			// A dependent pinned to a standby engine can warm up now.
 			return t.dispatch()
 		}
 		kind := o.FailureKind
@@ -467,7 +464,6 @@ func (k *Kernel) Cancel(missionID, pkgID string) (*CancelResult, error) {
 			if _, err := t.event(p.MissionID, p.ID, p.Attempt, EvCancelled, "已取消（原状态："+stateLabel(from)+"）"); err != nil {
 				return err
 			}
-			t.drops = append(t.drops, p.ID)
 			out.Cancelled = append(out.Cancelled, CancelledPackage{ID: p.ID, Key: p.Key, From: from})
 		}
 		return t.dispatch()

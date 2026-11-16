@@ -87,7 +87,7 @@ func scripted(t *testing.T, kind, script string) {
 		t.Fatal(err)
 	}
 	original := specs[kind]
-	specs[kind] = &spec{bin: "sh", standby: original.standby,
+	specs[kind] = &spec{bin: "sh",
 		argv:    func(c *launchCtx) ([]string, error) { return []string{"sh", path}, nil },
 		prepare: func(c *launchCtx) error { return nil }, ready: original.ready}
 	t.Cleanup(func() { specs[kind] = original })
@@ -233,58 +233,6 @@ sleep 1
 	second.Reattach(r, ModeCold, unit)
 	if o := secondSink.waitFinished(t, r.AttemptID, 5*time.Second); !o.Success || o.Text != "all done" {
 		t.Fatalf("reattached outcome = %+v", o)
-	}
-}
-
-func TestStandbyProcessReceivesThePromptOnRelease(t *testing.T) {
-	scripted(t, "claude", `echo '{"type":"system","subtype":"init","session_id":"s1"}'
-read line
-text=$(printf '%s' "$line" | sed 's/.*"text":"\([^"]*\)".*/\1/')
-echo "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"got $text\"}]}}"
-echo "{\"type\":\"result\",\"subtype\":\"success\",\"result\":\"got $text\"}"
-read never
-`)
-	cold, sink := newCold(t)
-	r := run(t, "claude", "p_h.1")
-	warm := r
-	warm.Instruction = ""
-	cold.Prewarm(warm)
-	time.Sleep(200 * time.Millisecond)
-	if len(sink.handed) != 0 || len(sink.started) != 0 {
-		t.Fatalf("a standby process reported before release: handed=%v started=%v", sink.handed, sink.started)
-	}
-	if !cold.Release(r) {
-		t.Fatal("release found no standby process")
-	}
-	o := sink.waitFinished(t, r.AttemptID, 3*time.Second)
-	if !o.Success || o.Text != "got PROMPT-p_h.1" || sink.handed[r.AttemptID] != ModeStandby {
-		t.Fatalf("outcome=%+v mode=%q", o, sink.handed[r.AttemptID])
-	}
-	// The process would wait for more input forever; it must be ended, and that is not an anomaly.
-	cold.mu.Lock()
-	tracked := cold.runs[r.AttemptID]
-	cold.mu.Unlock()
-	if tracked != nil {
-		select {
-		case <-tracked.done:
-		case <-time.After(8 * time.Second):
-			t.Fatal("the standby process was left running after its result")
-		}
-	}
-	if len(sink.anomaly) != 0 {
-		t.Fatalf("anomalies = %v", sink.anomaly)
-	}
-}
-
-func TestReleaseRefusesAStandbyStartedForAnotherRoute(t *testing.T) {
-	scripted(t, "claude", "read never\n")
-	cold, _ := newCold(t)
-	r := run(t, "claude", "p_i.1")
-	cold.Prewarm(r)
-	other := r
-	other.Model = "another-model"
-	if cold.Release(other) {
-		t.Fatal("a standby process for one model was used for another")
 	}
 }
 

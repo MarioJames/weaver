@@ -565,7 +565,6 @@ var settingDefaults = map[string]string{
 	"quota_refresh_minutes": fmt.Sprint(int(defaultQuotaInterval.Minutes())),
 	"stall_seconds":         fmt.Sprint(int(defaultStall.Seconds())),
 	"resident":              "on",
-	"standby":               "on",
 }
 
 func (k *Kernel) Settings() (map[string]string, error) {
@@ -584,7 +583,10 @@ func (k *Kernel) Settings() (map[string]string, error) {
 			if err := rows.Scan(&key, &value); err != nil {
 				return err
 			}
-			out[key] = value
+			// Old databases keep rows for retired settings; only known ones count.
+			if _, known := settingDefaults[key]; known {
+				out[key] = value
+			}
 		}
 		return rows.Err()
 	})
@@ -624,7 +626,7 @@ func (k *Kernel) SetSetting(key, value string) error {
 		if n, err := strconv.Atoi(value); err != nil || n < 1 || n > 1440 {
 			return errf("INVALID", "quota_refresh_minutes 需要 1 到 1440 之间的整数（分钟）")
 		}
-	case "resident", "standby":
+	case "resident":
 		if value != "on" && value != "off" {
 			return errf("INVALID", "%s 只能是 on 或 off", key)
 		}
