@@ -63,9 +63,6 @@ func TestPolishScreenshots(t *testing.T) {
 				click(t, tt, fxTitle)
 				tasksWait(t, tt, "创建主任务", 5*time.Second)
 			}
-			if page == "设置" {
-				waitFor(t, tt, a, func() bool { return !a.busy["skill:check"] })
-			}
 			menuOpen := page == "账号" && size.width == 1280
 			if menuOpen {
 				// Keep the menu over the subscription rows so the unconfigured
@@ -280,7 +277,7 @@ func TestNarrowPagesStayUsable(t *testing.T) {
 		"任务": "父 Agent 对话、子 Agent 生命周期和产物",
 		"账号": "7 个账号",
 		"候选": "6 个候选",
-		"设置": "调度、常驻引擎、服务和技能",
+		"设置": "调度、常驻引擎和服务",
 	}
 	for page, subtitle := range subtitles {
 		click(t, tt, page)

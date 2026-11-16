@@ -144,7 +144,7 @@ func TestCustomDataDirectorySettings(t *testing.T) {
 	a.page = "设置"
 	a.mu.Unlock()
 	tt := ui.NewTester(a.view, 1280, 900)
-	waitFor(t, tt, a, func() bool { return !a.busy["skill:check"] })
+	tt.Frame()
 	if !tt.HasText("自定义数据目录 " + f.home) {
 		t.Fatalf("没有显示自定义数据目录：%q", tt.Texts())
 	}

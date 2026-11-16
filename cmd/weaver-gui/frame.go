@@ -95,9 +95,6 @@ func (a *app) navigation(c *ui.Context, compact bool) {
 
 func (a *app) navigateTo(page string) {
 	a.page = page
-	if page == "设置" && !a.skillChecked {
-		a.checkSkill()
-	}
 }
 
 // pageHeader is the one title area: a 24 DIP title, a 13 DIP subtitle and the

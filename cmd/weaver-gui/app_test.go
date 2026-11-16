@@ -362,9 +362,6 @@ func TestScreenshots(t *testing.T) {
 	}
 	for _, page := range []string{"概览", "设置"} {
 		click(t, tt, page)
-		if page == "设置" {
-			waitFor(t, tt, a, func() bool { return !a.busy["skill:check"] })
-		}
 		name := "overview.png"
 		if page == "设置" {
 			name = "settings.png"
@@ -381,36 +378,11 @@ func TestScreenshots(t *testing.T) {
 	}
 }
 
-func TestSkillInstallAndBackup(t *testing.T) {
+func TestBackup(t *testing.T) {
 	f := newFake(t)
 	a := testApp(t, f)
-	skillPath := filepath.Join(os.Getenv("HOME"), ".agents", "skills", "agents-weaver", "SKILL.md")
-	runCommand = func(_ context.Context, name string, args ...string) ([]byte, error) {
-		if strings.Join(args, " ") == "skill install" {
-			if err := os.MkdirAll(filepath.Dir(skillPath), 0755); err != nil {
-				return nil, err
-			}
-			if err := os.WriteFile(skillPath, []byte("技能内容\n"), 0644); err != nil {
-				return nil, err
-			}
-		}
-		return []byte("技能内容\n"), nil
-	}
 	tt := ui.NewTester(a.view, 1280, 820)
 	click(t, tt, "设置")
-	waitFor(t, tt, a, func() bool { return !a.busy["skill:check"] && a.skillState == "未安装" })
-	// The skill section sits at the end of the page.
-	tt.Scroll(700, 500, 0, 2000)
-	tt.Advance(time.Second)
-	click(t, tt, "安装")
-	waitFor(t, tt, a, func() bool { return !a.busy["skill:install"] && !a.busy["skill:check"] && a.skillState == "已安装" })
-	if err := os.WriteFile(skillPath, []byte("旧版技能"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	a.mu.Lock()
-	a.checkSkill()
-	a.mu.Unlock()
-	waitFor(t, tt, a, func() bool { return !a.busy["skill:check"] && a.skillState == "需要更新" })
 	click(t, tt, "立即备份")
 	waitFor(t, tt, a, func() bool { return !a.busy["backup"] && strings.Contains(a.toast, "backups") })
 	if !tt.HasText(filepath.Join(f.home, "backups", "weaver.db")) {

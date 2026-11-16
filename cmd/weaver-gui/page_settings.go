@@ -1,10 +1,7 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/lobehub/lobe-mygo/pkg/choice"
@@ -40,7 +37,7 @@ func (a *app) saveSetting(key, value string) {
 }
 
 func (a *app) settingsPage(c *ui.Context) {
-	a.pageHeader(c, "设置", "调度、常驻引擎、服务和技能", nil)
+	a.pageHeader(c, "设置", "调度、常驻引擎和服务", nil)
 	section(c, "调度", func() {
 		ui.Column(c).Gap(10).Children(func() {
 			for _, item := range []struct {
@@ -116,35 +113,6 @@ func (a *app) settingsPage(c *ui.Context) {
 		for _, key := range []string{"backup", "service:restart", "service:uninstall"} {
 			fieldError(c, a.errors[key])
 		}
-	})
-	section(c, "技能 agents-weaver", func() {
-		ui.Row(c).Gap(16).AlignItems(ui.Center).Disabled(a.busy["skill:check"]).Children(func() {
-			state := a.skillState
-			color := display.TagColor("")
-			switch state {
-			case "已安装":
-				color = display.TagSuccess
-			case "需要更新":
-				color = display.TagWarning
-			}
-			display.Tag(c, state, display.TagProps{Color: color})
-			label := "重新安装"
-			if a.skillState == "未安装" {
-				label = "安装"
-			}
-			a.button(c, "skill:install", label, func() {
-				a.action("skill:install", func() (string, error) { return command(a.ctx, weaverExecutable(), "skill", "install") }, func(_ string, err error) {
-					if err == nil {
-						a.checkSkill()
-					}
-				})
-			})
-		})
-		if a.busy["skill:check"] {
-			display.Text(c, "检查中…", display.TextProps{Type: display.TextSecondary, FontSize: 12})
-		}
-		fieldError(c, a.errors["skill:check"])
-		fieldError(c, a.errors["skill:install"])
 	})
 }
 
@@ -224,33 +192,4 @@ func (a *app) external(key, name string, args ...string) {
 		}
 		return out, err
 	}, nil)
-}
-
-func (a *app) checkSkill() {
-	a.skillChecked = true
-	a.action("skill:check", func() (string, error) {
-		expected, err := command(a.ctx, weaverExecutable(), "skill")
-		if err != nil {
-			return "", err
-		}
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		installed, err := os.ReadFile(filepath.Join(home, ".agents", "skills", "agents-weaver", "SKILL.md"))
-		if os.IsNotExist(err) {
-			return "未安装", nil
-		}
-		if err != nil {
-			return "", err
-		}
-		if bytes.Equal(installed, []byte(expected)) {
-			return "已安装", nil
-		}
-		return "需要更新", nil
-	}, func(state string, err error) {
-		if err == nil {
-			a.skillState = state
-		}
-	})
 }

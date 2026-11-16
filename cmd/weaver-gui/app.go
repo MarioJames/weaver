@@ -138,8 +138,6 @@ type app struct {
 	confirmTitle  string
 	confirmBody   string
 	confirmAction func()
-	skillState    string
-	skillChecked  bool
 	ctx           context.Context
 	cancel        context.CancelFunc
 	invalidate    func()
@@ -148,7 +146,7 @@ type app struct {
 
 func newApp() *app {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &app{client: client{rpc.Home()}, page: "概览", busy: map[string]bool{}, errors: map[string]string{}, fields: map[string]*settingField{}, ctx: ctx, cancel: cancel, skillState: "未安装"}
+	return &app{client: client{rpc.Home()}, page: "概览", busy: map[string]bool{}, errors: map[string]string{}, fields: map[string]*settingField{}, ctx: ctx, cancel: cancel}
 }
 func (a *app) close() { a.cancel() }
 func (a *app) notify() {
