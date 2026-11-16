@@ -279,3 +279,21 @@ func TestQuotaRefreshBatchContinuesAndFilters(t *testing.T) {
 	}
 	assertQuotaPrivate(t, f)
 }
+
+func TestQuotaRefreshIntervalIsConfigurable(t *testing.T) {
+	f := newFixture(t)
+	if got := f.k.quotaInterval(); got != 5*time.Minute {
+		t.Fatalf("default interval = %s, want 5m", got)
+	}
+	for _, bad := range []string{"0", "-1", "abc", "1.5", "1441"} {
+		if err := f.k.SetSetting("quota_refresh_minutes", bad); err == nil {
+			t.Fatalf("quota_refresh_minutes=%q accepted", bad)
+		}
+	}
+	if err := f.k.SetSetting("quota_refresh_minutes", "30"); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.k.quotaInterval(); got != 30*time.Minute {
+		t.Fatalf("interval = %s, want 30m", got)
+	}
+}

@@ -72,6 +72,7 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
   weaver worker set <候选> [--engine <引擎>] [--model <模型>] [--effort <强度>] [--intelligence <能力分>] [--max-parallel <数量>] [--enabled true|false] [--accounts <账号,账号>]
   weaver engine list | start <账号> | stop <账号>
   weaver config list | set <键> <值>          archive_after_days: 0（关闭）/1/3/7（默认）/30
+                                             quota_refresh_minutes: 额度自动刷新间隔，1–1440 分钟（默认 5）
 
 服务
   weaver status

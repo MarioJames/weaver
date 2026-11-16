@@ -197,7 +197,7 @@ func (a *app) refresh() {
 		a.loaded = true
 		a.offline = false
 		a.reason = ""
-		for _, key := range []string{"max_parallel", "stall_seconds", "resident", "standby"} {
+		for _, key := range []string{"max_parallel", "stall_seconds", "quota_refresh_minutes", "resident", "standby"} {
 			f := a.fields[key]
 			if f == nil {
 				f = &settingField{}

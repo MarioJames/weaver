@@ -559,12 +559,13 @@ func (k *Kernel) Workers() ([]*Worker, error) {
 
 // Settings the kernel understands, with their defaults.
 var settingDefaults = map[string]string{
-	"archive_after_days": "7",
-	"dialogue_rounds":    "1",
-	"max_parallel":       fmt.Sprint(defaultMaxParallel),
-	"stall_seconds":      fmt.Sprint(int(defaultStall.Seconds())),
-	"resident":           "on",
-	"standby":            "on",
+	"archive_after_days":    "7",
+	"dialogue_rounds":       "1",
+	"max_parallel":          fmt.Sprint(defaultMaxParallel),
+	"quota_refresh_minutes": fmt.Sprint(int(defaultQuotaInterval.Minutes())),
+	"stall_seconds":         fmt.Sprint(int(defaultStall.Seconds())),
+	"resident":              "on",
+	"standby":               "on",
 }
 
 func (k *Kernel) Settings() (map[string]string, error) {
@@ -618,6 +619,10 @@ func (k *Kernel) SetSetting(key, value string) error {
 	case "stall_seconds":
 		if n, err := strconv.Atoi(value); err != nil || n <= 0 {
 			return errf("INVALID", "stall_seconds 需要正整数")
+		}
+	case "quota_refresh_minutes":
+		if n, err := strconv.Atoi(value); err != nil || n < 1 || n > 1440 {
+			return errf("INVALID", "quota_refresh_minutes 需要 1 到 1440 之间的整数（分钟）")
 		}
 	case "resident", "standby":
 		if value != "on" && value != "off" {

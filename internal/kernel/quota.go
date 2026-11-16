@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -138,14 +139,24 @@ func (k *Kernel) quotaLoop() {
 		case <-done:
 		}
 	}()
-	delay := 10 * time.Second
+	// The first read comes shortly after start. Later reads follow the
+	// configured interval, re-read on every check so a change applies without
+	// a restart and without waiting out the old interval.
+	due := time.Now().Add(10 * time.Second)
+	var last time.Time
 	for {
-		timer := time.NewTimer(delay)
-		select {
-		case <-k.stop:
-			timer.Stop()
-			return
-		case <-timer.C:
+		if !last.IsZero() {
+			due = last.Add(k.quotaInterval())
+		}
+		if wait := time.Until(due); wait > 0 {
+			timer := time.NewTimer(min(wait, quotaCheckEvery))
+			select {
+			case <-k.stop:
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+			continue
 		}
 		_, _ = k.refreshQuotas(ctx, "", true)
 		if ctx.Err() != nil {
@@ -154,9 +165,23 @@ func (k *Kernel) quotaLoop() {
 		if err := k.Dispatch(); err != nil {
 			k.log.Error("quota dispatch failed", "err", err)
 		}
-		delay = 5 * time.Minute
+		last = time.Now()
 	}
 }
+
+const (
+	defaultQuotaInterval = 5 * time.Minute
+	quotaCheckEvery      = 15 * time.Second
+)
+
+// quotaInterval is how often enabled subscription accounts are read.
+func (k *Kernel) quotaInterval() time.Duration {
+	if n, err := strconv.Atoi(k.Setting("quota_refresh_minutes")); err == nil && n > 0 {
+		return time.Duration(n) * time.Minute
+	}
+	return defaultQuotaInterval
+}
+
 func quotaExhaustedReason(name string, s *quota.Snapshot, model string, now time.Time) string {
 	reason := fmt.Sprintf("账号「%s」额度已用完", name)
 	var reset int64
