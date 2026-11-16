@@ -106,11 +106,16 @@ func newTaskDetail(m *taskMission) taskDetail {
 }
 
 func taskMissionLabel(state string) string {
-	labels := map[string]string{"empty": "待拆包", "awaiting_verdict": "待结论", "attention": "需关注", "blocked": "等待依赖", "running": "进行中", "closed": "已完成", "done": "已完成", "completed": "已完成"}
+	labels := map[string]string{"empty": "待拆包", "awaiting_verdict": "待结论", "attention": "需关注", "dialogue_error": "对谈异常", "blocked": "等待依赖", "running": "进行中", "closed": "已完成", "done": "已完成", "completed": "已完成"}
 	if label := labels[state]; label != "" {
 		return label
 	}
 	return state
+}
+
+// taskNeedsAttention: something failed and waits for the owner; a failed dialogue side has its own label.
+func taskNeedsAttention(m taskMission) bool {
+	return m.State == "attention" || m.State == "dialogue_error"
 }
 func taskMissionDone(m taskMission) bool {
 	return m.ClosedAt != 0 || m.State == "closed" || m.State == "done" || m.State == "completed"
@@ -120,9 +125,9 @@ func taskMissionDone(m taskMission) bool {
 func taskFilterMatches(filter int, m taskMission) bool {
 	switch filter {
 	case taskFilterActive:
-		return m.State != "attention" && !taskMissionDone(m)
+		return !taskNeedsAttention(m) && !taskMissionDone(m)
 	case taskFilterAttention:
-		return m.State == "attention"
+		return taskNeedsAttention(m)
 	case taskFilterDone:
 		return taskMissionDone(m)
 	}

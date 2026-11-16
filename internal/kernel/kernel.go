@@ -367,22 +367,51 @@ func getMission(q querier, id string) (*Mission, error) {
 		m.Counts[state] = n
 		m.Total += n
 	}
-	m.State = missionState(m.Counts, m.Total)
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	rows.Close()
+	dialogueFailed := false
+	if m.Counts[StateFailed] > 0 {
+		if dialogueFailed, err = failedDialogueSide(q, id); err != nil {
+			return nil, err
+		}
+	}
+	m.State = missionState(m.Counts, m.Total, dialogueFailed)
 	m.Activity, err = missionActivity(q, m)
 	return m, err
 }
 
-// missionState derives a mission's state from its packages.
-func missionState(c map[string]int, total int) string {
+// failedDialogueSide reports whether a side of a dialogue is failed: its next round cannot start.
+func failedDialogueSide(q querier, mission string) (bool, error) {
+	rows, err := q.Query(`SELECT key FROM packages WHERE mission_id=? AND advisory=1 AND state=?`, mission, StateFailed)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return false, err
+		}
+		if _, _, _, ok := parseDialoguePackage(key, true); ok {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
+}
+
+// missionState derives a mission's state from its packages. A failed dialogue
+// side outranks results waiting for a verdict: the dialogue is stuck until the
+// owner retries or cancels it.
+func missionState(c map[string]int, total int, dialogueFailed bool) string {
 	switch {
 	case total == 0:
 		return "empty"
 	case c[StateLaunch]+c[StateRunning] > 0:
 		return "running"
+	case dialogueFailed:
+		return "dialogue_error"
 	case c[StateVerdict] > 0:
 		return "awaiting_verdict"
 	case c[StateFailed] > 0:

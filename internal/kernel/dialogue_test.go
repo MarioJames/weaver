@@ -214,8 +214,26 @@ func TestDialogueContinuesAfterAFailedSideIsRetried(t *testing.T) {
 	if s := f.state(ids["dialogue.r2.a"]); s != StatePending {
 		t.Fatalf("the exchange started without the failed side (%s)", s)
 	}
+	// The mission names the dialogue as what broke, also while other results wait for a verdict.
+	if got, _ := f.k.Mission(m); got.State != "dialogue_error" {
+		t.Fatalf("mission state = %s, want dialogue_error", got.State)
+	}
+	for want, counts := range map[string]map[string]int{
+		"dialogue_error": {StateVerdict: 1, StateFailed: 1, StatePending: 2},
+		"running":        {StateRunning: 1, StateFailed: 1},
+	} {
+		if got := missionState(counts, 4, true); got != want {
+			t.Fatalf("missionState(%v) = %s, want %s", counts, got, want)
+		}
+	}
+	if got := missionState(map[string]int{StateVerdict: 1, StateFailed: 1}, 2, false); got != "awaiting_verdict" {
+		t.Fatalf("a failed work package keeps the old order, got %s", got)
+	}
 	if _, err := f.k.Retry(ids["dialogue.r1.b"], ""); err != nil {
 		t.Fatal(err)
+	}
+	if got, _ := f.k.Mission(m); got.State == "dialogue_error" {
+		t.Fatal("a retried side is no longer a dialogue error")
 	}
 	f.succeed(ids["dialogue.r1.b"], 2, "B")
 	if s := f.state(ids["dialogue.r2.a"]); s != StateLaunch {

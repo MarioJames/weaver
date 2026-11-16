@@ -109,7 +109,7 @@ func (a *app) taskListHead(c *ui.Context) {
 func taskStatusTag(c *ui.Context, m taskMission) {
 	color := display.TagColor("")
 	switch {
-	case m.State == "attention":
+	case taskNeedsAttention(m):
 		color = display.TagWarning
 	case taskMissionDone(m):
 		color = display.TagSuccess
@@ -137,7 +137,7 @@ func taskActivityView(c *ui.Context, m taskMission, lines int) {
 	if m.Activity == "" {
 		return
 	}
-	attention := m.State == "attention"
+	attention := taskNeedsAttention(m)
 	color := tk.TextSecondary
 	if attention {
 		color = tk.Warning

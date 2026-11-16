@@ -78,6 +78,19 @@ func TestTaskListAttention(t *testing.T) {
 	tasksAbsent(t, tt, fxTitle)
 }
 
+// A failed dialogue side is named as such and counts as needing attention.
+func TestTaskListDialogueError(t *testing.T) {
+	_, _, tt := tasksTesterWith(t, 1180, 820, func(f *tasksFake) {
+		f.missions[1].State, f.missions[1].ClosedAt = "dialogue_error", 0
+		f.missions[1].Activity = "design.r1.b 失败：模型不可用"
+	})
+	tasksContains(t, tt, "需关注 1", "进行中 0", "对谈异常", "design.r1.b 失败：模型不可用")
+	tasksAbsent(t, tt, "dialogue_error")
+	click(t, tt, "需关注 1")
+	tasksContains(t, tt, "对谈异常", "design.r1.b 失败：模型不可用")
+	tasksAbsent(t, tt, fxTitle)
+}
+
 func TestTaskListReadFailure(t *testing.T) {
 	f := newTasksFake(t)
 	f.listError = "数据库暂时不可读"
