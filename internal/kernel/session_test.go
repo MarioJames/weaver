@@ -369,7 +369,7 @@ func TestSessionResumeAndPerformanceA13(t *testing.T) {
 			if len(items) != 6200 {
 				t.Fatalf("count=%d", len(items))
 			}
-			if elapsed > 5*time.Second || maxWrite > time.Second {
+			if !raceDetector && (elapsed > 5*time.Second || maxWrite > time.Second) {
 				t.Fatalf("sync=%v max write=%v", elapsed, maxWrite)
 			}
 			// Compare against a separate uninterrupted import of the entire file.
@@ -382,7 +382,7 @@ func TestSessionResumeAndPerformanceA13(t *testing.T) {
 				t.Fatal(err)
 			}
 			full := time.Since(at)
-			if len(getSessionItems(t, other.k, engine)) != len(items) || full > 5*time.Second {
+			if len(getSessionItems(t, other.k, engine)) != len(items) || !raceDetector && full > 5*time.Second {
 				t.Fatalf("single import=%v", full)
 			}
 			t.Logf("%s: %.2f MiB, full=%v resume=%v max concurrent write=%v", engine, float64(len(body))/(1<<20), full, elapsed, maxWrite)

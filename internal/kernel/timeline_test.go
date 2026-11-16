@@ -375,7 +375,7 @@ func TestTimelinePerformanceA11(t *testing.T) {
 	v := timeline(t, f, m)
 	elapsed := time.Since(start)
 	t.Logf("A11 first timeline: %s (%d entries, 500 session items, 3000 events, 20 packages)", elapsed, len(v.Entries))
-	if elapsed > 100*time.Millisecond {
+	if !raceDetector && elapsed > 100*time.Millisecond {
 		t.Fatalf("timeline exceeded 100ms: %s", elapsed)
 	}
 }
