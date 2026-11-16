@@ -60,6 +60,16 @@ func fxAdd(t *taskTimeline, entries ...taskEntry) {
 	}
 }
 
+// fxRecent is d ago, kept inside today: shortly after midnight "an hour ago"
+// was yesterday, and the list would file the task under another group. A
+// larger d is always earlier.
+func fxRecent(d time.Duration) int64 {
+	now := time.Now()
+	today := now.Sub(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()))
+	scaled := time.Duration(float64(today) * float64(d) / float64(24*time.Hour))
+	return now.Add(-min(d, scaled)).UnixMilli()
+}
+
 // fxDay is today at h:m local, in unix milliseconds.
 func fxDay(h, m int) int64 {
 	n := time.Now()
@@ -84,7 +94,7 @@ const fxLongReply = "方案设计文档已出，没有写代码，也没有动 W
 func fxMainMission() taskMission {
 	return taskMission{ID: fxMain, Title: fxTitle, State: "closed", Owner: &taskOwner{Engine: "claude", Session: "session-main"}, Workspace: "/home/mocha/opensource/weaver-gui",
 		Counts: map[string]int{"accepted": 18, "cancelled": 1}, Total: 19, Artifacts: 2, Activity: "采纳 report-update", CreatedAt: fxDay(22, 12), ClosedAt: fxDay(23, 50),
-		LastActivityAt: time.Now().Add(-time.Hour).UnixMilli()}
+		LastActivityAt: fxRecent(time.Hour)}
 }
 
 func fxPackage(key, title, worker, state string, startMin, endMin int) taskListedPackage {
@@ -222,7 +232,7 @@ func fxConvorelTimeline() (taskMission, *taskTimeline) {
 func fxOtherMissions() []taskMission {
 	now := time.Now()
 	return []taskMission{
-		{ID: "m_convorel", Title: "Convorel 1.0：Go 常驻进程 + 直连 CDP", State: "closed", Workspace: "/home/mocha/opensource/convorel-go-1-0", Counts: map[string]int{"accepted": 11}, Total: 11, Activity: "任务结束", ClosedAt: 1, LastActivityAt: now.Add(-3 * time.Hour).UnixMilli()},
+		{ID: "m_convorel", Title: "Convorel 1.0：Go 常驻进程 + 直连 CDP", State: "closed", Workspace: "/home/mocha/opensource/convorel-go-1-0", Counts: map[string]int{"accepted": 11}, Total: 11, Activity: "任务结束", ClosedAt: 1, LastActivityAt: fxRecent(3 * time.Hour)},
 		{ID: "m_smoke1", Title: "opencode 库清理后冒烟", State: "closed", Workspace: "/home/mocha/smoke", Counts: map[string]int{"accepted": 1, "cancelled": 1}, Total: 2, Activity: "任务结束", ClosedAt: 1, LastActivityAt: now.AddDate(0, 0, -2).UnixMilli()},
 		{ID: "m_smoke2", Title: "清理后冒烟", State: "closed", Workspace: "/home/mocha/smoke", Counts: map[string]int{"accepted": 3, "cancelled": 1}, Total: 4, Activity: "任务结束", ClosedAt: 1, LastActivityAt: now.AddDate(0, 0, -2).Add(-time.Hour).UnixMilli()},
 		{ID: "m_switch", Title: "2.0 切换冒烟", State: "closed", Workspace: "/home/mocha/smoke", Counts: map[string]int{"accepted": 2}, Total: 2, Activity: "任务结束", ClosedAt: 1, LastActivityAt: now.AddDate(0, 0, -5).UnixMilli()},
