@@ -163,6 +163,16 @@ func TestSessionUserFilters(t *testing.T) {
 		if len(got) != 1 || got[0].Text != "helloworld" {
 			t.Fatal(got)
 		}
+		// LobeHub prepends its CLI guide to the first message of a session;
+		// only what the user wrote after it is theirs.
+		guide := "## LobeHub CLI (`lh`)\n\nYou are running inside a LobeHub conversation.\n\n- **When to use it:** rarely.\n- **Leave these alone:** `lh hetero`."
+		got = parseTranscriptLine([]byte(sessionLine(engine, "user", guide+"\n\n发一下 macOS 的最新版本\n\n第二段\n")), engine)
+		if len(got) != 1 || got[0].Text != "发一下 macOS 的最新版本\n\n第二段" {
+			t.Fatalf("%s guide: %+v", engine, got)
+		}
+		if got = parseTranscriptLine([]byte(sessionLine(engine, "user", guide)), engine); len(got) != 0 {
+			t.Fatalf("%s guide alone: %+v", engine, got)
+		}
 	}
 	// Claude Code's stock reply to a message that asked for nothing is not something the owner said.
 	if got := parseTranscriptLine([]byte(sessionLine("claude", "assistant", "No response requested.")), "claude"); len(got) != 0 {

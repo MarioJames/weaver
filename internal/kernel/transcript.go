@@ -192,7 +192,29 @@ func cleanUserText(s string) string {
 	if strings.HasPrefix(s, "Base directory for this skill:") || strings.HasPrefix(s, "[Request interrupted") {
 		return ""
 	}
-	return strings.TrimSpace(userWrapper.ReplaceAllString(s, ""))
+	return strings.TrimSpace(userWrapper.ReplaceAllString(stripLobeHubGuide(s), ""))
+}
+
+// stripLobeHubGuide drops the CLI guide LobeHub attaches to the first message
+// of a session: its heading, an introduction and a list of "- " points, each
+// a paragraph of its own. What follows is what the user wrote.
+func stripLobeHubGuide(s string) string {
+	if !strings.HasPrefix(s, "## LobeHub CLI (`lh`)\n") {
+		return s
+	}
+	parts := strings.SplitN(s, "\n\n", 4)
+	if len(parts) < 3 {
+		return ""
+	}
+	for _, line := range strings.Split(parts[2], "\n") {
+		if !strings.HasPrefix(line, "- ") {
+			return strings.Join(parts[2:], "\n\n")
+		}
+	}
+	if len(parts) < 4 {
+		return ""
+	}
+	return parts[3]
 }
 func sessionSummary(s string) string {
 	r := []rune(s)
