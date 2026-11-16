@@ -495,6 +495,25 @@ func TestTaskFollowYieldsToMouseWheel(t *testing.T) {
 	}
 }
 
+// A follow request that returns with nothing new is not new content: it must
+// not send the page to the end again, which would take a wheel turn that
+// started in the same frame away from the reader.
+func TestTaskFollowIgnoresAnEmptyAnswer(t *testing.T) {
+	_, _, tt := tasksTesterWith(t, 1180, 800, runningMain)
+	last := "引擎中途退出：opencode 常驻服务进程已退出，这次运行随之中断"
+	openTask(t, tt, fxTitle, last)
+	before := rectOf(t, tt, last)
+	// The fake holds a follow request for 400 ms, then answers that nothing changed.
+	time.Sleep(600 * time.Millisecond)
+	tt.Wheel(600, 500, 0, -300)
+	for i := 0; i < 40; i++ {
+		tt.Advance(16 * time.Millisecond)
+	}
+	if after := rectOf(t, tt, last); after.Y-before.Y < 200 {
+		t.Fatalf("空的跟随应答把滚轮往上翻拉回了底部：%.0f → %.0f", before.Y, after.Y)
+	}
+}
+
 // A finished task opens at the top.
 func TestTaskFinishedOpensAtTop(t *testing.T) {
 	_, _, tt := tasksTester(t, 1180, 600)

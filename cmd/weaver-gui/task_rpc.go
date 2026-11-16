@@ -129,6 +129,9 @@ func (a *app) watchTask(s *taskState, id string, revision int64) {
 func (a *app) applyTimeline(s *taskState, suffix bool, out *taskTimeline) {
 	d := &s.d
 	first := !d.loaded
+	// A follow request also returns when its wait runs out with nothing new;
+	// only an answer that changes the entries counts as growth.
+	changed := !suffix || len(out.Entries) > 0 || out.Keep != len(d.entries)
 	if suffix {
 		d.entries = taskMergeEntries(d.entries, out.Entries, out.Keep)
 	} else {
@@ -139,7 +142,8 @@ func (a *app) applyTimeline(s *taskState, suffix bool, out *taskTimeline) {
 		d.mission = out.Mission
 	}
 	d.packages, d.session = out.Packages, out.Session
-	d.loaded, d.grew = true, true
+	d.loaded = true
+	d.grew = d.grew || changed
 	if first && d.mission != nil && !taskMissionDone(*d.mission) {
 		d.pinned = true
 	}
