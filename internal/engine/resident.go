@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -112,6 +113,8 @@ func (r *Resident) Status() []ResidentStatus {
 		out = append(out, ResidentStatus{AccountID: id, State: srv.state, Reason: srv.reason, Unit: srv.rec.Unit, Port: srv.rec.Port, Sessions: len(srv.sessions), StartedAt: srv.rec.StartedAt})
 		srv.mu.Unlock()
 	}
+	// Servers live in a map; a stable order keeps every listing from shuffling.
+	sort.Slice(out, func(i, j int) bool { return out[i].AccountID < out[j].AccountID })
 	return out
 }
 

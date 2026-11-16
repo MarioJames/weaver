@@ -59,15 +59,16 @@ func (a *app) settingsPage(c *ui.Context) {
 		})
 	})
 	section(c, "常驻引擎", func() {
-		shown := map[string]bool{}
-		// status.residents 与 engine.list 使用同一个服务端结果，随统一快照刷新。
-		for _, r := range a.snapshot.Residents {
-			a.engineRow(c, r.AccountID, &r)
-			shown[r.AccountID] = true
+		display.Text(c, "每个 opencode 订阅账号各有一个常驻服务，包来了直接进；其他引擎不常驻。", display.TextProps{Type: display.TextSecondary, FontSize: 12})
+		// Rows follow the account list, so a refresh or a stop never moves them;
+		// status.residents carries no order of its own.
+		running := map[string]*resident{}
+		for i := range a.snapshot.Residents {
+			running[a.snapshot.Residents[i].AccountID] = &a.snapshot.Residents[i]
 		}
 		for _, acc := range a.snapshot.Accounts {
-			if acc.Engine == "opencode" && acc.Kind == "subscription" && !shown[acc.ID] {
-				a.engineRow(c, acc.ID, nil)
+			if r := running[acc.ID]; r != nil || (acc.Engine == "opencode" && acc.Kind == "subscription") {
+				a.engineRow(c, acc, r)
 			}
 		}
 	})
@@ -189,19 +190,17 @@ func (a *app) settingRow(c *ui.Context, key, label, desc string, toggle bool) {
 	})
 }
 
-func (a *app) engineRow(c *ui.Context, id string, r *resident) {
+func (a *app) engineRow(c *ui.Context, acc account, r *resident) {
 	tk := theme.TokensOf(c)
-	label := "账号"
-	for _, acc := range a.snapshot.Accounts {
-		if acc.ID == id {
-			label = acc.Label
-			break
-		}
-	}
+	id := acc.ID
 	key := "engine:" + id
 	ui.Column(c).Key(key).Gap(4).Children(func() {
 		ui.Row(c).Gap(10).Wrap().AlignItems(ui.Center).Children(func() {
-			ui.Text(c, label).FontSize(13).FontWeight(600).TextColor(tk.Text)
+			// A fixed name column lines the states and buttons up across rows.
+			ui.Column(c).Width(300).Gap(2).Children(func() {
+				ui.Text(c, acc.Label).FontSize(13).FontWeight(600).TextColor(tk.Text).SingleLine()
+				display.Text(c, acc.Engine+" · "+kindLabel(acc.Kind), display.TextProps{Type: display.TextSecondary, FontSize: 12}).SingleLine()
+			})
 			if r != nil {
 				statusTag(c, r.State)
 				display.Text(c, fmt.Sprintf("端口 %d · %d 个会话", r.Port, r.Sessions), display.TextProps{Type: display.TextSecondary, FontSize: 12})

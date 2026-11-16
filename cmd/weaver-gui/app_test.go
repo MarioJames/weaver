@@ -401,6 +401,9 @@ func TestSkillInstallAndBackup(t *testing.T) {
 	tt := ui.NewTester(a.view, 1280, 820)
 	click(t, tt, "设置")
 	waitFor(t, tt, a, func() bool { return !a.busy["skill:check"] && a.skillState == "未安装" })
+	// The skill section sits at the end of the page.
+	tt.Scroll(700, 500, 0, 2000)
+	tt.Advance(time.Second)
 	click(t, tt, "安装")
 	waitFor(t, tt, a, func() bool { return !a.busy["skill:install"] && !a.busy["skill:check"] && a.skillState == "已安装" })
 	if err := os.WriteFile(skillPath, []byte("旧版技能"), 0644); err != nil {
@@ -469,4 +472,32 @@ func TestUninstallConfirmationAndBusyButton(t *testing.T) {
 	}
 	unblock()
 	waitFor(t, tt, a, func() bool { return !a.busy["service:uninstall"] })
+}
+
+// The resident list keeps the account order whatever order the service lists
+// the servers in, and a stopped server keeps its place.
+func TestResidentRowsKeepAccountOrder(t *testing.T) {
+	f := newFake(t)
+	f.mu.Lock()
+	f.data.Residents = []resident{{AccountID: "a3", State: "ready", Port: 37389}, {AccountID: "a2", State: "ready", Port: 39009}}
+	f.mu.Unlock()
+	a := testApp(t, f)
+	tt := ui.NewTester(a.view, 1280, 820)
+	click(t, tt, "设置")
+	first, second := "opencode no••@gmail.com", "opencode im••@gmail.com / Default"
+	above := func() bool { return rectOf(t, tt, first).Y < rectOf(t, tt, second).Y }
+	if !above() {
+		t.Fatalf("常驻引擎没有按账号顺序排列：%q", tt.Texts())
+	}
+	if !tt.HasText("opencode · 订阅") {
+		t.Fatalf("没有标出引擎：%q", tt.Texts())
+	}
+	f.mu.Lock()
+	f.data.Residents = []resident{{AccountID: "a3", State: "ready", Port: 37389}}
+	f.mu.Unlock()
+	a.refresh()
+	tt.Frame()
+	if !above() {
+		t.Fatalf("停止后位置变了：%q", tt.Texts())
+	}
 }
