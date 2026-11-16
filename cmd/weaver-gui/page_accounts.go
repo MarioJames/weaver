@@ -102,7 +102,7 @@ var accountColumns = []accountColumn{
 	{title: "账号", grow: true, weight: 3, minW: 130},
 	{title: "状态", width: 108},
 	{title: "用它的候选", grow: true, weight: 2, minW: 120},
-	{title: "用量 / 额度", width: 132},
+	{title: "用量 / 额度", width: 166},
 	{title: "剩余 / 重置", width: 104},
 	{title: "启用", width: 36, align: ui.Center},
 	{title: "操作", width: 116, align: ui.End},
@@ -238,7 +238,7 @@ func (a *app) accountCards(c *ui.Context) {
 						})
 					} else if len(quotaWindows(acc)) > 0 {
 						ui.Row(c).Gap(16).Children(func() {
-							ui.Column(c).Width(180).Gap(2).Children(func() { a.quotaUsedCell(c, acc) })
+							ui.Column(c).Width(214).Gap(2).Children(func() { a.quotaUsedCell(c, acc) })
 							ui.Column(c).Gap(2).Children(func() { a.quotaResetCell(c, acc) })
 						})
 					}

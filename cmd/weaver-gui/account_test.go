@@ -806,7 +806,7 @@ func TestAccountScreenshots(t *testing.T) {
 	f := newAccountService(t)
 	checked := time.Now().Add(-3 * time.Minute).UnixMilli()
 	f.find("a1").Quota = &accountQuota{Status: "available", Windows: []quotaWindow{{Label: "5 小时额度", UsedPercent: 42, ResetsAt: time.Now().Add(time.Hour).UnixMilli()}, {Label: "7 天额度", UsedPercent: 76, ResetsAt: time.Now().Add(50 * time.Hour).UnixMilli()}}, CheckedAt: checked, Factor: 1}
-	f.find("import_e6f3c04da52965f2b7c02668").Quota = &accountQuota{Status: "available", Windows: []quotaWindow{{Label: "5 小时额度", UsedPercent: 0}, {Label: "7 天额度", UsedPercent: 98, ResetsAt: time.Now().Add(11 * time.Hour).UnixMilli()}}, CheckedAt: checked, Factor: 0.3}
+	f.find("import_e6f3c04da52965f2b7c02668").Quota = &accountQuota{Status: "available", Windows: []quotaWindow{{Label: "5 小时额度", UsedPercent: 0}, {Label: "7 天额度", UsedPercent: 98, ResetsAt: time.Now().Add(11 * time.Hour).UnixMilli()}, {Label: "7 天额度", Model: "Fable", UsedPercent: 70, ResetsAt: time.Now().Add(11 * time.Hour).UnixMilli()}}, CheckedAt: checked, Factor: 0.3}
 
 	seedUsage(f, "a5", &usage{Month: usageTotals{Runs: 12, InputTokens: 1_200_000, OutputTokens: 150_000, Unpriced: 12},
 		Balance: moneyPtr(50), BalanceAt: checked})
@@ -1034,5 +1034,14 @@ func TestAccountQuotaRefresh(t *testing.T) {
 	}
 	if !found || !tt.HasText("42%") || !tt.HasText("5 小时") {
 		t.Fatalf("missing refreshed quota window: %v", tt.Texts())
+	}
+}
+
+func TestModelQuotaWindowNamesItsModel(t *testing.T) {
+	if got := quotaWindowLabel(quotaWindow{Label: "7 天额度", Model: "Fable"}); got != "7 天 · Fable" {
+		t.Fatalf("model window label = %q", got)
+	}
+	if got := quotaWindowLabel(quotaWindow{Label: "7 天额度"}); got != "7 天" {
+		t.Fatalf("account window label = %q", got)
 	}
 }

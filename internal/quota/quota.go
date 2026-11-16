@@ -233,10 +233,31 @@ func (c *Client) httpClient() *http.Client {
 	return &base
 }
 
+// retryDelays spaces the extra attempts made after a dropped connection or a
+// 5xx. A rate limit is never retried: probing again only extends it.
+var retryDelays = []time.Duration{500 * time.Millisecond, 2 * time.Second}
+
 func (c *Client) request(ctx context.Context, url string, headers map[string]string, ep endpoint) (any, error) {
+	for attempt := 0; ; attempt++ {
+		payload, retry, err := c.requestOnce(ctx, url, headers, ep)
+		if !retry || attempt == len(retryDelays) {
+			return payload, err
+		}
+		timer := time.NewTimer(retryDelays[attempt])
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, err
+		case <-timer.C:
+		}
+	}
+}
+
+// requestOnce performs one GET. retry reports a failure worth repeating at once.
+func (c *Client) requestOnce(ctx context.Context, url string, headers map[string]string, ep endpoint) (_ any, retry bool, _ error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, upstream("额度接口地址无效")
+		return nil, false, upstream("额度接口地址无效")
 	}
 	for key, value := range headers {
 		req.Header.Set(key, value)
@@ -245,11 +266,11 @@ func (c *Client) request(ctx context.Context, url string, headers map[string]str
 	if err != nil {
 		switch {
 		case errors.Is(err, context.DeadlineExceeded), ctx.Err() == context.DeadlineExceeded:
-			return nil, transient("额度接口请求超时")
+			return nil, false, transient("额度接口请求超时")
 		case errors.Is(err, context.Canceled), ctx.Err() == context.Canceled:
-			return nil, transient("额度请求已取消")
+			return nil, false, transient("额度请求已取消")
 		default:
-			return nil, transient("额度接口请求失败")
+			return nil, true, transient("额度接口请求失败")
 		}
 	}
 	defer resp.Body.Close()
@@ -257,28 +278,28 @@ func (c *Client) request(ctx context.Context, url string, headers map[string]str
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		if ep == endpointOpenCodeGo && resp.StatusCode == http.StatusForbidden {
 			if body, readErr := readLimited(resp.Body); readErr == nil && isEntitlementError(body) {
-				return nil, unsupported("当前 key 没有 Go 订阅，无法读取 Go 套餐窗口；免费模型与按量余额没有官方只读额度接口")
+				return nil, false, unsupported("当前 key 没有 Go 订阅，无法读取 Go 套餐窗口；免费模型与按量余额没有官方只读额度接口")
 			}
-			return nil, upstream("额度接口暂时不可用")
+			return nil, false, upstream("额度接口暂时不可用")
 		}
 		switch resp.StatusCode {
 		case http.StatusUnauthorized:
 			if ep == endpointOpenCodeConsole {
-				return nil, unauthenticated("原生 Console 登录无效，请在 OpenCode 中重新登录后手动刷新")
+				return nil, false, unauthenticated("原生 Console 登录无效，请在 OpenCode 中重新登录后手动刷新")
 			}
-			return nil, unauthenticated("原生登录无效或无权读取额度，请在对应工具中确认登录")
+			return nil, false, unauthenticated("原生登录无效或无权读取额度，请在对应工具中确认登录")
 		case http.StatusForbidden:
 			if ep == endpointOpenCodeConsole {
-				return nil, unsupported("当前 Console 登录无 Go 额度读取权限；免费模型与按量余额没有官方只读额度接口")
+				return nil, false, unsupported("当前 Console 登录无 Go 额度读取权限；免费模型与按量余额没有官方只读额度接口")
 			}
-			return nil, unauthenticated("原生登录无效或无权读取额度，请在对应工具中确认登录")
+			return nil, false, unauthenticated("原生登录无效或无权读取额度，请在对应工具中确认登录")
 		case http.StatusTooManyRequests:
-			return nil, transient("额度探测接口限流，请稍后重试")
+			return nil, false, transient("额度探测接口限流，请稍后重试")
 		}
 		if resp.StatusCode >= 500 {
-			return nil, transient("额度接口暂时不可用")
+			return nil, true, transient("额度接口暂时不可用")
 		}
-		return nil, upstream("额度接口暂时不可用")
+		return nil, false, upstream("额度接口暂时不可用")
 	}
 
 	contentType := resp.Header.Get("Content-Type")
@@ -287,17 +308,17 @@ func (c *Client) request(ctx context.Context, url string, headers map[string]str
 	}
 	contentType = strings.ToLower(strings.TrimSpace(contentType))
 	if contentType != "application/json" && !strings.HasSuffix(contentType, "+json") {
-		return nil, upstream("额度接口返回了非 JSON 数据")
+		return nil, false, upstream("额度接口返回了非 JSON 数据")
 	}
 	body, err := readLimited(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	var payload any
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil, upstream("额度接口返回了无效 JSON")
+		return nil, false, upstream("额度接口返回了无效 JSON")
 	}
-	return payload, nil
+	return payload, false, nil
 }
 
 func readLimited(r io.Reader) ([]byte, error) {

@@ -13,6 +13,7 @@ import (
 
 type quotaWindow struct {
 	Label       string  `json:"label"`
+	Model       string  `json:"model,omitempty"`
 	UsedPercent float64 `json:"usedPercent"`
 	ResetsAt    int64   `json:"resetsAt,omitempty"`
 }
@@ -42,8 +43,16 @@ func quotaWindows(acc account) []quotaWindow {
 	return acc.Quota.Windows
 }
 
-// quotaShortLabel drops the trailing 「额度」: the column already says what the bars are.
-func quotaShortLabel(label string) string { return strings.TrimSuffix(label, "额度") }
+// quotaWindowLabel drops the trailing 「额度」 (the column already says what the
+// bars are) and names the model of a model-scoped window, so an account-wide
+// 7-day window and a per-model one do not read as duplicates.
+func quotaWindowLabel(w quotaWindow) string {
+	label := strings.TrimSuffix(w.Label, "额度")
+	if w.Model != "" {
+		label += " · " + w.Model
+	}
+	return label
+}
 
 const quotaLineHeight = 18
 
@@ -66,8 +75,8 @@ func (a *app) quotaUsedCell(c *ui.Context, acc account) {
 		}
 		line := ui.Row(c.Key(i)).Height(quotaLineHeight).Gap(6).AlignItems(ui.Center)
 		line.Children(func() {
-			ui.Column(c).Width(38).Children(func() {
-				display.Text(c, quotaShortLabel(w.Label), display.TextProps{Type: display.TextSecondary, FontSize: 11}).SingleLine()
+			ui.Column(c).Width(72).Children(func() {
+				display.Text(c, quotaWindowLabel(w), display.TextProps{Type: display.TextSecondary, FontSize: 11}).SingleLine()
 			})
 			ui.Column(c).Grow(1).Basis(0).MinWidth(0).Children(func() {
 				feedback.Progress(c, float32(w.UsedPercent), feedback.ProgressProps{Size: theme.Middle, Color: color})
@@ -76,7 +85,11 @@ func (a *app) quotaUsedCell(c *ui.Context, acc account) {
 				display.Text(c, fmt.Sprintf("%.0f%%", w.UsedPercent), display.TextProps{FontSize: 11}).FontFeatures("tnum").SingleLine()
 			})
 		})
-		line.Label(fmt.Sprintf("%s 已用 %.0f%%", w.Label, w.UsedPercent))
+		spoken := w.Label
+		if w.Model != "" {
+			spoken += "（" + w.Model + "）"
+		}
+		line.Label(fmt.Sprintf("%s 已用 %.0f%%", spoken, w.UsedPercent))
 	}
 	display.Text(c, "读取于 "+quotaLocalTime(acc.Quota.CheckedAt), display.TextProps{Type: display.TextSecondary, FontSize: 11}).SingleLine()
 }

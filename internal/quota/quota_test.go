@@ -666,3 +666,48 @@ func TestDefaultEndpoints(t *testing.T) {
 		t.Errorf("default timeout = %v", client.httpClient().Timeout)
 	}
 }
+
+// A dropped connection is common on long links; one blip must not surface as
+// a failed read, while a rate limit must not be hit again in the same round.
+func TestTransientNetworkFailureIsRetriedButRateLimitIsNot(t *testing.T) {
+	dir := t.TempDir()
+	writeClaudeCredential(t, dir, "secret-claude", testNow.Add(24*time.Hour).UnixMilli(), true)
+	body := map[string]any{"limits": []any{map[string]any{"kind": "session", "percent": 12.0}, map[string]any{"kind": "weekly_all", "percent": 40.0}}}
+
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		if calls == 1 {
+			conn, _, err := w.(http.Hijacker).Hijack()
+			if err == nil {
+				conn.Close()
+			}
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(body)
+	}))
+	defer server.Close()
+	client := &Client{HTTP: server.Client(), ClaudeURL: server.URL}
+	snapshot, err := client.Fetch(context.Background(), Source{Engine: "claude", AuthDir: dir}, testNow)
+	if err != nil {
+		t.Fatalf("Fetch after one dropped connection: %v", err)
+	}
+	if len(snapshot.Windows) != 2 {
+		t.Fatalf("windows = %+v", snapshot.Windows)
+	}
+
+	limited := 0
+	server429 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		limited++
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server429.Close()
+	client = &Client{HTTP: server429.Client(), ClaudeURL: server429.URL}
+	if _, err := client.Fetch(context.Background(), Source{Engine: "claude", AuthDir: dir}, testNow); errKind(t, err) != kindTransient {
+		t.Fatalf("429: %v", err)
+	}
+	if limited != 1 {
+		t.Fatalf("rate-limited endpoint was called %d times in one read", limited)
+	}
+}
