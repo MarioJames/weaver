@@ -5,7 +5,7 @@ description: "Run development work as a swarm through the Weaver scheduling engi
 
 # Weaver
 
-Weaver is a scheduling engine. It keeps the package tree and its dependencies, moves each package through its states, launches agents the fastest way each engine allows, and wakes you when something needs you. What to build, whether a result is good, commits, pushes and talking to the user stay with you: you are the owner of the mission, the agents are workers.
+Weaver is a scheduling engine. It keeps the package tree and its dependencies, moves each package through its states, launches agents the fastest way each engine allows, and records wake events when something needs you. How those events reach the parent depends on the host; see [Waiting](#waiting). What to build, whether a result is good, commits, pushes and talking to the user stay with you: you are the owner of the mission, the agents are workers.
 
 Every command prints JSON. Errors go to stderr as `{"error":{"code","message"}}` with a non-zero exit. `weaver help` lists every command.
 
@@ -61,8 +61,9 @@ weaver plan submit --mission m_… --key plan-1 <<'JSON'
 JSON
 # The reply reports the shape: {"shape":{"packages":5,"ready":4,"waves":2,"parallel":4,"high":0}}
 
-# 3. Block until something needs you. Returns at once if it already happened.
-weaver wait --mission m_…
+# 3. Wait in bounded calls so you can respond and report progress between them.
+# Returns at once if something already needs you. A timeout is not completion.
+weaver wait --mission m_… --timeout 30s
 
 # 4. Read the result, verify it yourself, then decide.
 weaver package result m_…/limiter
@@ -70,6 +71,7 @@ weaver verdict --package m_…/limiter accept
 weaver verdict --package m_…/wiring return --note "The middleware order is wrong: auth must run first."
 
 # 5. Back to step 3 until every package is accepted.
+# Before ending your turn, read mission show and apply the completion check below.
 # 6. Finish your own part (integrate, run, commit, deliver), then: weaver mission close m_…
 ```
 
@@ -86,6 +88,7 @@ A package reference is its ID or `<mission>/<key>`.
 - **Intelligence.** Every package states `intelligence`, a number from 1 to 10 in steps of 0.5: what its instruction leaves for the worker to work out (see [the scale](#intelligence)). Weaver gives the package to the lowest-rated candidates that qualify, chooses among those from each one's first-attempt acceptance rate, typical duration, remaining quota and current load, and moves up a tier only when they are full or unavailable. The reply and `weaver package show` name the chosen candidate with a one-line `routeNote`. You do not rank candidates and you do not need their names.
 - **Pinning.** `worker` pins a package to one candidate regardless of its rating; use it only for a reason you could explain, such as a second opinion from a specific engine. `engine` restricts the choice to one engine. `weaver worker list` shows the candidates, their ratings and their measured results.
 - **`"advisory": true`** for a package whose product is a document: research, an audit, a comparison. The agent is told to leave files alone and to cite what it read, and it reads its upstream results in full.
+- **Long-running monitors are operational packages, not `advisory`.** State the terminal conditions, permitted actions, evidence and resource owner in the instruction. A verified PID or active scope proves startup only: report it as progress and continue monitoring. Deliver when the terminal condition is observed or an actionable problem needs the parent. Include the authoritative final state, evidence paths, process exit status and any retained resources with their owner and release condition. If the worker cannot call Weaver itself, the parent registers its artifacts and handles the verdict.
 - **`"autoAccept": true`** for a result that needs no judgement from you before the next step, such as research feeding an implementation package. It is accepted as it arrives and its dependents start; you are not woken for it. A failure still wakes you. Do not use it on packages that change code: accepting is your statement that you checked the work.
 - **All or nothing.** A cycle, an unknown dependency, a duplicate key, a missing `intelligence` or a package no enabled candidate is rated for (`NO_CANDIDATE`) rejects the whole plan. You may submit further plans to the same mission as the work unfolds.
 - **`--key`** makes a submission idempotent: repeating the command returns the first result and creates nothing. Use it whenever a reply might have been lost.
@@ -152,6 +155,8 @@ Most packages of a well-cut plan are 6 or 7, because you did the spine: you alre
 
 `weaver wait --mission <id>` returns on a result, a failure, a stall report, a timer or an external wake. Each wake is delivered once: a plain `wait` continues after the last one, and `--cursor <n>` asks for everything after a sequence number.
 
+- **Verify the notification route for this host.** A recorded owner session or `wake: true` event does not prove delivery or that the parent resumed. Do not infer Herdr push support in a LobeHub/API session or another host. Without a verified route that can resume this parent, stay in bounded `weaver wait --mission <id> --timeout 30s` calls, handling results and reporting progress between calls. A timer or a detached watch does not establish that route.
+- **On resuming a mission, read `mission show` before waiting.** Handle every `awaiting_verdict` package by reading its result, checking evidence and giving `accept` or `return`; an earlier one-shot notification may already have been consumed. A timeout or the absence of a new message does not mean there are no results to review.
 - `idle: true` means nothing is running and no timer is set, so waiting longer cannot help. Read `hint`, then act: give verdicts, retry, or submit more work.
 - `kind: "stalled"` means a package produced no event for five minutes and its processes used almost no CPU. It is still running. Look at `weaver events --mission <id>` before deciding to cancel: a quiet long build is not a stall.
 - `weaver timer set --mission <id> --in 20m --note "check the long build"` wakes you later. Timers survive service restarts.
@@ -159,6 +164,15 @@ Most packages of a well-cut plan are 6 or 7, because you did the spine: you alre
 - A service restart or upgrade does not interrupt running packages, and `wait` reconnects by itself for up to 60 seconds.
 
 `weaver mission show <id>` gives the mission state and every package. `weaver events --mission <id> [--follow]` is the full stream: launches, hand-off to the engine, tool activity, results, verdicts.
+
+## Before ending your turn
+
+Read `weaver mission show <id>` again; startup evidence and an earlier snapshot are not a completion check.
+
+- Resolve outstanding `awaiting_verdict` packages first: inspect each result and its evidence, then give a verdict. If a verdict needs a user decision, state that decision and leave it pending. Do not accept merely to clear the queue.
+- If work is still running, continue your own useful work or bounded waits. Ending the turn with a background handoff requires a verified notification route that resumes the responsible parent, plus a named owner and terminal conditions. A running monitor alone is not that handoff; an explicit user request to stop or defer takes precedence.
+- Handle failed or blocked packages within the authorized scope, or report the precise unresolved condition. Do not describe unfinished work as complete.
+- Once delivery and resource cleanup are complete, close the mission and read back `done`. While awaiting a user decision, keep it open and state what remains. Report verified results and material limits without claiming an external deployment or recovery from a monitoring result alone.
 
 ## Design dialogue
 
