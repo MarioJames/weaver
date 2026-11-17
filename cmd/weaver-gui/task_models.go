@@ -113,7 +113,7 @@ func newTaskDetail(m *taskMission) taskDetail {
 }
 
 func taskMissionLabel(state string) string {
-	labels := map[string]string{"empty": "待拆包", "awaiting_verdict": "待结论", "attention": "需关注", "dialogue_error": "对谈异常", "blocked": "等待依赖", "running": "进行中", "closed": "已完成", "done": "已完成", "completed": "已完成"}
+	labels := map[string]string{"empty": "待拆包", "awaiting_verdict": "待结论", "attention": "需关注", "dialogue_error": "对谈异常", "blocked": "等待依赖", "running": "进行中", "settled": "待收尾", "closed": "已完成", "done": "已完成", "completed": "已完成"}
 	if label := labels[state]; label != "" {
 		return label
 	}

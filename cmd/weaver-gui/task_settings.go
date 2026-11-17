@@ -38,7 +38,7 @@ func (a *app) autoArchiveSetting(c *ui.Context) {
 					a.saveSetting(key, f.value)
 				}
 			})
-			display.Text(c, "已结束的任务在这么多天没有活动后归档，进行中的从不归档",
+			display.Text(c, "父 Agent 已关闭的任务在这么多天没有活动后归档，未关闭的从不自动归档",
 				display.TextProps{Type: display.TextSecondary, FontSize: 12}).Grow(1).Basis(0).MinWidth(0)
 		})
 		fieldError(c, f.err)

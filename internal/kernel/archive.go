@@ -13,7 +13,8 @@ func (k *Kernel) ArchiveMission(id string, archived bool) (*Mission, error) {
 		if err != nil {
 			return err
 		}
-		if archived && m.State != "done" {
+		// By hand the owner may also archive a settled mission it never closed.
+		if archived && m.State != "done" && m.State != "settled" {
 			return errf("INVALID", "进行中的主任务不能归档")
 		}
 		var at any
@@ -29,7 +30,7 @@ func (k *Kernel) ArchiveMission(id string, archived bool) (*Mission, error) {
 	return out, err
 }
 
-// AutoArchive only archives completed missions whose latest event is old enough.
+// AutoArchive only archives closed missions whose latest event is old enough.
 func (k *Kernel) AutoArchive() error {
 	return k.write(func(t *tx) error {
 		value := settingDefaults["archive_after_days"]

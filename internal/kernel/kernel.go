@@ -365,7 +365,7 @@ func getMission(q querier, id string) (*Mission, error) {
 			return nil, err
 		}
 	}
-	m.State = missionState(m.Counts, m.Total, dialogueFailed)
+	m.State = missionState(m.Counts, m.Total, dialogueFailed, m.ClosedAt != 0)
 	m.Activity, err = missionActivity(q, m)
 	return m, err
 }
@@ -391,9 +391,13 @@ func failedDialogueSide(q querier, mission string) (bool, error) {
 
 // missionState derives a mission's state from its packages. A failed dialogue
 // side outranks results waiting for a verdict: the dialogue is stuck until the
-// owner retries or cancels it.
-func missionState(c map[string]int, total int, dialogueFailed bool) string {
+// owner retries or cancels it. Only the parent Agent's close makes a mission
+// done; packages that have all settled leave it "settled" while the parent
+// integrates, waits on the user or delivers.
+func missionState(c map[string]int, total int, dialogueFailed, closed bool) string {
 	switch {
+	case closed:
+		return "done"
 	case total == 0:
 		return "empty"
 	case c[StateLaunch]+c[StateRunning] > 0:
@@ -407,7 +411,7 @@ func missionState(c map[string]int, total int, dialogueFailed bool) string {
 	case c[StatePending] > 0:
 		return "blocked"
 	default:
-		return "done"
+		return "settled"
 	}
 }
 

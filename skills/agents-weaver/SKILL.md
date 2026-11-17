@@ -69,7 +69,8 @@ weaver package result m_…/limiter
 weaver verdict --package m_…/limiter accept
 weaver verdict --package m_…/wiring return --note "The middleware order is wrong: auth must run first."
 
-# 5. Back to step 3 until every package is accepted, then: weaver mission close m_…
+# 5. Back to step 3 until every package is accepted.
+# 6. Finish your own part (integrate, run, commit, deliver), then: weaver mission close m_…
 ```
 
 `mission create` automatically records the parent Agent session (Claude Code or Codex).
@@ -139,6 +140,7 @@ Most packages of a well-cut plan are 6 or 7, because you did the spine: you alre
 - `return` on `awaiting_verdict` starts the next attempt of the same package. The note is required: it is the only thing that tells the next attempt what was wrong.
 - `failed` can be retried with `weaver retry --package …`. A failure caused by a vendor limit pauses that account and moves the package to another ready candidate by itself.
 - `cancelled` is final. `weaver cancel --package …` or `--mission …` returns once the processes are gone. On a resident engine (opencode) a cancel can only interrupt the session: the reply then has `residual: true` and the workspace to check for leftover commands.
+- The mission itself is `settled` (shown as 待收尾) once every package has ended, and becomes `done` only when you run `weaver mission close`. Close it after your own remaining work and the delivery to the user are finished, not as soon as the last package is accepted; while you wait on the user, leave it open.
 
 ## While a wave runs
 

@@ -91,11 +91,11 @@ func TestArchiveRules(t *testing.T) {
 	f := newFixture(t)
 	now := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
 	f.k.now = func() time.Time { return now }
-	done, running, recent := f.mission(), f.mission(), f.mission()
+	done, running, recent, settled := f.mission(), f.mission(), f.mission(), f.mission()
 	for _, c := range []struct {
 		id, state string
 		days      int
-	}{{done, StateAccepted, 8}, {running, StateRunning, 10}, {recent, StateAccepted, 8}} {
+	}{{done, StateAccepted, 8}, {running, StateRunning, 10}, {recent, StateAccepted, 8}, {settled, StateAccepted, 8}} {
 		_, err := f.k.db.Exec(`INSERT INTO packages(id,mission_id,key,title,instruction,workspace,state,created_at,updated_at,position) VALUES(?,?,?,?,?,?,?,?,?,0)`, "p_"+c.id, c.id, "test", "test", "test", f.ws, c.state, 1, 1)
 		if err != nil {
 			t.Fatal(err)
@@ -106,6 +106,10 @@ func TestArchiveRules(t *testing.T) {
 		}
 	}
 	if _, err := f.k.db.Exec(`INSERT INTO events(mission_id,kind,at) VALUES(?,?,?)`, recent, "test", now.UnixMilli()); err != nil {
+		t.Fatal(err)
+	}
+	// Only the parent Agent closes a mission; settled packages alone do not finish it.
+	if _, err := f.k.db.Exec(`UPDATE missions SET closed_at=? WHERE id IN (?,?)`, now.UnixMilli(), done, recent); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.k.SetSetting("archive_after_days", "0"); err != nil {
@@ -124,7 +128,7 @@ func TestArchiveRules(t *testing.T) {
 	if err := f.k.AutoArchive(); err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range []string{done, running, recent} {
+	for _, id := range []string{done, running, recent, settled} {
 		m, err := f.k.Mission(id)
 		if err != nil || m.Archived != (id == done) {
 			t.Fatalf("archive %+v %v", m, err)
@@ -141,12 +145,16 @@ func TestArchiveRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	list, err := f.k.Missions(true)
-	if err != nil || len(list) != 2 {
+	if err != nil || len(list) != 3 {
 		t.Fatalf("list %d %v", len(list), err)
 	}
 	list, err = f.k.Missions(false, true)
 	if err != nil || len(list) != 1 || list[0].ID != done {
 		t.Fatalf("archived %+v %v", list, err)
+	}
+	// The owner may still archive a settled mission by hand.
+	if _, err = f.k.ArchiveMission(settled, true); err != nil {
+		t.Fatal(err)
 	}
 	if err = f.k.SetSetting("archive_after_days", "2"); err == nil {
 		t.Fatal("invalid setting")
@@ -166,5 +174,35 @@ func TestToolSummaryFirstLine(t *testing.T) {
 	item := toolItem(1, "Bash", map[string]any{"command": "export TEST_VALUE=1\nweaver verdict --mission 'm_x' --package=p_x accept"})
 	if item.Text != "Bash: export TEST_VALUE=1" {
 		t.Fatalf("item=%+v", item)
+	}
+}
+
+func TestMissionDoneOnlyAfterClose(t *testing.T) {
+	f := newFixture(t)
+	settled, empty := f.mission(), f.mission()
+	if _, err := f.k.db.Exec(`INSERT INTO packages(id,mission_id,key,title,instruction,workspace,state,created_at,updated_at,position) VALUES(?,?,?,?,?,?,?,?,?,0)`, "p_"+settled, settled, "test", "test", "test", f.ws, StateAccepted, 1, 1); err != nil {
+		t.Fatal(err)
+	}
+	if m, err := f.k.Mission(settled); err != nil || m.State != "settled" {
+		t.Fatalf("all packages accepted but not closed: %+v %v", m, err)
+	}
+	for _, id := range []string{settled, empty} {
+		m, err := f.k.CloseMission(id)
+		if err != nil || m.State != "done" {
+			t.Fatalf("closed mission %s: %+v %v", id, m, err)
+		}
+	}
+	for want, c := range map[string]struct {
+		counts map[string]int
+		total  int
+		closed bool
+	}{
+		"settled": {map[string]int{StateAccepted: 2, StateCanceled: 1}, 3, false},
+		"done":    {map[string]int{StateAccepted: 2, StateFailed: 1}, 3, true},
+		"empty":   {map[string]int{}, 0, false},
+	} {
+		if got := missionState(c.counts, c.total, false, c.closed); got != want {
+			t.Errorf("missionState(%v, closed=%v) = %s, want %s", c.counts, c.closed, got, want)
+		}
 	}
 }

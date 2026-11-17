@@ -222,11 +222,11 @@ func TestDialogueContinuesAfterAFailedSideIsRetried(t *testing.T) {
 		"dialogue_error": {StateVerdict: 1, StateFailed: 1, StatePending: 2},
 		"running":        {StateRunning: 1, StateFailed: 1},
 	} {
-		if got := missionState(counts, 4, true); got != want {
+		if got := missionState(counts, 4, true, false); got != want {
 			t.Fatalf("missionState(%v) = %s, want %s", counts, got, want)
 		}
 	}
-	if got := missionState(map[string]int{StateVerdict: 1, StateFailed: 1}, 2, false); got != "awaiting_verdict" {
+	if got := missionState(map[string]int{StateVerdict: 1, StateFailed: 1}, 2, false, false); got != "awaiting_verdict" {
 		t.Fatalf("a failed work package keeps the old order, got %s", got)
 	}
 	if _, err := f.k.Retry(ids["dialogue.r1.b"], ""); err != nil {

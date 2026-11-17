@@ -31,10 +31,11 @@ func TestTaskPlainText(t *testing.T) {
 func TestTaskFilters(t *testing.T) {
 	missions := []taskMission{
 		{ID: "a", State: "running"}, {ID: "b", State: "attention"}, {ID: "c", State: "closed", ClosedAt: 1}, {ID: "d", State: "blocked"}, {ID: "e", State: "awaiting_verdict"}, {ID: "f", State: "dialogue_error"},
+		{ID: "g", State: "settled"},
 	}
 	archived := []taskMission{{ID: "z", State: "closed"}}
 	counts := taskFilterCounts(missions, archived)
-	if counts != [5]int{6, 3, 2, 1, 1} {
+	if counts != [5]int{7, 4, 2, 1, 1} {
 		t.Fatalf("计数 %v", counts)
 	}
 	ids := func(rows []taskMission) string {
@@ -44,7 +45,10 @@ func TestTaskFilters(t *testing.T) {
 		}
 		return strings.Join(out, "")
 	}
-	for filter, want := range map[int]string{taskFilterAll: "abcdef", taskFilterActive: "ade", taskFilterAttention: "bf", taskFilterDone: "c", taskFilterArchived: "z"} {
+	if got := taskMissionLabel("settled"); got != "待收尾" {
+		t.Errorf("包都结束但父 Agent 未关闭：%s，want 待收尾", got)
+	}
+	for filter, want := range map[int]string{taskFilterAll: "abcdefg", taskFilterActive: "adeg", taskFilterAttention: "bf", taskFilterDone: "c", taskFilterArchived: "z"} {
 		if got := ids(taskFilterRows(filter, missions, archived)); got != want {
 			t.Errorf("筛选 %d：%s，want %s", filter, got, want)
 		}

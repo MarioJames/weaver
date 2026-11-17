@@ -199,7 +199,7 @@ func TestTasksAutoArchiveSetting(t *testing.T) {
 	a := testApp(t, f)
 	tt := ui.NewTester(a.view, 1440, 1000)
 	click(t, tt, "设置")
-	tasksContains(t, tt, "自动归档", "已结束的任务在这么多天没有活动后归档，进行中的从不归档")
+	tasksContains(t, tt, "自动归档", "父 Agent 已关闭的任务在这么多天没有活动后归档，未关闭的从不自动归档")
 	click(t, tt, "7 天")
 	click(t, tt, "30 天")
 	waitFor(t, tt, a, func() bool {

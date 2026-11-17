@@ -174,7 +174,13 @@ func TestTasksRealDaemonContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	tasksWait(t, tt, "服务接口已复核", 5*time.Second)
-	tasksContains(t, tt, "已完成")
+	// Every package accepted is not the end: the task waits for its parent Agent to close it.
+	tasksContains(t, tt, "待收尾")
+	tasksAbsent(t, tt, "已完成")
+	if err := c.call("mission.close", map[string]string{"id": mission}, nil); err != nil {
+		t.Fatal(err)
+	}
+	tasksWait(t, tt, "已完成", 5*time.Second)
 	click(t, tt, "产物 3")
 	tasksWait(t, tt, "设计 v2", 5*time.Second)
 	tasksContains(t, tt, "2 个版本", "待拍板 1 项 · 验收清单 1 项", "验收报告", "通过 1 · 失败 1")

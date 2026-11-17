@@ -113,7 +113,7 @@ func taskStatusTag(c *ui.Context, m taskMission) {
 		color = display.TagWarning
 	case taskMissionDone(m):
 		color = display.TagSuccess
-	case m.State == "running":
+	case m.State == "running" || m.State == "settled":
 		color = display.TagProcessing
 	}
 	display.Tag(c, taskMissionLabel(m.State), display.TagProps{Color: color, Size: theme.Small})
