@@ -21,7 +21,7 @@ func fakeConvorel(t *testing.T, fn func(string) ([]byte, error)) {
 }
 func convorelJSON(at int64, complete bool) []byte {
 	stamp := func(n int64) string { return time.UnixMilli(n).UTC().Format(time.RFC3339Nano) }
-	state := "waiting"
+	state := "delivered"
 	if complete {
 		state = "complete"
 	}
@@ -154,6 +154,90 @@ func TestTimelineConvorelWaitingRefresh(t *testing.T) {
 	}
 	t.Logf("waiting review refreshed after %s", time.Since(start))
 }
+
+// Convorel can fail before sending, or retain an observable run after an error.
+// Neither is evidence that ChatGPT is still preparing a reply.
+func TestTimelineConvorelDeliveryStates(t *testing.T) {
+	for _, tc := range []struct {
+		name, state, problem, want string
+		sent, intent               bool
+	}{
+		{name: "draft protection", state: "prepared", problem: "composer: existing draft", want: "not_sent"},
+		{name: "preparing", state: "prepared", want: "not_sent"},
+		{name: "send intent", state: "prepared", intent: true, want: "delivery_unknown"},
+		{name: "sent without confirmation", state: "prepared", sent: true, want: "delivery_unknown"},
+		{name: "HTTP rejection", state: "rejected", problem: "HTTP_REJECTED", sent: true, want: "rejected"},
+		{name: "uncertain delivery", state: "delivery_unknown", problem: "dispatch uncertain", sent: true, want: "delivery_unknown"},
+		{name: "waiting", state: "delivered", sent: true, want: "waiting"},
+		{name: "observation error", state: "delivered", problem: "tab not responding", sent: true, want: "blocked"},
+		{name: "blocked", state: "blocked", problem: "login required", want: "blocked"},
+		{name: "failed", state: "failed", problem: "observation failed", want: "failed"},
+		{name: "lost", state: "lost", problem: "conversation missing", want: "lost"},
+		{name: "superseded", state: "superseded", want: "superseded"},
+		{name: "incomplete result", state: "complete", want: "incomplete"},
+		{name: "unrecognized state", state: "future-state", want: "unknown"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f, m, at := convorelMission(t)
+			stamp := time.UnixMilli(at).UTC().Format(time.RFC3339Nano)
+			run := map[string]any{"state": tc.state, "createdAt": stamp, "input": "review this design", "error": tc.problem,
+				"delivery": map[string]any{"requestSent": tc.sent}, "reply": map[string]any{"final": false, "markdown": "partial response"}}
+			if tc.intent {
+				run["submittedAt"] = stamp
+			}
+			fakeConvorel(t, func(string) ([]byte, error) {
+				return json.Marshal(map[string]any{"id": "t-1", "runs": []any{run}})
+			})
+			reviews := entriesOf(timeline(t, f, m), "review")
+			if len(reviews) != 1 || reviews[0].State != tc.want || reviews[0].Text != tc.problem {
+				t.Fatalf("want %s with error %q, got %+v", tc.want, tc.problem, reviews)
+			}
+			full, err := f.k.MissionText(m, reviews[0].Ref)
+			if err != nil || full.Text != tc.problem {
+				t.Fatalf("error detail: %+v, %v", full, err)
+			}
+		})
+	}
+}
+
+func TestTimelineConvorelRetryRefresh(t *testing.T) {
+	f, m, at := convorelMission(t)
+	var done atomic.Bool
+	fakeConvorel(t, func(string) ([]byte, error) {
+		if done.Load() {
+			return convorelJSON(at, true), nil
+		}
+		var h map[string]any
+		if err := json.Unmarshal(convorelJSON(at, false), &h); err != nil {
+			t.Fatal(err)
+		}
+		run := h["runs"].([]any)[1].(map[string]any)
+		run["state"], run["error"] = "prepared", "composer: existing draft"
+		delete(run, "submittedAt")
+		run["createdAt"] = time.UnixMilli(at + 20).UTC().Format(time.RFC3339Nano)
+		return json.Marshal(h)
+	})
+	v := timeline(t, f, m)
+	reviews := entriesOf(v, "review")
+	if len(reviews) != 2 || reviews[1].State != "not_sent" {
+		t.Fatalf("%+v", reviews)
+	}
+	have := []string{}
+	for _, e := range v.Entries {
+		have = append(have, e.Hash)
+	}
+	done.Store(true)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	next, err := f.k.Timeline(ctx, TimelineInput{Mission: m, From: v.Entries[0].Ord, Have: have, Wait: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reviews = entriesOf(next, "review")
+	if len(reviews) != 1 || reviews[0].State != "complete" || reviews[0].Text != "答复二" {
+		t.Fatalf("retry result did not refresh: %+v", next)
+	}
+}
 func TestTimelineConvorelDisplayBounds(t *testing.T) {
 	f, m, at := convorelMission(t)
 	injectTimelineItems(t, f, m, SessionItem{At: at + 15, Role: "user", Text: "next mission"})
@@ -211,7 +295,7 @@ func TestTimelineConvorelCreatedFallbackAndFailed(t *testing.T) {
 		return b, e
 	})
 	es := entriesOf(timeline(t, f, m), "ask", "review")
-	if len(es) != 4 || es[0].At != at || es[1].State != "waiting" || es[1].Text != "" || es[1].At != at+1 || es[3].State != "failed" || es[3].At != at+30 {
+	if len(es) != 4 || es[0].At != at || es[1].State != "incomplete" || es[1].Text != "" || es[1].At != at+1 || es[3].State != "failed" || es[3].At != at+30 {
 		t.Fatalf("%+v", es)
 	}
 }

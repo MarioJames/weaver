@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -124,6 +125,65 @@ func TestTaskConvorel(t *testing.T) {
 	})
 	tasksWait(t, tt, "这一轮没有拿到回复", 3*time.Second)
 	tasksAbsent(t, tt, "等待回复…")
+}
+
+func TestTaskConvorelStatus(t *testing.T) {
+	for _, tc := range []struct{ state, label string }{
+		{"not_sent", "尚未投递"},
+		{"rejected", "投递被拒绝"},
+		{"delivery_unknown", "投递结果尚未确认"},
+		{"blocked", "回复读取受阻"},
+		{"failed", "这一轮没有拿到回复"},
+		{"lost", "无法找到这一轮会话"},
+		{"superseded", "这一轮已被替代"},
+		{"incomplete", "回复尚不完整"},
+		{"unknown", "审查状态未知"},
+	} {
+		t.Run(tc.state, func(t *testing.T) {
+			f, _, tt := tasksTesterWith(t, 860, 1400, func(f *tasksFake) {
+				withConvorel(f)
+				tl := f.timelines[fxConvorel]
+				e := &tl.Entries[len(tl.Entries)-1]
+				e.State, e.Text = tc.state, "composer: existing draft"
+				e.Hash = fxHash(*e)
+			})
+			openTask(t, tt, "定时任务调度方案审查", "问 Convorel")
+			tasksContains(t, tt, tc.label, "composer: existing draft", "结论：方案方向可行")
+			tasksAbsent(t, tt, "等待回复…")
+			if dir := os.Getenv("WEAVER_GUI_SCREENSHOTS"); dir != "" {
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					t.Fatal(err)
+				}
+				shotTo(t, dir, "convorel-"+tc.state+".png", tt)
+			}
+			if tc.state != "not_sent" {
+				return
+			}
+			// Long provider errors use the same full-text drawer as replies.
+			const detail = "完整错误详情：composer: existing draft"
+			f.taskMu.Lock()
+			f.texts[fxConvorel+"|review:cv1:2"] = kernel.MissionTextResult{Title: "Convorel · 第 2 轮回复", Text: detail}
+			f.taskMu.Unlock()
+			f.edit(fxConvorel, func(tl *taskTimeline) {
+				e := &tl.Entries[len(tl.Entries)-1]
+				e.Chars = 2400
+				e.Hash = fxHash(*e)
+			})
+			tasksWait(t, tt, "查看全文 · 2400 字", 3*time.Second)
+			click(t, tt, "查看全文 · 2400 字")
+			tasksWait(t, tt, detail, 3*time.Second)
+			click(t, tt, "Close")
+			// The same round can be retried outside Weaver. A fresh reply must
+			// replace the status and its error rather than leave a stale failure.
+			f.edit(fxConvorel, func(tl *taskTimeline) {
+				e := &tl.Entries[len(tl.Entries)-1]
+				e.State, e.Text = "complete", "重试后的完整评审回复"
+				e.Hash = fxHash(*e)
+			})
+			tasksWait(t, tt, "重试后的完整评审回复", 3*time.Second)
+			tasksAbsent(t, tt, tc.label, "composer: existing draft")
+		})
+	}
 }
 
 // A24: a task with no Convorel entries is an ordinary page.

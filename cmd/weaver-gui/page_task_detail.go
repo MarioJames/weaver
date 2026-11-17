@@ -342,14 +342,41 @@ func (a *app) taskEntryView(c *ui.Context, s *taskState, group []taskEntry) {
 		a.taskSpeech(c, s, a.taskOwnerHeader(s, "问 Convorel", e.At), e, taskAgentLines)
 	case "review":
 		h := taskHeaderInfo{Convorel: true, Name: "Convorel", Role: taskRoleReviewer, Meta: e.Model, Time: at}
-		if e.State == "waiting" || e.State == "failed" {
+		if e.State != "complete" {
 			tk := theme.TokensOf(c)
-			word := "等待回复…"
-			if e.State == "failed" {
+			word := "审查状态未知"
+			switch e.State {
+			case "waiting":
+				word = "等待回复…"
+			case "not_sent":
+				word = "尚未投递"
+			case "rejected":
+				word = "投递被拒绝"
+			case "delivery_unknown":
+				word = "投递结果尚未确认"
+			case "blocked":
+				word = "回复读取受阻"
+			case "failed":
 				word = "这一轮没有拿到回复"
+			case "lost":
+				word = "无法找到这一轮会话"
+			case "superseded":
+				word = "这一轮已被替代"
+			case "incomplete":
+				word = "回复尚不完整"
 			}
 			taskMessage(c, taskHeaderOf(c, h, 32), func() {
-				taskBubble(c, func() { ui.Text(c, word).FontSize(14).LineHeight(1.6).TextColor(tk.TextSecondary) })
+				taskBubble(c, func() {
+					ui.Column(c).Gap(6).Children(func() {
+						ui.Text(c, word).FontSize(14).LineHeight(1.6).TextColor(tk.TextSecondary)
+						if e.Text != "" {
+							text, clipped := taskPreviewOf(e)
+							if taskPreviewChars(c, text, taskAgentLines, e.Chars, clipped) {
+								a.openText(s, e.Ref, h)
+							}
+						}
+					})
+				})
 			})
 			return
 		}

@@ -201,7 +201,9 @@ func (k *Kernel) Timeline(ctx context.Context, in TimelineInput) (*TimelineResul
 		all := out.Entries
 		pendingReview := false
 		for _, e := range all {
-			if e.Kind == "review" && e.State == "waiting" {
+			// A retry or resumed observation can change an unsuccessful round
+			// without another tool call in the owner's session.
+			if e.Kind == "review" && e.State != "complete" {
 				pendingReview = true
 				break
 			}

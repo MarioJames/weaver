@@ -32,7 +32,11 @@ type convorelRun struct {
 	CreatedAt      string `json:"createdAt"`
 	LastObservedAt string `json:"lastObservedAt"`
 	ObservedModel  string `json:"observedModel"`
-	Reply          struct {
+	Error          string `json:"error"`
+	Delivery       struct {
+		RequestSent bool `json:"requestSent"`
+	} `json:"delivery"`
+	Reply struct {
 		Final    bool   `json:"final"`
 		Markdown string `json:"markdown"`
 	} `json:"reply"`
@@ -178,14 +182,36 @@ func (k *Kernel) timelineConvorel(m *Mission, items []SessionItem) ([]convorelTe
 			ask.body(run.Input, fmt.Sprintf("ask:%s:%d", id, round))
 			ask.Ord = timelineOrd(at, 0, ask.Ref)
 			out = append(out, convorelText{ask, run.Input})
-			review := TimelineEntry{Kind: "review", At: at + 1, Convorel: id, Round: round, Model: run.ObservedModel, State: "waiting"}
-			text := ""
+			review := TimelineEntry{Kind: "review", At: at + 1, Convorel: id, Round: round, Model: run.ObservedModel, State: run.State}
+			text := run.Error
+			switch run.State {
+			case "prepared":
+				// A persisted send intent is not proof that delivery succeeded or
+				// failed. Only a run without that intent is known to be unsent.
+				if run.SubmittedAt != "" || run.Delivery.RequestSent {
+					review.State = "delivery_unknown"
+				} else {
+					review.State = "not_sent"
+				}
+			case "delivered":
+				review.State = "waiting"
+				if run.Error != "" {
+					review.State = "blocked"
+				}
+			case "complete":
+				review.State = "incomplete"
+				if run.Reply.Final {
+					review.State, text = "complete", run.Reply.Markdown
+				}
+			case "rejected", "delivery_unknown", "failed", "blocked", "superseded", "lost":
+				// Preserve the provider's unsuccessful outcome and its reason.
+			default:
+				review.State = "unknown"
+			}
 			if run.State == "failed" || (run.State == "complete" && run.Reply.Final) {
-				review.State = run.State
 				if observed := convorelMillis(run.LastObservedAt); observed != 0 {
 					review.At = observed
 				}
-				text = run.Reply.Markdown
 			}
 			review.body(text, fmt.Sprintf("review:%s:%d", id, round))
 			review.Ord = timelineOrd(review.At, 0, review.Ref)
