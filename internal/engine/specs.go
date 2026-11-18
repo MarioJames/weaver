@@ -223,7 +223,9 @@ var specs = map[string]*spec{
 		},
 		login: func(a Account) ([]string, map[string]string) {
 			env, _ := opencodeAccountEnv(a.AuthDir)
-			return []string{"opencode", "auth", "login"}, env
+			// Without --standalone, opencode 2.2 leaves a background service
+			// holding its fixed global port, and the user's own opencode then hangs.
+			return []string{"opencode", "auth", "login", "--standalone"}, env
 		},
 	},
 	"dsh": {bin: "dsh", argv: dshArgv, prepare: dshPrepare, ready: apiReady},
