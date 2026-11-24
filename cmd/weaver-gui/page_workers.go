@@ -90,7 +90,7 @@ func (a *app) debaterSection(c *ui.Context, state *workerPageState, narrow bool)
 		display.Text(c, "设计对谈固定由这些席位出方案并互评（配置丙方后启用三方对谈）。对谈人不参与工作包的选路。", display.TextProps{Type: display.TextSecondary, FontSize: 12})
 		ui.Column(c).Gap(0).Border(1, tk.BorderSecondary).Radius(10).Clip().Children(func() {
 			if !narrow {
-				ui.Row(c).Padding(10, 12).Gap(12).Background(tk.FillQuaternary).Children(func() {
+				ui.Row(c).Padding(10, 12).Gap(16).Background(tk.FillQuaternary).Children(func() {
 					for i, label := range []string{"席位", "引擎与模型", "思考力度", "账号", "操作"} {
 						debaterCell(c, i, func() {
 							display.Text(c, label, display.TextProps{Type: display.TextSecondary, FontSize: 12, Strong: true})
@@ -179,7 +179,7 @@ func (a *app) debaterSection(c *ui.Context, state *workerPageState, narrow bool)
 						}
 					})
 				} else {
-					ui.Row(c).Key("debater:"+id).Padding(10, 12).Gap(12).AlignItems(ui.Center).Children(func() {
+					ui.Row(c).Key("debater:"+id).Padding(10, 12).Gap(16).AlignItems(ui.Center).Children(func() {
 						debaterCell(c, 0, identity)
 						for col := 1; col <= 3; col++ {
 							debaterCell(c, col, func() { details(col) })
@@ -223,23 +223,26 @@ func debaterCell(c *ui.Context, col int, body func()) {
 	case 0:
 		e.Width(165)
 	case 1:
-		e.Grow(1).Basis(0)
+		e.Grow(1).Basis(0).MinWidth(180)
 	case 2:
-		e.Width(90)
+		e.Width(96)
 	case 3:
-		e.Width(190)
+		e.Grow(1.8).Basis(0).MinWidth(240)
 	case 4:
-		e.Width(68)
+		e.Width(76)
 	}
 	e.Children(body)
 }
 
 func workerCell(c *ui.Context, i int, body func()) {
-	sizes := []float32{0, 76, 76, 76, 190, 44, 52, 114}
+	sizes := []float32{0, 80, 80, 80, 0, 48, 56, 118}
 	e := ui.Column(c).MinWidth(0)
-	if i == 0 {
-		e.Grow(1).Basis(0).MinWidth(160)
-	} else {
+	switch i {
+	case 0:
+		e.Grow(1.4).Basis(0).MinWidth(160)
+	case 4:
+		e.Grow(1.5).Basis(0).MinWidth(190)
+	default:
 		e.Width(sizes[i])
 	}
 	e.Children(body)

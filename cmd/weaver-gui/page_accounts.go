@@ -99,13 +99,13 @@ type accountColumn struct {
 }
 
 var accountColumns = []accountColumn{
-	{title: "账号", grow: true, weight: 3, minW: 130},
-	{title: "状态", width: 108},
-	{title: "用它的候选", grow: true, weight: 2, minW: 120},
-	{title: "用量 / 额度", width: 166},
-	{title: "剩余 / 重置", width: 104},
-	{title: "启用", width: 36, align: ui.Center},
-	{title: "操作", width: 116, align: ui.End},
+	{title: "账号", grow: true, weight: 1.9, minW: 112},
+	{title: "状态", width: 80},
+	{title: "用它的候选", grow: true, weight: 1.2, minW: 112},
+	{title: "用量 / 额度", grow: true, weight: 2.1, minW: 168},
+	{title: "剩余 / 重置", grow: true, weight: 0.8, minW: 82},
+	{title: "启用", width: 44, align: ui.Center},
+	{title: "操作", width: 120, align: ui.End},
 }
 
 func accountCell(c *ui.Context, i int, body func(cell ui.Element)) ui.Element {
@@ -123,7 +123,7 @@ func accountCell(c *ui.Context, i int, body func(cell ui.Element)) ui.Element {
 func (a *app) accountsTable(c *ui.Context) {
 	tk := theme.TokensOf(c)
 	ui.Column(c).Border(1, tk.BorderSecondary).Radius(10).Clip().Children(func() {
-		ui.Row(c).Padding(10, 12).Gap(8).Background(tk.FillQuaternary).AlignItems(ui.Center).Children(func() {
+		ui.Row(c).Padding(10, 12).Gap(12).Background(tk.FillQuaternary).AlignItems(ui.Center).Children(func() {
 			for i, col := range accountColumns {
 				accountCell(c, i, func(cell ui.Element) {
 					row := ui.Row(c).Gap(4).AlignItems(ui.Center)
@@ -152,7 +152,7 @@ func (a *app) accountRow(c *ui.Context, acc account, divider bool) {
 	root := ui.Column(c).Key("account:" + acc.ID)
 	open := ui.Local(root, "more", func() bool { return false })
 	root.Children(func() {
-		row := ui.Row(c).Padding(12).Gap(8).AlignItems(ui.Start)
+		row := ui.Row(c).Padding(12).Gap(12).AlignItems(ui.Start)
 		if row.Hovered() {
 			row.Background(tk.FillQuaternary)
 		}
@@ -175,13 +175,15 @@ func (a *app) accountRow(c *ui.Context, acc account, divider bool) {
 				accountCell(c, 4, func(cell ui.Element) { a.quotaResetCell(c, acc) })
 			}
 			accountCell(c, 5, func(cell ui.Element) {
-				on := acc.Enabled
-				sw := choice.Switch(c, &on, choice.SwitchProps{Size: theme.Small}).Label("启用 " + label)
-				key := "account:enabled:" + acc.ID
-				sw.Disabled(a.busy[key])
-				if sw.Changed() {
-					a.write(key, "account.set", map[string]any{"id": acc.ID, "enabled": on})
-				}
+				ui.Row(c).Justify(ui.Center).Children(func() {
+					on := acc.Enabled
+					sw := choice.Switch(c, &on, choice.SwitchProps{Size: theme.Small}).Label("启用 " + label)
+					key := "account:enabled:" + acc.ID
+					sw.Disabled(a.busy[key])
+					if sw.Changed() {
+						a.write(key, "account.set", map[string]any{"id": acc.ID, "enabled": on})
+					}
+				})
 			})
 			accountCell(c, 6, func(cell ui.Element) {
 				ui.Row(c).Justify(ui.End).Children(func() { a.accountActions(c, acc, open) })
@@ -238,7 +240,7 @@ func (a *app) accountCards(c *ui.Context) {
 						})
 					} else if hasQuotaData(acc) {
 						ui.Row(c).Gap(16).Children(func() {
-							ui.Column(c).Width(214).Gap(2).Children(func() { a.quotaUsedCell(c, acc) })
+							ui.Column(c).Width(240).Gap(2).Children(func() { a.quotaUsedCell(c, acc) })
 							ui.Column(c).Gap(2).Children(func() { a.quotaResetCell(c, acc) })
 						})
 					}

@@ -176,15 +176,15 @@ func (a *app) quotaUsedCell(c *ui.Context, acc account) {
 		case w.UsedPercent >= 70:
 			color = tk.Warning
 		}
-		line := ui.Row(c.Key(i)).Height(quotaLineHeight).Gap(6).AlignItems(ui.Center)
+		line := ui.Row(c.Key(i)).Height(quotaLineHeight).Gap(6).Padding(0, 6, 0, 0).AlignItems(ui.Center)
 		line.Children(func() {
-			ui.Column(c).Width(96).Children(func() {
+			ui.Column(c).Width(102).Children(func() {
 				display.Text(c, quotaWindowLabel(w), display.TextProps{Type: display.TextSecondary, FontSize: 11}).SingleLine()
 			})
 			ui.Column(c).Grow(1).Basis(0).MinWidth(0).Children(func() {
 				feedback.Progress(c, float32(w.UsedPercent), feedback.ProgressProps{Size: theme.Middle, Color: color})
 			})
-			ui.Column(c).Width(30).AlignItems(ui.End).Children(func() {
+			ui.Column(c).Width(34).AlignItems(ui.End).Children(func() {
 				display.Text(c, fmt.Sprintf("%.0f%%", w.UsedPercent), display.TextProps{FontSize: 11}).FontFeatures("tnum").SingleLine()
 			})
 		})
@@ -200,7 +200,7 @@ func (a *app) quotaUsedCell(c *ui.Context, acc account) {
 		if warn {
 			props.Type = display.TextWarning
 		}
-		line := ui.Row(c.Key("credits")).Height(quotaLineHeight).Gap(6).AlignItems(ui.Center)
+		line := ui.Row(c.Key("credits")).Height(quotaLineHeight).Gap(6).Padding(0, 6, 0, 0).AlignItems(ui.Center)
 		line.Children(func() {
 			ui.Column(c).Width(72).Children(func() {
 				display.Text(c, "Credits", display.TextProps{Type: display.TextSecondary, FontSize: 11}).SingleLine()
@@ -213,7 +213,7 @@ func (a *app) quotaUsedCell(c *ui.Context, acc account) {
 	}
 	if reset := quotaResetCreditsOf(acc); reset != nil {
 		val := fmt.Sprintf("%d 张", reset.AvailableCount)
-		line := ui.Row(c.Key("reset-credits")).Height(quotaLineHeight).Gap(6).AlignItems(ui.Center)
+		line := ui.Row(c.Key("reset-credits")).Height(quotaLineHeight).Gap(6).Padding(0, 6, 0, 0).AlignItems(ui.Center)
 		line.Children(func() {
 			ui.Column(c).Width(72).Children(func() {
 				display.Text(c, "重置卡", display.TextProps{Type: display.TextSecondary, FontSize: 11}).SingleLine()

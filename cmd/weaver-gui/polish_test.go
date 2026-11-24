@@ -153,7 +153,14 @@ func TestAccountUsageCellsKeepCopyInsideColumn(t *testing.T) {
 			if !ok {
 				t.Fatalf("找不到用量列表头：%q", tt.Texts())
 			}
-			columnRight := header.X + accountColumns[3].width
+			nextHeader, ok := tt.Find("剩余 / 重置")
+			if !ok {
+				t.Fatalf("找不到剩余列表头：%q", tt.Texts())
+			}
+			columnRight := nextHeader.X
+			if width >= 1600 && nextHeader.X-header.X < 280 {
+				t.Fatalf("%d 宽时用量/额度列仍过窄：%.0f", width, nextHeader.X-header.X)
+			}
 			empty, ok := tt.Find("本月没有运行")
 			if !ok {
 				t.Fatalf("找不到没有运行的文案：%q", tt.Texts())
