@@ -257,8 +257,18 @@ func TestPlanQualificationIgnoresReadinessButHonorsEngineAndEnabled(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(workers[0].Reason, "未评分：只在包指定它时使用") {
-		t.Fatal(workers[0].Reason)
+	if workers[0].Available || !strings.Contains(workers[0].Reason, "等待登录") {
+		t.Fatalf("unready unrated worker should keep readiness reason: %+v", workers[0])
+	}
+	if _, err := f.k.db.Exec(`UPDATE accounts SET ready=1, ready_reason=''`); err != nil {
+		t.Fatal(err)
+	}
+	workers, err = f.k.Workers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !workers[0].Available || !strings.HasPrefix(workers[0].Reason, "未评分：只在包指定它时使用") {
+		t.Fatalf("ready unrated worker should report unrated hint: %+v", workers[0])
 	}
 	if _, err := f.k.db.Exec(`UPDATE workers SET intelligence=10,enabled=0 WHERE id='alpha'`); err != nil {
 		t.Fatal(err)

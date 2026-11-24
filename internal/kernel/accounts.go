@@ -548,7 +548,7 @@ func (k *Kernel) Workers() ([]*Worker, error) {
 					w.Reason = ""
 				}
 			}
-			if w.Intelligence == 0 {
+			if !isDebater(w.ID) && w.Available && w.Intelligence == 0 {
 				w.Reason = "未评分：只在包指定它时使用；用 weaver worker set <候选> --intelligence <1-10> 评分"
 			}
 		}

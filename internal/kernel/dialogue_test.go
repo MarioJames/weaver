@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/MarioJames/weaver/internal/engine"
+	"github.com/MarioJames/weaver/internal/quota"
 )
 
 // dialogueFixture adds a rated claude candidate and both dialogue seats.
@@ -374,6 +375,43 @@ func TestDebaterConfigurationAndRole(t *testing.T) {
 		if body["role"] != role {
 			t.Fatalf("%s JSON: %s", id, b)
 		}
+		if role == "debater" && (w.Reason != "" || !w.Available) {
+			t.Fatalf("%s available=%v reason=%q", id, w.Available, w.Reason)
+		}
+	}
+	// An unavailable debater (e.g. model quota exhausted or account unready) must expose
+	// the real unavailability reason rather than the execution-worker unrated hint.
+	snapJSON, err := json.Marshal(&quota.Snapshot{
+		Status: "available",
+		Windows: []quota.Window{{
+			ID:          "claude:weekly_scoped:top-b",
+			Label:       "7 天额度",
+			Scope:       "model",
+			Model:       "top-b",
+			UsedPercent: 100,
+			ResetsAt:    f.k.now().Add(2 * time.Hour).UnixMilli(),
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.k.db.Exec(`UPDATE accounts SET quota=? WHERE id='acct-claude'`, string(snapJSON)); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := f.k.Worker("debater_b"); err != nil || b.Available || !strings.Contains(b.Reason, "额度已用完") {
+		t.Fatalf("exhausted debater_b: %+v err=%v", b, err)
+	}
+	if _, err := f.k.db.Exec(`UPDATE accounts SET quota='' WHERE id='acct-claude'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.k.db.Exec(`UPDATE accounts SET ready=0, ready_reason='等待登录' WHERE id='acct-claude'`); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := f.k.Worker("debater_b"); err != nil || b.Available || !strings.Contains(b.Reason, "等待登录") {
+		t.Fatalf("unready debater_b: %+v err=%v", b, err)
+	}
+	if _, err := f.k.db.Exec(`UPDATE accounts SET ready=1, ready_reason='' WHERE id='acct-claude'`); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := f.k.SetWorker(WorkerInput{ID: "alpha", Engine: "claude", Accounts: []string{"acct-claude"}}); err == nil {
 		t.Fatal("ordinary engine changed")
