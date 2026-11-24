@@ -260,7 +260,124 @@ func normalizeCodex(payload any, now time.Time) *Snapshot {
 	if spend, ok := object(body["spend_control"]); ok {
 		globalBlocked = isTrue(spend["reached"])
 	}
-	return evaluate(windows, accountAttempts, droppedAccount, now, permission, blocked, globalBlocked)
+	snap := evaluate(windows, accountAttempts, droppedAccount, now, permission, blocked, globalBlocked)
+	snap.Credits = parseCodexCredits(body["credits"])
+	snap.ResetCredits = parseCodexResetCreditsSummary(body["rate_limit_reset_credits"])
+	return snap
+}
+
+func parseCodexCredits(value any) *Credits {
+	raw, ok := object(value)
+	if !ok {
+		return nil
+	}
+	_, hasCreditsKey := raw["has_credits"]
+	_, hasUnlimitedKey := raw["unlimited"]
+	_, hasOverageKey := raw["overage_limit_reached"]
+	balance, hasBalance := parseBalanceNumber(raw["balance"])
+	if !hasCreditsKey && !hasUnlimitedKey && !hasOverageKey && !hasBalance {
+		return nil
+	}
+	return &Credits{
+		HasCredits:          isTrue(raw["has_credits"]),
+		Unlimited:           isTrue(raw["unlimited"]),
+		OverageLimitReached: isTrue(raw["overage_limit_reached"]),
+		Balance:             balance,
+		HasBalance:          hasBalance,
+	}
+}
+
+func parseBalanceNumber(value any) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
+			return 0, false
+		}
+		return v, true
+	case string:
+		text := strings.TrimSpace(v)
+		if text == "" || len(text) > 64 {
+			return 0, false
+		}
+		f, err := strconv.ParseFloat(text, 64)
+		if err != nil || math.IsNaN(f) || math.IsInf(f, 0) || f < 0 {
+			return 0, false
+		}
+		return f, true
+	default:
+		return 0, false
+	}
+}
+
+func parseNonNegativeInt(value any) (int, bool) {
+	f, ok := number(value)
+	if !ok || f != math.Trunc(f) || f > 1_000_000 {
+		return 0, false
+	}
+	return int(f), true
+}
+
+func parseCodexResetCreditsSummary(value any) *ResetCredits {
+	raw, ok := object(value)
+	if !ok {
+		return nil
+	}
+	if count, ok := parseNonNegativeInt(raw["available_count"]); ok {
+		return &ResetCredits{AvailableCount: count}
+	}
+	if count, ok := parseNonNegativeInt(raw["applicable_available_count"]); ok {
+		return &ResetCredits{AvailableCount: count}
+	}
+	return nil
+}
+
+func mergeCodexResetCredits(snap *Snapshot, payload any, now time.Time) {
+	if snap == nil {
+		return
+	}
+	body, ok := object(payload)
+	if !ok {
+		return
+	}
+	nowMS := now.UnixMilli()
+	var earliest int64
+	counted := 0
+	hasList := false
+	if items, ok := body["credits"].([]any); ok {
+		hasList = true
+		if len(items) > 100 {
+			items = items[:100]
+		}
+		for _, item := range items {
+			card, ok := object(item)
+			if !ok {
+				continue
+			}
+			status, _ := card["status"].(string)
+			if status != "available" {
+				continue
+			}
+			expiresAt := parseProviderTimestamp(card["expires_at"])
+			if expiresAt != 0 && expiresAt <= nowMS {
+				continue
+			}
+			counted++
+			if expiresAt != 0 && (earliest == 0 || expiresAt < earliest) {
+				earliest = expiresAt
+			}
+		}
+	}
+	count, hasCount := parseNonNegativeInt(body["available_count"])
+	if !hasCount {
+		if !hasList {
+			return
+		}
+		count = counted
+	}
+	snap.ResetCredits = &ResetCredits{
+		AvailableCount: count,
+		NextExpiresAt:  earliest,
+	}
 }
 
 func normalizeClaude(payload any, now time.Time) *Snapshot {

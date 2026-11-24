@@ -26,10 +26,11 @@ const (
 // Default provider endpoints. They are constants so the zero Client works,
 // while the exported Client fields let tests point at local servers.
 const (
-	defaultCodexURL           = "https://chatgpt.com/backend-api/wham/usage"
-	defaultClaudeURL          = "https://api.anthropic.com/api/oauth/usage"
-	defaultOpenCodeGoURL      = "https://opencode.ai/zen/go/v1/usage"
-	defaultOpenCodeConsoleURL = openCodeConsoleRoot + "/api/go/status"
+	defaultCodexURL             = "https://chatgpt.com/backend-api/wham/usage"
+	defaultCodexResetCreditsURL = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits"
+	defaultClaudeURL            = "https://api.anthropic.com/api/oauth/usage"
+	defaultOpenCodeGoURL        = "https://opencode.ai/zen/go/v1/usage"
+	defaultOpenCodeConsoleURL   = openCodeConsoleRoot + "/api/go/status"
 )
 
 const (
@@ -58,11 +59,28 @@ type Window struct {
 	DurationMinutes int     `json:"durationMinutes,omitempty"` // 窗口长度，0 表示未知
 }
 
+// Credits describes a subscription account's overage credit balance (Codex).
+type Credits struct {
+	HasCredits          bool    `json:"hasCredits"`
+	Unlimited           bool    `json:"unlimited,omitempty"`
+	OverageLimitReached bool    `json:"overageLimitReached,omitempty"`
+	Balance             float64 `json:"balance,omitempty"`
+	HasBalance          bool    `json:"hasBalance,omitempty"`
+}
+
+// ResetCredits describes available rate-limit reset cards (Codex).
+type ResetCredits struct {
+	AvailableCount int   `json:"availableCount"`
+	NextExpiresAt  int64 `json:"nextExpiresAt,omitempty"` // 最早一张可用重置卡到期时间，Unix 毫秒
+}
+
 // Snapshot is a normalized reading of one subscription account.
 type Snapshot struct {
-	Status  string   `json:"status"` // available | exhausted | unknown
-	Windows []Window `json:"windows"`
-	Detail  string   `json:"detail,omitempty"` // 一句中文说明
+	Status       string        `json:"status"` // available | exhausted | unknown
+	Windows      []Window      `json:"windows"`
+	Credits      *Credits      `json:"credits,omitempty"`
+	ResetCredits *ResetCredits `json:"resetCredits,omitempty"`
+	Detail       string        `json:"detail,omitempty"` // 一句中文说明
 }
 
 // Source identifies one subscription account. AuthDir means CODEX_HOME for
@@ -110,14 +128,15 @@ func upstream(message string) *Error  { return quotaError(kindUpstream, message)
 // Client fetches quota snapshots. The zero value is ready to use with a
 // 15-second timeout and the official provider endpoints.
 type Client struct {
-	HTTP               *http.Client
-	CodexURL           string        // 默认 https://chatgpt.com/backend-api/wham/usage
-	CodexTokenURL      string        // 默认 https://auth.openai.com/oauth/token
-	ClaudeURL          string        // 默认 https://api.anthropic.com/api/oauth/usage
-	ClaudeTokenURL     string        // 默认 https://platform.claude.com/v1/oauth/token
-	OpenCodeGoURL      string        // 默认 https://opencode.ai/zen/go/v1/usage
-	OpenCodeConsoleURL string        // 默认 https://opencode.ai/console/api/go/status
-	RefreshAhead       time.Duration // 默认 15 分钟；<=0 使用默认值
+	HTTP                 *http.Client
+	CodexURL             string        // 默认 https://chatgpt.com/backend-api/wham/usage
+	CodexResetCreditsURL string        // 默认 https://chatgpt.com/backend-api/wham/rate-limit-reset-credits
+	CodexTokenURL        string        // 默认 https://auth.openai.com/oauth/token
+	ClaudeURL            string        // 默认 https://api.anthropic.com/api/oauth/usage
+	ClaudeTokenURL       string        // 默认 https://platform.claude.com/v1/oauth/token
+	OpenCodeGoURL        string        // 默认 https://opencode.ai/zen/go/v1/usage
+	OpenCodeConsoleURL   string        // 默认 https://opencode.ai/console/api/go/status
+	RefreshAhead         time.Duration // 默认 15 分钟；<=0 使用默认值
 }
 
 type endpoint int
@@ -150,6 +169,17 @@ func (c *Client) Fetch(ctx context.Context, src Source, now time.Time) (*Snapsho
 			return nil, err
 		}
 		snap := normalizeCodex(payload, now)
+		if resetURL := c.codexResetCreditsURL(); resetURL != "" {
+			if resetPayload, resetErr := c.request(ctx, resetURL, map[string]string{
+				"Authorization":      "Bearer " + cred.token,
+				"ChatGPT-Account-Id": cred.accountID,
+				"User-Agent":         "codex-cli",
+				"OpenAI-Beta":        "codex-1",
+				"Accept":             "application/json",
+			}, endpointCodex); resetErr == nil {
+				mergeCodexResetCredits(snap, resetPayload, now)
+			}
+		}
 		redactSnapshot(snap, "codex", cred.token, cred.accountID)
 		return snap, nil
 	case "claude":
@@ -273,6 +303,19 @@ func (c *Client) codexURL() string {
 		return c.CodexURL
 	}
 	return defaultCodexURL
+}
+
+func (c *Client) codexResetCreditsURL() string {
+	if c != nil && c.CodexResetCreditsURL != "" {
+		return c.CodexResetCreditsURL
+	}
+	// When a caller overrides CodexURL (e.g. unit tests) without setting
+	// CodexResetCreditsURL, skip the optional reset-card endpoint rather than
+	// hitting the live upstream.
+	if c != nil && c.CodexURL != "" {
+		return ""
+	}
+	return defaultCodexResetCreditsURL
 }
 
 func (c *Client) claudeURL() string {

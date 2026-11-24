@@ -334,6 +334,47 @@ func TestQuotaRefreshBatchContinuesAndFilters(t *testing.T) {
 	assertQuotaPrivate(t, f)
 }
 
+func TestRefreshQuotaCodexCreditsAndResetCards(t *testing.T) {
+	f := newFixture(t)
+	f.k.now = func() time.Time { return quotaTestNow }
+	usageServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"rate_limit":{"allowed":true,"primary_window":{"used_percent":40,"reset_at":%d,"limit_window_seconds":604800}},"credits":{"has_credits":true,"balance":"1234.50"},"rate_limit_reset_credits":{"available_count":1}}`, quotaTestNow.Add(48*time.Hour).Unix())
+	}))
+	defer usageServer.Close()
+	resetExpiry := quotaTestNow.Add(20 * 24 * time.Hour)
+	resetServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"available_count":1,"credits":[{"status":"available","expires_at":%q}]}`, resetExpiry.Format(time.RFC3339))
+	}))
+	defer resetServer.Close()
+	f.k.quotaClient = &quota.Client{HTTP: usageServer.Client(), CodexURL: usageServer.URL, CodexResetCreditsURL: resetServer.URL}
+
+	dir := t.TempDir()
+	// Minimal JWT whose exp is in the future.
+	header := "eyJhbGciOiJub25lIn0"
+	claims := "eyJleHAiOjE5OTk5OTk5OTl9"
+	tok := header + "." + claims + ".sig"
+	data, _ := json.Marshal(map[string]any{"auth_mode": "chatgpt", "tokens": map[string]any{"access_token": tok, "account_id": "codex-acct-secret"}})
+	if err := os.WriteFile(filepath.Join(dir, "auth.json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.k.AddAccount(AccountInput{ID: "codex-sub", Label: "ChatGPT Pro", Engine: "codex", Kind: "subscription", AuthDir: dir}); err != nil {
+		t.Fatal(err)
+	}
+	a, err := f.k.RefreshQuota("codex-sub")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Quota == nil || a.Quota.Credits == nil || !a.Quota.Credits.HasCredits || a.Quota.Credits.Balance != 1234.5 {
+		t.Fatalf("credits = %+v", a.Quota)
+	}
+	if a.Quota.ResetCredits == nil || a.Quota.ResetCredits.AvailableCount != 1 || a.Quota.ResetCredits.NextExpiresAt != resetExpiry.UnixMilli() {
+		t.Fatalf("resetCredits = %+v", a.Quota)
+	}
+	assertQuotaPrivate(t, f)
+}
+
 func TestQuotaRefreshIntervalIsConfigurable(t *testing.T) {
 	f := newFixture(t)
 	if got := f.k.quotaInterval(); got != 5*time.Minute {

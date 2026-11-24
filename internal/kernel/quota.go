@@ -14,12 +14,14 @@ import (
 
 // AccountQuota is the public, credential-free quota view.
 type AccountQuota struct {
-	Status    string         `json:"status"`
-	Windows   []quota.Window `json:"windows"`
-	Detail    string         `json:"detail,omitempty"`
-	CheckedAt int64          `json:"checkedAt,omitempty"`
-	Error     string         `json:"error,omitempty"`
-	Factor    float64        `json:"factor"`
+	Status       string              `json:"status"`
+	Windows      []quota.Window      `json:"windows"`
+	Credits      *quota.Credits      `json:"credits,omitempty"`
+	ResetCredits *quota.ResetCredits `json:"resetCredits,omitempty"`
+	Detail       string              `json:"detail,omitempty"`
+	CheckedAt    int64               `json:"checkedAt,omitempty"`
+	Error        string              `json:"error,omitempty"`
+	Factor       float64             `json:"factor"`
 }
 
 func supportsQuota(engine, kind string) bool {
@@ -36,7 +38,7 @@ func quotaView(raw string, checked int64, message string, now time.Time) *Accoun
 	s := parseQuota(raw)
 	v := &AccountQuota{Status: "unknown", Windows: []quota.Window{}, CheckedAt: checked, Error: message, Factor: quota.Factor(s, "", now)}
 	if s != nil {
-		v.Status, v.Windows, v.Detail = s.Status, s.Windows, s.Detail
+		v.Status, v.Windows, v.Credits, v.ResetCredits, v.Detail = s.Status, s.Windows, s.Credits, s.ResetCredits, s.Detail
 	}
 	return v
 }

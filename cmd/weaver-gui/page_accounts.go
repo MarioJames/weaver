@@ -236,7 +236,7 @@ func (a *app) accountCards(c *ui.Context) {
 							ui.Column(c).Grow(1).Basis(0).Children(func() { a.usageSpentCell(c, acc, 0) })
 							ui.Column(c).Grow(1).Basis(0).Children(func() { a.usageRemainingCell(c, acc, 0) })
 						})
-					} else if len(quotaWindows(acc)) > 0 {
+					} else if hasQuotaData(acc) {
 						ui.Row(c).Gap(16).Children(func() {
 							ui.Column(c).Width(214).Gap(2).Children(func() { a.quotaUsedCell(c, acc) })
 							ui.Column(c).Gap(2).Children(func() { a.quotaResetCell(c, acc) })

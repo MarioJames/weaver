@@ -805,7 +805,17 @@ func TestAccountScreenshots(t *testing.T) {
 	}
 	f := newAccountService(t)
 	checked := time.Now().Add(-3 * time.Minute).UnixMilli()
-	f.find("a1").Quota = &accountQuota{Status: "available", Windows: []quotaWindow{{Label: "5 小时额度", UsedPercent: 42, ResetsAt: time.Now().Add(time.Hour).UnixMilli()}, {Label: "7 天额度", UsedPercent: 76, ResetsAt: time.Now().Add(50 * time.Hour).UnixMilli()}}, CheckedAt: checked, Factor: 1}
+	f.find("a1").Quota = &accountQuota{
+		Status:  "exhausted",
+		Windows: []quotaWindow{{Label: "7 天额度", UsedPercent: 100, ResetsAt: time.Now().Add(50 * time.Hour).UnixMilli()}},
+		Credits: &quotaCredits{HasCredits: true, Balance: 57525.497649, HasBalance: true},
+		ResetCredits: &quotaResetCredits{
+			AvailableCount: 1,
+			NextExpiresAt:  time.Date(2026, 12, 12, 22, 18, 0, 0, time.UTC).UnixMilli(),
+		},
+		CheckedAt: checked,
+		Factor:    0,
+	}
 	f.find("import_e6f3c04da52965f2b7c02668").Quota = &accountQuota{Status: "available", Windows: []quotaWindow{{Label: "5 小时额度", UsedPercent: 0}, {Label: "7 天额度", UsedPercent: 98, ResetsAt: time.Now().Add(11 * time.Hour).UnixMilli()}, {Label: "7 天额度", Model: "Fable", UsedPercent: 70, ResetsAt: time.Now().Add(11 * time.Hour).UnixMilli()}}, CheckedAt: checked, Factor: 0.3}
 
 	seedUsage(f, "a5", &usage{Month: usageTotals{Runs: 12, InputTokens: 1_200_000, OutputTokens: 150_000, Unpriced: 12},
@@ -1043,5 +1053,54 @@ func TestModelQuotaWindowNamesItsModel(t *testing.T) {
 	}
 	if got := quotaWindowLabel(quotaWindow{Label: "7 天额度"}); got != "7 天" {
 		t.Fatalf("account window label = %q", got)
+	}
+}
+
+func TestCodexCreditsAndResetCardsDisplay(t *testing.T) {
+	for _, tc := range []struct {
+		got, want string
+	}{
+		{formatCreditsBalance(57525.497649), "57,525.5"},
+		{formatCreditsBalance(1000), "1,000"},
+		{formatCreditsBalance(12.345), "12.35"},
+		{formatCreditsBalance(0), "0"},
+	} {
+		if tc.got != tc.want {
+			t.Errorf("formatCreditsBalance = %q, want %q", tc.got, tc.want)
+		}
+	}
+	if v, s, w := formatCredits(&quotaCredits{Unlimited: true}); v != "无限制" || s != "不限量" || w {
+		t.Fatalf("unlimited = %q %q %v", v, s, w)
+	}
+	if v, s, w := formatCredits(&quotaCredits{HasCredits: true, HasBalance: true, Balance: 10, OverageLimitReached: true}); v != "10" || s != "已达上限" || !w {
+		t.Fatalf("overage = %q %q %v", v, s, w)
+	}
+
+	f := newAccountService(t)
+	checked := time.Now().Add(-time.Minute).UnixMilli()
+	expiry := time.Date(2026, 12, 12, 12, 0, 0, 0, time.Local).UnixMilli()
+	f.find("a1").Quota = &accountQuota{
+		Status:       "exhausted",
+		Windows:      []quotaWindow{{Label: "7 天额度", UsedPercent: 100, ResetsAt: time.Now().Add(24 * time.Hour).UnixMilli()}},
+		Credits:      &quotaCredits{HasCredits: true, Balance: 57525.497649, HasBalance: true},
+		ResetCredits: &quotaResetCredits{AvailableCount: 1, NextExpiresAt: expiry},
+		CheckedAt:    checked,
+		Factor:       0,
+	}
+	for _, width := range []int{1280, 800} {
+		a := testApp(t, &f.fakeService)
+		tt := ui.NewTester(a.view, width, 820)
+		click(t, tt, "账号")
+		for _, want := range []string{"Credits", "57,525.5", "可用", "重置卡", "1 张", "12-12 到期"} {
+			if !tt.HasText(want) {
+				t.Fatalf("width=%d missing %q in %v", width, want, tt.Texts())
+			}
+		}
+		if _, ok := tt.Find("Credits 57,525.5 可用"); !ok {
+			t.Fatalf("width=%d missing accessible Credits label", width)
+		}
+		if _, ok := tt.Find("重置卡 1 张"); !ok {
+			t.Fatalf("width=%d missing accessible reset-card label", width)
+		}
 	}
 }

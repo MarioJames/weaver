@@ -654,6 +654,9 @@ func TestDefaultEndpoints(t *testing.T) {
 	if got := client.codexURL(); got != "https://chatgpt.com/backend-api/wham/usage" {
 		t.Errorf("codex URL = %q", got)
 	}
+	if got := client.codexResetCreditsURL(); got != "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits" {
+		t.Errorf("codex reset credits URL = %q", got)
+	}
 	if got := client.codexTokenURL(); got != "https://auth.openai.com/oauth/token" {
 		t.Errorf("codex token URL = %q", got)
 	}
@@ -672,6 +675,94 @@ func TestDefaultEndpoints(t *testing.T) {
 	if client.httpClient().Timeout != 15*time.Second {
 		t.Errorf("default timeout = %v", client.httpClient().Timeout)
 	}
+}
+
+func TestCodexCreditsAndResetCards(t *testing.T) {
+	t.Run("parses credits and merges reset cards detail", func(t *testing.T) {
+		dir := t.TempDir()
+		token := testJWT(testNow.Add(24 * time.Hour))
+		writeCodexCredential(t, dir, token, "acct-secret", true)
+		usageServer, _ := jsonHandler(t, map[string]any{
+			"rate_limit": map[string]any{
+				"allowed":        false,
+				"limit_reached":  true,
+				"primary_window": map[string]any{"used_percent": 100.0, "reset_at": float64(testNow.Add(24 * time.Hour).Unix()), "limit_window_seconds": 604800.0},
+			},
+			"credits": map[string]any{
+				"has_credits":           true,
+				"unlimited":             false,
+				"overage_limit_reached": false,
+				"balance":               "57525.4976490000",
+			},
+			"rate_limit_reset_credits": map[string]any{
+				"available_count":            1,
+				"applicable_available_count": 1,
+			},
+		})
+		earlyExpiry := testNow.Add(15 * 24 * time.Hour).UTC().Format(time.RFC3339Nano)
+		lateExpiry := testNow.Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339Nano)
+		expiredCard := testNow.Add(-time.Hour).UTC().Format(time.RFC3339Nano)
+		resetServer, resetHeaders := jsonHandler(t, map[string]any{
+			"available_count": 2,
+			"credits": []any{
+				map[string]any{"id": "c-expired", "status": "available", "expires_at": expiredCard},
+				map[string]any{"id": "c-redeemed", "status": "redeemed", "expires_at": earlyExpiry},
+				map[string]any{"id": "c-late", "status": "available", "expires_at": lateExpiry},
+				map[string]any{"id": "c-early", "status": "available", "expires_at": earlyExpiry},
+			},
+		})
+		client := &Client{HTTP: usageServer.Client(), CodexURL: usageServer.URL, CodexResetCreditsURL: resetServer.URL}
+		snap, err := client.Fetch(context.Background(), Source{Engine: "codex", AuthDir: dir}, testNow)
+		if err != nil {
+			t.Fatalf("Fetch: %v", err)
+		}
+		hdr := <-resetHeaders
+		if hdr.Get("OpenAI-Beta") != "codex-1" || hdr.Get("Authorization") != "Bearer "+token || hdr.Get("ChatGPT-Account-Id") != "acct-secret" {
+			t.Fatalf("unexpected reset headers: %+v", hdr)
+		}
+		if snap.Status != statusExhausted || Factor(snap, "", testNow) != 0 {
+			t.Fatalf("exhausted subscription window with credits must keep Factor=0: status=%s factor=%v", snap.Status, Factor(snap, "", testNow))
+		}
+		if snap.Credits == nil || !snap.Credits.HasCredits || snap.Credits.Unlimited || snap.Credits.OverageLimitReached || !snap.Credits.HasBalance || snap.Credits.Balance < 57525.49 || snap.Credits.Balance > 57525.50 {
+			t.Fatalf("credits = %+v", snap.Credits)
+		}
+		if snap.ResetCredits == nil || snap.ResetCredits.AvailableCount != 2 || snap.ResetCredits.NextExpiresAt != testNow.Add(15*24*time.Hour).UnixMilli() {
+			t.Fatalf("resetCredits = %+v", snap.ResetCredits)
+		}
+	})
+
+	t.Run("reset cards failure falls back to usage summary without failing quota", func(t *testing.T) {
+		dir := t.TempDir()
+		writeCodexCredential(t, dir, testJWT(testNow.Add(24*time.Hour)), "acct-secret", false)
+		usageServer, _ := jsonHandler(t, map[string]any{
+			"rate_limit": map[string]any{
+				"allowed":        true,
+				"primary_window": map[string]any{"used_percent": 30.0, "reset_at": float64(testNow.Add(5 * time.Hour).Unix()), "limit_window_seconds": 18000.0},
+			},
+			"credits": map[string]any{
+				"has_credits": true,
+				"unlimited":   true,
+			},
+			"rate_limit_reset_credits": map[string]any{
+				"available_count": 2,
+			},
+		})
+		resetFail := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer resetFail.Close()
+		client := &Client{HTTP: usageServer.Client(), CodexURL: usageServer.URL, CodexResetCreditsURL: resetFail.URL}
+		snap, err := client.Fetch(context.Background(), Source{Engine: "codex", AuthDir: dir}, testNow)
+		if err != nil {
+			t.Fatalf("Fetch should succeed when reset-credits fails: %v", err)
+		}
+		if snap.Credits == nil || !snap.Credits.Unlimited {
+			t.Fatalf("credits = %+v", snap.Credits)
+		}
+		if snap.ResetCredits == nil || snap.ResetCredits.AvailableCount != 2 || snap.ResetCredits.NextExpiresAt != 0 {
+			t.Fatalf("resetCredits = %+v", snap.ResetCredits)
+		}
+	})
 }
 
 // A dropped connection is common on long links; one blip must not surface as
