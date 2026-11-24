@@ -45,8 +45,7 @@ func Factor(snapshot *Snapshot, model string, now time.Time) float64 {
 			if model == "" || window.Model == "" {
 				continue
 			}
-			candidate := strings.ToLower(window.Model)
-			if !strings.Contains(candidate, model) && !strings.Contains(model, candidate) {
+			if !modelMatchesWindow(model, window.Model) {
 				continue
 			}
 		default:
@@ -95,4 +94,20 @@ func Factor(snapshot *Snapshot, model string, now time.Time) float64 {
 		return 1
 	}
 	return best
+}
+
+// modelMatchesWindow matches a model name against a window's model label.
+// Labels may contain "/" to list multiple model families sharing one quota pool
+// (e.g. Antigravity's "claude/gpt" pool).
+func modelMatchesWindow(model, windowModel string) bool {
+	for _, part := range strings.Split(strings.ToLower(windowModel), "/") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if strings.Contains(part, model) || strings.Contains(model, part) {
+			return true
+		}
+	}
+	return false
 }

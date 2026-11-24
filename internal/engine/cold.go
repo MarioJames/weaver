@@ -138,7 +138,9 @@ func (c *Cold) start(run Run) (*coldRun, error) {
 		return nil, err
 	}
 	name := os.DevNull
-	if ctx.stdin {
+	if ctx.stdinFile != "" {
+		name = ctx.stdinFile
+	} else if ctx.stdin {
 		name = ctx.promptPath()
 	}
 	stdin, err := os.Open(name)

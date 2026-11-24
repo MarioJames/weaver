@@ -49,7 +49,7 @@ func quotaExpiryDate(ms int64) string {
 	return time.UnixMilli(ms).Local().Format("01-02") + " 到期"
 }
 func hasQuota(acc account) bool {
-	return acc.Kind == "subscription" && (acc.Engine == "codex" || acc.Engine == "claude" || acc.Engine == "opencode")
+	return acc.Kind == "subscription" && (acc.Engine == "codex" || acc.Engine == "claude" || acc.Engine == "opencode" || acc.Engine == "agy")
 }
 
 // quotaWindows are the windows of a snapshot that was actually read.
@@ -178,7 +178,7 @@ func (a *app) quotaUsedCell(c *ui.Context, acc account) {
 		}
 		line := ui.Row(c.Key(i)).Height(quotaLineHeight).Gap(6).AlignItems(ui.Center)
 		line.Children(func() {
-			ui.Column(c).Width(72).Children(func() {
+			ui.Column(c).Width(96).Children(func() {
 				display.Text(c, quotaWindowLabel(w), display.TextProps{Type: display.TextSecondary, FontSize: 11}).SingleLine()
 			})
 			ui.Column(c).Grow(1).Basis(0).MinWidth(0).Children(func() {

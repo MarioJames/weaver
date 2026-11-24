@@ -424,3 +424,112 @@ func TestDialogueRoundsSetting(t *testing.T) {
 		t.Fatalf("explicit rounds ignored: %d", len(d.Packages))
 	}
 }
+
+func TestDialogueThreeSeatsAndFallback(t *testing.T) {
+	f := dialogueFixture(t)
+	if _, err := f.k.AddAccount(AccountInput{ID: "acct-agy", Engine: "agy", Kind: "subscription", AuthDir: t.TempDir(), Label: "Antigravity"}); err != nil {
+		t.Fatal(err)
+	}
+	// Mark agy account ready in DB so fake engine can run it without live credentials.
+	if err := f.k.write(func(tx *tx) error {
+		_, err := tx.Exec(`UPDATE accounts SET ready=1, ready_reason='' WHERE id='acct-agy'`)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	effort := "xhigh"
+	if _, err := f.k.SetWorker(WorkerInput{ID: "debater_c", Engine: "agy", Model: "gemini-4-neon-xhigh", Effort: &effort, Accounts: []string{"acct-agy"}}); err != nil {
+		t.Fatal(err)
+	}
+	// debater_c must have role="debater" and be excluded from automatic routing.
+	wc, err := f.k.Worker("debater_c")
+	if err != nil || wc.Role != "debater" {
+		t.Fatalf("debater_c = %+v err=%v", wc, err)
+	}
+
+	m := f.mission()
+	d, err := f.k.StartDialogue("", DialogueInput{Mission: m, Name: "tri", Brief: "Three-way architecture decision"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Packages) != 6 || len(d.Sides) != 3 || len(d.Final) != 3 {
+		t.Fatalf("3-seat dialogue = %d pkgs, sides=%v final=%v", len(d.Packages), d.Sides, d.Final)
+	}
+	ids := map[string]string{}
+	for _, p := range d.Packages {
+		ids[p.Key] = p.ID
+	}
+	// Round 1 launches all 3 sides concurrently.
+	runs := f.eng.runs()
+	if len(runs) != 3 {
+		t.Fatalf("round 1 launched %d packages, want 3", len(runs))
+	}
+	f.succeed(ids["tri.r1.a"], 1, "PROP-A")
+	f.succeed(ids["tri.r1.b"], 1, "PROP-B")
+	if s := f.state(ids["tri.r2.a"]); s != StatePending {
+		t.Fatalf("r2.a started before r1.c finished (%s)", s)
+	}
+	f.succeed(ids["tri.r1.c"], 1, "PROP-C")
+	for _, key := range []string{"tri.r2.a", "tri.r2.b", "tri.r2.c"} {
+		in := f.last(ids[key])
+		if !strings.Contains(in, "PROP-A") || !strings.Contains(in, "PROP-B") || !strings.Contains(in, "PROP-C") {
+			t.Errorf("%s did not receive all three proposals", key)
+		}
+	}
+	f.succeed(ids["tri.r2.a"], 1, "FINAL-A")
+	f.succeed(ids["tri.r2.b"], 1, "FINAL-B")
+	// Still running until c finishes.
+	if tr, _ := f.k.Dialogue(m, "tri"); tr.State != "running" {
+		t.Fatalf("dialogue concluded before c finished: %+v", tr)
+	}
+	f.succeed(ids["tri.r2.c"], 1, "FINAL-C")
+	tr, err := f.k.Dialogue(m, "tri")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tr.State != "concluded" || len(tr.Rounds) != 2 || len(tr.Rounds[1].Entries) != 3 || tr.Rounds[1].Entries[2].Result != "FINAL-C" {
+		t.Fatalf("transcript = %+v", tr)
+	}
+	// Timeline includes all 3 sides.
+	tl, err := f.k.Timeline(context.Background(), TimelineInput{Mission: m})
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundDialogue := false
+	for _, e := range tl.Entries {
+		if e.Kind == "dialogue" && e.Name == "tri" {
+			foundDialogue = true
+			if len(e.Sides) != 3 || e.Sides[2].Side != "c" || e.Sides[2].Engine != "agy" {
+				t.Fatalf("timeline dialogue sides = %+v", e.Sides)
+			}
+		}
+	}
+	if !foundDialogue {
+		t.Fatal("missing dialogue entry in timeline")
+	}
+
+	// Disabling debater_c falls back cleanly to a 2-seat dialogue.
+	disabled := false
+	if _, err := f.k.SetWorker(WorkerInput{ID: "debater_c", Enabled: &disabled}); err != nil {
+		t.Fatal(err)
+	}
+	d2, err := f.k.StartDialogue("", DialogueInput{Mission: f.mission(), Name: "duo", Brief: "fallback to two"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d2.Packages) != 4 || len(d2.Sides) != 2 {
+		t.Fatalf("disabled debater_c should fall back to 2 seats, got %d pkgs sides=%v", len(d2.Packages), d2.Sides)
+	}
+
+	// Explicit --workers with 3 distinct candidates succeeds; 4 or duplicates are rejected.
+	d3, err := f.k.StartDialogue("", DialogueInput{Mission: f.mission(), Name: "w3", Brief: "x", Workers: []string{"alpha", "gamma", "claude_w"}})
+	if err != nil || len(d3.Packages) != 6 {
+		t.Fatalf("3 explicit workers: d=%+v err=%v", d3, err)
+	}
+	if _, err := f.k.StartDialogue("", DialogueInput{Mission: f.mission(), Name: "dup", Brief: "x", Workers: []string{"alpha", "gamma", "alpha"}}); err == nil {
+		t.Fatal("duplicate worker in 3-seat dialogue should be rejected")
+	}
+	if _, err := f.k.StartDialogue("", DialogueInput{Mission: f.mission(), Name: "four", Brief: "x", Workers: []string{"alpha", "gamma", "claude_w", "debater_a"}}); err == nil {
+		t.Fatal("4 workers should be rejected")
+	}
+}

@@ -208,7 +208,7 @@ weaver dialogue show --mission m_… --name cache-design      # state and the fu
 
 - **The brief is all both sides get besides the code**, and every round is a fresh agent that reads it again. Leave your own preferred design out of it: it anchors both sides and you get one design twice. A decision the user has already made goes in as a constraint.
 - One exchange is enough for most questions. Without `--rounds` the count comes from the user's `dialogue_rounds` setting, which starts at one. Use `--rounds 2` when the stakes are high and you expect real disagreement; each extra round adds two runs.
-- The two sides are the debater seats the user configured (甲方 and 乙方: engine, model, effort and account each), not routed candidates. If a seat is not ready the command says which one and why: tell the user rather than working around it. `--workers a,b` names two candidates for one dialogue instead.
+- The sides are the debater seats the user configured (甲方, 乙方, and optional 丙方 when configured and enabled: engine, model, effort and account each), not routed candidates. If a configured seat is not ready the command says which one and why: tell the user rather than working around it. `--workers a,b` or `--workers a,b,c` names two or three candidates for one dialogue instead.
 - `dialogue show` reports `running`, `concluded` or `needs_attention`. If a side failed, `weaver retry --package m_…/cache-design.r1.a` and the dialogue continues from there; do not start a new one.
 
 ### From dialogue to work

@@ -355,7 +355,7 @@ type Worker struct {
 	Reason       string      `json:"reason,omitempty"`
 }
 
-// isDebater identifies the two reserved dialogue seats.
+// isDebater identifies the reserved dialogue seats (甲方、乙方、丙方).
 func isDebater(id string) bool {
-	return id == "debater_a" || id == "debater_b"
+	return id == "debater_a" || id == "debater_b" || id == "debater_c"
 }

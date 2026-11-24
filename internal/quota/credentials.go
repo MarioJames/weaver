@@ -166,6 +166,34 @@ func readClaudeCredentialRaw(authDir string) (*nativeCredential, map[string]any,
 	return cred, root, path, nil
 }
 
+func readAgyCredentialRaw(authDir string) (*nativeCredential, map[string]any, string, error) {
+	path, err := credentialPath(authDir, filepath.Join(".gemini", "antigravity-cli", "antigravity-oauth-token"))
+	if err != nil {
+		return nil, nil, "", err
+	}
+	root, err := readCredentialObject(path)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	tok, _ := object(root["token"])
+	token := nonempty(tok["access_token"], 16384)
+	if token == "" {
+		return nil, nil, "", unauthenticated("缺少 Antigravity 原生登录凭据")
+	}
+	var expiresAt int64
+	if raw, present := tok["expiry"]; present {
+		if exp := parseProviderTimestamp(raw); exp > 0 {
+			expiresAt = exp
+		}
+	}
+	cred := &nativeCredential{
+		token:        token,
+		refreshToken: nonempty(tok["refresh_token"], 16384),
+		expiresAt:    expiresAt,
+	}
+	return cred, root, path, nil
+}
+
 // readOpenCodeCredential follows the native login priority: an active Console
 // session in opencode.db wins; otherwise the Go key stored in the credential
 // table or data/opencode/auth.json is used. A present-but-unusable Console

@@ -499,3 +499,74 @@ func TestResidentCancelInterruptsOnlyThatSessionAndWarns(t *testing.T) {
 		t.Fatal("the cancelled session reported an outcome")
 	}
 }
+
+func TestAgyNormalizationIsolationAndErrors(t *testing.T) {
+	t.Run("cold stream normalization and usage", func(t *testing.T) {
+		scripted(t, "agy", `cat > /dev/null
+printf '%s\n' '{"event":"init","conversation_id":"conv_agy_1","init":{"model":"gemini-4-neon-xhigh"}}'
+printf '%s\n' '{"event":"step_update","step_update":{"conversation_id":"conv_agy_1","step_index":1,"state":"ACTIVE","step_type":"tool","tool_name":"read_file"}}'
+printf '%s\n' '{"event":"step_update","step_update":{"conversation_id":"conv_agy_1","step_index":1,"state":"DONE","step_type":"tool","tool_name":"read_file"}}'
+printf '%s\n' '{"event":"step_update","step_update":{"conversation_id":"conv_agy_1","step_index":2,"state":"ACTIVE","step_type":"agent_response","text_delta":"part"}}'
+printf '%s\n' '{"event":"result","result":{"conversation_id":"conv_agy_1","status":"SUCCESS","response":"agy final answer\n","finished_reason":"stop","usage":{"input_tokens":1200,"output_tokens":340,"cache_read_tokens":500,"total_tokens":1540}}}'
+`)
+		cold, sink := newCold(t)
+		r := run(t, "agy", "p_agy.1")
+		cold.Launch(r)
+		o := sink.waitFinished(t, r.AttemptID, 2*time.Second)
+		if !o.Success || o.Text != "agy final answer" || o.InputTokens != 1200 || o.OutputTokens != 340 || o.CacheReadTokens != 500 {
+			t.Fatalf("outcome = %+v", o)
+		}
+		if !sink.started[r.AttemptID] {
+			t.Fatal("agy init did not mark attempt started")
+		}
+		joinedNotes := strings.Join(sink.notes, "|")
+		if !strings.Contains(joinedNotes, "工具 read_file 开始") || !strings.Contains(joinedNotes, "工具 read_file 完成") {
+			t.Fatalf("notes = %v", sink.notes)
+		}
+	})
+
+	t.Run("vendor error classification", func(t *testing.T) {
+		scripted(t, "agy", `printf '%s\n' '{"event":"result","result":{"conversation_id":"","status":"ERROR","response":"","error":"RESOURCE_EXHAUSTED: Gemini quota exhausted"}}'`)
+		cold2, sink2 := newCold(t)
+		r2 := run(t, "agy", "p_agy_quota.1")
+		cold2.Launch(r2)
+		if o2 := sink2.waitFinished(t, r2.AttemptID, 2*time.Second); o2.Success || o2.FailureKind != FailQuota {
+			t.Fatalf("quota outcome = %+v, want FailQuota", o2)
+		}
+	})
+
+	t.Run("multi-account isolation and login command", func(t *testing.T) {
+		authDir := t.TempDir()
+		acc := Account{ID: "acct-agy", Engine: "agy", Kind: "subscription", AuthDir: authDir}
+		if ok, reason := specs["agy"].ready(acc); ok || !strings.Contains(reason, "没有登录凭据") {
+			t.Fatalf("missing token ready=(%v,%q)", ok, reason)
+		}
+		argv, env, err := LoginCommand(acc)
+		if err != nil {
+			t.Fatalf("LoginCommand: %v", err)
+		}
+		if len(argv) == 0 || argv[0] != "agy" || env["HOME"] != authDir || env["DBUS_SESSION_BUS_ADDRESS"] != "unix:path=/nonexistent" {
+			t.Fatalf("login argv=%v env=%v", argv, env)
+		}
+		tokDir := filepath.Join(authDir, ".gemini", "antigravity-cli")
+		if err := os.MkdirAll(tokDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		tokPath := filepath.Join(tokDir, "antigravity-oauth-token")
+		if err := os.WriteFile(tokPath, []byte(`{"token":{"access_token":"tok","expiry":"2020-01-01T00:00:00Z"}}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if ok, reason := specs["agy"].ready(acc); ok || !strings.Contains(reason, "已过期") {
+			t.Fatalf("expired without refresh ready=(%v,%q)", ok, reason)
+		}
+		if err := os.WriteFile(tokPath, []byte(`{"token":{"access_token":"tok","refresh_token":"ref","expiry":"2020-01-01T00:00:00Z"}}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if ok, reason := specs["agy"].ready(acc); !ok || reason != "" {
+			t.Fatalf("expired with refresh ready=(%v,%q), want ready", ok, reason)
+		}
+		if ok, _ := specs["agy"].ready(Account{ID: "a", Engine: "agy", Kind: "api", APIKey: "k"}); ok {
+			t.Fatal("agy api account should not be ready")
+		}
+	})
+}

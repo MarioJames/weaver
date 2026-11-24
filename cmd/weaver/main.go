@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,8 +11,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/MarioJames/weaver/internal/daemon"
@@ -35,10 +38,10 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
                                         包交给够格的最低档候选；回执的 shape 是并行宽度，宽度不足或高分包过多时带 advice
                                         包可带 "advisory": true（只出文档、不改文件）和 "autoAccept": true（出结果即采纳并放行下游）
 
-对谈                                          两个候选各出方案、互相评审，只在最终立场给出时唤醒
-  weaver dialogue start --mission <主任务> [--name <名称>] [--rounds 1-3] [--workers <候选,候选>] [--brief-file <说明.md>] [--key <幂等编号>]
-                                        说明默认从标准输入读；默认使用甲方、乙方对谈人席位；--rounds 缺省取 dialogue_rounds 设置
-  weaver dialogue show --mission <主任务> [--name <名称>]     两方各轮的全文
+对谈                                          两方或三方候选各出方案、互相评审，只在最终立场给出时唤醒
+  weaver dialogue start --mission <主任务> [--name <名称>] [--rounds 1-3] [--workers <候选,候选[,候选]>] [--brief-file <说明.md>] [--key <幂等编号>]
+                                        说明默认从标准输入读；默认使用甲方、乙方（配置丙方后启用三席）；--rounds 缺省取 dialogue_rounds 设置
+  weaver dialogue show --mission <主任务> [--name <名称>]     各方各轮的全文
 
 进度与唤醒
   weaver wait --mission <主任务> [--cursor <序号>] [--timeout 30m]
@@ -912,17 +915,146 @@ func login(id string) error {
 	if err := json.Unmarshal(result, &info); err != nil {
 		return err
 	}
+	if len(info.Argv) > 0 && info.Argv[0] == "agy" {
+		if err := loginAgy(id, info.Argv, info.Env); err != nil {
+			return err
+		}
+		return call("account.check", map[string]any{"id": id})
+	}
 	cmd := exec.Command(info.Argv[0], info.Argv[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	cmd.Env = os.Environ()
-	for key, value := range info.Env {
-		cmd.Env = append(cmd.Env, key+"="+value)
-	}
+	cmd.Env = mergeEnv(os.Environ(), info.Env)
 	fmt.Fprintf(os.Stderr, "在账号 %s 的认证目录里运行：%s\n", id, strings.Join(info.Argv, " "))
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("登录命令没有成功：%v", err)
 	}
 	return call("account.check", map[string]any{"id": id})
+}
+
+func mergeEnv(base []string, overrides map[string]string) []string {
+	out := make([]string, 0, len(base)+len(overrides))
+	for _, kv := range base {
+		name, _, _ := strings.Cut(kv, "=")
+		if _, overridden := overrides[name]; overridden {
+			continue
+		}
+		out = append(out, kv)
+	}
+	for key, value := range overrides {
+		out = append(out, key+"="+value)
+	}
+	return out
+}
+
+var reGoogleOAuthURL = regexp.MustCompile(`https://accounts\.google\.com/o/oauth2/auth\S+`)
+
+// loginAgy runs agy's isolated OAuth sign-in flow: backs up any existing token
+// before re-login (restoring it on failure/cancellation), forwards the printed
+// OAuth URL to $BROWSER when set (so Weaver GUI offers its link bar), forwards
+// the pasted authorization code, and closes stdin so agy exits cleanly after
+// saving the token without running a prompt turn.
+func loginAgy(id string, argv []string, env map[string]string) error {
+	tokPath := filepath.Join(env["HOME"], ".gemini", "antigravity-cli", "antigravity-oauth-token")
+	bakPath := tokPath + ".login-bak"
+	hadBackup := false
+	if _, err := os.Stat(tokPath); err == nil {
+		if err := os.Rename(tokPath, bakPath); err != nil {
+			return fmt.Errorf("无法暂存旧凭据：%v", err)
+		}
+		hadBackup = true
+	}
+	restore := func() {
+		if hadBackup {
+			_ = os.Remove(tokPath)
+			_ = os.Rename(bakPath, tokPath)
+		}
+	}
+
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.Env = mergeEnv(os.Environ(), env)
+	stdinPipe, err := cmd.StdinPipe()
+	if err != nil {
+		restore()
+		return err
+	}
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		restore()
+		return err
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		restore()
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "在账号 %s 的认证目录里运行 Antigravity OAuth 登录…\n", id)
+	if err := cmd.Start(); err != nil {
+		restore()
+		return fmt.Errorf("无法启动 agy 登录：%v", err)
+	}
+
+	var browserOnce sync.Once
+	notifyURL := func(line string) {
+		if u := reGoogleOAuthURL.FindString(line); u != "" {
+			browserOnce.Do(func() {
+				if browser := os.Getenv("BROWSER"); browser != "" {
+					go func() { _ = exec.Command(browser, u).Run() }()
+				}
+			})
+		}
+	}
+
+	var wg sync.WaitGroup
+	stream := func(r io.Reader, dst io.Writer) {
+		defer wg.Done()
+		sc := bufio.NewScanner(r)
+		sc.Buffer(make([]byte, 0, 16<<10), 256<<10)
+		for sc.Scan() {
+			line := sc.Text()
+			notifyURL(line)
+			// Skip agy's final stream-json error frame emitted on empty EOF.
+			if strings.HasPrefix(strings.TrimSpace(line), `{"event":`) {
+				continue
+			}
+			fmt.Fprintln(dst, line)
+		}
+	}
+	wg.Add(2)
+	go stream(stdoutPipe, os.Stdout)
+	go stream(stderrPipe, os.Stderr)
+
+	// Forward the pasted authorization code line from the user's terminal and
+	// immediately close stdin so agy saves the token and exits without running
+	// an agent turn.
+	go func() {
+		reader := bufio.NewReader(os.Stdin)
+		for {
+			line, readErr := reader.ReadString('\n')
+			if strings.TrimSpace(line) != "" {
+				_, _ = io.WriteString(stdinPipe, line)
+				_ = stdinPipe.Close()
+				return
+			}
+			if readErr != nil {
+				_ = stdinPipe.Close()
+				return
+			}
+		}
+	}()
+
+	wg.Wait()
+	runErr := cmd.Wait()
+	if info, statErr := os.Stat(tokPath); statErr == nil && info.Size() > 0 {
+		if hadBackup {
+			_ = os.Remove(bakPath)
+		}
+		return nil
+	}
+	restore()
+	if runErr != nil {
+		return fmt.Errorf("登录命令没有成功：%v", runErr)
+	}
+	return errors.New("未生成 Antigravity 登录凭据")
 }
 
 // skillInstall is what "weaver skill install" did.

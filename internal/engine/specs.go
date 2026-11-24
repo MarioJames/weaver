@@ -15,10 +15,11 @@ import (
 
 // launchCtx carries one attempt's command line while it is being built.
 type launchCtx struct {
-	run   Run
-	env   map[string]string // variables added on top of the cleaned service environment
-	extra []string          // account-specific arguments
-	stdin bool              // the prompt is delivered on stdin (otherwise the engine reads promptPath)
+	run       Run
+	env       map[string]string // variables added on top of the cleaned service environment
+	extra     []string          // account-specific arguments
+	stdin     bool              // the prompt is delivered on stdin (otherwise the engine reads promptPath)
+	stdinFile string            // optional file delivered on stdin instead of promptPath
 }
 
 func (c *launchCtx) promptPath() string { return filepath.Join(c.run.RunDir, "prompt.txt") }
@@ -228,6 +229,78 @@ var specs = map[string]*spec{
 			return []string{"opencode", "auth", "login", "--standalone"}, env
 		},
 	},
+	"agy": {
+		bin: "agy",
+		argv: func(c *launchCtx) ([]string, error) {
+			argv := []string{"agy", "--input-format", "stream-json", "--output-format", "stream-json", "--model", c.run.Model}
+			if c.run.Effort != "" {
+				argv = append(argv, "--effort", c.run.Effort)
+			}
+			argv = append(argv, "--dangerously-skip-permissions", "--disable-slash-commands")
+			return append(argv, c.extra...), nil
+		},
+		prepare: func(c *launchCtx) error {
+			a := c.run.Account
+			if a.Kind != "subscription" {
+				return errors.New("Antigravity (agy) 目前只支持订阅账号")
+			}
+			if a.AuthDir == "" {
+				return errors.New("账号没有认证目录")
+			}
+			env, err := agyAccountEnv(a.AuthDir)
+			if err != nil {
+				return err
+			}
+			for key, value := range env {
+				c.env[key] = value
+			}
+			// Deliver the prompt as a stream-json user message on stdin so large
+			// instructions never hit Linux's single-argument length limit.
+			msg, err := json.Marshal(map[string]any{
+				"event": "user",
+				"message": map[string]string{
+					"content": c.run.Instruction,
+				},
+			})
+			if err != nil {
+				return err
+			}
+			path, err := c.put("stdin.jsonl", string(msg)+"\n")
+			if err != nil {
+				return err
+			}
+			c.stdinFile = path
+			return nil
+		},
+		ready: func(a Account) (bool, string) {
+			if a.Kind != "subscription" {
+				return false, "Antigravity (agy) 目前只支持订阅账号"
+			}
+			var v struct {
+				Token struct {
+					AccessToken  string `json:"access_token"`
+					RefreshToken string `json:"refresh_token"`
+					Expiry       string `json:"expiry"`
+				} `json:"token"`
+			}
+			if why := readAuthJSON(a.AuthDir, filepath.Join(".gemini", "antigravity-cli", "antigravity-oauth-token"), &v); why != "" {
+				return false, why
+			}
+			if v.Token.AccessToken == "" {
+				return false, "没有登录凭据，请重新登录"
+			}
+			if v.Token.Expiry != "" && v.Token.RefreshToken == "" {
+				if exp, err := time.Parse(time.RFC3339Nano, v.Token.Expiry); err == nil && !exp.After(time.Now()) {
+					return false, "登录已过期，请重新登录"
+				}
+			}
+			return true, ""
+		},
+		login: func(a Account) ([]string, map[string]string) {
+			env, _ := agyAccountEnv(a.AuthDir)
+			return []string{"agy", "--input-format", "stream-json", "--output-format", "stream-json"}, env
+		},
+	},
 	"dsh": {bin: "dsh", argv: dshArgv, prepare: dshPrepare, ready: apiReady},
 }
 
@@ -298,6 +371,26 @@ func opencodeAccountEnv(root string) (map[string]string, error) {
 		if err := os.MkdirAll(env[key], 0o700); err != nil {
 			return nil, err
 		}
+	}
+	return env, nil
+}
+
+// agyAccountEnv isolates Antigravity CLI into one account's own directory and
+// disables desktop D-Bus keyring access so tokens stay per-account in
+// <root>/.gemini/antigravity-cli/antigravity-oauth-token.
+func agyAccountEnv(root string) (map[string]string, error) {
+	env := map[string]string{
+		"HOME":                     root,
+		"DBUS_SESSION_BUS_ADDRESS": "unix:path=/nonexistent",
+	}
+	for key, dir := range map[string]string{"XDG_CONFIG_HOME": "config", "XDG_DATA_HOME": "data", "XDG_STATE_HOME": "state", "XDG_CACHE_HOME": "cache"} {
+		env[key] = filepath.Join(root, dir)
+		if err := os.MkdirAll(env[key], 0o700); err != nil {
+			return nil, err
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".gemini", "antigravity-cli"), 0o700); err != nil {
+		return nil, err
 	}
 	return env, nil
 }

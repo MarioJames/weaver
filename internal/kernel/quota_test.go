@@ -109,7 +109,7 @@ func TestRefreshQuotaSuccessUnsupportedAndPrivacy(t *testing.T) {
 			}
 		}
 		if _, err := f.k.RefreshQuota(id); err == nil || AsError(err).Code != "UNSUPPORTED" ||
-			AsError(err).Message != "只有 Codex、Claude、OpenCode 的订阅账号有额度窗口" {
+			AsError(err).Message != "只有 Codex、Claude、OpenCode、Antigravity 的订阅账号有额度窗口" {
 			t.Fatalf("unsupported %s: %v", id, err)
 		}
 	}

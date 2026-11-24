@@ -945,6 +945,7 @@ func missionActivity(q querier, m *Mission) (string, error) {
 	type status struct {
 		last, current int
 		active        bool
+		sides         map[string]bool
 		finalReady    map[string]bool
 	}
 	dialogues := map[string]*status{}
@@ -961,10 +962,11 @@ func missionActivity(q querier, m *Mission) (string, error) {
 		}
 		s := dialogues[name]
 		if s == nil {
-			s = &status{finalReady: map[string]bool{}}
+			s = &status{sides: map[string]bool{}, finalReady: map[string]bool{}}
 			dialogues[name] = s
 			order = append(order, name)
 		}
+		s.sides[side] = true
 		if state == StatePending || state == StateRunning || state == StateLaunch || state == StateVerdict {
 			s.active = true
 		}
@@ -986,7 +988,14 @@ func missionActivity(q querier, m *Mission) (string, error) {
 	}
 	for _, name := range order {
 		s := dialogues[name]
-		if s.active && (!s.finalReady["a"] || !s.finalReady["b"]) {
+		allReady := len(s.sides) > 0
+		for side := range s.sides {
+			if !s.finalReady[side] {
+				allReady = false
+				break
+			}
+		}
+		if s.active && !allReady {
 			return fmt.Sprintf("对谈 %s 进行到第 %d 轮", name, max(1, s.current)), nil
 		}
 	}

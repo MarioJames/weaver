@@ -295,3 +295,84 @@ func TestDebaterExcludedFromRoutingWarnings(t *testing.T) {
 		t.Fatal(tt.Texts())
 	}
 }
+
+func TestDebaterThreeSeatsAndAgyUI(t *testing.T) {
+	w, a, tt := debatersTester(t, true)
+	agyAcc := account{
+		ID:      "acct_agy_main",
+		Engine:  "agy",
+		Kind:    "subscription",
+		Label:   "Antigravity Pro",
+		Enabled: true,
+		Ready:   true,
+		Quota: &accountQuota{
+			Status:    "available",
+			CheckedAt: time.Now().UnixMilli(),
+			Factor:    0.85,
+			Windows: []quotaWindow{
+				{Label: "5 小时额度", Model: "gemini", UsedPercent: 15, ResetsAt: time.Now().Add(3 * time.Hour).UnixMilli()},
+				{Label: "7 天额度", Model: "gemini", UsedPercent: 8, ResetsAt: time.Now().Add(5 * 24 * time.Hour).UnixMilli()},
+				{Label: "5 小时额度", Model: "claude/gpt", UsedPercent: 40, ResetsAt: time.Now().Add(2 * time.Hour).UnixMilli()},
+			},
+		},
+	}
+	seatC := worker{
+		ID:        "debater_c",
+		Role:      "debater",
+		Engine:    "agy",
+		Model:     "gemini-4-neon-xhigh",
+		Effort:    "xhigh",
+		Enabled:   true,
+		Available: true,
+		Accounts:  []string{agyAcc.ID},
+	}
+	w.f.mu.Lock()
+	w.f.data.Accounts = append(w.f.data.Accounts, agyAcc)
+	w.f.data.Workers = append(w.f.data.Workers, seatC)
+	w.f.mu.Unlock()
+	a.refresh()
+	tt.Frame()
+
+	for _, text := range []string{"甲方", "乙方", "丙方", "agy · gemini-4-neon-xhigh", "xhigh", "Antigravity Pro"} {
+		if !tt.HasText(text) {
+			t.Fatalf("missing %q in three-seat workers page: %v", text, tt.Texts())
+		}
+	}
+	if _, ok := tt.Find("debater_c 能力分"); ok {
+		t.Fatal("debater_c leaked into execution workers table")
+	}
+
+	// Switch to Accounts page and verify agy subscription quota renders.
+	a.page = "账号"
+	tt.Frame()
+	for _, text := range []string{"Antigravity Pro", "15%", "8%", "40%"} {
+		if !tt.HasText(text) {
+			t.Fatalf("missing %q in accounts page: %v", text, tt.Texts())
+		}
+	}
+
+	if dir := os.Getenv("WEAVER_AGY_SCREENSHOTS"); dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		render := func(page, name string, width, height int, dark bool) {
+			a.page = page
+			shot := ui.NewTester(a.view, width, height)
+			shot.SetDark(dark)
+			shot.Advance(time.Second)
+			shot.Frame()
+			f, err := os.Create(filepath.Join(dir, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = png.Encode(f, shot.Image())
+			f.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		render("候选", "workers-3seat-light.png", 1240, 1480, false)
+		render("候选", "workers-3seat-dark.png", 1240, 1480, true)
+		render("账号", "accounts-agy-light.png", 1280, 1100, false)
+	}
+}

@@ -17,6 +17,7 @@ var (
 		"opencode": regexp.MustCompile(`(?i)FreeUsageLimitError|GoUsageLimitError|usage limit`),
 		"codex":    regexp.MustCompile(`(?i)usage limit|you.?ve hit your limit|limit reached`),
 		"claude":   regexp.MustCompile(`(?i)usage limit|you.?ve hit your limit|limit reached`),
+		"agy":      regexp.MustCompile(`(?i)resource[_ ]?exhausted|quota.{0,30}(?:exceeded|exhausted|limit)|usage limit|limit reached`),
 		"dsh":      regexp.MustCompile(`\bQUOTA\b`),
 	}
 

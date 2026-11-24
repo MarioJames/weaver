@@ -217,10 +217,14 @@ func taskHeaderOf(c *ui.Context, h taskHeaderInfo, size float32) taskMessageHead
 }
 
 func taskSideLabel(side string) string {
-	if side == "b" {
+	switch side {
+	case "b":
 		return "乙方"
+	case "c":
+		return "丙方"
+	default:
+		return "甲方"
 	}
-	return "甲方"
 }
 
 // taskEntryTarget names who an entry is about: a package, or one side of a dialogue.
@@ -327,11 +331,14 @@ func (a *app) taskEntryView(c *ui.Context, s *taskState, group []taskEntry) {
 		item := taskArtifact{ID: e.Artifact.ID, Kind: e.Artifact.Kind, Title: e.Artifact.Title, Path: e.Artifact.Path, URL: e.Artifact.URL}
 		taskProcessRowEnd(c, lucide.Paperclip(), taskToneNeutral, "登记产物", item.Title, at, func() { a.taskOpenButton(c, item, true) }, nil)
 	case "round":
-		taskDivider(c, taskRoundLabel(e), false)
+		taskDivider(c, taskRoundLabelFor(e, taskDialogueSideCount(d.entries, e.Name)), false)
 	case "debater":
 		avoid := ""
-		if e.Side == "b" {
+		switch e.Side {
+		case "b":
 			avoid = id + "/" + e.Name + ".a"
+		case "c":
+			avoid = id + "/" + e.Name + ".b"
 		}
 		name := e.Model
 		if name == "" {
@@ -435,11 +442,30 @@ func taskProblemLabel(problem string) string {
 	return problem
 }
 
+func taskDialogueSideCount(entries []taskEntry, name string) int {
+	for _, e := range entries {
+		if e.Kind == "dialogue" && e.Name == name && len(e.Sides) > 0 {
+			return len(e.Sides)
+		}
+	}
+	return 2
+}
+
 func taskRoundLabel(e taskEntry) string {
+	return taskRoundLabelFor(e, 2)
+}
+
+func taskRoundLabelFor(e taskEntry, sideCount int) string {
 	switch e.RoundKind {
 	case "proposal":
+		if sideCount >= 3 {
+			return "方案 · 三方同时写，互相看不到"
+		}
 		return "方案 · 两方同时写，互相看不到"
 	case "final":
+		if sideCount >= 3 {
+			return "最终立场 · 各自读完其他方的方案后，评对方并修订自己"
+		}
 		return "最终立场 · 各自读完对方的方案后，评对方并修订自己"
 	}
 	return fmt.Sprintf("第 %d 轮互评 · 各自读完对方上一轮后写", e.Round-1)
@@ -499,8 +525,11 @@ func (a *app) taskDialogue(c *ui.Context, s *taskState, e taskEntry) {
 			}
 		}
 		row := taskRosterRow{Key: side.Side, Name: taskSideLabel(side.Side), Seed: base + "." + side.Side, Title: strings.Join(parts, " · "), Worker: side.Account, State: state, Cost: cost}
-		if side.Side == "b" {
+		switch side.Side {
+		case "b":
 			row.AvoidSeed = base + ".a"
+		case "c":
+			row.AvoidSeed = base + ".b"
 		}
 		rows = append(rows, row)
 	}

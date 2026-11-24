@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -234,6 +235,127 @@ func (c *Client) refreshClaude(ctx context.Context, authDir, rejectedToken strin
 		updated.scopes = newScopes
 	}
 	return &updated, nil
+}
+
+// refreshAgy renews an expiring, expired, or rejected Antigravity OAuth token
+// by invoking `agy models` inside the account's isolated AuthDir (with desktop
+// D-Bus keyring disabled). This uses agy's own OAuth client configuration and
+// persists the refreshed token back to antigravity-oauth-token without storing
+// any OAuth client secrets in Weaver.
+func (c *Client) refreshAgy(ctx context.Context, authDir, rejectedToken string, now time.Time) (*nativeCredential, error) {
+	unlock := lockAuthDir(authDir)
+	defer unlock()
+
+	cred, root, path, err := readAgyCredentialRaw(authDir)
+	if err != nil {
+		return nil, err
+	}
+	if rejectedToken != "" {
+		if cred.token != rejectedToken && !cred.isExpired(now) {
+			return cred, nil
+		}
+	} else if _, expiringSoon := c.shouldRefresh(cred, now); !expiringSoon {
+		return cred, nil
+	}
+	if cred.refreshToken == "" {
+		return nil, unauthenticated("原生登录已过期，请在对应工具中重新登录")
+	}
+
+	// agy's oauth2.ReuseTokenSource only refreshes when expiry <= now + 10s.
+	// If we are proactively refreshing ahead of expiry or retrying a 401 while
+	// expiry is still in the future, mark expiry in the past and restore the
+	// original file on transient failure.
+	var backup []byte
+	if cred.expiresAt == 0 || cred.expiresAt > now.UnixMilli() {
+		if raw, readErr := os.ReadFile(path); readErr == nil {
+			backup = raw
+		}
+		tok, ok := object(root["token"])
+		if !ok {
+			return nil, unsupported("认证文件格式不受支持")
+		}
+		tok["expiry"] = "1970-01-01T00:00:00Z"
+		root["token"] = tok
+		if err := writeCredentialObject(path, root); err != nil {
+			return nil, err
+		}
+	}
+	restore := func() {
+		if len(backup) == 0 {
+			return
+		}
+		var orig map[string]any
+		if json.Unmarshal(backup, &orig) == nil {
+			_ = writeCredentialObject(path, orig)
+		}
+	}
+
+	var runErr error
+	if c != nil && c.AgyRefreshFunc != nil {
+		runErr = c.AgyRefreshFunc(ctx, authDir)
+	} else {
+		runErr = runAgyRefresh(ctx, authDir)
+	}
+	if runErr != nil {
+		restore()
+		var qe *Error
+		if errors.As(runErr, &qe) {
+			return nil, qe
+		}
+		return nil, transient("Antigravity 自动续期失败，请稍后重试")
+	}
+
+	updated, _, _, err := readAgyCredentialRaw(authDir)
+	if err != nil {
+		restore()
+		return nil, err
+	}
+	if updated.token == "" || (rejectedToken != "" && updated.token == rejectedToken) || updated.isExpired(now) {
+		restore()
+		return nil, unauthenticated("登录已失效，自动续期失败，请重新登录")
+	}
+	return updated, nil
+}
+
+func runAgyRefresh(ctx context.Context, authDir string) error {
+	bin, err := exec.LookPath("agy")
+	if err != nil {
+		return unsupported("本机没有安装 agy，无法自动续期")
+	}
+	refreshCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(refreshCtx, bin, "models")
+	cmd.Stdin = nil
+	env := []string{
+		"PATH=" + os.Getenv("PATH"),
+		"HOME=" + authDir,
+		"XDG_CONFIG_HOME=" + filepath.Join(authDir, "config"),
+		"XDG_DATA_HOME=" + filepath.Join(authDir, "data"),
+		"XDG_STATE_HOME=" + filepath.Join(authDir, "state"),
+		"XDG_CACHE_HOME=" + filepath.Join(authDir, "cache"),
+		"DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent",
+	}
+	for _, key := range []string{"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy", "ALL_PROXY", "all_proxy", "SSL_CERT_FILE", "SSL_CERT_DIR"} {
+		if v := os.Getenv(key); v != "" {
+			env = append(env, key+"="+v)
+		}
+	}
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if errors.Is(refreshCtx.Err(), context.DeadlineExceeded) {
+			return transient("Antigravity 自动续期超时")
+		}
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return transient("额度请求已取消")
+		}
+		lower := strings.ToLower(string(out))
+		if strings.Contains(lower, "please sign in") || strings.Contains(lower, "invalid_grant") || strings.Contains(lower, "unauthorized") {
+			return unauthenticated("登录已失效，自动续期失败，请重新登录")
+		}
+		return transient("Antigravity 自动续期失败，请稍后重试")
+	}
+	return nil
 }
 
 // postToken sends one OAuth refresh_token POST without automatic retries

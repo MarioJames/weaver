@@ -6,6 +6,7 @@
 package quota
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -20,6 +21,7 @@ const (
 	maxResponseBytes    = 256 << 10
 	defaultHTTPTimeout  = 15 * time.Second
 	quotaUserAgent      = "Weaver"
+	agyQuotaUserAgent   = "antigravity/cli/1.5.15"
 	openCodeConsoleRoot = "https://opencode.ai/console"
 )
 
@@ -31,6 +33,8 @@ const (
 	defaultClaudeURL            = "https://api.anthropic.com/api/oauth/usage"
 	defaultOpenCodeGoURL        = "https://opencode.ai/zen/go/v1/usage"
 	defaultOpenCodeConsoleURL   = openCodeConsoleRoot + "/api/go/status"
+	defaultAgyLoadCodeAssistURL = "https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist"
+	defaultAgyQuotaURL          = "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary"
 )
 
 const (
@@ -147,14 +151,17 @@ func upstream(message string) *Error  { return quotaError(kindUpstream, message)
 // 15-second timeout and the official provider endpoints.
 type Client struct {
 	HTTP                 *http.Client
-	CodexURL             string        // 默认 https://chatgpt.com/backend-api/wham/usage
-	CodexResetCreditsURL string        // 默认 https://chatgpt.com/backend-api/wham/rate-limit-reset-credits
-	CodexTokenURL        string        // 默认 https://auth.openai.com/oauth/token
-	ClaudeURL            string        // 默认 https://api.anthropic.com/api/oauth/usage
-	ClaudeTokenURL       string        // 默认 https://platform.claude.com/v1/oauth/token
-	OpenCodeGoURL        string        // 默认 https://opencode.ai/zen/go/v1/usage
-	OpenCodeConsoleURL   string        // 默认 https://opencode.ai/console/api/go/status
-	RefreshAhead         time.Duration // 默认 15 分钟；<=0 使用默认值
+	CodexURL             string                                     // 默认 https://chatgpt.com/backend-api/wham/usage
+	CodexResetCreditsURL string                                     // 默认 https://chatgpt.com/backend-api/wham/rate-limit-reset-credits
+	CodexTokenURL        string                                     // 默认 https://auth.openai.com/oauth/token
+	ClaudeURL            string                                     // 默认 https://api.anthropic.com/api/oauth/usage
+	ClaudeTokenURL       string                                     // 默认 https://platform.claude.com/v1/oauth/token
+	OpenCodeGoURL        string                                     // 默认 https://opencode.ai/zen/go/v1/usage
+	OpenCodeConsoleURL   string                                     // 默认 https://opencode.ai/console/api/go/status
+	AgyLoadCodeAssistURL string                                     // 默认 https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist
+	AgyQuotaURL          string                                     // 默认 https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary
+	AgyRefreshFunc       func(ctx context.Context, authDir string) error // 测试用钩子；留空调用本机 agy models
+	RefreshAhead         time.Duration                              // 默认 15 分钟；<=0 使用默认值
 }
 
 type endpoint int
@@ -164,6 +171,7 @@ const (
 	endpointClaude
 	endpointOpenCodeGo
 	endpointOpenCodeConsole
+	endpointAgy
 )
 
 // Fetch reads the account credential, proactively renews expiring/expired OAuth
@@ -248,6 +256,40 @@ func (c *Client) Fetch(ctx context.Context, src Source, now time.Time) (*Snapsho
 		}
 		snap := normalizeOpenCodeGo(payload, now)
 		redactSnapshot(snap, "opencode", cred.token)
+		return snap, nil
+	case "agy":
+		cred, refreshed, err := c.prepareCredential(ctx, src, now, readAgyCredentialRaw, c.refreshAgy)
+		if err != nil {
+			return nil, err
+		}
+		payload, err := c.fetchWith401Retry(ctx, src, now, cred, refreshed, c.refreshAgy, func(active *nativeCredential) (any, error) {
+			headers := map[string]string{
+				"Authorization": "Bearer " + active.token,
+				"Content-Type":  "application/json",
+				"Accept":        "application/json",
+				"User-Agent":    agyQuotaUserAgent,
+			}
+			project := ""
+			if loadURL := c.agyLoadCodeAssistURL(); loadURL != "" {
+				loadPayload, loadErr := c.postJSON(ctx, loadURL, headers, []byte(`{"metadata":{"ideType":"ANTIGRAVITY"}}`), endpointAgy)
+				if loadErr != nil {
+					return nil, loadErr
+				}
+				if obj, ok := object(loadPayload); ok {
+					project = nonemptyID(obj["cloudaicompanionProject"])
+				}
+			}
+			body := []byte(`{}`)
+			if project != "" {
+				body, _ = json.Marshal(map[string]string{"project": project})
+			}
+			return c.postJSON(ctx, c.agyQuotaURL(), headers, body, endpointAgy)
+		})
+		if err != nil {
+			return nil, err
+		}
+		snap := normalizeAgy(payload, now)
+		redactSnapshot(snap, "agy", cred.token)
 		return snap, nil
 	default:
 		return nil, unsupported("不支持的订阅引擎")
@@ -357,6 +399,23 @@ func (c *Client) openCodeConsoleURL() string {
 	return defaultOpenCodeConsoleURL
 }
 
+func (c *Client) agyLoadCodeAssistURL() string {
+	if c != nil && c.AgyLoadCodeAssistURL != "" {
+		return c.AgyLoadCodeAssistURL
+	}
+	if c != nil && c.AgyQuotaURL != "" {
+		return ""
+	}
+	return defaultAgyLoadCodeAssistURL
+}
+
+func (c *Client) agyQuotaURL() string {
+	if c != nil && c.AgyQuotaURL != "" {
+		return c.AgyQuotaURL
+	}
+	return defaultAgyQuotaURL
+}
+
 // httpClient returns a copy of the configured client. Redirects are never
 // followed and ambient cookies are never sent, so a bearer token cannot be
 // forwarded to a third-party host.
@@ -379,8 +438,16 @@ func (c *Client) httpClient() *http.Client {
 var retryDelays = []time.Duration{500 * time.Millisecond, 2 * time.Second}
 
 func (c *Client) request(ctx context.Context, url string, headers map[string]string, ep endpoint) (any, error) {
+	return c.requestMethod(ctx, http.MethodGet, url, headers, nil, ep)
+}
+
+func (c *Client) postJSON(ctx context.Context, url string, headers map[string]string, body []byte, ep endpoint) (any, error) {
+	return c.requestMethod(ctx, http.MethodPost, url, headers, body, ep)
+}
+
+func (c *Client) requestMethod(ctx context.Context, method, url string, headers map[string]string, body []byte, ep endpoint) (any, error) {
 	for attempt := 0; ; attempt++ {
-		payload, retry, err := c.requestOnce(ctx, url, headers, ep)
+		payload, retry, err := c.requestOnce(ctx, method, url, headers, body, ep)
 		if !retry || attempt == len(retryDelays) {
 			return payload, err
 		}
@@ -394,9 +461,13 @@ func (c *Client) request(ctx context.Context, url string, headers map[string]str
 	}
 }
 
-// requestOnce performs one GET. retry reports a failure worth repeating at once.
-func (c *Client) requestOnce(ctx context.Context, url string, headers map[string]string, ep endpoint) (_ any, retry bool, _ error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+// requestOnce performs one HTTP request. retry reports a failure worth repeating at once.
+func (c *Client) requestOnce(ctx context.Context, method, url string, headers map[string]string, reqBody []byte, ep endpoint) (_ any, retry bool, _ error) {
+	var bodyReader io.Reader
+	if reqBody != nil {
+		bodyReader = bytes.NewReader(reqBody)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
 	if err != nil {
 		return nil, false, upstream("额度接口地址无效")
 	}

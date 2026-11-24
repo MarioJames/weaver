@@ -135,14 +135,18 @@ func (a *app) accountFormBody(c *ui.Context, f *accountForm) {
 				sel := field.Select(c, &f.Engine, field.SelectProps{Size: theme.Small, Options: []field.SelectOption{
 					{Value: "claude", Label: "claude"},
 					{Value: "codex", Label: "codex"},
+					{Value: "agy", Label: "agy"},
 					{Value: "opencode", Label: "opencode"},
 					{Value: "dsh", Label: "dsh"},
 				}}).Label("引擎").LabelledBy(label)
 				if sel.Changed() {
 					f.Err = ""
-					if f.Engine == "dsh" {
+					switch f.Engine {
+					case "dsh":
 						f.Kind = "api"
 						f.applyPreset("openai")
+					case "agy":
+						f.Kind = "subscription"
 					}
 				}
 			})
@@ -155,6 +159,10 @@ func (a *app) accountFormBody(c *ui.Context, f *accountForm) {
 		if f.Engine == "dsh" {
 			formRow(c, "类型", func(label ui.Element) {
 				display.Text(c, "API（dsh 渠道）", display.TextProps{Type: display.TextSecondary})
+			})
+		} else if f.Engine == "agy" {
+			formRow(c, "类型", func(label ui.Element) {
+				display.Text(c, "订阅（Antigravity 多账号隔离）", display.TextProps{Type: display.TextSecondary})
 			})
 		} else if f.Mode == "add" {
 			formRow(c, "类型", func(label ui.Element) {

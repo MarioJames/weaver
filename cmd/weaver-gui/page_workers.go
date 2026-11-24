@@ -71,17 +71,23 @@ func (a *app) executionWorkers() []worker {
 }
 
 func debaterName(id string) string {
-	if id == "debater_a" {
+	switch id {
+	case "debater_a":
 		return "甲方"
+	case "debater_b":
+		return "乙方"
+	case "debater_c":
+		return "丙方"
+	default:
+		return id
 	}
-	return "乙方"
 }
 
 func (a *app) debaterSection(c *ui.Context, state *workerPageState, narrow bool) {
 	tk := theme.TokensOf(c)
 	ui.Column(c).Gap(12).Padding(24, 0, 0, 0).Children(func() {
 		display.Text(c, "对谈人", display.TextProps{Strong: true, FontSize: 16})
-		display.Text(c, "设计对谈固定由这两位出方案并互评。对谈人不参与工作包的选路。", display.TextProps{Type: display.TextSecondary, FontSize: 12})
+		display.Text(c, "设计对谈固定由这些席位出方案并互评（配置丙方后启用三方对谈）。对谈人不参与工作包的选路。", display.TextProps{Type: display.TextSecondary, FontSize: 12})
 		ui.Column(c).Gap(0).Border(1, tk.BorderSecondary).Radius(10).Clip().Children(func() {
 			if !narrow {
 				ui.Row(c).Padding(10, 12).Gap(12).Background(tk.FillQuaternary).Children(func() {
@@ -92,7 +98,8 @@ func (a *app) debaterSection(c *ui.Context, state *workerPageState, narrow bool)
 					}
 				})
 			}
-			for i, id := range []string{"debater_a", "debater_b"} {
+			seats := []string{"debater_a", "debater_b", "debater_c"}
+			for i, id := range seats {
 				var seat *worker
 				for _, w := range a.snapshot.Workers {
 					if w.ID == id {
@@ -105,8 +112,11 @@ func (a *app) debaterSection(c *ui.Context, state *workerPageState, narrow bool)
 				identity := func() {
 					ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 						avoid := ""
-						if i == 1 {
+						switch i {
+						case 1:
 							avoid = "debater_a"
+						case 2:
+							avoid = "debater_b"
 						}
 						taskAvatarAvoid(c, id, avoid, 24)
 						display.Text(c, name, display.TextProps{Strong: true})
@@ -116,7 +126,11 @@ func (a *app) debaterSection(c *ui.Context, state *workerPageState, narrow bool)
 				details := func(col int) {
 					if seat == nil {
 						if col == 1 {
-							display.Text(c, "未配置", display.TextProps{Type: display.TextSecondary})
+							placeholder := "未配置"
+							if id == "debater_c" {
+								placeholder = "未配置（可选）"
+							}
+							display.Text(c, placeholder, display.TextProps{Type: display.TextSecondary})
 						}
 						return
 					}
@@ -173,7 +187,7 @@ func (a *app) debaterSection(c *ui.Context, state *workerPageState, narrow bool)
 						debaterCell(c, 4, operation)
 					})
 				}
-				if i == 0 {
+				if i < len(seats)-1 {
 					ui.Box(c).Height(1).AlignSelf(ui.Stretch).Background(tk.Split)
 				}
 			}

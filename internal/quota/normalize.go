@@ -700,6 +700,126 @@ func normalizeConsole(payload any) *Snapshot {
 	return availableSnapshot(windows, "已读取 Go 套餐窗口；这不保证模型可以运行")
 }
 
+// normalizeAgy converts retrieveUserQuotaSummary groups ("Gemini Models",
+// "Claude and GPT models") into model-scoped quota windows so Gemini and 3p
+// pools never cross-block each other during scheduling.
+func normalizeAgy(payload any, now time.Time) *Snapshot {
+	body, ok := object(payload)
+	if !ok {
+		return unknownSnapshot("额度响应缺少有效数据")
+	}
+	rawGroups, ok := body["groups"].([]any)
+	if !ok || len(rawGroups) == 0 {
+		return unknownSnapshot(universalQuotaDetail)
+	}
+	windows := []Window{}
+	nowMS := now.UnixMilli()
+	anyAvailable := false
+	anyCurrent := false
+	for gi, item := range rawGroups {
+		if gi >= 20 {
+			break
+		}
+		group, ok := object(item)
+		if !ok {
+			continue
+		}
+		displayName, _ := group["displayName"].(string)
+		modelPool := agyModelPool(displayName)
+		rawBuckets, ok := group["buckets"].([]any)
+		if !ok {
+			continue
+		}
+		for bi, rawBucket := range rawBuckets {
+			if bi >= 20 {
+				break
+			}
+			bucket, ok := object(rawBucket)
+			if !ok {
+				continue
+			}
+			rem, ok := number(bucket["remainingFraction"])
+			if !ok {
+				continue
+			}
+			if rem > 1 {
+				rem = 1
+			}
+			used := math.Round((1-rem)*1000) / 10
+			if used < 0 {
+				used = 0
+			}
+			if used > 100 {
+				used = 100
+			}
+			winKey, _ := bucket["window"].(string)
+			minutes, fallback := agyWindowSpec(winKey)
+			bucketID := firstName(bucket["bucketId"])
+			if bucketID == "" {
+				bucketID = strconv.Itoa(gi) + ":" + strconv.Itoa(bi)
+			}
+			if modelPool == "" {
+				modelPool = agyModelPool(bucketID)
+			}
+			scope := scopeModel
+			if modelPool == "" {
+				scope = scopeAccount
+			}
+			resetsAt := parseProviderTimestamp(bucket["resetTime"])
+			windows = append(windows, Window{
+				ID:              "agy:" + bucketID,
+				Label:           durationLabel(minutes, fallback),
+				Scope:           scope,
+				Model:           modelPool,
+				UsedPercent:     used,
+				ResetsAt:        resetsAt,
+				DurationMinutes: minutes,
+			})
+			if resetsAt == 0 || resetsAt > nowMS {
+				anyCurrent = true
+				if used < 100 {
+					anyAvailable = true
+				}
+			}
+		}
+	}
+	if len(windows) == 0 {
+		return unknownSnapshot(universalQuotaDetail)
+	}
+	if anyCurrent && !anyAvailable {
+		return exhaustedSnapshot(windows, "Antigravity 各模型池额度窗口均已耗尽")
+	}
+	if anyAvailable || !anyCurrent {
+		return availableSnapshot(windows, "已读取 Antigravity 额度窗口；按模型池分别计入")
+	}
+	return unknownSnapshotWithWindows(windows, universalQuotaDetail)
+}
+
+func agyModelPool(label string) string {
+	lower := strings.ToLower(strings.TrimSpace(label))
+	switch {
+	case strings.Contains(lower, "gemini"):
+		return "gemini"
+	case strings.Contains(lower, "claude") || strings.Contains(lower, "gpt") || strings.HasPrefix(lower, "3p"):
+		return "claude/gpt"
+	default:
+		return ""
+	}
+}
+
+func agyWindowSpec(window string) (minutes int, fallback string) {
+	switch strings.ToLower(strings.TrimSpace(window)) {
+	case "5h":
+		return 300, "5 小时额度"
+	case "weekly", "7d":
+		return 10080, "7 天额度"
+	case "daily", "24h":
+		return 1440, "1 天额度"
+	default:
+		return 0, "额度窗口"
+	}
+}
+
 func redactSnapshot(snapshot *Snapshot, engine string, secrets ...string) {
 	if snapshot == nil {
 		return

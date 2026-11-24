@@ -204,7 +204,7 @@ func (s *workerPageState) drawer(a *app, c *ui.Context) {
 						formRow(c, "引擎", func(label ui.Element) {
 							if s.original != nil && !s.debater {
 								display.Text(c, s.engine+"（建好后不能改）", display.TextProps{Type: display.TextSecondary})
-							} else if ui.Select(c, &s.engine, []string{"claude", "codex", "opencode", "dsh"}).LabelledBy(label).Changed() {
+							} else if ui.Select(c, &s.engine, []string{"claude", "codex", "agy", "opencode", "dsh"}).LabelledBy(label).Changed() {
 								s.accounts = []string{}
 								s.model = ""
 								s.configs = map[string]workerConfig{}

@@ -160,7 +160,18 @@ func (n *normalizer) push(line string) signal {
 		return signal{}
 	}
 	var event obj
-	if err := json.Unmarshal([]byte(line), &event); err != nil || str(event["type"]) == "" {
+	if err := json.Unmarshal([]byte(line), &event); err != nil {
+		n.unparsed++
+		return signal{}
+	}
+	if n.engine == "agy" {
+		if str(event["event"]) == "" {
+			n.unparsed++
+			return signal{}
+		}
+		return n.agy(event)
+	}
+	if str(event["type"]) == "" {
 		n.unparsed++
 		return signal{}
 	}
@@ -455,6 +466,67 @@ func (n *normalizer) dsh(e obj) (s signal) {
 			message = "dsh error"
 		}
 		n.fail("error", message)
+	}
+	return
+}
+
+// agy --output-format stream-json emits init, step_update, and result events
+// keyed by top-level "event".
+func (n *normalizer) agy(e obj) (s signal) {
+	if id := str(e["conversation_id"]); id != "" {
+		n.session = id
+	}
+	switch str(e["event"]) {
+	case "init":
+		s.started = true
+	case "step_update":
+		su := asObj(e["step_update"])
+		if id := str(su["conversation_id"]); id != "" && n.session == "" {
+			n.session = id
+		}
+		switch str(su["step_type"]) {
+		case "tool":
+			s.output = true
+			switch str(su["state"]) {
+			case "ACTIVE":
+				s.notes = append(s.notes, toolNote(su["tool_name"], "开始"))
+			case "DONE":
+				s.notes = append(s.notes, toolNote(su["tool_name"], "完成"))
+			}
+		case "agent_response":
+			if str(su["text_delta"]) != "" || str(su["state"]) == "DONE" {
+				s.output = true
+			}
+		}
+	case "result":
+		res := asObj(e["result"])
+		if id := str(res["conversation_id"]); id != "" {
+			n.session = id
+		}
+		if u := asObj(res["usage"]); u != nil {
+			n.usage(u["input_tokens"], u["output_tokens"])
+			if v := num(u["cache_read_tokens"]); v > 0 {
+				n.cacheRead = v
+			}
+		}
+		if r := str(res["finished_reason"]); r != "" {
+			n.stopReason = r
+		}
+		if str(res["status"]) != "SUCCESS" {
+			detail := strings.TrimSpace(str(res["error"]))
+			if detail == "" {
+				detail = strings.TrimSpace(str(res["finished_reason"]))
+			}
+			if detail == "" {
+				detail = "unknown agy error"
+			}
+			n.fail("result", detail)
+			return
+		}
+		if text := str(res["response"]); strings.TrimSpace(text) != "" {
+			n.remember(text, false)
+		}
+		n.done = true
 	}
 	return
 }

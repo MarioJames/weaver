@@ -356,3 +356,180 @@ func TestConcurrentRefreshDeduplicatesUnderAuthDirLock(t *testing.T) {
 		t.Fatalf("concurrent tokenCalls = %d, want 1", got)
 	}
 }
+
+func writeAgyCredential(t *testing.T, authDir, accessToken, refreshToken string, expiry time.Time) string {
+	t.Helper()
+	dir := filepath.Join(authDir, ".gemini", "antigravity-cli")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tok := map[string]any{
+		"access_token": accessToken,
+		"token_type":   "Bearer",
+	}
+	if refreshToken != "" {
+		tok["refresh_token"] = refreshToken
+	}
+	if !expiry.IsZero() {
+		tok["expiry"] = expiry.UTC().Format(time.RFC3339Nano)
+	}
+	raw, _ := json.Marshal(map[string]any{
+		"token":       tok,
+		"auth_method": "oauth",
+	})
+	path := filepath.Join(dir, "antigravity-oauth-token")
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestAgyQuotaFetchPoolScopingAndAutoRefresh(t *testing.T) {
+	reset5h := testNow.Add(3 * time.Hour).UTC().Format(time.RFC3339)
+	reset7d := testNow.Add(4 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+	t.Run("fetches loadCodeAssist and retrieveUserQuotaSummary with model pool isolation", func(t *testing.T) {
+		dir := t.TempDir()
+		writeAgyCredential(t, dir, "agy-valid-tok", "agy-ref", testNow.Add(time.Hour))
+
+		var gotUA, gotProject string
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			gotUA = r.Header.Get("User-Agent")
+			w.Header().Set("Content-Type", "application/json")
+			switch r.URL.Path {
+			case "/load":
+				_ = json.NewEncoder(w).Encode(map[string]any{"cloudaicompanionProject": "aicode-consumers"})
+			case "/quota":
+				var req map[string]any
+				_ = json.NewDecoder(r.Body).Decode(&req)
+				gotProject, _ = req["project"].(string)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"groups": []any{
+						map[string]any{
+							"displayName": "Gemini Models",
+							"buckets": []any{
+								map[string]any{"bucketId": "gemini-5h", "window": "5h", "remainingFraction": 0.8, "resetTime": reset5h},
+								map[string]any{"bucketId": "gemini-weekly", "window": "weekly", "remainingFraction": 0.9, "resetTime": reset7d},
+							},
+						},
+						map[string]any{
+							"displayName": "Claude and GPT models",
+							"buckets": []any{
+								map[string]any{"bucketId": "3p-5h", "window": "5h", "remainingFraction": 0.0, "resetTime": reset5h},
+								map[string]any{"bucketId": "3p-weekly", "window": "weekly", "remainingFraction": 0.5, "resetTime": reset7d},
+							},
+						},
+					},
+				})
+			}
+		}))
+		defer srv.Close()
+
+		client := &Client{
+			HTTP:                 srv.Client(),
+			AgyLoadCodeAssistURL: srv.URL + "/load",
+			AgyQuotaURL:          srv.URL + "/quota",
+		}
+		snap, err := client.Fetch(context.Background(), Source{Engine: "agy", AuthDir: dir}, testNow)
+		if err != nil {
+			t.Fatalf("Fetch: %v", err)
+		}
+		if !strings.HasPrefix(gotUA, "antigravity/cli/") || gotProject != "aicode-consumers" {
+			t.Fatalf("ua=%q project=%q", gotUA, gotProject)
+		}
+		if snap.Status != statusAvailable || len(snap.Windows) != 4 {
+			t.Fatalf("snap = %+v", snap)
+		}
+		// 3p pool is 100% used, but Gemini pool still has 80%/90% left:
+		// Gemini models must stay routable while Claude/GPT models are blocked.
+		if f := Factor(snap, "gemini-4-neon-xhigh", testNow); f <= 0 {
+			t.Fatalf("gemini factor = %v, want > 0", f)
+		}
+		if f := Factor(snap, "claude-opus-5-5", testNow); f != 0 {
+			t.Fatalf("claude factor = %v, want 0", f)
+		}
+		if f := Factor(snap, "gpt-oss-120b-medium", testNow); f != 0 {
+			t.Fatalf("gpt factor = %v, want 0", f)
+		}
+	})
+
+	t.Run("expired token refreshes automatically and respects SkipRefresh", func(t *testing.T) {
+		dir := t.TempDir()
+		writeAgyCredential(t, dir, "agy-expired-tok", "agy-ref", testNow.Add(-5*time.Minute))
+
+		var refreshCalls atomic.Int32
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Authorization") != "Bearer agy-fresh-tok" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"groups": []any{
+					map[string]any{
+						"displayName": "Gemini Models",
+						"buckets":     []any{map[string]any{"bucketId": "gemini-5h", "window": "5h", "remainingFraction": 1.0, "resetTime": reset5h}},
+					},
+				},
+			})
+		}))
+		defer srv.Close()
+
+		client := &Client{
+			HTTP:        srv.Client(),
+			AgyQuotaURL: srv.URL,
+			AgyRefreshFunc: func(_ context.Context, authDir string) error {
+				refreshCalls.Add(1)
+				writeAgyCredential(t, authDir, "agy-fresh-tok", "agy-ref", testNow.Add(time.Hour))
+				return nil
+			},
+		}
+
+		// SkipRefresh returns renewal_pending without touching credentials.
+		if _, err := client.Fetch(context.Background(), Source{Engine: "agy", AuthDir: dir, SkipRefresh: true}, testNow); errKind(t, err) != kindRenewalPending {
+			t.Fatalf("SkipRefresh err = %v, want renewal_pending", err)
+		}
+		if refreshCalls.Load() != 0 {
+			t.Fatalf("SkipRefresh called refresh %d times", refreshCalls.Load())
+		}
+
+		snap, err := client.Fetch(context.Background(), Source{Engine: "agy", AuthDir: dir}, testNow)
+		if err != nil {
+			t.Fatalf("Fetch after refresh: %v", err)
+		}
+		if refreshCalls.Load() != 1 || snap.Status != statusAvailable {
+			t.Fatalf("calls=%d snap=%+v", refreshCalls.Load(), snap)
+		}
+	})
+
+	t.Run("401 triggers forced refresh and restores original token on transient failure", func(t *testing.T) {
+		dir := t.TempDir()
+		tokPath := writeAgyCredential(t, dir, "agy-revoked-tok", "agy-ref", testNow.Add(time.Hour))
+		origBytes, _ := os.ReadFile(tokPath)
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+		}))
+		defer srv.Close()
+
+		client := &Client{
+			HTTP:        srv.Client(),
+			AgyQuotaURL: srv.URL,
+			AgyRefreshFunc: func(_ context.Context, _ string) error {
+				return transient("temporary failure")
+			},
+		}
+		if _, err := client.Fetch(context.Background(), Source{Engine: "agy", AuthDir: dir}, testNow); errKind(t, err) != kindTransient {
+			t.Fatalf("err = %v, want transient", err)
+		}
+		afterBytes, _ := os.ReadFile(tokPath)
+		var beforeObj, afterObj map[string]any
+		_ = json.Unmarshal(origBytes, &beforeObj)
+		_ = json.Unmarshal(afterBytes, &afterObj)
+		beforeExp := beforeObj["token"].(map[string]any)["expiry"]
+		afterExp := afterObj["token"].(map[string]any)["expiry"]
+		if beforeExp != afterExp {
+			t.Fatalf("expiry not restored: before=%v after=%v", beforeExp, afterExp)
+		}
+	})
+}

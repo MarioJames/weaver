@@ -25,7 +25,7 @@ type AccountQuota struct {
 }
 
 func supportsQuota(engine, kind string) bool {
-	return kind == "subscription" && (engine == "codex" || engine == "claude" || engine == "opencode")
+	return kind == "subscription" && (engine == "codex" || engine == "claude" || engine == "opencode" || engine == "agy")
 }
 func parseQuota(raw string) *quota.Snapshot {
 	var s quota.Snapshot
@@ -54,7 +54,7 @@ func (k *Kernel) refreshQuota(ctx context.Context, id string) (*Account, error) 
 		return nil, err
 	}
 	if !supportsQuota(a.Engine, a.Kind) {
-		return nil, errf("UNSUPPORTED", "只有 Codex、Claude、OpenCode 的订阅账号有额度窗口")
+		return nil, errf("UNSUPPORTED", "只有 Codex、Claude、OpenCode、Antigravity 的订阅账号有额度窗口")
 	}
 	var active int
 	_ = k.read(func() error {

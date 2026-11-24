@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-// A dialogue is a plan with a fixed shape: two candidates answer the same
-// brief independently, then read each other and revise, for one or more
+// A dialogue is a plan with a fixed shape: two or three candidates answer the
+// same brief independently, then read each other and revise, for one or more
 // exchanges. Every package is advisory. All but the last exchange are
-// auto-accepted, so the owner is woken once, by the two final positions.
+// auto-accepted, so the owner is woken once, by the final positions.
 
 // DialogueInput starts a dialogue inside a mission.
 type DialogueInput struct {
@@ -18,7 +18,7 @@ type DialogueInput struct {
 	Name    string   `json:"name"`    // key prefix; several dialogues may live in one mission
 	Brief   string   `json:"brief"`   // the question, its constraints and what a good answer settles
 	Rounds  int      `json:"rounds"`  // exchanges after the proposals: 1 to 3; zero uses dialogue_rounds
-	Workers []string `json:"workers"` // two candidates; default: debater_a and debater_b
+	Workers []string `json:"workers"` // two or three candidates; default: debater_a, debater_b (and debater_c when configured & enabled)
 }
 
 // DialogueResult reports the packages a dialogue created.
@@ -62,13 +62,13 @@ const (
 	maxBrief          = 20000
 )
 
-var dialogueSides = []string{"a", "b"}
+var dialogueSides = []string{"a", "b", "c"}
 
 func dialogueKey(name string, round int, side string) string {
 	return fmt.Sprintf("%s.r%d.%s", name, round, side)
 }
 
-// StartDialogue creates the packages of a dialogue and releases the two proposals.
+// StartDialogue creates the packages of a dialogue and releases the proposals.
 func (k *Kernel) StartDialogue(key string, in DialogueInput) (*DialogueResult, error) {
 	in.Name = strings.TrimSpace(in.Name)
 	if in.Name == "" {
@@ -90,20 +90,37 @@ func (k *Kernel) StartDialogue(key string, in DialogueInput) (*DialogueResult, e
 	if in.Rounds < 1 || in.Rounds > maxDialogueRounds {
 		return nil, errf("INVALID", "交换轮数只能是 1 到 %d", maxDialogueRounds)
 	}
-	if len(in.Workers) != 0 && len(in.Workers) != 2 {
-		return nil, errf("INVALID", "对谈需要正好两个候选")
+	if len(in.Workers) != 0 && (len(in.Workers) < 2 || len(in.Workers) > len(dialogueSides)) {
+		return nil, errf("INVALID", "对谈需要 2 或 3 个候选")
 	}
-	if len(in.Workers) == 2 && in.Workers[0] == in.Workers[1] {
-		return nil, errf("INVALID", "对谈的两方不能是同一个候选")
+	if len(in.Workers) >= 2 {
+		seen := map[string]bool{}
+		for _, w := range in.Workers {
+			if seen[w] {
+				return nil, errf("INVALID", "对谈的各方不能是同一个候选")
+			}
+			seen[w] = true
+		}
 	}
 	out := &DialogueResult{}
 	err := k.keyed(key, "dialogue.start", out, func(t *tx) error {
-		// Default dialogues require both seats to be configured before creating a plan.
+		// Default dialogues require debater_a and debater_b, and include debater_c
+		// automatically when it exists and is enabled.
 		type side struct{ worker, engine, label string }
-		sides := []side{{worker: "debater_a", label: "甲方"}, {worker: "debater_b", label: "乙方"}}
-		if len(in.Workers) == 2 {
-			sides = []side{{worker: in.Workers[0], label: in.Workers[0]}, {worker: in.Workers[1], label: in.Workers[1]}}
+		var sides []side
+		if len(in.Workers) >= 2 {
+			for _, w := range in.Workers {
+				sides = append(sides, side{worker: w, label: w})
+			}
 		} else {
+			sides = []side{{worker: "debater_a", label: "甲方"}, {worker: "debater_b", label: "乙方"}}
+			var cEnabled bool
+			switch err := t.QueryRow(`SELECT enabled FROM workers WHERE id='debater_c'`).Scan(&cEnabled); {
+			case err == nil && cEnabled:
+				sides = append(sides, side{worker: "debater_c", label: "丙方"})
+			case err != nil && err != sql.ErrNoRows:
+				return err
+			}
 			rt, err := t.loadRouting()
 			if err != nil {
 				return err
@@ -140,7 +157,7 @@ func (k *Kernel) StartDialogue(key string, in DialogueInput) (*DialogueResult, e
 					}
 				}
 				if reason != "" {
-					return errf("INVALID", "%s对谈人：%s；在图形界面候选页的「对谈人」里配置，或用 --workers 临时指定两个候选", s.label, reason)
+					return errf("INVALID", "%s对谈人：%s；在图形界面候选页的「对谈人」里配置，或用 --workers 临时指定候选", s.label, reason)
 				}
 			}
 		}
@@ -154,15 +171,21 @@ func (k *Kernel) StartDialogue(key string, in DialogueInput) (*DialogueResult, e
 				}
 				if round == 1 {
 					p.Title = fmt.Sprintf("对谈 %s · 方案 · %s", in.Name, s.label)
-					p.Instruction = proposalInstruction(brief)
+					p.Instruction = proposalInstruction(brief, len(sides))
 				} else {
-					own, peer := dialogueKey(in.Name, round-1, dialogueSides[i]), dialogueKey(in.Name, round-1, dialogueSides[1-i])
+					own := dialogueKey(in.Name, round-1, dialogueSides[i])
+					peers := make([]string, 0, len(sides)-1)
+					for j := range sides {
+						if j != i {
+							peers = append(peers, dialogueKey(in.Name, round-1, dialogueSides[j]))
+						}
+					}
 					p.Title = fmt.Sprintf("对谈 %s · 第 %d 轮互评 · %s", in.Name, round-1, s.label)
 					if round == last {
 						p.Title = fmt.Sprintf("对谈 %s · 最终立场 · %s", in.Name, s.label)
 					}
-					p.Instruction = exchangeInstruction(brief, round, last, own, peer)
-					p.DependsOn = []string{own, peer}
+					p.Instruction = exchangeInstruction(brief, round, last, own, peers)
+					p.DependsOn = append([]string{own}, peers...)
 				}
 				plan.Packages = append(plan.Packages, p)
 			}
@@ -171,9 +194,15 @@ func (k *Kernel) StartDialogue(key string, in DialogueInput) (*DialogueResult, e
 		if err := t.createPlan(&plan, res); err != nil {
 			return err
 		}
+		sideLabels := make([]string, len(sides))
+		finals := make([]string, len(sides))
+		for i, s := range sides {
+			sideLabels[i] = s.label
+			finals[i] = dialogueKey(in.Name, last, dialogueSides[i])
+		}
 		*out = DialogueResult{Mission: res.Mission, Name: in.Name, Packages: res.Packages, Cursor: res.Cursor,
-			Sides: []string{sides[0].label, sides[1].label},
-			Final: []string{dialogueKey(in.Name, last, "a"), dialogueKey(in.Name, last, "b")}}
+			Sides: sideLabels,
+			Final: finals}
 		return nil
 	})
 	if err != nil {
@@ -182,8 +211,12 @@ func (k *Kernel) StartDialogue(key string, in DialogueInput) (*DialogueResult, e
 	return out, nil
 }
 
-func proposalInstruction(brief string) string {
-	return `This is round 1 of a design dialogue. Another engineer is answering the same brief independently, and afterwards you will review each other's proposal. Do not try to guess theirs: the dialogue is only worth its cost if the two designs are independent.
+func proposalInstruction(brief string, sideCount int) string {
+	others := "Another engineer is answering the same brief independently, and afterwards you will review each other's proposal. Do not try to guess theirs: the dialogue is only worth its cost if the two designs are independent."
+	if sideCount > 2 {
+		others = fmt.Sprintf("%d other engineers are answering the same brief independently, and afterwards you will review each other's proposals. Do not try to guess theirs: the dialogue is only worth its cost if the designs are independent.", sideCount-1)
+	}
+	return `This is round 1 of a design dialogue. ` + others + `
 
 <brief>
 ` + brief + `
@@ -198,30 +231,44 @@ Read as much of the codebase as the brief needs, then write your proposal with t
 Aim for depth over breadth, within about 1,200 words.`
 }
 
-func exchangeInstruction(brief string, round, last int, own, peer string) string {
+func exchangeInstruction(brief string, round, last int, own string, peers []string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "This is round %d of %d of a design dialogue. Two upstream results are attached below: %q is your own latest position, %q is the other engineer's. You do not remember writing yours; read both.\n\n<brief>\n%s\n</brief>\n\n", round, last, own, peer, brief)
-	b.WriteString(`Do this, in this order:
+	if len(peers) == 1 {
+		fmt.Fprintf(&b, "This is round %d of %d of a design dialogue. Two upstream results are attached below: %q is your own latest position, %q is the other engineer's. You do not remember writing yours; read both.\n\n<brief>\n%s\n</brief>\n\n", round, last, own, peers[0], brief)
+	} else {
+		quoted := make([]string, len(peers))
+		for i, p := range peers {
+			quoted[i] = fmt.Sprintf("%q", p)
+		}
+		fmt.Fprintf(&b, "This is round %d of %d of a design dialogue. %d upstream results are attached below: %q is your own latest position, and %s are the other engineers'. You do not remember writing yours; read all of them.\n\n<brief>\n%s\n</brief>\n\n", round, last, len(peers)+1, own, strings.Join(quoted, " and "), brief)
+	}
+	if len(peers) == 1 {
+		b.WriteString(`Do this, in this order:
 1. Review the other position. Check its factual claims against the code rather than trusting or dismissing them. Say what it gets right that yours missed; what is wrong or risky, each with evidence (a path, a behaviour, or a concrete failure scenario); and what it leaves unspecified.
 `)
+	} else {
+		b.WriteString(`Do this, in this order:
+1. Review each of the other positions. Check their factual claims against the code rather than trusting or dismissing them. Say what each gets right that yours missed; what is wrong or risky, each with evidence (a path, a behaviour, or a concrete failure scenario); and what each leaves unspecified.
+`)
+	}
 	if round > 2 {
-		b.WriteString("2. Answer the criticism the other side made of your position: concede what holds, and rebut the rest with evidence.\n")
+		b.WriteString("2. Answer the criticism the other side(s) made of your position: concede what holds, and rebut the rest with evidence.\n")
 	} else {
 		b.WriteString("2. Reconsider your own position in the light of theirs: name what you now think you got wrong.\n")
 	}
 	if round < last {
-		b.WriteString("3. Give your updated position in full. It replaces your previous one, so it must stand on its own.\nAgreeing is fine when the other side is right; do not defend a point only because it was yours, and do not concede one only to converge.")
+		b.WriteString("3. Give your updated position in full. It replaces your previous one, so it must stand on its own.\nAgreeing is fine when another side is right; do not defend a point only because it was yours, and do not concede one only to converge.")
 		return b.String()
 	}
 	b.WriteString(`3. This is the last round. Close with exactly these three headed parts:
-Agreed: the points both positions now share.
+Agreed: the points the positions now share.
 Still disagree: each remaining difference, your recommendation on it, and what evidence or decision would settle it.
 Recommended plan: the design you would build now, complete and self-contained. The owner may read only this part.
-Agreeing is fine when the other side is right; do not defend a point only because it was yours, and do not concede one only to converge.`)
+Agreeing is fine when another side is right; do not defend a point only because it was yours, and do not concede one only to converge.`)
 	return b.String()
 }
 
-// Dialogue returns the transcript of a dialogue: every round, both sides, full text.
+// Dialogue returns the transcript of a dialogue: every round, every side, full text.
 func (k *Kernel) Dialogue(mission, name string) (*DialogueTranscript, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -243,16 +290,22 @@ func (k *Kernel) Dialogue(mission, name string) (*DialogueTranscript, error) {
 		if a == nil || b == nil {
 			break
 		}
+		roundPkgs := []*Package{a, b}
+		roundSides := []string{"a", "b"}
+		if c := byKey[dialogueKey(name, round, "c")]; c != nil {
+			roundPkgs = append(roundPkgs, c)
+			roundSides = append(roundSides, "c")
+		}
 		r := DialogueRound{Round: round, Kind: "exchange"}
 		if round == 1 {
 			r.Kind = "proposal"
 		}
-		for i, p := range []*Package{a, b} {
+		for i, p := range roundPkgs {
 			full, err := k.Package(p.ID)
 			if err != nil {
 				return nil, err
 			}
-			e := DialogueEntry{Side: dialogueSides[i], Package: p.Key, State: p.State}
+			e := DialogueEntry{Side: roundSides[i], Package: p.Key, State: p.State}
 			if full.Current != nil {
 				e.Worker, e.Result = full.Current.Worker, full.Current.Result
 				if p.State == StateFailed {
@@ -287,9 +340,9 @@ func (k *Kernel) Dialogue(mission, name string) (*DialogueTranscript, error) {
 	}
 	if concluded {
 		out.State = "concluded"
-		out.Hint = "两方的最终立场都已给出。写出最终方案后，对两个最终包给出采纳"
+		out.Hint = "各方的最终立场都已给出。写出最终方案后，对各最终包给出采纳"
 		if closed {
-			out.Hint = "对谈已收尾：两个最终包都已采纳"
+			out.Hint = "对谈已收尾：各最终包都已采纳"
 		}
 	}
 	return out, nil
@@ -304,7 +357,7 @@ func parseDialoguePackage(key string, advisory bool) (name string, round int, si
 		return "", 0, "", false
 	}
 	side = key[len(key)-1:]
-	if key[len(key)-2] != '.' || (side != "a" && side != "b") {
+	if key[len(key)-2] != '.' || (side != "a" && side != "b" && side != "c") {
 		return "", 0, "", false
 	}
 	prefix := key[:len(key)-2]
