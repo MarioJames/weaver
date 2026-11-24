@@ -260,9 +260,14 @@ func normalizeCodex(payload any, now time.Time) *Snapshot {
 	if spend, ok := object(body["spend_control"]); ok {
 		globalBlocked = isTrue(spend["reached"])
 	}
+	credits := parseCodexCredits(body["credits"])
 	snap := evaluate(windows, accountAttempts, droppedAccount, now, permission, blocked, globalBlocked)
-	snap.Credits = parseCodexCredits(body["credits"])
+	snap.Credits = credits
 	snap.ResetCredits = parseCodexResetCreditsSummary(body["rate_limit_reset_credits"])
+	if !globalBlocked && credits.Usable() && snap.Status != statusAvailable {
+		snap.Status = statusAvailable
+		snap.Detail = "套餐额度已用完，当前可使用 Credits 余额"
+	}
 	return snap
 }
 

@@ -68,6 +68,24 @@ type Credits struct {
 	HasBalance          bool    `json:"hasBalance,omitempty"`
 }
 
+// Usable reports whether the account has remaining overage credits that can
+// serve requests when subscription rate-limit windows are exhausted.
+func (c *Credits) Usable() bool {
+	if c == nil || c.OverageLimitReached {
+		return false
+	}
+	if c.Unlimited {
+		return true
+	}
+	if !c.HasCredits {
+		return false
+	}
+	if c.HasBalance {
+		return c.Balance > 0
+	}
+	return true
+}
+
 // ResetCredits describes available rate-limit reset cards (Codex).
 type ResetCredits struct {
 	AvailableCount int   `json:"availableCount"`

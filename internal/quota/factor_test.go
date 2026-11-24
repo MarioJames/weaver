@@ -69,6 +69,31 @@ func TestFactor(t *testing.T) {
 		{"unknown scope ignored", &Snapshot{Status: statusAvailable, Windows: []Window{
 			window(scopeUnknown, "", 99, now.Add(time.Hour), 300),
 		}}, "any", 1},
+		{"used up with usable credits uses fallback factor", &Snapshot{
+			Status:  statusAvailable,
+			Windows: []Window{window(scopeAccount, "", 100, now.Add(time.Hour), 10080)},
+			Credits: &Credits{HasCredits: true, HasBalance: true, Balance: 500},
+		}, "any", creditFallbackFactor},
+		{"used up with unlimited credits uses fallback factor", &Snapshot{
+			Status:  statusAvailable,
+			Windows: []Window{window(scopeAccount, "", 100, now.Add(time.Hour), 10080)},
+			Credits: &Credits{Unlimited: true},
+		}, "any", creditFallbackFactor},
+		{"used up with overage limit reached blocks", &Snapshot{
+			Status:  statusExhausted,
+			Windows: []Window{window(scopeAccount, "", 100, now.Add(time.Hour), 10080)},
+			Credits: &Credits{HasCredits: true, HasBalance: true, Balance: 500, OverageLimitReached: true},
+		}, "any", 0},
+		{"used up with zero balance blocks", &Snapshot{
+			Status:  statusExhausted,
+			Windows: []Window{window(scopeAccount, "", 100, now.Add(time.Hour), 10080)},
+			Credits: &Credits{HasCredits: true, HasBalance: true, Balance: 0},
+		}, "any", 0},
+		{"spend control exhausted blocks even with credits", &Snapshot{
+			Status:  statusExhausted,
+			Windows: []Window{window(scopeAccount, "", 100, now.Add(time.Hour), 10080)},
+			Credits: &Credits{HasCredits: true, HasBalance: true, Balance: 500},
+		}, "any", 0},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

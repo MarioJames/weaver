@@ -720,8 +720,8 @@ func TestCodexCreditsAndResetCards(t *testing.T) {
 		if hdr.Get("OpenAI-Beta") != "codex-1" || hdr.Get("Authorization") != "Bearer "+token || hdr.Get("ChatGPT-Account-Id") != "acct-secret" {
 			t.Fatalf("unexpected reset headers: %+v", hdr)
 		}
-		if snap.Status != statusExhausted || Factor(snap, "", testNow) != 0 {
-			t.Fatalf("exhausted subscription window with credits must keep Factor=0: status=%s factor=%v", snap.Status, Factor(snap, "", testNow))
+		if snap.Status != statusAvailable || Factor(snap, "", testNow) != creditFallbackFactor {
+			t.Fatalf("exhausted subscription window with usable credits must stay routable with creditFallbackFactor: status=%s factor=%v", snap.Status, Factor(snap, "", testNow))
 		}
 		if snap.Credits == nil || !snap.Credits.HasCredits || snap.Credits.Unlimited || snap.Credits.OverageLimitReached || !snap.Credits.HasBalance || snap.Credits.Balance < 57525.49 || snap.Credits.Balance > 57525.50 {
 			t.Fatalf("credits = %+v", snap.Credits)

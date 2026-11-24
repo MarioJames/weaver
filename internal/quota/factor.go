@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+// creditFallbackFactor is returned when included subscription windows are
+// exhausted (100%) but the account still has usable overage credits and is not
+// globally spend-blocked. It stays positive so dispatch succeeds (e.g. pinned
+// debaters or sole accounts) while keeping accounts with remaining included
+// subscription quota preferred ahead of overage credits.
+const creditFallbackFactor = 0.05
+
 // Factor returns the scheduling quota coefficient in [0, 1]. It compares the
 // remaining quota ratio with the remaining time ratio of each participating
 // window and returns the smallest coefficient.
@@ -26,6 +33,7 @@ func Factor(snapshot *Snapshot, model string, now time.Time) float64 {
 			return 0
 		}
 	}
+	creditFallback := snapshot.Status != statusExhausted && snapshot.Credits.Usable()
 	nowMS := now.UnixMilli()
 	model = strings.ToLower(model)
 	best := 1.0
@@ -56,7 +64,13 @@ func Factor(snapshot *Snapshot, model string, now time.Time) float64 {
 			remaining = 1
 		}
 		if remaining == 0 {
-			return 0
+			if !creditFallback {
+				return 0
+			}
+			if creditFallbackFactor < best {
+				best = creditFallbackFactor
+			}
+			continue
 		}
 		coefficient := 1.0
 		if window.ResetsAt != 0 && window.DurationMinutes > 0 {

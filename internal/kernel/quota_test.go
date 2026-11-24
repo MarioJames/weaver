@@ -375,6 +375,46 @@ func TestRefreshQuotaCodexCreditsAndResetCards(t *testing.T) {
 	assertQuotaPrivate(t, f)
 }
 
+func TestQuotaUsableCreditsAllowDispatchWhenWindowExhausted(t *testing.T) {
+	f := newFixture(t)
+	f.k.now = func() time.Time { return quotaTestNow }
+	usageServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"rate_limit":{"allowed":false,"limit_reached":true,"primary_window":{"used_percent":100,"reset_at":%d,"limit_window_seconds":604800}},"credits":{"has_credits":true,"overage_limit_reached":false,"balance":"57500.5"},"spend_control":{"reached":false}}`, quotaTestNow.Add(48*time.Hour).Unix())
+	}))
+	defer usageServer.Close()
+	f.k.quotaClient = &quota.Client{HTTP: usageServer.Client(), CodexURL: usageServer.URL}
+
+	dir := t.TempDir()
+	tok := "eyJhbGciOiJub25lIn0.eyJleHAiOjE5OTk5OTk5OTl9.sig"
+	data, _ := json.Marshal(map[string]any{"auth_mode": "chatgpt", "tokens": map[string]any{"access_token": tok, "account_id": "codex-acct-secret"}})
+	if err := os.WriteFile(filepath.Join(dir, "auth.json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.k.AddAccount(AccountInput{ID: "codex-credits", Label: "ChatGPT Pro 5x", Engine: "codex", Kind: "subscription", AuthDir: dir}); err != nil {
+		t.Fatal(err)
+	}
+	score := 8.0
+	if _, err := f.k.SetWorker(WorkerInput{ID: "codex-w", Engine: "codex", Model: "gpt-6.2-astra", Intelligence: &score, Accounts: []string{"codex-credits"}}); err != nil {
+		t.Fatal(err)
+	}
+	a, err := f.k.RefreshQuota("codex-credits")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Quota.Status != "available" || a.Quota.Factor <= 0 {
+		t.Fatalf("expected available with positive factor, got %+v", a.Quota)
+	}
+	m := f.mission()
+	p := pkg("credit-run")
+	p.Worker = "codex-w"
+	id := f.submit(m, p)["credit-run"]
+	if got := f.state(id); got != StateLaunch {
+		t.Fatalf("state = %s, want launching", got)
+	}
+	assertQuotaPrivate(t, f)
+}
+
 func TestQuotaRefreshIntervalIsConfigurable(t *testing.T) {
 	f := newFixture(t)
 	if got := f.k.quotaInterval(); got != 5*time.Minute {
