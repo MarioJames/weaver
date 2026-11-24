@@ -1,6 +1,8 @@
 // Package quota reads subscription quota windows from the native credential
-// stores of Codex, Claude Code and OpenCode. It is read-only: it never
-// refreshes or rotates credentials, switches accounts, or writes to a database.
+// stores of Codex, Claude Code and OpenCode. For Codex and Claude Code it can
+// proactively renew expiring or expired OAuth access tokens inside the
+// account's isolated AuthDir (skipped when SkipRefresh is set). OpenCode
+// databases remain strictly read-only.
 package quota
 
 import (
@@ -67,12 +69,21 @@ type Snapshot struct {
 // codex (auth.json below it), CLAUDE_CONFIG_DIR for claude
 // (.credentials.json below it), and the account root for opencode
 // (opencode.db below it plus data/opencode/auth.json).
-type Source struct{ Engine, AuthDir string }
+// When SkipRefresh is true (for example, while an engine attempt is actively
+// running on this account), Fetch will not refresh or modify credentials.
+type Source struct {
+	Engine      string
+	AuthDir     string
+	SkipRefresh bool
+}
 
 // Error is a quota failure. Kind is one of unsupported, unauthenticated,
 // renewal_pending, transient or upstream. Message is user-facing Chinese and
 // never contains a token, key, e-mail address, organization id or response body.
-type Error struct{ Kind, Message string }
+type Error struct {
+	Kind, Message string
+	status        int
+}
 
 // Error implements error.
 func (e *Error) Error() string {
@@ -100,10 +111,13 @@ func upstream(message string) *Error  { return quotaError(kindUpstream, message)
 // 15-second timeout and the official provider endpoints.
 type Client struct {
 	HTTP               *http.Client
-	CodexURL           string // 默认 https://chatgpt.com/backend-api/wham/usage
-	ClaudeURL          string // 默认 https://api.anthropic.com/api/oauth/usage
-	OpenCodeGoURL      string // 默认 https://opencode.ai/zen/go/v1/usage
-	OpenCodeConsoleURL string // 默认 https://opencode.ai/console/api/go/status
+	CodexURL           string        // 默认 https://chatgpt.com/backend-api/wham/usage
+	CodexTokenURL      string        // 默认 https://auth.openai.com/oauth/token
+	ClaudeURL          string        // 默认 https://api.anthropic.com/api/oauth/usage
+	ClaudeTokenURL     string        // 默认 https://platform.claude.com/v1/oauth/token
+	OpenCodeGoURL      string        // 默认 https://opencode.ai/zen/go/v1/usage
+	OpenCodeConsoleURL string        // 默认 https://opencode.ai/console/api/go/status
+	RefreshAhead       time.Duration // 默认 15 分钟；<=0 使用默认值
 }
 
 type endpoint int
@@ -115,21 +129,23 @@ const (
 	endpointOpenCodeConsole
 )
 
-// Fetch reads the account credential and probes its subscription endpoint.
-// It only reads local credential material and performs bounded GET requests.
+// Fetch reads the account credential, proactively renews expiring/expired OAuth
+// tokens for Codex and Claude when allowed, and probes the subscription endpoint.
 func (c *Client) Fetch(ctx context.Context, src Source, now time.Time) (*Snapshot, error) {
 	switch src.Engine {
 	case "codex":
-		cred, err := readCodexCredential(src.AuthDir, now)
+		cred, refreshed, err := c.prepareCredential(ctx, src, now, readCodexCredentialRaw, c.refreshCodex)
 		if err != nil {
 			return nil, err
 		}
-		payload, err := c.request(ctx, c.codexURL(), map[string]string{
-			"Authorization":      "Bearer " + cred.token,
-			"ChatGPT-Account-Id": cred.accountID,
-			"User-Agent":         "codex-cli",
-			"Accept":             "application/json",
-		}, endpointCodex)
+		payload, err := c.fetchWith401Retry(ctx, src, now, cred, refreshed, c.refreshCodex, func(active *nativeCredential) (any, error) {
+			return c.request(ctx, c.codexURL(), map[string]string{
+				"Authorization":      "Bearer " + active.token,
+				"ChatGPT-Account-Id": active.accountID,
+				"User-Agent":         "codex-cli",
+				"Accept":             "application/json",
+			}, endpointCodex)
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -137,16 +153,18 @@ func (c *Client) Fetch(ctx context.Context, src Source, now time.Time) (*Snapsho
 		redactSnapshot(snap, "codex", cred.token, cred.accountID)
 		return snap, nil
 	case "claude":
-		cred, err := readClaudeCredential(src.AuthDir, now)
+		cred, refreshed, err := c.prepareCredential(ctx, src, now, readClaudeCredentialRaw, c.refreshClaude)
 		if err != nil {
 			return nil, err
 		}
-		payload, err := c.request(ctx, c.claudeURL(), map[string]string{
-			"Authorization":  "Bearer " + cred.token,
-			"anthropic-beta": "oauth-2025-04-20",
-			"Accept":         "application/json",
-			"User-Agent":     quotaUserAgent,
-		}, endpointClaude)
+		payload, err := c.fetchWith401Retry(ctx, src, now, cred, refreshed, c.refreshClaude, func(active *nativeCredential) (any, error) {
+			return c.request(ctx, c.claudeURL(), map[string]string{
+				"Authorization":  "Bearer " + active.token,
+				"anthropic-beta": "oauth-2025-04-20",
+				"Accept":         "application/json",
+				"User-Agent":     quotaUserAgent,
+			}, endpointClaude)
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -186,6 +204,68 @@ func (c *Client) Fetch(ctx context.Context, src Source, now time.Time) (*Snapsho
 	default:
 		return nil, unsupported("不支持的订阅引擎")
 	}
+}
+
+type credReader func(authDir string) (*nativeCredential, map[string]any, string, error)
+type credRefresher func(ctx context.Context, authDir, rejectedToken string, now time.Time) (*nativeCredential, error)
+
+func (c *Client) prepareCredential(ctx context.Context, src Source, now time.Time, read credReader, refresh credRefresher) (*nativeCredential, bool, error) {
+	cred, _, _, err := read(src.AuthDir)
+	if err != nil {
+		return nil, false, err
+	}
+	expired, expiringSoon := c.shouldRefresh(cred, now)
+	if expired {
+		if cred.refreshToken == "" {
+			return nil, false, unauthenticated("原生登录已过期，请在对应工具中重新登录")
+		}
+		if src.SkipRefresh {
+			return nil, false, renewalPending()
+		}
+		updated, err := refresh(ctx, src.AuthDir, "", now)
+		if err != nil {
+			return nil, false, err
+		}
+		return updated, true, nil
+	}
+	if expiringSoon && cred.refreshToken != "" && !src.SkipRefresh {
+		updated, err := refresh(ctx, src.AuthDir, "", now)
+		if err == nil {
+			return updated, true, nil
+		}
+		var qe *Error
+		if errors.As(err, &qe) && qe.Kind == kindUnauthenticated {
+			return nil, false, err
+		}
+		// Transient refresh error while the current access token is still valid:
+		// proceed with the current token and retry refresh on the next poll.
+	}
+	return cred, false, nil
+}
+
+func (c *Client) fetchWith401Retry(
+	ctx context.Context,
+	src Source,
+	now time.Time,
+	cred *nativeCredential,
+	alreadyRefreshed bool,
+	refresh credRefresher,
+	call func(*nativeCredential) (any, error),
+) (any, error) {
+	payload, err := call(cred)
+	if err == nil || alreadyRefreshed || src.SkipRefresh || cred.refreshToken == "" {
+		return payload, err
+	}
+	var qe *Error
+	if !errors.As(err, &qe) || qe.status != http.StatusUnauthorized {
+		return nil, err
+	}
+	updated, refreshErr := refresh(ctx, src.AuthDir, cred.token, now)
+	if refreshErr != nil {
+		return nil, refreshErr
+	}
+	*cred = *updated
+	return call(cred)
 }
 
 func (c *Client) codexURL() string {
@@ -285,9 +365,13 @@ func (c *Client) requestOnce(ctx context.Context, url string, headers map[string
 		switch resp.StatusCode {
 		case http.StatusUnauthorized:
 			if ep == endpointOpenCodeConsole {
-				return nil, false, unauthenticated("原生 Console 登录无效，请在 OpenCode 中重新登录后手动刷新")
+				e := unauthenticated("原生 Console 登录无效，请在 OpenCode 中重新登录后手动刷新")
+				e.status = http.StatusUnauthorized
+				return nil, false, e
 			}
-			return nil, false, unauthenticated("原生登录无效或无权读取额度，请在对应工具中确认登录")
+			e := unauthenticated("原生登录无效或无权读取额度，请在对应工具中确认登录")
+			e.status = http.StatusUnauthorized
+			return nil, false, e
 		case http.StatusForbidden:
 			if ep == endpointOpenCodeConsole {
 				return nil, false, unsupported("当前 Console 登录无 Go 额度读取权限；免费模型与按量余额没有官方只读额度接口")

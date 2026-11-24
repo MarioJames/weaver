@@ -16,12 +16,20 @@ import (
 	"unicode"
 )
 
-// nativeCredential is the minimal material needed for one quota request.
+// nativeCredential is the minimal material needed for one quota request
+// and optional OAuth refresh.
 type nativeCredential struct {
-	token     string
-	accountID string // codex only
-	orgID     string // OpenCode Console only
-	console   bool   // OpenCode Console rather than a Go API key
+	token        string
+	refreshToken string
+	accountID    string   // codex only
+	scopes       []string // claude only
+	expiresAt    int64    // unix milliseconds; 0 when unknown
+	orgID        string   // OpenCode Console only
+	console      bool     // OpenCode Console rather than a Go API key
+}
+
+func (c *nativeCredential) isExpired(now time.Time) bool {
+	return c != nil && c.expiresAt > 0 && c.expiresAt <= now.UnixMilli()
 }
 
 // readCredentialObject reads a small JSON object without following a symlink.
@@ -80,23 +88,23 @@ func credentialPath(authDir, name string) (string, error) {
 	return filepath.Join(authDir, name), nil
 }
 
-func readCodexCredential(authDir string, now time.Time) (*nativeCredential, error) {
+func readCodexCredentialRaw(authDir string) (*nativeCredential, map[string]any, string, error) {
 	path, err := credentialPath(authDir, "auth.json")
 	if err != nil {
-		return nil, err
+		return nil, nil, "", err
 	}
 	root, err := readCredentialObject(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, "", err
 	}
 	if mode, present := root["auth_mode"]; present {
 		if value, _ := mode.(string); value != "chatgpt" {
-			return nil, unsupported("仅支持 Codex 原生 ChatGPT 登录")
+			return nil, nil, "", unsupported("仅支持 Codex 原生 ChatGPT 登录")
 		}
 	} else {
 		for _, key := range []string{"OPENAI_API_KEY", "personal_access_token", "agent_identity", "bedrock_api_key", "bedrock_access_keys"} {
 			if value, present := root[key]; present && notEmptyish(value) {
-				return nil, unsupported("Codex 当前认证模式不明确")
+				return nil, nil, "", unsupported("Codex 当前认证模式不明确")
 			}
 		}
 	}
@@ -104,49 +112,58 @@ func readCodexCredential(authDir string, now time.Time) (*nativeCredential, erro
 	token := nonempty(tokens["access_token"], 16384)
 	accountID := nonempty(tokens["account_id"], 256)
 	if token == "" || accountID == "" {
-		return nil, unsupported("缺少完整的 Codex ChatGPT 登录凭据")
+		return nil, nil, "", unsupported("缺少完整的 Codex ChatGPT 登录凭据")
 	}
 	expires := jwtExpiryMillis(token)
 	if expires == 0 {
-		return nil, unsupported("无法确认 Codex 原生登录有效期")
+		return nil, nil, "", unsupported("无法确认 Codex 原生登录有效期")
 	}
-	if expires <= now.UnixMilli() {
-		if hasText(tokens["refresh_token"]) {
-			return nil, renewalPending()
-		}
-		return nil, unauthenticated("原生登录已过期，请在对应工具中重新登录")
+	cred := &nativeCredential{
+		token:        token,
+		refreshToken: nonempty(tokens["refresh_token"], 16384),
+		accountID:    accountID,
+		expiresAt:    expires,
 	}
-	return &nativeCredential{token: token, accountID: accountID}, nil
+	return cred, root, path, nil
 }
 
-func readClaudeCredential(authDir string, now time.Time) (*nativeCredential, error) {
+func readClaudeCredentialRaw(authDir string) (*nativeCredential, map[string]any, string, error) {
 	path, err := credentialPath(authDir, ".credentials.json")
 	if err != nil {
-		return nil, err
+		return nil, nil, "", err
 	}
 	root, err := readCredentialObject(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, "", err
 	}
 	oauth, _ := object(root["claudeAiOauth"])
 	token := nonempty(oauth["accessToken"], 16384)
 	if token == "" {
-		return nil, unauthenticated("缺少 Claude Code 原生登录凭据")
+		return nil, nil, "", unauthenticated("缺少 Claude Code 原生登录凭据")
 	}
-	renewable := hasText(oauth["refreshToken"])
+	var expiresAt int64
 	if raw, present := oauth["expiresAt"]; present {
 		expires, ok := toFloat(raw)
 		if !ok || math.IsNaN(expires) || math.IsInf(expires, 0) || expires <= 0 {
-			return nil, unsupported("无法确认 Claude Code 登录有效期")
+			return nil, nil, "", unsupported("无法确认 Claude Code 登录有效期")
 		}
-		if int64(expires) <= now.UnixMilli() {
-			if renewable {
-				return nil, renewalPending()
+		expiresAt = int64(expires)
+	}
+	var scopes []string
+	if rawScopes, ok := oauth["scopes"].([]any); ok {
+		for _, item := range rawScopes {
+			if s := nonempty(item, 256); s != "" {
+				scopes = append(scopes, s)
 			}
-			return nil, unauthenticated("原生登录已过期，请在对应工具中重新登录")
 		}
 	}
-	return &nativeCredential{token: token}, nil
+	cred := &nativeCredential{
+		token:        token,
+		refreshToken: nonempty(oauth["refreshToken"], 16384),
+		scopes:       scopes,
+		expiresAt:    expiresAt,
+	}
+	return cred, root, path, nil
 }
 
 // readOpenCodeCredential follows the native login priority: an active Console
@@ -225,11 +242,6 @@ func nonemptyID(value any) string {
 		}
 	}
 	return text
-}
-
-func hasText(value any) bool {
-	text, ok := value.(string)
-	return ok && strings.TrimSpace(text) != ""
 }
 
 func notEmptyish(value any) bool {

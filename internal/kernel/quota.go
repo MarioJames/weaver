@@ -54,7 +54,11 @@ func (k *Kernel) refreshQuota(ctx context.Context, id string) (*Account, error) 
 	if !supportsQuota(a.Engine, a.Kind) {
 		return nil, errf("UNSUPPORTED", "只有 Codex、Claude、OpenCode 的订阅账号有额度窗口")
 	}
-	s, fetchErr := k.quotaClient.Fetch(ctx, quota.Source{Engine: a.Engine, AuthDir: a.AuthDir}, k.now())
+	var active int
+	_ = k.read(func() error {
+		return k.db.QueryRow(`SELECT COUNT(*) FROM attempts WHERE account_id=? AND state IN (?,?)`, id, StateLaunch, StateRunning).Scan(&active)
+	})
+	s, fetchErr := k.quotaClient.Fetch(ctx, quota.Source{Engine: a.Engine, AuthDir: a.AuthDir, SkipRefresh: active > 0}, k.now())
 	message := ""
 	if fetchErr != nil {
 		message = "额度读取失败"
@@ -62,7 +66,11 @@ func (k *Kernel) refreshQuota(ctx context.Context, id string) (*Account, error) 
 		if errors.As(fetchErr, &qe) {
 			message = qe.Message
 			if qe.Kind == "renewal_pending" {
-				message = "访问令牌已到期，等待引擎下次运行续期"
+				if active > 0 {
+					message = "访问令牌已到期，等待运行中的引擎续期"
+				} else {
+					message = "访问令牌已到期，等待引擎下次运行续期"
+				}
 			}
 		}
 	}

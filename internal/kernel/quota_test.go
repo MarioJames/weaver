@@ -37,7 +37,7 @@ func quotaFixture(t *testing.T, handler http.HandlerFunc) (*fixture, string) {
 	f.k.now = func() time.Time { return quotaTestNow }
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
-	f.k.quotaClient = &quota.Client{HTTP: server.Client(), ClaudeURL: server.URL}
+	f.k.quotaClient = &quota.Client{HTTP: server.Client(), ClaudeURL: server.URL, ClaudeTokenURL: server.URL}
 	dir := t.TempDir()
 	quotaCredential(t, dir, quotaTestNow.Add(time.Hour))
 	_, err := f.k.AddAccount(AccountInput{ID: "subscription", Label: "订阅", Engine: "claude", Kind: "subscription", AuthDir: dir})
@@ -118,8 +118,69 @@ func TestRefreshQuotaSuccessUnsupportedAndPrivacy(t *testing.T) {
 	}
 	assertQuotaPrivate(t, f)
 }
-func TestRefreshQuotaRenewalPreservesSnapshotAndRouting(t *testing.T) {
-	f, dir := quotaFixture(t, func(w http.ResponseWriter, r *http.Request) { quotaResponse(w, 70) })
+func TestRefreshQuotaAutoRenewsWhenIdleAndSkipsWhenActive(t *testing.T) {
+	var refreshed int
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		refreshed++
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"access_token":"quota-renewed-token","refresh_token":"quota-renewed-refresh","expires_in":28800}`)
+	}))
+	defer tokenServer.Close()
+
+	var lastAuth string
+	f, dir := quotaFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		lastAuth = r.Header.Get("Authorization")
+		quotaResponse(w, 70)
+	})
+	f.k.quotaClient.ClaudeTokenURL = tokenServer.URL
+
+	before, err := f.k.RefreshQuota("subscription")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Expire the token while the account is idle: RefreshQuota automatically renews it.
+	quotaCredential(t, dir, quotaTestNow.Add(-time.Minute))
+	f.k.now = func() time.Time { return quotaTestNow.Add(time.Minute) }
+	after, err := f.k.RefreshQuota("subscription")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refreshed != 1 || lastAuth != "Bearer quota-renewed-token" || after.Quota.Error != "" || len(after.Quota.Windows) != 2 || after.Quota.CheckedAt <= before.Quota.CheckedAt {
+		t.Fatalf("refreshed=%d auth=%q quota=%+v", refreshed, lastAuth, after.Quota)
+	}
+
+	// Now launch an attempt so the account has active > 0, then expire the token again:
+	// RefreshQuota must skip refresh to avoid racing with the running engine.
+	m := f.mission()
+	p := pkg("renewal")
+	p.Worker = "sub-worker"
+	id := f.submit(m, p)["renewal"]
+	if got := f.state(id); got != StateLaunch {
+		t.Fatal(got)
+	}
+	quotaCredential(t, dir, quotaTestNow.Add(-time.Minute))
+	f.k.now = func() time.Time { return quotaTestNow.Add(2 * time.Minute) }
+	whileActive, err := f.k.RefreshQuota("subscription")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refreshed != 1 || whileActive.Quota.CheckedAt != after.Quota.CheckedAt ||
+		whileActive.Quota.Error != "访问令牌已到期，等待运行中的引擎续期" {
+		t.Fatalf("refreshed=%d quota=%+v", refreshed, whileActive.Quota)
+	}
+	assertQuotaPrivate(t, f)
+}
+
+func TestRefreshQuotaInvalidGrantReportsReLogin(t *testing.T) {
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{"error":"invalid_grant","detail":%q}`, quotaTestToken)
+	}))
+	defer tokenServer.Close()
+
+	f, dir := quotaFixture(t, func(w http.ResponseWriter, r *http.Request) { quotaResponse(w, 40) })
+	f.k.quotaClient.ClaudeTokenURL = tokenServer.URL
 	before, err := f.k.RefreshQuota("subscription")
 	if err != nil {
 		t.Fatal(err)
@@ -131,15 +192,8 @@ func TestRefreshQuotaRenewalPreservesSnapshotAndRouting(t *testing.T) {
 		t.Fatal(err)
 	}
 	if after.Quota.CheckedAt != before.Quota.CheckedAt || len(after.Quota.Windows) != 2 ||
-		after.Quota.Error != "访问令牌已到期，等待引擎下次运行续期" {
-		t.Fatalf("%+v", after.Quota)
-	}
-	m := f.mission()
-	p := pkg("renewal")
-	p.Worker = "sub-worker"
-	id := f.submit(m, p)["renewal"]
-	if got := f.state(id); got != StateLaunch {
-		t.Fatal(got)
+		after.Quota.Error != "登录已失效，自动续期失败，请重新登录" {
+		t.Fatalf("quota=%+v", after.Quota)
 	}
 	assertQuotaPrivate(t, f)
 }

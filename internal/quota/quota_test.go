@@ -385,39 +385,40 @@ func TestIncompleteAccountWindowsDoNotBecomeAvailable(t *testing.T) {
 }
 
 func TestExpiredCredentialsRenewalVersusLogout(t *testing.T) {
-	codex := func(t *testing.T, refresh bool) error {
+	codex := func(t *testing.T, refresh, skipRefresh bool) error {
 		dir := t.TempDir()
 		writeCodexCredential(t, dir, testJWT(testNow.Add(-time.Second)), "acct", refresh)
 		client, transport := offlineClient()
-		_, err := client.Fetch(context.Background(), Source{Engine: "codex", AuthDir: dir}, testNow)
+		_, err := client.Fetch(context.Background(), Source{Engine: "codex", AuthDir: dir, SkipRefresh: skipRefresh}, testNow)
 		if transport.calls != 0 {
 			t.Errorf("expired codex credential made %d HTTP request(s)", transport.calls)
 		}
 		return err
 	}
-	claude := func(t *testing.T, refresh bool) error {
+	claude := func(t *testing.T, refresh, skipRefresh bool) error {
 		dir := t.TempDir()
 		writeClaudeCredential(t, dir, "secret-claude", testNow.Add(-time.Millisecond).UnixMilli(), refresh)
 		client, transport := offlineClient()
-		_, err := client.Fetch(context.Background(), Source{Engine: "claude", AuthDir: dir}, testNow)
+		_, err := client.Fetch(context.Background(), Source{Engine: "claude", AuthDir: dir, SkipRefresh: skipRefresh}, testNow)
 		if transport.calls != 0 {
 			t.Errorf("expired claude credential made %d HTTP request(s)", transport.calls)
 		}
 		return err
 	}
 	for _, tc := range []struct {
-		name    string
-		renew   func(*testing.T, bool) error
-		refresh bool
-		want    string
+		name        string
+		renew       func(*testing.T, bool, bool) error
+		refresh     bool
+		skipRefresh bool
+		want        string
 	}{
-		{"codex renewable", codex, true, kindRenewalPending},
-		{"codex expired", codex, false, kindUnauthenticated},
-		{"claude renewable", claude, true, kindRenewalPending},
-		{"claude expired", claude, false, kindUnauthenticated},
+		{"codex renewable skipped", codex, true, true, kindRenewalPending},
+		{"codex expired without refresh token", codex, false, false, kindUnauthenticated},
+		{"claude renewable skipped", claude, true, true, kindRenewalPending},
+		{"claude expired without refresh token", claude, false, false, kindUnauthenticated},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.renew(t, tc.refresh)
+			err := tc.renew(t, tc.refresh, tc.skipRefresh)
 			if err == nil {
 				t.Fatal("expected an error")
 			}
@@ -653,8 +654,14 @@ func TestDefaultEndpoints(t *testing.T) {
 	if got := client.codexURL(); got != "https://chatgpt.com/backend-api/wham/usage" {
 		t.Errorf("codex URL = %q", got)
 	}
+	if got := client.codexTokenURL(); got != "https://auth.openai.com/oauth/token" {
+		t.Errorf("codex token URL = %q", got)
+	}
 	if got := client.claudeURL(); got != "https://api.anthropic.com/api/oauth/usage" {
 		t.Errorf("claude URL = %q", got)
+	}
+	if got := client.claudeTokenURL(); got != "https://platform.claude.com/v1/oauth/token" {
+		t.Errorf("claude token URL = %q", got)
 	}
 	if got := client.openCodeGoURL(); got != "https://opencode.ai/zen/go/v1/usage" {
 		t.Errorf("opencode Go URL = %q", got)
