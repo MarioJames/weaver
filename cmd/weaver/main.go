@@ -84,6 +84,7 @@ const usage = `weaver：需求开发的调度引擎。主任务拆成工作包�
   weaver service install|uninstall      安装或移除 systemd 用户服务 weaver.service；install 会接管 0.x 留下的同名服务
   weaver backup
   weaver skill                          打印父 Agent 使用的技能说明（agents-weaver）
+  weaver skill <主题>                   打印技能的一份参考：plan、dialogue、states-and-waiting
   weaver skill install                  把技能装到 ~/.agents/skills/agents-weaver，并链接到 ~/.claude/skills、~/.codex/skills
   weaver version
 
@@ -271,7 +272,12 @@ func run(argv []string) error {
 			return nil
 		}
 		if a.pos[0] != "install" {
-			return fmt.Errorf("skill 只有 install 这一个子命令，见 weaver help")
+			body, ok := skills.Reference(a.pos[0])
+			if !ok {
+				return fmt.Errorf("skill 没有 %s 这份参考，可用的有：%s；安装用 weaver skill install", a.pos[0], strings.Join(skills.References(), "、"))
+			}
+			fmt.Print(body)
+			return nil
 		}
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -1079,6 +1085,16 @@ func installSkill(home string) (*skillInstall, error) {
 	}
 	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(skills.Weaver), 0o644); err != nil {
 		return nil, err
+	}
+	// SKILL.md links to these by relative path, so they sit next to it.
+	if err := os.MkdirAll(filepath.Join(dir, "references"), 0o755); err != nil {
+		return nil, err
+	}
+	for _, name := range skills.References() {
+		body, _ := skills.Reference(name)
+		if err := os.WriteFile(filepath.Join(dir, "references", name+".md"), []byte(body), 0o644); err != nil {
+			return nil, err
+		}
 	}
 	res := &skillInstall{Installed: dir, Links: []string{}}
 	for _, agent := range []string{".claude", ".codex"} {

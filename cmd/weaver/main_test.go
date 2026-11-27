@@ -30,8 +30,20 @@ func TestSkillInstallReplacesAnOlderCopyAndLinksTheAgents(t *testing.T) {
 	if err != nil || string(body) != skills.Weaver {
 		t.Fatalf("SKILL.md is not the embedded skill: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(old, "references")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(old, "references", "config.md")); !os.IsNotExist(err) {
 		t.Error("files of the older skill were left behind")
+	}
+	// The references SKILL.md links to are installed next to it, and nothing else.
+	installed, err := os.ReadDir(filepath.Join(old, "references"))
+	if err != nil || len(installed) != len(skills.References()) {
+		t.Fatalf("installed references = %d, %v; want %d", len(installed), err, len(skills.References()))
+	}
+	for _, name := range skills.References() {
+		want, _ := skills.Reference(name)
+		got, err := os.ReadFile(filepath.Join(old, "references", name+".md"))
+		if err != nil || string(got) != want {
+			t.Errorf("reference %s is not the embedded text: %v", name, err)
+		}
 	}
 	link := filepath.Join(home, ".claude", "skills", "agents-weaver")
 	if target, err := os.Readlink(link); err != nil || target != old {
@@ -163,5 +175,44 @@ func TestWorkerRejectsInvalidIntelligenceBeforeRPC(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "INVALID") {
 			t.Fatalf("%s: %v", score, err)
 		}
+	}
+}
+
+// SKILL.md stays short by pointing at references. Each link must lead to a
+// file that ships in the binary, and each shipped reference must be linked,
+// or an agent is sent to text it cannot read or never learns it exists.
+func TestSkillReferencesAreAllLinkedAndAllShipped(t *testing.T) {
+	names := skills.References()
+	if len(names) == 0 {
+		t.Fatal("no references are embedded")
+	}
+	shipped := map[string]bool{}
+	for _, name := range names {
+		shipped[name] = true
+		body, ok := skills.Reference(name)
+		if !ok || strings.TrimSpace(body) == "" {
+			t.Errorf("reference %s is empty", name)
+		}
+		if !strings.Contains(skills.Weaver, "](references/"+name+".md)") {
+			t.Errorf("SKILL.md does not link references/%s.md", name)
+		}
+		if !strings.Contains(skills.Weaver, "`weaver skill "+name+"`") {
+			t.Errorf("SKILL.md does not name the command that prints %s", name)
+		}
+	}
+	rest := skills.Weaver
+	for {
+		i := strings.Index(rest, "](references/")
+		if i < 0 {
+			break
+		}
+		rest = rest[i+len("](references/"):]
+		name, _, _ := strings.Cut(rest, ".md")
+		if !shipped[name] {
+			t.Errorf("SKILL.md links references/%s.md, which is not embedded", name)
+		}
+	}
+	if _, ok := skills.Reference("no-such-reference"); ok {
+		t.Error("an unknown reference name resolved")
 	}
 }
